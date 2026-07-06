@@ -1,7 +1,7 @@
 {
   "applicationId": "com.github.vantoan1511.orbit",
   "applicationName": "Orbit",
-  "applicationIcon": "public/favicon.ico",
+  "applicationIcon": "public/icon.png",
   "description": "A fast, lightweight desktop application for exploring, monitoring, and managing Kubernetes clusters from a single intuitive interface.",
   "version": "1.0.0",
   "author": "Toan Nguyen",
@@ -31,7 +31,7 @@
       "minWidth": 1280,
       "minHeight": 720,
       "center": true,
-      "icon": "/public/favicon.ico",
+      "icon": "/public/icon.png",
       "enableInspector": false
     }
   },
