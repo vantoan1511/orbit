@@ -1,0 +1,55 @@
+{
+  "applicationId": "com.github.vantoan1511.orbit",
+  "applicationName": "Orbit",
+  "applicationIcon": "public/favicon.ico",
+  "description": "A fast, lightweight desktop application for exploring, monitoring, and managing Kubernetes clusters from a single intuitive interface.",
+  "version": "1.0.0",
+  "author": "Toan Nguyen",
+  "copyright": "Copyright © Orbit 2026. All rights reserved.",
+  "defaultMode": "window",
+  "storageLocation": "system",
+  "dataLocation": "system",
+  "documentRoot": "/build/",
+  "logging": {
+    "enabled": true,
+    "writeToLogFile": true
+  },
+  "port": 0,
+  "url": "/",
+  "enableServer": true,
+  "enableNativeAPI": true,
+  "singlePageServe": true,
+  "enableExtensions": true,
+  "tokenSecurity": "one-time",
+  "nativeAllowList": [
+    "filesystem.readDirectory"
+  ],
+  "extensions": [],
+  "modes": {
+    "window": {
+      "title": "Orbit",
+      "minWidth": 1280,
+      "minHeight": 720,
+      "center": true,
+      "icon": "/public/favicon.ico",
+      "enableInspector": false
+    }
+  },
+  "cli": {
+    "binaryName": "orbit",
+    "resourcesPath": "/build/",
+    "resourcesExclude": ".*\\.ts$|.*\\.tsx$|.*\\.map$",
+    "extensionsPath": "/extensions/",
+    "extensionsExclude": "node_modules|src|internal|drivers|vendor|.*\\.go$|.*\\.js$|.*\\.mod$|.*\\.sum$|.*\\.log$|package.*\\.json|target|.*\\.rs$|Cargo.*",
+    "binaryVersion": "6.8.0",
+    "clientVersion": "6.8.0",
+    "frontendLibrary": {
+      "patchFile": "/index.html",
+      "devUrl": "http://localhost:5173",
+      "projectPath": "/",
+      "initCommand": "npm install",
+      "devCommand": "npm run dev",
+      "buildCommand": "npm run build"
+    }
+  }
+}
