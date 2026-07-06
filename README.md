@@ -6,20 +6,20 @@ Orbit is a lightweight, cross-platform desktop application for exploring, monito
 
 ## Features
 
-* 🚀 Lightweight and fast
-* ☸️ Connect to multiple Kubernetes clusters
-* 📦 Browse and manage Kubernetes resources
-* 📋 View logs, events, and resource details
-* 🔍 Search and filter resources
-* 🖥️ Cross-platform desktop application
-* ❤️ Open source
+- 🚀 Lightweight and fast
+- ☸️ Connect to multiple Kubernetes clusters
+- 📦 Browse and manage Kubernetes resources
+- 📋 View logs, events, and resource details
+- 🔍 Search and filter resources
+- 🖥️ Cross-platform desktop application
+- ❤️ Open source
 
 ## Tech Stack
 
-* Neutralino.js
-* Vue
-* TypeScript
-* Kubernetes API
+- Neutralino.js
+- Vue
+- TypeScript
+- Kubernetes API
 
 ## Status
 

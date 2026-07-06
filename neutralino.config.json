@@ -21,9 +21,7 @@
   "singlePageServe": true,
   "enableExtensions": true,
   "tokenSecurity": "one-time",
-  "nativeAllowList": [
-    "filesystem.readDirectory"
-  ],
+  "nativeAllowList": ["filesystem.readDirectory"],
   "extensions": [],
   "modes": {
     "window": {

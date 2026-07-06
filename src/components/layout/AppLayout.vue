@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import AppSidebar from "./AppSidebar.vue";
-import AppHeader from "./AppHeader.vue";
+import AppSidebar from './AppSidebar.vue'
+import AppHeader from './AppHeader.vue'
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans">
+  <div
+    class="flex h-screen w-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans"
+  >
     <!-- Sidebar -->
     <AppSidebar />
 

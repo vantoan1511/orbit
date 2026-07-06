@@ -1,34 +1,34 @@
-import "./assets/main.css";
+import './assets/main.css'
 
-import "primeicons/primeicons.css";
+import 'primeicons/primeicons.css'
 
-import { init } from "@neutralinojs/lib";
-import { createPinia } from "pinia";
-import PrimeVue from "primevue/config";
-import { createApp } from "vue";
+import { init } from '@neutralinojs/lib'
+import { createPinia } from 'pinia'
+import PrimeVue from 'primevue/config'
+import { createApp } from 'vue'
 
-import App from "./App.vue";
-import router from "./router";
-import { Noir } from "./theme/orbitTheme";
+import App from './App.vue'
+import router from './router'
+import { Noir } from './theme/orbitTheme'
 
-const app = createApp(App);
+const app = createApp(App)
 
-app.use(createPinia());
-app.use(router);
+app.use(createPinia())
+app.use(router)
 app.use(PrimeVue, {
   ripple: true,
   theme: {
     preset: Noir,
     options: {
-      darkModeSelector: ".my-app-dark",
+      darkModeSelector: '.my-app-dark',
       cssLayer: {
-        name: "primevue",
-        order: "theme, base, primevue",
-      },
-    },
-  },
-});
+        name: 'primevue',
+        order: 'theme, base, primevue'
+      }
+    }
+  }
+})
 
-app.mount("#app");
+app.mount('#app')
 
-init();
+init()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute } from "vue-router";
+import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   LayoutDashboard,
   Server,
@@ -19,65 +19,73 @@ import {
   BookOpen,
   Bell,
   User
-} from "@lucide/vue";
+} from '@lucide/vue'
 
 // Define clusters list
 const clusters = ref([
-  { id: "prod-us-east", name: "production-us-east-1", status: "healthy" },
-  { id: "staging-eu-west", name: "staging-eu-west-1", status: "offline" },
-  { id: "local-dev", name: "local-dev", status: "offline" }
-]);
+  { id: 'prod-us-east', name: 'production-us-east-1', status: 'healthy' },
+  { id: 'staging-eu-west', name: 'staging-eu-west-1', status: 'offline' },
+  { id: 'local-dev', name: 'local-dev', status: 'offline' }
+])
 
-const activeCluster = ref("prod-us-east");
+const activeCluster = ref('prod-us-east')
 
 // Navigation links
 const navLinks = [
-  { name: "Overview", icon: LayoutDashboard, path: "/" },
-  { name: "Nodes", icon: Server, path: "/nodes" },
-  { name: "Workloads", icon: Boxes, path: "/workloads" },
-  { name: "Pods", icon: Box, path: "/pods" },
-  { name: "Services", icon: Network, path: "/services" },
-  { name: "ConfigMaps & Secrets", icon: Settings2, path: "/config" },
-  { name: "Storage", icon: HardDrive, path: "/storage" },
-  { name: "Namespaces", icon: FolderOpen, path: "/namespaces" },
-  { name: "Events", icon: Activity, path: "/events" },
-  { name: "Policies", icon: ShieldCheck, path: "/policies" },
-  { name: "Settings", icon: Settings, path: "/settings" }
-];
+  { name: 'Overview', icon: LayoutDashboard, path: '/' },
+  { name: 'Nodes', icon: Server, path: '/nodes' },
+  { name: 'Workloads', icon: Boxes, path: '/workloads' },
+  { name: 'Pods', icon: Box, path: '/pods' },
+  { name: 'Services', icon: Network, path: '/services' },
+  { name: 'ConfigMaps & Secrets', icon: Settings2, path: '/config' },
+  { name: 'Storage', icon: HardDrive, path: '/storage' },
+  { name: 'Namespaces', icon: FolderOpen, path: '/namespaces' },
+  { name: 'Events', icon: Activity, path: '/events' },
+  { name: 'Policies', icon: ShieldCheck, path: '/policies' },
+  { name: 'Settings', icon: Settings, path: '/settings' }
+]
 
-const route = useRoute();
+const route = useRoute()
 
 // Theme state
-const isDark = ref(true);
+const isDark = ref(true)
 
 const toggleTheme = () => {
-  isDark.value = !isDark.value;
-  const html = document.documentElement;
+  isDark.value = !isDark.value
+  const html = document.documentElement
   if (isDark.value) {
-    html.classList.add("my-app-dark");
-    html.setAttribute("data-theme", "dark");
+    html.classList.add('my-app-dark')
+    html.setAttribute('data-theme', 'dark')
   } else {
-    html.classList.remove("my-app-dark");
-    html.setAttribute("data-theme", "light");
+    html.classList.remove('my-app-dark')
+    html.setAttribute('data-theme', 'light')
   }
-};
+}
 </script>
 
 <template>
-  <aside class="w-64 bg-[var(--bg-sidebar)] border-r border-[var(--border)] flex flex-col h-screen text-[var(--text-primary)] select-none">
+  <aside
+    class="w-64 bg-[var(--bg-sidebar)] border-r border-[var(--border)] flex flex-col h-screen text-[var(--text-primary)] select-none"
+  >
     <!-- Brand Header -->
     <div class="h-16 px-6 flex items-center gap-3 border-b border-[var(--border)]">
       <!-- Orbit Icon Logo -->
-      <div class="w-6 h-6 rounded-full border-2 border-[var(--accent)] flex items-center justify-center relative">
+      <div
+        class="w-6 h-6 rounded-full border-2 border-[var(--accent)] flex items-center justify-center relative"
+      >
         <div class="w-2.5 h-2.5 rounded-full bg-[var(--accent)]"></div>
-        <div class="absolute -right-0.5 -bottom-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-[var(--bg-sidebar)]"></div>
+        <div
+          class="absolute -right-0.5 -bottom-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-[var(--bg-sidebar)]"
+        ></div>
       </div>
       <span class="text-xl font-bold tracking-tight font-ui">Orbit</span>
     </div>
 
     <!-- Clusters Section -->
     <div class="p-4 border-b border-[var(--border)]">
-      <div class="text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase mb-2 px-2">
+      <div
+        class="text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase mb-2 px-2"
+      >
         Clusters
       </div>
       <div class="flex flex-col gap-1">
@@ -93,7 +101,7 @@ const toggleTheme = () => {
           ]"
         >
           <div class="flex items-center gap-2 truncate">
-            <span 
+            <span
               class="w-2 h-2 rounded-full flex-shrink-0"
               :class="cluster.status === 'healthy' ? 'bg-emerald-500' : 'bg-zinc-500'"
             ></span>
@@ -101,7 +109,9 @@ const toggleTheme = () => {
           </div>
         </button>
 
-        <button class="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-muted)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all duration-200">
+        <button
+          class="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-muted)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all duration-200"
+        >
           <Plus class="w-4 h-4" />
           <span>Add Cluster</span>
         </button>
@@ -127,11 +137,13 @@ const toggleTheme = () => {
     </nav>
 
     <!-- Bottom Footer -->
-    <div class="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-sidebar)]">
+    <div
+      class="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-sidebar)]"
+    >
       <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
-        <button 
-          @click="toggleTheme" 
+        <button
+          @click="toggleTheme"
           class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all duration-200"
           title="Toggle Theme"
         >
@@ -140,8 +152,8 @@ const toggleTheme = () => {
         </button>
 
         <!-- Docs -->
-        <a 
-          href="#" 
+        <a
+          href="#"
           class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all duration-200"
           title="Documentation"
         >
@@ -149,7 +161,7 @@ const toggleTheme = () => {
         </a>
 
         <!-- Notifications -->
-        <button 
+        <button
           class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all duration-200 relative"
           title="Notifications"
         >
@@ -161,7 +173,9 @@ const toggleTheme = () => {
       <!-- Profile & Version -->
       <div class="flex items-center gap-2">
         <span class="text-[10px] text-[var(--text-muted)] font-mono">v0.1.0</span>
-        <button class="w-8 h-8 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-active)] transition-all duration-200">
+        <button
+          class="w-8 h-8 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-active)] transition-all duration-200"
+        >
           <User class="w-4 h-4" />
         </button>
       </div>

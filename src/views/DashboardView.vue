@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import StatusSummary from "../components/dashboard/StatusSummary.vue";
-import ResourceUsage from "../components/dashboard/ResourceUsage.vue";
-import HealthOverview from "../components/dashboard/HealthOverview.vue";
-import AlertsEvents from "../components/dashboard/AlertsEvents.vue";
-import TopConsumers from "../components/dashboard/TopConsumers.vue";
-import WorkloadSummaries from "../components/dashboard/WorkloadSummaries.vue";
+import StatusSummary from '../components/dashboard/StatusSummary.vue'
+import ResourceUsage from '../components/dashboard/ResourceUsage.vue'
+import HealthOverview from '../components/dashboard/HealthOverview.vue'
+import AlertsEvents from '../components/dashboard/AlertsEvents.vue'
+import TopConsumers from '../components/dashboard/TopConsumers.vue'
+import WorkloadSummaries from '../components/dashboard/WorkloadSummaries.vue'
 </script>
 
 <template>
