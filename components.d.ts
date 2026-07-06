@@ -11,7 +11,16 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
+    AppHeader: typeof import('./src/components/layout/AppHeader.vue')['default']
+    AppLayout: typeof import('./src/components/layout/AppLayout.vue')['default']
+    AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
+    HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
+    ResourceUsage: typeof import('./src/components/dashboard/ResourceUsage.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    StatusSummary: typeof import('./src/components/dashboard/StatusSummary.vue')['default']
+    TopConsumers: typeof import('./src/components/dashboard/TopConsumers.vue')['default']
+    WorkloadSummaries: typeof import('./src/components/dashboard/WorkloadSummaries.vue')['default']
   }
 }
