@@ -103,19 +103,19 @@
      Backgrounds
      =========================== */
 
-  --bg-app: #111214;
-  --bg-sidebar: #16181b;
-  --bg-panel: #1a1d21;
-  --bg-card: #20242a;
+  --bg-app: #0b0d0f;
+  --bg-sidebar: #0d1012;
+  --bg-panel: #0b0d0f;
+  --bg-card: #0e1012;
   --bg-hover: #262a31;
-  --bg-active: #313640;
+  --bg-active: #1b1e21;
 
   /* ===========================
      Borders
      =========================== */
 
-  --border: #2e343d;
-  --border-strong: #414955;
+  --border: #212427;
+  --border-strong: #2e3134;
 
   /* ===========================
      Text
