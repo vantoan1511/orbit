@@ -70,14 +70,8 @@ const toggleTheme = () => {
     <!-- Brand Header -->
     <div class="h-16 px-6 flex items-center gap-3 border-b border-[var(--border)]">
       <!-- Orbit Icon Logo -->
-      <div
-        class="w-6 h-6 rounded-full border-2 border-[var(--accent)] flex items-center justify-center relative"
-      >
-        <div class="w-2.5 h-2.5 rounded-full bg-[var(--accent)]"></div>
-        <div
-          class="absolute -right-0.5 -bottom-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500 border border-[var(--bg-sidebar)]"
-        ></div>
-      </div>
+      <img src="/logo.png" alt="Orbit Logo" class="w-8 h-8 object-contain" />
+
       <span class="text-xl font-bold tracking-tight font-ui">Orbit</span>
     </div>
 
