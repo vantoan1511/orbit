@@ -55,3 +55,4 @@ __screenshots__/
 *.timestamp-*-*.mjs
 
 /mockups
+/.claude
