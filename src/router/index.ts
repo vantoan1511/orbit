@@ -14,6 +14,11 @@ const router = createRouter({
       path: '/nodes',
       name: 'nodes',
       component: NodesView
+    },
+    {
+      path: '/workloads',
+      name: 'workloads',
+      component: () => import('../views/WorkloadsView.vue')
     }
   ]
 })

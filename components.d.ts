@@ -30,6 +30,9 @@ declare module 'vue' {
     TabPanels: typeof import('primevue/tabpanels')['default']
     Tabs: typeof import('primevue/tabs')['default']
     TopConsumers: typeof import('./src/components/dashboard/TopConsumers.vue')['default']
+    WorkloadDetailsDrawer: typeof import('./src/components/workloads/WorkloadDetailsDrawer.vue')['default']
+    WorkloadMetricsCards: typeof import('./src/components/workloads/WorkloadMetricsCards.vue')['default']
+    WorkloadsDataTable: typeof import('./src/components/workloads/WorkloadsDataTable.vue')['default']
     WorkloadsTable: typeof import('./src/components/nodes/WorkloadsTable.vue')['default']
     WorkloadSummaries: typeof import('./src/components/dashboard/WorkloadSummaries.vue')['default']
   }
