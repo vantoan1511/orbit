@@ -10,7 +10,7 @@ const activeTab = ref('0')
 <template>
   <div class="flex flex-col gap-6">
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-[var(--border)]">
+      <TabList class="border-b border-(--border)">
         <Tab value="0" class="px-5 py-3 text-sm font-semibold">Nodes</Tab>
         <Tab value="1" class="px-5 py-3 text-sm font-semibold">Workloads</Tab>
       </TabList>
@@ -24,7 +24,7 @@ const activeTab = ref('0')
         </TabPanel>
         <TabPanel value="1">
           <div
-            class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-8 text-center text-[var(--text-muted)]"
+            class="bg-(--bg-card) border border-(--border) rounded-xl p-8 text-center text-(--text-muted)"
           >
             Detailed workload management is available under the main Workloads menu.
           </div>

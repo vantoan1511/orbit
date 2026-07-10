@@ -313,6 +313,16 @@ Avoid:
 - tmp
 - data1
 
+Variable Naming in CSS
+
+Good:
+
+- border-(--border)
+
+Avoid
+
+- border-[var(--border)]
+
 ---
 
 # Comments
