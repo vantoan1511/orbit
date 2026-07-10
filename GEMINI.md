@@ -9,6 +9,8 @@ Technology stack:
 - Rust (backend)
 - Neutralinojs (desktop runtime)
 - Vue 3
+- Tailwindcss v4
+- PrimeVue v4
 - TypeScript
 - Vite
 
@@ -350,7 +352,6 @@ Update:
 Documentation should reflect implementation.
 
 ---
-
 
 # Goal
 
