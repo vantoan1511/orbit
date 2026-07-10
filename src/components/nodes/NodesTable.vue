@@ -199,15 +199,13 @@ const nodes = ref([
 
 <template>
   <div
-    class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm transition-all duration-200"
+    class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm transition-all duration-200"
   >
     <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
-      <div class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+      <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider">
         Nodes List
       </div>
-      <div class="text-xs text-[var(--text-muted)] font-medium">
-        Showing all 12 nodes in cluster
-      </div>
+      <div class="text-xs text-(--text-muted) font-medium">Showing all 12 nodes in cluster</div>
     </div>
 
     <!-- PrimeVue DataTable -->
@@ -215,18 +213,13 @@ const nodes = ref([
       :value="nodes"
       paginator
       :rows="5"
-      class="p-datatable-sm border border-[var(--border)] rounded-lg overflow-hidden"
+      class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
       tableClass="w-full text-left text-xs border-collapse"
       paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
       currentPageReportTemplate="Showing {first} to {last} of {totalRecords} nodes"
     >
       <!-- Name Column -->
-      <Column
-        field="name"
-        header="Name"
-        sortable
-        class="font-medium p-3 text-[var(--text-primary)]"
-      >
+      <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
         <template #body="{ data }">
           <span class="font-semibold">{{ data.name }}</span>
         </template>
@@ -237,7 +230,7 @@ const nodes = ref([
         <template #body="{ data }">
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <span class="text-[var(--text-secondary)] font-medium">{{ data.status }}</span>
+            <span class="text-(--text-secondary) font-medium">{{ data.status }}</span>
           </div>
         </template>
       </Column>
@@ -250,7 +243,7 @@ const nodes = ref([
             :class="
               data.role === 'control-plane'
                 ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-                : 'bg-zinc-500/10 text-[var(--text-secondary)] border-[var(--border)]'
+                : 'bg-zinc-500/10 text-(--text-secondary) border-(--border)'
             "
           >
             {{ data.role }}
@@ -259,23 +252,19 @@ const nodes = ref([
       </Column>
 
       <!-- Version Column -->
-      <Column
-        field="version"
-        header="Version"
-        class="p-3 font-mono text-[var(--text-muted)]"
-      ></Column>
+      <Column field="version" header="Version" class="p-3 font-mono text-(--text-muted)"></Column>
 
       <!-- CPU Column -->
-      <Column field="cpuPct" header="CPU" sortable class="p-3 min-w-[140px]">
+      <Column field="cpuPct" header="CPU" sortable class="p-3 min-w-35">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
-            <div class="flex justify-between font-mono text-[var(--text-secondary)]">
+            <div class="flex justify-between font-mono text-(--text-secondary)">
               <span>{{ data.cpuPct }}%</span>
-              <span class="text-[var(--text-muted)] text-[10px]"
+              <span class="text-(--text-muted) text-[10px]"
                 >{{ data.cpuUsed }} / {{ data.cpuTotal }}C</span
               >
             </div>
-            <div class="w-full h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+            <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
                 class="h-full bg-blue-500 rounded-full"
                 :style="{ width: data.cpuPct + '%' }"
@@ -289,13 +278,13 @@ const nodes = ref([
       <Column field="memPct" header="Memory" sortable class="p-3 min-w-[140px]">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
-            <div class="flex justify-between font-mono text-[var(--text-secondary)]">
+            <div class="flex justify-between font-mono text-(--text-secondary)">
               <span>{{ data.memPct }}%</span>
-              <span class="text-[var(--text-muted)] text-[10px]"
+              <span class="text-(--text-muted) text-[10px]"
                 >{{ data.memUsed }} / {{ data.memTotal }}G</span
               >
             </div>
-            <div class="w-full h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+            <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
                 class="h-full bg-indigo-500 rounded-full"
                 :style="{ width: data.memPct + '%' }"
@@ -309,13 +298,13 @@ const nodes = ref([
       <Column field="podsCount" header="Pods" sortable class="p-3 min-w-[120px]">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
-            <div class="flex justify-between font-mono text-[var(--text-secondary)]">
+            <div class="flex justify-between font-mono text-(--text-secondary)">
               <span>{{ Math.round((data.podsCount / data.podsLimit) * 100) }}%</span>
-              <span class="text-[var(--text-muted)] text-[10px]"
+              <span class="text-(--text-muted) text-[10px]"
                 >{{ data.podsCount }} / {{ data.podsLimit }}</span
               >
             </div>
-            <div class="w-full h-1.5 rounded-full bg-[var(--bg-hover)] overflow-hidden">
+            <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
                 class="h-full bg-sky-500 rounded-full"
                 :style="{ width: (data.podsCount / data.podsLimit) * 100 + '%' }"
@@ -326,12 +315,7 @@ const nodes = ref([
       </Column>
 
       <!-- Uptime Column -->
-      <Column
-        field="uptime"
-        header="Uptime"
-        sortable
-        class="p-3 text-[var(--text-secondary)]"
-      ></Column>
+      <Column field="uptime" header="Uptime" sortable class="p-3 text-(--text-secondary)"></Column>
 
       <!-- Labels Column -->
       <Column field="labels" header="Labels" class="p-3 max-w-[200px]">
@@ -340,7 +324,7 @@ const nodes = ref([
             <span
               v-for="label in data.labels"
               :key="label"
-              class="px-1.5 py-0.5 rounded bg-[var(--bg-hover)] text-[var(--text-secondary)] text-[10px] border border-[var(--border)] font-mono truncate"
+              class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-(--text-secondary) text-[10px] border border-(--border) font-mono truncate"
               :title="label"
             >
               {{ label }}
