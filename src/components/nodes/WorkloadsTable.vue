@@ -151,23 +151,23 @@ onMounted(() => {
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
     <!-- Workloads List (Left 2/3) -->
     <div
-      class="lg:col-span-2 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm flex flex-col justify-between"
+      class="lg:col-span-2 bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col justify-between"
     >
       <div>
         <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <div class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider">
+          <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider">
             Workloads Distribution
           </div>
 
           <!-- Sub-Tab Selectors -->
-          <div class="flex rounded-lg bg-[var(--bg-hover)] p-0.5 border border-[var(--border)]">
+          <div class="flex rounded-lg bg-(--bg-hover) p-0.5 border border-(--border)">
             <button
               @click="activeSubTab = 'all'"
               class="px-3 py-1.5 text-xs font-bold rounded-md transition-all duration-200"
               :class="
                 activeSubTab === 'all'
-                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  ? 'bg-(--bg-card) text-(--text-primary) shadow-sm'
+                  : 'text-(--text-secondary) hover:text-(--text-primary)'
               "
             >
               All
@@ -177,8 +177,8 @@ onMounted(() => {
               class="px-3 py-1.5 text-xs font-bold rounded-md transition-all duration-200"
               :class="
                 activeSubTab === 'deployment'
-                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  ? 'bg-(--bg-card) text-(--text-primary) shadow-sm'
+                  : 'text-(--text-secondary) hover:text-(--text-primary)'
               "
             >
               Deployments
@@ -188,8 +188,8 @@ onMounted(() => {
               class="px-3 py-1.5 text-xs font-bold rounded-md transition-all duration-200"
               :class="
                 activeSubTab === 'statefulset'
-                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  ? 'bg-(--bg-card) text-(--text-primary) shadow-sm'
+                  : 'text-(--text-secondary) hover:text-(--text-primary)'
               "
             >
               StatefulSets
@@ -199,8 +199,8 @@ onMounted(() => {
               class="px-3 py-1.5 text-xs font-bold rounded-md transition-all duration-200"
               :class="
                 activeSubTab === 'daemonset'
-                  ? 'bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  ? 'bg-(--bg-card) text-(--text-primary) shadow-sm'
+                  : 'text-(--text-secondary) hover:text-(--text-primary)'
               "
             >
               DaemonSets
@@ -211,11 +211,11 @@ onMounted(() => {
         <!-- DataTable -->
         <DataTable
           :value="filteredWorkloads"
-          class="p-datatable-sm border border-[var(--border)] rounded-lg overflow-hidden"
+          class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
           tableClass="w-full text-left text-xs border-collapse"
         >
           <!-- Name Column -->
-          <Column field="name" header="Name" class="font-medium p-3 text-[var(--text-primary)]">
+          <Column field="name" header="Name" class="font-medium p-3 text-(--text-primary)">
             <template #body="{ data }">
               <span class="font-semibold">{{ data.name }}</span>
             </template>
@@ -243,15 +243,11 @@ onMounted(() => {
           <Column
             field="namespace"
             header="Namespace"
-            class="p-3 font-medium text-[var(--text-secondary)]"
+            class="p-3 font-medium text-(--text-secondary)"
           ></Column>
 
           <!-- Node Column -->
-          <Column
-            field="node"
-            header="Node"
-            class="p-3 font-mono text-[var(--text-muted)]"
-          ></Column>
+          <Column field="node" header="Node" class="p-3 font-mono text-(--text-muted)"></Column>
 
           <!-- Status Column -->
           <Column field="status" header="Status" class="p-3">
@@ -287,12 +283,12 @@ onMounted(() => {
           <Column
             field="cpu"
             header="CPU Allocation"
-            class="p-3 font-mono text-[var(--text-secondary)]"
+            class="p-3 font-mono text-(--text-secondary)"
           ></Column>
           <Column
             field="memory"
             header="Memory Allocation"
-            class="p-3 font-mono text-[var(--text-secondary)]"
+            class="p-3 font-mono text-(--text-secondary)"
           ></Column>
         </DataTable>
       </div>
@@ -300,10 +296,10 @@ onMounted(() => {
 
     <!-- Workloads Status Donut (Right 1/3) -->
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm flex flex-col justify-between"
+      class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col justify-between"
     >
       <div>
-        <div class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-5">
+        <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider mb-5">
           Workloads Status
         </div>
 
@@ -313,25 +309,25 @@ onMounted(() => {
 
           <!-- Middle Total Label -->
           <div class="absolute flex flex-col items-center justify-center">
-            <span class="text-3xl font-bold text-[var(--text-primary)]">8</span>
-            <span class="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider"
+            <span class="text-3xl font-bold text-(--text-primary)">8</span>
+            <span class="text-[10px] uppercase font-bold text-(--text-muted) tracking-wider"
               >Total Pods</span
             >
           </div>
         </div>
       </div>
 
-      <div class="border-t border-[var(--border)] pt-4 mt-4 grid grid-cols-3 text-center">
+      <div class="border-t border-(--border) pt-4 mt-4 grid grid-cols-3 text-center">
         <div>
-          <div class="text-xs text-[var(--text-muted)] font-medium">Running</div>
+          <div class="text-xs text-(--text-muted) font-medium">Running</div>
           <div class="text-lg font-bold text-emerald-500 mt-0.5">6</div>
         </div>
-        <div class="border-l border-[var(--border)]">
-          <div class="text-xs text-[var(--text-muted)] font-medium">Pending</div>
+        <div class="border-l border-(--border)">
+          <div class="text-xs text-(--text-muted) font-medium">Pending</div>
           <div class="text-lg font-bold text-amber-500 mt-0.5">1</div>
         </div>
-        <div class="border-l border-[var(--border)]">
-          <div class="text-xs text-[var(--text-muted)] font-medium">Failed</div>
+        <div class="border-l border-(--border)">
+          <div class="text-xs text-(--text-muted) font-medium">Failed</div>
           <div class="text-lg font-bold text-rose-500 mt-0.5">1</div>
         </div>
       </div>

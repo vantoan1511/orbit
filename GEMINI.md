@@ -318,10 +318,12 @@ Variable Naming in CSS
 Good:
 
 - border-(--border)
+- min-w-35
 
 Avoid
 
 - border-[var(--border)]
+- min-w-[140px]
 
 ---
 
