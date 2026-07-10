@@ -34,6 +34,11 @@ const router = createRouter({
       path: '/config',
       name: 'configmaps-secrets',
       component: () => import('../views/ConfigView.vue')
+    },
+    {
+      path: '/storage',
+      name: 'storage',
+      component: () => import('../views/StorageView.vue')
     }
   ]
 })
