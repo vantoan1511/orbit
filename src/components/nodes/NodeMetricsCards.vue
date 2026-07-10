@@ -1,137 +1,115 @@
 <script setup lang="ts">
-import { Server, Cpu, Database, Box, Activity } from '@lucide/vue'
+import { Activity, Box, Cpu, Database, Server } from '@lucide/vue'
+
+const cards = [
+  {
+    title: 'Total Nodes',
+    value: '12',
+    subvalue: '/ 12',
+    detail: '12 Online (100%)',
+    icon: Server,
+    iconColor: 'text-violet-400 bg-violet-500/10'
+  },
+  {
+    title: 'CPU Allocation',
+    value: '58%',
+    detail: '27.8 / 48 cores',
+    progress: 58,
+    progressColor: 'bg-blue-500',
+    icon: Cpu,
+    iconColor: 'text-blue-400 bg-blue-500/10'
+  },
+  {
+    title: 'Memory Allocation',
+    value: '72%',
+    detail: '138.2 / 192 GiB',
+    progress: 72,
+    progressColor: 'bg-indigo-500',
+    icon: Database,
+    iconColor: 'text-indigo-400 bg-indigo-500/10'
+  },
+  {
+    title: 'Pods Allocation',
+    value: '84',
+    subvalue: '/ 120',
+    detail: '70% Capacity',
+    progress: 70,
+    progressColor: 'bg-sky-500',
+    icon: Box,
+    iconColor: 'text-sky-400 bg-sky-500/10'
+  },
+  {
+    title: 'Node Pressures',
+    value: 'Normal',
+    isPressure: true,
+    pressures: [
+      { name: 'Disk', ok: true },
+      { name: 'Mem', ok: true },
+      { name: 'PID', ok: true }
+    ],
+    icon: Activity,
+    iconColor: 'text-emerald-400 bg-emerald-500/10'
+  }
+]
 </script>
 
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-    <!-- Card 1: Nodes Count -->
     <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div
-        class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400 flex-shrink-0"
-      >
-        <Server class="w-6 h-6" />
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-          Total Nodes
-        </div>
-        <div class="text-2xl font-bold text-(--text-primary) mt-1">
-          12 <span class="text-sm text-(--text-muted) font-normal">/ 12</span>
-        </div>
-        <div class="text-xs text-emerald-500 mt-0.5 font-medium">12 Online (100%)</div>
-      </div>
-    </div>
-
-    <!-- Card 2: CPU Allocation -->
-    <div
+      v-for="card in cards"
+      :key="card.title"
       class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
+      <!-- Top Section: Icon & Value -->
       <div class="flex items-center gap-5">
         <div
-          class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 flex-shrink-0"
+          class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          :class="card.iconColor"
         >
-          <Cpu class="w-6 h-6" />
+          <component :is="card.icon" class="w-6 h-6" />
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            CPU Allocation
+            {{ card.title }}
           </div>
-          <div class="text-2xl font-bold text-(--text-primary) mt-1">58%</div>
+          <div
+            class="text-2xl font-bold mt-1"
+            :class="
+              card.title === 'Node Pressures' ? 'text-emerald-500 text-lg' : 'text-(--text-primary)'
+            "
+          >
+            {{ card.value }}
+            <span v-if="card.subvalue" class="text-sm text-(--text-muted) font-normal">
+              {{ card.subvalue }}
+            </span>
+          </div>
         </div>
       </div>
-      <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
-          <span>27.8 / 48 cores</span>
-        </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full bg-blue-500 rounded-full" style="width: 58%"></div>
-        </div>
-      </div>
-    </div>
 
-    <!-- Card 3: Memory Allocation -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-5">
-        <div
-          class="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 flex-shrink-0"
-        >
-          <Database class="w-6 h-6" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Memory Allocation
-          </div>
-          <div class="text-2xl font-bold text-(--text-primary) mt-1">72%</div>
-        </div>
-      </div>
+      <!-- Bottom Section: Progress or Detail -->
       <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
-          <span>138.2 / 192 GiB</span>
-        </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full bg-indigo-500 rounded-full" style="width: 72%"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 4: Pods Allocation -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-5">
-        <div
-          class="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-400 flex-shrink-0"
-        >
-          <Box class="w-6 h-6" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Pods Allocation
+        <template v-if="card.progress !== undefined">
+          <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
+            <span>{{ card.detail }}</span>
           </div>
-          <div class="text-2xl font-bold text-(--text-primary) mt-1">
-            84 <span class="text-sm text-(--text-muted) font-normal">/ 120</span>
+          <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
+            <div
+              class="h-full rounded-full"
+              :class="card.progressColor"
+              :style="{ width: card.progress + '%' }"
+            ></div>
           </div>
-        </div>
-      </div>
-      <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
-          <span>70% Capacity</span>
-        </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full bg-sky-500 rounded-full" style="width: 70%"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 5: Pressure Status -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div
-        class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 flex-shrink-0"
-      >
-        <Activity class="w-6 h-6" />
-      </div>
-      <div class="flex-1 min-w-0">
-        <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-          Node Pressures
-        </div>
-        <div class="text-lg font-bold text-emerald-500 mt-1">Normal</div>
-        <div class="text-[10px] text-(--text-muted) mt-1 flex gap-2">
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Disk
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Mem
-          </span>
-          <span class="flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>PID
-          </span>
-        </div>
+        </template>
+        <template v-else-if="card.isPressure">
+          <div class="text-[10px] text-(--text-muted) flex gap-2">
+            <span v-for="p in card.pressures" :key="p.name" class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{{ p.name }}
+            </span>
+          </div>
+        </template>
+        <template v-else>
+          <div class="text-xs text-emerald-500 font-medium">{{ card.detail }}</div>
+        </template>
       </div>
     </div>
   </div>

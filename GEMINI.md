@@ -319,11 +319,13 @@ Good:
 
 - border-(--border)
 - min-w-35
+- shrink-0
 
 Avoid
 
 - border-[var(--border)]
 - min-w-[140px]
+- flex-shrink-0
 
 ---
 
