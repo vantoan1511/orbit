@@ -39,6 +39,11 @@ const router = createRouter({
       path: '/storage',
       name: 'storage',
       component: () => import('../views/StorageView.vue')
+    },
+    {
+      path: '/namespaces',
+      name: 'namespaces',
+      component: () => import('../views/NamespacesView.vue')
     }
   ]
 })
