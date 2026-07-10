@@ -29,6 +29,11 @@ const router = createRouter({
       path: '/services',
       name: 'services',
       component: () => import('../views/ServicesView.vue')
+    },
+    {
+      path: '/config',
+      name: 'configmaps-secrets',
+      component: () => import('../views/ConfigView.vue')
     }
   ]
 })

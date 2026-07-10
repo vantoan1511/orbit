@@ -1,0 +1,301 @@
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
+import Select from 'primevue/select'
+import ToggleSwitch from 'primevue/toggleswitch'
+import InputText from 'primevue/inputtext'
+import Button from 'primevue/button'
+import { Search, Info, RefreshCw, Settings2, MoreVertical, FileText, Lock } from '@lucide/vue'
+import { mockConfigMaps, mockSecrets } from './mockConfig'
+import type { ConfigMapInfo, SecretInfo } from './mockConfig'
+import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
+
+const props = defineProps<{
+  activeTab: 'configmaps' | 'secrets'
+}>()
+
+const configMaps = ref<ConfigMapInfo[]>(mockConfigMaps)
+const secrets = ref<SecretInfo[]>(mockSecrets)
+
+const searchQuery = ref('')
+const selectedNamespace = ref('All Namespaces')
+const selectedLabel = ref('All Labels')
+const showSystemNamespaces = ref(false)
+
+// Drawer state
+const drawerVisible = ref(false)
+const selectedResource = ref<ConfigMapInfo | SecretInfo | null>(null)
+
+// Reset filters on tab switch
+watch(
+  () => props.activeTab,
+  () => {
+    searchQuery.value = ''
+    selectedNamespace.value = 'All Namespaces'
+    selectedLabel.value = 'All Labels'
+  }
+)
+
+const namespaces = computed(() => {
+  const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
+  const list = new Set(currentList.map((item) => item.namespace))
+  return ['All Namespaces', ...Array.from(list)]
+})
+
+const labels = computed(() => {
+  const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
+  const labelKeys = new Set<string>()
+  currentList.forEach((item) => {
+    Object.keys(item.labels).forEach((key) => labelKeys.add(key))
+  })
+  return ['All Labels', ...Array.from(labelKeys)]
+})
+
+const filteredItems = computed(() => {
+  const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
+  return currentList.filter((item) => {
+    // Search Query filter
+    if (searchQuery.value) {
+      const query = searchQuery.value.toLowerCase()
+      if (!item.name.toLowerCase().includes(query)) return false
+    }
+
+    // Namespace filter
+    if (
+      selectedNamespace.value !== 'All Namespaces' &&
+      item.namespace !== selectedNamespace.value
+    ) {
+      return false
+    }
+
+    // System Namespaces filter
+    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(item.namespace)
+    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
+      return false
+    }
+
+    // Label filter
+    if (selectedLabel.value !== 'All Labels') {
+      const hasLabelKey = Object.keys(item.labels).includes(selectedLabel.value)
+      if (!hasLabelKey) return false
+    }
+
+    return true
+  })
+})
+
+const onRowClick = (event: { data: ConfigMapInfo | SecretInfo }) => {
+  selectedResource.value = event.data
+  drawerVisible.value = true
+}
+
+const handleActionClick = (event: Event, action: string, resourceName: string) => {
+  event.stopPropagation()
+  alert(`${action} triggered for: ${resourceName}`)
+}
+</script>
+
+<template>
+  <div class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col gap-6">
+    <!-- Filter Toolbar -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <!-- Search -->
+        <div class="relative min-w-64">
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+          <InputText
+            v-model="searchQuery"
+            :placeholder="
+              props.activeTab === 'configmaps' ? 'Search configmaps...' : 'Search secrets...'
+            "
+            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+          />
+        </div>
+
+        <!-- Namespace Select -->
+        <Select
+          v-model="selectedNamespace"
+          :options="namespaces"
+          class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
+        />
+
+        <!-- Label Select -->
+        <Select
+          v-model="selectedLabel"
+          :options="labels"
+          class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
+        />
+      </div>
+
+      <!-- Toggles and Actions -->
+      <div class="flex items-center gap-4 self-end md:self-auto">
+        <div class="flex items-center gap-2">
+          <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
+          <label
+            for="system-ns-toggle"
+            class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+          >
+            Show system namespaces
+          </label>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <Button severity="secondary" variant="text" size="small" class="p-1">
+            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+          </Button>
+          <Button severity="secondary" variant="text" size="small" class="p-1">
+            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <DataTable
+      :value="filteredItems"
+      paginator
+      :rows="12"
+      class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"
+      tableClass="w-full text-left text-xs border-collapse"
+      paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+      :currentPageReportTemplate="
+        props.activeTab === 'configmaps'
+          ? 'Showing {first} to {last} of {totalRecords} configmaps'
+          : 'Showing {first} to {last} of {totalRecords} secrets'
+      "
+      @row-click="onRowClick"
+    >
+      <template #empty>
+        <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
+          <Info class="w-8 h-8 text-(--text-muted)/50" />
+          <span
+            >No {{ props.activeTab === 'configmaps' ? 'configmaps' : 'secrets' }} found matching the
+            filter criteria.</span
+          >
+        </div>
+      </template>
+
+      <!-- Name Column -->
+      <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+        <template #body="{ data }">
+          <div class="flex items-center gap-2">
+            <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-sky-400" />
+            <Lock v-else class="w-4 h-4 text-rose-400" />
+            <span class="font-semibold hover:text-violet-400 transition-colors">{{
+              data.name
+            }}</span>
+          </div>
+        </template>
+      </Column>
+
+      <!-- Namespace Column -->
+      <Column field="namespace" header="Namespace" sortable class="p-3">
+        <template #body="{ data }">
+          <span
+            class="font-mono px-2 py-0.5 rounded text-[10px]"
+            :class="[
+              data.namespace === 'kube-system'
+                ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
+                : data.namespace === 'monitoring'
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : data.namespace === 'logging'
+                    ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                    : data.namespace === 'backend'
+                      ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                      : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+            ]"
+          >
+            {{ data.namespace }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- Labels Column -->
+      <Column field="labels" header="Labels" class="p-3">
+        <template #body="{ data }">
+          <div class="flex flex-wrap gap-1 max-w-72">
+            <span
+              v-for="(val, key) in data.labels"
+              :key="key"
+              class="font-mono text-[9px] bg-(--bg-hover) text-(--text-secondary) border border-(--border) px-1.5 py-0.5 rounded"
+            >
+              {{ key }}: {{ val }}
+            </span>
+          </div>
+        </template>
+      </Column>
+
+      <!-- Secret Type Column (Only for Secrets) -->
+      <Column v-if="props.activeTab === 'secrets'" field="type" header="Type" sortable class="p-3">
+        <template #body="{ data }">
+          <span class="font-mono text-(--text-secondary)">{{ data.type }}</span>
+        </template>
+      </Column>
+
+      <!-- Data Keys Column -->
+      <Column field="keysCount" header="Data Keys" sortable class="p-3 text-center">
+        <template #body="{ data }">
+          <span class="font-mono text-(--text-primary)">{{ data.keysCount }}</span>
+        </template>
+      </Column>
+
+      <!-- Size Column -->
+      <Column
+        field="size"
+        header="Size"
+        sortable
+        class="p-3 text-(--text-muted) font-mono"
+      ></Column>
+
+      <!-- Mounted In Column -->
+      <Column field="mountedPods" header="Mounted In" sortable class="p-3 text-center">
+        <template #body="{ data }">
+          <span
+            class="font-mono font-semibold"
+            :class="data.mountedPods > 0 ? 'text-emerald-400' : 'text-(--text-muted)'"
+          >
+            {{ data.mountedPods }} {{ data.mountedPods === 1 ? 'pod' : 'pods' }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- Age Column -->
+      <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+
+      <!-- Actions Column -->
+      <Column class="p-3 text-center">
+        <template #body="{ data }">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            title="Actions"
+            @click="handleActionClick($event, 'Show Actions Menu', data.name)"
+          >
+            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          </Button>
+        </template>
+      </Column>
+    </DataTable>
+
+    <!-- Details Slideout Drawer -->
+    <ConfigDetailsDrawer v-model:visible="drawerVisible" :resource="selectedResource" />
+  </div>
+</template>
+
+<style scoped>
+:deep(.p-datatable-thead > tr > th) {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+:deep(.p-datatable-tbody > tr:hover) {
+  background: var(--bg-hover) / 20;
+}
+</style>
