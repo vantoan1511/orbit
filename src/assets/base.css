@@ -157,3 +157,14 @@
   --danger: #ff6b6b;
   --info: #6aa8ff;
 }
+
+@layer base {
+  /* Global resets */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    font-weight: normal;
+  }
+}
