@@ -83,7 +83,7 @@ const nodes = ref(mockNodes)
       </Column>
 
       <!-- Memory Column -->
-      <Column field="memPct" header="Memory" sortable class="p-3 min-w-[140px]">
+      <Column field="memPct" header="Memory" sortable class="p-3 min-w-35">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
@@ -103,7 +103,7 @@ const nodes = ref(mockNodes)
       </Column>
 
       <!-- Pods Column -->
-      <Column field="podsCount" header="Pods" sortable class="p-3 min-w-[120px]">
+      <Column field="podsCount" header="Pods" sortable class="p-3 min-w-30">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
@@ -126,7 +126,7 @@ const nodes = ref(mockNodes)
       <Column field="uptime" header="Uptime" sortable class="p-3 text-(--text-secondary)"></Column>
 
       <!-- Labels Column -->
-      <Column field="labels" header="Labels" class="p-3 max-w-[200px]">
+      <Column field="labels" header="Labels" class="p-3 max-w-50">
         <template #body="{ data }">
           <div class="flex flex-wrap gap-1">
             <span
