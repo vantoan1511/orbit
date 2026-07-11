@@ -23,6 +23,9 @@ export interface OrbitEventMap {
   activeClusterChanged: {
     active_cluster_id: string | null
   }
+  errorOccurred: {
+    message: string
+  }
 }
 
 export const OrbitEvents = {
@@ -32,7 +35,8 @@ export const OrbitEvents = {
   NamespacesUpdated: 'namespacesUpdated',
   PodsUpdated: 'podsUpdated',
   ClustersUpdated: 'clustersUpdated',
-  ActiveClusterChanged: 'activeClusterChanged'
+  ActiveClusterChanged: 'activeClusterChanged',
+  ErrorOccurred: 'errorOccurred'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

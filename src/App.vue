@@ -5,10 +5,12 @@ import { OrbitEvents } from '@/types/events'
 import type { ClusterInfo, PodInfo } from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
 
 const k8sStore = useKubernetesStore()
+const toast = useToast()
 
 const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: string }) => {
   if (payload.status === 'ready') {
@@ -35,6 +37,15 @@ const handleActiveClusterChanged = (payload: { active_cluster_id: string | null 
   k8sStore.setActiveClusterId(payload.active_cluster_id)
 }
 
+const handleErrorOccurred = (payload: { message: string }) => {
+  toast.add({
+    severity: 'error',
+    summary: 'Error',
+    detail: payload.message,
+    life: 5000
+  })
+}
+
 onMounted(() => {
   // Initialize dark mode by default
   document.documentElement.classList.add('my-app-dark')
@@ -45,6 +56,7 @@ onMounted(() => {
   events.on(OrbitEvents.PodsUpdated, handlePodsUpdated)
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
+  events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
 })
 
 onUnmounted(() => {
@@ -53,6 +65,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.PodsUpdated, handlePodsUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
+  events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
 })
 </script>
 

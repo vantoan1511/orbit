@@ -32,4 +32,8 @@ pub enum OrbitEvent {
     ActiveClusterChanged {
         active_cluster_id: Option<String>,
     },
+    #[serde(rename = "errorOccurred")]
+    ErrorOccurred {
+        message: String,
+    },
 }

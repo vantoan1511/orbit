@@ -141,6 +141,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 Ok(()) => {
                                     let active_cluster_id = w_manager.active_context.clone();
                                     let clusters = w_manager.get_clusters();
+                                    let client = w_manager.active_client.clone();
+                                    drop(w_manager);
 
                                     let _ = Bridge::send_event(
                                         &writer,
@@ -155,7 +157,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     ).await;
 
                                     // Refresh namespaces and pods for new active client
-                                    if let Some(ref client) = w_manager.active_client {
+                                    if let Some(ref client) = client {
                                         if let Ok(namespaces) = kubernetes::list_namespaces(client).await {
                                             let _ = Bridge::send_event(
                                                 &writer,
@@ -174,6 +176,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 }
                                 Err(e) => {
                                     eprintln!("Error switching cluster: {:?}", e);
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ErrorOccurred {
+                                            message: format!("Failed to switch cluster: {}", e),
+                                        },
+                                    ).await;
                                 }
                             }
                         }
@@ -192,6 +201,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 Ok(()) => {
                                     let clusters = w_manager.get_clusters();
                                     let active_cluster_id = w_manager.active_context.clone();
+                                    let client = w_manager.active_client.clone();
+                                    drop(w_manager);
 
                                     let _ = Bridge::send_event(
                                         &writer,
@@ -206,7 +217,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     ).await;
 
                                     // Refresh namespaces and pods for new active client
-                                    if let Some(ref client) = w_manager.active_client {
+                                    if let Some(ref client) = client {
                                         if let Ok(namespaces) = kubernetes::list_namespaces(client).await {
                                             let _ = Bridge::send_event(
                                                 &writer,
@@ -225,6 +236,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 }
                                 Err(e) => {
                                     eprintln!("Error adding cluster: {:?}", e);
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ErrorOccurred {
+                                            message: format!("Failed to add cluster: {}", e),
+                                        },
+                                    ).await;
                                 }
                             }
                         }
@@ -232,8 +250,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 }
                 "getNamespaces" => {
                     tokio::spawn(async move {
-                        let r_manager = manager.read().await;
-                        if let Some(ref client) = r_manager.active_client {
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
                             match kubernetes::list_namespaces(client).await {
                                 Ok(namespaces) => {
                                     let _ = Bridge::send_event(
@@ -256,8 +277,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             .and_then(|d| d.get("namespace").cloned())
                             .and_then(|v| v.as_str().map(|s| s.to_string()));
 
-                        let r_manager = manager.read().await;
-                        if let Some(ref client) = r_manager.active_client {
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
                             match kubernetes::list_pods(client, namespace).await {
                                 Ok(pods) => {
                                     let _ = Bridge::send_event(

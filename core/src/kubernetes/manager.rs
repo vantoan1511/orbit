@@ -68,6 +68,14 @@ impl KubeManager {
     }
 
     pub async fn add_kubeconfig_file(&mut self, file_path: &str) -> Result<(), String> {
+        let path = std::path::Path::new(file_path);
+        if !path.exists() {
+            return Err("Provided kubeconfig path does not exist".to_string());
+        }
+        if !path.is_file() {
+            return Err("Provided kubeconfig path is not a file".to_string());
+        }
+
         let new_config = Kubeconfig::read_from(file_path)
             .map_err(|e| format!("Failed to read custom kubeconfig: {}", e))?;
             

@@ -19,6 +19,7 @@ urlencoding = "2.1"
 async-trait = "0.1"
 kube = { version = "0.98.0", features = ["runtime", "derive", "client"] }
 k8s-openapi = { version = "0.24.0", features = ["latest"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [profile.release]
 opt-level = 3          # speed up compilation (3 is faster than 'z')

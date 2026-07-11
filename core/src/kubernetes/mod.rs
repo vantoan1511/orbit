@@ -42,10 +42,19 @@ pub async fn list_pods(client: &Client, namespace: Option<String>) -> Result<Vec
             
         // Calculate age
         let age = if let Some(creation) = &p.metadata.creation_timestamp {
-            if let Some(time) = creation.0.to_rfc3339().split('T').next() {
-                time.to_string()
+            let now = chrono::Utc::now();
+            let duration = now.signed_duration_since(creation.0);
+            let seconds = duration.num_seconds();
+            if seconds < 0 {
+                "0s".to_string()
+            } else if seconds < 60 {
+                format!("{}s", seconds)
+            } else if seconds < 3600 {
+                format!("{}m", duration.num_minutes())
+            } else if seconds < 86400 {
+                format!("{}h", duration.num_hours())
             } else {
-                "Unknown".to_string()
+                format!("{}d", duration.num_days())
             }
         } else {
             "Unknown".to_string()
