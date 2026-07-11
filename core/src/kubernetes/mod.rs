@@ -600,8 +600,8 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
             }
         }
         
-        let cpu_pct = if cpu_total_val > 0.0 { (cpu_req / cpu_total_val) * 100.0 } else { 0.0 };
-        let mem_pct = if mem_total_val > 0.0 { (mem_req / mem_total_val) * 100.0 } else { 0.0 };
+        let cpu_pct = if cpu_total_val > 0.0 { ((cpu_req / cpu_total_val) * 1000.0).round() / 10.0 } else { 0.0 };
+        let mem_pct = if mem_total_val > 0.0 { ((mem_req / mem_total_val) * 1000.0).round() / 10.0 } else { 0.0 };
         
         list.push(models::NodeInfo {
             name,

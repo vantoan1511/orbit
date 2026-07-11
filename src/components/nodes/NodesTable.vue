@@ -14,7 +14,9 @@ const nodes = computed(() => k8sStore.nodes)
       <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider">
         Nodes List
       </div>
-      <div class="text-xs text-(--text-muted) font-medium">Showing all {{ nodes.length }} nodes in cluster</div>
+      <div class="text-xs text-(--text-muted) font-medium">
+        Showing all {{ nodes.length }} nodes in cluster
+      </div>
     </div>
 
     <!-- PrimeVue DataTable -->
@@ -68,7 +70,7 @@ const nodes = computed(() => k8sStore.nodes)
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
-              <span>{{ data.cpuPct }}%</span>
+              <span>{{ Number(data.cpuPct.toFixed(1)) }}%</span>
               <span class="text-(--text-muted) text-[10px]"
                 >{{ data.cpuUsed }} / {{ data.cpuTotal }}C</span
               >
@@ -88,7 +90,7 @@ const nodes = computed(() => k8sStore.nodes)
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
-              <span>{{ data.memPct }}%</span>
+              <span>{{ Number(data.memPct.toFixed(1)) }}%</span>
               <span class="text-(--text-muted) text-[10px]"
                 >{{ data.memUsed }} / {{ data.memTotal }}G</span
               >
