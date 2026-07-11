@@ -56,3 +56,6 @@ __screenshots__/
 
 /mockups
 /.claude
+
+/target/
+target/
