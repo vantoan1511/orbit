@@ -1,12 +1,46 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Network, Circle, Cpu, Cloud, Globe } from '@lucide/vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-// Metrics stats
-const totalServices = 96
-const clusterIPCount = 72
-const nodePortCount = 18
-const loadBalancerCount = 5
-const externalNameCount = 1
+const k8sStore = useKubernetesStore()
+
+const totalServices = computed(() => k8sStore.services.length)
+const clusterIPCount = computed(
+  () => k8sStore.services.filter((s) => s.type === 'ClusterIP').length
+)
+const nodePortCount = computed(() => k8sStore.services.filter((s) => s.type === 'NodePort').length)
+const loadBalancerCount = computed(
+  () => k8sStore.services.filter((s) => s.type === 'LoadBalancer').length
+)
+const externalNameCount = computed(
+  () => k8sStore.services.filter((s) => s.type === 'ExternalName').length
+)
+
+const clusterIPPct = computed(() => {
+  if (totalServices.value === 0) return '0.0%'
+  return ((clusterIPCount.value / totalServices.value) * 100).toFixed(1) + '%'
+})
+
+const nodePortPct = computed(() => {
+  if (totalServices.value === 0) return '0.0%'
+  return ((nodePortCount.value / totalServices.value) * 100).toFixed(1) + '%'
+})
+
+const loadBalancerPct = computed(() => {
+  if (totalServices.value === 0) return '0.0%'
+  return ((loadBalancerCount.value / totalServices.value) * 100).toFixed(1) + '%'
+})
+
+const externalNamePct = computed(() => {
+  if (totalServices.value === 0) return '0.0%'
+  return ((externalNameCount.value / totalServices.value) * 100).toFixed(1) + '%'
+})
+
+const namespacesCount = computed(() => {
+  const set = new Set(k8sStore.services.map((s) => s.namespace))
+  return set.size
+})
 </script>
 
 <template>
@@ -27,7 +61,9 @@ const externalNameCount = 1
         <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
           {{ totalServices }}
         </div>
-        <div class="text-[10px] text-(--text-muted) mt-0.5">Across 12 namespaces</div>
+        <div class="text-[10px] text-(--text-muted) mt-0.5">
+          Across {{ namespacesCount }} namespaces
+        </div>
       </div>
     </div>
 
@@ -47,7 +83,7 @@ const externalNameCount = 1
         <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
           {{ clusterIPCount }}
         </div>
-        <div class="text-[10px] text-emerald-400 font-medium mt-0.5">75.0%</div>
+        <div class="text-[10px] text-emerald-400 font-medium mt-0.5">{{ clusterIPPct }}</div>
       </div>
     </div>
 
@@ -67,7 +103,7 @@ const externalNameCount = 1
         <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
           {{ nodePortCount }}
         </div>
-        <div class="text-[10px] text-blue-400 font-medium mt-0.5">18.8%</div>
+        <div class="text-[10px] text-blue-400 font-medium mt-0.5">{{ nodePortPct }}</div>
       </div>
     </div>
 
@@ -87,7 +123,7 @@ const externalNameCount = 1
         <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
           {{ loadBalancerCount }}
         </div>
-        <div class="text-[10px] text-violet-400 font-medium mt-0.5">5.2%</div>
+        <div class="text-[10px] text-violet-400 font-medium mt-0.5">{{ loadBalancerPct }}</div>
       </div>
     </div>
 
@@ -107,7 +143,7 @@ const externalNameCount = 1
         <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
           {{ externalNameCount }}
         </div>
-        <div class="text-[10px] text-amber-400 font-medium mt-0.5">1.0%</div>
+        <div class="text-[10px] text-amber-400 font-medium mt-0.5">{{ externalNamePct }}</div>
       </div>
     </div>
   </div>

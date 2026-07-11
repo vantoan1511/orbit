@@ -473,6 +473,33 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                     });
                 }
+                "getServices" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_services(client, namespace).await {
+                                Ok(services) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ServicesUpdated { services },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing services: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
                 "getNodes" => {
                     tokio::spawn(async move {
                         let client = {
