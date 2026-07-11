@@ -31,4 +31,6 @@ app.use(PrimeVue, {
 
 app.mount('#app')
 
-init()
+if (window.NL_PORT) {
+  init()
+}
