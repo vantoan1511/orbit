@@ -43,6 +43,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
             break;
         }
 
+        // Re-broadcast connection status when a client connects to ensure the frontend receives it
+        if msg.event.as_deref() == Some("appClientConnect") || msg.event.as_deref() == Some("clientConnect") {
+            let writer = bridge.writer.clone();
+            let token = bridge.token.clone();
+            tokio::spawn(async move {
+                let _ = Bridge::broadcast(
+                    &writer,
+                    &token,
+                    "engineConnected",
+                    serde_json::json!({
+                        "status": "ready",
+                        "message": "Orbit Engine is connected and ready."
+                    }),
+                ).await;
+            });
+        }
+
         tokio::spawn(async move {
             println!("Handled received message: {:?}", msg);
         });

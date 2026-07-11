@@ -7,12 +7,12 @@
   "author": "Toan Nguyen",
   "copyright": "Copyright © Toan Nguyen 2026. All rights reserved.",
   "defaultMode": "window",
-  "storageLocation": "app",
-  "dataLocation": "app",
+  "storageLocation": "system",
+  "dataLocation": "system",
   "documentRoot": "/build/",
   "logging": {
     "enabled": true,
-    "writeToLogFile": true
+    "writeToLogFile": false
   },
   "port": 0,
   "url": "/",
@@ -20,10 +20,15 @@
   "enableNativeAPI": true,
   "singlePageServe": true,
   "enableExtensions": true,
-  "tokenSecurity": "none",
+  "tokenSecurity": "one-time",
   "nativeAllowList": [
     "filesystem.readDirectory",
-    "extensions.getStats"
+    "extensions.getStats",
+    "app.broadcast",
+    "events.on",
+    "events.off",
+    "events.dispatch",
+    "events.broadcast"
   ],
   "extensions": [
     {
@@ -40,7 +45,7 @@
       "minHeight": 720,
       "center": true,
       "icon": "/public/icon.png",
-      "enableInspector": true
+      "enableInspector": false
     }
   },
   "cli": {
