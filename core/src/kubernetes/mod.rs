@@ -496,10 +496,8 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
     
     let mut pods_by_node: std::collections::HashMap<String, Vec<Pod>> = std::collections::HashMap::new();
     for pod in pods {
-        if let Some(spec) = &pod.spec {
-            if let Some(node_name) = &spec.node_name {
-                pods_by_node.entry(node_name.clone()).or_default().push(pod);
-            }
+        if let Some(node_name) = pod.spec.as_ref().and_then(|spec| spec.node_name.as_ref()) {
+            pods_by_node.entry(node_name.clone()).or_default().push(pod);
         }
     }
     
@@ -521,11 +519,12 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
         };
         
         let mut role = "worker".to_string();
-        if let Some(labels_map) = &node.metadata.labels {
-            if labels_map.contains_key("node-role.kubernetes.io/control-plane") 
-                || labels_map.contains_key("node-role.kubernetes.io/master") {
-                role = "control-plane".to_string();
-            }
+        let has_control_plane_role = node.metadata.labels.as_ref().is_some_and(|labels_map| {
+            labels_map.contains_key("node-role.kubernetes.io/control-plane")
+                || labels_map.contains_key("node-role.kubernetes.io/master")
+        });
+        if has_control_plane_role {
+            role = "control-plane".to_string();
         }
         
         let version = node.status.as_ref()
@@ -589,14 +588,12 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
         for pod in &node_pods {
             if let Some(spec) = &pod.spec {
                 for container in &spec.containers {
-                    if let Some(resources) = &container.resources {
-                        if let Some(requests) = &resources.requests {
-                            if let Some(cpu) = requests.get("cpu") {
-                                cpu_req += parse_cpu_quantity(&cpu.0);
-                            }
-                            if let Some(mem) = requests.get("memory") {
-                                mem_req += parse_memory_quantity(&mem.0);
-                            }
+                    if let Some(requests) = container.resources.as_ref().and_then(|r| r.requests.as_ref()) {
+                        if let Some(cpu) = requests.get("cpu") {
+                            cpu_req += parse_cpu_quantity(&cpu.0);
+                        }
+                        if let Some(mem) = requests.get("memory") {
+                            mem_req += parse_memory_quantity(&mem.0);
                         }
                     }
                 }
@@ -629,8 +626,8 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
 
 fn parse_cpu_quantity(q: &str) -> f64 {
     let q = q.trim();
-    if q.ends_with('m') {
-        q[..q.len() - 1].parse::<f64>().unwrap_or(0.0) / 1000.0
+    if let Some(stripped) = q.strip_suffix('m') {
+        stripped.parse::<f64>().unwrap_or(0.0) / 1000.0
     } else {
         q.parse::<f64>().unwrap_or(0.0)
     }
@@ -642,40 +639,40 @@ fn parse_memory_quantity(q: &str) -> f64 {
         return 0.0;
     }
     
-    if q.ends_with("Ki") {
-        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+    if let Some(stripped) = q.strip_suffix("Ki") {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1024.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with("Mi") {
-        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix("Mi") {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1024.0 * 1024.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with("Gi") {
-        q[..q.len() - 2].parse::<f64>().unwrap_or(0.0)
-    } else if q.ends_with("Ti") {
-        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix("Gi") {
+        stripped.parse::<f64>().unwrap_or(0.0)
+    } else if let Some(stripped) = q.strip_suffix("Ti") {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1024.0
-    } else if q.ends_with("Pi") {
-        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix("Pi") {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1024.0 * 1024.0
-    } else if q.ends_with("Ei") {
-        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix("Ei") {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1024.0 * 1024.0 * 1024.0
-    } else if q.ends_with('k') {
-        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix('k') {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1000.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with('M') {
-        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix('M') {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with('G') {
-        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix('G') {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with('T') {
-        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix('T') {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with('P') {
-        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix('P') {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
-    } else if q.ends_with('E') {
-        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+    } else if let Some(stripped) = q.strip_suffix('E') {
+        let val = stripped.parse::<f64>().unwrap_or(0.0);
         val * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
     } else {
         let val = q.parse::<f64>().unwrap_or(0.0);
