@@ -194,17 +194,3 @@ const getStatusBadgeClass = (status: string) => {
     </div>
   </Drawer>
 </template>
-
-<style scoped>
-:deep(.p-tabs) {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-:deep(.p-tablist-content) {
-  border-bottom: none !important;
-}
-:deep(.p-tablist-tab-inline) {
-  border-bottom: none !important;
-}
-</style>

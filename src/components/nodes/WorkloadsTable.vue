@@ -262,27 +262,3 @@ onMounted(() => {
     </div>
   </div>
 </template>
-
-<style scoped>
-:deep(.p-datatable) {
-  background: transparent;
-}
-:deep(.p-datatable-thead > tr > th) {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-:deep(.p-datatable-tbody > tr) {
-  background: transparent;
-  color: var(--text-secondary);
-  border-bottom: 1px solid rgba(var(--border), 0.5);
-  transition: background-color 0.2s;
-}
-:deep(.p-datatable-tbody > tr:hover) {
-  background: var(--bg-hover) !important;
-}
-</style>

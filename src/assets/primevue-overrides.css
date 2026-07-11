@@ -1,0 +1,144 @@
+/* PrimeVue CSS Overrides for Orbit UI Consistency */
+
+/* ==========================================================================
+   DataTable Styling (from PodsDataTable)
+   ========================================================================== */
+.p-datatable {
+  background: transparent;
+}
+
+.p-datatable-thead > tr > th {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.p-datatable-tbody > tr {
+  background: transparent;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(var(--border), 0.5);
+  transition: background-color 0.2s;
+}
+
+.p-datatable-tbody > tr:hover {
+  background: var(--bg-hover) !important;
+}
+
+/* ==========================================================================
+   Paginator Styling (from PodsDataTable)
+   ========================================================================== */
+.p-paginator {
+  background: transparent;
+  border-top: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.75rem;
+  font-size: 0.75rem;
+}
+
+.p-paginator-current {
+  color: var(--text-muted);
+}
+
+.p-paginator-page,
+.p-paginator-first,
+.p-paginator-prev,
+.p-paginator-next,
+.p-paginator-last {
+  color: var(--text-secondary);
+  border-radius: 6px;
+  min-width: 2rem;
+  height: 2rem;
+}
+
+.p-paginator-page.p-highlight {
+  background: var(--bg-active);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Select Components (from PodsDataTable)
+   ========================================================================== */
+.p-select {
+  border-radius: 8px;
+}
+
+/* ==========================================================================
+   Drawer Content (from details drawers)
+   ========================================================================== */
+.p-drawer-content {
+  padding: 0 !important;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ==========================================================================
+   Tabs Styling (from details drawers)
+   ========================================================================== */
+.p-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.p-tablist-tab-list {
+  border-bottom-width: 0 !important;
+}
+
+.p-tablist-content {
+  border-bottom: none !important;
+}
+
+.p-tablist-tab-inline {
+  border-bottom: none !important;
+}
+
+.p-tab {
+  font-family: inherit;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.p-tab-active {
+  color: var(--text-primary) !important;
+  border-bottom-color: var(--text-primary) !important;
+}
+
+/* ==========================================================================
+   Checkbox and ToggleSwitch (from GeneralSettingsForm)
+   ========================================================================== */
+.p-checkbox {
+  width: 1rem;
+  height: 1rem;
+}
+
+.p-checkbox-box {
+  border-radius: 0.25rem;
+  border-color: var(--border);
+  background-color: transparent;
+}
+
+.p-checkbox-checked .p-checkbox-box {
+  background-color: var(--p-primary-color, #8b5cf6);
+  border-color: var(--p-primary-color, #8b5cf6);
+}
+
+.p-toggleswitch {
+  width: 2.25rem;
+  height: 1.25rem;
+}
+
+.p-toggleswitch-slider {
+  border-radius: 9999px;
+  background-color: var(--border);
+}
+
+.p-toggleswitch-checked .p-toggleswitch-slider {
+  background-color: var(--p-primary-color, #8b5cf6);
+}

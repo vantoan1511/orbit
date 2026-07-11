@@ -335,25 +335,3 @@ spec:
     </div>
   </Drawer>
 </template>
-
-<style scoped>
-:deep(.p-drawer-content) {
-  padding: 0 !important;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-:deep(.p-tablist-tab-list) {
-  border-bottom-width: 0 !important;
-}
-:deep(.p-tab) {
-  font-family: inherit;
-  color: var(--text-secondary);
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
-}
-:deep(.p-tab-active) {
-  color: var(--text-primary) !important;
-  border-bottom-color: var(--text-primary) !important;
-}
-</style>

@@ -224,31 +224,3 @@ const handleDeleteCachedContexts = () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Styling matches Orbit theme */
-:deep(.p-checkbox) {
-  width: 1rem;
-  height: 1rem;
-}
-:deep(.p-checkbox-box) {
-  border-radius: 0.25rem;
-  border-color: var(--border);
-  background-color: transparent;
-}
-:deep(.p-checkbox-checked .p-checkbox-box) {
-  background-color: var(--p-primary-color, #8b5cf6);
-  border-color: var(--p-primary-color, #8b5cf6);
-}
-:deep(.p-toggleswitch) {
-  width: 2.25rem;
-  height: 1.25rem;
-}
-:deep(.p-toggleswitch-slider) {
-  border-radius: 9999px;
-  background-color: var(--border);
-}
-:deep(.p-toggleswitch-checked .p-toggleswitch-slider) {
-  background-color: var(--p-primary-color, #8b5cf6);
-}
-</style>
