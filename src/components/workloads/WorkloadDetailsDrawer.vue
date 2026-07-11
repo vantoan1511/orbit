@@ -8,7 +8,13 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import { Clock, Tag } from '@lucide/vue'
 
-import type { WorkloadInfo, CronJobInfo, JobInfo } from '../../types/kubernetes'
+import type {
+  WorkloadInfo,
+  CronJobInfo,
+  JobInfo,
+  DeploymentInfo,
+  DaemonSetReplicas
+} from '../../types/kubernetes'
 
 const props = defineProps<{
   visible: boolean
@@ -37,7 +43,7 @@ const getWorkloadKind = (w: WorkloadInfo): string => {
 const workloadStatus = computed(() => {
   if (!props.workload) return 'Active'
   if ('status' in props.workload) {
-    return (props.workload as any).status
+    return (props.workload as Exclude<WorkloadInfo, CronJobInfo>).status
   }
   return 'Active'
 })
@@ -60,7 +66,7 @@ const desiredReplicas = computed(() => replicas.value?.desired)
 const currentReplicas = computed(() => replicas.value?.current)
 const readyReplicas = computed(() => {
   if (replicas.value && 'ready' in replicas.value) {
-    return (replicas.value as any).ready
+    return (replicas.value as DaemonSetReplicas).ready
   }
   return undefined
 })
@@ -68,7 +74,7 @@ const readyReplicas = computed(() => {
 const available = computed(() => {
   if (!props.workload) return undefined
   if ('available' in props.workload) {
-    return (props.workload as any).available
+    return (props.workload as DeploymentInfo).available
   }
   return undefined
 })
@@ -76,7 +82,7 @@ const available = computed(() => {
 const availableReplicas = computed(() => {
   if (available.value !== undefined) return available.value
   if (replicas.value && 'available' in replicas.value) {
-    return (replicas.value as any).available
+    return (replicas.value as DaemonSetReplicas).available
   }
   return undefined
 })
@@ -84,7 +90,7 @@ const availableReplicas = computed(() => {
 const completions = computed(() => {
   if (!props.workload) return undefined
   if ('completions' in props.workload) {
-    return (props.workload as any).completions
+    return (props.workload as JobInfo).completions
   }
   return undefined
 })
@@ -92,7 +98,7 @@ const completions = computed(() => {
 const duration = computed(() => {
   if (!props.workload) return undefined
   if ('duration' in props.workload) {
-    return (props.workload as any).duration
+    return (props.workload as JobInfo).duration
   }
   return undefined
 })
@@ -100,7 +106,7 @@ const duration = computed(() => {
 const schedule = computed(() => {
   if (!props.workload) return undefined
   if ('schedule' in props.workload) {
-    return (props.workload as any).schedule
+    return (props.workload as CronJobInfo).schedule
   }
   return undefined
 })
@@ -108,7 +114,7 @@ const schedule = computed(() => {
 const suspend = computed(() => {
   if (!props.workload) return undefined
   if ('suspend' in props.workload) {
-    return (props.workload as any).suspend
+    return (props.workload as CronJobInfo).suspend
   }
   return undefined
 })
@@ -116,7 +122,7 @@ const suspend = computed(() => {
 const active = computed(() => {
   if (!props.workload) return undefined
   if ('active' in props.workload) {
-    return (props.workload as any).active
+    return (props.workload as CronJobInfo).active
   }
   return undefined
 })
@@ -124,7 +130,7 @@ const active = computed(() => {
 const lastSchedule = computed(() => {
   if (!props.workload) return undefined
   if ('lastSchedule' in props.workload) {
-    return (props.workload as any).lastSchedule
+    return (props.workload as CronJobInfo).lastSchedule
   }
   return undefined
 })
@@ -132,7 +138,7 @@ const lastSchedule = computed(() => {
 const strategy = computed(() => {
   if (!props.workload) return undefined
   if ('strategy' in props.workload) {
-    return (props.workload as any).strategy
+    return (props.workload as DeploymentInfo).strategy
   }
   return undefined
 })
@@ -140,7 +146,7 @@ const strategy = computed(() => {
 const minReadySeconds = computed(() => {
   if (!props.workload) return undefined
   if ('minReadySeconds' in props.workload) {
-    return (props.workload as any).minReadySeconds
+    return (props.workload as DeploymentInfo).minReadySeconds
   }
   return undefined
 })
@@ -148,7 +154,7 @@ const minReadySeconds = computed(() => {
 const revisionHistory = computed(() => {
   if (!props.workload) return undefined
   if ('revisionHistory' in props.workload) {
-    return (props.workload as any).revisionHistory
+    return (props.workload as DeploymentInfo).revisionHistory
   }
   return undefined
 })
@@ -311,11 +317,7 @@ ${specSection}
                         class="h-full rounded-full bg-indigo-500"
                         :style="{
                           width:
-                            (desiredReplicas
-                              ? (currentReplicas! /
-                                  desiredReplicas) *
-                                100
-                              : 0) + '%'
+                            (desiredReplicas ? (currentReplicas! / desiredReplicas) * 100 : 0) + '%'
                         }"
                       ></div>
                     </div>
@@ -333,10 +335,7 @@ ${specSection}
                         class="h-full rounded-full bg-emerald-500"
                         :style="{
                           width:
-                            (desiredReplicas
-                              ? (readyReplicas / desiredReplicas) *
-                                100
-                              : 0) + '%'
+                            (desiredReplicas ? (readyReplicas / desiredReplicas) * 100 : 0) + '%'
                         }"
                       ></div>
                     </div>
@@ -354,10 +353,8 @@ ${specSection}
                         class="h-full rounded-full bg-emerald-500"
                         :style="{
                           width:
-                            (desiredReplicas
-                              ? (availableReplicas / desiredReplicas) *
-                                100
-                              : 0) + '%'
+                            (desiredReplicas ? (availableReplicas / desiredReplicas) * 100 : 0) +
+                            '%'
                         }"
                       ></div>
                     </div>
@@ -375,15 +372,11 @@ ${specSection}
                 >
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Completions</span>
-                    <span class="font-mono font-bold text-(--text-primary)">{{
-                      completions
-                    }}</span>
+                    <span class="font-mono font-bold text-(--text-primary)">{{ completions }}</span>
                   </div>
                   <div v-if="duration" class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Duration</span>
-                    <span class="font-mono text-(--text-primary)">{{
-                      duration
-                    }}</span>
+                    <span class="font-mono text-(--text-primary)">{{ duration }}</span>
                   </div>
                 </div>
               </div>
@@ -398,9 +391,7 @@ ${specSection}
                 >
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Schedule</span>
-                    <span class="font-mono font-bold text-(--text-primary)">{{
-                      schedule
-                    }}</span>
+                    <span class="font-mono font-bold text-(--text-primary)">{{ schedule }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Suspend</span>
@@ -414,9 +405,7 @@ ${specSection}
                   </div>
                   <div v-if="lastSchedule" class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Last Schedule</span>
-                    <span class="font-mono text-(--text-primary)">{{
-                      lastSchedule
-                    }}</span>
+                    <span class="font-mono text-(--text-primary)">{{ lastSchedule }}</span>
                   </div>
                 </div>
               </div>
@@ -446,20 +435,13 @@ ${specSection}
                   </div>
                   <div v-if="minReadySeconds !== undefined">
                     <span class="text-(--text-muted) block mb-0.5">Min Ready Seconds</span>
-                    <span class="font-mono text-(--text-secondary)"
-                      >{{ minReadySeconds }}s</span
-                    >
+                    <span class="font-mono text-(--text-secondary)">{{ minReadySeconds }}s</span>
                   </div>
                   <div v-if="revisionHistory !== undefined">
                     <span class="text-(--text-muted) block mb-0.5">Revision History Limit</span>
-                    <span class="font-mono text-(--text-secondary)">{{
-                      revisionHistory
-                    }}</span>
+                    <span class="font-mono text-(--text-secondary)">{{ revisionHistory }}</span>
                   </div>
-                  <div
-                    class="col-span-2"
-                    v-if="workloadImages && workloadImages.length"
-                  >
+                  <div class="col-span-2" v-if="workloadImages && workloadImages.length">
                     <span class="text-(--text-muted) block mb-0.5">Container Images</span>
                     <div class="space-y-1 mt-1">
                       <span
@@ -491,9 +473,7 @@ ${specSection}
                 </div>
               </div>
 
-              <div
-                v-if="workloadAnnotations && Object.keys(workloadAnnotations).length"
-              >
+              <div v-if="workloadAnnotations && Object.keys(workloadAnnotations).length">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Annotations
                 </h3>
