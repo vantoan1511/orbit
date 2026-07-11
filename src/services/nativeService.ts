@@ -101,3 +101,14 @@ export const extensions = {
 export const app = {
   // Add app wrapper functions as needed
 }
+
+const CORE_ENGINE_ID = 'vantoan1511.orbit.core.engine'
+
+/**
+ * Safe wrapper for Orbit Core Engine extension
+ */
+export const coreEngine = {
+  dispatch(event: string, data?: unknown) {
+    return extensions.dispatch(CORE_ENGINE_ID, event, data)
+  }
+}

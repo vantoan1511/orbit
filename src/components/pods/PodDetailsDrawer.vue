@@ -8,7 +8,7 @@ import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import Chart from 'primevue/chart'
 import { Clock, Tag, Server, Shield, Activity, FileCode } from '@lucide/vue'
-import type { PodInfo } from './mockPods'
+import type { PodInfo } from '@/types/kubernetes'
 
 const props = defineProps<{
   visible: boolean
@@ -63,11 +63,17 @@ const updateCharts = (pod: PodInfo) => {
     }
   }
 
+  // Fallback if cpuHistory or memoryHistory are missing
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cpuData = (pod as any).cpuHistory || [0, 0, 0, 0, 0, 0, 0]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const memData = (pod as any).memoryHistory || [0, 0, 0, 0, 0, 0, 0]
+
   cpuChartData.value = {
     labels: ['10s ago', '9s ago', '8s ago', '7s ago', '6s ago', '5s ago', 'Now'],
     datasets: [
       {
-        data: pod.cpuHistory,
+        data: cpuData,
         borderColor: violetColor,
         backgroundColor: 'rgba(139, 92, 246, 0.05)',
         fill: true
@@ -79,7 +85,7 @@ const updateCharts = (pod: PodInfo) => {
     labels: ['10s ago', '9s ago', '8s ago', '7s ago', '6s ago', '5s ago', 'Now'],
     datasets: [
       {
-        data: pod.memoryHistory,
+        data: memData,
         borderColor: blueColor,
         backgroundColor: 'rgba(59, 130, 246, 0.05)',
         fill: true
@@ -99,35 +105,45 @@ watch(
 )
 
 const generateYaml = (p: PodInfo) => {
+  const labelsYaml = p.labels
+    ? Object.entries(p.labels)
+        .map(([k, v]) => `    ${k}: ${v}`)
+        .join('\n')
+    : '    none'
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const containersList = (p as any).containers || [{ name: p.name, image: 'unknown' }]
+  const containersYaml = containersList
+    .map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (c: any) => `  - name: ${c.name}
+    image: ${c.image}
+    resources:
+      limits:
+        cpu: ${p.cpu && p.cpu !== '-' ? p.cpu : '200m'}
+        memory: ${p.memory && p.memory !== '-' ? p.memory : '256Mi'}
+      requests:
+        cpu: 100m
+        memory: 128Mi`
+    )
+    .join('\n')
+
+  const recordPod = p as Record<string, unknown>
   return `apiVersion: v1
 kind: Pod
 metadata:
   name: ${p.name}
   namespace: ${p.namespace}
   labels:
-${Object.entries(p.labels)
-  .map(([k, v]) => `    ${k}: ${v}`)
-  .join('\n')}
+${labelsYaml}
 spec:
   containers:
-${p.containers
-  .map(
-    (c) => `  - name: ${c.name}
-    image: ${c.image}
-    resources:
-      limits:
-        cpu: ${p.cpu !== '-' ? p.cpu : '200m'}
-        memory: ${p.memory !== '-' ? p.memory : '256Mi'}
-      requests:
-        cpu: 100m
-        memory: 128Mi`
-  )
-  .join('\n')}
-  nodeName: ${p.node}
+${containersYaml}
+  nodeName: ${String(recordPod.node || 'N/A')}
 status:
   phase: ${p.status}
-  podIP: ${p.ip}
-  hostIP: ${p.nodeIP}
+  podIP: ${String(recordPod.ip || 'N/A')}
+  hostIP: ${String(recordPod.nodeIP || 'N/A')}
 `
 }
 
@@ -345,7 +361,7 @@ const getStatusBadgeClass = (status: string) => {
                     <span>{{ key }}={{ val }}</span>
                   </div>
                   <div
-                    v-if="Object.keys(props.pod.labels).length === 0"
+                    v-if="!props.pod.labels || Object.keys(props.pod.labels).length === 0"
                     class="text-xs text-(--text-muted)"
                   >
                     No labels configured.
@@ -367,7 +383,7 @@ const getStatusBadgeClass = (status: string) => {
                     <span class="truncate text-right">{{ val }}</span>
                   </div>
                   <div
-                    v-if="Object.keys(props.pod.annotations).length === 0"
+                    v-if="!props.pod.annotations || Object.keys(props.pod.annotations).length === 0"
                     class="text-xs text-(--text-muted)"
                   >
                     No annotations configured.
@@ -379,9 +395,9 @@ const getStatusBadgeClass = (status: string) => {
             <!-- CONTAINERS PANEL -->
             <TabPanel value="containers" class="space-y-6">
               <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
-                Containers ({{ props.pod.containers.length }})
+                Containers ({{ props.pod.containers ? props.pod.containers.length : 0 }})
               </div>
-              <div class="space-y-4">
+              <div class="space-y-4" v-if="props.pod.containers">
                 <div
                   v-for="c in props.pod.containers"
                   :key="c.name"
@@ -435,7 +451,7 @@ const getStatusBadgeClass = (status: string) => {
               </div>
               <div
                 class="relative pl-4 border-l border-(--border) space-y-4 ml-2"
-                v-if="props.pod.events.length > 0"
+                v-if="props.pod.events && props.pod.events.length > 0"
               >
                 <div v-for="(ev, idx) in props.pod.events" :key="idx" class="relative">
                   <span

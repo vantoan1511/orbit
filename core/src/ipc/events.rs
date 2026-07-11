@@ -16,4 +16,12 @@ pub enum OrbitEvent {
     Pong {
         reply: String,
     },
+    #[serde(rename = "namespacesUpdated")]
+    NamespacesUpdated {
+        namespaces: Vec<String>,
+    },
+    #[serde(rename = "podsUpdated")]
+    PodsUpdated {
+        pods: Vec<crate::kubernetes::models::PodInfo>,
+    },
 }
