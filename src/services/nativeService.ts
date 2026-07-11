@@ -1,8 +1,8 @@
 import {
-  init as neuInit,
-  filesystem as neuFilesystem,
   events as neuEvents,
-  extensions as neuExtensions
+  extensions as neuExtensions,
+  filesystem as neuFilesystem,
+  init as neuInit
 } from '@neutralinojs/lib'
 
 /**
@@ -32,9 +32,16 @@ export function init(): void {
   neuInit()
 
   // Register listener for core extension connection
-  events.on('coreConnected', (evt: unknown) => {
-    const detail = (evt as { detail?: unknown })?.detail
-    console.log('Rust core extension reports connection:', detail)
+  events.on('engineConnected', (evt: unknown) => {
+    const customEvent = evt as { detail?: { status: string; message: string } }
+    const payload = customEvent.detail
+    if (payload) {
+      if (payload.status === 'ready') {
+        console.log('Orbit Engine connected!', payload.message)
+      } else {
+        console.log('Orbit Engine connected with error:', payload.message)
+      }
+    }
   })
 }
 

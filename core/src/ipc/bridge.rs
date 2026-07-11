@@ -21,15 +21,15 @@ pub struct AuthInfo {
 
 impl AuthInfo {
     pub fn from_stdin() -> Self {
-        use std::io::Read;
+        use std::io::BufRead;
         let mut buf = String::new();
         let stdin = std::io::stdin();
         let mut handle = stdin.lock();
-        let mut small_buf = [0u8; 4096];
-        if let Ok(n) = handle.read(&mut small_buf) {
-            buf.push_str(&String::from_utf8_lossy(&small_buf[..n]));
+        if let Ok(_) = handle.read_line(&mut buf) {
+            serde_json::from_str(buf.trim()).unwrap_or_default()
+        } else {
+            Self::default()
         }
-        serde_json::from_str(&buf).unwrap_or_default()
     }
 
     pub fn override_from_cli(&mut self) {
