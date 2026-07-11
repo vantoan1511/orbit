@@ -19,6 +19,14 @@ export interface OrbitEventMap {
   }
 }
 
+export const OrbitEvents = {
+  EngineConnected: 'engineConnected',
+  Ping: 'ping',
+  Pong: 'pong',
+  NamespacesUpdated: 'namespacesUpdated',
+  PodsUpdated: 'podsUpdated'
+} as const
+
 export type OrbitEventName = keyof OrbitEventMap
 
 export type OrbitEvent<K extends OrbitEventName = OrbitEventName> = {
