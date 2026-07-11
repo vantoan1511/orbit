@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import type { OrbitEventMap, OrbitEventName } from '@/types/events'
 import {
   events as neuEvents,
@@ -5,6 +6,8 @@ import {
   filesystem as neuFilesystem,
   init as neuInit
 } from '@neutralinojs/lib'
+
+export const isEngineReady = ref(false)
 
 /**
  * Sanitizes input path strings to prevent directory traversal attacks (e.g., ../).
@@ -36,8 +39,10 @@ export function init(): void {
   events.on('engineConnected', (payload) => {
     if (payload.status === 'ready') {
       console.log('Orbit Engine connected!', payload.message)
+      isEngineReady.value = true
     } else {
       console.log('Orbit Engine connected with error:', payload.message)
+      isEngineReady.value = false
     }
   })
 }
@@ -66,18 +71,28 @@ export const os = {
   // Add sanitized os wrapper functions as needed
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const eventHandlerMap = new Map<any, any>()
+
 /**
  * Safe wrapper for Neutralino events API
  */
 export const events = {
   on<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return neuEvents.on(event, (evt: any) => {
+    const wrapper = (evt: any) => {
       const payload = evt?.detail as OrbitEventMap[K]
       handler(payload)
-    })
+    }
+    eventHandlerMap.set(handler, wrapper)
+    return neuEvents.on(event, wrapper)
   },
   off<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
+    const wrapper = eventHandlerMap.get(handler)
+    if (wrapper) {
+      eventHandlerMap.delete(handler)
+      return neuEvents.off(event, wrapper)
+    }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return neuEvents.off(event, handler as any)
   },

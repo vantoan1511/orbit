@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -11,7 +11,7 @@ import type { PodInfo } from '@/types/kubernetes'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
 import { kubernetesService } from '@/services/kubernetesService'
-import { events } from '@/services/nativeService'
+import { events, isEngineReady } from '@/services/nativeService'
 
 const toast = useToast()
 
@@ -107,16 +107,33 @@ const loadData = async () => {
   await kubernetesService.getPods()
 }
 
+const handleNamespacesUpdated = (data: { namespaces: string[] }) => {
+  console.log('Received namespaces: ', data)
+  namespaceList.value = ['All Namespaces', ...data.namespaces]
+}
+
+const handlePodsUpdated = (data: { pods: PodInfo[] }) => {
+  pods.value = data.pods
+}
+
+watch(
+  isEngineReady,
+  (ready) => {
+    if (ready) {
+      loadData()
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
-  events.on('namespacesUpdated', (data) => {
-    namespaceList.value = ['All Namespaces', ...data.namespaces]
-  })
+  events.on('namespacesUpdated', handleNamespacesUpdated)
+  events.on('podsUpdated', handlePodsUpdated)
+})
 
-  events.on('podsUpdated', (data) => {
-    pods.value = data.pods
-  })
-
-  loadData()
+onUnmounted(() => {
+  events.off('namespacesUpdated', handleNamespacesUpdated)
+  events.off('podsUpdated', handlePodsUpdated)
 })
 </script>
 
