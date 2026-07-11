@@ -113,10 +113,6 @@
 /* ==========================================================================
    Checkbox and ToggleSwitch (from GeneralSettingsForm)
    ========================================================================== */
-.p-checkbox {
-  width: 1rem;
-  height: 1rem;
-}
 
 .p-checkbox-box {
   border-radius: 0.25rem;
