@@ -195,19 +195,3 @@ const refreshTable = () => {
     </DataTable>
   </div>
 </template>
-
-<style scoped>
-:deep(.p-datatable-thead > tr > th) {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-:deep(.p-datatable-tbody > tr:hover) {
-  background: var(--bg-hover) / 20;
-}
-</style>

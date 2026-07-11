@@ -256,18 +256,3 @@ const handleActionClick = (event: Event, action: string, eventName: string) => {
     <EventDetailsDrawer v-model:visible="drawerVisible" :event="selectedEvent" />
   </div>
 </template>
-
-<style scoped>
-:deep(.p-datatable-thead > tr > th) {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
-
-:deep(.p-datatable-tbody > tr:hover) {
-  background: var(--bg-hover) / 20;
-}
-</style>
