@@ -7,11 +7,17 @@ function sanitizePath(path: string): string {
   // Normalize backslashes to forward slashes
   let sanitized = path.replace(/\\/g, '/')
 
+  // Remove drive letters (e.g. C:) to prevent absolute path access on Windows
+  sanitized = sanitized.replace(/^[a-zA-Z]:/g, '')
+
+  // Remove leading slashes to prevent absolute path access on Unix-like systems
+  sanitized = sanitized.replace(/^\/+/g, '')
+
   // Remove directory traversal sequences (e.g. '../', '..')
   sanitized = sanitized.replace(/\.\.+\//g, '')
   sanitized = sanitized.replace(/\.\.+$/g, '')
 
-  return sanitized
+  return sanitized || './'
 }
 
 /**
