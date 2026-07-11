@@ -200,7 +200,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "orbit-core"
+name = "orbit-engine"
 version = "1.0.0"
 dependencies = [
  "futures-util",

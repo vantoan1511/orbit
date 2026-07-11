@@ -1,11 +1,11 @@
 {
-  "applicationId": "com.github.vantoan1511.orbit",
+  "applicationId": "vantoan1511.orbit",
   "applicationName": "Orbit",
   "applicationIcon": "public/icon.png",
   "description": "A fast, lightweight desktop application for exploring, monitoring, and managing Kubernetes clusters from a single intuitive interface.",
   "version": "1.0.0",
   "author": "Toan Nguyen",
-  "copyright": "Copyright © Orbit 2026. All rights reserved.",
+  "copyright": "Copyright © Toan Nguyen 2026. All rights reserved.",
   "defaultMode": "window",
   "storageLocation": "system",
   "dataLocation": "system",
@@ -27,10 +27,10 @@
   ],
   "extensions": [
     {
-      "id": "orbit.core",
-      "commandLinux": "${NL_PATH}/core/target/debug/orbit-core",
-      "commandWindows": "${NL_PATH}/core/target/debug/orbit-core.exe",
-      "commandDarwin": "${NL_PATH}/core/target/debug/orbit-core"
+      "id": "vantoan1511.orbit.core.engine",
+      "commandLinux": "${NL_PATH}/core/target/release/orbit-engine",
+      "commandWindows": "${NL_PATH}/core/target/release/orbit-engine.exe",
+      "commandDarwin": "${NL_PATH}/core/target/release/orbit-engine"
     }
   ],
   "modes": {
@@ -47,8 +47,8 @@
     "binaryName": "orbit",
     "resourcesPath": "/build/",
     "resourcesExclude": ".*\\.ts$|.*\\.tsx$|.*\\.map$",
-    "extensionsPath": "/extensions/",
-    "extensionsExclude": "node_modules|src|internal|drivers|vendor|.*\\.go$|.*\\.js$|.*\\.mod$|.*\\.sum$|.*\\.log$|package.*\\.json|target|.*\\.rs$|Cargo.*",
+    "extensionsPath": "/core/",
+    "extensionsExclude": "",
     "binaryVersion": "6.8.0",
     "clientVersion": "6.8.0",
     "frontendLibrary": {
@@ -57,7 +57,7 @@
       "projectPath": "/",
       "initCommand": "npm install",
       "devCommand": "npm run dev",
-      "buildCommand": "npm run build"
+      "buildCommand": "npm run build && cd core && cargo build --release"
     }
   }
 }
