@@ -1,28 +1,52 @@
 mod ipc;
 
 use std::error::Error;
-use std::io::{self, BufRead};
-use ipc::models::NeutralinoConfig;
+use ipc::bridge::{AuthInfo, Bridge};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     println!("Orbit Core Engine starting up...");
 
-    // Neutralinojs sends config details over stdin as JSON
-    let stdin = io::stdin();
-    let mut reader = stdin.lock();
-    let mut input = String::new();
+    // Retrieve authentication details from stdin
+    let mut auth = AuthInfo::from_stdin();
+    // Allow overriding authentication details from command-line arguments
+    auth.override_from_cli();
 
-    // Read the first line which contains the config
-    if reader.read_line(&mut input)? == 0 {
-        return Err("No config received on stdin".into());
+    println!("Connecting to port: {}", auth.nl_port);
+
+    let mut bridge = Bridge::connect(&auth).await?;
+    println!("Orbit Core Engine connected to Neutralinojs WebSocket server.");
+
+    // Broadcast that the core is connected and ready
+    Bridge::broadcast(
+        &bridge.writer,
+        &bridge.token,
+        "engineConnected",
+        serde_json::json!({
+            "status": "ready",
+            "message": "Orbit Engine is connected and ready."
+        }),
+    ).await?;
+
+    // Message processing loop
+    loop {
+        let msg = match Bridge::read_message(&mut bridge.reader, &bridge.writer).await {
+            Ok(msg) => msg,
+            Err(e) => {
+                eprintln!("WebSocket error occurred or connection closed: {:?}", e);
+                break;
+            }
+        };
+
+        if msg.event.as_deref() == Some("windowClose") {
+            log::info!("Received windowClose, shutting down.");
+            break;
+        }
+
+        tokio::spawn(async move {
+            println!("Handled received message: {:?}", msg);
+        });
     }
-
-    let config: NeutralinoConfig = serde_json::from_str(&input.trim())?;
-    println!("Configuration parsed. Connecting to port: {}", config.nl_port);
-
-    let ws_stream = ipc::connect(&config).await?;
-    ipc::run_loop(ws_stream).await?;
 
     Ok(())
 }
