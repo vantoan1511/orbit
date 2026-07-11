@@ -1,3 +1,5 @@
+import type { PodInfo } from './kubernetes'
+
 export interface OrbitEventMap {
   engineConnected: {
     status: 'ready' | 'error'
@@ -8,6 +10,12 @@ export interface OrbitEventMap {
   }
   pong: {
     reply: string
+  }
+  namespacesUpdated: {
+    namespaces: string[]
+  }
+  podsUpdated: {
+    pods: PodInfo[]
   }
 }
 

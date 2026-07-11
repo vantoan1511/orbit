@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -7,14 +7,16 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, Power, Trash2 } from '@lucide/vue'
-import { mockPods } from './mockPods'
-import type { PodInfo } from './mockPods'
+import type { PodInfo } from '@/types/kubernetes'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
+import { kubernetesService } from '@/services/kubernetesService'
+import { events } from '@/services/nativeService'
 
 const toast = useToast()
 
-const pods = ref<PodInfo[]>(mockPods)
+const pods = ref<PodInfo[]>([])
+const namespaceList = ref<string[]>(['All Namespaces'])
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
 const selectedStatus = ref('All Statuses')
@@ -25,8 +27,7 @@ const drawerVisible = ref(false)
 const selectedPod = ref<PodInfo | null>(null)
 
 const namespaces = computed(() => {
-  const list = new Set(pods.value.map((p) => p.namespace))
-  return ['All Namespaces', ...Array.from(list)]
+  return namespaceList.value
 })
 
 const statuses = [
@@ -45,9 +46,7 @@ const filteredPods = computed(() => {
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
       const matchesName = p.name.toLowerCase().includes(query)
-      const matchesImage = p.images.some((img) => img.toLowerCase().includes(query))
-      const matchesNode = p.node.toLowerCase().includes(query)
-      if (!matchesName && !matchesImage && !matchesNode) return false
+      if (!matchesName) return false
     }
 
     // Namespace filter
@@ -63,9 +62,6 @@ const filteredPods = computed(() => {
 
     // Status filter
     if (selectedStatus.value !== 'All Statuses') {
-      if (selectedStatus.value === 'Failed' && p.status === 'CrashLoopBackOff') {
-        // include CrashLoopBackOff under Failed or check exact match
-      }
       if (p.status !== selectedStatus.value) {
         return false
       }
@@ -105,6 +101,23 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     life: 3000
   })
 }
+
+const loadData = async () => {
+  await kubernetesService.getNamespaces()
+  await kubernetesService.getPods()
+}
+
+onMounted(() => {
+  events.on('namespacesUpdated', (data) => {
+    namespaceList.value = ['All Namespaces', ...data.namespaces]
+  })
+
+  events.on('podsUpdated', (data) => {
+    pods.value = data.pods
+  })
+
+  loadData()
+})
 </script>
 
 <template>
@@ -207,72 +220,74 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
         </template>
       </Column>
 
-      <!-- Node Column -->
+      <!-- Node Column (Optional fallback) -->
       <Column field="node" header="Node" sortable class="p-3">
         <template #body="{ data }">
           <span
             class="text-(--text-secondary) font-mono truncate block max-w-44"
-            :title="data.node"
+            :title="data.node || 'N/A'"
           >
-            {{ data.node.split('.')[0] }}
+            {{ data.node ? data.node.split('.')[0] : 'N/A' }}
           </span>
         </template>
       </Column>
 
-      <!-- Restarts Column -->
+      <!-- Restarts Column (Optional fallback) -->
       <Column field="restarts" header="Restarts" sortable class="p-3 text-center">
         <template #body="{ data }">
           <span
             class="font-mono px-1.5 py-0.5 rounded text-[10px]"
             :class="
-              data.restarts > 0
+              (data.restarts || 0) > 0
                 ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                 : 'text-(--text-muted)'
             "
           >
-            {{ data.restarts }}
+            {{ data.restarts || 0 }}
           </span>
         </template>
       </Column>
 
-      <!-- CPU Column -->
+      <!-- CPU Column (Optional fallback) -->
       <Column field="cpu" header="CPU" sortable class="p-3">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-24">
             <div class="flex justify-between font-mono text-[10px]">
-              <span class="text-(--text-secondary)">{{ data.cpu }}</span>
-              <span class="text-(--text-muted)" v-if="data.cpu !== '-'">{{ data.cpuPct }}%</span>
+              <span class="text-(--text-secondary)">{{ data.cpu || '-' }}</span>
+              <span class="text-(--text-muted)" v-if="data.cpu && data.cpu !== '-'"
+                >{{ data.cpuPct || 0 }}%</span
+              >
             </div>
             <div
               class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-              v-if="data.cpu !== '-'"
+              v-if="data.cpu && data.cpu !== '-'"
             >
               <div
                 class="h-full rounded-full bg-violet-500"
-                :style="{ width: data.cpuPct + '%' }"
+                :style="{ width: (data.cpuPct || 0) + '%' }"
               ></div>
             </div>
           </div>
         </template>
       </Column>
 
-      <!-- Memory Column -->
+      <!-- Memory Column (Optional fallback) -->
       <Column field="memory" header="Memory" sortable class="p-3">
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-24">
             <div class="flex justify-between font-mono text-[10px]">
-              <span class="text-(--text-secondary)">{{ data.memory }}</span>
-              <span class="text-(--text-muted)" v-if="data.memory !== '-'"
-                >{{ data.memoryPct }}%</span
+              <span class="text-(--text-secondary)">{{ data.memory || '-' }}</span>
+              <span class="text-(--text-muted)" v-if="data.memory && data.memory !== '-'"
+                >{{ data.memoryPct || 0 }}%</span
               >
             </div>
             <div
               class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-              v-if="data.memory !== '-'"
+              v-if="data.memory && data.memory !== '-'"
             >
               <div
                 class="h-full rounded-full bg-blue-500"
-                :style="{ width: data.memoryPct + '%' }"
+                :style="{ width: (data.memoryPct || 0) + '%' }"
               ></div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 mod ipc;
+mod kubernetes;
 
 use std::error::Error;
 use ipc::bridge::{AuthInfo, Bridge};
@@ -57,6 +58,57 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     },
                 ).await;
             });
+        }
+
+        // Handle extension events from frontend
+        if msg.event.as_deref() == Some("extClientMessage") {
+            if let Some(ref data) = msg.data {
+                if let Some(event_name) = data.get("event").and_then(|v| v.as_str()) {
+                    let ext_data = data.get("data").cloned();
+                    let writer = bridge.writer.clone();
+                    let token = bridge.token.clone();
+                    
+                    match event_name {
+                        "getNamespaces" => {
+                            tokio::spawn(async move {
+                                match kubernetes::list_namespaces().await {
+                                    Ok(namespaces) => {
+                                        let _ = Bridge::send_event(
+                                            &writer,
+                                            &token,
+                                            &OrbitEvent::NamespacesUpdated { namespaces },
+                                        ).await;
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Error listing namespaces: {:?}", e);
+                                    }
+                                }
+                            });
+                        }
+                        "getPods" => {
+                            tokio::spawn(async move {
+                                let namespace = ext_data
+                                    .and_then(|d| d.get("namespace").cloned())
+                                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                                    
+                                match kubernetes::list_pods(namespace).await {
+                                    Ok(pods) => {
+                                        let _ = Bridge::send_event(
+                                            &writer,
+                                            &token,
+                                            &OrbitEvent::PodsUpdated { pods },
+                                        ).await;
+                                    }
+                                    Err(e) => {
+                                        eprintln!("Error listing pods: {:?}", e);
+                                    }
+                                }
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
 
         tokio::spawn(async move {

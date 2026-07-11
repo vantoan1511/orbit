@@ -24,6 +24,7 @@
   "nativeAllowList": [
     "filesystem.readDirectory",
     "extensions.getStats",
+    "extensions.dispatch",
     "app.broadcast",
     "events.on",
     "events.off",
