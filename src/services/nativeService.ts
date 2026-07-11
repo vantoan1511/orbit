@@ -58,7 +58,7 @@ export const os = {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const eventHandlerMap = new Map<any, any>()
+const eventHandlerMap = new Map<string, Map<any, any>>()
 
 /**
  * Safe wrapper for Neutralino events API
@@ -70,14 +70,27 @@ export const events = {
       const payload = evt?.detail as OrbitEventMap[K]
       handler(payload)
     }
-    eventHandlerMap.set(handler, wrapper)
+
+    let handlers = eventHandlerMap.get(event)
+    if (!handlers) {
+      handlers = new Map()
+      eventHandlerMap.set(event, handlers)
+    }
+    handlers.set(handler, wrapper)
+
     return neuEvents.on(event, wrapper)
   },
   off<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
-    const wrapper = eventHandlerMap.get(handler)
-    if (wrapper) {
-      eventHandlerMap.delete(handler)
-      return neuEvents.off(event, wrapper)
+    const handlers = eventHandlerMap.get(event)
+    if (handlers) {
+      const wrapper = handlers.get(handler)
+      if (wrapper) {
+        handlers.delete(handler)
+        if (handlers.size === 0) {
+          eventHandlerMap.delete(event)
+        }
+        return neuEvents.off(event, wrapper)
+      }
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return neuEvents.off(event, handler as any)
