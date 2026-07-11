@@ -35,3 +35,9 @@ export interface PodInfo {
   containers?: PodContainer[]
   events?: PodEvent[]
 }
+
+export interface ClusterInfo {
+  id: string
+  name: string
+  status: 'healthy' | 'offline' | string
+}

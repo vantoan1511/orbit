@@ -29,7 +29,8 @@
     "events.on",
     "events.off",
     "events.dispatch",
-    "events.broadcast"
+    "events.broadcast",
+    "os.showOpenDialog"
   ],
   "extensions": [
     {

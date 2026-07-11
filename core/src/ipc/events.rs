@@ -24,4 +24,12 @@ pub enum OrbitEvent {
     PodsUpdated {
         pods: Vec<crate::kubernetes::models::PodInfo>,
     },
+    #[serde(rename = "clustersUpdated")]
+    ClustersUpdated {
+        clusters: Vec<crate::kubernetes::models::ClusterInfo>,
+    },
+    #[serde(rename = "activeClusterChanged")]
+    ActiveClusterChanged {
+        active_cluster_id: Option<String>,
+    },
 }

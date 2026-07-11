@@ -2,8 +2,11 @@ mod ipc;
 mod kubernetes;
 
 use std::error::Error;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use ipc::bridge::{AuthInfo, Bridge};
 use ipc::events::OrbitEvent;
+use kubernetes::manager::KubeManager;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -19,6 +22,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let mut bridge = Bridge::connect(&auth).await?;
     println!("Orbit Core Engine connected to Neutralinojs WebSocket server.");
 
+    // Initialize KubeManager
+    let kube_manager = Arc::new(RwLock::new(KubeManager::new().await));
+
     // Broadcast that the core is connected and ready
     Bridge::send_event(
         &bridge.writer,
@@ -28,6 +34,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
             message: "Orbit Engine is connected and ready.".to_string(),
         },
     ).await?;
+
+    // Also send initial clusters list and active context
+    {
+        let manager = kube_manager.read().await;
+        let clusters = manager.get_clusters();
+        let active_cluster_id = manager.active_context.clone();
+
+        let _ = Bridge::send_event(
+            &bridge.writer,
+            &bridge.token,
+            &OrbitEvent::ClustersUpdated { clusters },
+        ).await;
+
+        let _ = Bridge::send_event(
+            &bridge.writer,
+            &bridge.token,
+            &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+        ).await;
+    }
 
     // Message processing loop
     loop {
@@ -48,6 +73,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if msg.event.as_deref() == Some("appClientConnect") || msg.event.as_deref() == Some("clientConnect") {
             let writer = bridge.writer.clone();
             let token = bridge.token.clone();
+            let manager = kube_manager.clone();
             tokio::spawn(async move {
                 let _ = Bridge::send_event(
                     &writer,
@@ -57,6 +83,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         message: "Orbit Engine is connected and ready.".to_string(),
                     },
                 ).await;
+
+                let r_manager = manager.read().await;
+                let clusters = r_manager.get_clusters();
+                let active_cluster_id = r_manager.active_context.clone();
+
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ClustersUpdated { clusters },
+                ).await;
+
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+                ).await;
             });
         }
 
@@ -64,20 +106,145 @@ async fn main() -> Result<(), Box<dyn Error>> {
         if let Some(event_name) = msg.event.as_deref() {
             let writer = bridge.writer.clone();
             let token = bridge.token.clone();
+            let manager = kube_manager.clone();
             
             match event_name {
+                "getClusters" => {
+                    tokio::spawn(async move {
+                        let r_manager = manager.read().await;
+                        let clusters = r_manager.get_clusters();
+                        let active_cluster_id = r_manager.active_context.clone();
+
+                        let _ = Bridge::send_event(
+                            &writer,
+                            &token,
+                            &OrbitEvent::ClustersUpdated { clusters },
+                        ).await;
+
+                        let _ = Bridge::send_event(
+                            &writer,
+                            &token,
+                            &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+                        ).await;
+                    });
+                }
+                "switchCluster" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let cluster_id = ext_data
+                            .and_then(|d| d.get("clusterId").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        if let Some(id) = cluster_id {
+                            let mut w_manager = manager.write().await;
+                            match w_manager.switch_context(&id).await {
+                                Ok(()) => {
+                                    let active_cluster_id = w_manager.active_context.clone();
+                                    let clusters = w_manager.get_clusters();
+
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+                                    ).await;
+
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ClustersUpdated { clusters },
+                                    ).await;
+
+                                    // Refresh namespaces and pods for new active client
+                                    if let Some(ref client) = w_manager.active_client {
+                                        if let Ok(namespaces) = kubernetes::list_namespaces(client).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::NamespacesUpdated { namespaces },
+                                            ).await;
+                                        }
+                                        if let Ok(pods) = kubernetes::list_pods(client, None).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::PodsUpdated { pods },
+                                            ).await;
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error switching cluster: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "addCluster" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let file_path = ext_data
+                            .and_then(|d| d.get("filePath").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        if let Some(path) = file_path {
+                            let mut w_manager = manager.write().await;
+                            match w_manager.add_kubeconfig_file(&path).await {
+                                Ok(()) => {
+                                    let clusters = w_manager.get_clusters();
+                                    let active_cluster_id = w_manager.active_context.clone();
+
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ClustersUpdated { clusters },
+                                    ).await;
+
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+                                    ).await;
+
+                                    // Refresh namespaces and pods for new active client
+                                    if let Some(ref client) = w_manager.active_client {
+                                        if let Ok(namespaces) = kubernetes::list_namespaces(client).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::NamespacesUpdated { namespaces },
+                                            ).await;
+                                        }
+                                        if let Ok(pods) = kubernetes::list_pods(client, None).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::PodsUpdated { pods },
+                                            ).await;
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    eprintln!("Error adding cluster: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
                 "getNamespaces" => {
                     tokio::spawn(async move {
-                        match kubernetes::list_namespaces().await {
-                            Ok(namespaces) => {
-                                let _ = Bridge::send_event(
-                                    &writer,
-                                    &token,
-                                    &OrbitEvent::NamespacesUpdated { namespaces },
-                                ).await;
-                            }
-                            Err(e) => {
-                                eprintln!("Error listing namespaces: {:?}", e);
+                        let r_manager = manager.read().await;
+                        if let Some(ref client) = r_manager.active_client {
+                            match kubernetes::list_namespaces(client).await {
+                                Ok(namespaces) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::NamespacesUpdated { namespaces },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing namespaces: {:?}", e);
+                                }
                             }
                         }
                     });
@@ -88,17 +255,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         let namespace = ext_data
                             .and_then(|d| d.get("namespace").cloned())
                             .and_then(|v| v.as_str().map(|s| s.to_string()));
-                            
-                        match kubernetes::list_pods(namespace).await {
-                            Ok(pods) => {
-                                let _ = Bridge::send_event(
-                                    &writer,
-                                    &token,
-                                    &OrbitEvent::PodsUpdated { pods },
-                                ).await;
-                            }
-                            Err(e) => {
-                                eprintln!("Error listing pods: {:?}", e);
+
+                        let r_manager = manager.read().await;
+                        if let Some(ref client) = r_manager.active_client {
+                            match kubernetes::list_pods(client, namespace).await {
+                                Ok(pods) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::PodsUpdated { pods },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing pods: {:?}", e);
+                                }
                             }
                         }
                     });

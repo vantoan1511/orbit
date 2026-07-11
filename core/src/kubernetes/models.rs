@@ -9,3 +9,11 @@ pub struct PodInfo {
     pub cpu: Option<String>,
     pub memory: Option<String>,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ClusterInfo {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+}
+

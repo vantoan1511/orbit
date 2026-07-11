@@ -13,5 +13,26 @@ export const kubernetesService = {
    */
   async getPods(namespace?: string): Promise<void> {
     await coreEngine.dispatch('getPods', { namespace })
+  },
+
+  /**
+   * Request list of clusters
+   */
+  async getClusters(): Promise<void> {
+    await coreEngine.dispatch('getClusters')
+  },
+
+  /**
+   * Switch active context/cluster
+   */
+  async switchCluster(clusterId: string): Promise<void> {
+    await coreEngine.dispatch('switchCluster', { clusterId })
+  },
+
+  /**
+   * Add a new cluster kubeconfig file path
+   */
+  async addCluster(filePath: string): Promise<void> {
+    await coreEngine.dispatch('addCluster', { filePath })
   }
 }

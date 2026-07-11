@@ -3,7 +3,8 @@ import {
   events as neuEvents,
   extensions as neuExtensions,
   filesystem as neuFilesystem,
-  init as neuInit
+  init as neuInit,
+  os as neuOs
 } from '@neutralinojs/lib'
 
 /**
@@ -54,7 +55,15 @@ export const window = {
  * Safe wrapper for Neutralino os API
  */
 export const os = {
-  // Add sanitized os wrapper functions as needed
+  showOpenDialog(
+    title: string,
+    options?: {
+      filters?: Array<{ name: string; extensions: string[] }>
+      multiSelections?: boolean
+    }
+  ): Promise<string[]> {
+    return neuOs.showOpenDialog(title, options)
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
