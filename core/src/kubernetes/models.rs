@@ -138,6 +138,47 @@ pub struct NodeInfo {
     pub labels: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServicePort {
+    pub port: i32,
+    pub target_port: String,
+    pub protocol: String,
+    pub node_port: Option<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceEvent {
+    pub r#type: String,
+    pub reason: String,
+    pub message: String,
+    pub age: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceInfo {
+    pub name: String,
+    pub namespace: String,
+    pub r#type: String,
+    pub cluster_ip: String,
+    pub external_ip: String,
+    pub ports: String,
+    pub endpoints: String,
+    pub age: String,
+    pub session_affinity: String,
+    pub internal_traffic_policy: Option<String>,
+    pub created: String,
+    pub uid: String,
+    pub selector: std::collections::BTreeMap<String, String>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub ports_list: Vec<ServicePort>,
+    pub endpoints_list: Vec<String>,
+    pub events: Vec<ServiceEvent>,
+}
+
+
 
 
 

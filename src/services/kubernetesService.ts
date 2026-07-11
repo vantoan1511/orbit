@@ -58,6 +58,13 @@ export const kubernetesService = {
   },
 
   /**
+   * Request list of services, optionally filtered by namespace
+   */
+  async getServices(namespace?: string): Promise<void> {
+    await coreEngine.dispatch('getServices', { namespace })
+  },
+
+  /**
    * Request list of nodes
    */
   async getNodes(): Promise<void> {

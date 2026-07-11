@@ -148,3 +148,37 @@ export interface NodeInfo {
   uptime: string
   labels: string[]
 }
+
+export interface ServicePort {
+  port: number
+  targetPort: number | string
+  protocol: string
+  nodePort?: number
+}
+
+export interface ServiceEvent {
+  type: string
+  reason: string
+  message: string
+  age: string
+}
+
+export interface ServiceInfo {
+  name: string
+  namespace: string
+  type: string
+  clusterIP: string
+  externalIP: string
+  ports: string
+  endpoints: string
+  age: string
+  sessionAffinity: string
+  internalTrafficPolicy?: string
+  created: string
+  uid: string
+  selector: Record<string, string>
+  labels: Record<string, string>
+  portsList: ServicePort[]
+  endpointsList: string[]
+  events: ServiceEvent[]
+}

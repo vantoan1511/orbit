@@ -7,12 +7,12 @@ const k8sStore = useKubernetesStore()
 
 const cards = computed(() => {
   const nodes = k8sStore.nodes
-  
+
   // Total Nodes
   const totalNodes = nodes.length
-  const readyNodes = nodes.filter(n => n.status === 'Ready').length
+  const readyNodes = nodes.filter((n) => n.status === 'Ready').length
   const onlinePct = totalNodes > 0 ? Math.round((readyNodes / totalNodes) * 100) : 0
-  
+
   // CPU
   let cpuUsed = 0
   let cpuTotal = 0
@@ -22,8 +22,8 @@ const cards = computed(() => {
   // Pods
   let podsCount = 0
   let podsLimit = 0
-  
-  nodes.forEach(n => {
+
+  nodes.forEach((n) => {
     cpuUsed += parseFloat(n.cpuUsed) || 0
     cpuTotal += parseFloat(n.cpuTotal) || 0
     memUsed += parseFloat(n.memUsed) || 0
@@ -31,13 +31,13 @@ const cards = computed(() => {
     podsCount += n.podsCount || 0
     podsLimit += n.podsLimit || 0
   })
-  
+
   const cpuPct = cpuTotal > 0 ? Math.round((cpuUsed / cpuTotal) * 100) : 0
   const memPct = memTotal > 0 ? Math.round((memUsed / memTotal) * 100) : 0
   const podsPct = podsLimit > 0 ? Math.round((podsCount / podsLimit) * 100) : 0
-  
+
   const allReady = totalNodes > 0 && readyNodes === totalNodes
-  
+
   return [
     {
       title: 'Total Nodes',

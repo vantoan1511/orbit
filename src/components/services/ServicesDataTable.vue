@@ -7,14 +7,16 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, ExternalLink, MoreVertical } from '@lucide/vue'
-import { mockServices } from './mockServices'
-import type { ServiceInfo } from './mockServices'
+import type { ServiceInfo } from '@/types/kubernetes'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { kubernetesService } from '@/services/kubernetesService'
 import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
 
 const toast = useToast()
+const k8sStore = useKubernetesStore()
 
-const services = ref<ServiceInfo[]>(mockServices)
+const services = computed(() => k8sStore.services)
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
 const selectedType = ref('All Types')
@@ -23,6 +25,10 @@ const showSystemNamespaces = ref(false)
 // Drawer state
 const drawerVisible = ref(false)
 const selectedService = ref<ServiceInfo | null>(null)
+
+const handleRefresh = async () => {
+  await kubernetesService.getServices()
+}
 
 const namespaces = computed(() => {
   const list = new Set(services.value.map((s) => s.namespace))
@@ -133,7 +139,13 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
         </div>
 
         <div class="flex items-center gap-1">
-          <Button severity="secondary" variant="text" size="small" class="p-1">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="handleRefresh"
+          >
             <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
