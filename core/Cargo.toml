@@ -1,7 +1,11 @@
 [package]
-name = "orbit-core"
+name = "orbit-engine"
 version = "1.0.0"
 edition = "2024"
+
+[[bin]]
+name = "orbit-engine"
+path = "src/main.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -9,3 +13,10 @@ tokio-tungstenite = "0.26"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 futures-util = "0.3"
+
+[profile.release]
+opt-level = 3          # speed up compilation (3 is faster than 'z')
+lto = "thin"           # faster than full LTO, still good optimization
+codegen-units = 1      # parallelize compilation for faster builds
+strip = true           # keep symbols stripped for reasonable binary size
+panic = "abort"        # abort on panic (smaller binary)
