@@ -2,7 +2,16 @@
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
-import type { ClusterInfo, PodInfo } from '@/types/kubernetes'
+import type {
+  ClusterInfo,
+  PodInfo,
+  DeploymentInfo,
+  StatefulSetInfo,
+  DaemonSetInfo,
+  ReplicaSetInfo,
+  JobInfo,
+  CronJobInfo
+} from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -27,6 +36,30 @@ const handleNamespacesUpdated = (payload: { namespaces: string[] }) => {
 
 const handlePodsUpdated = (payload: { pods: PodInfo[] }) => {
   k8sStore.setPods(payload.pods)
+}
+
+const handleDeploymentsUpdated = (payload: { deployments: DeploymentInfo[] }) => {
+  k8sStore.setDeployments(payload.deployments)
+}
+
+const handleStatefulSetsUpdated = (payload: { stateful_sets: StatefulSetInfo[] }) => {
+  k8sStore.setStatefulSets(payload.stateful_sets)
+}
+
+const handleDaemonSetsUpdated = (payload: { daemon_sets: DaemonSetInfo[] }) => {
+  k8sStore.setDaemonSets(payload.daemon_sets)
+}
+
+const handleReplicaSetsUpdated = (payload: { replica_sets: ReplicaSetInfo[] }) => {
+  k8sStore.setReplicaSets(payload.replica_sets)
+}
+
+const handleJobsUpdated = (payload: { jobs: JobInfo[] }) => {
+  k8sStore.setJobs(payload.jobs)
+}
+
+const handleCronJobsUpdated = (payload: { cron_jobs: CronJobInfo[] }) => {
+  k8sStore.setCronJobs(payload.cron_jobs)
 }
 
 const handleClustersUpdated = (payload: { clusters: ClusterInfo[] }) => {
@@ -54,6 +87,12 @@ onMounted(() => {
   events.on(OrbitEvents.EngineConnected, handleEngineConnected)
   events.on(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.on(OrbitEvents.PodsUpdated, handlePodsUpdated)
+  events.on(OrbitEvents.DeploymentsUpdated, handleDeploymentsUpdated)
+  events.on(OrbitEvents.StatefulSetsUpdated, handleStatefulSetsUpdated)
+  events.on(OrbitEvents.DaemonSetsUpdated, handleDaemonSetsUpdated)
+  events.on(OrbitEvents.ReplicaSetsUpdated, handleReplicaSetsUpdated)
+  events.on(OrbitEvents.JobsUpdated, handleJobsUpdated)
+  events.on(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
@@ -63,6 +102,12 @@ onUnmounted(() => {
   events.off(OrbitEvents.EngineConnected, handleEngineConnected)
   events.off(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.off(OrbitEvents.PodsUpdated, handlePodsUpdated)
+  events.off(OrbitEvents.DeploymentsUpdated, handleDeploymentsUpdated)
+  events.off(OrbitEvents.StatefulSetsUpdated, handleStatefulSetsUpdated)
+  events.off(OrbitEvents.DaemonSetsUpdated, handleDaemonSetsUpdated)
+  events.off(OrbitEvents.ReplicaSetsUpdated, handleReplicaSetsUpdated)
+  events.off(OrbitEvents.JobsUpdated, handleJobsUpdated)
+  events.off(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)

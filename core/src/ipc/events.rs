@@ -24,6 +24,30 @@ pub enum OrbitEvent {
     PodsUpdated {
         pods: Vec<crate::kubernetes::models::PodInfo>,
     },
+    #[serde(rename = "deploymentsUpdated")]
+    DeploymentsUpdated {
+        deployments: Vec<crate::kubernetes::models::DeploymentInfo>,
+    },
+    #[serde(rename = "statefulSetsUpdated")]
+    StatefulSetsUpdated {
+        stateful_sets: Vec<crate::kubernetes::models::StatefulSetInfo>,
+    },
+    #[serde(rename = "daemonSetsUpdated")]
+    DaemonSetsUpdated {
+        daemon_sets: Vec<crate::kubernetes::models::DaemonSetInfo>,
+    },
+    #[serde(rename = "replicaSetsUpdated")]
+    ReplicaSetsUpdated {
+        replica_sets: Vec<crate::kubernetes::models::ReplicaSetInfo>,
+    },
+    #[serde(rename = "jobsUpdated")]
+    JobsUpdated {
+        jobs: Vec<crate::kubernetes::models::JobInfo>,
+    },
+    #[serde(rename = "cronJobsUpdated")]
+    CronJobsUpdated {
+        cron_jobs: Vec<crate::kubernetes::models::CronJobInfo>,
+    },
     #[serde(rename = "clustersUpdated")]
     ClustersUpdated {
         clusters: Vec<crate::kubernetes::models::ClusterInfo>,

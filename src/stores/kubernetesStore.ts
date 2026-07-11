@@ -1,11 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { PodInfo, ClusterInfo } from '@/types/kubernetes'
+import type {
+  PodInfo,
+  ClusterInfo,
+  DeploymentInfo,
+  StatefulSetInfo,
+  DaemonSetInfo,
+  ReplicaSetInfo,
+  JobInfo,
+  CronJobInfo
+} from '@/types/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
   const pods = ref<PodInfo[]>([])
+  const deployments = ref<DeploymentInfo[]>([])
+  const statefulSets = ref<StatefulSetInfo[]>([])
+  const daemonSets = ref<DaemonSetInfo[]>([])
+  const replicaSets = ref<ReplicaSetInfo[]>([])
+  const jobs = ref<JobInfo[]>([])
+  const cronJobs = ref<CronJobInfo[]>([])
   const namespaces = ref<string[]>(['All Namespaces'])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
@@ -18,6 +33,30 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     pods.value = newPods
   }
 
+  function setDeployments(newDeployments: DeploymentInfo[]) {
+    deployments.value = newDeployments
+  }
+
+  function setStatefulSets(newStatefulSets: StatefulSetInfo[]) {
+    statefulSets.value = newStatefulSets
+  }
+
+  function setDaemonSets(newDaemonSets: DaemonSetInfo[]) {
+    daemonSets.value = newDaemonSets
+  }
+
+  function setReplicaSets(newReplicaSets: ReplicaSetInfo[]) {
+    replicaSets.value = newReplicaSets
+  }
+
+  function setJobs(newJobs: JobInfo[]) {
+    jobs.value = newJobs
+  }
+
+  function setCronJobs(newCronJobs: CronJobInfo[]) {
+    cronJobs.value = newCronJobs
+  }
+
   function setNamespaces(newNamespaces: string[]) {
     namespaces.value = ['All Namespaces', ...newNamespaces]
   }
@@ -28,6 +67,13 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setActiveClusterId(id: string | null) {
     activeClusterId.value = id
+    // Clear workloads when cluster changes to prevent stale data
+    deployments.value = []
+    statefulSets.value = []
+    daemonSets.value = []
+    replicaSets.value = []
+    jobs.value = []
+    cronJobs.value = []
   }
 
   async function loadInitialData() {
@@ -41,14 +87,27 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   return {
     isEngineReady,
     pods,
+    deployments,
+    statefulSets,
+    daemonSets,
+    replicaSets,
+    jobs,
+    cronJobs,
     namespaces,
     clusters,
     activeClusterId,
     setEngineReady,
     setPods,
+    setDeployments,
+    setStatefulSets,
+    setDaemonSets,
+    setReplicaSets,
+    setJobs,
+    setCronJobs,
     setNamespaces,
     setClusters,
     setActiveClusterId,
     loadInitialData
   }
 })
+
