@@ -44,6 +44,11 @@ const router = createRouter({
       path: '/namespaces',
       name: 'namespaces',
       component: () => import('../views/NamespacesView.vue')
+    },
+    {
+      path: '/events',
+      name: 'events',
+      component: () => import('../views/EventsView.vue')
     }
   ]
 })
