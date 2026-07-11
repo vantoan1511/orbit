@@ -50,9 +50,12 @@ watch(selectedNamespace, () => {
   fetchDaemonSets()
 })
 
-watch(() => k8sStore.activeClusterId, () => {
-  fetchDaemonSets()
-})
+watch(
+  () => k8sStore.activeClusterId,
+  () => {
+    fetchDaemonSets()
+  }
+)
 
 const filteredDaemonSets = computed(() => {
   return k8sStore.daemonSets.filter((d) => {
@@ -124,7 +127,14 @@ const onRowClick = (event: { data: DaemonSetInfo }) => {
           </label>
         </div>
 
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchDaemonSets" :loading="loading">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="fetchDaemonSets"
+          :loading="loading"
+        >
           <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
         </Button>
       </div>

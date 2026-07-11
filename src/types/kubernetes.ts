@@ -129,3 +129,5 @@ export interface CronJobInfo {
   annotations: Record<string, string>
 }
 
+export type WorkloadInfo =
+  DeploymentInfo | StatefulSetInfo | DaemonSetInfo | ReplicaSetInfo | JobInfo | CronJobInfo

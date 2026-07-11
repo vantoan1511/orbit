@@ -50,9 +50,12 @@ watch(selectedNamespace, () => {
   fetchReplicaSets()
 })
 
-watch(() => k8sStore.activeClusterId, () => {
-  fetchReplicaSets()
-})
+watch(
+  () => k8sStore.activeClusterId,
+  () => {
+    fetchReplicaSets()
+  }
+)
 
 const filteredReplicaSets = computed(() => {
   return k8sStore.replicaSets.filter((r) => {
@@ -124,7 +127,14 @@ const onRowClick = (event: { data: ReplicaSetInfo }) => {
           </label>
         </div>
 
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchReplicaSets" :loading="loading">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="fetchReplicaSets"
+          :loading="loading"
+        >
           <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
         </Button>
       </div>

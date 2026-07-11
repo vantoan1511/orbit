@@ -50,9 +50,12 @@ watch(selectedNamespace, () => {
   fetchCronJobs()
 })
 
-watch(() => k8sStore.activeClusterId, () => {
-  fetchCronJobs()
-})
+watch(
+  () => k8sStore.activeClusterId,
+  () => {
+    fetchCronJobs()
+  }
+)
 
 const filteredCronJobs = computed(() => {
   return k8sStore.cronJobs.filter((cj) => {
@@ -125,7 +128,14 @@ const onRowClick = (event: { data: CronJobInfo }) => {
           </label>
         </div>
 
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchCronJobs" :loading="loading">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="fetchCronJobs"
+          :loading="loading"
+        >
           <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
         </Button>
       </div>
@@ -164,14 +174,23 @@ const onRowClick = (event: { data: CronJobInfo }) => {
       </Column>
 
       <!-- Schedule Column -->
-      <Column field="schedule" header="Schedule" sortable class="p-3 font-mono text-(--text-primary)"></Column>
+      <Column
+        field="schedule"
+        header="Schedule"
+        sortable
+        class="p-3 font-mono text-(--text-primary)"
+      ></Column>
 
       <!-- Suspend Column -->
       <Column field="suspend" header="Suspend" sortable class="p-3">
         <template #body="{ data }">
           <span
             class="font-medium px-2 py-0.5 rounded text-[10px] uppercase tracking-wider"
-            :class="data.suspend ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'"
+            :class="
+              data.suspend
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            "
           >
             {{ data.suspend ? 'True' : 'False' }}
           </span>
@@ -186,7 +205,12 @@ const onRowClick = (event: { data: CronJobInfo }) => {
       </Column>
 
       <!-- Last Schedule Column -->
-      <Column field="lastSchedule" header="Last Schedule" sortable class="p-3 font-mono text-(--text-secondary)">
+      <Column
+        field="lastSchedule"
+        header="Last Schedule"
+        sortable
+        class="p-3 font-mono text-(--text-secondary)"
+      >
         <template #body="{ data }">
           <span>{{ data.lastSchedule || '-' }}</span>
         </template>

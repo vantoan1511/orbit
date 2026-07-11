@@ -110,4 +110,3 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     loadInitialData
   }
 })
-
