@@ -1,4 +1,13 @@
-import type { PodInfo, ClusterInfo } from './kubernetes'
+import type {
+  PodInfo,
+  ClusterInfo,
+  DeploymentInfo,
+  StatefulSetInfo,
+  DaemonSetInfo,
+  ReplicaSetInfo,
+  JobInfo,
+  CronJobInfo
+} from './kubernetes'
 
 export interface OrbitEventMap {
   engineConnected: {
@@ -17,6 +26,24 @@ export interface OrbitEventMap {
   podsUpdated: {
     pods: PodInfo[]
   }
+  deploymentsUpdated: {
+    deployments: DeploymentInfo[]
+  }
+  statefulSetsUpdated: {
+    stateful_sets: StatefulSetInfo[]
+  }
+  daemonSetsUpdated: {
+    daemon_sets: DaemonSetInfo[]
+  }
+  replicaSetsUpdated: {
+    replica_sets: ReplicaSetInfo[]
+  }
+  jobsUpdated: {
+    jobs: JobInfo[]
+  }
+  cronJobsUpdated: {
+    cron_jobs: CronJobInfo[]
+  }
   clustersUpdated: {
     clusters: ClusterInfo[]
   }
@@ -34,6 +61,12 @@ export const OrbitEvents = {
   Pong: 'pong',
   NamespacesUpdated: 'namespacesUpdated',
   PodsUpdated: 'podsUpdated',
+  DeploymentsUpdated: 'deploymentsUpdated',
+  StatefulSetsUpdated: 'statefulSetsUpdated',
+  DaemonSetsUpdated: 'daemonSetsUpdated',
+  ReplicaSetsUpdated: 'replicaSetsUpdated',
+  JobsUpdated: 'jobsUpdated',
+  CronJobsUpdated: 'cronJobsUpdated',
   ClustersUpdated: 'clustersUpdated',
   ActiveClusterChanged: 'activeClusterChanged',
   ErrorOccurred: 'errorOccurred'

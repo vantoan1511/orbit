@@ -1,55 +1,74 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
-import { Search, Info } from '@lucide/vue'
-import { mockDeployments } from './mockDeployments'
-import type { DeploymentInfo } from './mockDeployments'
+import Button from 'primevue/button'
+import { Search, Info, RefreshCw } from '@lucide/vue'
+import type { JobInfo } from '@/types/kubernetes'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { kubernetesService } from '@/services/kubernetesService'
 
-const deployments = ref<DeploymentInfo[]>(mockDeployments)
+const k8sStore = useKubernetesStore()
+
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
 const selectedStatus = ref('All Statuses')
 const showSystemNamespaces = ref(false)
+const loading = ref(false)
 
 // Drawer state
 const drawerVisible = ref(false)
-const selectedWorkload = ref<DeploymentInfo | null>(null)
+const selectedWorkload = ref<JobInfo | null>(null)
 
 const namespaces = computed(() => {
-  const list = new Set(deployments.value.map((d) => d.namespace))
-  return ['All Namespaces', ...Array.from(list)]
+  return k8sStore.namespaces
 })
 
-const statuses = ['All Statuses', 'Running', 'Progressing', 'Failed']
+const statuses = ['All Statuses', 'Active', 'Succeeded', 'Failed', 'Unknown']
 
-const filteredDeployments = computed(() => {
-  return deployments.value.filter((d) => {
-    // Search Query filter
+const fetchJobs = async () => {
+  loading.value = true
+  try {
+    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    await kubernetesService.getJobs(ns)
+  } catch (e) {
+    console.error('Error fetching jobs', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchJobs()
+})
+
+watch(selectedNamespace, () => {
+  fetchJobs()
+})
+
+watch(() => k8sStore.activeClusterId, () => {
+  fetchJobs()
+})
+
+const filteredJobs = computed(() => {
+  return k8sStore.jobs.filter((j) => {
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
-      const matchesName = d.name.toLowerCase().includes(query)
-      const matchesImage = d.images.some((img) => img.toLowerCase().includes(query))
+      const matchesName = j.name.toLowerCase().includes(query)
+      const matchesImage = j.images?.some((img) => img.toLowerCase().includes(query))
       if (!matchesName && !matchesImage) return false
     }
 
-    // Namespace filter
-    if (selectedNamespace.value !== 'All Namespaces' && d.namespace !== selectedNamespace.value) {
-      return false
-    }
-
-    // System Namespaces filter
-    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(d.namespace)
+    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(j.namespace)
     if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
       return false
     }
 
-    // Status filter
-    if (selectedStatus.value !== 'All Statuses' && d.status !== selectedStatus.value) {
+    if (selectedStatus.value !== 'All Statuses' && j.status !== selectedStatus.value) {
       return false
     }
 
@@ -57,7 +76,7 @@ const filteredDeployments = computed(() => {
   })
 })
 
-const onRowClick = (event: { data: DeploymentInfo }) => {
+const onRowClick = (event: { data: JobInfo }) => {
   selectedWorkload.value = event.data
   drawerVisible.value = true
 }
@@ -73,7 +92,7 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
           <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
           <InputText
             v-model="searchQuery"
-            placeholder="Search workloads or images..."
+            placeholder="Search jobs or images..."
             class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
@@ -93,35 +112,39 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
         />
       </div>
 
-      <!-- Toggles -->
-      <div class="flex items-center gap-3 self-end md:self-auto">
+      <!-- Toggles and Refresh -->
+      <div class="flex items-center gap-4 self-end md:self-auto">
         <div class="flex items-center gap-2">
           <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
           <label
             for="system-ns-toggle"
             class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
           >
-            Show System Namespaces
+            Show System
           </label>
         </div>
+
+        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchJobs" :loading="loading">
+          <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+        </Button>
       </div>
     </div>
 
     <!-- Data Table -->
     <DataTable
-      :value="filteredDeployments"
+      :value="filteredJobs"
       paginator
       :rows="10"
       class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"
       tableClass="w-full text-left text-xs border-collapse"
       paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} deployments"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} jobs"
       @row-click="onRowClick"
     >
       <template #empty>
         <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
           <Info class="w-8 h-8 text-(--text-muted)/50" />
-          <span>No workloads found matching the filter criteria.</span>
+          <span>No jobs found matching the filter criteria.</span>
         </div>
       </template>
 
@@ -146,9 +169,9 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
             <span
               class="w-1.5 h-1.5 rounded-full"
               :class="
-                data.status === 'Running'
+                data.status === 'Succeeded'
                   ? 'bg-emerald-500'
-                  : data.status === 'Progressing'
+                  : data.status === 'Active'
                     ? 'bg-amber-500'
                     : 'bg-rose-500'
               "
@@ -156,9 +179,9 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
             <span
               class="font-medium"
               :class="
-                data.status === 'Running'
+                data.status === 'Succeeded'
                   ? 'text-emerald-500'
-                  : data.status === 'Progressing'
+                  : data.status === 'Active'
                     ? 'text-amber-500'
                     : 'text-rose-500'
               "
@@ -169,35 +192,13 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
         </template>
       </Column>
 
-      <!-- Replicas Column -->
-      <Column header="Replicas" class="p-3">
-        <template #body="{ data }">
-          <div class="flex items-center gap-2 font-mono text-(--text-secondary)">
-            <span class="font-bold">{{ data.replicas.current }}</span>
-            <span class="text-(--text-muted)">/</span>
-            <span>{{ data.replicas.desired }}</span>
-          </div>
-        </template>
-      </Column>
+      <!-- Completions Column -->
+      <Column field="completions" header="Completions" sortable class="p-3 font-mono text-(--text-secondary)"></Column>
 
-      <!-- Available Column -->
-      <Column field="available" header="Available" sortable class="p-3">
+      <!-- Duration Column -->
+      <Column field="duration" header="Duration" sortable class="p-3 font-mono text-(--text-secondary)">
         <template #body="{ data }">
-          <span
-            class="font-mono"
-            :class="
-              data.available === data.replicas.desired ? 'text-emerald-500' : 'text-amber-500'
-            "
-          >
-            {{ data.available }}
-          </span>
-        </template>
-      </Column>
-
-      <!-- Up to Date Column -->
-      <Column field="upToDate" header="Up-To-Date" sortable class="p-3">
-        <template #body="{ data }">
-          <span class="font-mono text-(--text-secondary)">{{ data.upToDate }}</span>
+          <span>{{ data.duration || '-' }}</span>
         </template>
       </Column>
 

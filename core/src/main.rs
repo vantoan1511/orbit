@@ -297,6 +297,168 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                     });
                 }
+                "getDeployments" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_deployments(client, namespace).await {
+                                Ok(deployments) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::DeploymentsUpdated { deployments },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing deployments: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getStatefulSets" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_statefulsets(client, namespace).await {
+                                Ok(stateful_sets) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::StatefulSetsUpdated { stateful_sets },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing statefulsets: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getDaemonSets" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_daemonsets(client, namespace).await {
+                                Ok(daemon_sets) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::DaemonSetsUpdated { daemon_sets },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing daemonsets: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getReplicaSets" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_replicasets(client, namespace).await {
+                                Ok(replica_sets) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ReplicaSetsUpdated { replica_sets },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing replicasets: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getJobs" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_jobs(client, namespace).await {
+                                Ok(jobs) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::JobsUpdated { jobs },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing jobs: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getCronJobs" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_cronjobs(client, namespace).await {
+                                Ok(cron_jobs) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::CronJobsUpdated { cron_jobs },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing cronjobs: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
                 _ => {}
             }
         }

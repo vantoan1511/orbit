@@ -7,11 +7,10 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import { Clock, Tag } from '@lucide/vue'
-import type { DeploymentInfo } from './mockDeployments'
 
 const props = defineProps<{
   visible: boolean
-  workload: DeploymentInfo | null
+  workload: any | null
 }>()
 
 const emit = defineEmits<{
@@ -20,19 +19,50 @@ const emit = defineEmits<{
 
 const activeTab = ref('overview')
 
+const getWorkloadKind = (w: any): string => {
+  if ('schedule' in w) return 'CronJob'
+  if ('completions' in w) return 'Job'
+  if ('strategy' in w) return 'Deployment'
+  if ('replicas' in w) {
+    if ('ready' in w.replicas && 'upToDate' in w.replicas) return 'DaemonSet'
+    if (w.name.includes('stateful')) return 'StatefulSet' // fallback
+    return 'ReplicaSet' // fallback
+  }
+  return 'Workload'
+}
+
 // Generate a dummy YAML representation for the YAML tab
-const generateYaml = (w: DeploymentInfo) => {
-  return `apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: ${w.name}
-  namespace: ${w.namespace}
-  labels:
-${Object.entries(w.labels)
-  .map(([k, v]) => `    ${k}: ${v}`)
-  .join('\n')}
-spec:
-  replicas: ${w.replicas.desired}
+const generateYaml = (w: any) => {
+  const kind = getWorkloadKind(w)
+  const labelsStr = w.labels
+    ? Object.entries(w.labels)
+        .map(([k, v]) => `    ${k}: ${v}`)
+        .join('\n')
+    : ''
+    
+  let specSection = ''
+  if (kind === 'CronJob') {
+    specSection = `spec:
+  schedule: "${w.schedule}"
+  suspend: ${w.suspend}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: ${w.name}
+            image: ${w.images?.[0] || 'unknown'}`
+  } else if (kind === 'Job') {
+    specSection = `spec:
+  template:
+    spec:
+      containers:
+      - name: ${w.name}
+        image: ${w.images?.[0] || 'unknown'}
+      restartPolicy: OnFailure`
+  } else {
+    specSection = `spec:
+  replicas: ${w.replicas?.desired ?? 1}
   selector:
     matchLabels:
       app: ${w.name}
@@ -43,9 +73,17 @@ spec:
     spec:
       containers:
       - name: ${w.name}
-        image: ${w.images[0]}
-        ports:
-        - containerPort: 80
+        image: ${w.images?.[0] || 'unknown'}`
+  }
+
+  return `apiVersion: apps/v1
+kind: ${kind}
+metadata:
+  name: ${w.name}
+  namespace: ${w.namespace}
+  labels:
+${labelsStr}
+${specSection}
 `
 }
 </script>
@@ -65,15 +103,15 @@ spec:
           <span
             class="w-2.5 h-2.5 rounded-full animate-pulse"
             :class="
-              props.workload.status === 'Running'
+              props.workload.status === 'Running' || props.workload.status === 'Succeeded'
                 ? 'bg-emerald-500'
-                : props.workload.status === 'Progressing'
+                : props.workload.status === 'Progressing' || props.workload.status === 'Active'
                   ? 'bg-amber-500'
                   : 'bg-rose-500'
             "
           ></span>
           <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
-            {{ props.workload.status }}
+            {{ props.workload.status || 'Active' }}
           </span>
         </div>
         <div
@@ -118,7 +156,7 @@ spec:
             <!-- OVERVIEW PANEL -->
             <TabPanel value="overview" class="space-y-6">
               <!-- Replicas Progress Bars -->
-              <div>
+              <div v-if="props.workload.replicas">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Replicas Status
                 </h3>
@@ -147,19 +185,19 @@ spec:
                         class="h-full rounded-full bg-indigo-500"
                         :style="{
                           width:
-                            (props.workload.replicas.current / props.workload.replicas.desired) *
-                              100 +
-                            '%'
+                            (props.workload.replicas.desired
+                              ? (props.workload.replicas.current / props.workload.replicas.desired) * 100
+                              : 0) + '%'
                         }"
                       ></div>
                     </div>
                   </div>
 
-                  <div>
+                  <div v-if="props.workload.replicas.ready !== undefined">
                     <div class="flex justify-between text-xs mb-1">
-                      <span class="text-(--text-secondary) font-medium">Available Replicas</span>
+                      <span class="text-(--text-secondary) font-medium">Ready Replicas</span>
                       <span class="font-mono font-bold text-(--text-primary)">{{
-                        props.workload.available
+                        props.workload.replicas.ready
                       }}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -167,7 +205,33 @@ spec:
                         class="h-full rounded-full bg-emerald-500"
                         :style="{
                           width:
-                            (props.workload.available / props.workload.replicas.desired) * 100 + '%'
+                            (props.workload.replicas.desired
+                              ? (props.workload.replicas.ready / props.workload.replicas.desired) * 100
+                              : 0) + '%'
+                        }"
+                      ></div>
+                    </div>
+                  </div>
+
+                  <div v-if="props.workload.available !== undefined || props.workload.replicas.available !== undefined">
+                    <div class="flex justify-between text-xs mb-1">
+                      <span class="text-(--text-secondary) font-medium">Available Replicas</span>
+                      <span class="font-mono font-bold text-(--text-primary)">{{
+                        props.workload.available !== undefined ? props.workload.available : props.workload.replicas.available
+                      }}</span>
+                    </div>
+                    <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
+                      <div
+                        class="h-full rounded-full bg-emerald-500"
+                        :style="{
+                          width:
+                            (props.workload.replicas.desired
+                              ? ((props.workload.available !== undefined
+                                  ? props.workload.available
+                                  : props.workload.replicas.available) /
+                                  props.workload.replicas.desired) *
+                                100
+                              : 0) + '%'
                         }"
                       ></div>
                     </div>
@@ -175,7 +239,61 @@ spec:
                 </div>
               </div>
 
-              <!-- Metadata Grid -->
+              <!-- Job Status -->
+              <div v-if="props.workload.completions">
+                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                  Job Status
+                </h3>
+                <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3">
+                  <div class="flex justify-between">
+                    <span class="text-(--text-secondary) font-medium">Completions</span>
+                    <span class="font-mono font-bold text-(--text-primary)">{{
+                      props.workload.completions
+                    }}</span>
+                  </div>
+                  <div v-if="props.workload.duration" class="flex justify-between">
+                    <span class="text-(--text-secondary) font-medium">Duration</span>
+                    <span class="font-mono text-(--text-primary)">{{
+                      props.workload.duration
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CronJob Schedule -->
+              <div v-if="props.workload.schedule">
+                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                  CronJob Schedule
+                </h3>
+                <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3">
+                  <div class="flex justify-between">
+                    <span class="text-(--text-secondary) font-medium">Schedule</span>
+                    <span class="font-mono font-bold text-(--text-primary)">{{
+                      props.workload.schedule
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-(--text-secondary) font-medium">Suspend</span>
+                    <span class="font-mono text-(--text-primary)">{{
+                      props.workload.suspend ? 'True' : 'False'
+                    }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-(--text-secondary) font-medium">Active Jobs</span>
+                    <span class="font-mono text-(--text-primary)">{{
+                      props.workload.active
+                    }}</span>
+                  </div>
+                  <div v-if="props.workload.lastSchedule" class="flex justify-between">
+                    <span class="text-(--text-secondary) font-medium">Last Schedule</span>
+                    <span class="font-mono text-(--text-primary)">{{
+                      props.workload.lastSchedule
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Configuration Metadata Grid -->
               <div>
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Configuration
@@ -189,7 +307,7 @@ spec:
                       props.workload.namespace
                     }}</span>
                   </div>
-                  <div>
+                  <div v-if="props.workload.strategy">
                     <span class="text-(--text-muted) block mb-0.5">Strategy</span>
                     <span
                       class="font-semibold text-(--text-secondary) truncate block"
@@ -198,19 +316,19 @@ spec:
                       {{ props.workload.strategy }}
                     </span>
                   </div>
-                  <div>
+                  <div v-if="props.workload.minReadySeconds !== undefined">
                     <span class="text-(--text-muted) block mb-0.5">Min Ready Seconds</span>
                     <span class="font-mono text-(--text-secondary)"
                       >{{ props.workload.minReadySeconds }}s</span
                     >
                   </div>
-                  <div>
+                  <div v-if="props.workload.revisionHistory !== undefined">
                     <span class="text-(--text-muted) block mb-0.5">Revision History Limit</span>
                     <span class="font-mono text-(--text-secondary)">{{
                       props.workload.revisionHistory
                     }}</span>
                   </div>
-                  <div class="col-span-2">
+                  <div class="col-span-2" v-if="props.workload.images && props.workload.images.length">
                     <span class="text-(--text-muted) block mb-0.5">Container Images</span>
                     <div class="space-y-1 mt-1">
                       <span
@@ -226,7 +344,7 @@ spec:
               </div>
 
               <!-- Labels & Annotations -->
-              <div>
+              <div v-if="props.workload.labels && Object.keys(props.workload.labels).length">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Labels
                 </h3>
@@ -242,7 +360,7 @@ spec:
                 </div>
               </div>
 
-              <div>
+              <div v-if="props.workload.annotations && Object.keys(props.workload.annotations).length">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Annotations
                 </h3>
@@ -262,10 +380,11 @@ spec:
             <!-- PODS PANEL -->
             <TabPanel value="pods" class="space-y-4">
               <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
-                Active Pods ({{ props.workload.replicas.current }})
+                Active Pods
               </div>
               <div class="space-y-2">
                 <div
+                  v-if="props.workload.replicas && props.workload.replicas.current > 0"
                   v-for="i in props.workload.replicas.current"
                   :key="i"
                   class="flex items-center justify-between p-3.5 bg-(--bg-hover)/30 border border-(--border) rounded-xl"
@@ -284,7 +403,7 @@ spec:
                   <div class="text-[10px] font-mono text-(--text-muted)">Ready (1/1)</div>
                 </div>
                 <div
-                  v-if="props.workload.replicas.current === 0"
+                  v-else
                   class="text-center py-6 text-xs text-(--text-muted)"
                 >
                   No active pods for this workload.
@@ -302,21 +421,11 @@ spec:
                   <span
                     class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-(--bg-card)"
                   ></span>
-                  <div class="text-xs font-semibold text-(--text-primary)">ScalingReplicaSet</div>
+                  <div class="text-xs font-semibold text-(--text-primary)">SyncLoop</div>
                   <div class="text-[10px] text-(--text-muted) mt-0.5">
-                    Scaled up replica set to {{ props.workload.replicas.desired }}
+                    Resource reconciled successfully by controller
                   </div>
                   <div class="text-[9px] font-mono text-(--text-muted) mt-1">2m ago</div>
-                </div>
-                <div class="relative">
-                  <span
-                    class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-blue-500 ring-4 ring-(--bg-card)"
-                  ></span>
-                  <div class="text-xs font-semibold text-(--text-primary)">DeploymentRollback</div>
-                  <div class="text-[10px] text-(--text-muted) mt-0.5">
-                    Recreation strategy triggered successfully
-                  </div>
-                  <div class="text-[9px] font-mono text-(--text-muted) mt-1">1h ago</div>
                 </div>
               </div>
             </TabPanel>
