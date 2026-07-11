@@ -128,7 +128,7 @@ const generateYaml = (p: PodInfo) => {
     )
     .join('\n')
 
-  const recordPod = p as Record<string, unknown>
+  const recordPod = p as unknown as Record<string, unknown>
   return `apiVersion: v1
 kind: Pod
 metadata:
