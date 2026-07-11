@@ -97,16 +97,13 @@ impl Bridge {
         })
     }
 
-    pub async fn broadcast(
+
+    pub async fn send_event(
         writer: &Arc<Mutex<WsWriter>>,
         token: &str,
-        event: &str,
-        data: Value,
+        event: &super::events::OrbitEvent,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let payload = serde_json::json!({
-            "event": event,
-            "data": data,
-        });
+        let payload = serde_json::to_value(event)?;
 
         let msg = WsMessage {
             id: Some(uuid::Uuid::new_v4().to_string()),
@@ -117,7 +114,7 @@ impl Bridge {
         };
 
         let text = serde_json::to_string(&msg)?;
-        log::info!("Broadcasting event: {}", event);
+        log::info!("Sending typed event");
         let mut w = writer.lock().await;
         w.send(Message::Text(text.into())).await?;
         Ok(())

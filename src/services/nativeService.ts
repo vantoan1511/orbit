@@ -1,3 +1,4 @@
+import type { OrbitEventMap, OrbitEventName } from '@/types/events'
 import {
   events as neuEvents,
   extensions as neuExtensions,
@@ -32,15 +33,11 @@ export function init(): void {
   neuInit()
 
   // Register listener for core extension connection
-  events.on('engineConnected', (evt: unknown) => {
-    const customEvent = evt as { detail?: { status: string; message: string } }
-    const payload = customEvent.detail
-    if (payload) {
-      if (payload.status === 'ready') {
-        console.log('Orbit Engine connected!', payload.message)
-      } else {
-        console.log('Orbit Engine connected with error:', payload.message)
-      }
+  events.on('engineConnected', (payload) => {
+    if (payload.status === 'ready') {
+      console.log('Orbit Engine connected!', payload.message)
+    } else {
+      console.log('Orbit Engine connected with error:', payload.message)
     }
   })
 }
@@ -73,13 +70,16 @@ export const os = {
  * Safe wrapper for Neutralino events API
  */
 export const events = {
-  on(event: string, handler: (evt: unknown) => void) {
+  on<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return neuEvents.on(event, handler as (evt: any) => void)
+    return neuEvents.on(event, (evt: any) => {
+      const payload = evt?.detail as OrbitEventMap[K]
+      handler(payload)
+    })
   },
-  off(event: string, handler: (evt: unknown) => void) {
+  off<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return neuEvents.off(event, handler as (evt: any) => void)
+    return neuEvents.off(event, handler as any)
   },
   dispatch(event: string, data?: unknown) {
     return neuEvents.dispatch(event, data)

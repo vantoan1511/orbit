@@ -33,9 +33,7 @@
   "extensions": [
     {
       "id": "vantoan1511.orbit.core.engine",
-      "commandLinux": "${NL_PATH}/core/target/release/orbit-engine",
-      "commandWindows": "core\\target\\release\\orbit-engine.exe",
-      "commandDarwin": "${NL_PATH}/core/target/release/orbit-engine"
+      "commandWindows": "core\\target\\release\\orbit-engine.exe"
     }
   ],
   "modes": {
