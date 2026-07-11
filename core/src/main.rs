@@ -2,6 +2,7 @@ mod ipc;
 
 use std::error::Error;
 use ipc::bridge::{AuthInfo, Bridge};
+use ipc::events::OrbitEvent;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -18,14 +19,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Orbit Core Engine connected to Neutralinojs WebSocket server.");
 
     // Broadcast that the core is connected and ready
-    Bridge::broadcast(
+    Bridge::send_event(
         &bridge.writer,
         &bridge.token,
-        "engineConnected",
-        serde_json::json!({
-            "status": "ready",
-            "message": "Orbit Engine is connected and ready."
-        }),
+        &OrbitEvent::EngineConnected {
+            status: "ready".to_string(),
+            message: "Orbit Engine is connected and ready.".to_string(),
+        },
     ).await?;
 
     // Message processing loop
@@ -48,14 +48,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let writer = bridge.writer.clone();
             let token = bridge.token.clone();
             tokio::spawn(async move {
-                let _ = Bridge::broadcast(
+                let _ = Bridge::send_event(
                     &writer,
                     &token,
-                    "engineConnected",
-                    serde_json::json!({
-                        "status": "ready",
-                        "message": "Orbit Engine is connected and ready."
-                    }),
+                    &OrbitEvent::EngineConnected {
+                        status: "ready".to_string(),
+                        message: "Orbit Engine is connected and ready.".to_string(),
+                    },
                 ).await;
             });
         }
