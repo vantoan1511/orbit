@@ -138,3 +138,133 @@
 .p-toggleswitch-checked .p-toggleswitch-slider {
   background-color: var(--p-primary-color, #8b5cf6);
 }
+
+/* ==========================================================================
+   Toast and ConfirmDialog
+   ========================================================================== */
+.p-toast {
+  max-width: 24rem;
+}
+
+.p-toast .p-toast-message {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-primary) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.p-toast-message-content {
+  padding: 0.75rem 1rem !important;
+}
+
+.p-toast-message-icon {
+  color: var(--text-primary) !important;
+}
+
+.p-toast-message-text {
+  margin-left: 0.5rem;
+}
+
+.p-toast-summary {
+  font-weight: 600 !important;
+  font-size: 0.875rem !important;
+  color: var(--text-primary) !important;
+}
+
+.p-toast-detail {
+  font-size: 0.75rem !important;
+  color: var(--text-secondary) !important;
+  margin-top: 0.25rem;
+}
+
+.p-toast-icon-close {
+  color: var(--text-muted) !important;
+  transition: color 0.2s;
+}
+
+.p-toast-icon-close:hover {
+  color: var(--text-primary) !important;
+}
+
+/* ConfirmDialog / Dialog Overlay and Box */
+.p-dialog-mask {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(4px);
+}
+
+.p-dialog {
+  background: var(--bg-primary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+  color: var(--text-primary) !important;
+  overflow: hidden;
+  max-width: 28rem;
+  width: 90%;
+}
+
+.p-dialog-header {
+  background: var(--bg-primary) !important;
+  padding: 1.25rem 1.5rem 0.5rem 1.5rem !important;
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+}
+
+.p-dialog-title {
+  font-size: 1.125rem !important;
+}
+
+.p-dialog-content {
+  background: var(--bg-primary) !important;
+  padding: 0.5rem 1.5rem 1.25rem 1.5rem !important;
+  color: var(--text-secondary) !important;
+  font-size: 0.875rem !important;
+  line-height: 1.5 !important;
+}
+
+.p-dialog-footer {
+  background: var(--bg-hover) !important;
+  border-top: 1px solid var(--border) !important;
+  padding: 0.75rem 1.5rem !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 0.5rem !important;
+}
+
+.p-dialog-footer button {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.875rem !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s !important;
+}
+
+/* Base button styles matching our components */
+.p-dialog-footer .p-button-secondary,
+.p-dialog-footer .p-confirmdialog-reject-button {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-secondary) !important;
+}
+
+.p-dialog-footer .p-button-secondary:hover,
+.p-dialog-footer .p-confirmdialog-reject-button:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.p-dialog-footer .p-button-primary,
+.p-dialog-footer .p-confirmdialog-accept-button {
+  background: var(--text-primary) !important;
+  border: 1px solid var(--text-primary) !important;
+  color: var(--bg-primary) !important;
+}
+
+.p-dialog-footer .p-button-primary:hover,
+.p-dialog-footer .p-confirmdialog-accept-button:hover {
+  background: var(--text-secondary) !important;
+  border-color: var(--text-secondary) !important;
+}

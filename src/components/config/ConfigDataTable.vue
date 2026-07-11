@@ -10,6 +10,9 @@ import { Search, Info, RefreshCw, Settings2, MoreVertical, FileText, Lock } from
 import { mockConfigMaps, mockSecrets } from './mockConfig'
 import type { ConfigMapInfo, SecretInfo } from './mockConfig'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
+import { useToast } from 'primevue/usetoast'
+
+const toast = useToast()
 
 const props = defineProps<{
   activeTab: 'configmaps' | 'secrets'
@@ -92,7 +95,12 @@ const onRowClick = (event: { data: ConfigMapInfo | SecretInfo }) => {
 
 const handleActionClick = (event: Event, action: string, resourceName: string) => {
   event.stopPropagation()
-  alert(`${action} triggered for: ${resourceName}`)
+  toast.add({
+    severity: 'info',
+    summary: action,
+    detail: `Action triggered for: ${resourceName}`,
+    life: 3000
+  })
 }
 </script>
 

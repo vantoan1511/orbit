@@ -10,6 +10,9 @@ import { Search, Info, RefreshCw, Settings2, Power, Trash2 } from '@lucide/vue'
 import { mockPods } from './mockPods'
 import type { PodInfo } from './mockPods'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
+import { useToast } from 'primevue/usetoast'
+
+const toast = useToast()
 
 const pods = ref<PodInfo[]>(mockPods)
 const searchQuery = ref('')
@@ -95,7 +98,12 @@ const getStatusColor = (status: string) => {
 
 const handleActionClick = (event: Event, action: string, podName: string) => {
   event.stopPropagation()
-  alert(`${action} triggered for pod: ${podName}`)
+  toast.add({
+    severity: action === 'Terminate' ? 'warn' : 'info',
+    summary: `${action} Pod`,
+    detail: `Action triggered for pod: ${podName}`,
+    life: 3000
+  })
 }
 </script>
 

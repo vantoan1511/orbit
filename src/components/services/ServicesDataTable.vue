@@ -10,6 +10,9 @@ import { Search, Info, RefreshCw, Settings2, ExternalLink, MoreVertical } from '
 import { mockServices } from './mockServices'
 import type { ServiceInfo } from './mockServices'
 import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
+import { useToast } from 'primevue/usetoast'
+
+const toast = useToast()
 
 const services = ref<ServiceInfo[]>(mockServices)
 const searchQuery = ref('')
@@ -78,7 +81,12 @@ const getTypeBadgeClass = (type: string) => {
 
 const handleActionClick = (event: Event, action: string, serviceName: string) => {
   event.stopPropagation()
-  alert(`${action} triggered for service: ${serviceName}`)
+  toast.add({
+    severity: 'info',
+    summary: action,
+    detail: `Action triggered for service: ${serviceName}`,
+    life: 3000
+  })
 }
 </script>
 

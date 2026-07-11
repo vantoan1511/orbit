@@ -6,6 +6,11 @@ import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import Button from 'primevue/button'
 import { RefreshCw, Folder, AlertTriangle } from '@lucide/vue'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+
+const toast = useToast()
+const confirm = useConfirm()
 
 // Startup settings state
 const launchOnStartup = ref(true)
@@ -23,25 +28,57 @@ const kubeconfigPath = ref('~/.kube/config')
 const shareTelemetry = ref(false)
 
 const handleReloadKubeconfig = () => {
-  alert('Kubeconfig reloaded successfully!')
+  toast.add({
+    severity: 'success',
+    summary: 'Kubeconfig Reloaded',
+    detail: 'Kubeconfig reloaded successfully!',
+    life: 3000
+  })
 }
 
 const handleResetCache = () => {
-  if (confirm('Are you sure you want to reset the application cache?')) {
-    alert('Application cache cleared.')
-  }
+  confirm.require({
+    message: 'Are you sure you want to reset the application cache?',
+    header: 'Reset Cache',
+    accept: () => {
+      toast.add({
+        severity: 'success',
+        summary: 'Cache Cleared',
+        detail: 'Application cache cleared.',
+        life: 3000
+      })
+    }
+  })
 }
 
 const handleResetAllSettings = () => {
-  if (confirm('Are you sure you want to reset all settings to defaults?')) {
-    alert('Settings reset to defaults.')
-  }
+  confirm.require({
+    message: 'Are you sure you want to reset all settings to defaults?',
+    header: 'Reset Settings',
+    accept: () => {
+      toast.add({
+        severity: 'success',
+        summary: 'Settings Reset',
+        detail: 'Settings reset to defaults.',
+        life: 3000
+      })
+    }
+  })
 }
 
 const handleDeleteCachedContexts = () => {
-  if (confirm('Are you sure you want to delete all cached context metadata?')) {
-    alert('Cached contexts deleted.')
-  }
+  confirm.require({
+    message: 'Are you sure you want to delete all cached context metadata?',
+    header: 'Delete Contexts',
+    accept: () => {
+      toast.add({
+        severity: 'success',
+        summary: 'Contexts Deleted',
+        detail: 'Cached contexts deleted.',
+        life: 3000
+      })
+    }
+  })
 }
 </script>
 

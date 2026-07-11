@@ -9,6 +9,9 @@ import { Search, Info, RefreshCw, Settings2, MoreVertical } from '@lucide/vue'
 import { mockPolicies } from './mockPolicies'
 import type { PolicyInfo } from './mockPolicies'
 import PolicyDetailsDrawer from './PolicyDetailsDrawer.vue'
+import { useToast } from 'primevue/usetoast'
+
+const toast = useToast()
 
 const policies = ref<PolicyInfo[]>(mockPolicies)
 const searchQuery = ref('')
@@ -82,7 +85,12 @@ const getStatusBadgeClass = (status: string) => {
 
 const handleActionClick = (event: Event, action: string, policyName: string) => {
   event.stopPropagation()
-  alert(`${action} triggered for policy: ${policyName}`)
+  toast.add({
+    severity: 'info',
+    summary: action,
+    detail: `Action triggered for policy: ${policyName}`,
+    life: 3000
+  })
 }
 </script>
 
