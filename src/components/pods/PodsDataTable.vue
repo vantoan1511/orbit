@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -10,13 +10,11 @@ import { Search, Info, RefreshCw, Settings2, Power, Trash2 } from '@lucide/vue'
 import type { PodInfo } from '@/types/kubernetes'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
-import { kubernetesService } from '@/services/kubernetesService'
-import { events, isEngineReady } from '@/services/nativeService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
 const toast = useToast()
+const k8sStore = useKubernetesStore()
 
-const pods = ref<PodInfo[]>([])
-const namespaceList = ref<string[]>(['All Namespaces'])
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
 const selectedStatus = ref('All Statuses')
@@ -27,7 +25,7 @@ const drawerVisible = ref(false)
 const selectedPod = ref<PodInfo | null>(null)
 
 const namespaces = computed(() => {
-  return namespaceList.value
+  return k8sStore.namespaces
 })
 
 const statuses = [
@@ -41,7 +39,7 @@ const statuses = [
 ]
 
 const filteredPods = computed(() => {
-  return pods.value.filter((p) => {
+  return k8sStore.pods.filter((p) => {
     // Search Query filter
     if (searchQuery.value) {
       const query = searchQuery.value.toLowerCase()
@@ -101,40 +99,6 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     life: 3000
   })
 }
-
-const loadData = async () => {
-  await kubernetesService.getNamespaces()
-  await kubernetesService.getPods()
-}
-
-const handleNamespacesUpdated = (data: { namespaces: string[] }) => {
-  console.log('Received namespaces: ', data)
-  namespaceList.value = ['All Namespaces', ...data.namespaces]
-}
-
-const handlePodsUpdated = (data: { pods: PodInfo[] }) => {
-  pods.value = data.pods
-}
-
-watch(
-  isEngineReady,
-  (ready) => {
-    if (ready) {
-      loadData()
-    }
-  },
-  { immediate: true }
-)
-
-onMounted(() => {
-  events.on('namespacesUpdated', handleNamespacesUpdated)
-  events.on('podsUpdated', handlePodsUpdated)
-})
-
-onUnmounted(() => {
-  events.off('namespacesUpdated', handleNamespacesUpdated)
-  events.off('podsUpdated', handlePodsUpdated)
-})
 </script>
 
 <template>

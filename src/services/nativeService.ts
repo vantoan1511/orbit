@@ -1,4 +1,3 @@
-import { ref } from 'vue'
 import type { OrbitEventMap, OrbitEventName } from '@/types/events'
 import {
   events as neuEvents,
@@ -6,8 +5,6 @@ import {
   filesystem as neuFilesystem,
   init as neuInit
 } from '@neutralinojs/lib'
-
-export const isEngineReady = ref(false)
 
 /**
  * Sanitizes input path strings to prevent directory traversal attacks (e.g., ../).
@@ -34,17 +31,6 @@ function sanitizePath(path: string): string {
  */
 export function init(): void {
   neuInit()
-
-  // Register listener for core extension connection
-  events.on('engineConnected', (payload) => {
-    if (payload.status === 'ready') {
-      console.log('Orbit Engine connected!', payload.message)
-      isEngineReady.value = true
-    } else {
-      console.log('Orbit Engine connected with error:', payload.message)
-      isEngineReady.value = false
-    }
-  })
 }
 
 /**
