@@ -50,9 +50,12 @@ watch(selectedNamespace, () => {
   fetchStatefulSets()
 })
 
-watch(() => k8sStore.activeClusterId, () => {
-  fetchStatefulSets()
-})
+watch(
+  () => k8sStore.activeClusterId,
+  () => {
+    fetchStatefulSets()
+  }
+)
 
 const filteredStatefulSets = computed(() => {
   return k8sStore.statefulSets.filter((s) => {
@@ -124,7 +127,14 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
           </label>
         </div>
 
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchStatefulSets" :loading="loading">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="fetchStatefulSets"
+          :loading="loading"
+        >
           <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
         </Button>
       </div>

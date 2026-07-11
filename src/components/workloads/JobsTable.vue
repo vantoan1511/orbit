@@ -50,9 +50,12 @@ watch(selectedNamespace, () => {
   fetchJobs()
 })
 
-watch(() => k8sStore.activeClusterId, () => {
-  fetchJobs()
-})
+watch(
+  () => k8sStore.activeClusterId,
+  () => {
+    fetchJobs()
+  }
+)
 
 const filteredJobs = computed(() => {
   return k8sStore.jobs.filter((j) => {
@@ -124,7 +127,14 @@ const onRowClick = (event: { data: JobInfo }) => {
           </label>
         </div>
 
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchJobs" :loading="loading">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="fetchJobs"
+          :loading="loading"
+        >
           <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
         </Button>
       </div>
@@ -193,10 +203,20 @@ const onRowClick = (event: { data: JobInfo }) => {
       </Column>
 
       <!-- Completions Column -->
-      <Column field="completions" header="Completions" sortable class="p-3 font-mono text-(--text-secondary)"></Column>
+      <Column
+        field="completions"
+        header="Completions"
+        sortable
+        class="p-3 font-mono text-(--text-secondary)"
+      ></Column>
 
       <!-- Duration Column -->
-      <Column field="duration" header="Duration" sortable class="p-3 font-mono text-(--text-secondary)">
+      <Column
+        field="duration"
+        header="Duration"
+        sortable
+        class="p-3 font-mono text-(--text-secondary)"
+      >
         <template #body="{ data }">
           <span>{{ data.duration || '-' }}</span>
         </template>

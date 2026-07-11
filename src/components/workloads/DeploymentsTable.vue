@@ -52,9 +52,12 @@ watch(selectedNamespace, () => {
 })
 
 // Refetch on cluster change
-watch(() => k8sStore.activeClusterId, () => {
-  fetchDeployments()
-})
+watch(
+  () => k8sStore.activeClusterId,
+  () => {
+    fetchDeployments()
+  }
+)
 
 const filteredDeployments = computed(() => {
   return k8sStore.deployments.filter((d) => {
@@ -129,7 +132,14 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
           </label>
         </div>
 
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="fetchDeployments" :loading="loading">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="fetchDeployments"
+          :loading="loading"
+        >
           <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
         </Button>
       </div>

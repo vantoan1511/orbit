@@ -120,16 +120,12 @@ pub async fn list_deployments(client: &Client, namespace: Option<String>) -> Res
         let replicas = models::Replicas { current, desired };
         
         let mut status = "Progressing".to_string();
-        if desired == 0 && current == 0 {
+        if (desired == 0 && current == 0) || available == desired {
             status = "Running".to_string();
-        } else if available == desired {
-            status = "Running".to_string();
-        } else if let Some(st) = status_replicas {
-            if let Some(conds) = &st.conditions {
-                for c in conds {
-                    if c.type_ == "ReplicaFailure" && c.status == "True" {
-                        status = "Failed".to_string();
-                    }
+        } else if let Some(conds) = status_replicas.and_then(|st| st.conditions.as_ref()) {
+            for c in conds {
+                if c.type_ == "ReplicaFailure" && c.status == "True" {
+                    status = "Failed".to_string();
                 }
             }
         }
@@ -310,12 +306,10 @@ pub async fn list_replicasets(client: &Client, namespace: Option<String>) -> Res
         };
         
         let mut images = Vec::new();
-        if let Some(spec) = rs.spec.as_ref() {
-            if let Some(template) = &spec.template {
-                for c in &template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-                    if let Some(img) = &c.image {
-                        images.push(img.clone());
-                    }
+        if let Some(template) = rs.spec.as_ref().and_then(|spec| spec.template.as_ref()) {
+            for c in &template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
+                if let Some(img) = &c.image {
+                    images.push(img.clone());
                 }
             }
         }
@@ -465,12 +459,10 @@ pub async fn list_cronjobs(client: &Client, namespace: Option<String>) -> Result
         };
         
         let mut images = Vec::new();
-        if let Some(spec) = cj.spec.as_ref() {
-            if let Some(job_spec) = spec.job_template.spec.as_ref() {
-                for c in &job_spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-                    if let Some(img) = &c.image {
-                        images.push(img.clone());
-                    }
+        if let Some(job_spec) = cj.spec.as_ref().and_then(|spec| spec.job_template.spec.as_ref()) {
+            for c in &job_spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
+                if let Some(img) = &c.image {
+                    images.push(img.clone());
                 }
             }
         }
