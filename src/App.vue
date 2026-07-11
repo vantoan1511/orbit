@@ -2,7 +2,7 @@
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
-import type { PodInfo } from '@/types/kubernetes'
+import type { ClusterInfo, PodInfo } from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
 import { onMounted, onUnmounted } from 'vue'
@@ -27,6 +27,14 @@ const handlePodsUpdated = (payload: { pods: PodInfo[] }) => {
   k8sStore.setPods(payload.pods)
 }
 
+const handleClustersUpdated = (payload: { clusters: ClusterInfo[] }) => {
+  k8sStore.setClusters(payload.clusters)
+}
+
+const handleActiveClusterChanged = (payload: { active_cluster_id: string | null }) => {
+  k8sStore.setActiveClusterId(payload.active_cluster_id)
+}
+
 onMounted(() => {
   // Initialize dark mode by default
   document.documentElement.classList.add('my-app-dark')
@@ -35,12 +43,16 @@ onMounted(() => {
   events.on(OrbitEvents.EngineConnected, handleEngineConnected)
   events.on(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.on(OrbitEvents.PodsUpdated, handlePodsUpdated)
+  events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
+  events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
 })
 
 onUnmounted(() => {
   events.off(OrbitEvents.EngineConnected, handleEngineConnected)
   events.off(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.off(OrbitEvents.PodsUpdated, handlePodsUpdated)
+  events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
+  events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
 })
 </script>
 

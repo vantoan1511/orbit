@@ -1,4 +1,4 @@
-import type { PodInfo } from './kubernetes'
+import type { PodInfo, ClusterInfo } from './kubernetes'
 
 export interface OrbitEventMap {
   engineConnected: {
@@ -17,6 +17,12 @@ export interface OrbitEventMap {
   podsUpdated: {
     pods: PodInfo[]
   }
+  clustersUpdated: {
+    clusters: ClusterInfo[]
+  }
+  activeClusterChanged: {
+    active_cluster_id: string | null
+  }
 }
 
 export const OrbitEvents = {
@@ -24,7 +30,9 @@ export const OrbitEvents = {
   Ping: 'ping',
   Pong: 'pong',
   NamespacesUpdated: 'namespacesUpdated',
-  PodsUpdated: 'podsUpdated'
+  PodsUpdated: 'podsUpdated',
+  ClustersUpdated: 'clustersUpdated',
+  ActiveClusterChanged: 'activeClusterChanged'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

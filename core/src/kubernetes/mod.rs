@@ -6,10 +6,10 @@ use kube::{
 use k8s_openapi::api::core::v1::{Namespace, Pod};
 
 pub mod models;
+pub mod manager;
 
-pub async fn list_namespaces() -> Result<Vec<String>, kube::Error> {
-    let client = Client::try_default().await?;
-    let namespaces: Api<Namespace> = Api::all(client);
+pub async fn list_namespaces(client: &Client) -> Result<Vec<String>, kube::Error> {
+    let namespaces: Api<Namespace> = Api::all(client.clone());
     let mut namespace_list = Vec::new();
     
     for ns in namespaces.list(&ListParams::default()).await? {
@@ -24,12 +24,11 @@ pub async fn list_namespaces() -> Result<Vec<String>, kube::Error> {
     Ok(namespace_list)
 }
 
-pub async fn list_pods(namespace: Option<String>) -> Result<Vec<PodInfo>, kube::Error> {
-    let client = Client::try_default().await?;
+pub async fn list_pods(client: &Client, namespace: Option<String>) -> Result<Vec<PodInfo>, kube::Error> {
     let pods: Api<Pod> = if let Some(ns) = namespace {
-        Api::namespaced(client, &ns)
+        Api::namespaced(client.clone(), &ns)
     } else {
-        Api::all(client)
+        Api::all(client.clone())
     };
     
     let mut pod_list = Vec::new();
@@ -64,3 +63,4 @@ pub async fn list_pods(namespace: Option<String>) -> Result<Vec<PodInfo>, kube::
     
     Ok(pod_list)
 }
+

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { kubernetesService } from '@/services/kubernetesService'
+import { os } from '@/services/nativeService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { VERSION } from '@/version'
 import {
   Activity,
@@ -21,14 +24,25 @@ import {
 } from '@lucide/vue'
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
-// Define clusters list
-const clusters = ref([
-  { id: 'prod-us-east', name: 'production-us-east-1', status: 'healthy' },
-  { id: 'staging-eu-west', name: 'staging-eu-west-1', status: 'offline' },
-  { id: 'local-dev', name: 'local-dev', status: 'offline' }
-])
 
-const activeCluster = ref('prod-us-east')
+const k8sStore = useKubernetesStore()
+
+const handleSwitchCluster = async (clusterId: string) => {
+  await kubernetesService.switchCluster(clusterId)
+}
+
+const handleAddCluster = async () => {
+  try {
+    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File', {
+      filters: [{ name: 'Kubeconfig', extensions: ['*', 'yaml', 'yml', 'conf'] }]
+    })
+    if (selectedFiles && selectedFiles.length > 0 && selectedFiles[0]) {
+      await kubernetesService.addCluster(selectedFiles[0])
+    }
+  } catch (error) {
+    console.error('Failed to add cluster:', error)
+  }
+}
 
 // Navigation links
 const navLinks = [
@@ -84,12 +98,12 @@ const toggleTheme = () => {
       </div>
       <div class="flex flex-col gap-1">
         <button
-          v-for="cluster in clusters"
+          v-for="cluster in k8sStore.clusters"
           :key="cluster.id"
-          @click="activeCluster = cluster.id"
+          @click="handleSwitchCluster(cluster.id)"
           class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all duration-200"
           :class="[
-            activeCluster === cluster.id
+            k8sStore.activeClusterId === cluster.id
               ? 'bg-[var(--bg-active)] font-medium text-[var(--text-primary)]'
               : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
           ]"
@@ -104,6 +118,7 @@ const toggleTheme = () => {
         </button>
 
         <button
+          @click="handleAddCluster"
           class="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-muted)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all duration-200"
         >
           <Plus class="w-4 h-4" />
