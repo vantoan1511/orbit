@@ -25,7 +25,7 @@ impl AuthInfo {
         let mut buf = String::new();
         let stdin = std::io::stdin();
         let mut handle = stdin.lock();
-        if let Ok(_) = handle.read_line(&mut buf) {
+        if handle.read_line(&mut buf).is_ok() {
             serde_json::from_str(buf.trim()).unwrap_or_default()
         } else {
             Self::default()
