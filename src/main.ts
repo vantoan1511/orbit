@@ -2,7 +2,7 @@ import './assets/main.css'
 
 import 'primeicons/primeicons.css'
 
-import { init } from '@neutralinojs/lib'
+import { init } from './services/nativeService'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import { createApp } from 'vue'

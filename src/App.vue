@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { filesystem } from '@neutralinojs/lib'
+import { filesystem } from './services/nativeService'
 import AppLayout from './components/layout/AppLayout.vue'
 
 onMounted(() => {
