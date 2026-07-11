@@ -1,26 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { VERSION } from '@/version'
 import {
-  LayoutDashboard,
-  Server,
-  Boxes,
-  Box,
-  Network,
-  Settings2,
-  HardDrive,
-  FolderOpen,
   Activity,
-  ShieldCheck,
-  Settings,
-  Plus,
-  Sun,
-  Moon,
-  BookOpen,
   Bell,
+  BookOpen,
+  Box,
+  Boxes,
+  FolderOpen,
+  HardDrive,
+  LayoutDashboard,
+  Moon,
+  Network,
+  Plus,
+  Server,
+  Settings,
+  Settings2,
+  ShieldCheck,
+  Sun,
   User
 } from '@lucide/vue'
-
+import { ref } from 'vue'
+import { useRoute } from 'vue-router'
 // Define clusters list
 const clusters = ref([
   { id: 'prod-us-east', name: 'production-us-east-1', status: 'healthy' },
@@ -132,7 +132,7 @@ const toggleTheme = () => {
 
     <!-- Bottom Footer -->
     <div
-      class="p-4 border-t border-[var(--border)] flex items-center justify-between bg-[var(--bg-sidebar)]"
+      class="p-4 border-t border-[var(--border)] flex items-center justify-around bg-[var(--bg-sidebar)]"
     >
       <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
@@ -162,17 +162,17 @@ const toggleTheme = () => {
           <Bell class="w-4.5 h-4.5" />
           <span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500"></span>
         </button>
-      </div>
 
-      <!-- Profile & Version -->
-      <div class="flex items-center gap-2">
-        <span class="text-[10px] text-[var(--text-muted)] font-mono">v0.1.0</span>
+        <!-- Profile -->
         <button
           class="w-8 h-8 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-active)] transition-all duration-200"
         >
           <User class="w-4 h-4" />
         </button>
       </div>
+    </div>
+    <div class="flex items-center justify-center gap-2">
+      <span class="text-[10px] text-[var(--text-muted)] font-mono">{{ VERSION }}</span>
     </div>
   </aside>
 </template>
