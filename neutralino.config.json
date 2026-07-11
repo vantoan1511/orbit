@@ -12,7 +12,7 @@
   "documentRoot": "/build/",
   "logging": {
     "enabled": true,
-    "writeToLogFile": false
+    "writeToLogFile": true
   },
   "port": 0,
   "url": "/",
@@ -21,7 +21,10 @@
   "singlePageServe": true,
   "enableExtensions": true,
   "tokenSecurity": "one-time",
-  "nativeAllowList": ["filesystem.readDirectory"],
+  "nativeAllowList": [
+    "filesystem.readDirectory",
+    "extensions.getStats"
+  ],
   "extensions": [],
   "modes": {
     "window": {
