@@ -119,5 +119,25 @@ pub struct CronJobInfo {
     pub annotations: std::collections::BTreeMap<String, String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeInfo {
+    pub name: String,
+    pub status: String,
+    pub role: String,
+    pub version: String,
+    pub cpu_pct: f64,
+    pub cpu_used: String,
+    pub cpu_total: String,
+    pub mem_pct: f64,
+    pub mem_used: String,
+    pub mem_total: String,
+    pub pods_count: i32,
+    pub pods_limit: i32,
+    pub uptime: String,
+    pub labels: Vec<String>,
+}
+
+
 
 

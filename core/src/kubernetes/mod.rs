@@ -3,7 +3,7 @@ use kube::{
     api::{Api, ListParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Namespace, Pod};
+use k8s_openapi::api::core::v1::{Namespace, Pod, Node};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 
@@ -486,5 +486,202 @@ pub async fn list_cronjobs(client: &Client, namespace: Option<String>) -> Result
     
     Ok(list)
 }
+
+pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::Error> {
+    let nodes_api: Api<Node> = Api::all(client.clone());
+    let pods_api: Api<Pod> = Api::all(client.clone());
+    
+    let nodes = nodes_api.list(&ListParams::default()).await?;
+    let pods = pods_api.list(&ListParams::default()).await?;
+    
+    let mut pods_by_node: std::collections::HashMap<String, Vec<Pod>> = std::collections::HashMap::new();
+    for pod in pods {
+        if let Some(spec) = &pod.spec {
+            if let Some(node_name) = &spec.node_name {
+                pods_by_node.entry(node_name.clone()).or_default().push(pod);
+            }
+        }
+    }
+    
+    let mut list = Vec::new();
+    for node in nodes {
+        let name = node.metadata.name.clone().unwrap_or_default();
+        
+        let status = if let Some(status_ref) = &node.status {
+            if let Some(conditions) = &status_ref.conditions {
+                conditions.iter()
+                    .find(|c| c.type_ == "Ready")
+                    .map(|c| if c.status == "True" { "Ready".to_string() } else { "NotReady".to_string() })
+                    .unwrap_or_else(|| "Unknown".to_string())
+            } else {
+                "Unknown".to_string()
+            }
+        } else {
+            "Unknown".to_string()
+        };
+        
+        let mut role = "worker".to_string();
+        if let Some(labels_map) = &node.metadata.labels {
+            if labels_map.contains_key("node-role.kubernetes.io/control-plane") 
+                || labels_map.contains_key("node-role.kubernetes.io/master") {
+                role = "control-plane".to_string();
+            }
+        }
+        
+        let version = node.status.as_ref()
+            .and_then(|s| s.node_info.as_ref())
+            .map(|ni| ni.kubelet_version.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+            
+        let uptime = if let Some(creation) = &node.metadata.creation_timestamp {
+            let now = chrono::Utc::now();
+            let duration = now.signed_duration_since(creation.0);
+            let seconds = duration.num_seconds();
+            if seconds < 0 {
+                "0s".to_string()
+            } else if seconds < 60 {
+                format!("{}s", seconds)
+            } else if seconds < 3600 {
+                format!("{}m", duration.num_minutes())
+            } else if seconds < 86400 {
+                format!("{}h", duration.num_hours())
+            } else {
+                format!("{}d", duration.num_days())
+            }
+        } else {
+            "Unknown".to_string()
+        };
+        
+        let mut labels = Vec::new();
+        if let Some(map) = &node.metadata.labels {
+            for (k, v) in map {
+                labels.push(format!("{}={}", k, v));
+            }
+        }
+        labels.sort();
+        
+        let node_pods = pods_by_node.get(&name).cloned().unwrap_or_default();
+        let pods_count = node_pods.len() as i32;
+        
+        let pods_limit = node.status.as_ref()
+            .and_then(|s| s.capacity.as_ref())
+            .and_then(|c| c.get("pods"))
+            .and_then(|q| q.0.parse::<i32>().ok())
+            .unwrap_or(110);
+            
+        let cpu_total_str = node.status.as_ref()
+            .and_then(|s| s.capacity.as_ref())
+            .and_then(|c| c.get("cpu"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+        let cpu_total_val = parse_cpu_quantity(&cpu_total_str);
+        
+        let mem_total_str = node.status.as_ref()
+            .and_then(|s| s.capacity.as_ref())
+            .and_then(|c| c.get("memory"))
+            .map(|q| q.0.clone())
+            .unwrap_or_else(|| "0".to_string());
+        let mem_total_val = parse_memory_quantity(&mem_total_str);
+        
+        let mut cpu_req = 0.0;
+        let mut mem_req = 0.0;
+        
+        for pod in &node_pods {
+            if let Some(spec) = &pod.spec {
+                for container in &spec.containers {
+                    if let Some(resources) = &container.resources {
+                        if let Some(requests) = &resources.requests {
+                            if let Some(cpu) = requests.get("cpu") {
+                                cpu_req += parse_cpu_quantity(&cpu.0);
+                            }
+                            if let Some(mem) = requests.get("memory") {
+                                mem_req += parse_memory_quantity(&mem.0);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        let cpu_pct = if cpu_total_val > 0.0 { (cpu_req / cpu_total_val) * 100.0 } else { 0.0 };
+        let mem_pct = if mem_total_val > 0.0 { (mem_req / mem_total_val) * 100.0 } else { 0.0 };
+        
+        list.push(models::NodeInfo {
+            name,
+            status,
+            role,
+            version,
+            cpu_pct,
+            cpu_used: format!("{:.1}", cpu_req),
+            cpu_total: format!("{:.0}", cpu_total_val),
+            mem_pct,
+            mem_used: format!("{:.1}", mem_req),
+            mem_total: format!("{:.0}", mem_total_val),
+            pods_count,
+            pods_limit,
+            uptime,
+            labels,
+        });
+    }
+    
+    Ok(list)
+}
+
+fn parse_cpu_quantity(q: &str) -> f64 {
+    let q = q.trim();
+    if q.ends_with('m') {
+        q[..q.len() - 1].parse::<f64>().unwrap_or(0.0) / 1000.0
+    } else {
+        q.parse::<f64>().unwrap_or(0.0)
+    }
+}
+
+fn parse_memory_quantity(q: &str) -> f64 {
+    let q = q.trim();
+    if q.is_empty() {
+        return 0.0;
+    }
+    
+    if q.ends_with("Ki") {
+        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+        val * 1024.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with("Mi") {
+        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+        val * 1024.0 * 1024.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with("Gi") {
+        q[..q.len() - 2].parse::<f64>().unwrap_or(0.0)
+    } else if q.ends_with("Ti") {
+        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+        val * 1024.0
+    } else if q.ends_with("Pi") {
+        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+        val * 1024.0 * 1024.0
+    } else if q.ends_with("Ei") {
+        let val = q[..q.len() - 2].parse::<f64>().unwrap_or(0.0);
+        val * 1024.0 * 1024.0 * 1024.0
+    } else if q.ends_with('k') {
+        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+        val * 1000.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with('M') {
+        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+        val * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with('G') {
+        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+        val * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with('T') {
+        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+        val * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with('P') {
+        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+        val * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
+    } else if q.ends_with('E') {
+        let val = q[..q.len() - 1].parse::<f64>().unwrap_or(0.0);
+        val * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
+    } else {
+        let val = q.parse::<f64>().unwrap_or(0.0);
+        val / (1024.0 * 1024.0 * 1024.0)
+    }
+}
+
 
 

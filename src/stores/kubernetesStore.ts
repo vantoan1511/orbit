@@ -8,7 +8,8 @@ import type {
   DaemonSetInfo,
   ReplicaSetInfo,
   JobInfo,
-  CronJobInfo
+  CronJobInfo,
+  NodeInfo
 } from '@/types/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 
@@ -21,6 +22,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const replicaSets = ref<ReplicaSetInfo[]>([])
   const jobs = ref<JobInfo[]>([])
   const cronJobs = ref<CronJobInfo[]>([])
+  const nodes = ref<NodeInfo[]>([])
   const namespaces = ref<string[]>(['All Namespaces'])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
@@ -57,6 +59,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobs.value = newCronJobs
   }
 
+  function setNodes(newNodes: NodeInfo[]) {
+    nodes.value = newNodes
+  }
+
   function setNamespaces(newNamespaces: string[]) {
     namespaces.value = ['All Namespaces', ...newNamespaces]
   }
@@ -74,6 +80,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSets.value = []
     jobs.value = []
     cronJobs.value = []
+    nodes.value = []
   }
 
   async function loadInitialData() {
@@ -81,6 +88,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await kubernetesService.getClusters()
       await kubernetesService.getNamespaces()
       await kubernetesService.getPods()
+      await kubernetesService.getNodes()
     }
   }
 
@@ -93,6 +101,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSets,
     jobs,
     cronJobs,
+    nodes,
     namespaces,
     clusters,
     activeClusterId,
@@ -104,6 +113,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setReplicaSets,
     setJobs,
     setCronJobs,
+    setNodes,
     setNamespaces,
     setClusters,
     setActiveClusterId,

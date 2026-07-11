@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { mockNodes } from './mockNodes'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { computed } from 'vue'
 
-const nodes = ref(mockNodes)
+const k8sStore = useKubernetesStore()
+const nodes = computed(() => k8sStore.nodes)
 </script>
 
 <template>
@@ -13,7 +14,7 @@ const nodes = ref(mockNodes)
       <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider">
         Nodes List
       </div>
-      <div class="text-xs text-(--text-muted) font-medium">Showing all 12 nodes in cluster</div>
+      <div class="text-xs text-(--text-muted) font-medium">Showing all {{ nodes.length }} nodes in cluster</div>
     </div>
 
     <!-- PrimeVue DataTable -->

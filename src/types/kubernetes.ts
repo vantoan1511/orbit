@@ -131,3 +131,20 @@ export interface CronJobInfo {
 
 export type WorkloadInfo =
   DeploymentInfo | StatefulSetInfo | DaemonSetInfo | ReplicaSetInfo | JobInfo | CronJobInfo
+
+export interface NodeInfo {
+  name: string
+  status: string
+  role: string
+  version: string
+  cpuPct: number
+  cpuUsed: string
+  cpuTotal: string
+  memPct: number
+  memUsed: string
+  memTotal: string
+  podsCount: number
+  podsLimit: number
+  uptime: string
+  labels: string[]
+}
