@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import Drawer from 'primevue/drawer'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
@@ -26,13 +26,132 @@ const getWorkloadKind = (w: WorkloadInfo): string => {
   if ('completions' in w) return 'Job'
   if ('strategy' in w) return 'Deployment'
   if ('replicas' in w && w.replicas) {
-    const reps = w.replicas as Record<string, unknown>
+    const reps = w.replicas as unknown as Record<string, unknown>
     if ('ready' in reps && 'upToDate' in reps) return 'DaemonSet'
     if (w.name.includes('stateful')) return 'StatefulSet' // fallback
     return 'ReplicaSet' // fallback
   }
   return 'Workload'
 }
+
+const workloadStatus = computed(() => {
+  if (!props.workload) return 'Active'
+  if ('status' in props.workload) {
+    return (props.workload as any).status
+  }
+  return 'Active'
+})
+const workloadNamespace = computed(() => props.workload?.namespace ?? '')
+const workloadName = computed(() => props.workload?.name ?? '')
+const workloadAge = computed(() => props.workload?.age ?? '')
+const workloadLabels = computed(() => props.workload?.labels ?? {})
+const workloadAnnotations = computed(() => props.workload?.annotations ?? {})
+const workloadImages = computed(() => props.workload?.images ?? [])
+
+const replicas = computed(() => {
+  if (!props.workload) return null
+  if ('replicas' in props.workload) {
+    return props.workload.replicas
+  }
+  return null
+})
+
+const desiredReplicas = computed(() => replicas.value?.desired)
+const currentReplicas = computed(() => replicas.value?.current)
+const readyReplicas = computed(() => {
+  if (replicas.value && 'ready' in replicas.value) {
+    return (replicas.value as any).ready
+  }
+  return undefined
+})
+
+const available = computed(() => {
+  if (!props.workload) return undefined
+  if ('available' in props.workload) {
+    return (props.workload as any).available
+  }
+  return undefined
+})
+
+const availableReplicas = computed(() => {
+  if (available.value !== undefined) return available.value
+  if (replicas.value && 'available' in replicas.value) {
+    return (replicas.value as any).available
+  }
+  return undefined
+})
+
+const completions = computed(() => {
+  if (!props.workload) return undefined
+  if ('completions' in props.workload) {
+    return (props.workload as any).completions
+  }
+  return undefined
+})
+
+const duration = computed(() => {
+  if (!props.workload) return undefined
+  if ('duration' in props.workload) {
+    return (props.workload as any).duration
+  }
+  return undefined
+})
+
+const schedule = computed(() => {
+  if (!props.workload) return undefined
+  if ('schedule' in props.workload) {
+    return (props.workload as any).schedule
+  }
+  return undefined
+})
+
+const suspend = computed(() => {
+  if (!props.workload) return undefined
+  if ('suspend' in props.workload) {
+    return (props.workload as any).suspend
+  }
+  return undefined
+})
+
+const active = computed(() => {
+  if (!props.workload) return undefined
+  if ('active' in props.workload) {
+    return (props.workload as any).active
+  }
+  return undefined
+})
+
+const lastSchedule = computed(() => {
+  if (!props.workload) return undefined
+  if ('lastSchedule' in props.workload) {
+    return (props.workload as any).lastSchedule
+  }
+  return undefined
+})
+
+const strategy = computed(() => {
+  if (!props.workload) return undefined
+  if ('strategy' in props.workload) {
+    return (props.workload as any).strategy
+  }
+  return undefined
+})
+
+const minReadySeconds = computed(() => {
+  if (!props.workload) return undefined
+  if ('minReadySeconds' in props.workload) {
+    return (props.workload as any).minReadySeconds
+  }
+  return undefined
+})
+
+const revisionHistory = computed(() => {
+  if (!props.workload) return undefined
+  if ('revisionHistory' in props.workload) {
+    return (props.workload as any).revisionHistory
+  }
+  return undefined
+})
 
 // Generate a dummy YAML representation for the YAML tab
 const generateYaml = (w: WorkloadInfo) => {
@@ -101,7 +220,7 @@ ${specSection}
     @update:visible="emit('update:visible', $event)"
     position="right"
     class="w-full sm:max-w-lg border-l border-(--border) bg-(--bg-card) p-0"
-    :header="props.workload?.name || 'Workload Details'"
+    :header="workloadName || 'Workload Details'"
     :style="{ width: '32rem' }"
   >
     <template #header>
@@ -110,21 +229,21 @@ ${specSection}
           <span
             class="w-2.5 h-2.5 rounded-full animate-pulse"
             :class="
-              props.workload.status === 'Running' || props.workload.status === 'Succeeded'
+              workloadStatus === 'Running' || workloadStatus === 'Succeeded'
                 ? 'bg-emerald-500'
-                : props.workload.status === 'Progressing' || props.workload.status === 'Active'
+                : workloadStatus === 'Progressing' || workloadStatus === 'Active'
                   ? 'bg-amber-500'
                   : 'bg-rose-500'
             "
           ></span>
           <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
-            {{ props.workload.status || 'Active' }}
+            {{ workloadStatus || 'Active' }}
           </span>
         </div>
         <div
           class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
-          ns/{{ props.workload.namespace }}
+          ns/{{ workloadNamespace }}
         </div>
       </div>
     </template>
@@ -133,11 +252,11 @@ ${specSection}
       <!-- Title Section -->
       <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
         <h2 class="text-xl font-bold text-(--text-primary) font-ui truncate mb-1">
-          {{ props.workload.name }}
+          {{ workloadName }}
         </h2>
         <div class="text-xs text-(--text-muted) flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
-          <span>Age: {{ props.workload.age }}</span>
+          <span>Age: {{ workloadAge }}</span>
         </div>
       </div>
 
@@ -163,7 +282,7 @@ ${specSection}
             <!-- OVERVIEW PANEL -->
             <TabPanel value="overview" class="space-y-6">
               <!-- Replicas Progress Bars -->
-              <div v-if="props.workload.replicas">
+              <div v-if="replicas">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Replicas Status
                 </h3>
@@ -172,7 +291,7 @@ ${specSection}
                     <div class="flex justify-between text-xs mb-1">
                       <span class="text-(--text-secondary) font-medium">Desired Replicas</span>
                       <span class="font-mono font-bold text-(--text-primary)">{{
-                        props.workload.replicas.desired
+                        desiredReplicas
                       }}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -184,7 +303,7 @@ ${specSection}
                     <div class="flex justify-between text-xs mb-1">
                       <span class="text-(--text-secondary) font-medium">Current Replicas</span>
                       <span class="font-mono font-bold text-(--text-primary)">{{
-                        props.workload.replicas.current
+                        currentReplicas
                       }}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -192,9 +311,9 @@ ${specSection}
                         class="h-full rounded-full bg-indigo-500"
                         :style="{
                           width:
-                            (props.workload.replicas.desired
-                              ? (props.workload.replicas.current /
-                                  props.workload.replicas.desired) *
+                            (desiredReplicas
+                              ? (currentReplicas! /
+                                  desiredReplicas) *
                                 100
                               : 0) + '%'
                         }"
@@ -202,11 +321,11 @@ ${specSection}
                     </div>
                   </div>
 
-                  <div v-if="props.workload.replicas.ready !== undefined">
+                  <div v-if="readyReplicas !== undefined">
                     <div class="flex justify-between text-xs mb-1">
                       <span class="text-(--text-secondary) font-medium">Ready Replicas</span>
                       <span class="font-mono font-bold text-(--text-primary)">{{
-                        props.workload.replicas.ready
+                        readyReplicas
                       }}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -214,8 +333,8 @@ ${specSection}
                         class="h-full rounded-full bg-emerald-500"
                         :style="{
                           width:
-                            (props.workload.replicas.desired
-                              ? (props.workload.replicas.ready / props.workload.replicas.desired) *
+                            (desiredReplicas
+                              ? (readyReplicas / desiredReplicas) *
                                 100
                               : 0) + '%'
                         }"
@@ -223,18 +342,11 @@ ${specSection}
                     </div>
                   </div>
 
-                  <div
-                    v-if="
-                      props.workload.available !== undefined ||
-                      props.workload.replicas.available !== undefined
-                    "
-                  >
+                  <div v-if="availableReplicas !== undefined">
                     <div class="flex justify-between text-xs mb-1">
                       <span class="text-(--text-secondary) font-medium">Available Replicas</span>
                       <span class="font-mono font-bold text-(--text-primary)">{{
-                        props.workload.available !== undefined
-                          ? props.workload.available
-                          : props.workload.replicas.available
+                        availableReplicas
                       }}</span>
                     </div>
                     <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -242,11 +354,8 @@ ${specSection}
                         class="h-full rounded-full bg-emerald-500"
                         :style="{
                           width:
-                            (props.workload.replicas.desired
-                              ? ((props.workload.available !== undefined
-                                  ? props.workload.available
-                                  : props.workload.replicas.available) /
-                                  props.workload.replicas.desired) *
+                            (desiredReplicas
+                              ? (availableReplicas / desiredReplicas) *
                                 100
                               : 0) + '%'
                         }"
@@ -257,7 +366,7 @@ ${specSection}
               </div>
 
               <!-- Job Status -->
-              <div v-if="props.workload.completions">
+              <div v-if="completions">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Job Status
                 </h3>
@@ -267,20 +376,20 @@ ${specSection}
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Completions</span>
                     <span class="font-mono font-bold text-(--text-primary)">{{
-                      props.workload.completions
+                      completions
                     }}</span>
                   </div>
-                  <div v-if="props.workload.duration" class="flex justify-between">
+                  <div v-if="duration" class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Duration</span>
                     <span class="font-mono text-(--text-primary)">{{
-                      props.workload.duration
+                      duration
                     }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- CronJob Schedule -->
-              <div v-if="props.workload.schedule">
+              <div v-if="schedule">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   CronJob Schedule
                 </h3>
@@ -290,23 +399,23 @@ ${specSection}
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Schedule</span>
                     <span class="font-mono font-bold text-(--text-primary)">{{
-                      props.workload.schedule
+                      schedule
                     }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Suspend</span>
                     <span class="font-mono text-(--text-primary)">{{
-                      props.workload.suspend ? 'True' : 'False'
+                      suspend ? 'True' : 'False'
                     }}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Active Jobs</span>
-                    <span class="font-mono text-(--text-primary)">{{ props.workload.active }}</span>
+                    <span class="font-mono text-(--text-primary)">{{ active }}</span>
                   </div>
-                  <div v-if="props.workload.lastSchedule" class="flex justify-between">
+                  <div v-if="lastSchedule" class="flex justify-between">
                     <span class="text-(--text-secondary) font-medium">Last Schedule</span>
                     <span class="font-mono text-(--text-primary)">{{
-                      props.workload.lastSchedule
+                      lastSchedule
                     }}</span>
                   </div>
                 </div>
@@ -323,38 +432,38 @@ ${specSection}
                   <div>
                     <span class="text-(--text-muted) block mb-0.5">Namespace</span>
                     <span class="font-semibold text-(--text-secondary)">{{
-                      props.workload.namespace
+                      workloadNamespace
                     }}</span>
                   </div>
-                  <div v-if="props.workload.strategy">
+                  <div v-if="strategy">
                     <span class="text-(--text-muted) block mb-0.5">Strategy</span>
                     <span
                       class="font-semibold text-(--text-secondary) truncate block"
-                      :title="props.workload.strategy"
+                      :title="strategy"
                     >
-                      {{ props.workload.strategy }}
+                      {{ strategy }}
                     </span>
                   </div>
-                  <div v-if="props.workload.minReadySeconds !== undefined">
+                  <div v-if="minReadySeconds !== undefined">
                     <span class="text-(--text-muted) block mb-0.5">Min Ready Seconds</span>
                     <span class="font-mono text-(--text-secondary)"
-                      >{{ props.workload.minReadySeconds }}s</span
+                      >{{ minReadySeconds }}s</span
                     >
                   </div>
-                  <div v-if="props.workload.revisionHistory !== undefined">
+                  <div v-if="revisionHistory !== undefined">
                     <span class="text-(--text-muted) block mb-0.5">Revision History Limit</span>
                     <span class="font-mono text-(--text-secondary)">{{
-                      props.workload.revisionHistory
+                      revisionHistory
                     }}</span>
                   </div>
                   <div
                     class="col-span-2"
-                    v-if="props.workload.images && props.workload.images.length"
+                    v-if="workloadImages && workloadImages.length"
                   >
                     <span class="text-(--text-muted) block mb-0.5">Container Images</span>
                     <div class="space-y-1 mt-1">
                       <span
-                        v-for="img in props.workload.images"
+                        v-for="img in workloadImages"
                         :key="img"
                         class="inline-block bg-(--bg-hover) text-(--text-secondary) font-mono text-[10px] px-2 py-1 rounded border border-(--border) mr-2 mb-1 truncate max-w-full"
                       >
@@ -366,13 +475,13 @@ ${specSection}
               </div>
 
               <!-- Labels & Annotations -->
-              <div v-if="props.workload.labels && Object.keys(props.workload.labels).length">
+              <div v-if="workloadLabels && Object.keys(workloadLabels).length">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Labels
                 </h3>
                 <div class="flex flex-wrap gap-2">
                   <div
-                    v-for="(val, key) in props.workload.labels"
+                    v-for="(val, key) in workloadLabels"
                     :key="key"
                     class="flex items-center gap-1 bg-violet-500/5 border border-violet-500/10 rounded-md text-[10px] px-2 py-0.5 text-violet-400 font-mono"
                   >
@@ -383,14 +492,14 @@ ${specSection}
               </div>
 
               <div
-                v-if="props.workload.annotations && Object.keys(props.workload.annotations).length"
+                v-if="workloadAnnotations && Object.keys(workloadAnnotations).length"
               >
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
                   Annotations
                 </h3>
                 <div class="space-y-1.5">
                   <div
-                    v-for="(val, key) in props.workload.annotations"
+                    v-for="(val, key) in workloadAnnotations"
                     :key="key"
                     class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-(--text-secondary) flex justify-between gap-4"
                   >
@@ -407,9 +516,9 @@ ${specSection}
                 Active Pods
               </div>
               <div class="space-y-2">
-                <template v-if="props.workload.replicas && props.workload.replicas.current > 0">
+                <template v-if="replicas && currentReplicas && currentReplicas > 0">
                   <div
-                    v-for="i in props.workload.replicas.current"
+                    v-for="i in currentReplicas"
                     :key="i"
                     class="flex items-center justify-between p-3.5 bg-(--bg-hover)/30 border border-(--border) rounded-xl"
                   >
@@ -417,7 +526,7 @@ ${specSection}
                       <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                       <div>
                         <span class="text-xs font-semibold text-(--text-secondary) font-mono">
-                          {{ props.workload.name }}-{{ Math.random().toString(36).substring(2, 7) }}
+                          {{ workloadName }}-{{ Math.random().toString(36).substring(2, 7) }}
                         </span>
                         <span class="block text-[10px] text-(--text-muted) mt-0.5"
                           >IP: 10.244.1.{{ 20 + i }}</span
