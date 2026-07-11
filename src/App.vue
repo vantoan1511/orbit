@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { events } from '@/services/nativeService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { OrbitEvents } from '@/types/events'
+import type { PodInfo } from '@/types/kubernetes'
+import ConfirmDialog from 'primevue/confirmdialog'
+import Toast from 'primevue/toast'
 import { onMounted, onUnmounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
-import Toast from 'primevue/toast'
-import ConfirmDialog from 'primevue/confirmdialog'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { events } from '@/services/nativeService'
-import type { PodInfo } from '@/types/kubernetes'
 
 const k8sStore = useKubernetesStore()
 
@@ -31,15 +32,15 @@ onMounted(() => {
   document.documentElement.classList.add('my-app-dark')
   document.documentElement.setAttribute('data-theme', 'dark')
 
-  events.on('engineConnected', handleEngineConnected)
-  events.on('namespacesUpdated', handleNamespacesUpdated)
-  events.on('podsUpdated', handlePodsUpdated)
+  events.on(OrbitEvents.EngineConnected, handleEngineConnected)
+  events.on(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
+  events.on(OrbitEvents.PodsUpdated, handlePodsUpdated)
 })
 
 onUnmounted(() => {
-  events.off('engineConnected', handleEngineConnected)
-  events.off('namespacesUpdated', handleNamespacesUpdated)
-  events.off('podsUpdated', handlePodsUpdated)
+  events.off(OrbitEvents.EngineConnected, handleEngineConnected)
+  events.off(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
+  events.off(OrbitEvents.PodsUpdated, handlePodsUpdated)
 })
 </script>
 
