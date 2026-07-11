@@ -2,6 +2,11 @@
 import { ref } from 'vue'
 import Button from 'primevue/button'
 import { Hexagon, FileText, Database, CheckCircle2, Trash2 } from '@lucide/vue'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+
+const toast = useToast()
+const confirm = useConfirm()
 
 const currentContext = ref({
   name: 'production-us-east-1',
@@ -25,17 +30,35 @@ const dataManagementInfo = ref({
 })
 
 const handleClearCache = () => {
-  if (confirm('Are you sure you want to clear the local object cache?')) {
-    dataManagementInfo.value.cachedObjects = 0
-    dataManagementInfo.value.cacheSize = '0 KB'
-    alert('Local cache cleared.')
-  }
+  confirm.require({
+    message: 'Are you sure you want to clear the local object cache?',
+    header: 'Clear Cache',
+    accept: () => {
+      dataManagementInfo.value.cachedObjects = 0
+      dataManagementInfo.value.cacheSize = '0 KB'
+      toast.add({
+        severity: 'success',
+        summary: 'Cache Cleared',
+        detail: 'Local cache cleared successfully.',
+        life: 3000
+      })
+    }
+  })
 }
 
 const handleClearAllData = () => {
-  if (confirm('This will reset all application data. Continue?')) {
-    alert('All local database storage cleared.')
-  }
+  confirm.require({
+    message: 'This will reset all application data. Continue?',
+    header: 'Reset All Data',
+    accept: () => {
+      toast.add({
+        severity: 'success',
+        summary: 'Database Cleared',
+        detail: 'All local database storage cleared successfully.',
+        life: 3000
+      })
+    }
+  })
 }
 </script>
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
+import Toast from 'primevue/toast'
+import ConfirmDialog from 'primevue/confirmdialog'
 
 onMounted(() => {
   // Initialize dark mode by default
@@ -11,6 +13,8 @@ onMounted(() => {
 
 <template>
   <AppLayout />
+  <Toast />
+  <ConfirmDialog />
 </template>
 
 <style>

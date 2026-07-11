@@ -10,6 +10,9 @@ import { Search, Info, RefreshCw, Settings2, MoreVertical } from '@lucide/vue'
 import { mockEvents } from './mockEvents'
 import type { EventInfo } from './mockEvents'
 import EventDetailsDrawer from './EventDetailsDrawer.vue'
+import { useToast } from 'primevue/usetoast'
+
+const toast = useToast()
 
 const events = ref<EventInfo[]>(mockEvents)
 const searchQuery = ref('')
@@ -83,7 +86,12 @@ const getTypeBadgeClass = (type: string) => {
 
 const handleActionClick = (event: Event, action: string, eventName: string) => {
   event.stopPropagation()
-  alert(`${action} triggered for event on: ${eventName}`)
+  toast.add({
+    severity: 'info',
+    summary: action,
+    detail: `Action triggered for event on: ${eventName}`,
+    life: 3000
+  })
 }
 </script>
 
