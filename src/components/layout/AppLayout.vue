@@ -17,7 +17,11 @@ import AppHeader from './AppHeader.vue'
 
       <!-- Scrollable Content -->
       <main class="flex-1 overflow-y-auto p-8">
-        <RouterView />
+        <RouterView v-slot="{ Component }">
+          <transition name="page" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </RouterView>
       </main>
     </div>
   </div>
