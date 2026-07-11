@@ -25,7 +25,14 @@
     "filesystem.readDirectory",
     "extensions.getStats"
   ],
-  "extensions": [],
+  "extensions": [
+    {
+      "id": "orbit.core",
+      "commandLinux": "${NL_PATH}/core/target/debug/orbit-core",
+      "commandWindows": "${NL_PATH}/core/target/debug/orbit-core.exe",
+      "commandDarwin": "${NL_PATH}/core/target/debug/orbit-core"
+    }
+  ],
   "modes": {
     "window": {
       "title": "Orbit",

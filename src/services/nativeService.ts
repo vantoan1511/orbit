@@ -1,4 +1,9 @@
-import { init as neuInit, filesystem as neuFilesystem } from '@neutralinojs/lib'
+import {
+  init as neuInit,
+  filesystem as neuFilesystem,
+  events as neuEvents,
+  extensions as neuExtensions
+} from '@neutralinojs/lib'
 
 /**
  * Sanitizes input path strings to prevent directory traversal attacks (e.g., ../).
@@ -25,6 +30,12 @@ function sanitizePath(path: string): string {
  */
 export function init(): void {
   neuInit()
+
+  // Register listener for core extension connection
+  events.on('coreConnected', (evt: unknown) => {
+    const detail = (evt as { detail?: unknown })?.detail
+    console.log('Rust core extension reports connection:', detail)
+  })
 }
 
 /**
@@ -55,7 +66,26 @@ export const os = {
  * Safe wrapper for Neutralino events API
  */
 export const events = {
-  // Add events wrapper functions as needed
+  on(event: string, handler: (evt: unknown) => void) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return neuEvents.on(event, handler as (evt: any) => void)
+  },
+  off(event: string, handler: (evt: unknown) => void) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return neuEvents.off(event, handler as (evt: any) => void)
+  },
+  dispatch(event: string, data?: unknown) {
+    return neuEvents.dispatch(event, data)
+  }
+}
+
+/**
+ * Safe wrapper for Neutralino extensions API
+ */
+export const extensions = {
+  dispatch(extensionId: string, event: string, data?: unknown) {
+    return neuExtensions.dispatch(extensionId, event, data)
+  }
 }
 
 /**
