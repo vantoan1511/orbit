@@ -172,6 +172,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 &OrbitEvent::PodsUpdated { pods },
                                             ).await;
                                         }
+                                        if let Ok(nodes) = kubernetes::list_nodes(client).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::NodesUpdated { nodes },
+                                            ).await;
+                                        }
                                     }
                                 }
                                 Err(e) => {
@@ -230,6 +237,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 &writer,
                                                 &token,
                                                 &OrbitEvent::PodsUpdated { pods },
+                                            ).await;
+                                        }
+                                        if let Ok(nodes) = kubernetes::list_nodes(client).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::NodesUpdated { nodes },
                                             ).await;
                                         }
                                     }
@@ -454,6 +468,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 }
                                 Err(e) => {
                                     eprintln!("Error listing cronjobs: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getNodes" => {
+                    tokio::spawn(async move {
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_nodes(client).await {
+                                Ok(nodes) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::NodesUpdated { nodes },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing nodes: {:?}", e);
                                 }
                             }
                         }

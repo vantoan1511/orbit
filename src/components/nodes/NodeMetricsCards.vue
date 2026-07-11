@@ -1,56 +1,94 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { Activity, Box, Cpu, Database, Server } from '@lucide/vue'
 
-const cards = [
-  {
-    title: 'Total Nodes',
-    value: '12',
-    subvalue: '/ 12',
-    detail: '12 Online (100%)',
-    icon: Server,
-    iconColor: 'text-violet-400 bg-violet-500/10'
-  },
-  {
-    title: 'CPU Allocation',
-    value: '58%',
-    detail: '27.8 / 48 cores',
-    progress: 58,
-    progressColor: 'bg-blue-500',
-    icon: Cpu,
-    iconColor: 'text-blue-400 bg-blue-500/10'
-  },
-  {
-    title: 'Memory Allocation',
-    value: '72%',
-    detail: '138.2 / 192 GiB',
-    progress: 72,
-    progressColor: 'bg-indigo-500',
-    icon: Database,
-    iconColor: 'text-indigo-400 bg-indigo-500/10'
-  },
-  {
-    title: 'Pods Allocation',
-    value: '84',
-    subvalue: '/ 120',
-    detail: '70% Capacity',
-    progress: 70,
-    progressColor: 'bg-sky-500',
-    icon: Box,
-    iconColor: 'text-sky-400 bg-sky-500/10'
-  },
-  {
-    title: 'Node Pressures',
-    value: 'Normal',
-    isPressure: true,
-    pressures: [
-      { name: 'Disk', ok: true },
-      { name: 'Mem', ok: true },
-      { name: 'PID', ok: true }
-    ],
-    icon: Activity,
-    iconColor: 'text-emerald-400 bg-emerald-500/10'
-  }
-]
+const k8sStore = useKubernetesStore()
+
+const cards = computed(() => {
+  const nodes = k8sStore.nodes
+  
+  // Total Nodes
+  const totalNodes = nodes.length
+  const readyNodes = nodes.filter(n => n.status === 'Ready').length
+  const onlinePct = totalNodes > 0 ? Math.round((readyNodes / totalNodes) * 100) : 0
+  
+  // CPU
+  let cpuUsed = 0
+  let cpuTotal = 0
+  // Memory
+  let memUsed = 0
+  let memTotal = 0
+  // Pods
+  let podsCount = 0
+  let podsLimit = 0
+  
+  nodes.forEach(n => {
+    cpuUsed += parseFloat(n.cpuUsed) || 0
+    cpuTotal += parseFloat(n.cpuTotal) || 0
+    memUsed += parseFloat(n.memUsed) || 0
+    memTotal += parseFloat(n.memTotal) || 0
+    podsCount += n.podsCount || 0
+    podsLimit += n.podsLimit || 0
+  })
+  
+  const cpuPct = cpuTotal > 0 ? Math.round((cpuUsed / cpuTotal) * 100) : 0
+  const memPct = memTotal > 0 ? Math.round((memUsed / memTotal) * 100) : 0
+  const podsPct = podsLimit > 0 ? Math.round((podsCount / podsLimit) * 100) : 0
+  
+  const allReady = totalNodes > 0 && readyNodes === totalNodes
+  
+  return [
+    {
+      title: 'Total Nodes',
+      value: String(totalNodes),
+      subvalue: `/ ${totalNodes}`,
+      detail: `${readyNodes} Online (${onlinePct}%)`,
+      icon: Server,
+      iconColor: 'text-violet-400 bg-violet-500/10'
+    },
+    {
+      title: 'CPU Allocation',
+      value: `${cpuPct}%`,
+      detail: `${cpuUsed.toFixed(1)} / ${cpuTotal.toFixed(0)} cores`,
+      progress: cpuPct,
+      progressColor: 'bg-blue-500',
+      icon: Cpu,
+      iconColor: 'text-blue-400 bg-blue-500/10'
+    },
+    {
+      title: 'Memory Allocation',
+      value: `${memPct}%`,
+      detail: `${memUsed.toFixed(1)} / ${memTotal.toFixed(0)} GiB`,
+      progress: memPct,
+      progressColor: 'bg-indigo-500',
+      icon: Database,
+      iconColor: 'text-indigo-400 bg-indigo-500/10'
+    },
+    {
+      title: 'Pods Allocation',
+      value: String(podsCount),
+      subvalue: `/ ${podsLimit}`,
+      detail: `${podsPct}% Capacity`,
+      progress: podsPct,
+      progressColor: 'bg-sky-500',
+      icon: Box,
+      iconColor: 'text-sky-400 bg-sky-500/10'
+    },
+    {
+      title: 'Node Pressures',
+      value: allReady ? 'Normal' : 'Warning',
+      isPressure: true,
+      pressures: [
+        { name: 'Disk', ok: allReady },
+        { name: 'Mem', ok: allReady },
+        { name: 'PID', ok: allReady }
+      ],
+      icon: Activity,
+      iconColor: allReady ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
+    }
+  ]
+})
 </script>
 
 <template>

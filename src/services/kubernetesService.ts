@@ -58,6 +58,13 @@ export const kubernetesService = {
   },
 
   /**
+   * Request list of nodes
+   */
+  async getNodes(): Promise<void> {
+    await coreEngine.dispatch('getNodes')
+  },
+
+  /**
    * Request list of clusters
    */
   async getClusters(): Promise<void> {

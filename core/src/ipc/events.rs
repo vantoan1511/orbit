@@ -56,6 +56,10 @@ pub enum OrbitEvent {
     ActiveClusterChanged {
         active_cluster_id: Option<String>,
     },
+    #[serde(rename = "nodesUpdated")]
+    NodesUpdated {
+        nodes: Vec<crate::kubernetes::models::NodeInfo>,
+    },
     #[serde(rename = "errorOccurred")]
     ErrorOccurred {
         message: String,

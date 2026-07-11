@@ -6,7 +6,8 @@ import type {
   DaemonSetInfo,
   ReplicaSetInfo,
   JobInfo,
-  CronJobInfo
+  CronJobInfo,
+  NodeInfo
 } from './kubernetes'
 
 export interface OrbitEventMap {
@@ -50,6 +51,9 @@ export interface OrbitEventMap {
   activeClusterChanged: {
     active_cluster_id: string | null
   }
+  nodesUpdated: {
+    nodes: NodeInfo[]
+  }
   errorOccurred: {
     message: string
   }
@@ -69,6 +73,7 @@ export const OrbitEvents = {
   CronJobsUpdated: 'cronJobsUpdated',
   ClustersUpdated: 'clustersUpdated',
   ActiveClusterChanged: 'activeClusterChanged',
+  NodesUpdated: 'nodesUpdated',
   ErrorOccurred: 'errorOccurred'
 } as const
 
