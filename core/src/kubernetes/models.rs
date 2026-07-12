@@ -178,6 +178,51 @@ pub struct ServiceInfo {
     pub events: Vec<ServiceEvent>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UsedByPod {
+    pub name: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigMapInfo {
+    pub name: String,
+    pub namespace: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: i32,
+    pub created: String,
+    pub age: String,
+    pub resource_version: String,
+    pub immutable: bool,
+    pub keys_count: i32,
+    pub size: String,
+    pub mounted_pods: i32,
+    pub used_by: Vec<UsedByPod>,
+    pub data: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretInfo {
+    pub name: String,
+    pub namespace: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: i32,
+    pub r#type: String,
+    pub created: String,
+    pub age: String,
+    pub resource_version: String,
+    pub immutable: bool,
+    pub keys_count: i32,
+    pub size: String,
+    pub mounted_pods: i32,
+    pub used_by: Vec<UsedByPod>,
+    pub data: std::collections::BTreeMap<String, String>,
+}
+
+
 
 
 

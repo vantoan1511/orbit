@@ -987,6 +987,7 @@ name = "orbit-engine"
 version = "1.0.0"
 dependencies = [
  "async-trait",
+ "base64",
  "chrono",
  "futures-util",
  "k8s-openapi",

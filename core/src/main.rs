@@ -500,6 +500,61 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                     });
                 }
+                "getConfigMaps" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_configmaps(client, namespace).await {
+                                Ok(config_maps) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::ConfigMapsUpdated { config_maps },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing configmaps: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getSecrets" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_secrets(client, namespace).await {
+                                Ok(secrets) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::SecretsUpdated { secrets },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing secrets: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+
                 "getNodes" => {
                     tokio::spawn(async move {
                         let client = {

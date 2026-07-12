@@ -65,6 +65,20 @@ export const kubernetesService = {
   },
 
   /**
+   * Request list of configmaps, optionally filtered by namespace
+   */
+  async getConfigMaps(namespace?: string): Promise<void> {
+    await coreEngine.dispatch('getConfigMaps', { namespace })
+  },
+
+  /**
+   * Request list of secrets, optionally filtered by namespace
+   */
+  async getSecrets(namespace?: string): Promise<void> {
+    await coreEngine.dispatch('getSecrets', { namespace })
+  },
+
+  /**
    * Request list of nodes
    */
   async getNodes(): Promise<void> {

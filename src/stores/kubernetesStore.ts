@@ -10,7 +10,9 @@ import type {
   JobInfo,
   CronJobInfo,
   NodeInfo,
-  ServiceInfo
+  ServiceInfo,
+  ConfigMapInfo,
+  SecretInfo
 } from '@/types/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 
@@ -25,6 +27,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const cronJobs = ref<CronJobInfo[]>([])
   const nodes = ref<NodeInfo[]>([])
   const services = ref<ServiceInfo[]>([])
+  const configMaps = ref<ConfigMapInfo[]>([])
+  const secrets = ref<SecretInfo[]>([])
   const namespaces = ref<string[]>(['All Namespaces'])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
@@ -69,6 +73,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     services.value = newServices
   }
 
+  function setConfigMaps(newConfigMaps: ConfigMapInfo[]) {
+    configMaps.value = newConfigMaps
+  }
+
+  function setSecrets(newSecrets: SecretInfo[]) {
+    secrets.value = newSecrets
+  }
+
   function setNamespaces(newNamespaces: string[]) {
     namespaces.value = ['All Namespaces', ...newNamespaces]
   }
@@ -88,6 +100,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobs.value = []
     nodes.value = []
     services.value = []
+    configMaps.value = []
+    secrets.value = []
   }
 
   async function loadInitialData() {
@@ -97,6 +111,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await kubernetesService.getPods()
       await kubernetesService.getNodes()
       await kubernetesService.getServices()
+      await kubernetesService.getConfigMaps()
+      await kubernetesService.getSecrets()
     }
   }
 
@@ -111,6 +127,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobs,
     nodes,
     services,
+    configMaps,
+    secrets,
     namespaces,
     clusters,
     activeClusterId,
@@ -124,6 +142,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setCronJobs,
     setNodes,
     setServices,
+    setConfigMaps,
+    setSecrets,
     setNamespaces,
     setClusters,
     setActiveClusterId,

@@ -8,7 +8,9 @@ import type {
   JobInfo,
   CronJobInfo,
   NodeInfo,
-  ServiceInfo
+  ServiceInfo,
+  ConfigMapInfo,
+  SecretInfo
 } from './kubernetes'
 
 export interface OrbitEventMap {
@@ -58,6 +60,12 @@ export interface OrbitEventMap {
   servicesUpdated: {
     services: ServiceInfo[]
   }
+  configMapsUpdated: {
+    config_maps: ConfigMapInfo[]
+  }
+  secretsUpdated: {
+    secrets: SecretInfo[]
+  }
   errorOccurred: {
     message: string
   }
@@ -79,6 +87,8 @@ export const OrbitEvents = {
   ActiveClusterChanged: 'activeClusterChanged',
   NodesUpdated: 'nodesUpdated',
   ServicesUpdated: 'servicesUpdated',
+  ConfigMapsUpdated: 'configMapsUpdated',
+  SecretsUpdated: 'secretsUpdated',
   ErrorOccurred: 'errorOccurred'
 } as const
 

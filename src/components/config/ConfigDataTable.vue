@@ -7,10 +7,12 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, MoreVertical, FileText, Lock } from '@lucide/vue'
-import { mockConfigMaps, mockSecrets } from './mockConfig'
-import type { ConfigMapInfo, SecretInfo } from './mockConfig'
+import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { storeToRefs } from 'pinia'
+import { kubernetesService } from '@/services/kubernetesService'
 
 const toast = useToast()
 
@@ -18,8 +20,16 @@ const props = defineProps<{
   activeTab: 'configmaps' | 'secrets'
 }>()
 
-const configMaps = ref<ConfigMapInfo[]>(mockConfigMaps)
-const secrets = ref<SecretInfo[]>(mockSecrets)
+const k8sStore = useKubernetesStore()
+const { configMaps, secrets } = storeToRefs(k8sStore)
+
+const handleRefresh = async () => {
+  if (props.activeTab === 'configmaps') {
+    await kubernetesService.getConfigMaps()
+  } else {
+    await kubernetesService.getSecrets()
+  }
+}
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
@@ -149,7 +159,13 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
         </div>
 
         <div class="flex items-center gap-1">
-          <Button severity="secondary" variant="text" size="small" class="p-1">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="handleRefresh"
+          >
             <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">

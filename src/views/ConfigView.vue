@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import ConfigMetricsCards from '../components/config/ConfigMetricsCards.vue'
 import ConfigDataTable from '../components/config/ConfigDataTable.vue'
+import { kubernetesService } from '@/services/kubernetesService'
 
 const activeTab = ref<'configmaps' | 'secrets'>('configmaps')
+
+onMounted(async () => {
+  await kubernetesService.getConfigMaps()
+  await kubernetesService.getSecrets()
+})
 </script>
 
 <template>

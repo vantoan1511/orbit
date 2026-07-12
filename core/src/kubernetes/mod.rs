@@ -3,9 +3,12 @@ use kube::{
     api::{Api, ListParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Namespace, Pod, Node, Service};
+use k8s_openapi::api::core::v1::{Namespace, Pod, Node, Service, ConfigMap, Secret};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine as _;
+
 
 
 pub mod models;
@@ -797,6 +800,137 @@ pub async fn list_services(client: &Client, namespace: Option<String>) -> Result
 
     Ok(list)
 }
+
+fn format_size(bytes: usize) -> String {
+    if bytes < 1024 {
+        format!("{} B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KiB", bytes as f64 / 1024.0)
+    } else {
+        format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
+    }
+}
+
+pub async fn list_configmaps(client: &Client, namespace: Option<String>) -> Result<Vec<models::ConfigMapInfo>, kube::Error> {
+    let api: Api<ConfigMap> = if let Some(ns) = namespace {
+        Api::namespaced(client.clone(), &ns)
+    } else {
+        Api::all(client.clone())
+    };
+
+    let mut list = Vec::new();
+    for c in api.list(&ListParams::default()).await? {
+        let name = c.metadata.name.clone().unwrap_or_default();
+        let namespace_name = c.metadata.namespace.clone().unwrap_or_default();
+        
+        let age = format_age(&c.metadata.creation_timestamp);
+        let created = c.metadata.creation_timestamp.as_ref()
+            .map(|t| t.0.format("%b %d, %Y, %I:%M %p").to_string())
+            .unwrap_or_default();
+            
+        let resource_version = c.metadata.resource_version.clone().unwrap_or_default();
+        let immutable = c.immutable.unwrap_or(false);
+        
+        let data = c.data.clone().unwrap_or_default();
+        let keys_count = data.len() as i32;
+        
+        let mut total_bytes = 0;
+        for (k, v) in &data {
+            total_bytes += k.len() + v.len();
+        }
+        if let Some(binary) = &c.binary_data {
+            for (k, v) in binary {
+                total_bytes += k.len() + v.0.len();
+            }
+        }
+        let size = format_size(total_bytes);
+        
+        let annotations = c.metadata.annotations.as_ref().map(|a| a.len() as i32).unwrap_or(0);
+        let labels = c.metadata.labels.clone().unwrap_or_default();
+        
+        let mounted_pods = 0;
+        let used_by = Vec::new();
+        
+        list.push(models::ConfigMapInfo {
+            name,
+            namespace: namespace_name,
+            labels,
+            annotations,
+            created,
+            age,
+            resource_version,
+            immutable,
+            keys_count,
+            size,
+            mounted_pods,
+            used_by,
+            data,
+        });
+    }
+    
+    Ok(list)
+}
+
+pub async fn list_secrets(client: &Client, namespace: Option<String>) -> Result<Vec<models::SecretInfo>, kube::Error> {
+    let api: Api<Secret> = if let Some(ns) = namespace {
+        Api::namespaced(client.clone(), &ns)
+    } else {
+        Api::all(client.clone())
+    };
+
+    let mut list = Vec::new();
+    for s in api.list(&ListParams::default()).await? {
+        let name = s.metadata.name.clone().unwrap_or_default();
+        let namespace_name = s.metadata.namespace.clone().unwrap_or_default();
+        
+        let age = format_age(&s.metadata.creation_timestamp);
+        let created = s.metadata.creation_timestamp.as_ref()
+            .map(|t| t.0.format("%b %d, %Y, %I:%M %p").to_string())
+            .unwrap_or_default();
+            
+        let resource_version = s.metadata.resource_version.clone().unwrap_or_default();
+        let immutable = s.immutable.unwrap_or(false);
+        let secret_type = s.type_.clone().unwrap_or_else(|| "Opaque".to_string());
+        
+        let raw_data = s.data.clone().unwrap_or_default();
+        let keys_count = raw_data.len() as i32;
+        
+        let mut total_bytes = 0;
+        let mut data = std::collections::BTreeMap::new();
+        for (k, v) in &raw_data {
+            total_bytes += k.len() + v.0.len();
+            let base64_str = BASE64_STANDARD.encode(&v.0);
+            data.insert(k.clone(), base64_str);
+        }
+        let size = format_size(total_bytes);
+        
+        let annotations = s.metadata.annotations.as_ref().map(|a| a.len() as i32).unwrap_or(0);
+        let labels = s.metadata.labels.clone().unwrap_or_default();
+        
+        let mounted_pods = 0;
+        let used_by = Vec::new();
+        
+        list.push(models::SecretInfo {
+            name,
+            namespace: namespace_name,
+            labels,
+            annotations,
+            r#type: secret_type,
+            created,
+            age,
+            resource_version,
+            immutable,
+            keys_count,
+            size,
+            mounted_pods,
+            used_by,
+            data,
+        });
+    }
+    
+    Ok(list)
+}
+
 
 
 
