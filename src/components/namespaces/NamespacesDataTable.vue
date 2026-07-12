@@ -19,7 +19,7 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, onMounted, ref } from 'vue'
-import NamespaceDetailsDrawer from './NamespaceDetailsDrawer.vue'
+import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
 
 const store = useKubernetesStore()
 const searchQuery = ref('')
@@ -29,7 +29,7 @@ const showSystemNamespaces = ref(false)
 
 // Drawer state
 const drawerVisible = ref(false)
-const selectedNamespace = ref<NamespaceInfo | null>(null)
+const selectedNamespace = ref<DrawerNamespaceInfo | null>(null)
 
 const statuses = ['All Statuses', 'Active', 'Terminating']
 
@@ -68,6 +68,7 @@ const mappedNamespaces = computed(() => {
     const secretsCount = store.secrets.filter((s) => s.namespace === ns.name).length
 
     // Generate a simple dummy sparkline based on current pod count
+    // Placeholder sparkline until watch-API pod history is available
     const podSparkline = [
       podsCount,
       podsCount,
@@ -115,7 +116,7 @@ const filteredNamespaces = computed(() => {
   })
 })
 
-const onRowClick = (event: { data: NamespaceInfo }) => {
+const onRowClick = (event: { data: MappedNamespaceInfo }) => {
   selectedNamespace.value = event.data
   drawerVisible.value = true
 }
