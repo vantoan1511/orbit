@@ -1,4 +1,15 @@
 <script setup lang="ts">
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { NamespaceInfo } from '@/types/kubernetes'
+
+interface MappedNamespaceInfo extends NamespaceInfo {
+  pods: number
+  podSparkline: number[]
+  workloads: number
+  services: number
+  configMaps: number
+  secrets: number
+}
 import { Info, MoreHorizontal, RefreshCw, Search, Settings2 } from '@lucide/vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
@@ -8,11 +19,9 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, onMounted, ref } from 'vue'
-import type { NamespaceInfo } from './mockNamespaces'
-import { mockNamespaces } from './mockNamespaces'
 import NamespaceDetailsDrawer from './NamespaceDetailsDrawer.vue'
 
-const namespaces = ref<NamespaceInfo[]>(mockNamespaces)
+const store = useKubernetesStore()
 const searchQuery = ref('')
 const selectedStatus = ref('All Statuses')
 const selectedLabel = ref('All Labels')
@@ -27,14 +36,62 @@ const statuses = ['All Statuses', 'Active', 'Terminating']
 // Collect unique label keys across all namespaces
 const labelOptions = computed(() => {
   const keys = new Set<string>()
-  namespaces.value.forEach((ns) => {
+  store.namespaceList.forEach((ns) => {
     Object.keys(ns.labels).forEach((k) => keys.add(k))
   })
   return ['All Labels', ...Array.from(keys)]
 })
 
+// Dynamically map and compute resource counts for each namespace
+const mappedNamespaces = computed(() => {
+  return store.namespaceList.map((ns) => {
+    const podsList = store.pods.filter((p) => p.namespace === ns.name)
+    const podsCount = podsList.length
+
+    // Workloads count: deployments + statefulsets + daemonsets + replicasets + jobs + cronjobs
+    const deploymentsCount = store.deployments.filter((d) => d.namespace === ns.name).length
+    const statefulSetsCount = store.statefulSets.filter((s) => s.namespace === ns.name).length
+    const daemonSetsCount = store.daemonSets.filter((d) => d.namespace === ns.name).length
+    const replicaSetsCount = store.replicaSets.filter((r) => r.namespace === ns.name).length
+    const jobsCount = store.jobs.filter((j) => j.namespace === ns.name).length
+    const cronJobsCount = store.cronJobs.filter((c) => c.namespace === ns.name).length
+    const workloadsCount =
+      deploymentsCount +
+      statefulSetsCount +
+      daemonSetsCount +
+      replicaSetsCount +
+      jobsCount +
+      cronJobsCount
+
+    const servicesCount = store.services.filter((s) => s.namespace === ns.name).length
+    const configMapsCount = store.configMaps.filter((c) => c.namespace === ns.name).length
+    const secretsCount = store.secrets.filter((s) => s.namespace === ns.name).length
+
+    // Generate a simple dummy sparkline based on current pod count
+    const podSparkline = [
+      podsCount,
+      podsCount,
+      podsCount,
+      podsCount,
+      podsCount,
+      podsCount,
+      podsCount
+    ]
+
+    return {
+      ...ns,
+      pods: podsCount,
+      podSparkline,
+      workloads: workloadsCount,
+      services: servicesCount,
+      configMaps: configMapsCount,
+      secrets: secretsCount
+    }
+  })
+})
+
 const filteredNamespaces = computed(() => {
-  return namespaces.value.filter((ns) => {
+  return mappedNamespaces.value.filter((ns) => {
     // System namespace toggle
     if (!showSystemNamespaces.value && ns.isSystem) return false
 
@@ -97,7 +154,7 @@ onMounted(() => {
   }
 })
 
-const getSparklineData = (ns: NamespaceInfo) => ({
+const getSparklineData = (ns: MappedNamespaceInfo) => ({
   labels: ['1', '2', '3', '4', '5', '6', '7'],
   datasets: [
     {

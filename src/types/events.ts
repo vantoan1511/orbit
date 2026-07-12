@@ -1,18 +1,19 @@
 import type {
-  PodInfo,
   ClusterInfo,
-  DeploymentInfo,
-  StatefulSetInfo,
-  DaemonSetInfo,
-  ReplicaSetInfo,
-  JobInfo,
-  CronJobInfo,
-  NodeInfo,
-  ServiceInfo,
   ConfigMapInfo,
-  SecretInfo,
-  PersistentVolumeInfo,
+  CronJobInfo,
+  DaemonSetInfo,
+  DeploymentInfo,
+  JobInfo,
+  NamespaceInfo,
+  NodeInfo,
   PersistentVolumeClaimInfo,
+  PersistentVolumeInfo,
+  PodInfo,
+  ReplicaSetInfo,
+  SecretInfo,
+  ServiceInfo,
+  StatefulSetInfo,
   StorageClassInfo
 } from './kubernetes'
 
@@ -28,7 +29,7 @@ export interface OrbitEventMap {
     reply: string
   }
   namespacesUpdated: {
-    namespaces: string[]
+    namespaces: NamespaceInfo[]
   }
   podsUpdated: {
     pods: PodInfo[]

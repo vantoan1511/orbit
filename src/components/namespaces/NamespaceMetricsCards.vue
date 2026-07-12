@@ -1,17 +1,24 @@
 <script setup lang="ts">
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { NamespaceInfo } from '@/types/kubernetes'
 import { CheckCircle2, FolderOpen, Loader2, Shield, XCircle } from '@lucide/vue'
 import Chart from 'primevue/chart'
-import { computed, onMounted, ref } from 'vue'
-import { mockNamespaces } from './mockNamespaces'
+import { computed, onMounted, ref, watch } from 'vue'
 
-const totalNamespaces = mockNamespaces.length
+const store = useKubernetesStore()
 
-const activeCount = computed(() => mockNamespaces.filter((n) => n.status === 'Active').length)
+const totalNamespaces = computed(() => store.namespaceList.length)
+
+const activeCount = computed(
+  () => store.namespaceList.filter((n: NamespaceInfo) => n.status === 'Active').length
+)
 const terminatingCount = computed(
-  () => mockNamespaces.filter((n) => n.status === 'Terminating').length
+  () => store.namespaceList.filter((n: NamespaceInfo) => n.status === 'Terminating').length
 )
 const failedCount = 0
-const systemCount = computed(() => mockNamespaces.filter((n) => n.isSystem).length)
+const systemCount = computed(
+  () => store.namespaceList.filter((n: NamespaceInfo) => n.isSystem).length
+)
 
 const activeChartData = ref()
 const terminatingChartData = ref()
@@ -19,16 +26,42 @@ const failedChartData = ref()
 const systemChartData = ref()
 const donutOptions = ref()
 
-const makeDonutData = (value: number, total: number, color: string) => ({
-  datasets: [
-    {
-      data: [value, total - value],
-      backgroundColor: [color, 'rgba(255,255,255,0.05)'],
-      borderWidth: 0,
-      hoverBackgroundColor: [color, 'rgba(255,255,255,0.05)']
-    }
-  ]
-})
+const makeDonutData = (value: number, total: number, color: string) => {
+  const tot = total > 0 ? total : 1
+  return {
+    datasets: [
+      {
+        data: [value, Math.max(0, tot - value)],
+        backgroundColor: [color, 'rgba(255,255,255,0.05)'],
+        borderWidth: 0,
+        hoverBackgroundColor: [color, 'rgba(255,255,255,0.05)']
+      }
+    ]
+  }
+}
+
+watch(
+  [activeCount, terminatingCount, systemCount, totalNamespaces],
+  () => {
+    activeChartData.value = makeDonutData(
+      activeCount.value,
+      totalNamespaces.value,
+      '#10b981' // emerald-500
+    )
+    terminatingChartData.value = makeDonutData(
+      terminatingCount.value,
+      totalNamespaces.value,
+      '#f59e0b' // amber-500
+    )
+    failedChartData.value = makeDonutData(failedCount, totalNamespaces.value, '#ef4444')
+    systemChartData.value = makeDonutData(
+      systemCount.value,
+      totalNamespaces.value,
+      '#6aa8ff' // blue accent
+    )
+  },
+  { immediate: true }
+)
 
 onMounted(() => {
   donutOptions.value = {
@@ -41,23 +74,6 @@ onMounted(() => {
     },
     events: []
   }
-
-  activeChartData.value = makeDonutData(
-    activeCount.value,
-    totalNamespaces,
-    '#10b981' // emerald-500
-  )
-  terminatingChartData.value = makeDonutData(
-    terminatingCount.value,
-    totalNamespaces,
-    '#f59e0b' // amber-500
-  )
-  failedChartData.value = makeDonutData(failedCount, totalNamespaces, '#ef4444')
-  systemChartData.value = makeDonutData(
-    systemCount.value,
-    totalNamespaces,
-    '#6aa8ff' // blue accent
-  )
 })
 </script>
 
@@ -113,7 +129,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="text-[10px] text-(--text-muted) font-medium">
-        {{ Math.round((activeCount / totalNamespaces) * 1000) / 10 }}%
+        {{ totalNamespaces ? Math.round((activeCount / totalNamespaces) * 1000) / 10 : 0 }}%
       </div>
     </div>
 
@@ -145,7 +161,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="text-[10px] text-(--text-muted) font-medium">
-        {{ Math.round((terminatingCount / totalNamespaces) * 1000) / 10 }}%
+        {{ totalNamespaces ? Math.round((terminatingCount / totalNamespaces) * 1000) / 10 : 0 }}%
       </div>
     </div>
 
@@ -207,7 +223,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="text-[10px] text-(--text-muted) font-medium">
-        {{ Math.round((systemCount / totalNamespaces) * 1000) / 10 }}%
+        {{ totalNamespaces ? Math.round((systemCount / totalNamespaces) * 1000) / 10 : 0 }}%
       </div>
     </div>
   </div>

@@ -1,23 +1,24 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { kubernetesService } from '@/services/kubernetesService'
 import type {
-  PodInfo,
   ClusterInfo,
-  DeploymentInfo,
-  StatefulSetInfo,
-  DaemonSetInfo,
-  ReplicaSetInfo,
-  JobInfo,
-  CronJobInfo,
-  NodeInfo,
-  ServiceInfo,
   ConfigMapInfo,
-  SecretInfo,
-  PersistentVolumeInfo,
+  CronJobInfo,
+  DaemonSetInfo,
+  DeploymentInfo,
+  JobInfo,
+  NamespaceInfo,
+  NodeInfo,
   PersistentVolumeClaimInfo,
+  PersistentVolumeInfo,
+  PodInfo,
+  ReplicaSetInfo,
+  SecretInfo,
+  ServiceInfo,
+  StatefulSetInfo,
   StorageClassInfo
 } from '@/types/kubernetes'
-import { kubernetesService } from '@/services/kubernetesService'
+import { defineStore } from 'pinia'
+import { computed, ref } from 'vue'
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
@@ -40,7 +41,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const persistentVolumesLoading = ref(false)
   const persistentVolumeClaimsLoading = ref(false)
   const storageClassesLoading = ref(false)
-  const namespaces = ref<string[]>(['All Namespaces'])
+  const namespaceList = ref<NamespaceInfo[]>([])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
 
@@ -129,8 +130,12 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     storageClassesLoading.value = loading
   }
 
-  function setNamespaces(newNamespaces: string[]) {
-    namespaces.value = ['All Namespaces', ...newNamespaces]
+  const namespaces = computed(() => {
+    return ['All Namespaces', ...namespaceList.value.map((n) => n.name)]
+  })
+
+  function setNamespaces(newNamespaces: NamespaceInfo[]) {
+    namespaceList.value = newNamespaces
   }
 
   function setClusters(newClusters: ClusterInfo[]) {
@@ -242,6 +247,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     persistentVolumeClaimsLoading,
     storageClassesLoading,
     namespaces,
+    namespaceList,
     clusters,
     activeClusterId,
     setEngineReady,

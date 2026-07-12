@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { NamespaceInfo } from '@/types/kubernetes'
 import { BarChart2, Clock, FileCode, Layers, Tag } from '@lucide/vue'
 import Chart from 'primevue/chart'
 import Drawer from 'primevue/drawer'
@@ -8,11 +9,15 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { ref, watch } from 'vue'
-import type { NamespaceInfo } from './mockNamespaces'
+
+interface DrawerNamespaceInfo extends NamespaceInfo {
+  cpuHistory?: number[]
+  memoryHistory?: number[]
+}
 
 const props = defineProps<{
   visible: boolean
-  namespace: NamespaceInfo | null
+  namespace: DrawerNamespaceInfo | null
 }>()
 
 const emit = defineEmits<{
@@ -27,7 +32,7 @@ const chartOptions = ref()
 
 const isDarkTheme = () => document.documentElement.classList.contains('my-app-dark')
 
-const updateCharts = (ns: NamespaceInfo) => {
+const updateCharts = (ns: DrawerNamespaceInfo) => {
   const isDark = isDarkTheme()
   const violetColor = '#8b5cf6'
   const blueColor = '#3b82f6'
@@ -55,7 +60,7 @@ const updateCharts = (ns: NamespaceInfo) => {
     labels: ['10m ago', '8m ago', '6m ago', '4m ago', '2m ago', '1m ago', 'Now'],
     datasets: [
       {
-        data: ns.cpuHistory,
+        data: ns.cpuHistory || [0, 0, 0, 0, 0, 0, 0],
         borderColor: violetColor,
         backgroundColor: 'rgba(139, 92, 246, 0.05)',
         fill: true
@@ -67,7 +72,7 @@ const updateCharts = (ns: NamespaceInfo) => {
     labels: ['10m ago', '8m ago', '6m ago', '4m ago', '2m ago', '1m ago', 'Now'],
     datasets: [
       {
-        data: ns.memoryHistory,
+        data: ns.memoryHistory || [0, 0, 0, 0, 0, 0, 0],
         borderColor: blueColor,
         backgroundColor: 'rgba(59, 130, 246, 0.05)',
         fill: true

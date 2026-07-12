@@ -252,3 +252,14 @@ export interface StorageClassInfo {
   allowVolumeExpansion: boolean
   age: string
 }
+
+export interface NamespaceInfo {
+  name: string
+  status: string
+  isSystem: boolean
+  age: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
+  uid: string
+  created: string
+}
