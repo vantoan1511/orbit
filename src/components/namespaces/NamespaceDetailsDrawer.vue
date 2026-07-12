@@ -326,10 +326,16 @@ const annotationsExpanded = ref(false)
                   <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
                     Resource Usage
                   </h3>
-                  <span v-if="props.namespace.cpuUsage" class="text-[10px] text-(--text-muted)">Last 1 hour</span>
+                  <span v-if="props.namespace.cpuUsage" class="text-[10px] text-(--text-muted)"
+                    >Last 1 hour</span
+                  >
                 </div>
-                <div v-if="!props.namespace.cpuUsage" class="bg-(--bg-hover)/20 border border-(--border) border-dashed rounded-xl p-6 text-center text-xs text-(--text-muted)">
-                  Resource usage metrics are currently unavailable. Dynamic metric monitoring is planned for a future update.
+                <div
+                  v-if="!props.namespace.cpuUsage"
+                  class="bg-(--bg-hover)/20 border border-(--border) border-dashed rounded-xl p-6 text-center text-xs text-(--text-muted)"
+                >
+                  Resource usage metrics are currently unavailable. Dynamic metric monitoring is
+                  planned for a future update.
                 </div>
                 <div v-else class="space-y-4">
                   <!-- CPU Usage -->
