@@ -11,7 +11,12 @@ pub async fn list_namespaces(client: &Client) -> Result<Vec<models::NamespaceInf
 
     for ns in namespaces_api.list(&ListParams::default()).await? {
         let name = ns.metadata.name.clone().unwrap_or_default();
-        let is_system = name.starts_with("kube-") || name == "default";
+        let is_system = name.starts_with("kube-")
+            || name == "default"
+            || name.ends_with("-system")
+            || name == "cert-manager"
+            || name == "monitoring"
+            || name == "ingress-nginx";
         
         let status = ns.status.as_ref()
             .and_then(|s| s.phase.clone())

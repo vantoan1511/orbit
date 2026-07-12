@@ -15,6 +15,8 @@ const activeCount = computed(
 const terminatingCount = computed(
   () => store.namespaceList.filter((n: NamespaceInfo) => n.status === 'Terminating').length
 )
+// Placeholder: Namespaces themselves do not have a "failed" status phase in Kubernetes (only Active/Terminating).
+// This is kept for visual alignment with other dashboard pages.
 const failedCount = 0
 const systemCount = computed(
   () => store.namespaceList.filter((n: NamespaceInfo) => n.isSystem).length

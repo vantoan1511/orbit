@@ -258,7 +258,9 @@ pub struct StorageClassInfo {
     pub volume_binding_mode: String,
     pub allow_volume_expansion: bool,
     pub age: String,
-}#[derive(Debug, Serialize, Deserialize, Clone)]
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct NamespaceInfo {
     pub name: String,

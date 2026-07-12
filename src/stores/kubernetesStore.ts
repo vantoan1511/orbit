@@ -145,6 +145,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   function setActiveClusterId(id: string | null) {
     activeClusterId.value = id
     // Clear workloads when cluster changes to prevent stale data
+    namespaceList.value = []
     deployments.value = []
     statefulSets.value = []
     daemonSets.value = []
