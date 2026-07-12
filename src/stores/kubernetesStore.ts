@@ -12,7 +12,10 @@ import type {
   NodeInfo,
   ServiceInfo,
   ConfigMapInfo,
-  SecretInfo
+  SecretInfo,
+  PersistentVolumeInfo,
+  PersistentVolumeClaimInfo,
+  StorageClassInfo
 } from '@/types/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 
@@ -31,6 +34,12 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const secrets = ref<SecretInfo[]>([])
   const configMapsLoading = ref(false)
   const secretsLoading = ref(false)
+  const persistentVolumes = ref<PersistentVolumeInfo[]>([])
+  const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
+  const storageClasses = ref<StorageClassInfo[]>([])
+  const persistentVolumesLoading = ref(false)
+  const persistentVolumeClaimsLoading = ref(false)
+  const storageClassesLoading = ref(false)
   const namespaces = ref<string[]>(['All Namespaces'])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
@@ -93,6 +102,33 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     secretsLoading.value = loading
   }
 
+  function setPersistentVolumes(newPVs: PersistentVolumeInfo[]) {
+    persistentVolumes.value = newPVs
+    persistentVolumesLoading.value = false
+  }
+
+  function setPersistentVolumeClaims(newPVCs: PersistentVolumeClaimInfo[]) {
+    persistentVolumeClaims.value = newPVCs
+    persistentVolumeClaimsLoading.value = false
+  }
+
+  function setStorageClasses(newSCs: StorageClassInfo[]) {
+    storageClasses.value = newSCs
+    storageClassesLoading.value = false
+  }
+
+  function setPersistentVolumesLoading(loading: boolean) {
+    persistentVolumesLoading.value = loading
+  }
+
+  function setPersistentVolumeClaimsLoading(loading: boolean) {
+    persistentVolumeClaimsLoading.value = loading
+  }
+
+  function setStorageClassesLoading(loading: boolean) {
+    storageClassesLoading.value = loading
+  }
+
   function setNamespaces(newNamespaces: string[]) {
     namespaces.value = ['All Namespaces', ...newNamespaces]
   }
@@ -114,6 +150,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     services.value = []
     configMaps.value = []
     secrets.value = []
+    persistentVolumes.value = []
+    persistentVolumeClaims.value = []
+    storageClasses.value = []
   }
 
   async function loadInitialData() {
@@ -125,6 +164,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await kubernetesService.getServices()
       await kubernetesService.getConfigMaps()
       await kubernetesService.getSecrets()
+      await kubernetesService.getPersistentVolumes()
+      await kubernetesService.getPersistentVolumeClaims()
+      await kubernetesService.getStorageClasses()
     }
   }
 
@@ -141,8 +183,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     services,
     configMaps,
     secrets,
+    persistentVolumes,
+    persistentVolumeClaims,
+    storageClasses,
     configMapsLoading,
     secretsLoading,
+    persistentVolumesLoading,
+    persistentVolumeClaimsLoading,
+    storageClassesLoading,
     namespaces,
     clusters,
     activeClusterId,
@@ -158,8 +206,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setServices,
     setConfigMaps,
     setSecrets,
+    setPersistentVolumes,
+    setPersistentVolumeClaims,
+    setStorageClasses,
     setConfigMapsLoading,
     setSecretsLoading,
+    setPersistentVolumesLoading,
+    setPersistentVolumeClaimsLoading,
+    setStorageClassesLoading,
     setNamespaces,
     setClusters,
     setActiveClusterId,

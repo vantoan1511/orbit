@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import StorageMetricsCards from '../components/storage/StorageMetricsCards.vue'
 import StorageOverview from '../components/storage/StorageOverview.vue'
 import StoragePVTable from '../components/storage/StoragePVTable.vue'
 import StoragePVCTable from '../components/storage/StoragePVCTable.vue'
-import { mockStorageClasses } from '../components/storage/mockStorage'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
 const activeTab = ref<'overview' | 'pvs' | 'pvcs' | 'classes'>('overview')
-const storageClasses = ref(mockStorageClasses)
+const k8sStore = useKubernetesStore()
+const storageClasses = computed(() => k8sStore.storageClasses)
 </script>
 
 <template>

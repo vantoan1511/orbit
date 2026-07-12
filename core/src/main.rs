@@ -172,6 +172,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 &OrbitEvent::PodsUpdated { pods },
                                             ).await;
                                         }
+                                        if let Ok(persistent_volumes) = kubernetes::list_pvs(client).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::PersistentVolumesUpdated { persistent_volumes },
+                                             ).await;
+                                         }
+                                         if let Ok(persistent_volume_claims) = kubernetes::list_pvcs(client, None).await {
+                                             let _ = Bridge::send_event(
+                                                 &writer,
+                                                 &token,
+                                                 &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims },
+                                             ).await;
+                                         }
+                                         if let Ok(storage_classes) = kubernetes::list_storage_classes(client).await {
+                                             let _ = Bridge::send_event(
+                                                 &writer,
+                                                 &token,
+                                                 &OrbitEvent::StorageClassesUpdated { storage_classes },
+                                             ).await;
+                                         }
                                         if let Ok(nodes) = kubernetes::list_nodes(client).await {
                                             let _ = Bridge::send_event(
                                                 &writer,
@@ -239,6 +260,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 &OrbitEvent::PodsUpdated { pods },
                                             ).await;
                                         }
+                                        if let Ok(persistent_volumes) = kubernetes::list_pvs(client).await {
+                                            let _ = Bridge::send_event(
+                                                &writer,
+                                                &token,
+                                                &OrbitEvent::PersistentVolumesUpdated { persistent_volumes },
+                                             ).await;
+                                         }
+                                         if let Ok(persistent_volume_claims) = kubernetes::list_pvcs(client, None).await {
+                                             let _ = Bridge::send_event(
+                                                 &writer,
+                                                 &token,
+                                                 &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims },
+                                             ).await;
+                                         }
+                                         if let Ok(storage_classes) = kubernetes::list_storage_classes(client).await {
+                                             let _ = Bridge::send_event(
+                                                 &writer,
+                                                 &token,
+                                                 &OrbitEvent::StorageClassesUpdated { storage_classes },
+                                             ).await;
+                                         }
                                         if let Ok(nodes) = kubernetes::list_nodes(client).await {
                                             let _ = Bridge::send_event(
                                                 &writer,
@@ -549,6 +591,77 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 }
                                 Err(e) => {
                                     eprintln!("Error listing secrets: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getPersistentVolumes" => {
+                    tokio::spawn(async move {
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_pvs(client).await {
+                                Ok(persistent_volumes) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::PersistentVolumesUpdated { persistent_volumes },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing persistent volumes: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getPersistentVolumeClaims" => {
+                    let ext_data = msg.data.clone();
+                    tokio::spawn(async move {
+                        let namespace = ext_data
+                            .and_then(|d| d.get("namespace").cloned())
+                            .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_pvcs(client, namespace).await {
+                                Ok(persistent_volume_claims) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing persistent volume claims: {:?}", e);
+                                }
+                            }
+                        }
+                    });
+                }
+                "getStorageClasses" => {
+                    tokio::spawn(async move {
+                        let client = {
+                            let r_manager = manager.read().await;
+                            r_manager.active_client.clone()
+                        };
+                        if let Some(ref client) = client {
+                            match kubernetes::list_storage_classes(client).await {
+                                Ok(storage_classes) => {
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::StorageClassesUpdated { storage_classes },
+                                    ).await;
+                                }
+                                Err(e) => {
+                                    eprintln!("Error listing storage classes: {:?}", e);
                                 }
                             }
                         }

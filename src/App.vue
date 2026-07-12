@@ -14,7 +14,10 @@ import type {
   NodeInfo,
   ServiceInfo,
   ConfigMapInfo,
-  SecretInfo
+  SecretInfo,
+  PersistentVolumeInfo,
+  PersistentVolumeClaimInfo,
+  StorageClassInfo
 } from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
@@ -82,6 +85,22 @@ const handleSecretsUpdated = (payload: { secrets: SecretInfo[] }) => {
   k8sStore.setSecrets(payload.secrets)
 }
 
+const handlePersistentVolumesUpdated = (payload: {
+  persistent_volumes: PersistentVolumeInfo[]
+}) => {
+  k8sStore.setPersistentVolumes(payload.persistent_volumes)
+}
+
+const handlePersistentVolumeClaimsUpdated = (payload: {
+  persistent_volume_claims: PersistentVolumeClaimInfo[]
+}) => {
+  k8sStore.setPersistentVolumeClaims(payload.persistent_volume_claims)
+}
+
+const handleStorageClassesUpdated = (payload: { storage_classes: StorageClassInfo[] }) => {
+  k8sStore.setStorageClasses(payload.storage_classes)
+}
+
 const handleClustersUpdated = (payload: { clusters: ClusterInfo[] }) => {
   k8sStore.setClusters(payload.clusters)
 }
@@ -117,6 +136,9 @@ onMounted(() => {
   events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated)
   events.on(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
   events.on(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
+  events.on(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
+  events.on(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
+  events.on(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
@@ -136,6 +158,9 @@ onUnmounted(() => {
   events.off(OrbitEvents.ServicesUpdated, handleServicesUpdated)
   events.off(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
   events.off(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
+  events.off(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
+  events.off(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
+  events.off(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)

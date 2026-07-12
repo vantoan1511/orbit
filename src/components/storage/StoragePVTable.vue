@@ -6,10 +6,10 @@ import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, Database, AlertCircle } from '@lucide/vue'
-import { mockPVs } from './mockStorage'
-import type { PersistentVolumeInfo } from './mockStorage'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const pvs = ref<PersistentVolumeInfo[]>(mockPVs)
+const k8sStore = useKubernetesStore()
+const pvs = computed(() => k8sStore.persistentVolumes)
 
 const searchQuery = ref('')
 const selectedStorageClass = ref('All Storage Classes')
