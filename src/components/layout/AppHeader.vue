@@ -73,13 +73,13 @@ const handleRefresh = async () => {
 
 <template>
   <header
-    class="bg-[var(--bg-app)] border-b border-[var(--border)] px-8 py-4 flex flex-col gap-3 select-none"
+    class="bg-(--bg-app) border-b border-(--border) px-8 py-4 flex flex-col gap-3 select-none"
   >
     <!-- Top Row -->
     <div class="flex items-center justify-between">
       <!-- Left side: Cluster info & status -->
       <div class="flex items-center gap-4">
-        <h1 class="text-2xl font-bold text-[var(--text-primary)] font-ui tracking-tight">
+        <h1 class="text-2xl font-bold text-(--text-primary) font-ui tracking-tight">
           {{ activeCluster?.name || 'Unknown Cluster' }}
         </h1>
         <div
@@ -100,26 +100,26 @@ const handleRefresh = async () => {
 
       <!-- Right side: Last updated, Refresh, Actions -->
       <div class="flex items-center gap-3">
-        <span class="text-xs text-[var(--text-muted)]"> Last updated: 1m ago </span>
+        <span class="text-xs text-(--text-muted)"> Last updated: 1m ago </span>
         <button
           @click="handleRefresh"
-          class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] border border-[var(--border)] transition-all duration-200"
+          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) border border-[var(--border)] transition-all duration-200"
           :class="{ 'animate-spin': isRefreshing }"
           title="Refresh"
         >
           <RefreshCw class="w-4 h-4" />
         </button>
         <button
-          class="px-4 py-2 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-primary)] border border-[var(--border)] text-sm font-medium flex items-center gap-2 transition-all duration-200"
+          class="px-4 py-2 rounded-lg bg-(--bg-card) hover:bg-(--bg-hover) text-(--text-primary) border border-(--border) text-sm font-medium flex items-center gap-2 transition-all duration-200"
         >
           <span>Actions</span>
-          <ChevronDown class="w-4 h-4 text-[var(--text-muted)]" />
+          <ChevronDown class="w-4 h-4 text-(--text-muted)" />
         </button>
       </div>
     </div>
 
     <!-- Bottom Row (Sub-metadata) -->
-    <div class="flex items-center gap-6 text-xs text-[var(--text-secondary)] font-medium">
+    <div class="flex items-center gap-6 text-xs text-(--text-secondary) font-medium">
       <!-- Kubernetes Version -->
       <div class="flex items-center gap-2">
         <!-- SVG Kubernetes Icon -->
@@ -136,17 +136,17 @@ const handleRefresh = async () => {
       </div>
 
       <!-- Cloud Provider -->
-      <div class="flex items-center gap-2 border-l border-[var(--border)] pl-6">
+      <div class="flex items-center gap-2 border-l border-(--border) pl-6">
         <Cloud class="w-4 h-4 text-orange-400" />
-        <span class="font-semibold text-[var(--text-muted)] uppercase text-[10px] tracking-wider">{{
+        <span class="font-semibold text-(--text-muted) uppercase text-[10px] tracking-wider">{{
           cloudProvider.provider
         }}</span>
-        <span class="text-[var(--text-muted)]">/</span>
+        <span class="text-(--text-muted)">/</span>
         <span>{{ cloudProvider.platform }}</span>
       </div>
 
       <!-- Uptime -->
-      <div class="flex items-center gap-2 border-l border-[var(--border)] pl-6">
+      <div class="flex items-center gap-2 border-l border-(--border) pl-6">
         <Clock class="w-4 h-4 text-indigo-400" />
         <span>Uptime: {{ clusterUptime }}</span>
       </div>
