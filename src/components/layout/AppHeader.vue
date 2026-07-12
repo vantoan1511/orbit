@@ -1,14 +1,73 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { RefreshCw, ChevronDown, Clock, Cloud } from '@lucide/vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { ChevronDown, Clock, Cloud, RefreshCw } from '@lucide/vue'
+import { computed, ref } from 'vue'
 
+const kubernetesStore = useKubernetesStore()
 const isRefreshing = ref(false)
 
-const handleRefresh = () => {
+const activeCluster = computed(() => {
+  return kubernetesStore.clusters.find((c) => c.id === kubernetesStore.activeClusterId) || null
+})
+
+const kubernetesVersion = computed(() => {
+  return kubernetesStore.nodes[0]?.version || 'Unknown'
+})
+
+const clusterUptime = computed(() => {
+  return kubernetesStore.nodes[0]?.uptime || 'Unknown'
+})
+
+const cloudProvider = computed(() => {
+  const node = kubernetesStore.nodes[0]
+  if (!node || !node.labels) {
+    return { provider: 'Local', platform: 'Custom' }
+  }
+  const labels = node.labels
+  let provider = 'Local'
+  let platform = 'Custom'
+
+  for (const label of labels) {
+    const l = label.toLowerCase()
+    if (l.includes('eks.amazonaws.com') || l.includes('aws')) {
+      provider = 'AWS'
+      platform = 'EKS'
+      break
+    } else if (l.includes('google.com') || l.includes('gke')) {
+      provider = 'GCP'
+      platform = 'GKE'
+      break
+    } else if (l.includes('azure') || l.includes('aks')) {
+      provider = 'Azure'
+      platform = 'AKS'
+      break
+    } else if (l.includes('minikube')) {
+      provider = 'Minikube'
+      platform = 'Local'
+      break
+    } else if (l.includes('k3s')) {
+      provider = 'K3s'
+      platform = 'Local'
+      break
+    } else if (l.includes('microk8s')) {
+      provider = 'MicroK8s'
+      platform = 'Local'
+      break
+    }
+  }
+  return { provider, platform }
+})
+
+const handleRefresh = async () => {
+  if (isRefreshing.value) return
   isRefreshing.value = true
-  setTimeout(() => {
+  try {
+    await kubernetesStore.loadInitialData()
+  } catch (error) {
+    console.error('Failed to refresh cluster data:', error)
+  } finally {
     isRefreshing.value = false
-  }, 1000)
+  }
 }
 </script>
 
@@ -21,13 +80,21 @@ const handleRefresh = () => {
       <!-- Left side: Cluster info & status -->
       <div class="flex items-center gap-4">
         <h1 class="text-2xl font-bold text-[var(--text-primary)] font-ui tracking-tight">
-          production-us-east-1
+          {{ activeCluster?.name || 'Unknown Cluster' }}
         </h1>
         <div
-          class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-xs font-semibold border border-emerald-500/20"
+          class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200"
+          :class="
+            activeCluster?.status === 'healthy'
+              ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+              : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+          "
         >
-          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-          <span>Healthy</span>
+          <span
+            class="w-1.5 h-1.5 rounded-full"
+            :class="activeCluster?.status === 'healthy' ? 'bg-emerald-500' : 'bg-rose-500'"
+          ></span>
+          <span>{{ activeCluster?.status === 'healthy' ? 'Healthy' : 'Offline' }}</span>
         </div>
       </div>
 
@@ -65,23 +132,23 @@ const handleRefresh = () => {
             class="opacity-70"
           />
         </svg>
-        <span>Kubernetes v1.33.2</span>
+        <span>Kubernetes {{ kubernetesVersion }}</span>
       </div>
 
       <!-- Cloud Provider -->
       <div class="flex items-center gap-2 border-l border-[var(--border)] pl-6">
         <Cloud class="w-4 h-4 text-orange-400" />
-        <span class="font-semibold text-[var(--text-muted)] uppercase text-[10px] tracking-wider"
-          >aws</span
-        >
+        <span class="font-semibold text-[var(--text-muted)] uppercase text-[10px] tracking-wider">{{
+          cloudProvider.provider
+        }}</span>
         <span class="text-[var(--text-muted)]">/</span>
-        <span>EKS</span>
+        <span>{{ cloudProvider.platform }}</span>
       </div>
 
       <!-- Uptime -->
       <div class="flex items-center gap-2 border-l border-[var(--border)] pl-6">
         <Clock class="w-4 h-4 text-indigo-400" />
-        <span>Uptime: 18d 4h 32m</span>
+        <span>Uptime: {{ clusterUptime }}</span>
       </div>
     </div>
   </header>
