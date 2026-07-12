@@ -12,7 +12,9 @@ import type {
   JobInfo,
   CronJobInfo,
   NodeInfo,
-  ServiceInfo
+  ServiceInfo,
+  ConfigMapInfo,
+  SecretInfo
 } from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
 import Toast from 'primevue/toast'
@@ -72,6 +74,14 @@ const handleServicesUpdated = (payload: { services: ServiceInfo[] }) => {
   k8sStore.setServices(payload.services)
 }
 
+const handleConfigMapsUpdated = (payload: { config_maps: ConfigMapInfo[] }) => {
+  k8sStore.setConfigMaps(payload.config_maps)
+}
+
+const handleSecretsUpdated = (payload: { secrets: SecretInfo[] }) => {
+  k8sStore.setSecrets(payload.secrets)
+}
+
 const handleClustersUpdated = (payload: { clusters: ClusterInfo[] }) => {
   k8sStore.setClusters(payload.clusters)
 }
@@ -105,6 +115,8 @@ onMounted(() => {
   events.on(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
   events.on(OrbitEvents.NodesUpdated, handleNodesUpdated)
   events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated)
+  events.on(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
+  events.on(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
@@ -122,6 +134,8 @@ onUnmounted(() => {
   events.off(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
   events.off(OrbitEvents.NodesUpdated, handleNodesUpdated)
   events.off(OrbitEvents.ServicesUpdated, handleServicesUpdated)
+  events.off(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
+  events.off(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)

@@ -182,3 +182,41 @@ export interface ServiceInfo {
   endpointsList: string[]
   events: ServiceEvent[]
 }
+
+export interface UsedByPod {
+  name: string
+  status: 'Running' | 'Pending' | 'Failed' | 'Completed' | string
+}
+
+export interface ConfigMapInfo {
+  name: string
+  namespace: string
+  labels: Record<string, string>
+  annotations: number
+  created: string
+  age: string
+  resourceVersion: string
+  immutable: boolean
+  keysCount: number
+  size: string
+  mountedPods: number
+  usedBy: UsedByPod[]
+  data: Record<string, string>
+}
+
+export interface SecretInfo {
+  name: string
+  namespace: string
+  labels: Record<string, string>
+  annotations: number
+  type: string
+  created: string
+  age: string
+  resourceVersion: string
+  immutable: boolean
+  keysCount: number
+  size: string
+  mountedPods: number
+  usedBy: UsedByPod[]
+  data: Record<string, string>
+}

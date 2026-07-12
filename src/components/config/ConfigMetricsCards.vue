@@ -1,41 +1,72 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { FileText, ShieldAlert, Activity, Boxes, FileWarning, Lock } from '@lucide/vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { storeToRefs } from 'pinia'
 
 const props = defineProps<{
   activeTab: 'configmaps' | 'secrets'
 }>()
 
-// Calculate mock states based on activeTab
+const k8sStore = useKubernetesStore()
+const { configMaps, secrets } = storeToRefs(k8sStore)
+
+const parseSizeToBytes = (sizeStr: string): number => {
+  const match = sizeStr.match(/^([\d.]+)\s*([A-Za-z]+)?$/)
+  if (!match || !match[1]) return 0
+  const value = parseFloat(match[1])
+  const unit = match[2] ? match[2].toLowerCase() : ''
+  if (unit === 'kib' || unit === 'ki') return value * 1024
+  if (unit === 'mib' || unit === 'mi') return value * 1024 * 1024
+  return value
+}
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MiB`
+}
+
 const metrics = computed(() => {
+  const items = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
+  const uniqueNamespaces = new Set(items.map((item) => item.namespace)).size
+
+  const totalBytes = items.reduce((acc, item) => acc + parseSizeToBytes(item.size), 0)
+  const formattedTotalSize = formatBytes(totalBytes)
+
+  const mountedCount = items.reduce((acc, item) => acc + (item.mountedPods > 0 ? 1 : 0), 0)
+  const mountedPct = items.length > 0 ? ((mountedCount / items.length) * 100).toFixed(1) : '0'
+
+  const orphanedCount = items.filter((item) => item.mountedPods === 0).length
+
   if (props.activeTab === 'configmaps') {
     return [
       {
         title: 'ConfigMaps',
-        value: '128',
-        subtext: 'Across 12 namespaces',
+        value: String(items.length),
+        subtext: `Across ${uniqueNamespaces} ${uniqueNamespaces === 1 ? 'namespace' : 'namespaces'}`,
         icon: FileText,
         iconClass: 'bg-(--bg-hover) text-(--text-muted)'
       },
       {
         title: 'Total Size',
-        value: '4.2 MiB',
-        subtext: '+12% vs last 7d',
+        value: formattedTotalSize,
+        subtext: 'Total memory footprint',
         subtextClass: 'text-emerald-400 font-medium',
         icon: Activity,
         iconClass: 'bg-emerald-500/10 text-emerald-400'
       },
       {
         title: 'Mounted in Pods',
-        value: '62',
-        subtext: '48% of total',
+        value: String(mountedCount),
+        subtext: `${mountedPct}% of total`,
         subtextClass: 'text-blue-400 font-medium',
         icon: Boxes,
         iconClass: 'bg-blue-500/10 text-blue-400'
       },
       {
         title: 'Orphaned',
-        value: '8',
+        value: String(orphanedCount),
         subtext: 'Not referenced',
         subtextClass: 'text-amber-400 font-medium',
         icon: FileWarning,
@@ -46,30 +77,30 @@ const metrics = computed(() => {
     return [
       {
         title: 'Secrets',
-        value: '64',
-        subtext: 'Across 10 namespaces',
+        value: String(items.length),
+        subtext: `Across ${uniqueNamespaces} ${uniqueNamespaces === 1 ? 'namespace' : 'namespaces'}`,
         icon: Lock,
         iconClass: 'bg-(--bg-hover) text-(--text-muted)'
       },
       {
         title: 'Total Size',
-        value: '1.1 MiB',
-        subtext: '-4% vs last 7d',
+        value: formattedTotalSize,
+        subtext: 'Total memory footprint',
         subtextClass: 'text-emerald-400 font-medium',
         icon: Activity,
         iconClass: 'bg-emerald-500/10 text-emerald-400'
       },
       {
         title: 'Mounted in Pods',
-        value: '30',
-        subtext: '46.8% of total',
+        value: String(mountedCount),
+        subtext: `${mountedPct}% of total`,
         subtextClass: 'text-blue-400 font-medium',
         icon: Boxes,
         iconClass: 'bg-blue-500/10 text-blue-400'
       },
       {
         title: 'Orphaned',
-        value: '5',
+        value: String(orphanedCount),
         subtext: 'Not referenced',
         subtextClass: 'text-rose-400 font-medium',
         icon: ShieldAlert,

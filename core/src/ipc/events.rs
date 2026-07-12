@@ -64,8 +64,17 @@ pub enum OrbitEvent {
     ServicesUpdated {
         services: Vec<crate::kubernetes::models::ServiceInfo>,
     },
+    #[serde(rename = "configMapsUpdated")]
+    ConfigMapsUpdated {
+        config_maps: Vec<crate::kubernetes::models::ConfigMapInfo>,
+    },
+    #[serde(rename = "secretsUpdated")]
+    SecretsUpdated {
+        secrets: Vec<crate::kubernetes::models::SecretInfo>,
+    },
     #[serde(rename = "errorOccurred")]
     ErrorOccurred {
         message: String,
     },
 }
+

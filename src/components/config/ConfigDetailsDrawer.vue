@@ -7,7 +7,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import { Clock, Tag, Server, Shield, FileCode, Eye, EyeOff } from '@lucide/vue'
-import type { ConfigMapInfo, SecretInfo } from './mockConfig'
+import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 
 const props = defineProps<{
   visible: boolean
