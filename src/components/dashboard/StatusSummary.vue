@@ -1,5 +1,48 @@
 <script setup lang="ts">
-import { CheckCircle2, Server, LayoutGrid } from '@lucide/vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { CheckCircle2, Server, LayoutGrid, AlertTriangle, HelpCircle } from '@lucide/vue'
+import { computed } from 'vue'
+
+const store = useKubernetesStore()
+
+const totalNodesCount = computed(() => store.nodes.length)
+const readyNodesCount = computed(() => store.nodes.filter((n) => n.status === 'Ready').length)
+const namespacesCount = computed(() => store.namespaceList.length)
+const kubernetesVersion = computed(() => store.nodes[0]?.version || 'Unknown')
+
+const clusterStatusInfo = computed(() => {
+  const total = totalNodesCount.value
+  const ready = readyNodesCount.value
+
+  if (total === 0) {
+    return {
+      text: 'Unknown',
+      subtext: 'No nodes found',
+      icon: HelpCircle,
+      iconClass: 'text-slate-400',
+      bgClass: 'bg-slate-500/10',
+      textClass: 'text-slate-400'
+    }
+  } else if (ready < total) {
+    return {
+      text: 'Degraded',
+      subtext: `${total - ready} of ${total} nodes not ready`,
+      icon: AlertTriangle,
+      iconClass: 'text-amber-500',
+      bgClass: 'bg-amber-500/10',
+      textClass: 'text-amber-500'
+    }
+  } else {
+    return {
+      text: 'Healthy',
+      subtext: 'All systems normal',
+      icon: CheckCircle2,
+      iconClass: 'text-emerald-500',
+      bgClass: 'bg-emerald-500/10',
+      textClass: 'text-emerald-500'
+    }
+  }
+})
 </script>
 
 <template>
@@ -9,16 +52,25 @@ import { CheckCircle2, Server, LayoutGrid } from '@lucide/vue'
       class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-[var(--border-strong)]"
     >
       <div
-        class="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 flex-shrink-0"
+        class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+        :class="clusterStatusInfo.bgClass"
       >
-        <CheckCircle2 class="w-6 h-6" />
+        <component
+          :is="clusterStatusInfo.icon"
+          class="w-6 h-6"
+          :class="clusterStatusInfo.iconClass"
+        />
       </div>
       <div class="flex-1 min-w-0">
         <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
           Cluster Status
         </div>
-        <div class="text-2xl font-bold text-emerald-500 mt-1">Healthy</div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">All systems normal</div>
+        <div class="text-2xl font-bold mt-1" :class="clusterStatusInfo.textClass">
+          {{ clusterStatusInfo.text }}
+        </div>
+        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">
+          {{ clusterStatusInfo.subtext }}
+        </div>
       </div>
     </div>
 
@@ -44,8 +96,10 @@ import { CheckCircle2, Server, LayoutGrid } from '@lucide/vue'
         <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
           Kubernetes Version
         </div>
-        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">v1.33.2</div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Up to date</div>
+        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">
+          {{ kubernetesVersion }}
+        </div>
+        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Active Version</div>
       </div>
     </div>
 
@@ -63,9 +117,14 @@ import { CheckCircle2, Server, LayoutGrid } from '@lucide/vue'
           Nodes
         </div>
         <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">
-          12 <span class="text-base text-[var(--text-muted)] font-normal">/ 12</span>
+          {{ readyNodesCount }}
+          <span class="text-base text-[var(--text-muted)] font-normal"
+            >/ {{ totalNodesCount }}</span
+          >
         </div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">12 Ready</div>
+        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">
+          {{ readyNodesCount }} Ready
+        </div>
       </div>
     </div>
 
@@ -82,8 +141,10 @@ import { CheckCircle2, Server, LayoutGrid } from '@lucide/vue'
         <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
           Namespaces
         </div>
-        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">38</div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Active</div>
+        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">
+          {{ namespacesCount }}
+        </div>
+        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Active Namespaces</div>
       </div>
     </div>
   </div>
