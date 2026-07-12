@@ -193,6 +193,9 @@ fn parse_memory_quantity(q: &str) -> f64 {
         val * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 * 1000.0 / (1024.0 * 1024.0 * 1024.0)
     } else {
         let val = q.parse::<f64>().unwrap_or(0.0);
+        if q.parse::<f64>().is_err() {
+            log::warn!("parse_memory_quantity: unrecognised suffix in {:?}, treating as bytes", q);
+        }
         val / (1024.0 * 1024.0 * 1024.0)
     }
 }

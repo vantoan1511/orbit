@@ -101,12 +101,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 bridge.writer.clone(),
                 bridge.token.clone(),
                 kube_manager.clone(),
-            ).await;
+            );
         }
 
-        tokio::spawn(async move {
-            println!("Handled received message: {:?}", msg);
-        });
     }
 
     Ok(())
