@@ -2,24 +2,8 @@ use kube::{
     api::{Api, ListParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
+use k8s_openapi::api::core::v1::{Node, Pod};
 use crate::kubernetes::{models, format_age};
-
-pub async fn list_namespaces(client: &Client) -> Result<Vec<String>, kube::Error> {
-    let namespaces: Api<Namespace> = Api::all(client.clone());
-    let mut namespace_list = Vec::new();
-
-    for ns in namespaces.list(&ListParams::default()).await? {
-        if let Some(name) = ns.metadata.name {
-            namespace_list.push(name);
-        }
-    }
-
-    // Sort namespaces alphabetically for consistency
-    namespace_list.sort();
-
-    Ok(namespace_list)
-}
 
 pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::Error> {
     let nodes_api: Api<Node> = Api::all(client.clone());

@@ -4,19 +4,20 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type {
   ClusterInfo,
-  PodInfo,
-  DeploymentInfo,
-  StatefulSetInfo,
-  DaemonSetInfo,
-  ReplicaSetInfo,
-  JobInfo,
-  CronJobInfo,
-  NodeInfo,
-  ServiceInfo,
   ConfigMapInfo,
-  SecretInfo,
-  PersistentVolumeInfo,
+  CronJobInfo,
+  DaemonSetInfo,
+  DeploymentInfo,
+  JobInfo,
+  NamespaceInfo,
+  NodeInfo,
   PersistentVolumeClaimInfo,
+  PersistentVolumeInfo,
+  PodInfo,
+  ReplicaSetInfo,
+  SecretInfo,
+  ServiceInfo,
+  StatefulSetInfo,
   StorageClassInfo
 } from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
@@ -37,7 +38,7 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
   }
 }
 
-const handleNamespacesUpdated = (payload: { namespaces: string[] }) => {
+const handleNamespacesUpdated = (payload: { namespaces: NamespaceInfo[] }) => {
   k8sStore.setNamespaces(payload.namespaces)
 }
 
