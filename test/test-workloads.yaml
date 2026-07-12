@@ -251,3 +251,91 @@ type: kubernetes.io/tls
 data:
   tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==
   tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: orbit-storage-class
+provisioner: kubernetes.io/no-provisioner
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: orbit-pv-1
+spec:
+  capacity:
+    storage: 10Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: orbit-storage-class
+  local:
+    path: /tmp/orbit-data-1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - docker-desktop
+          - minikube
+          - kind-control-plane
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: orbit-pv-2
+spec:
+  capacity:
+    storage: 20Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: orbit-storage-class
+  local:
+    path: /tmp/orbit-data-2
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - docker-desktop
+          - minikube
+          - kind-control-plane
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: orbit-pvc-1
+  namespace: orbit-test
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeName: orbit-pv-1
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: orbit-storage-class
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: orbit-pvc-2
+  namespace: orbit-test
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeName: orbit-pv-2
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: orbit-storage-class
+

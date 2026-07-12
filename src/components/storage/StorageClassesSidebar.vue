@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import Chart from 'primevue/chart'
 import { Layers, PieChart, Activity } from '@lucide/vue'
-import { mockStorageClasses, mockPVs } from './mockStorage'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const storageClasses = ref(mockStorageClasses)
-const pvs = ref(mockPVs)
+const k8sStore = useKubernetesStore()
+const storageClasses = computed(() => k8sStore.storageClasses)
+const pvs = computed(() => k8sStore.persistentVolumes)
 
 // Chart configuration
 const chartData = ref()
@@ -49,7 +50,7 @@ const statusCounts = computed(() => {
   return counts
 })
 
-onMounted(() => {
+const updateChart = () => {
   const isDark = document.documentElement.classList.contains('my-app-dark')
 
   const colors = isDark
@@ -111,7 +112,9 @@ onMounted(() => {
       }
     }
   }
-})
+}
+
+watch(scCapacityData, updateChart, { immediate: true })
 </script>
 
 <template>

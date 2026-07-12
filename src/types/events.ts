@@ -10,7 +10,10 @@ import type {
   NodeInfo,
   ServiceInfo,
   ConfigMapInfo,
-  SecretInfo
+  SecretInfo,
+  PersistentVolumeInfo,
+  PersistentVolumeClaimInfo,
+  StorageClassInfo
 } from './kubernetes'
 
 export interface OrbitEventMap {
@@ -66,6 +69,15 @@ export interface OrbitEventMap {
   secretsUpdated: {
     secrets: SecretInfo[]
   }
+  persistentVolumesUpdated: {
+    persistent_volumes: PersistentVolumeInfo[]
+  }
+  persistentVolumeClaimsUpdated: {
+    persistent_volume_claims: PersistentVolumeClaimInfo[]
+  }
+  storageClassesUpdated: {
+    storage_classes: StorageClassInfo[]
+  }
   errorOccurred: {
     message: string
   }
@@ -89,6 +101,9 @@ export const OrbitEvents = {
   ServicesUpdated: 'servicesUpdated',
   ConfigMapsUpdated: 'configMapsUpdated',
   SecretsUpdated: 'secretsUpdated',
+  PersistentVolumesUpdated: 'persistentVolumesUpdated',
+  PersistentVolumeClaimsUpdated: 'persistentVolumeClaimsUpdated',
+  StorageClassesUpdated: 'storageClassesUpdated',
   ErrorOccurred: 'errorOccurred'
 } as const
 

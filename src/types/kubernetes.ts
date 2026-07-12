@@ -220,3 +220,35 @@ export interface SecretInfo {
   usedBy: UsedByPod[]
   data: Record<string, string>
 }
+
+export interface PersistentVolumeInfo {
+  name: string
+  capacity: string
+  accessMode: string
+  reclaimPolicy: string
+  status: 'Bound' | 'Available' | 'Released' | 'Failed' | string
+  storageClass: string
+  age: string
+  volumeMode: 'Filesystem' | 'Block' | string
+  reason?: string
+}
+
+export interface PersistentVolumeClaimInfo {
+  name: string
+  namespace: string
+  status: 'Bound' | 'Lost' | 'Pending' | string
+  volume: string
+  capacity: string
+  accessMode: string
+  storageClass: string
+  age: string
+}
+
+export interface StorageClassInfo {
+  name: string
+  provisioner: string
+  reclaimPolicy: string
+  volumeBindingMode: string
+  allowVolumeExpansion: boolean
+  age: string
+}

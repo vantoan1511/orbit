@@ -72,6 +72,18 @@ pub enum OrbitEvent {
     SecretsUpdated {
         secrets: Vec<crate::kubernetes::models::SecretInfo>,
     },
+    #[serde(rename = "persistentVolumesUpdated")]
+    PersistentVolumesUpdated {
+        persistent_volumes: Vec<crate::kubernetes::models::PersistentVolumeInfo>,
+    },
+    #[serde(rename = "persistentVolumeClaimsUpdated")]
+    PersistentVolumeClaimsUpdated {
+        persistent_volume_claims: Vec<crate::kubernetes::models::PersistentVolumeClaimInfo>,
+    },
+    #[serde(rename = "storageClassesUpdated")]
+    StorageClassesUpdated {
+        storage_classes: Vec<crate::kubernetes::models::StorageClassInfo>,
+    },
     #[serde(rename = "errorOccurred")]
     ErrorOccurred {
         message: String,

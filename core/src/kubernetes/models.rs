@@ -222,6 +222,45 @@ pub struct SecretInfo {
     pub data: std::collections::BTreeMap<String, String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistentVolumeInfo {
+    pub name: String,
+    pub capacity: String,
+    pub access_mode: String,
+    pub reclaim_policy: String,
+    pub status: String,
+    pub storage_class: String,
+    pub age: String,
+    pub volume_mode: String,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistentVolumeClaimInfo {
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub volume: String,
+    pub capacity: String,
+    pub access_mode: String,
+    pub storage_class: String,
+    pub age: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageClassInfo {
+    pub name: String,
+    pub provisioner: String,
+    pub reclaim_policy: String,
+    pub volume_binding_mode: String,
+    pub allow_volume_expansion: bool,
+    pub age: String,
+}
+
+
 
 
 

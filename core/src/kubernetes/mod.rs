@@ -13,9 +13,12 @@ pub mod models;
 pub mod manager;
 pub mod configmaps;
 pub mod secrets;
+pub mod storage;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;
+pub use storage::{list_pvs, list_pvcs, list_storage_classes};
+
 
 
 pub async fn list_namespaces(client: &Client) -> Result<Vec<String>, kube::Error> {
