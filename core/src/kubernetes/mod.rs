@@ -4,13 +4,15 @@ pub mod configmaps;
 pub mod secrets;
 pub mod storage;
 pub mod workloads;
+pub mod batch;
 pub mod nodes;
 pub mod services;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;
 pub use storage::{list_pvs, list_pvcs, list_storage_classes};
-pub use workloads::{list_pods, list_deployments, list_statefulsets, list_daemonsets, list_replicasets, list_jobs, list_cronjobs};
+pub use workloads::{list_pods, list_deployments, list_statefulsets, list_daemonsets, list_replicasets};
+pub use batch::{list_jobs, list_cronjobs};
 pub use nodes::{list_namespaces, list_nodes};
 pub use services::list_services;
 

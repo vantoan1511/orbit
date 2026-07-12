@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 
 /// Dispatches an IPC event from the frontend to the appropriate Kubernetes handler.
 /// Each arm spawns an async task so the message loop is never blocked.
-pub async fn dispatch(
+pub fn dispatch(
     event_name: &str,
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -86,7 +86,7 @@ pub async fn dispatch(
                             }
                         }
                         Err(e) => {
-                            eprintln!("Error switching cluster: {:?}", e);
+                            log::error!("Error switching cluster: {:?}", e);
                             let _ = Bridge::send_event(
                                 &writer,
                                 &token,
@@ -149,7 +149,7 @@ pub async fn dispatch(
                             }
                         }
                         Err(e) => {
-                            eprintln!("Error adding cluster: {:?}", e);
+                            log::error!("Error adding cluster: {:?}", e);
                             let _ = Bridge::send_event(
                                 &writer,
                                 &token,
@@ -173,7 +173,7 @@ pub async fn dispatch(
                         Ok(namespaces) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NamespacesUpdated { namespaces }).await;
                         }
-                        Err(e) => { eprintln!("Error listing namespaces: {:?}", e); }
+                        Err(e) => { log::error!("Error listing namespaces: {:?}", e); }
                     }
                 }
             });
@@ -193,7 +193,7 @@ pub async fn dispatch(
                         Ok(pods) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PodsUpdated { pods }).await;
                         }
-                        Err(e) => { eprintln!("Error listing pods: {:?}", e); }
+                        Err(e) => { log::error!("Error listing pods: {:?}", e); }
                     }
                 }
             });
@@ -213,7 +213,7 @@ pub async fn dispatch(
                         Ok(deployments) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::DeploymentsUpdated { deployments }).await;
                         }
-                        Err(e) => { eprintln!("Error listing deployments: {:?}", e); }
+                        Err(e) => { log::error!("Error listing deployments: {:?}", e); }
                     }
                 }
             });
@@ -233,7 +233,7 @@ pub async fn dispatch(
                         Ok(stateful_sets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StatefulSetsUpdated { stateful_sets }).await;
                         }
-                        Err(e) => { eprintln!("Error listing statefulsets: {:?}", e); }
+                        Err(e) => { log::error!("Error listing statefulsets: {:?}", e); }
                     }
                 }
             });
@@ -253,7 +253,7 @@ pub async fn dispatch(
                         Ok(daemon_sets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::DaemonSetsUpdated { daemon_sets }).await;
                         }
-                        Err(e) => { eprintln!("Error listing daemonsets: {:?}", e); }
+                        Err(e) => { log::error!("Error listing daemonsets: {:?}", e); }
                     }
                 }
             });
@@ -273,7 +273,7 @@ pub async fn dispatch(
                         Ok(replica_sets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ReplicaSetsUpdated { replica_sets }).await;
                         }
-                        Err(e) => { eprintln!("Error listing replicasets: {:?}", e); }
+                        Err(e) => { log::error!("Error listing replicasets: {:?}", e); }
                     }
                 }
             });
@@ -293,7 +293,7 @@ pub async fn dispatch(
                         Ok(jobs) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::JobsUpdated { jobs }).await;
                         }
-                        Err(e) => { eprintln!("Error listing jobs: {:?}", e); }
+                        Err(e) => { log::error!("Error listing jobs: {:?}", e); }
                     }
                 }
             });
@@ -313,7 +313,7 @@ pub async fn dispatch(
                         Ok(cron_jobs) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::CronJobsUpdated { cron_jobs }).await;
                         }
-                        Err(e) => { eprintln!("Error listing cronjobs: {:?}", e); }
+                        Err(e) => { log::error!("Error listing cronjobs: {:?}", e); }
                     }
                 }
             });
@@ -333,7 +333,7 @@ pub async fn dispatch(
                         Ok(services) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ServicesUpdated { services }).await;
                         }
-                        Err(e) => { eprintln!("Error listing services: {:?}", e); }
+                        Err(e) => { log::error!("Error listing services: {:?}", e); }
                     }
                 }
             });
@@ -353,7 +353,7 @@ pub async fn dispatch(
                         Ok(config_maps) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ConfigMapsUpdated { config_maps }).await;
                         }
-                        Err(e) => { eprintln!("Error listing configmaps: {:?}", e); }
+                        Err(e) => { log::error!("Error listing configmaps: {:?}", e); }
                     }
                 }
             });
@@ -373,7 +373,7 @@ pub async fn dispatch(
                         Ok(secrets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::SecretsUpdated { secrets }).await;
                         }
-                        Err(e) => { eprintln!("Error listing secrets: {:?}", e); }
+                        Err(e) => { log::error!("Error listing secrets: {:?}", e); }
                     }
                 }
             });
@@ -389,7 +389,7 @@ pub async fn dispatch(
                         Ok(persistent_volumes) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumesUpdated { persistent_volumes }).await;
                         }
-                        Err(e) => { eprintln!("Error listing persistent volumes: {:?}", e); }
+                        Err(e) => { log::error!("Error listing persistent volumes: {:?}", e); }
                     }
                 }
             });
@@ -409,7 +409,7 @@ pub async fn dispatch(
                         Ok(persistent_volume_claims) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims }).await;
                         }
-                        Err(e) => { eprintln!("Error listing persistent volume claims: {:?}", e); }
+                        Err(e) => { log::error!("Error listing persistent volume claims: {:?}", e); }
                     }
                 }
             });
@@ -425,7 +425,7 @@ pub async fn dispatch(
                         Ok(storage_classes) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StorageClassesUpdated { storage_classes }).await;
                         }
-                        Err(e) => { eprintln!("Error listing storage classes: {:?}", e); }
+                        Err(e) => { log::error!("Error listing storage classes: {:?}", e); }
                     }
                 }
             });
@@ -441,7 +441,7 @@ pub async fn dispatch(
                         Ok(nodes) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
                         }
-                        Err(e) => { eprintln!("Error listing nodes: {:?}", e); }
+                        Err(e) => { log::error!("Error listing nodes: {:?}", e); }
                     }
                 }
             });
