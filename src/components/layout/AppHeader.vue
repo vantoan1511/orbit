@@ -103,7 +103,7 @@ const handleRefresh = async () => {
         <span class="text-xs text-(--text-muted)"> Last updated: 1m ago </span>
         <button
           @click="handleRefresh"
-          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) border border-[var(--border)] transition-all duration-200"
+          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) border border-(--border) transition-all duration-200"
           :class="{ 'animate-spin': isRefreshing }"
           title="Refresh"
         >
