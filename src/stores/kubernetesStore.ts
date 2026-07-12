@@ -155,6 +155,56 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     storageClasses.value = []
   }
 
+  async function fetchConfigMaps(namespace?: string) {
+    configMapsLoading.value = true
+    try {
+      await kubernetesService.getConfigMaps(namespace)
+    } catch (error) {
+      configMapsLoading.value = false
+      throw error
+    }
+  }
+
+  async function fetchSecrets(namespace?: string) {
+    secretsLoading.value = true
+    try {
+      await kubernetesService.getSecrets(namespace)
+    } catch (error) {
+      secretsLoading.value = false
+      throw error
+    }
+  }
+
+  async function fetchPersistentVolumes() {
+    persistentVolumesLoading.value = true
+    try {
+      await kubernetesService.getPersistentVolumes()
+    } catch (error) {
+      persistentVolumesLoading.value = false
+      throw error
+    }
+  }
+
+  async function fetchPersistentVolumeClaims(namespace?: string) {
+    persistentVolumeClaimsLoading.value = true
+    try {
+      await kubernetesService.getPersistentVolumeClaims(namespace)
+    } catch (error) {
+      persistentVolumeClaimsLoading.value = false
+      throw error
+    }
+  }
+
+  async function fetchStorageClasses() {
+    storageClassesLoading.value = true
+    try {
+      await kubernetesService.getStorageClasses()
+    } catch (error) {
+      storageClassesLoading.value = false
+      throw error
+    }
+  }
+
   async function loadInitialData() {
     if (isEngineReady.value) {
       await kubernetesService.getClusters()
@@ -162,11 +212,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await kubernetesService.getPods()
       await kubernetesService.getNodes()
       await kubernetesService.getServices()
-      await kubernetesService.getConfigMaps()
-      await kubernetesService.getSecrets()
-      await kubernetesService.getPersistentVolumes()
-      await kubernetesService.getPersistentVolumeClaims()
-      await kubernetesService.getStorageClasses()
+      await fetchConfigMaps()
+      await fetchSecrets()
+      await fetchPersistentVolumes()
+      await fetchPersistentVolumeClaims()
+      await fetchStorageClasses()
     }
   }
 
@@ -217,6 +267,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setNamespaces,
     setClusters,
     setActiveClusterId,
+    fetchConfigMaps,
+    fetchSecrets,
+    fetchPersistentVolumes,
+    fetchPersistentVolumeClaims,
+    fetchStorageClasses,
     loadInitialData
   }
 })

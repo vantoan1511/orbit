@@ -68,100 +68,35 @@ export const kubernetesService = {
    * Request list of configmaps, optionally filtered by namespace
    */
   async getConfigMaps(namespace?: string): Promise<void> {
-    try {
-      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-      const store = useKubernetesStore()
-      store.setConfigMapsLoading(true)
-      await coreEngine.dispatch('getConfigMaps', { namespace })
-    } catch (error) {
-      console.error('Failed to get ConfigMaps:', error)
-      try {
-        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-        const store = useKubernetesStore()
-        store.setConfigMapsLoading(false)
-      } catch {}
-      throw error
-    }
+    await coreEngine.dispatch('getConfigMaps', { namespace })
   },
 
   /**
    * Request list of secrets, optionally filtered by namespace
    */
   async getSecrets(namespace?: string): Promise<void> {
-    try {
-      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-      const store = useKubernetesStore()
-      store.setSecretsLoading(true)
-      await coreEngine.dispatch('getSecrets', { namespace })
-    } catch (error) {
-      console.error('Failed to get Secrets:', error)
-      try {
-        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-        const store = useKubernetesStore()
-        store.setSecretsLoading(false)
-      } catch {}
-      throw error
-    }
+    await coreEngine.dispatch('getSecrets', { namespace })
   },
 
   /**
    * Request list of persistent volumes
    */
   async getPersistentVolumes(): Promise<void> {
-    try {
-      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-      const store = useKubernetesStore()
-      store.setPersistentVolumesLoading(true)
-      await coreEngine.dispatch('getPersistentVolumes')
-    } catch (error) {
-      console.error('Failed to get Persistent Volumes:', error)
-      try {
-        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-        const store = useKubernetesStore()
-        store.setPersistentVolumesLoading(false)
-      } catch {}
-      throw error
-    }
+    await coreEngine.dispatch('getPersistentVolumes')
   },
 
   /**
    * Request list of persistent volume claims, optionally filtered by namespace
    */
   async getPersistentVolumeClaims(namespace?: string): Promise<void> {
-    try {
-      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-      const store = useKubernetesStore()
-      store.setPersistentVolumeClaimsLoading(true)
-      await coreEngine.dispatch('getPersistentVolumeClaims', { namespace })
-    } catch (error) {
-      console.error('Failed to get Persistent Volume Claims:', error)
-      try {
-        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-        const store = useKubernetesStore()
-        store.setPersistentVolumeClaimsLoading(false)
-      } catch {}
-      throw error
-    }
+    await coreEngine.dispatch('getPersistentVolumeClaims', { namespace })
   },
 
   /**
    * Request list of storage classes
    */
   async getStorageClasses(): Promise<void> {
-    try {
-      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-      const store = useKubernetesStore()
-      store.setStorageClassesLoading(true)
-      await coreEngine.dispatch('getStorageClasses')
-    } catch (error) {
-      console.error('Failed to get Storage Classes:', error)
-      try {
-        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
-        const store = useKubernetesStore()
-        store.setStorageClassesLoading(false)
-      } catch {}
-      throw error
-    }
+    await coreEngine.dispatch('getStorageClasses')
   },
 
   /**

@@ -2,13 +2,14 @@
 import { ref, onMounted } from 'vue'
 import ConfigMetricsCards from '../components/config/ConfigMetricsCards.vue'
 import ConfigDataTable from '../components/config/ConfigDataTable.vue'
-import { kubernetesService } from '@/services/kubernetesService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
 const activeTab = ref<'configmaps' | 'secrets'>('configmaps')
+const k8sStore = useKubernetesStore()
 
 onMounted(async () => {
-  await kubernetesService.getConfigMaps()
-  await kubernetesService.getSecrets()
+  await k8sStore.fetchConfigMaps()
+  await k8sStore.fetchSecrets()
 })
 </script>
 
