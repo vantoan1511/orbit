@@ -10,9 +10,35 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { ref, watch } from 'vue'
 
+interface ResourceQuotaInfo {
+  cpuRequest: string
+  cpuLimit: string
+  cpuUsed: string
+  cpuPercent: number
+  memoryRequest: string
+  memoryLimit: string
+  memoryUsed: string
+  memoryPercent: number
+}
+
+interface LimitRangeInfo {
+  type: string
+  resource: string
+  min: string
+  max: string
+  default: string
+  defaultRequest: string
+}
+
 interface DrawerNamespaceInfo extends NamespaceInfo {
+  cpuUsage?: string
+  cpuPercent?: number
   cpuHistory?: number[]
+  memoryUsage?: string
+  memoryPercent?: number
   memoryHistory?: number[]
+  resourceQuota?: ResourceQuotaInfo | null
+  limitRanges?: LimitRangeInfo[]
 }
 
 const props = defineProps<{
@@ -437,7 +463,7 @@ const annotationsExpanded = ref(false)
 
             <!-- LIMIT RANGES PANEL -->
             <TabPanel value="limitranges" class="space-y-4">
-              <div v-if="props.namespace.limitRanges.length > 0">
+              <div v-if="props.namespace.limitRanges && props.namespace.limitRanges.length > 0">
                 <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-4">
                   Limit Ranges
                 </h3>
