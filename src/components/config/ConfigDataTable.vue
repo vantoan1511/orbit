@@ -12,7 +12,6 @@ import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { storeToRefs } from 'pinia'
-import { kubernetesService } from '@/services/kubernetesService'
 
 const toast = useToast()
 
@@ -25,9 +24,9 @@ const { configMaps, secrets } = storeToRefs(k8sStore)
 
 const handleRefresh = async () => {
   if (props.activeTab === 'configmaps') {
-    await kubernetesService.getConfigMaps()
+    await k8sStore.fetchConfigMaps()
   } else {
-    await kubernetesService.getSecrets()
+    await k8sStore.fetchSecrets()
   }
 }
 
