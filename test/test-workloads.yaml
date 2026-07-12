@@ -214,3 +214,40 @@ metadata:
 spec:
   type: ExternalName
   externalName: my.database.example.com
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-configmap
+  namespace: orbit-test
+  labels:
+    app: test-app
+    env: development
+data:
+  database.url: "postgresql://localhost:5432/db"
+  app.properties: |
+    server.port=8080
+    logging.level.org.springframework=INFO
+  settings.json: '{"theme": "dark", "notifications": true}'
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-opaque-secret
+  namespace: orbit-test
+  labels:
+    app: test-app
+type: Opaque
+data:
+  api-key: dGVzdC1hcGkta2V5LXZhbHVl
+  db-password: c3VwZXItc2VjcmV0LXBhc3N3b3Jk
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: test-tls-secret
+  namespace: orbit-test
+type: kubernetes.io/tls
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCg==
