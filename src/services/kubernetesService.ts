@@ -68,14 +68,40 @@ export const kubernetesService = {
    * Request list of configmaps, optionally filtered by namespace
    */
   async getConfigMaps(namespace?: string): Promise<void> {
-    await coreEngine.dispatch('getConfigMaps', { namespace })
+    try {
+      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
+      const store = useKubernetesStore()
+      store.setConfigMapsLoading(true)
+      await coreEngine.dispatch('getConfigMaps', { namespace })
+    } catch (error) {
+      console.error('Failed to get ConfigMaps:', error)
+      try {
+        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
+        const store = useKubernetesStore()
+        store.setConfigMapsLoading(false)
+      } catch {}
+      throw error
+    }
   },
 
   /**
    * Request list of secrets, optionally filtered by namespace
    */
   async getSecrets(namespace?: string): Promise<void> {
-    await coreEngine.dispatch('getSecrets', { namespace })
+    try {
+      const { useKubernetesStore } = await import('@/stores/kubernetesStore')
+      const store = useKubernetesStore()
+      store.setSecretsLoading(true)
+      await coreEngine.dispatch('getSecrets', { namespace })
+    } catch (error) {
+      console.error('Failed to get Secrets:', error)
+      try {
+        const { useKubernetesStore } = await import('@/stores/kubernetesStore')
+        const store = useKubernetesStore()
+        store.setSecretsLoading(false)
+      } catch {}
+      throw error
+    }
   },
 
   /**

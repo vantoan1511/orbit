@@ -29,6 +29,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const services = ref<ServiceInfo[]>([])
   const configMaps = ref<ConfigMapInfo[]>([])
   const secrets = ref<SecretInfo[]>([])
+  const configMapsLoading = ref(false)
+  const secretsLoading = ref(false)
   const namespaces = ref<string[]>(['All Namespaces'])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
@@ -75,10 +77,20 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setConfigMaps(newConfigMaps: ConfigMapInfo[]) {
     configMaps.value = newConfigMaps
+    configMapsLoading.value = false
   }
 
   function setSecrets(newSecrets: SecretInfo[]) {
     secrets.value = newSecrets
+    secretsLoading.value = false
+  }
+
+  function setConfigMapsLoading(loading: boolean) {
+    configMapsLoading.value = loading
+  }
+
+  function setSecretsLoading(loading: boolean) {
+    secretsLoading.value = loading
   }
 
   function setNamespaces(newNamespaces: string[]) {
@@ -129,6 +141,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     services,
     configMaps,
     secrets,
+    configMapsLoading,
+    secretsLoading,
     namespaces,
     clusters,
     activeClusterId,
@@ -144,6 +158,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setServices,
     setConfigMaps,
     setSecrets,
+    setConfigMapsLoading,
+    setSecretsLoading,
     setNamespaces,
     setClusters,
     setActiveClusterId,
