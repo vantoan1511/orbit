@@ -147,6 +147,7 @@ export interface NodeInfo {
   podsLimit: number
   uptime: string
   labels: string[]
+  isCordoned: boolean
 }
 
 export interface ServicePort {

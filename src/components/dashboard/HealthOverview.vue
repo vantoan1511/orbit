@@ -1,36 +1,84 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+
+const store = useKubernetesStore()
+
 // Data for Pod Health
-const podHealth = {
-  running: {
-    count: 264,
-    pct: 84,
-    color: 'bg-emerald-500',
-    text: 'text-emerald-500',
-    dot: 'bg-emerald-500'
-  },
-  pending: {
-    count: 18,
-    pct: 6,
-    color: 'bg-amber-500',
-    text: 'text-amber-500',
-    dot: 'bg-amber-500'
-  },
-  failed: { count: 6, pct: 2, color: 'bg-rose-500', text: 'text-rose-500', dot: 'bg-rose-500' },
-  crashLoop: { count: 16, pct: 5, color: 'bg-red-600', text: 'text-red-600', dot: 'bg-red-600' }
-}
+const podHealth = computed(() => {
+  const pods = store.pods
+  const total = pods.length || 1 // prevent division by zero
+
+  const runningCount = pods.filter((p) => p.status === 'Running').length
+  const pendingCount = pods.filter((p) => p.status === 'Pending').length
+  const failedCount = pods.filter((p) => p.status === 'Failed').length
+  const crashLoopCount = pods.filter((p) => p.status.includes('CrashLoop')).length
+
+  return {
+    running: {
+      count: runningCount,
+      pct: Math.round((runningCount / total) * 100),
+      color: 'bg-emerald-500',
+      text: 'text-emerald-500',
+      dot: 'bg-emerald-500'
+    },
+    pending: {
+      count: pendingCount,
+      pct: Math.round((pendingCount / total) * 100),
+      color: 'bg-amber-500',
+      text: 'text-amber-500',
+      dot: 'bg-amber-500'
+    },
+    failed: {
+      count: failedCount,
+      pct: Math.round((failedCount / total) * 100),
+      color: 'bg-rose-500',
+      text: 'text-rose-500',
+      dot: 'bg-rose-500'
+    },
+    crashLoop: {
+      count: crashLoopCount,
+      pct: Math.round((crashLoopCount / total) * 100),
+      color: 'bg-red-600',
+      text: 'text-red-600',
+      dot: 'bg-red-600'
+    }
+  }
+})
 
 // Data for Node Health
-const nodeHealth = {
-  ready: {
-    count: 12,
-    pct: 100,
-    color: 'bg-emerald-500',
-    text: 'text-emerald-500',
-    dot: 'bg-emerald-500'
-  },
-  notReady: { count: 0, pct: 0, color: 'bg-rose-500', text: 'text-rose-500', dot: 'bg-rose-500' },
-  cordoned: { count: 1, pct: 8, color: 'bg-sky-500', text: 'text-sky-500', dot: 'bg-sky-500' }
-}
+const nodeHealth = computed(() => {
+  const nodes = store.nodes
+  const total = nodes.length || 1
+
+  const readyCount = nodes.filter((n) => n.status === 'Ready').length
+  const notReadyCount = nodes.filter((n) => n.status === 'NotReady').length
+  const cordonedCount = nodes.filter((n) => n.isCordoned).length
+
+  return {
+    ready: {
+      count: readyCount,
+      pct: Math.round((readyCount / total) * 100),
+      color: 'bg-emerald-500',
+      text: 'text-emerald-500',
+      dot: 'bg-emerald-500'
+    },
+    notReady: {
+      count: notReadyCount,
+      pct: Math.round((notReadyCount / total) * 100),
+      color: 'bg-rose-500',
+      text: 'text-rose-500',
+      dot: 'bg-rose-500'
+    },
+    cordoned: {
+      count: cordonedCount,
+      pct: Math.round((cordonedCount / total) * 100),
+      color: 'bg-sky-500',
+      text: 'text-sky-500',
+      dot: 'bg-sky-500'
+    }
+  }
+})
 </script>
 
 <template>
@@ -51,8 +99,12 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.running.dot"></span>
               <span>Running</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">264</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">84%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ podHealth.running.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ podHealth.running.pct }}%
+            </div>
           </div>
 
           <div class="flex flex-col">
@@ -60,8 +112,12 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.pending.dot"></span>
               <span>Pending</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">18</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">6%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ podHealth.pending.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ podHealth.pending.pct }}%
+            </div>
           </div>
 
           <div class="flex flex-col">
@@ -69,8 +125,12 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.failed.dot"></span>
               <span>Failed</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">6</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">2%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ podHealth.failed.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ podHealth.failed.pct }}%
+            </div>
           </div>
 
           <div class="flex flex-col">
@@ -78,8 +138,12 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.crashLoop.dot"></span>
               <span class="truncate">CrashLoop</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">16</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">5%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ podHealth.crashLoop.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ podHealth.crashLoop.pct }}%
+            </div>
           </div>
         </div>
       </div>
@@ -125,8 +189,12 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.ready.dot"></span>
               <span>Ready</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">12</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">100%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ nodeHealth.ready.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ nodeHealth.ready.pct }}%
+            </div>
           </div>
 
           <div class="flex flex-col">
@@ -134,8 +202,12 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.notReady.dot"></span>
               <span>NotReady</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">0</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">0%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ nodeHealth.notReady.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ nodeHealth.notReady.pct }}%
+            </div>
           </div>
 
           <div class="flex flex-col">
@@ -143,16 +215,28 @@ const nodeHealth = {
               <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.cordoned.dot"></span>
               <span>Cordoned</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">1</div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">8%</div>
+            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+              {{ nodeHealth.cordoned.count }}
+            </div>
+            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+              {{ nodeHealth.cordoned.pct }}%
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Segmented Progress Bar -->
       <div class="w-full h-3 rounded-full bg-[var(--bg-hover)] overflow-hidden flex">
-        <div :style="{ width: '92%' }" :class="nodeHealth.ready.color" title="Ready"></div>
-        <div :style="{ width: '8%' }" :class="nodeHealth.cordoned.color" title="Cordoned"></div>
+        <div
+          :style="{ width: nodeHealth.ready.pct + '%' }"
+          :class="nodeHealth.ready.color"
+          title="Ready"
+        ></div>
+        <div
+          :style="{ width: nodeHealth.cordoned.pct + '%' }"
+          :class="nodeHealth.cordoned.color"
+          title="Cordoned"
+        ></div>
       </div>
     </div>
   </div>

@@ -136,6 +136,7 @@ pub struct NodeInfo {
     pub pods_limit: i32,
     pub uptime: String,
     pub labels: Vec<String>,
+    pub is_cordoned: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
