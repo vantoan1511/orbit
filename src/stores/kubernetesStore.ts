@@ -20,7 +20,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
@@ -50,6 +50,36 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const namespaceList = ref<NamespaceInfo[]>([])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
+
+  const cpuHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
+  const memHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
+
+  watch(
+    nodes,
+    (newNodes) => {
+      let totalCpu = 0
+      let usedCpu = 0
+      let totalMem = 0
+      let usedMem = 0
+
+      for (const node of newNodes) {
+        totalCpu += parseFloat(node.cpuTotal || '0')
+        usedCpu += parseFloat(node.cpuUsed || '0')
+        totalMem += parseFloat(node.memTotal || '0')
+        usedMem += parseFloat(node.memUsed || '0')
+      }
+
+      const cpuPct = totalCpu > 0 ? (usedCpu / totalCpu) * 100 : 0
+      const memPct = totalMem > 0 ? (usedMem / totalMem) * 100 : 0
+
+      cpuHistory.value.shift()
+      cpuHistory.value.push(cpuPct)
+
+      memHistory.value.shift()
+      memHistory.value.push(memPct)
+    },
+    { deep: true }
+  )
 
   function setEngineReady(ready: boolean) {
     isEngineReady.value = ready
@@ -185,6 +215,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     storageClasses.value = []
     events.value = []
     policies.value = []
+    cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
+    memHistory.value = [0, 0, 0, 0, 0, 0, 0]
   }
 
   async function fetchConfigMaps(namespace?: string) {
@@ -337,6 +369,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     fetchPersistentVolumes,
     fetchPersistentVolumeClaims,
     fetchStorageClasses,
-    loadInitialData
+    loadInitialData,
+    cpuHistory,
+    memHistory
   }
 })
