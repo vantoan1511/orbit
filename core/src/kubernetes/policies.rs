@@ -92,7 +92,7 @@ fn format_network_policy(p: &NetworkPolicy) -> PolicyInfo {
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_json::to_string_pretty(&p.spec).unwrap_or_default();
+    let rules = serde_yaml::to_string(&p.spec).unwrap_or_default();
 
     PolicyInfo {
         uid,
@@ -114,7 +114,7 @@ fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_json::to_string_pretty(&p.spec).unwrap_or_default();
+    let rules = serde_yaml::to_string(&p.spec).unwrap_or_default();
 
     PolicyInfo {
         uid,
@@ -136,7 +136,7 @@ fn format_limit_range(p: &LimitRange) -> PolicyInfo {
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_json::to_string_pretty(&p.spec).unwrap_or_default();
+    let rules = serde_yaml::to_string(&p.spec).unwrap_or_default();
 
     PolicyInfo {
         uid,
@@ -157,7 +157,7 @@ fn format_val_webhook(p: &ValidatingWebhookConfiguration) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_json::to_string_pretty(&p.webhooks).unwrap_or_default();
+    let rules = serde_yaml::to_string(&p.webhooks).unwrap_or_default();
 
     PolicyInfo {
         uid,
@@ -178,7 +178,7 @@ fn format_mut_webhook(p: &MutatingWebhookConfiguration) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_json::to_string_pretty(&p.webhooks).unwrap_or_default();
+    let rules = serde_yaml::to_string(&p.webhooks).unwrap_or_default();
 
     PolicyInfo {
         uid,

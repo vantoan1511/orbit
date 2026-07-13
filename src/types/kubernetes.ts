@@ -294,4 +294,3 @@ export interface PolicyInfo {
   description: string
   rules: string
 }
-
