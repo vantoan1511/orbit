@@ -1,47 +1,50 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import Chart from 'primevue/chart'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-// Mock data generator for 60 minutes
-const generateTimelineData = (points: number, min: number, max: number) => {
-  return Array.from({ length: points }, () => Math.floor(Math.random() * (max - min + 1) + min))
-}
+const store = useKubernetesStore()
+
+const totalCpu = computed(() => {
+  return store.nodes.reduce((acc, node) => acc + parseFloat(node.cpuTotal || '0'), 0)
+})
+
+const usedCpu = computed(() => {
+  return store.nodes.reduce((acc, node) => acc + parseFloat(node.cpuUsed || '0'), 0)
+})
+
+const totalMem = computed(() => {
+  return store.nodes.reduce((acc, node) => acc + parseFloat(node.memTotal || '0'), 0)
+})
+
+const usedMem = computed(() => {
+  return store.nodes.reduce((acc, node) => acc + parseFloat(node.memUsed || '0'), 0)
+})
+
+const cpuPct = computed(() => {
+  return totalCpu.value > 0 ? ((usedCpu.value / totalCpu.value) * 100).toFixed(0) : '0'
+})
+
+const memPct = computed(() => {
+  return totalMem.value > 0 ? ((usedMem.value / totalMem.value) * 100).toFixed(0) : '0'
+})
 
 const labels = ['-60m', '-50m', '-40m', '-30m', '-20m', '-10m', 'Now']
 
-const cpuDataValues = generateTimelineData(7, 45, 75)
-const memDataValues = generateTimelineData(7, 55, 65)
-
-const cpuChartData = ref()
-const memChartData = ref()
 const chartOptions = ref()
+const cpuGradient = ref<CanvasGradient | null>(null)
+const memGradient = ref<CanvasGradient | null>(null)
 
-onMounted(() => {
-  // Set dark mode options based on theme
-  const isDark = document.documentElement.classList.contains('my-app-dark')
-  const textColor = isDark ? '#878d98' : '#7b8191'
-  const borderColor = isDark ? '#2e343d' : '#d5d9e1'
-
-  // Create canvas gradients for smoother look
-  const ctxCpu = document.createElement('canvas').getContext('2d')
-  const gradientCpu = ctxCpu?.createLinearGradient(0, 0, 0, 150)
-  gradientCpu?.addColorStop(0, 'rgba(79, 140, 255, 0.3)')
-  gradientCpu?.addColorStop(1, 'rgba(79, 140, 255, 0.0)')
-
-  const ctxMem = document.createElement('canvas').getContext('2d')
-  const gradientMem = ctxMem?.createLinearGradient(0, 0, 0, 150)
-  gradientMem?.addColorStop(0, 'rgba(142, 107, 255, 0.3)')
-  gradientMem?.addColorStop(1, 'rgba(142, 107, 255, 0.0)')
-
-  cpuChartData.value = {
+const cpuChartData = computed(() => {
+  return {
     labels: labels,
     datasets: [
       {
         label: 'CPU Usage',
-        data: cpuDataValues,
+        data: [...store.cpuHistory],
         fill: true,
         borderColor: '#4f8cff',
-        backgroundColor: gradientCpu || 'rgba(79, 140, 255, 0.1)',
+        backgroundColor: cpuGradient.value || 'rgba(79, 140, 255, 0.1)',
         tension: 0.4,
         borderWidth: 2,
         pointRadius: 0,
@@ -49,22 +52,46 @@ onMounted(() => {
       }
     ]
   }
+})
 
-  memChartData.value = {
+const memChartData = computed(() => {
+  return {
     labels: labels,
     datasets: [
       {
         label: 'Memory Usage',
-        data: memDataValues,
+        data: [...store.memHistory],
         fill: true,
         borderColor: '#8e6bff',
-        backgroundColor: gradientMem || 'rgba(142, 107, 255, 0.1)',
+        backgroundColor: memGradient.value || 'rgba(142, 107, 255, 0.1)',
         tension: 0.4,
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 4
       }
     ]
+  }
+})
+
+onMounted(() => {
+  const isDark = document.documentElement.classList.contains('my-app-dark')
+  const textColor = isDark ? '#878d98' : '#7b8191'
+  const borderColor = isDark ? '#2e343d' : '#d5d9e1'
+
+  const ctxCpu = document.createElement('canvas').getContext('2d')
+  if (ctxCpu) {
+    const gradient = ctxCpu.createLinearGradient(0, 0, 0, 150)
+    gradient.addColorStop(0, 'rgba(79, 140, 255, 0.3)')
+    gradient.addColorStop(1, 'rgba(79, 140, 255, 0.0)')
+    cpuGradient.value = gradient
+  }
+
+  const ctxMem = document.createElement('canvas').getContext('2d')
+  if (ctxMem) {
+    const gradient = ctxMem.createLinearGradient(0, 0, 0, 150)
+    gradient.addColorStop(0, 'rgba(142, 107, 255, 0.3)')
+    gradient.addColorStop(1, 'rgba(142, 107, 255, 0.0)')
+    memGradient.value = gradient
   }
 
   chartOptions.value = {
@@ -128,9 +155,11 @@ onMounted(() => {
         <div class="flex items-center justify-between">
           <div class="flex flex-col">
             <span class="text-xs text-[var(--text-muted)] font-medium">CPU Usage</span>
-            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">68%</span>
+            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">{{ cpuPct }}%</span>
           </div>
-          <span class="text-xs text-[var(--text-muted)] font-mono">8.16 / 12 cores</span>
+          <span class="text-xs text-[var(--text-muted)] font-mono"
+            >{{ usedCpu.toFixed(2) }} / {{ totalCpu.toFixed(2) }} cores</span
+          >
         </div>
         <!-- Chart Wrapper -->
         <div class="h-44 w-full mt-2">
@@ -143,9 +172,11 @@ onMounted(() => {
         <div class="flex items-center justify-between">
           <div class="flex flex-col">
             <span class="text-xs text-[var(--text-muted)] font-medium">Memory Usage</span>
-            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">61%</span>
+            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">{{ memPct }}%</span>
           </div>
-          <span class="text-xs text-[var(--text-muted)] font-mono">49.1 / 80 GiB</span>
+          <span class="text-xs text-[var(--text-muted)] font-mono"
+            >{{ usedMem.toFixed(2) }} / {{ totalMem.toFixed(2) }} GiB</span
+          >
         </div>
         <!-- Chart Wrapper -->
         <div class="h-44 w-full mt-2">
