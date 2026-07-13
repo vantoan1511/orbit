@@ -1,62 +1,69 @@
 <script setup lang="ts">
-import { Layers, Database, Box, ClipboardList, HardDrive, Award } from '@lucide/vue'
+import { computed } from 'vue'
+import { Layers, Database, Box, ClipboardList, HardDrive, Clock } from '@lucide/vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const items = [
-  {
-    title: 'Deployments',
-    count: 52,
-    icon: Layers,
-    iconColor: 'text-[var(--deployment)] bg-[var(--deployment)]/10',
-    statusLabel: 'Updated',
-    statusVal: 3,
-    statusColor: 'text-emerald-500 bg-emerald-500/10'
-  },
-  {
-    title: 'StatefulSets',
-    count: 12,
-    icon: Database,
-    iconColor: 'text-[var(--statefulset)] bg-[var(--statefulset)]/10',
-    statusLabel: 'Ready',
-    statusVal: 12,
-    statusColor: 'text-emerald-500 bg-emerald-500/10'
-  },
-  {
-    title: 'DaemonSets',
-    count: 8,
-    icon: Box,
-    iconColor: 'text-[var(--daemonset)] bg-[var(--daemonset)]/10',
-    statusLabel: 'Updated',
-    statusVal: 8,
-    statusColor: 'text-emerald-500 bg-emerald-500/10'
-  },
-  {
-    title: 'Jobs',
-    count: 24,
-    icon: ClipboardList,
-    iconColor: 'text-[var(--job)] bg-[var(--job)]/10',
-    statusLabel: 'Active',
-    statusVal: 2,
-    statusColor: 'text-amber-500 bg-amber-500/10'
-  },
-  {
-    title: 'Persistent Volumes',
-    count: 28,
-    icon: HardDrive,
-    iconColor: 'text-[var(--text-muted)] bg-[var(--text-muted)]/10',
-    statusLabel: 'Bound',
-    statusVal: 26,
-    statusColor: 'text-emerald-500 bg-emerald-500/10'
-  },
-  {
-    title: 'Certificates',
-    count: 3,
-    icon: Award,
-    iconColor: 'text-rose-500 bg-rose-500/10',
-    statusLabel: 'Expiring',
-    statusVal: 1,
-    statusColor: 'text-amber-500 bg-amber-500/10'
-  }
-]
+const store = useKubernetesStore()
+
+const items = computed(() => {
+  return [
+    {
+      title: 'Deployments',
+      count: store.deployments.length,
+      icon: Layers,
+      iconColor: 'text-[var(--deployment)] bg-[var(--deployment)]/10',
+      statusLabel: 'Available',
+      statusVal: store.deployments.reduce((acc, d) => acc + d.available, 0),
+      statusColor: 'text-emerald-500 bg-emerald-500/10'
+    },
+    {
+      title: 'StatefulSets',
+      count: store.statefulSets.length,
+      icon: Database,
+      iconColor: 'text-[var(--statefulset)] bg-[var(--statefulset)]/10',
+      statusLabel: 'Current',
+      statusVal: store.statefulSets.reduce((acc, s) => acc + s.replicas.current, 0),
+      statusColor: 'text-emerald-500 bg-emerald-500/10'
+    },
+    {
+      title: 'DaemonSets',
+      count: store.daemonSets.length,
+      icon: Box,
+      iconColor: 'text-[var(--daemonset)] bg-[var(--daemonset)]/10',
+      statusLabel: 'Ready',
+      statusVal: store.daemonSets.reduce((acc, d) => acc + d.replicas.ready, 0),
+      statusColor: 'text-emerald-500 bg-emerald-500/10'
+    },
+    {
+      title: 'Jobs',
+      count: store.jobs.length,
+      icon: ClipboardList,
+      iconColor: 'text-[var(--job)] bg-[var(--job)]/10',
+      statusLabel: 'Completed',
+      statusVal: store.jobs.filter((j) => j.status === 'Complete' || j.status === 'Completed')
+        .length,
+      statusColor: 'text-emerald-500 bg-emerald-500/10'
+    },
+    {
+      title: 'Persistent Volumes',
+      count: store.persistentVolumes.length,
+      icon: HardDrive,
+      iconColor: 'text-[var(--text-muted)] bg-[var(--text-muted)]/10',
+      statusLabel: 'Bound',
+      statusVal: store.persistentVolumes.filter((pv) => pv.status === 'Bound').length,
+      statusColor: 'text-emerald-500 bg-emerald-500/10'
+    },
+    {
+      title: 'CronJobs',
+      count: store.cronJobs.length,
+      icon: Clock,
+      iconColor: 'text-rose-500 bg-rose-500/10',
+      statusLabel: 'Active',
+      statusVal: store.cronJobs.reduce((acc, c) => acc + c.active, 0),
+      statusColor: 'text-amber-500 bg-amber-500/10'
+    }
+  ]
+})
 </script>
 
 <template>
