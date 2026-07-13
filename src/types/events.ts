@@ -11,6 +11,7 @@ import type {
   PersistentVolumeClaimInfo,
   PersistentVolumeInfo,
   PodInfo,
+  PolicyInfo,
   ReplicaSetInfo,
   SecretInfo,
   ServiceInfo,
@@ -83,6 +84,9 @@ export interface OrbitEventMap {
   storageClassesUpdated: {
     storage_classes: StorageClassInfo[]
   }
+  policiesUpdated: {
+    policies: PolicyInfo[]
+  }
   errorOccurred: {
     message: string
   }
@@ -110,6 +114,7 @@ export const OrbitEvents = {
   PersistentVolumesUpdated: 'persistentVolumesUpdated',
   PersistentVolumeClaimsUpdated: 'persistentVolumeClaimsUpdated',
   StorageClassesUpdated: 'storageClassesUpdated',
+  PoliciesUpdated: 'policiesUpdated',
   ErrorOccurred: 'errorOccurred'
 } as const
 

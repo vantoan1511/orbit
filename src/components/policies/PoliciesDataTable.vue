@@ -6,14 +6,15 @@ import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, MoreVertical } from '@lucide/vue'
-import { mockPolicies } from './mockPolicies'
-import type { PolicyInfo } from './mockPolicies'
+import type { PolicyInfo } from '@/types/kubernetes'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import PolicyDetailsDrawer from './PolicyDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
 
 const toast = useToast()
+const k8sStore = useKubernetesStore()
 
-const policies = ref<PolicyInfo[]>(mockPolicies)
+const policies = computed(() => k8sStore.policies)
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
 const selectedType = ref('All Types')
@@ -127,8 +128,8 @@ const handleActionClick = (event: Event, action: string, policyName: string) => 
       <!-- Toggles and Actions -->
       <div class="flex items-center gap-4 self-end md:self-auto">
         <div class="flex items-center gap-1">
-          <Button severity="secondary" variant="text" size="small" class="p-1">
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+          <Button severity="secondary" variant="text" size="small" class="p-1" @click="k8sStore.fetchPolicies(selectedNamespace === 'All Namespaces' ? undefined : selectedNamespace)">
+            <RefreshCw class="w-4 h-4 text-(--text-secondary)" :class="{ 'animate-spin text-violet-400': k8sStore.policiesLoading }" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
             <Settings2 class="w-4 h-4 text-(--text-secondary)" />
@@ -140,6 +141,7 @@ const handleActionClick = (event: Event, action: string, policyName: string) => 
     <!-- Data Table -->
     <DataTable
       :value="filteredPolicies"
+      :loading="k8sStore.policiesLoading"
       paginator
       :rows="12"
       class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"

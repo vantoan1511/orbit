@@ -86,6 +86,9 @@ pub fn dispatch(
                                 if let Ok(events) = kubernetes::list_events(client, None).await {
                                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
                                 }
+                                if let Ok(policies) = kubernetes::list_policies(client, None).await {
+                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PoliciesUpdated { policies }).await;
+                                }
                             }
                         }
                         Err(e) => {
@@ -151,6 +154,9 @@ pub fn dispatch(
                                 }
                                 if let Ok(events) = kubernetes::list_events(client, None).await {
                                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
+                                }
+                                if let Ok(policies) = kubernetes::list_policies(client, None).await {
+                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PoliciesUpdated { policies }).await;
                                 }
                             }
                         }
@@ -468,6 +474,26 @@ pub fn dispatch(
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
                         }
                         Err(e) => { log::error!("Error listing nodes: {:?}", e); }
+                    }
+                }
+            });
+        }
+        "getPolicies" => {
+            tokio::spawn(async move {
+                let namespace = data
+                    .and_then(|d| d.get("namespace").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+                if let Some(ref client) = client {
+                    match kubernetes::list_policies(client, namespace).await {
+                        Ok(policies) => {
+                            let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PoliciesUpdated { policies }).await;
+                        }
+                        Err(e) => { log::error!("Error listing policies: {:?}", e); }
                     }
                 }
             });

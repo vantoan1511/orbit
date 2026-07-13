@@ -88,6 +88,10 @@ pub enum OrbitEvent {
     StorageClassesUpdated {
         storage_classes: Vec<crate::kubernetes::models::StorageClassInfo>,
     },
+    #[serde(rename = "policiesUpdated")]
+    PoliciesUpdated {
+        policies: Vec<crate::kubernetes::models::PolicyInfo>,
+    },
     #[serde(rename = "errorOccurred")]
     ErrorOccurred {
         message: String,

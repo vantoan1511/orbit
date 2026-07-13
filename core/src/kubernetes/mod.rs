@@ -9,6 +9,7 @@ pub mod nodes;
 pub mod services;
 pub mod namespaces;
 pub mod events;
+pub mod policies;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;
@@ -19,6 +20,7 @@ pub use nodes::list_nodes;
 pub use namespaces::list_namespaces;
 pub use services::list_services;
 pub use events::list_events;
+pub use policies::*;
 
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.

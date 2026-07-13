@@ -15,6 +15,7 @@ import type {
   PersistentVolumeClaimInfo,
   PersistentVolumeInfo,
   PodInfo,
+  PolicyInfo,
   ReplicaSetInfo,
   SecretInfo,
   ServiceInfo,
@@ -111,6 +112,10 @@ const handleClustersUpdated = (payload: { clusters: ClusterInfo[] }) => {
   k8sStore.setClusters(payload.clusters)
 }
 
+const handlePoliciesUpdated = (payload: { policies: PolicyInfo[] }) => {
+  k8sStore.setPolicies(payload.policies)
+}
+
 const handleActiveClusterChanged = (payload: { active_cluster_id: string | null }) => {
   k8sStore.setActiveClusterId(payload.active_cluster_id)
 }
@@ -146,6 +151,7 @@ onMounted(() => {
   events.on(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
   events.on(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
   events.on(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)
+  events.on(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated)
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
@@ -169,6 +175,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
   events.off(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
   events.off(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)
+  events.off(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
