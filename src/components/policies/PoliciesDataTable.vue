@@ -128,8 +128,21 @@ const handleActionClick = (event: Event, action: string, policyName: string) => 
       <!-- Toggles and Actions -->
       <div class="flex items-center gap-4 self-end md:self-auto">
         <div class="flex items-center gap-1">
-          <Button severity="secondary" variant="text" size="small" class="p-1" @click="k8sStore.fetchPolicies(selectedNamespace === 'All Namespaces' ? undefined : selectedNamespace)">
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" :class="{ 'animate-spin text-violet-400': k8sStore.policiesLoading }" />
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="
+              k8sStore.fetchPolicies(
+                selectedNamespace === 'All Namespaces' ? undefined : selectedNamespace
+              )
+            "
+          >
+            <RefreshCw
+              class="w-4 h-4 text-(--text-secondary)"
+              :class="{ 'animate-spin text-violet-400': k8sStore.policiesLoading }"
+            />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
             <Settings2 class="w-4 h-4 text-(--text-secondary)" />
