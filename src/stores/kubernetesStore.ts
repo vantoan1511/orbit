@@ -5,6 +5,7 @@ import type {
   CronJobInfo,
   DaemonSetInfo,
   DeploymentInfo,
+  EventInfo,
   JobInfo,
   NamespaceInfo,
   NodeInfo,
@@ -33,8 +34,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const services = ref<ServiceInfo[]>([])
   const configMaps = ref<ConfigMapInfo[]>([])
   const secrets = ref<SecretInfo[]>([])
+  const events = ref<EventInfo[]>([])
   const configMapsLoading = ref(false)
   const secretsLoading = ref(false)
+  const eventsLoading = ref(false)
   const persistentVolumes = ref<PersistentVolumeInfo[]>([])
   const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
   const storageClasses = ref<StorageClassInfo[]>([])
@@ -95,12 +98,21 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     secretsLoading.value = false
   }
 
+  function setEvents(newEvents: EventInfo[]) {
+    events.value = newEvents
+    eventsLoading.value = false
+  }
+
   function setConfigMapsLoading(loading: boolean) {
     configMapsLoading.value = loading
   }
 
   function setSecretsLoading(loading: boolean) {
     secretsLoading.value = loading
+  }
+
+  function setEventsLoading(loading: boolean) {
+    eventsLoading.value = loading
   }
 
   function setPersistentVolumes(newPVs: PersistentVolumeInfo[]) {
@@ -159,6 +171,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     persistentVolumes.value = []
     persistentVolumeClaims.value = []
     storageClasses.value = []
+    events.value = []
   }
 
   async function fetchConfigMaps(namespace?: string) {
@@ -177,6 +190,16 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await kubernetesService.getSecrets(namespace)
     } catch (error) {
       secretsLoading.value = false
+      throw error
+    }
+  }
+
+  async function fetchEvents(namespace?: string) {
+    eventsLoading.value = true
+    try {
+      await kubernetesService.getEvents(namespace)
+    } catch (error) {
+      eventsLoading.value = false
       throw error
     }
   }
@@ -223,6 +246,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await fetchPersistentVolumes()
       await fetchPersistentVolumeClaims()
       await fetchStorageClasses()
+      await fetchEvents()
     }
   }
 
@@ -239,11 +263,13 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     services,
     configMaps,
     secrets,
+    events,
     persistentVolumes,
     persistentVolumeClaims,
     storageClasses,
     configMapsLoading,
     secretsLoading,
+    eventsLoading,
     persistentVolumesLoading,
     persistentVolumeClaimsLoading,
     storageClassesLoading,
@@ -263,11 +289,13 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setServices,
     setConfigMaps,
     setSecrets,
+    setEvents,
     setPersistentVolumes,
     setPersistentVolumeClaims,
     setStorageClasses,
     setConfigMapsLoading,
     setSecretsLoading,
+    setEventsLoading,
     setPersistentVolumesLoading,
     setPersistentVolumeClaimsLoading,
     setStorageClassesLoading,
@@ -276,6 +304,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setActiveClusterId,
     fetchConfigMaps,
     fetchSecrets,
+    fetchEvents,
     fetchPersistentVolumes,
     fetchPersistentVolumeClaims,
     fetchStorageClasses,

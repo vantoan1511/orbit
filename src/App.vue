@@ -8,6 +8,7 @@ import type {
   CronJobInfo,
   DaemonSetInfo,
   DeploymentInfo,
+  EventInfo,
   JobInfo,
   NamespaceInfo,
   NodeInfo,
@@ -86,6 +87,10 @@ const handleSecretsUpdated = (payload: { secrets: SecretInfo[] }) => {
   k8sStore.setSecrets(payload.secrets)
 }
 
+const handleEventsUpdated = (payload: { events: EventInfo[] }) => {
+  k8sStore.setEvents(payload.events)
+}
+
 const handlePersistentVolumesUpdated = (payload: {
   persistent_volumes: PersistentVolumeInfo[]
 }) => {
@@ -137,6 +142,7 @@ onMounted(() => {
   events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated)
   events.on(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
   events.on(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
+  events.on(OrbitEvents.EventsUpdated, handleEventsUpdated)
   events.on(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
   events.on(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
   events.on(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)
@@ -159,6 +165,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.ServicesUpdated, handleServicesUpdated)
   events.off(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
   events.off(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
+  events.off(OrbitEvents.EventsUpdated, handleEventsUpdated)
   events.off(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
   events.off(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
   events.off(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)

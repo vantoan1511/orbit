@@ -263,3 +263,20 @@ export interface NamespaceInfo {
   uid: string
   created: string
 }
+
+export interface EventInfo {
+  uid: string
+  time: string
+  type: string
+  reason: string
+  objectName: string
+  objectKind: string
+  message: string
+  namespace: string
+  source: string
+  firstSeen: string
+  lastSeen: string
+  count: number
+  labels: Record<string, string>
+  annotations: Record<string, string>
+}

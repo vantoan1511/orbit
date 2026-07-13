@@ -72,6 +72,10 @@ pub enum OrbitEvent {
     SecretsUpdated {
         secrets: Vec<crate::kubernetes::models::SecretInfo>,
     },
+    #[serde(rename = "eventsUpdated")]
+    EventsUpdated {
+        events: Vec<crate::kubernetes::models::EventInfo>,
+    },
     #[serde(rename = "persistentVolumesUpdated")]
     PersistentVolumesUpdated {
         persistent_volumes: Vec<crate::kubernetes::models::PersistentVolumeInfo>,

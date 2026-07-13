@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -7,14 +7,29 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, MoreVertical } from '@lucide/vue'
-import { mockEvents } from './mockEvents'
-import type { EventInfo } from './mockEvents'
+import type { EventInfo } from '@/types/kubernetes'
 import EventDetailsDrawer from './EventDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { storeToRefs } from 'pinia'
 
 const toast = useToast()
 
-const events = ref<EventInfo[]>(mockEvents)
+const k8sStore = useKubernetesStore()
+const { events } = storeToRefs(k8sStore)
+
+const handleRefresh = async () => {
+  try {
+    await k8sStore.fetchEvents()
+  } catch (error) {
+    console.error('Error fetching events:', error)
+  }
+}
+
+onMounted(() => {
+  k8sStore.fetchEvents()
+})
+
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
 const selectedType = ref('All Types')
@@ -138,7 +153,13 @@ const handleActionClick = (event: Event, action: string, eventName: string) => {
         </div>
 
         <div class="flex items-center gap-1">
-          <Button severity="secondary" variant="text" size="small" class="p-1">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="handleRefresh"
+          >
             <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">

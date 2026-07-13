@@ -4,6 +4,7 @@ import type {
   CronJobInfo,
   DaemonSetInfo,
   DeploymentInfo,
+  EventInfo,
   JobInfo,
   NamespaceInfo,
   NodeInfo,
@@ -70,6 +71,9 @@ export interface OrbitEventMap {
   secretsUpdated: {
     secrets: SecretInfo[]
   }
+  eventsUpdated: {
+    events: EventInfo[]
+  }
   persistentVolumesUpdated: {
     persistent_volumes: PersistentVolumeInfo[]
   }
@@ -102,6 +106,7 @@ export const OrbitEvents = {
   ServicesUpdated: 'servicesUpdated',
   ConfigMapsUpdated: 'configMapsUpdated',
   SecretsUpdated: 'secretsUpdated',
+  EventsUpdated: 'eventsUpdated',
   PersistentVolumesUpdated: 'persistentVolumesUpdated',
   PersistentVolumeClaimsUpdated: 'persistentVolumeClaimsUpdated',
   StorageClassesUpdated: 'storageClassesUpdated',

@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Bell, CheckCircle, AlertTriangle, XCircle, Info } from '@lucide/vue'
-import { mockEvents } from './mockEvents'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const events = mockEvents
+const k8sStore = useKubernetesStore()
+const events = computed(() => k8sStore.events)
 
-const totalCount = computed(() => events.length)
-const normalCount = computed(() => events.filter((e) => e.type === 'Normal').length)
-const warningCount = computed(() => events.filter((e) => e.type === 'Warning').length)
-const errorCount = computed(() => events.filter((e) => e.type === 'Error').length)
+const totalCount = computed(() => events.value.length)
+const normalCount = computed(() => events.value.filter((e) => e.type === 'Normal').length)
+const warningCount = computed(() => events.value.filter((e) => e.type === 'Warning').length)
+const errorCount = computed(() => events.value.filter((e) => e.type === 'Error').length)
 const otherCount = computed(
   () =>
-    events.filter((e) => e.type !== 'Normal' && e.type !== 'Warning' && e.type !== 'Error').length
+    events.value.filter((e) => e.type !== 'Normal' && e.type !== 'Warning' && e.type !== 'Error')
+      .length
 )
 
 const normalPct = computed(() =>

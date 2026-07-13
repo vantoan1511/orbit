@@ -72,6 +72,13 @@ export const kubernetesService = {
   },
 
   /**
+   * Request list of events, optionally filtered by namespace
+   */
+  async getEvents(namespace?: string): Promise<void> {
+    await coreEngine.dispatch('getEvents', { namespace })
+  },
+
+  /**
    * Request list of secrets, optionally filtered by namespace
    */
   async getSecrets(namespace?: string): Promise<void> {

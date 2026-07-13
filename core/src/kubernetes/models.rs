@@ -273,3 +273,23 @@ pub struct NamespaceInfo {
     pub created: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EventInfo {
+    pub uid: String,
+    pub time: String,
+    pub r#type: String,
+    pub reason: String,
+    pub object_name: String,
+    pub object_kind: String,
+    pub message: String,
+    pub namespace: String,
+    pub source: String,
+    pub first_seen: String,
+    pub last_seen: String,
+    pub count: i32,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+

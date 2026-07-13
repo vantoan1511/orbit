@@ -83,6 +83,9 @@ pub fn dispatch(
                                 if let Ok(nodes) = kubernetes::list_nodes(client).await {
                                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
                                 }
+                                if let Ok(events) = kubernetes::list_events(client, None).await {
+                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
+                                }
                             }
                         }
                         Err(e) => {
@@ -145,6 +148,9 @@ pub fn dispatch(
                                 }
                                 if let Ok(nodes) = kubernetes::list_nodes(client).await {
                                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
+                                }
+                                if let Ok(events) = kubernetes::list_events(client, None).await {
+                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
                                 }
                             }
                         }
@@ -354,6 +360,26 @@ pub fn dispatch(
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ConfigMapsUpdated { config_maps }).await;
                         }
                         Err(e) => { log::error!("Error listing configmaps: {:?}", e); }
+                    }
+                }
+            });
+        }
+        "getEvents" => {
+            tokio::spawn(async move {
+                let namespace = data
+                    .and_then(|d| d.get("namespace").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+                if let Some(ref client) = client {
+                    match kubernetes::list_events(client, namespace).await {
+                        Ok(events) => {
+                            let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
+                        }
+                        Err(e) => { log::error!("Error listing events: {:?}", e); }
                     }
                 }
             });
