@@ -114,6 +114,13 @@ export const kubernetesService = {
   },
 
   /**
+   * Request list of policies, optionally filtered by namespace
+   */
+  async getPolicies(namespace?: string): Promise<void> {
+    await coreEngine.dispatch('getPolicies', { namespace })
+  },
+
+  /**
    * Request list of clusters
    */
   async getClusters(): Promise<void> {

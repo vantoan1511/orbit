@@ -292,4 +292,18 @@ pub struct EventInfo {
     pub annotations: std::collections::BTreeMap<String, String>,
 }
 
-
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyInfo {
+    pub uid: String,
+    pub name: String,
+    pub r#type: String,
+    pub scope: String,
+    pub namespace: String,
+    pub status: String,
+    pub mode: String,
+    pub violations: i32,
+    pub last_updated: String,
+    pub description: String,
+    pub rules: String,
+}

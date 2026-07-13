@@ -7,7 +7,7 @@ import Tab from 'primevue/tab'
 import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
 import { Clock, Server, FileCode } from '@lucide/vue'
-import type { PolicyInfo } from './mockPolicies'
+import type { PolicyInfo } from '@/types/kubernetes'
 
 const props = defineProps<{
   visible: boolean

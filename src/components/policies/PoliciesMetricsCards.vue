@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Shield, ShieldAlert, ShieldOff, AlertTriangle, FileText } from '@lucide/vue'
-import { mockPolicies } from './mockPolicies'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const policies = mockPolicies
+const k8sStore = useKubernetesStore()
+const policies = computed(() => k8sStore.policies)
 
-const totalCount = computed(() => policies.length)
-const enforcedCount = computed(() => policies.filter((p) => p.status === 'Enforced').length)
-const auditCount = computed(() => policies.filter((p) => p.status === 'Audit').length)
-const disabledCount = computed(() => policies.filter((p) => p.status === 'Disabled').length)
-const violationsCount = computed(() => policies.reduce((acc, p) => acc + p.violations, 0))
+const totalCount = computed(() => policies.value.length)
+const enforcedCount = computed(() => policies.value.filter((p) => p.status === 'Enforced').length)
+const auditCount = computed(() => policies.value.filter((p) => p.status === 'Audit').length)
+const disabledCount = computed(() => policies.value.filter((p) => p.status === 'Disabled').length)
+const violationsCount = computed(() => policies.value.reduce((acc, p) => acc + p.violations, 0))
 
 const enforcedPct = computed(() =>
   totalCount.value ? ((enforcedCount.value / totalCount.value) * 100).toFixed(1) : '0.0'

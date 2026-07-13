@@ -280,3 +280,18 @@ export interface EventInfo {
   labels: Record<string, string>
   annotations: Record<string, string>
 }
+
+export interface PolicyInfo {
+  uid: string
+  name: string
+  type: string
+  scope: string
+  namespace: string
+  status: string
+  mode: string
+  violations: number
+  lastUpdated: string
+  description: string
+  rules: string
+}
+
