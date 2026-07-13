@@ -8,6 +8,7 @@ pub mod batch;
 pub mod nodes;
 pub mod services;
 pub mod namespaces;
+pub mod events;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;
@@ -17,6 +18,8 @@ pub use batch::{list_jobs, list_cronjobs};
 pub use nodes::list_nodes;
 pub use namespaces::list_namespaces;
 pub use services::list_services;
+pub use events::list_events;
+
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
 pub(crate) fn format_age(creation_timestamp: &Option<k8s_openapi::apimachinery::pkg::apis::meta::v1::Time>) -> String {
