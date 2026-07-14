@@ -3,9 +3,9 @@ import { copyFileSync, mkdirSync, existsSync } from 'fs'
 import { join } from 'path'
 import { platform } from 'os'
 
-console.log('Building Orbit Core Engine...')
+console.log('Building Orbit Binaries (Engine & Updater)...')
 
-// Building Orbit Core Engine
+// Building Orbit Workspace in core directory
 execSync('cargo build --release', { cwd: 'core', stdio: 'inherit' })
 
 // Create the bin directory
@@ -14,14 +14,18 @@ if (!existsSync(binDir)) {
   mkdirSync(binDir)
 }
 
-// Copy the binary
+// Copy the binaries
 const ext = platform() === 'win32' ? '.exe' : ''
-const binaryName = `orbit-engine${ext}`
 
-const src = join('core', 'target', 'release', binaryName)
-const dest = join(binDir, binaryName)
+const binaries = ['orbit-engine', 'orbit-updater']
 
-console.log(`Copying binary from ${src} to ${dest}...`)
-copyFileSync(src, dest)
+for (const binName of binaries) {
+  const binaryName = `${binName}${ext}`
+  const src = join('core', 'target', 'release', binaryName)
+  const dest = join(binDir, binaryName)
 
-console.log('Orbit Core Engine built successfully!')
+  console.log(`Copying binary from ${src} to ${dest}...`)
+  copyFileSync(src, dest)
+}
+
+console.log('Orbit Binaries built successfully!')
