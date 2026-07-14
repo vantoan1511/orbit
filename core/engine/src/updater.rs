@@ -14,7 +14,7 @@ pub struct UpdateManifest {
 
 impl UpdateManifest {
     /// Fetch the latest update manifest from the given URL.
-    pub async fn fetch(url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn fetch(url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let manifest = reqwest::get(url)
             .await?
             .json::<UpdateManifest>()
@@ -34,9 +34,11 @@ impl UpdateManifest {
         let current = semver::Version::parse(current_version)?;
         let remote = semver::Version::parse(&self.resources.version)?;
         Ok(remote > current)
-        /// Download a file from the given URL to a temporary directory.
+    }
+
+    /// Download a file from the given URL to a temporary directory.
     /// Returns the path to the downloaded file.
-    pub async fn download(url: &str, filename: &str) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    pub async fn download(url: &str, filename: &str) -> Result<std::path::PathBuf, Box<dyn std::error::Error + Send + Sync>> {
         let response = reqwest::get(url).await?;
         let bytes = response.bytes().await?;
         
@@ -50,4 +52,4 @@ impl UpdateManifest {
         Ok(temp_path)
     }
 }
-}
+
