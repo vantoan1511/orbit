@@ -48,6 +48,7 @@ Source: "dist\\orbit\\orbit-win_x64.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "dist\\orbit\\resources.neu"; DestDir: "{app}"; Flags: ignoreversion
 ; Extension binary
 Source: "dist\\orbit\\bin\\orbit-engine.exe"; DestDir: "{app}\\bin"; Flags: ignoreversion
+Source: "dist\\orbit\\bin\\orbit-updater.exe"; DestDir: "{app}\\bin"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\\${appName}"; Filename: "{app}\\orbit-win_x64.exe"

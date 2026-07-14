@@ -1,0 +1,58 @@
+name: Release Engine
+
+on:
+  push:
+    paths:
+      - 'core/**'
+    branches:
+      - main
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Build Engine and Updater
+        run: |
+          cd core
+          cargo build --release
+      - name: Bundle Engine
+        run: |
+          mkdir engine-bundle
+          copy core\target\release\orbit-engine.exe engine-bundle\
+          copy core\target\release\orbit-updater.exe engine-bundle\
+          Compress-Archive -Path engine-bundle\* -DestinationPath orbit-engine.zip
+      - name: Get Version
+        id: version
+        run: |
+          $content = Get-Content core/engine/Cargo.toml | Out-String
+          $version = [regex]::match($content, 'version\s*=\s*"([^"]+)"').Groups[1].Value
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Create Tag & Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: engine-v${{ env.VERSION }}
+          files: orbit-engine.zip
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Update Manifest
+        run: |
+          node scripts/generate-manifest.js
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add update-manifest.json
+          # Check if there are changes before committing
+          if (git diff --cached --quiet) {
+            echo "No changes to commit"
+          } else {
+            git commit -m "chore: update manifest for engine-v${{ env.VERSION }} [skip ci]"
+            git push
+          }

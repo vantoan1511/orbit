@@ -1,0 +1,62 @@
+name: Release Full Installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Dependencies
+        run: npm install
+      - name: Install Neutralino CLI
+        run: npm install -g @neutralinojs/neu
+      - name: Build Resources & Neutralino Wrapper
+        run: neu build
+      - name: Build Engine and Updater
+        run: |
+          cd core
+          cargo build --release
+          cd ..
+          mkdir dist\orbit\bin
+          copy core\target\release\orbit-engine.exe dist\orbit\bin\
+          copy core\target\release\orbit-updater.exe dist\orbit\bin\
+      - name: Package Installer
+        run: npm run package
+      - name: Get Version
+        id: version
+        run: |
+          $version = node -p "require('./package.json').version"
+          echo "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Create Tag & Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          files: dist/Orbit-Setup-${{ env.VERSION }}.exe
+      - name: Update Manifest
+        run: |
+          node scripts/generate-manifest.js
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add update-manifest.json
+          # Check if there are changes before committing
+          if (git diff --cached --quiet) {
+            echo "No changes to commit"
+          } else {
+            git commit -m "chore: update manifest for v${{ env.VERSION }} [skip ci]"
+            git push
+          }
