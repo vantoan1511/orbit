@@ -1,12 +1,12 @@
+import { OrbitEvents, type OrbitEventMap } from '@/types/events'
 import { coreEngine, events } from './nativeService'
-import { OrbitEvents } from '@/types/events'
 
 class UpdaterService {
   /**
    * Triggers a check for updates.
    */
-  checkForUpdates() {
-    coreEngine.dispatch('checkForUpdates')
+  checkForUpdates(currentResources: string) {
+    coreEngine.dispatch('checkForUpdates', { currentResources })
   }
 
   /**
@@ -23,18 +23,15 @@ class UpdaterService {
     coreEngine.dispatch('triggerEngineUpdate', { url })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onUpdateCheckFinished(handler: (data: any) => void) {
+  onUpdateCheckFinished(handler: (data: OrbitEventMap['updateCheckFinished']) => void) {
     return events.on(OrbitEvents.UpdateCheckFinished, handler)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onUpdateDownloadProgress(handler: (data: any) => void) {
+  onUpdateDownloadProgress(handler: (data: OrbitEventMap['updateDownloadProgress']) => void) {
     return events.on(OrbitEvents.UpdateDownloadProgress, handler)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onUpdateReady(handler: (data: any) => void) {
+  onUpdateReady(handler: (data: OrbitEventMap['updateReady']) => void) {
     return events.on(OrbitEvents.UpdateReady, handler)
   }
 }
