@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
 
 const activeTab = ref('general')
 </script>
@@ -72,11 +73,7 @@ const activeTab = ref('general')
         </TabPanel>
 
         <TabPanel value="about">
-          <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            About Orbit coming soon.
-          </div>
+          <SettingsAboutTab />
         </TabPanel>
       </TabPanels>
     </Tabs>

@@ -90,6 +90,19 @@ export interface OrbitEventMap {
   errorOccurred: {
     message: string
   }
+  updateCheckFinished: {
+    has_resources_update: boolean
+    has_engine_update: boolean
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    manifest: any
+  }
+  updateDownloadProgress: {
+    component: string
+    progress_percentage: number
+  }
+  updateReady: {
+    component: string
+  }
 }
 
 export const OrbitEvents = {
@@ -115,7 +128,10 @@ export const OrbitEvents = {
   PersistentVolumeClaimsUpdated: 'persistentVolumeClaimsUpdated',
   StorageClassesUpdated: 'storageClassesUpdated',
   PoliciesUpdated: 'policiesUpdated',
-  ErrorOccurred: 'errorOccurred'
+  ErrorOccurred: 'errorOccurred',
+  UpdateCheckFinished: 'updateCheckFinished',
+  UpdateDownloadProgress: 'updateDownloadProgress',
+  UpdateReady: 'updateReady'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap
