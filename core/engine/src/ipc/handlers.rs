@@ -498,6 +498,101 @@ pub fn dispatch(
                 }
             });
         }
+        "checkForUpdates" => {
+            tokio::spawn(async move {
+                let url = data
+                    .and_then(|d| d.get("manifestUrl").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .unwrap_or_else(|| "https://raw.githubusercontent.com/vantoan1511/orbit/main/update-manifest.json".to_string());
+                
+                match crate::updater::UpdateManifest::fetch(&url).await {
+                    Ok(manifest) => {
+                        // TODO: get real versions from the build system or config
+                        let current_engine = env!("CARGO_PKG_VERSION");
+                        let current_resources = "1.0.0"; // Usually parsed from neutralino.config.json or passed from UI
+                        
+                        let has_engine_update = manifest.has_engine_update(current_engine).unwrap_or(false);
+                        let has_resources_update = manifest.has_resources_update(current_resources).unwrap_or(false);
+
+                        let _ = Bridge::send_event(
+                            &writer,
+                            &token,
+                            &OrbitEvent::UpdateCheckFinished {
+                                has_resources_update,
+                                has_engine_update,
+                                manifest,
+                            },
+                        ).await;
+                    }
+                    Err(e) => {
+                        log::error!("Failed to fetch update manifest: {:?}", e);
+                        let _ = Bridge::send_event(
+                            &writer,
+                            &token,
+                            &OrbitEvent::ErrorOccurred {
+                                message: format!("Failed to check for updates: {}", e),
+                            },
+                        ).await;
+                    }
+                }
+            });
+        }
+        "applyResourceUpdate" => {
+            tokio::spawn(async move {
+                let url = data
+                    .and_then(|d| d.get("url").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                    
+                if let Some(url) = url {
+                    match crate::updater::UpdateManifest::download(&url, "resources.neu").await {
+                        Ok(path) => {
+                            // Swap the resources.neu in the current directory
+                            // Note: this assumes we have write access to the current directory
+                            if let Ok(current_dir) = std::env::current_dir() {
+                                let target_path = current_dir.join("resources.neu");
+                                if let Err(e) = std::fs::copy(&path, &target_path) {
+                                    log::error!("Failed to copy updated resources: {:?}", e);
+                                } else {
+                                    log::info!("Successfully applied resource update from {:?}", path);
+                                    let _ = Bridge::send_event(
+                                        &writer,
+                                        &token,
+                                        &OrbitEvent::UpdateReady {
+                                            component: "resources".to_string(),
+                                        },
+                                    ).await;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            log::error!("Failed to download resource update: {:?}", e);
+                        }
+                    }
+                }
+            });
+        }
+        "triggerEngineUpdate" => {
+            tokio::spawn(async move {
+                let url = data
+                    .and_then(|d| d.get("url").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                    
+                if let Some(url) = url {
+                    // Start download
+                    if let Ok(_path) = crate::updater::UpdateManifest::download(&url, "orbit-engine.zip").await {
+                         // Here we would spawn updater.exe and exit
+                         // ...
+                         let _ = Bridge::send_event(
+                            &writer,
+                            &token,
+                            &OrbitEvent::UpdateReady {
+                                component: "engine".to_string(),
+                            },
+                        ).await;
+                    }
+                }
+            });
+        }
         _ => {}
     }
 }
