@@ -1,0 +1,10 @@
+{
+  "engine": {
+    "version": "1.0.0",
+    "url": "https://github.com/vantoan1511/orbit/releases/download/engine-v1.0.0/orbit-engine.zip"
+  },
+  "resources": {
+    "version": "1.0.0",
+    "url": "https://github.com/vantoan1511/orbit/releases/download/resources-v1.0.0/resources.neu"
+  }
+}
