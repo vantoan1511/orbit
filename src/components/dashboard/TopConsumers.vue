@@ -148,11 +148,12 @@ const consumers = computed(() => {
     </div>
 
     <!-- View All Link -->
-    <button
+    <router-link
+      to="/pods"
       class="text-xs text-(--accent) hover:underline flex items-center justify-between font-semibold mt-4 border-t border-(--border) pt-4 w-full"
     >
       <span>View all resource usage</span>
       <ArrowRight class="w-3.5 h-3.5" />
-    </button>
+    </router-link>
   </div>
 </template>

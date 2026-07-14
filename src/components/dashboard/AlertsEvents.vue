@@ -93,11 +93,12 @@ const normalEvents = computed(() => {
           <div class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider">
             Recent Warnings
           </div>
-          <button
+          <router-link
+            to="/events"
             class="text-xs text-(--accent) hover:underline flex items-center gap-1 font-medium"
           >
             <span>View all</span>
-          </button>
+          </router-link>
         </div>
 
         <div class="divide-y divide-(--border)">
@@ -136,11 +137,12 @@ const normalEvents = computed(() => {
           <div class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider">
             Recent Events
           </div>
-          <button
+          <router-link
+            to="/events"
             class="text-xs text-(--accent) hover:underline flex items-center gap-1 font-medium"
           >
             <span>View all</span>
-          </button>
+          </router-link>
         </div>
 
         <div class="divide-y divide-(--border)">
