@@ -30,10 +30,16 @@ fn main() {
     let mut log_path = PathBuf::from(&args.target_dir);
     log_path.push("updater.log");
     
+    let log_file = fs::File::create(&log_path).unwrap_or_else(|_| {
+        let mut temp_log = std::env::temp_dir();
+        temp_log.push("orbit_updater.log");
+        fs::File::create(&temp_log).unwrap()
+    });
+
     let _ = WriteLogger::init(
         LevelFilter::Info,
         Config::default(),
-        fs::File::create(&log_path).unwrap_or_else(|_| fs::File::create("updater.log").unwrap())
+        log_file
     );
 
     info!("Orbit Updater Started");
@@ -47,7 +53,8 @@ fn main() {
     // 1. Create Backup
     info!("Creating backup in {:?}", backup_path);
     if backup_path.exists() {
-        if let Err(e) = fs::remove_dir_all(&backup_path) {
+        let res = fs::remove_dir_all(&backup_path);
+        if let Err(e) = res {
             error!("Failed to remove old backup directory: {}", e);
             exit(1);
         }
@@ -58,7 +65,7 @@ fn main() {
         exit(1);
     }
 
-    if let Err(e) = backup_directory(&target_path, &backup_path) {
+    if let Err(e) = backup_directory(target_path, &backup_path) {
          error!("Failed to backup directory: {}", e);
          exit(1);
     }
@@ -68,17 +75,17 @@ fn main() {
 
     // 3. Extract Zip and Replace Files
     info!("Extracting zip {:?}", args.zip_path);
-    if let Err(e) = extract_and_replace(&args.zip_path, &target_path) {
+    if let Err(e) = extract_and_replace(&args.zip_path, target_path) {
         error!("Failed to extract and replace: {}", e);
         info!("Initiating rollback...");
         
-        if let Err(rollback_err) = restore_backup(&backup_path, &target_path) {
+        if let Err(rollback_err) = restore_backup(&backup_path, target_path) {
             error!("CRITICAL: Rollback failed! System may be in an inconsistent state. Error: {}", rollback_err);
             exit(1);
         } else {
             info!("Rollback successful.");
             // Restart original engine
-            restart_engine(&target_path, &args.executable_name);
+            restart_engine(target_path, &args.executable_name);
             exit(1);
         }
     }
@@ -86,7 +93,7 @@ fn main() {
     info!("Update applied successfully.");
 
     // 4. Re-launch the main engine
-    restart_engine(&target_path, &args.executable_name);
+    restart_engine(target_path, &args.executable_name);
     
     // Clean up update zip if needed
     let _ = fs::remove_file(&args.zip_path);
@@ -161,9 +168,7 @@ fn extract_and_replace(zip_path: &str, target_dir: &Path) -> Result<(), Box<dyn 
             fs::create_dir_all(&outpath)?;
         } else {
             if let Some(p) = outpath.parent() {
-                if !p.exists() {
-                    fs::create_dir_all(&p)?;
-                }
+                fs::create_dir_all(p)?;
             }
             let mut outfile = fs::File::create(&outpath)?;
             io::copy(&mut file, &mut outfile)?;

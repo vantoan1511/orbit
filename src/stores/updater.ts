@@ -1,13 +1,14 @@
+import { updaterService } from '@/services/updaterService'
+import type { UpdateManifest } from '@/types/events'
+import { VERSION } from '@/version'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { updaterService } from '@/services/updaterService'
 
 export const useUpdaterStore = defineStore('updater', () => {
   const isChecking = ref(false)
   const hasResourcesUpdate = ref(false)
   const hasEngineUpdate = ref(false)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const manifest = ref<any>(null)
+  const manifest = ref<UpdateManifest | null>(null)
 
   const isDownloading = ref(false)
   const downloadProgress = ref(0)
@@ -15,7 +16,7 @@ export const useUpdaterStore = defineStore('updater', () => {
 
   function checkForUpdates() {
     isChecking.value = true
-    updaterService.checkForUpdates()
+    updaterService.checkForUpdates(VERSION)
   }
 
   function applyResourceUpdate() {

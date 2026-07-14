@@ -19,6 +19,16 @@ import type {
   StorageClassInfo
 } from './kubernetes'
 
+export interface ComponentVersion {
+  version: string
+  url: string
+}
+
+export interface UpdateManifest {
+  engine: ComponentVersion
+  resources: ComponentVersion
+}
+
 export interface OrbitEventMap {
   engineConnected: {
     status: 'ready' | 'error'
@@ -93,8 +103,7 @@ export interface OrbitEventMap {
   updateCheckFinished: {
     has_resources_update: boolean
     has_engine_update: boolean
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    manifest: any
+    manifest: UpdateManifest
   }
   updateDownloadProgress: {
     component: string
