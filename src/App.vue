@@ -27,6 +27,7 @@ import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
+import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 
 const k8sStore = useKubernetesStore()
 const toast = useToast()
@@ -186,6 +187,7 @@ onUnmounted(() => {
   <AppLayout />
   <Toast />
   <ConfirmDialog />
+  <UpdaterNotifications />
 </template>
 
 <style>
