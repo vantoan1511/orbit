@@ -49,14 +49,39 @@ jobs:
           files: dist/Orbit-Setup-${{ env.VERSION }}.exe
       - name: Update Manifest
         run: |
-          node scripts/generate-manifest.js
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add update-manifest.json
-          # Check if there are changes before committing
-          if (git diff --cached --quiet) {
-            echo "No changes to commit"
-          } else {
+          
+          $max_retries = 5
+          $retry_count = 0
+          $success = $false
+          
+          while ($retry_count -lt $max_retries) {
+            git fetch origin main
+            git reset --hard origin/main
+            
+            node scripts/generate-manifest.js
+            git add update-manifest.json
+            
+            if (git diff --cached --quiet) {
+              echo "No changes to commit"
+              $success = $true
+              break
+            }
+            
             git commit -m "chore: update manifest for v${{ env.VERSION }} [skip ci]"
-            git push
+            git push origin HEAD:main
+            if ($LASTEXITCODE -eq 0) {
+              $success = $true
+              break
+            }
+            
+            echo "Push failed, retrying in 3 seconds..."
+            Start-Sleep -Seconds 3
+            $retry_count++
+          }
+          
+          if (-not $success) {
+            echo "Failed to push after $max_retries retries"
+            exit 1
           }
