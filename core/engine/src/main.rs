@@ -1,5 +1,6 @@
 mod ipc;
 mod kubernetes;
+pub mod updater;
 
 use std::error::Error;
 use std::sync::Arc;

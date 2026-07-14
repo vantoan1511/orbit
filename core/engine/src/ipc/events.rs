@@ -96,5 +96,21 @@ pub enum OrbitEvent {
     ErrorOccurred {
         message: String,
     },
+    #[serde(rename = "updateCheckFinished")]
+    UpdateCheckFinished {
+        has_resources_update: bool,
+        has_engine_update: bool,
+        manifest: crate::updater::UpdateManifest,
+    },
+    #[serde(rename = "updateDownloadProgress")]
+    UpdateDownloadProgress {
+        component: String,
+        progress_percentage: u8,
+    },
+    #[serde(rename = "updateReady")]
+    UpdateReady {
+        component: String,
+    },
 }
+
 
