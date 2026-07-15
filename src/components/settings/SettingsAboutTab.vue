@@ -1,8 +1,20 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
 import Button from 'primevue/button'
+import { ref, onMounted } from 'vue'
+import { app } from '@/services/nativeService'
 
 const updaterStore = useUpdaterStore()
+const appVersion = ref('')
+
+onMounted(async () => {
+  try {
+    const config = await app.getConfig()
+    appVersion.value = config.version
+  } catch (error) {
+    console.error('Failed to get app version:', error)
+  }
+})
 </script>
 
 <template>
@@ -25,7 +37,7 @@ const updaterStore = useUpdaterStore()
       <div class="flex flex-col gap-3">
         <div class="flex justify-between items-center py-2 border-b border-(--border)">
           <span class="text-sm font-medium text-(--text-secondary)">Version</span>
-          <span class="text-sm text-(--text-primary)">1.0.0</span>
+          <span class="text-sm text-(--text-primary)">{{ appVersion || 'Loading...' }}</span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-(--border)">
           <span class="text-sm font-medium text-(--text-secondary)">Architecture</span>

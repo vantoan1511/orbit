@@ -1,5 +1,6 @@
 import type { OrbitEventMap, OrbitEventName } from '@/types/events'
 import {
+  app as neuApp,
   events as neuEvents,
   extensions as neuExtensions,
   filesystem as neuFilesystem,
@@ -122,7 +123,9 @@ export const extensions = {
  * Safe wrapper for Neutralino app API
  */
 export const app = {
-  // Add app wrapper functions as needed
+  getConfig() {
+    return neuApp.getConfig()
+  }
 }
 
 const CORE_ENGINE_ID = 'vantoan1511.orbit.core.engine'
