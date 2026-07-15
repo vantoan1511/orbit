@@ -58,10 +58,7 @@ const updaterStore = useUpdaterStore()
           />
         </div>
         <div v-if="!updaterStore.isChecking && updaterStore.manifest" class="text-sm">
-          <span
-            v-if="updaterStore.hasUpdate"
-            class="text-green-500 font-medium"
-          >
+          <span v-if="updaterStore.hasUpdate" class="text-green-500 font-medium">
             <i class="pi pi-check-circle mr-1"></i> Update Available
           </span>
           <span v-else class="text-(--text-muted)">
@@ -94,8 +91,8 @@ const updaterStore = useUpdaterStore()
           <div>
             <h4 class="text-sm font-semibold text-blue-400 mb-1">Update Available</h4>
             <p class="text-xs text-(--text-muted) mb-3">
-              Version {{ updaterStore.manifest?.version }} is ready to install. This
-              requires restarting Orbit.
+              Version {{ updaterStore.manifest?.version }} is ready to install. This requires
+              restarting Orbit.
             </p>
             <Button
               size="small"
