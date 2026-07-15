@@ -36,7 +36,7 @@ jobs:
           cd ..
           New-Item -ItemType Directory -Force -Path dist\orbit\bin
           copy core\target\release\orbit-engine.exe dist\orbit\bin\
-          copy core\target\release\orbit-updater.exe dist\orbit\bin\
+          copy core\target\release\orbit-apply.exe dist\orbit\bin\
       - name: Package Installer
         run: npm run package
       - name: Package Update Zip

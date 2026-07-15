@@ -1526,8 +1526,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbit-apply"
+version = "1.0.2"
+dependencies = [
+ "clap",
+ "log",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "simplelog",
+ "zip",
+]
+
+[[package]]
 name = "orbit-engine"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "async-trait",
  "base64",
@@ -1545,19 +1558,6 @@ dependencies = [
  "tokio-tungstenite",
  "urlencoding",
  "uuid",
-]
-
-[[package]]
-name = "orbit-updater"
-version = "1.0.1"
-dependencies = [
- "clap",
- "log",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "simplelog",
- "zip",
 ]
 
 [[package]]

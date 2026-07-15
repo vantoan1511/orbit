@@ -549,7 +549,7 @@ pub fn dispatch(
                             if let Some(bin_dir) = bin_dir_opt {
                                 let app_dir = bin_dir.parent().unwrap_or(bin_dir);
                                 
-                                let updater_name = if cfg!(target_os = "windows") { "orbit-updater.exe" } else { "orbit-updater" };
+                                let updater_name = if cfg!(target_os = "windows") { "orbit-apply.exe" } else { "orbit-apply" };
                                 let updater_path = bin_dir.join(updater_name);
                                 
                                 let os = std::env::consts::OS;

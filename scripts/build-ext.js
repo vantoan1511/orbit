@@ -17,7 +17,7 @@ if (!existsSync(binDir)) {
 // Copy the binaries
 const ext = platform() === 'win32' ? '.exe' : ''
 
-const binaries = ['orbit-engine', 'orbit-updater']
+const binaries = ['orbit-engine', 'orbit-apply']
 
 for (const binName of binaries) {
   const binaryName = `${binName}${ext}`
