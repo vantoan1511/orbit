@@ -1527,7 +1527,7 @@ dependencies = [
 
 [[package]]
 name = "orbit-apply"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "clap",
  "log",
@@ -1540,7 +1540,7 @@ dependencies = [
 
 [[package]]
 name = "orbit-engine"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "async-trait",
  "base64",
