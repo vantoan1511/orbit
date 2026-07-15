@@ -40,13 +40,6 @@ export const useUpdaterStore = defineStore('updater', () => {
       isDownloading.value = false
       downloadProgress.value = 100
       updateReady.value = data.component
-      if (data.component === 'app') {
-        import('@neutralinojs/lib').then(({ app }) => {
-          setTimeout(() => {
-            app.exit()
-          }, 500)
-        })
-      }
     })
   }
 
