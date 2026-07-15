@@ -26,7 +26,7 @@ AppName=${appName}
 AppVersion=${appVersion}
 AppPublisher=${config.author || 'Toan Nguyen'}
 DefaultDirName={autopf}\\${appName}
-DisableProgramGroupPage=yes
+DisableProgramGroupPage=no
 ; We output to dist folder
 OutputDir=dist
 OutputBaseFilename=${appName}-Setup-${appVersion}
@@ -34,7 +34,10 @@ SetupIconFile=dist\\icon.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
+PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
+DisableDirPage=no
+DisableWelcomePage=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
