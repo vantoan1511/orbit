@@ -25,8 +25,8 @@ export interface ComponentVersion {
 }
 
 export interface UpdateManifest {
-  engine: ComponentVersion
-  resources: ComponentVersion
+  version: string
+  url: string
 }
 
 export interface OrbitEventMap {
@@ -101,8 +101,7 @@ export interface OrbitEventMap {
     message: string
   }
   updateCheckFinished: {
-    has_resources_update: boolean
-    has_engine_update: boolean
+    has_update: boolean
     manifest: UpdateManifest
   }
   updateDownloadProgress: {

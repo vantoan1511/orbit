@@ -5,22 +5,15 @@ class UpdaterService {
   /**
    * Triggers a check for updates.
    */
-  checkForUpdates(currentResources: string) {
-    coreEngine.dispatch('checkForUpdates', { currentResources })
+  checkForUpdates() {
+    coreEngine.dispatch('checkForUpdates', {})
   }
 
   /**
-   * Start downloading and applying a resource update (silent update).
+   * Start downloading and applying an update (requires restart).
    */
-  applyResourceUpdate(url: string) {
-    coreEngine.dispatch('applyResourceUpdate', { url })
-  }
-
-  /**
-   * Start downloading and applying an engine update (requires restart).
-   */
-  triggerEngineUpdate(url: string) {
-    coreEngine.dispatch('triggerEngineUpdate', { url })
+  applyUpdate(url: string) {
+    coreEngine.dispatch('applyUpdate', { url })
   }
 
   onUpdateCheckFinished(handler: (data: OrbitEventMap['updateCheckFinished']) => void) {

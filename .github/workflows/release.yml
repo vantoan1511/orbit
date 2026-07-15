@@ -1,4 +1,4 @@
-name: Release Full Installer
+name: Release
 
 on:
   workflow_dispatch:
@@ -37,6 +37,10 @@ jobs:
           copy core\target\release\orbit-updater.exe dist\orbit\bin\
       - name: Package Installer
         run: npm run package
+      - name: Package Update Zip
+        run: |
+          cd dist\orbit
+          Compress-Archive -Path resources.neu, bin -DestinationPath ..\orbit-update.zip
       - name: Get Version
         id: version
         run: |
@@ -46,7 +50,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
-          files: dist/Orbit-Setup-${{ env.VERSION }}.exe
+          files: |
+            dist/Orbit-Setup-${{ env.VERSION }}.exe
+            dist/orbit-update.zip
       - name: Update Manifest
         run: |
           git config user.name "github-actions[bot]"

@@ -6,38 +6,29 @@ import { ref } from 'vue'
 
 export const useUpdaterStore = defineStore('updater', () => {
   const isChecking = ref(false)
-  const hasResourcesUpdate = ref(false)
-  const hasEngineUpdate = ref(false)
+  const hasUpdate = ref(false)
   const manifest = ref<UpdateManifest | null>(null)
 
   const isDownloading = ref(false)
   const downloadProgress = ref(0)
-  const updateReady = ref<string | null>(null) // 'resources' | 'engine'
+  const updateReady = ref<string | null>(null) // 'app'
 
   function checkForUpdates() {
     isChecking.value = true
-    updaterService.checkForUpdates(VERSION)
+    updaterService.checkForUpdates()
   }
 
-  function applyResourceUpdate() {
-    if (!manifest.value?.resources?.url) return
+  function applyUpdate() {
+    if (!manifest.value?.url) return
     isDownloading.value = true
     downloadProgress.value = 0
-    updaterService.applyResourceUpdate(manifest.value.resources.url)
-  }
-
-  function triggerEngineUpdate() {
-    if (!manifest.value?.engine?.url) return
-    isDownloading.value = true
-    downloadProgress.value = 0
-    updaterService.triggerEngineUpdate(manifest.value.engine.url)
+    updaterService.applyUpdate(manifest.value.url)
   }
 
   function initListeners() {
     updaterService.onUpdateCheckFinished((data) => {
       isChecking.value = false
-      hasResourcesUpdate.value = data.has_resources_update
-      hasEngineUpdate.value = data.has_engine_update
+      hasUpdate.value = data.has_update
       manifest.value = data.manifest
     })
 
@@ -55,15 +46,13 @@ export const useUpdaterStore = defineStore('updater', () => {
 
   return {
     isChecking,
-    hasResourcesUpdate,
-    hasEngineUpdate,
+    hasUpdate,
     manifest,
     isDownloading,
     downloadProgress,
     updateReady,
     checkForUpdates,
-    applyResourceUpdate,
-    triggerEngineUpdate,
+    applyUpdate,
     initListeners
   }
 })

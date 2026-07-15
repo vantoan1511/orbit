@@ -170,6 +170,24 @@ fn extract_and_replace(zip_path: &str, target_dir: &Path) -> Result<(), Box<dyn 
             if let Some(p) = outpath.parent() {
                 fs::create_dir_all(p)?;
             }
+            if outpath.exists() {
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis();
+                let mut old_path = outpath.clone();
+                let ext = if let Some(e) = old_path.extension() {
+                    format!("{}.old.{}", e.to_string_lossy(), timestamp)
+                } else {
+                    format!("old.{}", timestamp)
+                };
+                old_path.set_extension(ext);
+
+                if let Err(e) = fs::rename(&outpath, &old_path) {
+                    println!("Failed to rename {} to {}: {}", outpath.display(), old_path.display(), e);
+                    return Err(Box::new(e));
+                }
+            }
             let mut outfile = fs::File::create(&outpath)?;
             io::copy(&mut file, &mut outfile)?;
         }

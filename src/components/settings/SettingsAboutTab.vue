@@ -59,7 +59,7 @@ const updaterStore = useUpdaterStore()
         </div>
         <div v-if="!updaterStore.isChecking && updaterStore.manifest" class="text-sm">
           <span
-            v-if="updaterStore.hasEngineUpdate || updaterStore.hasResourcesUpdate"
+            v-if="updaterStore.hasUpdate"
             class="text-green-500 font-medium"
           >
             <i class="pi pi-check-circle mr-1"></i> Update Available
@@ -86,22 +86,22 @@ const updaterStore = useUpdaterStore()
 
       <!-- Show apply actions if ready but not applied -->
       <div
-        v-if="!updaterStore.isDownloading && updaterStore.hasEngineUpdate"
+        v-if="!updaterStore.isDownloading && updaterStore.hasUpdate"
         class="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg"
       >
         <div class="flex items-start gap-3">
           <i class="pi pi-info-circle text-blue-500 mt-0.5"></i>
           <div>
-            <h4 class="text-sm font-semibold text-blue-400 mb-1">Engine Update Available</h4>
+            <h4 class="text-sm font-semibold text-blue-400 mb-1">Update Available</h4>
             <p class="text-xs text-(--text-muted) mb-3">
-              Version {{ updaterStore.manifest?.engine?.version }} is ready to install. This
+              Version {{ updaterStore.manifest?.version }} is ready to install. This
               requires restarting Orbit.
             </p>
             <Button
               size="small"
               severity="info"
               label="Update & Restart"
-              @click="updaterStore.triggerEngineUpdate()"
+              @click="updaterStore.applyUpdate()"
             />
           </div>
         </div>

@@ -98,8 +98,7 @@ pub enum OrbitEvent {
     },
     #[serde(rename = "updateCheckFinished")]
     UpdateCheckFinished {
-        has_resources_update: bool,
-        has_engine_update: bool,
+        has_update: bool,
         manifest: crate::updater::UpdateManifest,
     },
     #[serde(rename = "updateDownloadProgress")]

@@ -1,15 +1,9 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ComponentVersion {
+pub struct UpdateManifest {
     pub version: String,
     pub url: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UpdateManifest {
-    pub engine: ComponentVersion,
-    pub resources: ComponentVersion,
 }
 
 impl UpdateManifest {
@@ -22,17 +16,10 @@ impl UpdateManifest {
         Ok(manifest)
     }
 
-    /// Check if the engine has an update available.
-    pub fn has_engine_update(&self, current_version: &str) -> Result<bool, semver::Error> {
+    /// Check if an update is available.
+    pub fn has_update(&self, current_version: &str) -> Result<bool, semver::Error> {
         let current = semver::Version::parse(current_version)?;
-        let remote = semver::Version::parse(&self.engine.version)?;
-        Ok(remote > current)
-    }
-
-    /// Check if the resources have an update available.
-    pub fn has_resources_update(&self, current_version: &str) -> Result<bool, semver::Error> {
-        let current = semver::Version::parse(current_version)?;
-        let remote = semver::Version::parse(&self.resources.version)?;
+        let remote = semver::Version::parse(&self.version)?;
         Ok(remote > current)
     }
 

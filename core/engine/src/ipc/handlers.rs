@@ -506,25 +506,17 @@ pub fn dispatch(
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .unwrap_or_else(|| "https://raw.githubusercontent.com/vantoan1511/orbit/main/update-manifest.json".to_string());
                 
-                let current_resources = data
-                    .as_ref()
-                    .and_then(|d| d.get("currentResources").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .unwrap_or_else(|| "1.0.0".to_string());
-                
                 match crate::updater::UpdateManifest::fetch(&url).await {
                     Ok(manifest) => {
                         let current_engine = env!("CARGO_PKG_VERSION");
                         
-                        let has_engine_update = manifest.has_engine_update(current_engine).unwrap_or(false);
-                        let has_resources_update = manifest.has_resources_update(&current_resources).unwrap_or(false);
+                        let has_update = manifest.has_update(current_engine).unwrap_or(false);
 
                         let _ = Bridge::send_event(
                             &writer,
                             &token,
                             &OrbitEvent::UpdateCheckFinished {
-                                has_resources_update,
-                                has_engine_update,
+                                has_update,
                                 manifest,
                             },
                         ).await;
@@ -542,67 +534,49 @@ pub fn dispatch(
                 }
             });
         }
-        "applyResourceUpdate" => {
+        "applyUpdate" => {
             tokio::spawn(async move {
                 let url = data
                     .and_then(|d| d.get("url").cloned())
                     .and_then(|v| v.as_str().map(|s| s.to_string()));
                     
                 if let Some(url) = url {
-                    match crate::updater::UpdateManifest::download(&url, "resources.neu").await {
-                        Ok(path) => {
-                            // Swap the resources.neu in the current directory
-                            // Note: this assumes we have write access to the current directory
-                            if let Ok(current_dir) = std::env::current_dir() {
-                                let target_path = current_dir.join("resources.neu");
-                                if let Err(e) = std::fs::copy(&path, &target_path) {
-                                    log::error!("Failed to copy updated resources: {:?}", e);
-                                } else {
-                                    log::info!("Successfully applied resource update from {:?}", path);
-                                    let _ = Bridge::send_event(
-                                        &writer,
-                                        &token,
-                                        &OrbitEvent::UpdateReady {
-                                            component: "resources".to_string(),
-                                        },
-                                    ).await;
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            log::error!("Failed to download resource update: {:?}", e);
-                        }
-                    }
-                }
-            });
-        }
-        "triggerEngineUpdate" => {
-            tokio::spawn(async move {
-                let url = data
-                    .and_then(|d| d.get("url").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
-                    
-                if let Some(url) = url {
-                    let download_res = crate::updater::UpdateManifest::download(&url, "orbit-engine.zip").await;
+                    let download_res = crate::updater::UpdateManifest::download(&url, "orbit-update.zip").await;
                     if let Ok(path) = download_res {
                         let current_exe_res = std::env::current_exe();
                         if let Ok(current_exe) = current_exe_res {
                             let bin_dir_opt = current_exe.parent();
                             if let Some(bin_dir) = bin_dir_opt {
+                                let app_dir = bin_dir.parent().unwrap_or(bin_dir);
+                                
                                 let updater_name = if cfg!(target_os = "windows") { "orbit-updater.exe" } else { "orbit-updater" };
                                 let updater_path = bin_dir.join(updater_name);
                                 
-                                let exe_name = current_exe.file_name().and_then(|n| n.to_str()).unwrap_or(
-                                    if cfg!(target_os = "windows") { "orbit-engine.exe" } else { "orbit-engine" }
-                                );
+                                let os = std::env::consts::OS;
+                                let arch = std::env::consts::ARCH;
                                 
-                                log::info!("Spawning updater: {:?} with zip: {:?}, target_dir: {:?}, exe_name: {}", updater_path, path, bin_dir, exe_name);
+                                let neu_os = match os {
+                                    "windows" => "win",
+                                    "macos" => "mac",
+                                    "linux" => "linux",
+                                    _ => "linux",
+                                };
+                                
+                                let neu_arch = match arch {
+                                    "x86_64" => "x64",
+                                    "aarch64" => "arm64",
+                                    _ => "x64",
+                                };
+                                
+                                let ext = if cfg!(target_os = "windows") { ".exe" } else { "" };
+                                let exe_name = format!("orbit-{}_{}{}", neu_os, neu_arch, ext);
+                                log::info!("Spawning updater: {:?} with zip: {:?}, target_dir: {:?}, exe_name: {}", updater_path, path, app_dir, exe_name);
                                 
                                 match std::process::Command::new(&updater_path)
                                     .arg("--zip-path")
                                     .arg(&path)
                                     .arg("--target-dir")
-                                    .arg(bin_dir)
+                                    .arg(app_dir)
                                     .arg("--executable-name")
                                     .arg(exe_name)
                                     .spawn() {
@@ -620,7 +594,7 @@ pub fn dispatch(
                             &writer,
                             &token,
                             &OrbitEvent::UpdateReady {
-                                component: "engine".to_string(),
+                                component: "app".to_string(),
                             },
                         ).await;
                     }
