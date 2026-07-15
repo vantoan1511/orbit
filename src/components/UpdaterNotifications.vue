@@ -59,7 +59,12 @@ watch(
         </div>
         <div class="font-medium text-sm my-2">{{ slotProps.message.detail }}</div>
         <div class="flex gap-2 mt-2" v-if="updaterStore.hasUpdate">
-          <Button size="small" label="Apply & Restart" @click="updaterStore.applyUpdate()"></Button>
+          <Button 
+            size="small" 
+            :label="updaterStore.isDownloading ? `Downloading... ${updaterStore.downloadProgress}%` : 'Apply & Restart'" 
+            :disabled="updaterStore.isDownloading"
+            @click="updaterStore.applyUpdate()"
+          ></Button>
         </div>
       </div>
     </template>
