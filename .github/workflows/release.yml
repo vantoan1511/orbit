@@ -32,7 +32,7 @@ jobs:
           cd core
           cargo build --release
           cd ..
-          mkdir dist\orbit\bin
+          New-Item -ItemType Directory -Force -Path dist\orbit\bin
           copy core\target\release\orbit-engine.exe dist\orbit\bin\
           copy core\target\release\orbit-updater.exe dist\orbit\bin\
       - name: Package Installer
