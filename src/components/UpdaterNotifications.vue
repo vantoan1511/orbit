@@ -76,10 +76,18 @@ watch(
     </template>
   </Toast>
 
-  <Dialog v-model:visible="showRestartDialog" modal header="Update Ready" :closable="false" :style="{ width: '25rem' }">
+  <Dialog
+    v-model:visible="showRestartDialog"
+    modal
+    header="Update Ready"
+    :closable="false"
+    :style="{ width: '25rem' }"
+  >
     <div class="flex items-center gap-4 mb-4">
       <i class="pi pi-sync text-4xl text-primary"></i>
-      <span class="m-0">Orbit has been successfully updated. Restarting in {{ countdown }} seconds...</span>
+      <span class="m-0"
+        >Orbit has been successfully updated. Restarting in {{ countdown }} seconds...</span
+      >
     </div>
   </Dialog>
 </template>
