@@ -1,6 +1,5 @@
 import { updaterService } from '@/services/updaterService'
 import type { UpdateManifest } from '@/types/events'
-import { VERSION } from '@/version'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 

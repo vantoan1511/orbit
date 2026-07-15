@@ -2,34 +2,29 @@
 import { useUpdaterStore } from '@/stores/updater'
 import { watch, onMounted } from 'vue'
 import { useToast } from 'primevue/usetoast'
-import { useConfirm } from 'primevue/useconfirm'
 import { app } from '@neutralinojs/lib'
 import Button from 'primevue/button'
 
 const updaterStore = useUpdaterStore()
 const toast = useToast()
-const confirm = useConfirm()
 
 onMounted(() => {
   updaterStore.initListeners()
 
-  // Optionally trigger check on startup:
-  // setTimeout(() => updaterStore.checkForUpdates(), 2000)
+  // Trigger check on startup:
+  setTimeout(() => updaterStore.checkForUpdates(), 2000)
 })
 
 watch(
   () => updaterStore.hasUpdate,
   (hasUpdate) => {
     if (hasUpdate) {
-      confirm.require({
-        message: 'A new update is available. Would you like to update now?',
-        header: 'Update Available',
-        icon: 'pi pi-info-circle',
-        acceptLabel: 'Update & Restart',
-        rejectLabel: 'Later',
-        accept: () => {
-          updaterStore.applyUpdate()
-        }
+      toast.add({
+        severity: 'info',
+        summary: 'Update Available',
+        detail: 'A new version of Orbit is available.',
+        group: 'updater',
+        life: 15000
       })
     }
   }
