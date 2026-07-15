@@ -3,7 +3,7 @@
   "applicationName": "Orbit",
   "applicationIcon": "public/icon.png",
   "description": "A fast, lightweight desktop application for exploring, monitoring, and managing Kubernetes clusters from a single intuitive interface.",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "author": "Toan Nguyen",
   "copyright": "Copyright © Toan Nguyen 2026. All rights reserved.",
   "defaultMode": "window",
