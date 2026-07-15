@@ -541,7 +541,24 @@ pub fn dispatch(
                     .and_then(|v| v.as_str().map(|s| s.to_string()));
                     
                 if let Some(url) = url {
-                    let download_res = crate::updater::UpdateManifest::download(&url, "orbit-update.zip").await;
+                    let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+                    let writer_clone = writer.clone();
+                    let token_clone = token.clone();
+                    
+                    tokio::spawn(async move {
+                        while let Some(progress) = rx.recv().await {
+                            let _ = Bridge::send_event(
+                                &writer_clone,
+                                &token_clone,
+                                &OrbitEvent::UpdateDownloadProgress {
+                                    component: "app".to_string(),
+                                    progress_percentage: progress,
+                                },
+                            ).await;
+                        }
+                    });
+
+                    let download_res = crate::updater::UpdateManifest::download(&url, "orbit-update.zip", Some(tx)).await;
                     if let Ok(path) = download_res {
                         let current_exe_res = std::env::current_exe();
                         if let Ok(current_exe) = current_exe_res {
