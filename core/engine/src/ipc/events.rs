@@ -98,6 +98,10 @@ pub enum OrbitEvent {
         action: String,
         data: serde_json::Value,
     },
+    #[serde(rename = "podMetricsUpdated")]
+    PodMetricsUpdated {
+        metrics: Vec<crate::kubernetes::models::PodMetricItem>,
+    },
     #[serde(rename = "errorOccurred")]
     ErrorOccurred {
         message: String,

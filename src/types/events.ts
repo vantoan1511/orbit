@@ -103,6 +103,9 @@ export interface OrbitEventMap {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     data: any
   }
+  podMetricsUpdated: {
+    metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
+  }
   errorOccurred: {
     message: string
   }
@@ -143,6 +146,7 @@ export const OrbitEvents = {
   StorageClassesUpdated: 'storageClassesUpdated',
   PoliciesUpdated: 'policiesUpdated',
   ResourceUpdated: 'resourceUpdated',
+  PodMetricsUpdated: 'podMetricsUpdated',
   ErrorOccurred: 'errorOccurred',
   UpdateCheckFinished: 'updateCheckFinished',
   UpdateDownloadProgress: 'updateDownloadProgress',
