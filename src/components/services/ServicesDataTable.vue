@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import DataTable from 'primevue/datatable'
+import { kubernetesService } from '@/services/kubernetesService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { ServiceInfo } from '@/types/kubernetes'
+import { ExternalLink, Info, MoreVertical, RefreshCw, Search, Settings2 } from '@lucide/vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
-import InputText from 'primevue/inputtext'
-import Button from 'primevue/button'
-import { Search, Info, RefreshCw, Settings2, ExternalLink, MoreVertical } from '@lucide/vue'
-import type { ServiceInfo } from '@/types/kubernetes'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { kubernetesService } from '@/services/kubernetesService'
-import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
 import { useToast } from 'primevue/usetoast'
+import { computed, ref } from 'vue'
+import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
 
 const toast = useToast()
 const k8sStore = useKubernetesStore()
@@ -29,11 +29,6 @@ const selectedService = ref<ServiceInfo | null>(null)
 const handleRefresh = async () => {
   await kubernetesService.getServices()
 }
-
-const namespaces = computed(() => {
-  const list = new Set(services.value.map((s) => s.namespace))
-  return ['All Namespaces', ...Array.from(list)]
-})
 
 const types = ['All Types', 'ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName']
 
@@ -114,7 +109,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
         <!-- Namespace Select -->
         <Select
           v-model="selectedNamespace"
-          :options="namespaces"
+          :options="k8sStore.namespaces"
           class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
         />
 
@@ -177,7 +172,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
       <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
         <template #body="{ data }">
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0"></span>
+            <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
             <span class="font-semibold text-violet-400 hover:text-violet-300 transition-colors">{{
               data.name
             }}</span>
