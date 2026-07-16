@@ -67,7 +67,6 @@ declare module 'vue' {
     UpdaterNotifications: typeof import('./src/components/UpdaterNotifications.vue')['default']
     WorkloadDetailsDrawer: typeof import('./src/components/workloads/WorkloadDetailsDrawer.vue')['default']
     WorkloadMetricsCards: typeof import('./src/components/workloads/WorkloadMetricsCards.vue')['default']
-    WorkloadsTable: typeof import('./src/components/nodes/WorkloadsTable.vue')['default']
     WorkloadSummaries: typeof import('./src/components/dashboard/WorkloadSummaries.vue')['default']
   }
 }
