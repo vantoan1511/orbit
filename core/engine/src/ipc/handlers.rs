@@ -49,6 +49,12 @@ pub fn dispatch(
                             let active_cluster_id = w_manager.active_context.clone();
                             let clusters = w_manager.get_clusters();
                             let client = w_manager.active_client.clone();
+
+                            if let Some(cancel) = w_manager.watch_cancel.take() {
+                                let _ = cancel.send(true);
+                            }
+                            let (tx, rx) = tokio::sync::watch::channel(false);
+                            w_manager.watch_cancel = Some(tx);
                             drop(w_manager);
 
                             let _ = Bridge::send_event(
@@ -62,6 +68,24 @@ pub fn dispatch(
                                 &token,
                                 &OrbitEvent::ClustersUpdated { clusters },
                             ).await;
+
+                            // Spawn new watchers
+                            if let Some(ref client) = client {
+                                let writer_c = writer.clone();
+                                let token_c = token.clone();
+                                let client_c = client.clone();
+                                let rx_c = rx.clone();
+                                tokio::spawn(async move {
+                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
+                                        client_c,
+                                        writer_c,
+                                        token_c,
+                                        "Service".to_string(),
+                                        rx_c,
+                                        crate::kubernetes::services::map_service,
+                                    ).await;
+                                });
+                            }
 
                             // Refresh all resources for the new active client
                             if let Some(ref client) = client {
@@ -110,7 +134,7 @@ pub fn dispatch(
                 let file_path = data
                     .and_then(|d| d.get("filePath").cloned())
                     .and_then(|v| v.as_str().map(|s| s.to_string()));
-
+ 
                 if let Some(path) = file_path {
                     let mut w_manager = manager.write().await;
                     match w_manager.add_kubeconfig_file(&path).await {
@@ -118,19 +142,43 @@ pub fn dispatch(
                             let clusters = w_manager.get_clusters();
                             let active_cluster_id = w_manager.active_context.clone();
                             let client = w_manager.active_client.clone();
-                            drop(w_manager);
 
+                            if let Some(cancel) = w_manager.watch_cancel.take() {
+                                let _ = cancel.send(true);
+                            }
+                            let (tx, rx) = tokio::sync::watch::channel(false);
+                            w_manager.watch_cancel = Some(tx);
+                            drop(w_manager);
+ 
                             let _ = Bridge::send_event(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ClustersUpdated { clusters },
                             ).await;
-
+ 
                             let _ = Bridge::send_event(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ActiveClusterChanged { active_cluster_id },
                             ).await;
+
+                            // Spawn new watchers
+                            if let Some(ref client) = client {
+                                let writer_c = writer.clone();
+                                let token_c = token.clone();
+                                let client_c = client.clone();
+                                let rx_c = rx.clone();
+                                tokio::spawn(async move {
+                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
+                                        client_c,
+                                        writer_c,
+                                        token_c,
+                                        "Service".to_string(),
+                                        rx_c,
+                                        crate::kubernetes::services::map_service,
+                                    ).await;
+                                });
+                            }
 
                             // Refresh all resources for the new active client
                             if let Some(ref client) = client {

@@ -92,6 +92,12 @@ pub enum OrbitEvent {
     PoliciesUpdated {
         policies: Vec<crate::kubernetes::models::PolicyInfo>,
     },
+    #[serde(rename = "resourceUpdated")]
+    ResourceUpdated {
+        kind: String,
+        action: String,
+        data: serde_json::Value,
+    },
     #[serde(rename = "errorOccurred")]
     ErrorOccurred {
         message: String,

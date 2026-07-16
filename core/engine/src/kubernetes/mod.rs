@@ -10,6 +10,7 @@ pub mod services;
 pub mod namespaces;
 pub mod events;
 pub mod policies;
+pub mod watchers;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;

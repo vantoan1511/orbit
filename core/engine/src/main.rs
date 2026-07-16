@@ -38,9 +38,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Also send initial clusters list and active context
     {
-        let manager = kube_manager.read().await;
+        let mut manager = kube_manager.write().await;
         let clusters = manager.get_clusters();
         let active_cluster_id = manager.active_context.clone();
+        let client = manager.active_client.clone();
 
         let _ = Bridge::send_event(
             &bridge.writer,
@@ -53,6 +54,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &bridge.token,
             &OrbitEvent::ActiveClusterChanged { active_cluster_id },
         ).await;
+
+        if let Some(cancel) = manager.watch_cancel.take() {
+            let _ = cancel.send(true);
+        }
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        manager.watch_cancel = Some(tx);
+
+        if let Some(ref client) = client {
+            let writer_c = bridge.writer.clone();
+            let token_c = bridge.token.clone();
+            let client_c = client.clone();
+            tokio::spawn(async move {
+                kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
+                    client_c,
+                    writer_c,
+                    token_c,
+                    "Service".to_string(),
+                    rx,
+                    kubernetes::services::map_service,
+                ).await;
+            });
+        }
     }
 
     // Message processing loop

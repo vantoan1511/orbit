@@ -97,6 +97,12 @@ export interface OrbitEventMap {
   policiesUpdated: {
     policies: PolicyInfo[]
   }
+  resourceUpdated: {
+    kind: string
+    action: 'Applied' | 'Deleted'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    data: any
+  }
   errorOccurred: {
     message: string
   }
@@ -136,6 +142,7 @@ export const OrbitEvents = {
   PersistentVolumeClaimsUpdated: 'persistentVolumeClaimsUpdated',
   StorageClassesUpdated: 'storageClassesUpdated',
   PoliciesUpdated: 'policiesUpdated',
+  ResourceUpdated: 'resourceUpdated',
   ErrorOccurred: 'errorOccurred',
   UpdateCheckFinished: 'updateCheckFinished',
   UpdateDownloadProgress: 'updateDownloadProgress',

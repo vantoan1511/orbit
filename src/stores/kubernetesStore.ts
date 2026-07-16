@@ -1,4 +1,5 @@
 import { kubernetesService } from '@/services/kubernetesService'
+import { events as nativeEvents } from '@/services/nativeService'
 import type {
   ClusterInfo,
   ConfigMapInfo,
@@ -310,6 +311,23 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       await fetchPolicies()
     }
   }
+
+  nativeEvents.on('resourceUpdated', (payload) => {
+    const { kind, action, data } = payload
+    if (kind === 'Service') {
+      const svc = data as ServiceInfo
+      if (action === 'Applied') {
+        const index = services.value.findIndex((s) => s.uid === svc.uid)
+        if (index !== -1) {
+          services.value[index] = svc
+        } else {
+          services.value.push(svc)
+        }
+      } else if (action === 'Deleted') {
+        services.value = services.value.filter((s) => s.uid !== svc.uid)
+      }
+    }
+  })
 
   return {
     isEngineReady,
