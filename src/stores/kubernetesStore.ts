@@ -354,6 +354,16 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   })
 
+  nativeEvents.on('podMetricsUpdated', (payload) => {
+    for (const m of payload.metrics) {
+      const pod = pods.value.find((p) => p.name === m.name && p.namespace === m.namespace)
+      if (pod) {
+        pod.cpu = m.cpu
+        pod.memory = m.memory
+      }
+    }
+  })
+
   return {
     isEngineReady,
     pods,

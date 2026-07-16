@@ -128,7 +128,7 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
     Ok(list)
 }
 
-fn parse_cpu_quantity(q: &str) -> f64 {
+pub(crate) fn parse_cpu_quantity(q: &str) -> f64 {
     let q = q.trim();
     if let Some(stripped) = q.strip_suffix('m') {
         stripped.parse::<f64>().unwrap_or(0.0) / 1000.0
@@ -137,7 +137,7 @@ fn parse_cpu_quantity(q: &str) -> f64 {
     }
 }
 
-fn parse_memory_quantity(q: &str) -> f64 {
+pub(crate) fn parse_memory_quantity(q: &str) -> f64 {
     let q = q.trim();
     if q.is_empty() {
         return 0.0;

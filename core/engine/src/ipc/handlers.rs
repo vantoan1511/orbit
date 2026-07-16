@@ -113,6 +113,18 @@ pub fn dispatch(
                                         crate::kubernetes::workloads::map_pod,
                                     ).await;
                                 });
+                                let writer_m = writer.clone();
+                                let token_m = token.clone();
+                                let client_m = client.clone();
+                                let rx_m = rx.clone();
+                                tokio::spawn(async move {
+                                    crate::kubernetes::metrics::poll_pod_metrics(
+                                        client_m,
+                                        writer_m,
+                                        token_m,
+                                        rx_m,
+                                    ).await;
+                                });
                             }
 
                             // Refresh all resources for the new active client
@@ -232,6 +244,18 @@ pub fn dispatch(
                                         "Pod".to_string(),
                                         rx_p,
                                         crate::kubernetes::workloads::map_pod,
+                                    ).await;
+                                });
+                                let writer_m = writer.clone();
+                                let token_m = token.clone();
+                                let client_m = client.clone();
+                                let rx_m = rx.clone();
+                                tokio::spawn(async move {
+                                    crate::kubernetes::metrics::poll_pod_metrics(
+                                        client_m,
+                                        writer_m,
+                                        token_m,
+                                        rx_m,
                                     ).await;
                                 });
                             }

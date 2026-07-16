@@ -104,6 +104,18 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     kubernetes::workloads::map_pod,
                 ).await;
             });
+            let writer_m = bridge.writer.clone();
+            let token_m = bridge.token.clone();
+            let client_m = client.clone();
+            let rx_m = rx.clone();
+            tokio::spawn(async move {
+                kubernetes::metrics::poll_pod_metrics(
+                    client_m,
+                    writer_m,
+                    token_m,
+                    rx_m,
+                ).await;
+            });
         }
     }
 

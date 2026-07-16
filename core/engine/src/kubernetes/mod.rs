@@ -11,6 +11,7 @@ pub mod namespaces;
 pub mod events;
 pub mod policies;
 pub mod watchers;
+pub mod metrics;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;

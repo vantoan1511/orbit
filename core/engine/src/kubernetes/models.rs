@@ -308,3 +308,12 @@ pub struct PolicyInfo {
     pub description: String,
     pub rules: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PodMetricItem {
+    pub name: String,
+    pub namespace: String,
+    pub cpu: String,
+    pub memory: String,
+}
