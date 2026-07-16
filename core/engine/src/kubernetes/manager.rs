@@ -5,6 +5,7 @@ pub struct KubeManager {
     pub kubeconfig: Option<Kubeconfig>,
     pub active_context: Option<String>,
     pub active_client: Option<Client>,
+    pub watch_cancel: Option<tokio::sync::watch::Sender<bool>>,
 }
 
 impl KubeManager {
@@ -13,6 +14,7 @@ impl KubeManager {
             kubeconfig: None,
             active_context: None,
             active_client: None,
+            watch_cancel: None,
         };
         
         // Try reading default kubeconfig
