@@ -313,13 +313,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   nativeEvents.on('resourceUpdated', (payload) => {
+    console.log('[Real-Time] Resource Updated:', payload)
     const { kind, action, data } = payload
     if (kind === 'Service') {
       const svc = data as ServiceInfo
       if (action === 'Applied') {
         const index = services.value.findIndex((s) => s.uid === svc.uid)
         if (index !== -1) {
-          services.value[index] = svc
+          services.value.splice(index, 1, svc)
         } else {
           services.value.push(svc)
         }

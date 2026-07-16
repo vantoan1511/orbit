@@ -40,6 +40,7 @@ pub async fn watch_resource<K, M, F>(
                     Some(Ok(watcher::Event::Apply(obj))) | Some(Ok(watcher::Event::InitApply(obj))) => {
                         let mapped = mapper(&obj);
                         if let Ok(data) = serde_json::to_value(&mapped) {
+                            let _ = std::fs::write("orbit_watcher_debug.log", format!("Applied: {:?}", data));
                             let _ = Bridge::send_event(
                                 &writer,
                                 &ipc_token,
@@ -54,6 +55,7 @@ pub async fn watch_resource<K, M, F>(
                     Some(Ok(watcher::Event::Delete(obj))) => {
                         let mapped = mapper(&obj);
                         if let Ok(data) = serde_json::to_value(&mapped) {
+                            let _ = std::fs::write("orbit_watcher_debug.log", format!("Deleted: {:?}", data));
                             let _ = Bridge::send_event(
                                 &writer,
                                 &ipc_token,
