@@ -327,6 +327,30 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       } else if (action === 'Deleted') {
         services.value = services.value.filter((s) => s.uid !== svc.uid)
       }
+    } else if (kind === 'Deployment') {
+      const dep = data as DeploymentInfo
+      if (action === 'Applied') {
+        const index = deployments.value.findIndex((d) => d.name === dep.name && d.namespace === dep.namespace)
+        if (index !== -1) {
+          deployments.value.splice(index, 1, dep)
+        } else {
+          deployments.value.push(dep)
+        }
+      } else if (action === 'Deleted') {
+        deployments.value = deployments.value.filter((d) => !(d.name === dep.name && d.namespace === dep.namespace))
+      }
+    } else if (kind === 'Pod') {
+      const pod = data as PodInfo
+      if (action === 'Applied') {
+        const index = pods.value.findIndex((p) => p.name === pod.name && p.namespace === pod.namespace)
+        if (index !== -1) {
+          pods.value.splice(index, 1, pod)
+        } else {
+          pods.value.push(pod)
+        }
+      } else if (action === 'Deleted') {
+        pods.value = pods.value.filter((p) => !(p.name === pod.name && p.namespace === pod.namespace))
+      }
     }
   })
 

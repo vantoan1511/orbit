@@ -6,6 +6,26 @@ use k8s_openapi::api::core::v1::Pod;
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use crate::kubernetes::{models, format_age};
 
+pub fn map_pod(p: &Pod) -> models::PodInfo {
+    let name = p.metadata.name.clone().unwrap_or_default();
+    let namespace_name = p.metadata.namespace.clone().unwrap_or_default();
+
+    let status = p.status.as_ref()
+        .and_then(|s| s.phase.clone())
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    let age = format_age(&p.metadata.creation_timestamp);
+
+    models::PodInfo {
+        name,
+        namespace: namespace_name,
+        status,
+        age,
+        cpu: None,
+        memory: None,
+    }
+}
+
 pub async fn list_pods(client: &Client, namespace: Option<String>) -> Result<Vec<models::PodInfo>, kube::Error> {
     let pods: Api<Pod> = if let Some(ns) = namespace {
         Api::namespaced(client.clone(), &ns)
@@ -15,26 +35,71 @@ pub async fn list_pods(client: &Client, namespace: Option<String>) -> Result<Vec
 
     let mut pod_list = Vec::new();
     for p in pods.list(&ListParams::default()).await? {
-        let name = p.metadata.name.clone().unwrap_or_default();
-        let namespace_name = p.metadata.namespace.clone().unwrap_or_default();
-
-        let status = p.status.as_ref()
-            .and_then(|s| s.phase.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        let age = format_age(&p.metadata.creation_timestamp);
-
-        pod_list.push(models::PodInfo {
-            name,
-            namespace: namespace_name,
-            status,
-            age,
-            cpu: None,
-            memory: None,
-        });
+        pod_list.push(map_pod(&p));
     }
 
     Ok(pod_list)
+}
+
+pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
+    let name = d.metadata.name.clone().unwrap_or_default();
+    let namespace_name = d.metadata.namespace.clone().unwrap_or_default();
+
+    let age = format_age(&d.metadata.creation_timestamp);
+
+    let desired = d.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
+    let status_replicas = d.status.as_ref();
+    let current = status_replicas.and_then(|s| s.replicas).unwrap_or(0);
+    let available = status_replicas.and_then(|s| s.available_replicas).unwrap_or(0);
+    let up_to_date = status_replicas.and_then(|s| s.updated_replicas).unwrap_or(0);
+
+    let replicas = models::Replicas { current, desired };
+
+    let mut status = "Progressing".to_string();
+    if (desired == 0 && current == 0) || available == desired {
+        status = "Running".to_string();
+    } else if let Some(conds) = status_replicas.and_then(|st| st.conditions.as_ref()) {
+        for c in conds {
+            if c.type_ == "ReplicaFailure" && c.status == "True" {
+                status = "Failed".to_string();
+            }
+        }
+    }
+
+    let mut images = Vec::new();
+    if let Some(spec) = d.spec.as_ref() {
+        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
+            if let Some(img) = &c.image {
+                images.push(img.clone());
+            }
+        }
+    }
+
+    let strategy = d.spec.as_ref()
+        .and_then(|s| s.strategy.as_ref())
+        .and_then(|strt| strt.type_.clone());
+
+    let min_ready_seconds = d.spec.as_ref().and_then(|s| s.min_ready_seconds).unwrap_or(0);
+    let revision_history = d.spec.as_ref().and_then(|s| s.revision_history_limit);
+
+    let labels = d.metadata.labels.clone().unwrap_or_default();
+    let annotations = d.metadata.annotations.clone().unwrap_or_default();
+
+    models::DeploymentInfo {
+        name,
+        namespace: namespace_name,
+        status,
+        replicas,
+        available,
+        up_to_date,
+        age,
+        images,
+        strategy,
+        min_ready_seconds,
+        revision_history,
+        labels,
+        annotations,
+    }
 }
 
 pub async fn list_deployments(client: &Client, namespace: Option<String>) -> Result<Vec<models::DeploymentInfo>, kube::Error> {
@@ -46,64 +111,7 @@ pub async fn list_deployments(client: &Client, namespace: Option<String>) -> Res
 
     let mut list = Vec::new();
     for d in api.list(&ListParams::default()).await? {
-        let name = d.metadata.name.clone().unwrap_or_default();
-        let namespace_name = d.metadata.namespace.clone().unwrap_or_default();
-
-        let age = format_age(&d.metadata.creation_timestamp);
-
-        let desired = d.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
-        let status_replicas = d.status.as_ref();
-        let current = status_replicas.and_then(|s| s.replicas).unwrap_or(0);
-        let available = status_replicas.and_then(|s| s.available_replicas).unwrap_or(0);
-        let up_to_date = status_replicas.and_then(|s| s.updated_replicas).unwrap_or(0);
-
-        let replicas = models::Replicas { current, desired };
-
-        let mut status = "Progressing".to_string();
-        if (desired == 0 && current == 0) || available == desired {
-            status = "Running".to_string();
-        } else if let Some(conds) = status_replicas.and_then(|st| st.conditions.as_ref()) {
-            for c in conds {
-                if c.type_ == "ReplicaFailure" && c.status == "True" {
-                    status = "Failed".to_string();
-                }
-            }
-        }
-
-        let mut images = Vec::new();
-        if let Some(spec) = d.spec.as_ref() {
-            for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-                if let Some(img) = &c.image {
-                    images.push(img.clone());
-                }
-            }
-        }
-
-        let strategy = d.spec.as_ref()
-            .and_then(|s| s.strategy.as_ref())
-            .and_then(|strt| strt.type_.clone());
-
-        let min_ready_seconds = d.spec.as_ref().and_then(|s| s.min_ready_seconds).unwrap_or(0);
-        let revision_history = d.spec.as_ref().and_then(|s| s.revision_history_limit);
-
-        let labels = d.metadata.labels.clone().unwrap_or_default();
-        let annotations = d.metadata.annotations.clone().unwrap_or_default();
-
-        list.push(models::DeploymentInfo {
-            name,
-            namespace: namespace_name,
-            status,
-            replicas,
-            available,
-            up_to_date,
-            age,
-            images,
-            strategy,
-            min_ready_seconds,
-            revision_history,
-            labels,
-            annotations,
-        });
+        list.push(map_deployment(&d));
     }
 
     Ok(list)

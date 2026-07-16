@@ -7,8 +7,8 @@
   "author": "Toan Nguyen",
   "copyright": "Copyright © Toan Nguyen 2026. All rights reserved.",
   "defaultMode": "window",
-  "storageLocation": "system",
-  "dataLocation": "system",
+  "storageLocation": "app",
+  "dataLocation": "app",
   "documentRoot": "/build/",
   "logging": {
     "enabled": true,
@@ -20,7 +20,7 @@
   "enableNativeAPI": true,
   "singlePageServe": true,
   "enableExtensions": true,
-  "tokenSecurity": "one-time",
+  "tokenSecurity": "none",
   "nativeAllowList": [
     "filesystem.readDirectory",
     "extensions.getStats",
@@ -46,7 +46,7 @@
       "minHeight": 720,
       "center": true,
       "icon": "/public/icon.png",
-      "enableInspector": false
+      "enableInspector": true
     }
   },
   "cli": {
