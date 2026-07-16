@@ -62,17 +62,46 @@ async fn main() -> Result<(), Box<dyn Error>> {
         manager.watch_cancel = Some(tx);
 
         if let Some(ref client) = client {
-            let writer_c = bridge.writer.clone();
-            let token_c = bridge.token.clone();
-            let client_c = client.clone();
+            let writer_s = bridge.writer.clone();
+            let token_s = bridge.token.clone();
+            let client_s = client.clone();
+            let rx_s = rx.clone();
             tokio::spawn(async move {
                 kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
-                    client_c,
-                    writer_c,
-                    token_c,
+                    client_s,
+                    writer_s,
+                    token_s,
                     "Service".to_string(),
-                    rx,
+                    rx_s,
                     kubernetes::services::map_service,
+                ).await;
+            });
+            let writer_d = bridge.writer.clone();
+            let token_d = bridge.token.clone();
+            let client_d = client.clone();
+            let rx_d = rx.clone();
+            tokio::spawn(async move {
+                kubernetes::watchers::watch_resource::<k8s_openapi::api::apps::v1::Deployment, _, _>(
+                    client_d,
+                    writer_d,
+                    token_d,
+                    "Deployment".to_string(),
+                    rx_d,
+                    kubernetes::workloads::map_deployment,
+                ).await;
+            });
+            let writer_p = bridge.writer.clone();
+            let token_p = bridge.token.clone();
+            let client_p = client.clone();
+            let rx_p = rx.clone();
+            tokio::spawn(async move {
+                kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Pod, _, _>(
+                    client_p,
+                    writer_p,
+                    token_p,
+                    "Pod".to_string(),
+                    rx_p,
+                    kubernetes::workloads::map_pod,
                 ).await;
             });
         }
