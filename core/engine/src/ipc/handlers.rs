@@ -15,34 +15,30 @@ pub fn spawn_watchers(
     token: String,
     rx: tokio::sync::watch::Receiver<bool>,
 ) {
-    let (writer_s, token_s, client_s, rx_s) = (writer.clone(), token.clone(), client.clone(), rx.clone());
-    tokio::spawn(async move {
-        crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
-            client_s, writer_s, token_s, "Service".to_string(), rx_s,
-            crate::kubernetes::services::map_service,
-        ).await;
-    });
+    tokio::spawn(crate::kubernetes::watchers::watch_resource::<
+        k8s_openapi::api::core::v1::Service, _, _,
+    >(
+        client.clone(), writer.clone(), token.clone(), "Service".to_string(), rx.clone(),
+        crate::kubernetes::services::map_service,
+    ));
 
-    let (writer_d, token_d, client_d, rx_d) = (writer.clone(), token.clone(), client.clone(), rx.clone());
-    tokio::spawn(async move {
-        crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::apps::v1::Deployment, _, _>(
-            client_d, writer_d, token_d, "Deployment".to_string(), rx_d,
-            crate::kubernetes::workloads::map_deployment,
-        ).await;
-    });
+    tokio::spawn(crate::kubernetes::watchers::watch_resource::<
+        k8s_openapi::api::apps::v1::Deployment, _, _,
+    >(
+        client.clone(), writer.clone(), token.clone(), "Deployment".to_string(), rx.clone(),
+        crate::kubernetes::workloads::map_deployment,
+    ));
 
-    let (writer_p, token_p, client_p, rx_p) = (writer.clone(), token.clone(), client.clone(), rx.clone());
-    tokio::spawn(async move {
-        crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Pod, _, _>(
-            client_p, writer_p, token_p, "Pod".to_string(), rx_p,
-            crate::kubernetes::workloads::map_pod,
-        ).await;
-    });
+    tokio::spawn(crate::kubernetes::watchers::watch_resource::<
+        k8s_openapi::api::core::v1::Pod, _, _,
+    >(
+        client.clone(), writer.clone(), token.clone(), "Pod".to_string(), rx.clone(),
+        crate::kubernetes::workloads::map_pod,
+    ));
 
-    let (writer_m, token_m, client_m, rx_m) = (writer.clone(), token.clone(), client.clone(), rx.clone());
-    tokio::spawn(async move {
-        crate::kubernetes::metrics::poll_pod_metrics(client_m, writer_m, token_m, rx_m).await;
-    });
+    tokio::spawn(crate::kubernetes::metrics::poll_pod_metrics(
+        client.clone(), writer, token, rx,
+    ));
 }
 
 /// Dispatches an IPC event from the frontend to the appropriate Kubernetes handler.
