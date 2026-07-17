@@ -27,6 +27,7 @@
     "extensions.dispatch",
     "app.broadcast",
     "app.exit",
+    "app.getConfig",
     "events.on",
     "events.off",
     "events.dispatch",
