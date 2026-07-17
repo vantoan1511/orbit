@@ -100,8 +100,7 @@ export interface OrbitEventMap {
   resourceUpdated: {
     kind: string
     action: 'Applied' | 'Deleted'
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    data: any
+    data: ServiceInfo | DeploymentInfo | PodInfo
   }
   podMetricsUpdated: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>

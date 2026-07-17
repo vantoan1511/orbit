@@ -21,7 +21,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import { defineStore } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
@@ -312,7 +312,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  nativeEvents.on('resourceUpdated', (payload) => {
+  function onResourceUpdated(payload: { kind: string; action: 'Applied' | 'Deleted'; data: ServiceInfo | DeploymentInfo | PodInfo }) {
     const { kind, action, data } = payload
     if (kind === 'Service') {
       const svc = data as ServiceInfo
@@ -329,31 +329,39 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     } else if (kind === 'Deployment') {
       const dep = data as DeploymentInfo
       if (action === 'Applied') {
-        const index = deployments.value.findIndex((d) => d.name === dep.name && d.namespace === dep.namespace)
+        const index = deployments.value.findIndex(
+          (d) => d.name === dep.name && d.namespace === dep.namespace
+        )
         if (index !== -1) {
           deployments.value.splice(index, 1, dep)
         } else {
           deployments.value.push(dep)
         }
       } else if (action === 'Deleted') {
-        deployments.value = deployments.value.filter((d) => !(d.name === dep.name && d.namespace === dep.namespace))
+        deployments.value = deployments.value.filter(
+          (d) => !(d.name === dep.name && d.namespace === dep.namespace)
+        )
       }
     } else if (kind === 'Pod') {
       const pod = data as PodInfo
       if (action === 'Applied') {
-        const index = pods.value.findIndex((p) => p.name === pod.name && p.namespace === pod.namespace)
+        const index = pods.value.findIndex(
+          (p) => p.name === pod.name && p.namespace === pod.namespace
+        )
         if (index !== -1) {
           pods.value.splice(index, 1, pod)
         } else {
           pods.value.push(pod)
         }
       } else if (action === 'Deleted') {
-        pods.value = pods.value.filter((p) => !(p.name === pod.name && p.namespace === pod.namespace))
+        pods.value = pods.value.filter(
+          (p) => !(p.name === pod.name && p.namespace === pod.namespace)
+        )
       }
     }
-  })
+  }
 
-  nativeEvents.on('podMetricsUpdated', (payload) => {
+  function onPodMetricsUpdated(payload: { metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }> }) {
     for (const m of payload.metrics) {
       const pod = pods.value.find((p) => p.name === m.name && p.namespace === m.namespace)
       if (pod) {
@@ -361,6 +369,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         pod.memory = m.memory
       }
     }
+  }
+
+  nativeEvents.on('resourceUpdated', onResourceUpdated)
+  nativeEvents.on('podMetricsUpdated', onPodMetricsUpdated)
+
+  onScopeDispose(() => {
+    nativeEvents.off('resourceUpdated', onResourceUpdated)
+    nativeEvents.off('podMetricsUpdated', onPodMetricsUpdated)
   })
 
   return {
