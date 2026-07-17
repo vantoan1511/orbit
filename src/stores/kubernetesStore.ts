@@ -313,7 +313,6 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   nativeEvents.on('resourceUpdated', (payload) => {
-    console.log('[Real-Time] Resource Updated:', payload)
     const { kind, action, data } = payload
     if (kind === 'Service') {
       const svc = data as ServiceInfo

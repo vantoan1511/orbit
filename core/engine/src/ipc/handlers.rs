@@ -7,6 +7,44 @@ use crate::kubernetes;
 use crate::kubernetes::manager::KubeManager;
 use tokio::sync::Mutex;
 
+/// Spawns all background watchers and the metrics poller for a connected cluster.
+/// Called when the engine starts up and whenever the active cluster changes.
+pub fn spawn_watchers(
+    client: &kube::Client,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    rx: tokio::sync::watch::Receiver<bool>,
+) {
+    let (writer_s, token_s, client_s, rx_s) = (writer.clone(), token.clone(), client.clone(), rx.clone());
+    tokio::spawn(async move {
+        crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
+            client_s, writer_s, token_s, "Service".to_string(), rx_s,
+            crate::kubernetes::services::map_service,
+        ).await;
+    });
+
+    let (writer_d, token_d, client_d, rx_d) = (writer.clone(), token.clone(), client.clone(), rx.clone());
+    tokio::spawn(async move {
+        crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::apps::v1::Deployment, _, _>(
+            client_d, writer_d, token_d, "Deployment".to_string(), rx_d,
+            crate::kubernetes::workloads::map_deployment,
+        ).await;
+    });
+
+    let (writer_p, token_p, client_p, rx_p) = (writer.clone(), token.clone(), client.clone(), rx.clone());
+    tokio::spawn(async move {
+        crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Pod, _, _>(
+            client_p, writer_p, token_p, "Pod".to_string(), rx_p,
+            crate::kubernetes::workloads::map_pod,
+        ).await;
+    });
+
+    let (writer_m, token_m, client_m, rx_m) = (writer.clone(), token.clone(), client.clone(), rx.clone());
+    tokio::spawn(async move {
+        crate::kubernetes::metrics::poll_pod_metrics(client_m, writer_m, token_m, rx_m).await;
+    });
+}
+
 /// Dispatches an IPC event from the frontend to the appropriate Kubernetes handler.
 /// Each arm spawns an async task so the message loop is never blocked.
 pub fn dispatch(
@@ -69,62 +107,9 @@ pub fn dispatch(
                                 &OrbitEvent::ClustersUpdated { clusters },
                             ).await;
 
-                            // Spawn new watchers
+                            // Spawn watchers and metrics poller for the new cluster.
                             if let Some(ref client) = client {
-                                let writer_s = writer.clone();
-                                let token_s = token.clone();
-                                let client_s = client.clone();
-                                let rx_s = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
-                                        client_s,
-                                        writer_s,
-                                        token_s,
-                                        "Service".to_string(),
-                                        rx_s,
-                                        crate::kubernetes::services::map_service,
-                                    ).await;
-                                });
-                                let writer_d = writer.clone();
-                                let token_d = token.clone();
-                                let client_d = client.clone();
-                                let rx_d = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::apps::v1::Deployment, _, _>(
-                                        client_d,
-                                        writer_d,
-                                        token_d,
-                                        "Deployment".to_string(),
-                                        rx_d,
-                                        crate::kubernetes::workloads::map_deployment,
-                                    ).await;
-                                });
-                                let writer_p = writer.clone();
-                                let token_p = token.clone();
-                                let client_p = client.clone();
-                                let rx_p = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Pod, _, _>(
-                                        client_p,
-                                        writer_p,
-                                        token_p,
-                                        "Pod".to_string(),
-                                        rx_p,
-                                        crate::kubernetes::workloads::map_pod,
-                                    ).await;
-                                });
-                                let writer_m = writer.clone();
-                                let token_m = token.clone();
-                                let client_m = client.clone();
-                                let rx_m = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::metrics::poll_pod_metrics(
-                                        client_m,
-                                        writer_m,
-                                        token_m,
-                                        rx_m,
-                                    ).await;
-                                });
+                                spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
                             }
 
                             // Refresh all resources for the new active client
@@ -202,62 +187,9 @@ pub fn dispatch(
                                 &OrbitEvent::ActiveClusterChanged { active_cluster_id },
                             ).await;
 
-                            // Spawn new watchers
+                            // Spawn watchers and metrics poller for the new cluster.
                             if let Some(ref client) = client {
-                                let writer_s = writer.clone();
-                                let token_s = token.clone();
-                                let client_s = client.clone();
-                                let rx_s = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Service, _, _>(
-                                        client_s,
-                                        writer_s,
-                                        token_s,
-                                        "Service".to_string(),
-                                        rx_s,
-                                        crate::kubernetes::services::map_service,
-                                    ).await;
-                                });
-                                let writer_d = writer.clone();
-                                let token_d = token.clone();
-                                let client_d = client.clone();
-                                let rx_d = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::apps::v1::Deployment, _, _>(
-                                        client_d,
-                                        writer_d,
-                                        token_d,
-                                        "Deployment".to_string(),
-                                        rx_d,
-                                        crate::kubernetes::workloads::map_deployment,
-                                    ).await;
-                                });
-                                let writer_p = writer.clone();
-                                let token_p = token.clone();
-                                let client_p = client.clone();
-                                let rx_p = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::watchers::watch_resource::<k8s_openapi::api::core::v1::Pod, _, _>(
-                                        client_p,
-                                        writer_p,
-                                        token_p,
-                                        "Pod".to_string(),
-                                        rx_p,
-                                        crate::kubernetes::workloads::map_pod,
-                                    ).await;
-                                });
-                                let writer_m = writer.clone();
-                                let token_m = token.clone();
-                                let client_m = client.clone();
-                                let rx_m = rx.clone();
-                                tokio::spawn(async move {
-                                    crate::kubernetes::metrics::poll_pod_metrics(
-                                        client_m,
-                                        writer_m,
-                                        token_m,
-                                        rx_m,
-                                    ).await;
-                                });
+                                spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
                             }
 
                             // Refresh all resources for the new active client
