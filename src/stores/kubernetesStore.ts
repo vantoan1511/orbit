@@ -46,6 +46,16 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const persistentVolumes = ref<PersistentVolumeInfo[]>([])
   const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
   const storageClasses = ref<StorageClassInfo[]>([])
+
+  interface NamespacedResource {
+    name: string
+    namespace: string
+  }
+
+  interface ClusterScopedResource {
+    name?: string
+    uid?: string
+  }
   const persistentVolumesLoading = ref(false)
   const persistentVolumeClaimsLoading = ref(false)
   const storageClassesLoading = ref(false)
@@ -343,16 +353,6 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     data: ResourceInfo
   }) {
     const { kind, action, data } = payload
-
-    interface NamespacedResource {
-      name: string
-      namespace: string
-    }
-
-    interface ClusterScopedResource {
-      name?: string
-      uid?: string
-    }
 
     // Helper to update a namespaced list
     const updateNamespaced = <T extends NamespacedResource>(listRef: { value: T[] }, item: T) => {
