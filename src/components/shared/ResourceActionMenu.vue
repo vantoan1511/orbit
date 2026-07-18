@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
-import type { ActionMenuItem } from '@/composables/useWorkloadActions'
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{
-  items: ActionMenuItem[]
+  items: MenuItem[]
 }>()
 
 const menuModel = computed(() => props.items as unknown as MenuItem[])
@@ -35,7 +34,7 @@ defineExpose({
         :class="[item.class]"
         @click="item.command?.({ originalEvent: $event, item })"
       >
-        <component v-if="item.icon" :is="item.icon" class="w-4 h-4 shrink-0" />
+        <i v-if="item.icon" :class="item.icon" class="w-4 h-4 shrink-0" />
         <span>{{ item.label }}</span>
       </button>
     </template>
