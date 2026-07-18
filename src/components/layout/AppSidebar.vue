@@ -22,7 +22,7 @@ import { Button } from 'primevue'
 import { useRoute } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
-const { handleAddCluster } = useCluster()
+const { activeCluster, handleAddCluster } = useCluster()
 
 const handleSwitchCluster = async (clusterId: string) => {
   await kubernetesService.switchCluster(clusterId)
@@ -71,7 +71,13 @@ const { isDark, toggleTheme } = useTheme()
           :key="cluster.id"
           :label="cluster.name"
           :icon="k8sStore.activeClusterId === cluster.id ? 'pi pi-circle-fill' : ''"
-          :severity="k8sStore.activeClusterId === cluster.id ? 'success' : 'secondary'"
+          :severity="
+            k8sStore.activeClusterId === cluster.id
+              ? activeCluster?.status === 'healthy'
+                ? 'success'
+                : 'danger'
+              : 'secondary'
+          "
           fluid
           class="truncate justify-start text-xs"
           variant="text"

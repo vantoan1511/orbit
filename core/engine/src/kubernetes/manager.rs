@@ -6,6 +6,7 @@ pub struct KubeManager {
     pub active_context: Option<String>,
     pub active_client: Option<Client>,
     pub watch_cancel: Option<tokio::sync::watch::Sender<bool>>,
+    pub active_context_healthy: bool,
 }
 
 impl KubeManager {
@@ -15,6 +16,7 @@ impl KubeManager {
             active_context: None,
             active_client: None,
             watch_cancel: None,
+            active_context_healthy: false,
         };
         
         // Try reading default kubeconfig
@@ -31,7 +33,11 @@ impl KubeManager {
         if let Some(ref config) = self.kubeconfig {
             for ctx in &config.contexts {
                 let status = if Some(&ctx.name) == self.active_context.as_ref() {
-                    "healthy".to_string()
+                    if self.active_context_healthy {
+                        "healthy".to_string()
+                    } else {
+                        "offline".to_string()
+                    }
                 } else {
                     "offline".to_string()
                 };
@@ -43,6 +49,14 @@ impl KubeManager {
             }
         }
         clusters
+    }
+
+    pub async fn refresh_active_cluster_health(&mut self) {
+        if let Some(ref client) = self.active_client {
+            self.active_context_healthy = client.apiserver_version().await.is_ok();
+        } else {
+            self.active_context_healthy = false;
+        }
     }
 
     pub async fn switch_context(&mut self, context_name: &str) -> Result<(), String> {
@@ -60,8 +74,12 @@ impl KubeManager {
         let client = Client::try_from(config)
             .map_err(|e| format!("Failed to build client: {}", e))?;
             
+        // Test connection
+        let healthy = client.apiserver_version().await.is_ok();
+        
         self.active_context = Some(context_name.to_string());
         self.active_client = Some(client);
+        self.active_context_healthy = healthy;
         
         Ok(())
     }

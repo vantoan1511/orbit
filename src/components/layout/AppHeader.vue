@@ -1,17 +1,21 @@
 <script setup lang="ts">
+import { useCluster } from '@/composables/useCluster'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { ChevronDown, Clock, Cloud, RefreshCw } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { Clock, Cloud } from '@lucide/vue'
+import { computed } from 'vue'
 
 const kubernetesStore = useKubernetesStore()
-const isRefreshing = ref(false)
-
-const activeCluster = computed(() => {
-  return kubernetesStore.clusters.find((c) => c.id === kubernetesStore.activeClusterId) || null
-})
+const { activeCluster, isRefreshing, refreshCluster, lastUpdatedAt } = useCluster()
 
 const kubernetesVersion = computed(() => {
   return kubernetesStore.nodes[0]?.version || 'Unknown'
+})
+
+const lastUpdatedDisplay = computed(() => {
+  if (!lastUpdatedAt.value) return 'just now'
+  const diffMs = Date.now() - lastUpdatedAt.value.getTime()
+  const minutes = Math.round(diffMs / 60000)
+  return minutes > 0 ? `${minutes}m ago` : 'just now'
 })
 
 const clusterUptime = computed(() => {
@@ -57,18 +61,6 @@ const cloudProvider = computed(() => {
   }
   return { provider, platform }
 })
-
-const handleRefresh = async () => {
-  if (isRefreshing.value) return
-  isRefreshing.value = true
-  try {
-    await kubernetesStore.loadInitialData()
-  } catch (error) {
-    console.error('Failed to refresh cluster data:', error)
-  } finally {
-    isRefreshing.value = false
-  }
-}
 </script>
 
 <template>
@@ -104,30 +96,22 @@ const handleRefresh = async () => {
       </div>
 
       <!-- Right side: Last updated, Refresh, Actions -->
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-(--text-muted)"> Last updated: 1m ago </span>
-        <button
-          @click="handleRefresh"
-          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) border border-(--border) transition-all duration-200"
-          :class="{ 'animate-spin': isRefreshing }"
+      <div v-if="activeCluster" class="flex items-center gap-3">
+        <span class="text-xs text-(--text-muted)">Last updated: {{ lastUpdatedDisplay }}</span>
+        <Button
+          icon="pi pi-sync"
+          variant="text"
+          size="small"
+          :loading="isRefreshing"
           :disabled="activeCluster === null"
-          title="Refresh"
-        >
-          <RefreshCw class="w-4 h-4" />
-        </button>
-        <button
-          class="px-4 py-2 rounded-lg bg-(--bg-card) hover:bg-(--bg-hover) text-(--text-primary) border border-(--border) text-sm font-medium flex items-center gap-2 transition-all duration-200"
-          :disabled="activeCluster === null"
-        >
-          <span>Actions</span>
-          <ChevronDown class="w-4 h-4 text-(--text-muted)" />
-        </button>
+          @click="refreshCluster"
+        />
       </div>
     </div>
 
-    <!-- Bottom Row (Sub-metadata) — only shown when a cluster is active -->
+    <!-- Bottom Row (Sub-metadata) — only shown when a cluster is active and healthy -->
     <div
-      v-if="activeCluster !== null"
+      v-if="activeCluster !== null && activeCluster.status === 'healthy'"
       class="flex items-center gap-6 text-xs text-(--text-secondary) font-medium"
     >
       <!-- Kubernetes Version -->

@@ -53,6 +53,10 @@ pub fn dispatch(
     match event_name {
         "getClusters" => {
             tokio::spawn(async move {
+                {
+                    let mut w_manager = manager.write().await;
+                    w_manager.refresh_active_cluster_health().await;
+                }
                 let r_manager = manager.read().await;
                 let clusters = r_manager.get_clusters();
                 let active_cluster_id = r_manager.active_context.clone();
