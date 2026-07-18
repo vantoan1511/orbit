@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import Menu from 'primevue/menu'
-import { ref } from 'vue'
+import { ref, type Component } from 'vue'
 
 export interface ActionMenuItem {
   label: string
-  icon?: any
+  icon?: Component
   command?: () => void
   class?: string
 }
@@ -25,7 +25,12 @@ defineExpose({
 </script>
 
 <template>
-  <Menu ref="menuRef" :model="props.items" popup class="min-w-44 bg-(--bg-card) border border-(--border) p-1 rounded-lg shadow-lg">
+  <Menu
+    ref="menuRef"
+    :model="props.items"
+    popup
+    class="min-w-44 bg-(--bg-card) border border-(--border) p-1 rounded-lg shadow-lg"
+  >
     <template #item="{ item, props: menuProps }">
       <button
         v-bind="menuProps.action"
