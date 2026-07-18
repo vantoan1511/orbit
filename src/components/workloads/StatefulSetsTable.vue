@@ -137,7 +137,8 @@ const actionMenuItems = computed(() => [
   {
     label: 'View Logs',
     icon: ScrollText,
-    class: 'text-violet-400 hover:text-violet-300 font-semibold border border-violet-500/20 bg-violet-500/5',
+    class:
+      'text-violet-400 hover:text-violet-300 font-semibold border border-violet-500/20 bg-violet-500/5',
     command: () => {
       toast.add({
         severity: 'info',
