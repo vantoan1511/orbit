@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import { useTableColumns } from '@/composables/useTableColumns'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { PodInfo } from '@/types/kubernetes'
 import { Power, Trash2 } from '@lucide/vue'
@@ -14,7 +15,7 @@ import PodDetailsDrawer from './PodDetailsDrawer.vue'
 const toast = useToast()
 const k8sStore = useKubernetesStore()
 
-const tableColumns = ref<TableColumn[]>([
+const { tableColumns, visibleCols } = useTableColumns([
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'status', header: 'Status', visible: true },
   { field: 'node', header: 'Node', visible: true },
@@ -23,10 +24,6 @@ const tableColumns = ref<TableColumn[]>([
   { field: 'memory', header: 'Memory', visible: true },
   { field: 'age', header: 'Age', visible: true }
 ])
-
-const visibleCols = computed(() =>
-  Object.fromEntries(tableColumns.value.map((col) => [col.field, col.visible]))
-)
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')

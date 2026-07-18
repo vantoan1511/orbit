@@ -7,13 +7,9 @@ import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
 import { computed, ref } from 'vue'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-export interface TableColumn {
-  field: string
-  header: string
-  visible: boolean
-}
+import { type TableColumn } from '@/composables/useTableColumns'
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 const props = withDefaults(
   defineProps<{
     data: any[]

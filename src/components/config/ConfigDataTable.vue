@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import { useTableColumns } from '@/composables/useTableColumns'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import { FileText, Lock, MoreVertical } from '@lucide/vue'
@@ -20,7 +21,7 @@ const props = defineProps<{
 const k8sStore = useKubernetesStore()
 const { configMaps, secrets } = storeToRefs(k8sStore)
 
-const tableColumns = ref<TableColumn[]>([
+const { tableColumns, visibleCols } = useTableColumns([
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'labels', header: 'Labels', visible: true },
   { field: 'type', header: 'Type', visible: true },
@@ -29,10 +30,6 @@ const tableColumns = ref<TableColumn[]>([
   { field: 'mountedPods', header: 'Mounted In', visible: true },
   { field: 'age', header: 'Age', visible: true }
 ])
-
-const visibleCols = computed(() =>
-  Object.fromEntries(tableColumns.value.map((col) => [col.field, col.visible]))
-)
 
 // Filter out 'Type' column from configuration checkboxes when in configmaps tab
 const columnsForConfig = computed(() => {
