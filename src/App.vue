@@ -35,7 +35,6 @@ const toast = useToast()
 const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: string }) => {
   if (payload.status === 'ready') {
     k8sStore.setEngineReady(true)
-    k8sStore.loadInitialData()
   } else {
     k8sStore.setEngineReady(false)
   }

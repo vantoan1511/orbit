@@ -1,5 +1,6 @@
 import { kubernetesService } from '@/services/kubernetesService'
 import { events as nativeEvents } from '@/services/nativeService'
+import { OrbitEvents } from '@/types/events'
 import type {
   ClusterInfo,
   ConfigMapInfo,
@@ -57,7 +58,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   watch(
     nodes,
-    (newNodes) => {
+    (newNodes: NodeInfo[]) => {
       let totalCpu = 0
       let usedCpu = 0
       let totalMem = 0
@@ -198,6 +199,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setActiveClusterId(id: string | null) {
+    if (activeClusterId.value === id) return
     activeClusterId.value = id
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
@@ -218,6 +220,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     policies.value = []
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
+
+    // Load data for the newly selected cluster
+    if (id !== null) {
+      loadInitialData()
+    }
   }
 
   async function fetchConfigMaps(namespace?: string) {
@@ -312,7 +319,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  function onResourceUpdated(payload: { kind: string; action: 'Applied' | 'Deleted'; data: ServiceInfo | DeploymentInfo | PodInfo }) {
+  function onResourceUpdated(payload: {
+    kind: string
+    action: 'Applied' | 'Deleted'
+    data: ServiceInfo | DeploymentInfo | PodInfo
+  }) {
     const { kind, action, data } = payload
     if (kind === 'Service') {
       const svc = data as ServiceInfo
@@ -361,7 +372,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  function onPodMetricsUpdated(payload: { metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }> }) {
+  function onPodMetricsUpdated(payload: {
+    metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
+  }) {
     for (const m of payload.metrics) {
       const pod = pods.value.find((p) => p.name === m.name && p.namespace === m.namespace)
       if (pod) {
@@ -371,12 +384,12 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  nativeEvents.on('resourceUpdated', onResourceUpdated)
-  nativeEvents.on('podMetricsUpdated', onPodMetricsUpdated)
+  nativeEvents.on(OrbitEvents.ResourceUpdated, onResourceUpdated)
+  nativeEvents.on(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
 
   onScopeDispose(() => {
-    nativeEvents.off('resourceUpdated', onResourceUpdated)
-    nativeEvents.off('podMetricsUpdated', onPodMetricsUpdated)
+    nativeEvents.off(OrbitEvents.ResourceUpdated, onResourceUpdated)
+    nativeEvents.off(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
   })
 
   return {

@@ -79,23 +79,28 @@ const handleRefresh = async () => {
     <div class="flex items-center justify-between">
       <!-- Left side: Cluster info & status -->
       <div class="flex items-center gap-4">
-        <h1 class="text-2xl font-bold text-(--text-primary) font-ui tracking-tight">
-          {{ activeCluster?.name || 'Unknown Cluster' }}
+        <template v-if="activeCluster !== null">
+          <h1 class="text-2xl font-bold text-(--text-primary) font-ui tracking-tight">
+            {{ activeCluster.name }}
+          </h1>
+          <div
+            class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200"
+            :class="
+              activeCluster.status === 'healthy'
+                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+            "
+          >
+            <span
+              class="w-1.5 h-1.5 rounded-full"
+              :class="activeCluster.status === 'healthy' ? 'bg-emerald-500' : 'bg-rose-500'"
+            ></span>
+            <span>{{ activeCluster.status === 'healthy' ? 'Healthy' : 'Offline' }}</span>
+          </div>
+        </template>
+        <h1 v-else class="text-2xl font-bold text-(--text-muted) font-ui tracking-tight">
+          No active cluster
         </h1>
-        <div
-          class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200"
-          :class="
-            activeCluster?.status === 'healthy'
-              ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-              : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-          "
-        >
-          <span
-            class="w-1.5 h-1.5 rounded-full"
-            :class="activeCluster?.status === 'healthy' ? 'bg-emerald-500' : 'bg-rose-500'"
-          ></span>
-          <span>{{ activeCluster?.status === 'healthy' ? 'Healthy' : 'Offline' }}</span>
-        </div>
       </div>
 
       <!-- Right side: Last updated, Refresh, Actions -->
@@ -105,12 +110,14 @@ const handleRefresh = async () => {
           @click="handleRefresh"
           class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) border border-(--border) transition-all duration-200"
           :class="{ 'animate-spin': isRefreshing }"
+          :disabled="activeCluster === null"
           title="Refresh"
         >
           <RefreshCw class="w-4 h-4" />
         </button>
         <button
           class="px-4 py-2 rounded-lg bg-(--bg-card) hover:bg-(--bg-hover) text-(--text-primary) border border-(--border) text-sm font-medium flex items-center gap-2 transition-all duration-200"
+          :disabled="activeCluster === null"
         >
           <span>Actions</span>
           <ChevronDown class="w-4 h-4 text-(--text-muted)" />
@@ -118,8 +125,11 @@ const handleRefresh = async () => {
       </div>
     </div>
 
-    <!-- Bottom Row (Sub-metadata) -->
-    <div class="flex items-center gap-6 text-xs text-(--text-secondary) font-medium">
+    <!-- Bottom Row (Sub-metadata) — only shown when a cluster is active -->
+    <div
+      v-if="activeCluster !== null"
+      class="flex items-center gap-6 text-xs text-(--text-secondary) font-medium"
+    >
       <!-- Kubernetes Version -->
       <div class="flex items-center gap-2">
         <!-- SVG Kubernetes Icon -->

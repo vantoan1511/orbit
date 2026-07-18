@@ -15,6 +15,7 @@ declare module 'vue' {
     AppHeader: typeof import('./src/components/layout/AppHeader.vue')['default']
     AppLayout: typeof import('./src/components/layout/AppLayout.vue')['default']
     AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
+    Button: typeof import('primevue/button')['default']
     Column: typeof import('primevue/column')['default']
     ConfigDataTable: typeof import('./src/components/config/ConfigDataTable.vue')['default']
     ConfigDetailsDrawer: typeof import('./src/components/config/ConfigDetailsDrawer.vue')['default']

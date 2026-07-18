@@ -79,10 +79,10 @@ const toggleTheme = () => {
 
 <template>
   <aside
-    class="w-64 bg-[var(--bg-sidebar)] border-r border-[var(--border)] flex flex-col h-screen text-[var(--text-primary)] select-none"
+    class="w-64 bg-(--bg-sidebar) border-r border-(--border) flex flex-col h-screen text-(--text-primary) select-none"
   >
     <!-- Brand Header -->
-    <div class="h-16 px-6 flex items-center gap-3 border-b border-[var(--border)]">
+    <div class="h-16 px-6 flex items-center gap-3 border-b border-(--border)">
       <!-- Orbit Icon Logo -->
       <img src="/logo.png" alt="Orbit Logo" class="w-8 h-8 object-contain" />
 
@@ -90,10 +90,8 @@ const toggleTheme = () => {
     </div>
 
     <!-- Clusters Section -->
-    <div class="p-4 border-b border-[var(--border)]">
-      <div
-        class="text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase mb-2 px-2"
-      >
+    <div class="p-4 border-b border-(--border)">
+      <div class="text-[10px] font-bold text-(--text-muted) tracking-wider uppercase mb-2 px-2">
         Clusters
       </div>
       <div class="flex flex-col gap-1">
@@ -104,22 +102,27 @@ const toggleTheme = () => {
           class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all duration-200"
           :class="[
             k8sStore.activeClusterId === cluster.id
-              ? 'bg-[var(--bg-active)] font-medium text-[var(--text-primary)]'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+              ? 'bg-(--bg-active) font-medium text-(--text-primary)'
+              : 'text-(--text-secondary) hover:bg-(--bg-hover)'
           ]"
         >
           <div class="flex items-center gap-2 truncate">
             <span
-              class="w-2 h-2 rounded-full flex-shrink-0"
+              class="w-2 h-2 rounded-full shrink-0"
               :class="cluster.status === 'healthy' ? 'bg-emerald-500' : 'bg-zinc-500'"
             ></span>
             <span class="truncate">{{ cluster.name }}</span>
           </div>
         </button>
 
+        <!-- Empty state when no clusters are configured -->
+        <p v-if="k8sStore.clusters.length === 0" class="text-xs text-(--text-muted) px-3 py-1">
+          No clusters added yet
+        </p>
+
         <button
           @click="handleAddCluster"
-          class="w-full text-left px-3 py-2 rounded-lg text-sm text-[var(--text-muted)] hover:bg-[var(--bg-hover)] flex items-center gap-2 transition-all duration-200"
+          class="w-full text-left px-3 py-2 rounded-lg text-sm text-blue-500 hover:bg-(--bg-hover) flex items-center gap-2 transition-all duration-200 font-medium"
         >
           <Plus class="w-4 h-4" />
           <span>Add Cluster</span>
@@ -136,24 +139,25 @@ const toggleTheme = () => {
         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
         :class="[
           route.path === link.path
-            ? 'bg-[var(--bg-active)] font-medium text-[var(--text-primary)]'
-            : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+            ? 'bg-(--bg-active) font-medium text-(--text-primary)'
+            : 'text-(--text-secondary) hover:bg-(--bg-hover)',
+          k8sStore.activeClusterId === null && link.path !== '/settings'
+            ? 'opacity-40 pointer-events-none'
+            : ''
         ]"
       >
-        <component :is="link.icon" class="w-4 h-4 flex-shrink-0" />
+        <component :is="link.icon" class="w-4 h-4 shrink-0" />
         <span>{{ link.name }}</span>
       </router-link>
     </nav>
 
     <!-- Bottom Footer -->
-    <div
-      class="p-4 border-t border-[var(--border)] flex items-center justify-around bg-[var(--bg-sidebar)]"
-    >
+    <div class="p-4 border-t border-(--border) flex items-center justify-around bg-(--bg-sidebar)">
       <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
         <button
           @click="toggleTheme"
-          class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all duration-200"
+          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) transition-all duration-200"
           title="Toggle Theme"
         >
           <Sun v-if="isDark" class="w-4.5 h-4.5" />
@@ -163,7 +167,7 @@ const toggleTheme = () => {
         <!-- Docs -->
         <a
           href="#"
-          class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all duration-200"
+          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) transition-all duration-200"
           title="Documentation"
         >
           <BookOpen class="w-4.5 h-4.5" />
@@ -171,7 +175,7 @@ const toggleTheme = () => {
 
         <!-- Notifications -->
         <button
-          class="p-2 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] transition-all duration-200 relative"
+          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) transition-all duration-200 relative"
           title="Notifications"
         >
           <Bell class="w-4.5 h-4.5" />
@@ -180,14 +184,14 @@ const toggleTheme = () => {
 
         <!-- Profile -->
         <button
-          class="w-8 h-8 rounded-full bg-[var(--bg-hover)] flex items-center justify-center text-[var(--text-secondary)] hover:bg-[var(--bg-active)] transition-all duration-200"
+          class="w-8 h-8 rounded-full bg-(--bg-hover) flex items-center justify-center text-(--text-secondary) hover:bg-(--bg-active) transition-all duration-200"
         >
           <User class="w-4 h-4" />
         </button>
       </div>
     </div>
     <div class="flex items-center justify-center gap-2">
-      <span class="text-[10px] text-[var(--text-muted)] font-mono">{{ VERSION }}</span>
+      <span class="text-[10px] text-(--text-muted) font-mono">{{ VERSION }}</span>
     </div>
   </aside>
 </template>

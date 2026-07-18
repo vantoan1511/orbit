@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import AppSidebar from './AppSidebar.vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import WelcomeView from '@/views/WelcomeView.vue'
 import AppHeader from './AppHeader.vue'
+import AppSidebar from './AppSidebar.vue'
+
+const k8sStore = useKubernetesStore()
 </script>
 
 <template>
-  <div
-    class="flex h-screen w-screen overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans"
-  >
+  <div class="flex h-screen w-screen overflow-hidden bg-(--bg-app) text-(--text-primary) font-sans">
     <!-- Sidebar -->
     <AppSidebar />
 
@@ -17,11 +19,14 @@ import AppHeader from './AppHeader.vue'
 
       <!-- Scrollable Content -->
       <main class="flex-1 overflow-y-auto p-8">
-        <RouterView v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </RouterView>
+        <template v-if="k8sStore.activeClusterId !== null">
+          <RouterView v-slot="{ Component }">
+            <transition name="page" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </RouterView>
+        </template>
+        <WelcomeView v-else />
       </main>
     </div>
   </div>
