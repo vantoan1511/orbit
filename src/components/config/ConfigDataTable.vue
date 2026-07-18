@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import { FileText, Lock, MoreVertical } from '@lucide/vue'
@@ -19,6 +19,34 @@ const props = defineProps<{
 
 const k8sStore = useKubernetesStore()
 const { configMaps, secrets } = storeToRefs(k8sStore)
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'labels', header: 'Labels', visible: true },
+  { field: 'type', header: 'Type', visible: true },
+  { field: 'keysCount', header: 'Data Keys', visible: true },
+  { field: 'size', header: 'Size', visible: true },
+  { field: 'mountedPods', header: 'Mounted In', visible: true },
+  { field: 'age', header: 'Age', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
+
+// Filter out 'Type' column from configuration checkboxes when in configmaps tab
+const columnsForConfig = computed(() => {
+  if (props.activeTab === 'configmaps') {
+    return tableColumns.value.filter((col) => col.field !== 'type')
+  }
+  return tableColumns.value
+})
 
 const handleRefresh = async () => {
   if (props.activeTab === 'configmaps') {
@@ -115,6 +143,8 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
   <ResourceDataTable
     :data="filteredItems"
     v-model:searchQuery="searchQuery"
+    :columns="columnsForConfig"
+    @update:columns="tableColumns = $event"
     :searchPlaceholder="
       props.activeTab === 'configmaps' ? 'Search configmaps...' : 'Search secrets...'
     "
@@ -171,7 +201,13 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span
           class="font-mono px-2 py-0.5 rounded text-[10px]"
@@ -193,7 +229,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     </Column>
 
     <!-- Labels Column -->
-    <Column field="labels" header="Labels" class="p-3">
+    <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
       <template #body="{ data }">
         <div class="flex flex-wrap gap-1 max-w-72">
           <span
@@ -208,24 +244,48 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     </Column>
 
     <!-- Secret Type Column (Only for Secrets) -->
-    <Column v-if="props.activeTab === 'secrets'" field="type" header="Type" sortable class="p-3">
+    <Column
+      v-if="props.activeTab === 'secrets' && visibleCols['type']"
+      field="type"
+      header="Type"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-secondary)">{{ data.type }}</span>
       </template>
     </Column>
 
     <!-- Data Keys Column -->
-    <Column field="keysCount" header="Data Keys" sortable class="p-3 text-center">
+    <Column
+      v-if="visibleCols['keysCount']"
+      field="keysCount"
+      header="Data Keys"
+      sortable
+      class="p-3 text-center"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-primary)">{{ data.keysCount }}</span>
       </template>
     </Column>
 
     <!-- Size Column -->
-    <Column field="size" header="Size" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['size']"
+      field="size"
+      header="Size"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Mounted In Column -->
-    <Column field="mountedPods" header="Mounted In" sortable class="p-3 text-center">
+    <Column
+      v-if="visibleCols['mountedPods']"
+      field="mountedPods"
+      header="Mounted In"
+      sortable
+      class="p-3 text-center"
+    >
       <template #body="{ data }">
         <span
           class="font-mono font-semibold"
@@ -237,7 +297,13 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Actions Column -->
     <Column class="p-3 text-center">

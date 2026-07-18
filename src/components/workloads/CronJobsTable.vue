@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { CronJobInfo } from '@/types/kubernetes'
@@ -10,6 +10,25 @@ import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'schedule', header: 'Schedule', visible: true },
+  { field: 'suspend', header: 'Suspend', visible: true },
+  { field: 'active', header: 'Active Jobs', visible: true },
+  { field: 'lastSchedule', header: 'Last Schedule', visible: true },
+  { field: 'age', header: 'Age', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
@@ -87,6 +106,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
   <ResourceDataTable
     :data="filteredCronJobs"
     v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
     searchPlaceholder="Search cronjobs or images..."
     emptyMessage="No cronjobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} cronjobs"
@@ -133,7 +153,13 @@ const onRowClick = (event: { data: CronJobInfo }) => {
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
       </template>
@@ -141,6 +167,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
 
     <!-- Schedule Column -->
     <Column
+      v-if="visibleCols['schedule']"
       field="schedule"
       header="Schedule"
       sortable
@@ -148,7 +175,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
     ></Column>
 
     <!-- Suspend Column -->
-    <Column field="suspend" header="Suspend" sortable class="p-3">
+    <Column v-if="visibleCols['suspend']" field="suspend" header="Suspend" sortable class="p-3">
       <template #body="{ data }">
         <span
           class="font-medium px-2 py-0.5 rounded text-[10px] uppercase tracking-wider"
@@ -164,7 +191,13 @@ const onRowClick = (event: { data: CronJobInfo }) => {
     </Column>
 
     <!-- Active Column -->
-    <Column field="active" header="Active Jobs" sortable class="p-3 text-center">
+    <Column
+      v-if="visibleCols['active']"
+      field="active"
+      header="Active Jobs"
+      sortable
+      class="p-3 text-center"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-secondary)">{{ data.active }}</span>
       </template>
@@ -172,6 +205,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
 
     <!-- Last Schedule Column -->
     <Column
+      v-if="visibleCols['lastSchedule']"
       field="lastSchedule"
       header="Last Schedule"
       sortable
@@ -183,7 +217,13 @@ const onRowClick = (event: { data: CronJobInfo }) => {
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Drawer -->
     <template #drawer>

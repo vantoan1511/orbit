@@ -1,11 +1,20 @@
 <script setup lang="ts">
 import { Info, RefreshCw, Search, Settings2 } from '@lucide/vue'
 import Button from 'primevue/button'
+import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
+import Popover from 'primevue/popover'
+import { computed, ref } from 'vue'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-withDefaults(
+export interface TableColumn {
+  field: string
+  header: string
+  visible: boolean
+}
+
+const props = withDefaults(
   defineProps<{
     data: any[]
     searchQuery?: string
@@ -18,6 +27,7 @@ withDefaults(
     hideActions?: boolean
     hideRefresh?: boolean
     hideConfig?: boolean
+    columns?: TableColumn[]
   }>(),
   {
     searchQuery: '',
@@ -29,12 +39,14 @@ withDefaults(
     hideSearch: false,
     hideActions: false,
     hideRefresh: false,
-    hideConfig: false
+    hideConfig: false,
+    columns: () => []
   }
 )
 
 const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void
+  (e: 'update:columns', val: TableColumn[]): void
   (e: 'refresh'): void
   (e: 'row-click', event: any): void
 }>()
@@ -42,6 +54,34 @@ const emit = defineEmits<{
 const onSearchUpdate = (val: string | undefined) => {
   emit('update:searchQuery', val ?? '')
 }
+
+const configPopover = ref()
+const toggleConfig = (event: Event) => {
+  configPopover.value?.toggle(event)
+}
+
+const onToggleColumn = (field: string, visible: any) => {
+  if (!props.columns) return
+  const updated = props.columns.map((col) =>
+    col.field === field ? { ...col, visible: !!visible } : col
+  )
+  emit('update:columns', updated)
+}
+
+const allSelected = computed({
+  get: () => props.columns?.every((col) => col.visible) ?? false,
+  set: (val) => {
+    if (!props.columns) return
+    const updated = props.columns.map((col) => ({ ...col, visible: val }))
+    emit('update:columns', updated)
+  }
+})
+
+const isIndeterminate = computed(() => {
+  if (!props.columns || props.columns.length === 0) return false
+  const visibleCount = props.columns.filter((c) => c.visible).length
+  return visibleCount > 0 && visibleCount < props.columns.length
+})
 </script>
 
 <template>
@@ -81,9 +121,64 @@ const onSearchUpdate = (val: string | undefined) => {
           >
             <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
           </Button>
-          <Button v-if="!hideConfig" severity="secondary" variant="text" size="small" class="p-1">
+          <Button
+            v-if="!hideConfig"
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="toggleConfig"
+          >
             <Settings2 class="w-4 h-4 text-(--text-secondary)" />
           </Button>
+          <Popover ref="configPopover">
+            <div class="flex flex-col gap-2 p-3 min-w-48 bg-(--bg-card) text-(--text-primary)">
+              <div
+                class="font-semibold text-xs border-b border-(--border) pb-1.5 text-(--text-secondary)"
+              >
+                Configure Columns
+              </div>
+              <div class="flex flex-col gap-1.5 pt-1">
+                <div
+                  class="flex items-center gap-2 py-0.5 hover:bg-(--bg-hover)/20 rounded px-1 border-b border-(--border)/50"
+                >
+                  <Checkbox
+                    inputId="col-all"
+                    :modelValue="allSelected"
+                    @update:modelValue="allSelected = $event"
+                    :binary="true"
+                    :indeterminate="isIndeterminate"
+                    size="small"
+                  />
+                  <label
+                    for="col-all"
+                    class="text-xs cursor-pointer select-none font-semibold text-(--text-primary) w-full"
+                  >
+                    All
+                  </label>
+                </div>
+                <div
+                  v-for="col in columns"
+                  :key="col.field"
+                  class="flex items-center gap-2 py-0.5 hover:bg-(--bg-hover)/20 rounded px-1"
+                >
+                  <Checkbox
+                    :inputId="`col-${col.field}`"
+                    :modelValue="col.visible"
+                    @update:modelValue="onToggleColumn(col.field, $event)"
+                    :binary="true"
+                    size="small"
+                  />
+                  <label
+                    :for="`col-${col.field}`"
+                    class="text-xs cursor-pointer select-none font-medium text-(--text-secondary) w-full"
+                  >
+                    {{ col.header }}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </Popover>
         </div>
       </div>
     </div>

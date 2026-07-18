@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { JobInfo } from '@/types/kubernetes'
@@ -10,6 +10,25 @@ import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'status', header: 'Status', visible: true },
+  { field: 'completions', header: 'Completions', visible: true },
+  { field: 'duration', header: 'Duration', visible: true },
+  { field: 'age', header: 'Age', visible: true },
+  { field: 'images', header: 'Images', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
@@ -86,6 +105,7 @@ const onRowClick = (event: { data: JobInfo }) => {
   <ResourceDataTable
     :data="filteredJobs"
     v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
     searchPlaceholder="Search jobs or images..."
     emptyMessage="No jobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} jobs"
@@ -132,14 +152,20 @@ const onRowClick = (event: { data: JobInfo }) => {
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
       </template>
     </Column>
 
     <!-- Status Column -->
-    <Column field="status" header="Status" sortable class="p-3">
+    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
         <div class="flex items-center gap-1.5">
           <span
@@ -170,6 +196,7 @@ const onRowClick = (event: { data: JobInfo }) => {
 
     <!-- Completions Column -->
     <Column
+      v-if="visibleCols['completions']"
       field="completions"
       header="Completions"
       sortable
@@ -178,6 +205,7 @@ const onRowClick = (event: { data: JobInfo }) => {
 
     <!-- Duration Column -->
     <Column
+      v-if="visibleCols['duration']"
       field="duration"
       header="Duration"
       sortable
@@ -189,10 +217,16 @@ const onRowClick = (event: { data: JobInfo }) => {
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Images Column -->
-    <Column header="Images" class="p-3 max-w-48">
+    <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
       <template #body="{ data }">
         <div class="flex flex-wrap gap-1">
           <span

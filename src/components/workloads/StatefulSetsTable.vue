@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { StatefulSetInfo } from '@/types/kubernetes'
@@ -10,6 +10,24 @@ import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'status', header: 'Status', visible: true },
+  { field: 'replicas', header: 'Replicas', visible: true },
+  { field: 'age', header: 'Age', visible: true },
+  { field: 'images', header: 'Images', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
@@ -86,6 +104,7 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
   <ResourceDataTable
     :data="filteredStatefulSets"
     v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
     searchPlaceholder="Search statefulsets or images..."
     emptyMessage="No statefulsets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} statefulsets"
@@ -132,14 +151,20 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
       </template>
     </Column>
 
     <!-- Status Column -->
-    <Column field="status" header="Status" sortable class="p-3">
+    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
         <div class="flex items-center gap-1.5">
           <span
@@ -157,7 +182,7 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
     </Column>
 
     <!-- Replicas Column -->
-    <Column header="Replicas" class="p-3">
+    <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
       <template #body="{ data }">
         <div class="flex items-center gap-2 font-mono text-(--text-secondary)">
           <span class="font-bold">{{ data.replicas.current }}</span>
@@ -168,10 +193,16 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Images Column -->
-    <Column header="Images" class="p-3 max-w-48">
+    <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
       <template #body="{ data }">
         <div class="flex flex-wrap gap-1">
           <span
