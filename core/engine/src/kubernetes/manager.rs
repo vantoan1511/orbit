@@ -19,11 +19,8 @@ impl KubeManager {
         
         // Try reading default kubeconfig
         if let Ok(config) = Kubeconfig::read() {
-            let active_ctx = config.current_context.clone();
             manager.kubeconfig = Some(config);
-            if let Some(ref ctx) = active_ctx {
-                let _ = manager.switch_context(ctx).await;
-            }
+            // Intentionally do not connect — user must explicitly select a cluster
         }
         
         manager

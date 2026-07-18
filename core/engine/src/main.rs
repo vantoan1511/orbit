@@ -55,13 +55,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             &OrbitEvent::ActiveClusterChanged { active_cluster_id },
         ).await;
 
-        if let Some(cancel) = manager.watch_cancel.take() {
-            let _ = cancel.send(true);
-        }
-        let (tx, rx) = tokio::sync::watch::channel(false);
-        manager.watch_cancel = Some(tx);
-
         if let Some(ref client) = client {
+            if let Some(cancel) = manager.watch_cancel.take() {
+                let _ = cancel.send(true);
+            }
+            let (tx, rx) = tokio::sync::watch::channel(false);
+            manager.watch_cancel = Some(tx);
             ipc::handlers::spawn_watchers(client, bridge.writer.clone(), bridge.token.clone(), rx.clone());
         }
     }
