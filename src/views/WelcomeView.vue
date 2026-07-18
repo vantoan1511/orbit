@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { kubernetesService } from '@/services/kubernetesService'
 import { os } from '@/services/nativeService'
 import { Cog, Compass, FolderOpen, Layers, Lock } from '@lucide/vue'
@@ -8,9 +8,7 @@ const toast = useToast()
 
 const handleAddCluster = async () => {
   try {
-    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File', {
-      filters: [{ name: 'Kubeconfig', extensions: ['*', 'yaml', 'yml', 'conf'] }]
-    })
+    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File')
     if (selectedFiles && selectedFiles.length > 0 && selectedFiles[0]) {
       await kubernetesService.addCluster(selectedFiles[0])
     }
