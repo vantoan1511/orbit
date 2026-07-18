@@ -48,7 +48,7 @@ const statuses = ['All Statuses', 'Running', 'Progressing', 'Failed']
 const fetchDeployments = async () => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
     await kubernetesService.getDeployments(ns)
   } catch (e) {
     console.error('Error fetching deployments', e)

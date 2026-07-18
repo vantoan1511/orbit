@@ -46,7 +46,7 @@ const suspendOptions = ['All Suspend States', 'Suspended', 'Active']
 const fetchCronJobs = async () => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
     await kubernetesService.getCronJobs(ns)
   } catch (e) {
     console.error('Error fetching cronjobs', e)

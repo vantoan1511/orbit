@@ -31,7 +31,7 @@ onMounted(() => {
 })
 
 const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const selectedNamespace = ref<string[]>([])
 const selectedType = ref('All Types')
 const showSystemNamespaces = ref(false)
 
@@ -62,13 +62,13 @@ const filteredEvents = computed(() => {
     }
 
     // Namespace filter
-    if (selectedNamespace.value !== 'All Namespaces' && e.namespace !== selectedNamespace.value) {
+    if (selectedNamespace.value.length > 0 && !selectedNamespace.value.includes(e.namespace)) {
       return false
     }
 
     // System Namespaces filter
     const isSystem = ['kube-system', 'monitoring', 'logging'].includes(e.namespace)
-    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
+    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value.length === 0) {
       return false
     }
 

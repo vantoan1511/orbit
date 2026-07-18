@@ -47,7 +47,7 @@ const statuses = ['All Statuses', 'Active', 'Succeeded', 'Failed', 'Unknown']
 const fetchJobs = async () => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
     await kubernetesService.getJobs(ns)
   } catch (e) {
     console.error('Error fetching jobs', e)

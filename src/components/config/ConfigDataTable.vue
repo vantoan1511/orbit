@@ -66,7 +66,7 @@ watch(
   () => props.activeTab,
   () => {
     searchQuery.value = ''
-    selectedNamespace.value = 'All Namespaces'
+    selectedNamespace.value = []
     selectedLabel.value = 'All Labels'
   }
 )

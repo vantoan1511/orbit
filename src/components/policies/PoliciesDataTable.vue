@@ -16,7 +16,7 @@ const k8sStore = useKubernetesStore()
 
 const policies = computed(() => k8sStore.policies)
 const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const selectedNamespace = ref<string[]>([])
 const selectedType = ref('All Types')
 
 // Drawer state
@@ -51,8 +51,8 @@ const filteredPolicies = computed(() => {
     }
 
     // Namespace filter (only applies to namespaced policies)
-    if (selectedNamespace.value !== 'All Namespaces') {
-      if (p.scope === 'Namespaced' && p.namespace !== selectedNamespace.value) {
+    if (selectedNamespace.value.length > 0) {
+      if (p.scope === 'Namespaced' && !selectedNamespace.value.includes(p.namespace)) {
         return false
       }
     }
@@ -135,7 +135,7 @@ const handleActionClick = (event: Event, action: string, policyName: string) => 
             class="p-1"
             @click="
               k8sStore.fetchPolicies(
-                selectedNamespace === 'All Namespaces' ? undefined : selectedNamespace
+                selectedNamespace.length === 1 ? selectedNamespace[0] : undefined
               )
             "
           >

@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import Select from 'primevue/select'
+import MultiSelect from 'primevue/multiselect'
 
-const modelValue = defineModel<string>({ required: true })
+const modelValue = defineModel<string[]>({ required: true })
 const props = defineProps<{
   namespaces: string[]
 }>()
 </script>
 
 <template>
-  <Select
+  <MultiSelect
     v-model="modelValue"
-    :options="props.namespaces"
+    :options="props.namespaces.filter((n) => n !== 'All Namespaces')"
+    placeholder="All Namespaces"
+    :maxSelectedLabels="3"
     class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
   />
 </template>

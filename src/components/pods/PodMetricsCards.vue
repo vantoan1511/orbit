@@ -1,31 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { AlertTriangle, Box, CheckCircle2, HelpCircle, Loader2 } from '@lucide/vue'
 import Chart from 'primevue/chart'
-import { Box, CheckCircle2, Loader2, AlertTriangle, HelpCircle } from '@lucide/vue'
+import { computed, onMounted, ref } from 'vue'
 
-// Total counts matching exactly: 264 pods, 236 Running, 18 Pending, 6 Failed, 4 Unknown
-const totalPods = 264
-const maxPods = 330
-const runningCount = 236
-const pendingCount = 18
-const failedCount = 6
-const unknownCount = 4
+const k8sStore = useKubernetesStore()
+
+const totalPods = computed(() => k8sStore.pods.length)
+const maxPods = computed(() => Math.max(k8sStore.nodes.length * 110, 110))
+
+const runningCount = computed(() => k8sStore.pods.filter((p) => p.status === 'Running').length)
+const pendingCount = computed(() => k8sStore.pods.filter((p) => p.status === 'Pending').length)
+const failedCount = computed(() => k8sStore.pods.filter((p) => p.status === 'Failed').length)
+const unknownCount = computed(() => {
+  const recognized = ['Running', 'Pending', 'Failed']
+  return k8sStore.pods.filter((p) => !recognized.includes(p.status)).length
+})
 
 // Chart config and options
 const sparklineOptions = ref()
-const runningChartData = ref()
-const pendingChartData = ref()
-const failedChartData = ref()
-const unknownChartData = ref()
 
 onMounted(() => {
-  const isDark = document.documentElement.classList.contains('my-app-dark')
-
-  const runningColor = isDark ? '#10b981' : '#10b981' // emerald-500
-  const pendingColor = isDark ? '#f59e0b' : '#f59e0b' // amber-500
-  const failedColor = isDark ? '#ef4444' : '#ef4444' // red-500
-  const unknownColor = isDark ? '#9ca3af' : '#9ca3af' // gray-400
-
   sparklineOptions.value = {
     responsive: true,
     maintainAspectRatio: false,
@@ -42,49 +37,69 @@ onMounted(() => {
       line: { tension: 0.4, borderWidth: 1.5 }
     }
   }
+})
 
-  runningChartData.value = {
+const runningChartData = computed(() => {
+  const current = runningCount.value
+  const base = current > 10 ? current - 5 : current
+  const data = [base - 2, base + 2, base - 1, base + 3, base, base - 2, current]
+  return {
     labels: ['1', '2', '3', '4', '5', '6', '7'],
     datasets: [
       {
-        data: [220, 224, 228, 230, 235, 232, 236],
-        borderColor: runningColor,
+        data,
+        borderColor: '#10b981', // emerald-500
         backgroundColor: 'transparent',
         fill: false
       }
     ]
   }
+})
 
-  pendingChartData.value = {
+const pendingChartData = computed(() => {
+  const current = pendingCount.value
+  const base = current > 5 ? current - 2 : current
+  const data = [base - 1, base + 1, base, base + 2, base - 1, base + 1, current]
+  return {
     labels: ['1', '2', '3', '4', '5', '6', '7'],
     datasets: [
       {
-        data: [15, 22, 18, 19, 16, 20, 18],
-        borderColor: pendingColor,
+        data,
+        borderColor: '#f59e0b', // amber-500
         backgroundColor: 'transparent',
         fill: false
       }
     ]
   }
+})
 
-  failedChartData.value = {
+const failedChartData = computed(() => {
+  const current = failedCount.value
+  const base = current > 3 ? current - 1 : current
+  const data = [base, base + 1, base - 1, base + 2, base, base - 1, current]
+  return {
     labels: ['1', '2', '3', '4', '5', '6', '7'],
     datasets: [
       {
-        data: [5, 4, 6, 8, 5, 7, 6],
-        borderColor: failedColor,
+        data,
+        borderColor: '#ef4444', // red-500
         backgroundColor: 'transparent',
         fill: false
       }
     ]
   }
+})
 
-  unknownChartData.value = {
+const unknownChartData = computed(() => {
+  const current = unknownCount.value
+  const base = current > 2 ? current - 1 : current
+  const data = [base, base + 1, base, base - 1, base + 1, base, current]
+  return {
     labels: ['1', '2', '3', '4', '5', '6', '7'],
     datasets: [
       {
-        data: [2, 3, 2, 4, 3, 2, 4],
-        borderColor: unknownColor,
+        data,
+        borderColor: '#9ca3af', // gray-400
         backgroundColor: 'transparent',
         fill: false
       }

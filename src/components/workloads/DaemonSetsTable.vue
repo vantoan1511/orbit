@@ -48,7 +48,7 @@ const statuses = ['All Statuses', 'Running', 'Progressing']
 const fetchDaemonSets = async () => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
     await kubernetesService.getDaemonSets(ns)
   } catch (e) {
     console.error('Error fetching daemonsets', e)

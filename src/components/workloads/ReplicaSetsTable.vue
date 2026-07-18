@@ -46,7 +46,7 @@ const statuses = ['All Statuses', 'Running', 'Progressing']
 const fetchReplicaSets = async () => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
     await kubernetesService.getReplicaSets(ns)
   } catch (e) {
     console.error('Error fetching replicasets', e)

@@ -46,7 +46,7 @@ const statuses = ['All Statuses', 'Running', 'Progressing']
 const fetchStatefulSets = async () => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value === 'All Namespaces' ? undefined : selectedNamespace.value
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
     await kubernetesService.getStatefulSets(ns)
   } catch (e) {
     console.error('Error fetching statefulsets', e)

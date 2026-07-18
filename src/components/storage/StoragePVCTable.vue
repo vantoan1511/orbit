@@ -12,7 +12,7 @@ const k8sStore = useKubernetesStore()
 const pvcs = computed(() => k8sStore.persistentVolumeClaims)
 
 const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const selectedNamespace = ref<string[]>([])
 const selectedStatus = ref('All Statuses')
 
 const namespaces = computed(() => {
@@ -31,7 +31,7 @@ const filteredPVCs = computed(() => {
     }
 
     // Namespace
-    if (selectedNamespace.value !== 'All Namespaces' && pvc.namespace !== selectedNamespace.value) {
+    if (selectedNamespace.value.length > 0 && !selectedNamespace.value.includes(pvc.namespace)) {
       return false
     }
 
@@ -46,7 +46,7 @@ const filteredPVCs = computed(() => {
 
 const refreshTable = () => {
   searchQuery.value = ''
-  selectedNamespace.value = 'All Namespaces'
+  selectedNamespace.value = []
   selectedStatus.value = 'All Statuses'
 }
 </script>

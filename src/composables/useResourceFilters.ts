@@ -11,7 +11,7 @@ export function useResourceFilters<T extends ResourceItem>(
   searchFields: (keyof T)[] = ['name']
 ) {
   const searchQuery = ref('')
-  const selectedNamespace = ref('All Namespaces')
+  const selectedNamespace = ref<string[]>([])
   const showSystemNamespaces = ref(false)
 
   const filteredResources = computed(() => {
@@ -32,16 +32,13 @@ export function useResourceFilters<T extends ResourceItem>(
       }
 
       // 2. Namespace filter
-      if (
-        selectedNamespace.value !== 'All Namespaces' &&
-        item.namespace !== selectedNamespace.value
-      ) {
+      if (selectedNamespace.value.length > 0 && !selectedNamespace.value.includes(item.namespace)) {
         return false
       }
 
       // 3. System Namespaces filter
       const isSystem = ['kube-system', 'monitoring', 'logging'].includes(item.namespace)
-      if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
+      if (!showSystemNamespaces.value && isSystem && selectedNamespace.value.length === 0) {
         return false
       }
 
