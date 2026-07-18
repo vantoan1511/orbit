@@ -4,15 +4,21 @@ import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { StatefulSetInfo } from '@/types/kubernetes'
+import { MoreVertical, Info, FileEdit, Scale, ScrollText, Trash2 } from '@lucide/vue'
+import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
+import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
+
+const toast = useToast()
 
 const k8sStore = useKubernetesStore()
 
@@ -83,6 +89,78 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
   selectedWorkload.value = event.data
   drawerVisible.value = true
 }
+
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<StatefulSetInfo | null>(null)
+
+const toggleActionMenu = (event: Event, data: StatefulSetInfo) => {
+  event.stopPropagation()
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
+}
+
+const actionMenuItems = computed(() => [
+  {
+    label: 'View Details',
+    icon: Info,
+    command: () => {
+      if (selectedActionRow.value) {
+        selectedWorkload.value = selectedActionRow.value
+        drawerVisible.value = true
+      }
+    }
+  },
+  {
+    label: 'Edit (YAML)',
+    icon: FileEdit,
+    command: () => {
+      toast.add({
+        severity: 'info',
+        summary: 'Edit YAML',
+        detail: `Edit YAML triggered for ${selectedActionRow.value?.name}`,
+        life: 3000
+      })
+    }
+  },
+  {
+    label: 'Scale',
+    icon: Scale,
+    command: () => {
+      toast.add({
+        severity: 'info',
+        summary: 'Scale',
+        detail: `Scale triggered for ${selectedActionRow.value?.name}`,
+        life: 3000
+      })
+    }
+  },
+  {
+    label: 'View Logs',
+    icon: ScrollText,
+    class: 'text-violet-400 hover:text-violet-300 font-semibold border border-violet-500/20 bg-violet-500/5',
+    command: () => {
+      toast.add({
+        severity: 'info',
+        summary: 'View Logs',
+        detail: `View Logs triggered for ${selectedActionRow.value?.name}`,
+        life: 3000
+      })
+    }
+  },
+  {
+    label: 'Delete',
+    icon: Trash2,
+    class: 'text-red-400 hover:text-red-300',
+    command: () => {
+      toast.add({
+        severity: 'warn',
+        summary: 'Delete',
+        detail: `Delete triggered for ${selectedActionRow.value?.name}`,
+        life: 3000
+      })
+    }
+  }
+])
 </script>
 
 <template>
@@ -179,9 +257,26 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
       </template>
     </Column>
 
+    <!-- Actions Column -->
+    <Column class="p-3 text-center w-12 shrink-0">
+      <template #body="{ data }">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          title="Actions"
+          @click="toggleActionMenu($event, data)"
+        >
+          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+        </Button>
+      </template>
+    </Column>
+
     <!-- Drawer -->
     <template #drawer>
       <WorkloadDetailsDrawer v-model:visible="drawerVisible" :workload="selectedWorkload" />
+      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
     </template>
   </ResourceDataTable>
 </template>
