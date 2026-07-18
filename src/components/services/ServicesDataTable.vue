@@ -1,12 +1,11 @@
 <script setup lang="ts">
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ServiceInfo } from '@/types/kubernetes'
-import { ExternalLink, Info, MoreVertical, RefreshCw, Search, Settings2 } from '@lucide/vue'
+import { ExternalLink, MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
-import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
@@ -92,168 +91,134 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
 </script>
 
 <template>
-  <div class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col gap-6">
-    <!-- Filter Toolbar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div class="flex items-center gap-3 flex-wrap">
-        <!-- Search -->
-        <div class="relative min-w-64">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
-          <InputText
-            v-model="searchQuery"
-            placeholder="Search services..."
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-          />
-        </div>
+  <ResourceDataTable
+    :data="filteredServices"
+    v-model:searchQuery="searchQuery"
+    searchPlaceholder="Search services..."
+    emptyMessage="No services found matching the filter criteria."
+    reportTemplate="Showing {first} to {last} of {totalRecords} services"
+    :rows="12"
+    @refresh="handleRefresh"
+    @row-click="onRowClick"
+  >
+    <!-- Filters -->
+    <template #filters>
+      <!-- Namespace Select -->
+      <Select
+        v-model="selectedNamespace"
+        :options="k8sStore.namespaces"
+        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
+      />
 
-        <!-- Namespace Select -->
-        <Select
-          v-model="selectedNamespace"
-          :options="k8sStore.namespaces"
-          class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-        />
+      <!-- Type Select -->
+      <Select
+        v-model="selectedType"
+        :options="types"
+        class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
+      />
+    </template>
 
-        <!-- Type Select -->
-        <Select
-          v-model="selectedType"
-          :options="types"
-          class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
-        />
+    <!-- Actions Left -->
+    <template #actions-left>
+      <div class="flex items-center gap-2">
+        <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
+        <label
+          for="system-ns-toggle"
+          class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+        >
+          Show system namespaces
+        </label>
       </div>
+    </template>
 
-      <!-- Toggles and Actions -->
-      <div class="flex items-center gap-4 self-end md:self-auto">
+    <!-- Columns -->
+    <!-- Name Column -->
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+      <template #body="{ data }">
         <div class="flex items-center gap-2">
-          <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
-          <label
-            for="system-ns-toggle"
-            class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
-          >
-            Show system namespaces
-          </label>
-        </div>
-
-        <div class="flex items-center gap-1">
-          <Button
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            @click="handleRefresh"
-          >
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
-          </Button>
-          <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
-          </Button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Data Table -->
-    <DataTable
-      :value="filteredServices"
-      paginator
-      :rows="12"
-      class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"
-      tableClass="w-full text-left text-xs border-collapse"
-      paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} services"
-      @row-click="onRowClick"
-    >
-      <template #empty>
-        <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
-          <Info class="w-8 h-8 text-(--text-muted)/50" />
-          <span>No services found matching the filter criteria.</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+          <span class="font-semibold text-violet-400 hover:text-violet-300 transition-colors">{{
+            data.name
+          }}</span>
         </div>
       </template>
+    </Column>
 
-      <!-- Name Column -->
-      <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
-        <template #body="{ data }">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-            <span class="font-semibold text-violet-400 hover:text-violet-300 transition-colors">{{
-              data.name
-            }}</span>
-          </div>
-        </template>
-      </Column>
+    <!-- Namespace Column -->
+    <Column field="namespace" header="Namespace" sortable class="p-3">
+      <template #body="{ data }">
+        <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
+      </template>
+    </Column>
 
-      <!-- Namespace Column -->
-      <Column field="namespace" header="Namespace" sortable class="p-3">
-        <template #body="{ data }">
-          <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
-        </template>
-      </Column>
+    <!-- Type Column -->
+    <Column field="type" header="Type" sortable class="p-3">
+      <template #body="{ data }">
+        <span
+          class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
+          :class="getTypeBadgeClass(data.type)"
+        >
+          {{ data.type }}
+        </span>
+      </template>
+    </Column>
 
-      <!-- Type Column -->
-      <Column field="type" header="Type" sortable class="p-3">
-        <template #body="{ data }">
-          <span
-            class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
-            :class="getTypeBadgeClass(data.type)"
-          >
-            {{ data.type }}
-          </span>
-        </template>
-      </Column>
+    <!-- Cluster IP Column -->
+    <Column field="clusterIP" header="Cluster IP" sortable class="p-3">
+      <template #body="{ data }">
+        <span class="font-mono text-(--text-secondary)">{{ data.clusterIP }}</span>
+      </template>
+    </Column>
 
-      <!-- Cluster IP Column -->
-      <Column field="clusterIP" header="Cluster IP" sortable class="p-3">
-        <template #body="{ data }">
-          <span class="font-mono text-(--text-secondary)">{{ data.clusterIP }}</span>
-        </template>
-      </Column>
+    <!-- External IP Column -->
+    <Column field="externalIP" header="External IP" sortable class="p-3">
+      <template #body="{ data }">
+        <div class="flex items-center gap-1">
+          <span class="font-mono text-(--text-secondary)">{{ data.externalIP }}</span>
+          <ExternalLink
+            v-if="data.externalIP !== '-'"
+            class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
+          />
+        </div>
+      </template>
+    </Column>
 
-      <!-- External IP Column -->
-      <Column field="externalIP" header="External IP" sortable class="p-3">
-        <template #body="{ data }">
-          <div class="flex items-center gap-1">
-            <span class="font-mono text-(--text-secondary)">{{ data.externalIP }}</span>
-            <ExternalLink
-              v-if="data.externalIP !== '-'"
-              class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
-            />
-          </div>
-        </template>
-      </Column>
+    <!-- Ports Column -->
+    <Column field="ports" header="Ports" sortable class="p-3">
+      <template #body="{ data }">
+        <span class="font-mono text-(--text-muted) whitespace-pre-line">{{ data.ports }}</span>
+      </template>
+    </Column>
 
-      <!-- Ports Column -->
-      <Column field="ports" header="Ports" sortable class="p-3">
-        <template #body="{ data }">
-          <span class="font-mono text-(--text-muted) whitespace-pre-line">{{ data.ports }}</span>
-        </template>
-      </Column>
+    <!-- Endpoints Column -->
+    <Column field="endpoints" header="Endpoints" sortable class="p-3">
+      <template #body="{ data }">
+        <span class="font-mono font-medium text-emerald-400">{{ data.endpoints }}</span>
+      </template>
+    </Column>
 
-      <!-- Endpoints Column -->
-      <Column field="endpoints" header="Endpoints" sortable class="p-3">
-        <template #body="{ data }">
-          <span class="font-mono font-medium text-emerald-400">{{ data.endpoints }}</span>
-        </template>
-      </Column>
+    <!-- Age Column -->
+    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
 
-      <!-- Age Column -->
-      <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <!-- Actions Column -->
+    <Column class="p-3 text-center">
+      <template #body="{ data }">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          title="Actions"
+          @click="handleActionClick($event, 'Show Actions Menu', data.name)"
+        >
+          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+        </Button>
+      </template>
+    </Column>
 
-      <!-- Actions Column -->
-      <Column class="p-3 text-center">
-        <template #body="{ data }">
-          <Button
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            title="Actions"
-            @click="handleActionClick($event, 'Show Actions Menu', data.name)"
-          >
-            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
-          </Button>
-        </template>
-      </Column>
-    </DataTable>
-
-    <!-- Details Slideout Drawer -->
-    <ServiceDetailsDrawer v-model:visible="drawerVisible" :service="selectedService" />
-  </div>
+    <!-- Drawer -->
+    <template #drawer>
+      <ServiceDetailsDrawer v-model:visible="drawerVisible" :service="selectedService" />
+    </template>
+  </ResourceDataTable>
 </template>

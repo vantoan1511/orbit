@@ -42,6 +42,7 @@ declare module 'vue' {
     PoliciesMetricsCards: typeof import('./src/components/policies/PoliciesMetricsCards.vue')['default']
     PolicyDetailsDrawer: typeof import('./src/components/policies/PolicyDetailsDrawer.vue')['default']
     ReplicaSetsTable: typeof import('./src/components/workloads/ReplicaSetsTable.vue')['default']
+    ResourceDataTable: typeof import('./src/components/shared/ResourceDataTable.vue')['default']
     ResourceUsage: typeof import('./src/components/dashboard/ResourceUsage.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
