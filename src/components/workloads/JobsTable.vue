@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
+import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
+import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { JobInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
@@ -21,10 +25,13 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'images', header: 'Images', visible: true }
 ])
 
-const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
+  useResourceFilters(
+    computed(() => k8sStore.jobs),
+    ['name', 'images']
+  )
+
 const selectedStatus = ref('All Statuses')
-const showSystemNamespaces = ref(false)
 const loading = ref(false)
 
 // Drawer state
@@ -65,23 +72,10 @@ watch(
 )
 
 const filteredJobs = computed(() => {
-  return k8sStore.jobs.filter((j) => {
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      const matchesName = j.name.toLowerCase().includes(query)
-      const matchesImage = j.images?.some((img) => img.toLowerCase().includes(query))
-      if (!matchesName && !matchesImage) return false
-    }
-
-    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(j.namespace)
-    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
-      return false
-    }
-
+  return filteredResources.value.filter((j) => {
     if (selectedStatus.value !== 'All Statuses' && j.status !== selectedStatus.value) {
       return false
     }
-
     return true
   })
 })
@@ -107,11 +101,7 @@ const onRowClick = (event: { data: JobInfo }) => {
     <!-- Filters -->
     <template #filters>
       <!-- Namespace Select -->
-      <Select
-        v-model="selectedNamespace"
-        :options="namespaces"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Status Select -->
       <Select
@@ -123,15 +113,7 @@ const onRowClick = (event: { data: JobInfo }) => {
 
     <!-- Actions Left -->
     <template #actions-left>
-      <div class="flex items-center gap-2">
-        <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
-        <label
-          for="system-ns-toggle"
-          class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
-        >
-          Show System
-        </label>
-      </div>
+      <SystemNamespaceToggle v-model="showSystemNamespaces" />
     </template>
 
     <!-- Columns -->
@@ -151,37 +133,14 @@ const onRowClick = (event: { data: JobInfo }) => {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
+        <NamespaceBadge :namespace="data.namespace" />
       </template>
     </Column>
 
     <!-- Status Column -->
     <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-1.5">
-          <span
-            class="w-1.5 h-1.5 rounded-full"
-            :class="
-              data.status === 'Succeeded'
-                ? 'bg-emerald-500'
-                : data.status === 'Active'
-                  ? 'bg-amber-500'
-                  : 'bg-rose-500'
-            "
-          ></span>
-          <span
-            class="font-medium"
-            :class="
-              data.status === 'Succeeded'
-                ? 'text-emerald-500'
-                : data.status === 'Active'
-                  ? 'text-amber-500'
-                  : 'text-rose-500'
-            "
-          >
-            {{ data.status }}
-          </span>
-        </div>
+        <StatusBadge :status="data.status" />
       </template>
     </Column>
 

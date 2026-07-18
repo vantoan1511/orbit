@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
+import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -8,7 +12,6 @@ import { ExternalLink, MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
@@ -26,11 +29,10 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'age', header: 'Age', visible: true }
 ])
 
-const services = computed(() => k8sStore.services)
-const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
+  useResourceFilters(computed(() => k8sStore.services))
+
 const selectedType = ref('All Types')
-const showSystemNamespaces = ref(false)
 
 // Drawer state
 const drawerVisible = ref(false)
@@ -43,24 +45,7 @@ const handleRefresh = async () => {
 const types = ['All Types', 'ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName']
 
 const filteredServices = computed(() => {
-  return services.value.filter((s) => {
-    // Search Query filter
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      if (!s.name.toLowerCase().includes(query)) return false
-    }
-
-    // Namespace filter
-    if (selectedNamespace.value !== 'All Namespaces' && s.namespace !== selectedNamespace.value) {
-      return false
-    }
-
-    // System Namespaces filter
-    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(s.namespace)
-    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
-      return false
-    }
-
+  return filteredResources.value.filter((s) => {
     // Type filter
     if (selectedType.value !== 'All Types' && s.type !== selectedType.value) {
       return false
@@ -116,11 +101,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
     <!-- Filters -->
     <template #filters>
       <!-- Namespace Select -->
-      <Select
-        v-model="selectedNamespace"
-        :options="k8sStore.namespaces"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <NamespaceFilter v-model="selectedNamespace" :namespaces="k8sStore.namespaces" />
 
       <!-- Type Select -->
       <Select
@@ -132,15 +113,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
 
     <!-- Actions Left -->
     <template #actions-left>
-      <div class="flex items-center gap-2">
-        <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
-        <label
-          for="system-ns-toggle"
-          class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
-        >
-          Show system namespaces
-        </label>
-      </div>
+      <SystemNamespaceToggle v-model="showSystemNamespaces" />
     </template>
 
     <!-- Columns -->
@@ -165,7 +138,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
+        <NamespaceBadge :namespace="data.namespace" />
       </template>
     </Column>
 

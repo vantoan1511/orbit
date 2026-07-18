@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
+import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
+import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { PodInfo } from '@/types/kubernetes'
@@ -7,7 +12,6 @@ import { Power, Trash2 } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
@@ -25,10 +29,10 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'age', header: 'Age', visible: true }
 ])
 
-const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
+  useResourceFilters(computed(() => k8sStore.pods))
+
 const selectedStatus = ref('All Statuses')
-const showSystemNamespaces = ref(false)
 
 // Drawer state
 const drawerVisible = ref(false)
@@ -49,32 +53,10 @@ const statuses = [
 ]
 
 const filteredPods = computed(() => {
-  return k8sStore.pods.filter((p) => {
-    // Search Query filter
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      const matchesName = p.name.toLowerCase().includes(query)
-      if (!matchesName) return false
-    }
-
-    // Namespace filter
-    if (selectedNamespace.value !== 'All Namespaces' && p.namespace !== selectedNamespace.value) {
+  return filteredResources.value.filter((p) => {
+    if (selectedStatus.value !== 'All Statuses' && p.status !== selectedStatus.value) {
       return false
     }
-
-    // System Namespaces filter
-    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(p.namespace)
-    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
-      return false
-    }
-
-    // Status filter
-    if (selectedStatus.value !== 'All Statuses') {
-      if (p.status !== selectedStatus.value) {
-        return false
-      }
-    }
-
     return true
   })
 })
@@ -82,22 +64,6 @@ const filteredPods = computed(() => {
 const onRowClick = (event: { data: PodInfo }) => {
   selectedPod.value = event.data
   drawerVisible.value = true
-}
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Running':
-      return 'bg-emerald-500 text-emerald-500'
-    case 'Pending':
-      return 'bg-amber-500 text-amber-500'
-    case 'Failed':
-    case 'CrashLoopBackOff':
-      return 'bg-rose-500 text-rose-500'
-    case 'Completed':
-      return 'bg-blue-500 text-blue-500'
-    default:
-      return 'bg-gray-400 text-gray-400'
-  }
 }
 
 const handleActionClick = (event: Event, action: string, podName: string) => {
@@ -124,11 +90,7 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     <!-- Filters -->
     <template #filters>
       <!-- Namespace Select -->
-      <Select
-        v-model="selectedNamespace"
-        :options="namespaces"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Status Select -->
       <Select
@@ -140,15 +102,7 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
 
     <!-- Actions Left -->
     <template #actions-left>
-      <div class="flex items-center gap-2">
-        <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
-        <label
-          for="system-ns-toggle"
-          class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
-        >
-          Show System
-        </label>
-      </div>
+      <SystemNamespaceToggle v-model="showSystemNamespaces" />
     </template>
 
     <!-- Columns -->
@@ -168,22 +122,14 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
+        <NamespaceBadge :namespace="data.namespace" />
       </template>
     </Column>
 
     <!-- Status Column -->
     <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-1.5">
-          <span
-            class="w-1.5 h-1.5 rounded-full"
-            :class="getStatusColor(data.status).split(' ')[0]"
-          ></span>
-          <span class="font-medium" :class="getStatusColor(data.status).split(' ')[1]">
-            {{ data.status }}
-          </span>
-        </div>
+        <StatusBadge :status="data.status" />
       </template>
     </Column>
 

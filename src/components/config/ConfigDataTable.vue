@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
+import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
@@ -7,7 +11,6 @@ import { FileText, Lock, MoreVertical } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { computed, ref, watch } from 'vue'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
@@ -47,10 +50,12 @@ const handleRefresh = async () => {
   }
 }
 
-const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
+  useResourceFilters(
+    computed(() => (props.activeTab === 'configmaps' ? configMaps.value : secrets.value))
+  )
+
 const selectedLabel = ref('All Labels')
-const showSystemNamespaces = ref(false)
 
 // Drawer state
 const drawerVisible = ref(false)
@@ -82,28 +87,7 @@ const labels = computed(() => {
 })
 
 const filteredItems = computed(() => {
-  const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
-  return currentList.filter((item) => {
-    // Search Query filter
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      if (!item.name.toLowerCase().includes(query)) return false
-    }
-
-    // Namespace filter
-    if (
-      selectedNamespace.value !== 'All Namespaces' &&
-      item.namespace !== selectedNamespace.value
-    ) {
-      return false
-    }
-
-    // System Namespaces filter
-    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(item.namespace)
-    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
-      return false
-    }
-
+  return filteredResources.value.filter((item) => {
     // Label filter
     if (selectedLabel.value !== 'All Labels') {
       const hasLabelKey = Object.keys(item.labels).includes(selectedLabel.value)
@@ -152,11 +136,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     <!-- Filters -->
     <template #filters>
       <!-- Namespace Select -->
-      <Select
-        v-model="selectedNamespace"
-        :options="namespaces"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Label Select -->
       <Select
@@ -168,15 +148,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
 
     <!-- Actions Left -->
     <template #actions-left>
-      <div class="flex items-center gap-2">
-        <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
-        <label
-          for="system-ns-toggle"
-          class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
-        >
-          Show system namespaces
-        </label>
-      </div>
+      <SystemNamespaceToggle v-model="showSystemNamespaces" />
     </template>
 
     <!-- Columns -->
@@ -200,22 +172,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
       class="p-3"
     >
       <template #body="{ data }">
-        <span
-          class="font-mono px-2 py-0.5 rounded text-[10px]"
-          :class="[
-            data.namespace === 'kube-system'
-              ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-              : data.namespace === 'monitoring'
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                : data.namespace === 'logging'
-                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                  : data.namespace === 'backend'
-                    ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                    : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-          ]"
-        >
-          {{ data.namespace }}
-        </span>
+        <NamespaceBadge :namespace="data.namespace" />
       </template>
     </Column>
 

@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
+import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { CronJobInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
@@ -21,10 +24,13 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'age', header: 'Age', visible: true }
 ])
 
-const searchQuery = ref('')
-const selectedNamespace = ref('All Namespaces')
+const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
+  useResourceFilters(
+    computed(() => k8sStore.cronJobs),
+    ['name', 'images']
+  )
+
 const selectedSuspend = ref('All Suspend States')
-const showSystemNamespaces = ref(false)
 const loading = ref(false)
 
 // Drawer state
@@ -65,24 +71,11 @@ watch(
 )
 
 const filteredCronJobs = computed(() => {
-  return k8sStore.cronJobs.filter((cj) => {
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      const matchesName = cj.name.toLowerCase().includes(query)
-      const matchesImage = cj.images?.some((img) => img.toLowerCase().includes(query))
-      if (!matchesName && !matchesImage) return false
-    }
-
-    const isSystem = ['kube-system', 'monitoring', 'logging'].includes(cj.namespace)
-    if (!showSystemNamespaces.value && isSystem && selectedNamespace.value === 'All Namespaces') {
-      return false
-    }
-
+  return filteredResources.value.filter((cj) => {
     if (selectedSuspend.value !== 'All Suspend States') {
       const isSuspended = selectedSuspend.value === 'Suspended'
       if (cj.suspend !== isSuspended) return false
     }
-
     return true
   })
 })
@@ -108,11 +101,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
     <!-- Filters -->
     <template #filters>
       <!-- Namespace Select -->
-      <Select
-        v-model="selectedNamespace"
-        :options="namespaces"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Suspend Select -->
       <Select
@@ -124,15 +113,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
 
     <!-- Actions Left -->
     <template #actions-left>
-      <div class="flex items-center gap-2">
-        <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
-        <label
-          for="system-ns-toggle"
-          class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
-        >
-          Show System
-        </label>
-      </div>
+      <SystemNamespaceToggle v-model="showSystemNamespaces" />
     </template>
 
     <!-- Columns -->
@@ -152,7 +133,7 @@ const onRowClick = (event: { data: CronJobInfo }) => {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
+        <NamespaceBadge :namespace="data.namespace" />
       </template>
     </Column>
 
