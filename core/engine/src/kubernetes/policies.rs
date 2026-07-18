@@ -87,7 +87,7 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
     Ok(all_policies)
 }
 
-fn format_network_policy(p: &NetworkPolicy) -> PolicyInfo {
+pub fn format_network_policy(p: &NetworkPolicy) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
@@ -109,7 +109,7 @@ fn format_network_policy(p: &NetworkPolicy) -> PolicyInfo {
     }
 }
 
-fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
+pub fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
@@ -131,7 +131,7 @@ fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
     }
 }
 
-fn format_limit_range(p: &LimitRange) -> PolicyInfo {
+pub fn format_limit_range(p: &LimitRange) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
@@ -153,7 +153,7 @@ fn format_limit_range(p: &LimitRange) -> PolicyInfo {
     }
 }
 
-fn format_val_webhook(p: &ValidatingWebhookConfiguration) -> PolicyInfo {
+pub fn format_val_webhook(p: &ValidatingWebhookConfiguration) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
@@ -174,7 +174,7 @@ fn format_val_webhook(p: &ValidatingWebhookConfiguration) -> PolicyInfo {
     }
 }
 
-fn format_mut_webhook(p: &MutatingWebhookConfiguration) -> PolicyInfo {
+pub fn format_mut_webhook(p: &MutatingWebhookConfiguration) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
