@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
-import { ref } from 'vue'
+import type { ActionMenuItem } from '@/composables/useWorkloadActions'
+import { ref, computed } from 'vue'
 
 const props = defineProps<{
-  items: MenuItem[]
+  items: ActionMenuItem[]
 }>()
+
+const menuModel = computed(() => props.items as unknown as MenuItem[])
 
 const menuRef = ref<InstanceType<typeof Menu> | null>(null)
 
@@ -21,7 +24,7 @@ defineExpose({
 <template>
   <Menu
     ref="menuRef"
-    :model="props.items"
+    :model="menuModel"
     popup
     class="min-w-44 bg-(--bg-card) border border-(--border) p-1 rounded-lg shadow-lg"
   >

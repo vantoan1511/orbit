@@ -1,7 +1,14 @@
 import { Info, FileEdit, Scale, ScrollText, Trash2 } from '@lucide/vue'
 import { useToast } from 'primevue/usetoast'
 import { computed, type Ref } from 'vue'
-import type { MenuItem } from 'primevue/menuitem'
+import type { Component } from 'vue'
+
+export interface ActionMenuItem {
+  label: string
+  icon?: Component
+  command?: () => void
+  class?: string
+}
 
 export function useWorkloadActions<T extends { name: string }>(
   selectedActionRow: Ref<T | null>,
@@ -10,7 +17,7 @@ export function useWorkloadActions<T extends { name: string }>(
 ) {
   const toast = useToast()
 
-  const actionMenuItems = computed<MenuItem[]>(() => [
+  const actionMenuItems = computed<ActionMenuItem[]>(() => [
     {
       label: 'View Details',
       icon: Info,

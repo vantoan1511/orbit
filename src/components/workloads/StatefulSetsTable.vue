@@ -14,11 +14,8 @@ import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
-
-const toast = useToast()
 
 const k8sStore = useKubernetesStore()
 
