@@ -49,10 +49,10 @@ const clusterStatusInfo = computed(() => {
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
     <!-- Card 1: Cluster Status -->
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-[var(--border-strong)]"
+      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+        class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
         :class="clusterStatusInfo.bgClass"
       >
         <component
@@ -62,13 +62,13 @@ const clusterStatusInfo = computed(() => {
         />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+        <div class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
           Cluster Status
         </div>
         <div class="text-2xl font-bold mt-1" :class="clusterStatusInfo.textClass">
           {{ clusterStatusInfo.text }}
         </div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">
+        <div class="text-xs text-(--text-muted) mt-0.5 truncate">
           {{ clusterStatusInfo.subtext }}
         </div>
       </div>
@@ -76,10 +76,10 @@ const clusterStatusInfo = computed(() => {
 
     <!-- Card 2: Kubernetes Version -->
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-[var(--border-strong)]"
+      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500 flex-shrink-0"
+        class="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500 shrink-0"
       >
         <!-- SVG Kubernetes Icon -->
         <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
@@ -93,58 +93,52 @@ const clusterStatusInfo = computed(() => {
         </svg>
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+        <div class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
           Kubernetes Version
         </div>
-        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">
+        <div class="text-2xl font-bold text-(--text-primary) mt-1">
           {{ kubernetesVersion }}
         </div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Active Version</div>
+        <div class="text-xs text-(--text-muted) mt-0.5 truncate">Active Version</div>
       </div>
     </div>
 
     <!-- Card 3: Nodes -->
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-[var(--border-strong)]"
+      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400 flex-shrink-0"
+        class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400 shrink-0"
       >
         <Server class="w-6 h-6" />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-          Nodes
-        </div>
-        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">
+        <div class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">Nodes</div>
+        <div class="text-2xl font-bold text-(--text-primary) mt-1">
           {{ readyNodesCount }}
-          <span class="text-base text-[var(--text-muted)] font-normal"
-            >/ {{ totalNodesCount }}</span
-          >
+          <span class="text-base text-(--text-muted) font-normal">/ {{ totalNodesCount }}</span>
         </div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">
-          {{ readyNodesCount }} Ready
-        </div>
+        <div class="text-xs text-(--text-muted) mt-0.5 truncate">{{ readyNodesCount }} Ready</div>
       </div>
     </div>
 
     <!-- Card 4: Namespaces -->
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-[var(--border-strong)]"
+      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-5 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 flex-shrink-0"
+        class="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0"
       >
         <LayoutGrid class="w-6 h-6" />
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+        <div class="text-xs font-semibold text-(--text-muted) uppercase tracking-wider">
           Namespaces
         </div>
-        <div class="text-2xl font-bold text-[var(--text-primary)] mt-1">
+        <div class="text-2xl font-bold text-(--text-primary) mt-1">
           {{ namespacesCount }}
         </div>
-        <div class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Active Namespaces</div>
+        <div class="text-xs text-(--text-muted) mt-0.5 truncate">Active Namespaces</div>
       </div>
     </div>
   </div>
