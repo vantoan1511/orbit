@@ -48,10 +48,31 @@ jobs:
         run: |
           $version = node -p "require('./package.json').version"
           echo "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          $prev_tag = git describe --tags --abbrev=0 HEAD~1 2>$null
+          if (-not $prev_tag) {
+            $prev_tag = git rev-list --max-parents=0 HEAD
+          }
+          
+          $features = git log "$($prev_tag)..HEAD" --grep="^feat" --pretty=format:"- %s (%h)"
+          $fixes = git log "$($prev_tag)..HEAD" --grep="^fix" --pretty=format:"- %s (%h)"
+          $perf = git log "$($prev_tag)..HEAD" --grep="^perf" --pretty=format:"- %s (%h)"
+          
+          $notes = ""
+          if ($features) { $notes += "### 🚀 Features`n`n$features`n`n" }
+          if ($fixes) { $notes += "### 🐛 Bug Fixes`n`n$fixes`n`n" }
+          if ($perf) { $notes += "### ⚡ Performance Improvements`n`n$perf`n`n" }
+          
+          if ($notes -eq "") { $notes = "No significant user-facing changes in this release.`n" }
+          
+          Set-Content -Path release_notes.md -Value $notes -Encoding utf8
       - name: Create Tag & Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.VERSION }}
+          body_path: release_notes.md
           files: |
             dist/Orbit-Setup-${{ env.VERSION }}.exe
             dist/orbit-update.zip
