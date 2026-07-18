@@ -30,15 +30,9 @@ const tableColumns = ref<TableColumn[]>([
   { field: 'age', header: 'Age', visible: true }
 ])
 
-const visibleCols = computed(() => {
-  return tableColumns.value.reduce(
-    (acc, col) => {
-      acc[col.field] = col.visible
-      return acc
-    },
-    {} as Record<string, boolean>
-  )
-})
+const visibleCols = computed(() =>
+  Object.fromEntries(tableColumns.value.map((col) => [col.field, col.visible]))
+)
 
 // Filter out 'Type' column from configuration checkboxes when in configmaps tab
 const columnsForConfig = computed(() => {

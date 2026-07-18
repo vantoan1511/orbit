@@ -20,15 +20,9 @@ const tableColumns = ref<TableColumn[]>([
   { field: 'images', header: 'Images', visible: true }
 ])
 
-const visibleCols = computed(() => {
-  return tableColumns.value.reduce(
-    (acc, col) => {
-      acc[col.field] = col.visible
-      return acc
-    },
-    {} as Record<string, boolean>
-  )
-})
+const visibleCols = computed(() =>
+  Object.fromEntries(tableColumns.value.map((col) => [col.field, col.visible]))
+)
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
