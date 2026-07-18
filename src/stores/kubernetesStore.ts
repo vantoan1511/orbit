@@ -319,57 +319,97 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  function onResourceUpdated(payload: { kind: string; action: 'Applied' | 'Deleted'; data: any }) {
+  type ResourceInfo =
+    | ServiceInfo
+    | DeploymentInfo
+    | PodInfo
+    | StatefulSetInfo
+    | DaemonSetInfo
+    | ReplicaSetInfo
+    | JobInfo
+    | CronJobInfo
+    | NamespaceInfo
+    | ConfigMapInfo
+    | SecretInfo
+    | EventInfo
+    | PersistentVolumeInfo
+    | PersistentVolumeClaimInfo
+    | StorageClassInfo
+    | PolicyInfo
+
+  function onResourceUpdated(payload: {
+    kind: string
+    action: 'Applied' | 'Deleted'
+    data: ResourceInfo
+  }) {
     const { kind, action, data } = payload
 
+    interface NamespacedResource {
+      name: string
+      namespace: string
+    }
+
+    interface ClusterScopedResource {
+      name?: string
+      uid?: string
+    }
+
     // Helper to update a namespaced list
-    const updateNamespaced = (listRef: any, item: any) => {
+    const updateNamespaced = <T extends NamespacedResource>(listRef: { value: T[] }, item: T) => {
       if (action === 'Applied') {
         const index = listRef.value.findIndex(
-          (x: any) => x.name === item.name && x.namespace === item.namespace
+          (x) => x.name === item.name && x.namespace === item.namespace
         )
         if (index !== -1) listRef.value.splice(index, 1, item)
         else listRef.value.push(item)
       } else if (action === 'Deleted') {
         listRef.value = listRef.value.filter(
-          (x: any) => !(x.name === item.name && x.namespace === item.namespace)
+          (x) => !(x.name === item.name && x.namespace === item.namespace)
         )
       }
     }
 
     // Helper to update a cluster-scoped list (using name or uid)
-    const updateClusterScoped = (listRef: any, item: any, key: 'name' | 'uid' = 'name') => {
+    const updateClusterScoped = <T extends ClusterScopedResource, K extends 'name' | 'uid'>(
+      listRef: { value: T[] },
+      item: T,
+      key: K
+    ) => {
       if (action === 'Applied') {
-        const index = listRef.value.findIndex((x: any) => x[key] === item[key])
+        const index = listRef.value.findIndex((x) => x[key] === item[key])
         if (index !== -1) listRef.value.splice(index, 1, item)
         else listRef.value.push(item)
       } else if (action === 'Deleted') {
-        listRef.value = listRef.value.filter((x: any) => x[key] !== item[key])
+        listRef.value = listRef.value.filter((x) => x[key] !== item[key])
       }
     }
 
-    if (kind === 'Service') updateClusterScoped(services, data, 'uid')
-    else if (kind === 'Deployment') updateNamespaced(deployments, data)
-    else if (kind === 'Pod') updateNamespaced(pods, data)
-    else if (kind === 'StatefulSet') updateNamespaced(statefulSets, data)
-    else if (kind === 'DaemonSet') updateNamespaced(daemonSets, data)
-    else if (kind === 'ReplicaSet') updateNamespaced(replicaSets, data)
-    else if (kind === 'Job') updateNamespaced(jobs, data)
-    else if (kind === 'CronJob') updateNamespaced(cronJobs, data)
-    else if (kind === 'Namespace') updateClusterScoped(namespaceList, data, 'name')
-    else if (kind === 'ConfigMap') updateNamespaced(configMaps, data)
-    else if (kind === 'Secret') updateNamespaced(secrets, data)
-    else if (kind === 'Event') updateClusterScoped(events, data, 'uid')
-    else if (kind === 'PersistentVolume') updateClusterScoped(persistentVolumes, data, 'name')
-    else if (kind === 'PersistentVolumeClaim') updateNamespaced(persistentVolumeClaims, data)
-    else if (kind === 'StorageClass') updateClusterScoped(storageClasses, data, 'name')
+    if (kind === 'Service') updateClusterScoped(services, data as ServiceInfo, 'uid')
+    else if (kind === 'Deployment') updateNamespaced(deployments, data as DeploymentInfo)
+    else if (kind === 'Pod') updateNamespaced(pods, data as PodInfo)
+    else if (kind === 'StatefulSet') updateNamespaced(statefulSets, data as StatefulSetInfo)
+    else if (kind === 'DaemonSet') updateNamespaced(daemonSets, data as DaemonSetInfo)
+    else if (kind === 'ReplicaSet') updateNamespaced(replicaSets, data as ReplicaSetInfo)
+    else if (kind === 'Job') updateNamespaced(jobs, data as JobInfo)
+    else if (kind === 'CronJob') updateNamespaced(cronJobs, data as CronJobInfo)
+    else if (kind === 'Namespace') updateClusterScoped(namespaceList, data as NamespaceInfo, 'name')
+    else if (kind === 'ConfigMap') updateNamespaced(configMaps, data as ConfigMapInfo)
+    else if (kind === 'Secret') updateNamespaced(secrets, data as SecretInfo)
+    else if (kind === 'Event') updateClusterScoped(events, data as EventInfo, 'uid')
+    else if (kind === 'PersistentVolume')
+      updateClusterScoped(persistentVolumes, data as PersistentVolumeInfo, 'name')
+    else if (kind === 'PersistentVolumeClaim')
+      updateNamespaced(persistentVolumeClaims, data as PersistentVolumeClaimInfo)
+    else if (kind === 'StorageClass')
+      updateClusterScoped(storageClasses, data as StorageClassInfo, 'name')
     else if (kind === 'Policy') {
+      const policyData = data as PolicyInfo
       if (action === 'Applied') {
-        const index = policies.value.findIndex((x) => x.uid === data.uid)
-        if (index !== -1) policies.value.splice(index, 1, data)
-        else policies.value.push(data)
+        const index = policies.value.findIndex((x) => x.uid === policyData.uid)
+        if (index !== -1) policies.value.splice(index, 1, policyData)
+        else policies.value.push(policyData)
       } else if (action === 'Deleted') {
-        policies.value = policies.value.filter((x) => x.uid !== data.uid)
+        policies.value = policies.value.filter((x) => x.uid !== policyData.uid)
       }
     }
   }

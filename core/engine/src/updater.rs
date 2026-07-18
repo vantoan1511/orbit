@@ -48,11 +48,9 @@ impl UpdateManifest {
             file.write_all(&chunk).await?;
             downloaded += chunk.len() as u64;
             
-            if let Some(tx) = &progress_tx {
-                if total_size > 0 {
-                    let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u8;
-                    let _ = tx.send(progress).await;
-                }
+            if let (Some(tx), true) = (&progress_tx, total_size > 0) {
+                let progress = ((downloaded as f64 / total_size as f64) * 100.0) as u8;
+                let _ = tx.send(progress).await;
             }
         }
         
