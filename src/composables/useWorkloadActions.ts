@@ -1,14 +1,6 @@
-import { Info, FileEdit, Scale, ScrollText, Trash2 } from '@lucide/vue'
+import type { MenuItem } from 'primevue/menuitem'
 import { useToast } from 'primevue/usetoast'
 import { computed, type Ref } from 'vue'
-import type { Component } from 'vue'
-
-export interface ActionMenuItem {
-  label: string
-  icon?: Component
-  command?: () => void
-  class?: string
-}
 
 export function useWorkloadActions<T extends { name: string }>(
   selectedActionRow: Ref<T | null>,
@@ -17,10 +9,10 @@ export function useWorkloadActions<T extends { name: string }>(
 ) {
   const toast = useToast()
 
-  const actionMenuItems = computed<ActionMenuItem[]>(() => [
+  const actionMenuItems = computed<MenuItem[]>(() => [
     {
       label: 'View Details',
-      icon: Info,
+      icon: 'pi pi-info',
       command: () => {
         if (selectedActionRow.value) {
           selectedWorkload.value = selectedActionRow.value
@@ -30,7 +22,7 @@ export function useWorkloadActions<T extends { name: string }>(
     },
     {
       label: 'Edit (YAML)',
-      icon: FileEdit,
+      icon: 'pi pi-pencil',
       command: () => {
         toast.add({
           severity: 'info',
@@ -42,7 +34,7 @@ export function useWorkloadActions<T extends { name: string }>(
     },
     {
       label: 'Scale',
-      icon: Scale,
+      icon: 'pi pi-scale',
       command: () => {
         toast.add({
           severity: 'info',
@@ -54,7 +46,7 @@ export function useWorkloadActions<T extends { name: string }>(
     },
     {
       label: 'View Logs',
-      icon: ScrollText,
+      icon: 'pi pi-scroll',
       class:
         'text-violet-400 hover:text-violet-300 font-semibold border border-violet-500/20 bg-violet-500/5',
       command: () => {
@@ -68,7 +60,7 @@ export function useWorkloadActions<T extends { name: string }>(
     },
     {
       label: 'Delete',
-      icon: Trash2,
+      icon: 'pi pi-bin',
       class: 'text-red-400 hover:text-red-300',
       command: () => {
         toast.add({
