@@ -10,7 +10,7 @@ import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { StatefulSetInfo } from '@/types/kubernetes'
-import { MoreVertical, Info, FileEdit, Scale, ScrollText, Trash2 } from '@lucide/vue'
+import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -90,6 +90,8 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
   drawerVisible.value = true
 }
 
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+
 const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
 const selectedActionRow = ref<StatefulSetInfo | null>(null)
 
@@ -99,69 +101,7 @@ const toggleActionMenu = (event: Event, data: StatefulSetInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const actionMenuItems = computed(() => [
-  {
-    label: 'View Details',
-    icon: Info,
-    command: () => {
-      if (selectedActionRow.value) {
-        selectedWorkload.value = selectedActionRow.value
-        drawerVisible.value = true
-      }
-    }
-  },
-  {
-    label: 'Edit (YAML)',
-    icon: FileEdit,
-    command: () => {
-      toast.add({
-        severity: 'info',
-        summary: 'Edit YAML',
-        detail: `Edit YAML triggered for ${selectedActionRow.value?.name}`,
-        life: 3000
-      })
-    }
-  },
-  {
-    label: 'Scale',
-    icon: Scale,
-    command: () => {
-      toast.add({
-        severity: 'info',
-        summary: 'Scale',
-        detail: `Scale triggered for ${selectedActionRow.value?.name}`,
-        life: 3000
-      })
-    }
-  },
-  {
-    label: 'View Logs',
-    icon: ScrollText,
-    class:
-      'text-violet-400 hover:text-violet-300 font-semibold border border-violet-500/20 bg-violet-500/5',
-    command: () => {
-      toast.add({
-        severity: 'info',
-        summary: 'View Logs',
-        detail: `View Logs triggered for ${selectedActionRow.value?.name}`,
-        life: 3000
-      })
-    }
-  },
-  {
-    label: 'Delete',
-    icon: Trash2,
-    class: 'text-red-400 hover:text-red-300',
-    command: () => {
-      toast.add({
-        severity: 'warn',
-        summary: 'Delete',
-        detail: `Delete triggered for ${selectedActionRow.value?.name}`,
-        life: 3000
-      })
-    }
-  }
-])
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, drawerVisible, selectedWorkload)
 </script>
 
 <template>
