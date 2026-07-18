@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { PodInfo } from '@/types/kubernetes'
 import { Power, Trash2 } from '@lucide/vue'
@@ -13,6 +13,26 @@ import PodDetailsDrawer from './PodDetailsDrawer.vue'
 
 const toast = useToast()
 const k8sStore = useKubernetesStore()
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'status', header: 'Status', visible: true },
+  { field: 'node', header: 'Node', visible: true },
+  { field: 'restarts', header: 'Restarts', visible: true },
+  { field: 'cpu', header: 'CPU', visible: true },
+  { field: 'memory', header: 'Memory', visible: true },
+  { field: 'age', header: 'Age', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
@@ -104,6 +124,7 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
   <ResourceDataTable
     :data="filteredPods"
     v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
     searchPlaceholder="Search pods, images or nodes..."
     emptyMessage="No pods found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} pods"
@@ -148,14 +169,20 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
       </template>
     </Column>
 
     <!-- Status Column -->
-    <Column field="status" header="Status" sortable class="p-3">
+    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
         <div class="flex items-center gap-1.5">
           <span
@@ -170,7 +197,7 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     </Column>
 
     <!-- Node Column -->
-    <Column field="node" header="Node" sortable class="p-3">
+    <Column v-if="visibleCols['node']" field="node" header="Node" sortable class="p-3">
       <template #body="{ data }">
         <span
           class="text-(--text-secondary) font-mono truncate block max-w-44"
@@ -182,7 +209,13 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     </Column>
 
     <!-- Restarts Column -->
-    <Column field="restarts" header="Restarts" sortable class="p-3 text-center">
+    <Column
+      v-if="visibleCols['restarts']"
+      field="restarts"
+      header="Restarts"
+      sortable
+      class="p-3 text-center"
+    >
       <template #body="{ data }">
         <span
           class="font-mono px-1.5 py-0.5 rounded text-[10px]"
@@ -198,7 +231,7 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     </Column>
 
     <!-- CPU Column -->
-    <Column field="cpu" header="CPU" sortable class="p-3">
+    <Column v-if="visibleCols['cpu']" field="cpu" header="CPU" sortable class="p-3">
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-24">
           <div class="flex justify-between font-mono text-[10px]">
@@ -221,7 +254,7 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     </Column>
 
     <!-- Memory Column -->
-    <Column field="memory" header="Memory" sortable class="p-3">
+    <Column v-if="visibleCols['memory']" field="memory" header="Memory" sortable class="p-3">
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-24">
           <div class="flex justify-between font-mono text-[10px]">
@@ -244,7 +277,13 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Actions Column -->
     <Column class="p-3 text-center">

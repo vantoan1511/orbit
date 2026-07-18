@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ServiceInfo } from '@/types/kubernetes'
@@ -14,6 +14,26 @@ import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
 
 const toast = useToast()
 const k8sStore = useKubernetesStore()
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'type', header: 'Type', visible: true },
+  { field: 'clusterIP', header: 'Cluster IP', visible: true },
+  { field: 'externalIP', header: 'External IP', visible: true },
+  { field: 'ports', header: 'Ports', visible: true },
+  { field: 'endpoints', header: 'Endpoints', visible: true },
+  { field: 'age', header: 'Age', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
 
 const services = computed(() => k8sStore.services)
 const searchQuery = ref('')
@@ -94,6 +114,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
   <ResourceDataTable
     :data="filteredServices"
     v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
     searchPlaceholder="Search services..."
     emptyMessage="No services found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} services"
@@ -145,14 +166,20 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
       </template>
     </Column>
 
     <!-- Type Column -->
-    <Column field="type" header="Type" sortable class="p-3">
+    <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3">
       <template #body="{ data }">
         <span
           class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
@@ -164,14 +191,26 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
     </Column>
 
     <!-- Cluster IP Column -->
-    <Column field="clusterIP" header="Cluster IP" sortable class="p-3">
+    <Column
+      v-if="visibleCols['clusterIP']"
+      field="clusterIP"
+      header="Cluster IP"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-secondary)">{{ data.clusterIP }}</span>
       </template>
     </Column>
 
     <!-- External IP Column -->
-    <Column field="externalIP" header="External IP" sortable class="p-3">
+    <Column
+      v-if="visibleCols['externalIP']"
+      field="externalIP"
+      header="External IP"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <div class="flex items-center gap-1">
           <span class="font-mono text-(--text-secondary)">{{ data.externalIP }}</span>
@@ -184,21 +223,33 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
     </Column>
 
     <!-- Ports Column -->
-    <Column field="ports" header="Ports" sortable class="p-3">
+    <Column v-if="visibleCols['ports']" field="ports" header="Ports" sortable class="p-3">
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted) whitespace-pre-line">{{ data.ports }}</span>
       </template>
     </Column>
 
     <!-- Endpoints Column -->
-    <Column field="endpoints" header="Endpoints" sortable class="p-3">
+    <Column
+      v-if="visibleCols['endpoints']"
+      field="endpoints"
+      header="Endpoints"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono font-medium text-emerald-400">{{ data.endpoints }}</span>
       </template>
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Actions Column -->
     <Column class="p-3 text-center">

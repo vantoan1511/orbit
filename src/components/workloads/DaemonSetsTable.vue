@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { DaemonSetInfo } from '@/types/kubernetes'
@@ -10,6 +10,26 @@ import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+
+const tableColumns = ref<TableColumn[]>([
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'status', header: 'Status', visible: true },
+  { field: 'desiredCurrent', header: 'Desired/Current', visible: true },
+  { field: 'ready', header: 'Ready', visible: true },
+  { field: 'available', header: 'Available', visible: true },
+  { field: 'age', header: 'Age', visible: true },
+  { field: 'images', header: 'Images', visible: true }
+])
+
+const visibleCols = computed(() => {
+  return tableColumns.value.reduce(
+    (acc, col) => {
+      acc[col.field] = col.visible
+      return acc
+    },
+    {} as Record<string, boolean>
+  )
+})
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
@@ -86,6 +106,7 @@ const onRowClick = (event: { data: DaemonSetInfo }) => {
   <ResourceDataTable
     :data="filteredDaemonSets"
     v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
     searchPlaceholder="Search daemonsets or images..."
     emptyMessage="No daemonsets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} daemonsets"
@@ -132,14 +153,20 @@ const onRowClick = (event: { data: DaemonSetInfo }) => {
     </Column>
 
     <!-- Namespace Column -->
-    <Column field="namespace" header="Namespace" sortable class="p-3">
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
       <template #body="{ data }">
         <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
       </template>
     </Column>
 
     <!-- Status Column -->
-    <Column field="status" header="Status" sortable class="p-3">
+    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
         <div class="flex items-center gap-1.5">
           <span
@@ -157,7 +184,7 @@ const onRowClick = (event: { data: DaemonSetInfo }) => {
     </Column>
 
     <!-- Desired/Current Column -->
-    <Column header="Desired/Current" class="p-3">
+    <Column v-if="visibleCols['desiredCurrent']" header="Desired/Current" class="p-3">
       <template #body="{ data }">
         <span class="font-mono text-(--text-secondary)">
           {{ data.replicas.desired }} / {{ data.replicas.current }}
@@ -166,24 +193,30 @@ const onRowClick = (event: { data: DaemonSetInfo }) => {
     </Column>
 
     <!-- Ready Column -->
-    <Column header="Ready" class="p-3">
+    <Column v-if="visibleCols['ready']" header="Ready" class="p-3">
       <template #body="{ data }">
         <span class="font-mono text-emerald-500">{{ data.replicas.ready }}</span>
       </template>
     </Column>
 
     <!-- Available Column -->
-    <Column header="Available" class="p-3">
+    <Column v-if="visibleCols['available']" header="Available" class="p-3">
       <template #body="{ data }">
         <span class="font-mono text-emerald-400">{{ data.replicas.available }}</span>
       </template>
     </Column>
 
     <!-- Age Column -->
-    <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"></Column>
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3 text-(--text-muted) font-mono"
+    ></Column>
 
     <!-- Images Column -->
-    <Column header="Images" class="p-3 max-w-48">
+    <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
       <template #body="{ data }">
         <div class="flex flex-wrap gap-1">
           <span
