@@ -1,16 +1,10 @@
 <script setup lang="ts">
 import Menu from 'primevue/menu'
-import { ref, type Component } from 'vue'
-
-export interface ActionMenuItem {
-  label: string
-  icon?: Component
-  command?: () => void
-  class?: string
-}
+import type { MenuItem } from 'primevue/menuitem'
+import { ref } from 'vue'
 
 const props = defineProps<{
-  items: ActionMenuItem[]
+  items: MenuItem[]
 }>()
 
 const menuRef = ref<InstanceType<typeof Menu> | null>(null)
