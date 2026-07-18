@@ -1,27 +1,8 @@
 <script setup lang="ts">
-import { kubernetesService } from '@/services/kubernetesService'
-import { os } from '@/services/nativeService'
+import { useCluster } from '@/composables/useCluster'
 import { Cog, Compass, FolderOpen, Layers, Lock } from '@lucide/vue'
-import { useToast } from 'primevue'
 
-const toast = useToast()
-
-const handleAddCluster = async () => {
-  try {
-    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File')
-    if (selectedFiles && selectedFiles.length > 0 && selectedFiles[0]) {
-      await kubernetesService.addCluster(selectedFiles[0])
-    }
-  } catch (error) {
-    console.error('Failed to add cluster:', error)
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to add cluster.',
-      life: 3000
-    })
-  }
-}
+const { handleAddCluster } = useCluster()
 
 const quickStartSteps = [
   {
@@ -117,8 +98,7 @@ const quickStartSteps = [
           label="Add Cluster"
           severity="secondary"
           @click="handleAddCluster"
-        >
-        </Button>
+        />
         <p class="text-sm font-semibold text-(--text-secondary)">
           No clusters yet? Add one to get started.
         </p>

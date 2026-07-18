@@ -64,6 +64,9 @@ export const os = {
     }
   ): Promise<string[]> {
     return neuOs.showOpenDialog(title, options)
+  },
+  open(url: string): Promise<void> {
+    return neuOs.open(url)
   }
 }
 

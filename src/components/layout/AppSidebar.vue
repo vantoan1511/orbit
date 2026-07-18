@@ -1,45 +1,31 @@
 <script setup lang="ts">
+import { useCluster } from '@/composables/useCluster'
+import { useTheme } from '@/composables/useTheme'
 import { kubernetesService } from '@/services/kubernetesService'
 import { os } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { VERSION } from '@/version'
 import {
   Activity,
-  Bell,
-  BookOpen,
   Box,
   Boxes,
   FolderOpen,
   HardDrive,
   LayoutDashboard,
-  Moon,
   Network,
-  Plus,
   Server,
   Settings,
   Settings2,
-  ShieldCheck,
-  Sun,
-  User
+  ShieldCheck
 } from '@lucide/vue'
-import { ref } from 'vue'
+import { Button } from 'primevue'
 import { useRoute } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
+const { handleAddCluster } = useCluster()
 
 const handleSwitchCluster = async (clusterId: string) => {
   await kubernetesService.switchCluster(clusterId)
-}
-
-const handleAddCluster = async () => {
-  try {
-    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File')
-    if (selectedFiles && selectedFiles.length > 0 && selectedFiles[0]) {
-      await kubernetesService.addCluster(selectedFiles[0])
-    }
-  } catch (error) {
-    console.error('Failed to add cluster:', error)
-  }
 }
 
 // Navigation links
@@ -59,20 +45,7 @@ const navLinks = [
 
 const route = useRoute()
 
-// Theme state
-const isDark = ref(true)
-
-const toggleTheme = () => {
-  isDark.value = !isDark.value
-  const html = document.documentElement
-  if (isDark.value) {
-    html.classList.add('my-app-dark')
-    html.setAttribute('data-theme', 'dark')
-  } else {
-    html.classList.remove('my-app-dark')
-    html.setAttribute('data-theme', 'light')
-  }
-}
+const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
@@ -92,39 +65,33 @@ const toggleTheme = () => {
       <div class="text-[10px] font-bold text-(--text-muted) tracking-wider uppercase mb-2 px-2">
         Clusters
       </div>
-      <div class="flex flex-col gap-1">
-        <button
+      <div class="flex flex-col gap-2">
+        <Button
           v-for="cluster in k8sStore.clusters"
           :key="cluster.id"
+          :label="cluster.name"
+          :icon="k8sStore.activeClusterId === cluster.id ? 'pi pi-circle-fill' : ''"
+          :severity="k8sStore.activeClusterId === cluster.id ? 'success' : 'secondary'"
+          fluid
+          class="truncate justify-start text-xs"
+          variant="text"
+          size="small"
           @click="handleSwitchCluster(cluster.id)"
-          class="w-full text-left px-3 py-2 rounded-lg text-sm flex items-center justify-between transition-all duration-200"
-          :class="[
-            k8sStore.activeClusterId === cluster.id
-              ? 'bg-(--bg-active) font-medium text-(--text-primary)'
-              : 'text-(--text-secondary) hover:bg-(--bg-hover)'
-          ]"
-        >
-          <div class="flex items-center gap-2 truncate">
-            <span
-              class="w-2 h-2 rounded-full shrink-0"
-              :class="cluster.status === 'healthy' ? 'bg-emerald-500' : 'bg-zinc-500'"
-            ></span>
-            <span class="truncate">{{ cluster.name }}</span>
-          </div>
-        </button>
+        />
 
         <!-- Empty state when no clusters are configured -->
         <p v-if="k8sStore.clusters.length === 0" class="text-xs text-(--text-muted) px-3 py-1">
           No clusters added yet
         </p>
 
-        <button
+        <Button
+          fluid
+          icon="pi pi-plus"
+          label="Add Cluster"
+          severity="secondary"
+          size="small"
           @click="handleAddCluster"
-          class="w-full text-left px-3 py-2 rounded-lg text-sm text-blue-500 hover:bg-(--bg-hover) flex items-center gap-2 transition-all duration-200 font-medium"
-        >
-          <Plus class="w-4 h-4" />
-          <span>Add Cluster</span>
-        </button>
+        />
       </div>
     </div>
 
@@ -153,39 +120,26 @@ const toggleTheme = () => {
     <div class="p-4 border-t border-(--border) flex items-center justify-around bg-(--bg-sidebar)">
       <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
-        <button
+        <Button
+          rounded
+          variant="text"
+          :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
           @click="toggleTheme"
-          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) transition-all duration-200"
-          title="Toggle Theme"
-        >
-          <Sun v-if="isDark" class="w-4.5 h-4.5" />
-          <Moon v-else class="w-4.5 h-4.5" />
-        </button>
+        />
 
         <!-- Docs -->
-        <a
-          href="#"
-          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) transition-all duration-200"
-          title="Documentation"
-        >
-          <BookOpen class="w-4.5 h-4.5" />
-        </a>
+        <Button
+          rounded
+          variant="text"
+          icon="pi pi-github"
+          @click="os.open('https://github.com/vantoan1511/orbit')"
+        />
 
         <!-- Notifications -->
-        <button
-          class="p-2 rounded-lg hover:bg-(--bg-hover) text-(--text-secondary) transition-all duration-200 relative"
-          title="Notifications"
-        >
-          <Bell class="w-4.5 h-4.5" />
-          <span class="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500"></span>
-        </button>
+        <Button rounded variant="text" icon="pi pi-bell" />
 
         <!-- Profile -->
-        <button
-          class="w-8 h-8 rounded-full bg-(--bg-hover) flex items-center justify-center text-(--text-secondary) hover:bg-(--bg-active) transition-all duration-200"
-        >
-          <User class="w-4 h-4" />
-        </button>
+        <Button rounded variant="text" icon="pi pi-user" />
       </div>
     </div>
     <div class="flex items-center justify-center gap-2">

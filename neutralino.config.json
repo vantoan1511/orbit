@@ -32,7 +32,8 @@
     "events.off",
     "events.dispatch",
     "events.broadcast",
-    "os.showOpenDialog"
+    "os.showOpenDialog",
+    "os.open"
   ],
   "extensions": [
     {
