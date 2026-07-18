@@ -42,7 +42,7 @@ jobs:
       - name: Package Update Zip
         run: |
           cd dist\orbit
-          Compress-Archive -Path resources.neu, bin -DestinationPath ..\orbit-update.zip
+          Compress-Archive -Path resources.neu, bin\orbit-engine.exe, bin\orbit-apply.exe -DestinationPath ..\orbit-update.zip
       - name: Get Version
         id: version
         run: |
