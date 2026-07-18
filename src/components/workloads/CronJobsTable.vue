@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import ResourceDataTable, { type TableColumn } from '@/components/shared/ResourceDataTable.vue'
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { CronJobInfo } from '@/types/kubernetes'
@@ -11,7 +12,7 @@ import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
 
-const tableColumns = ref<TableColumn[]>([
+const { tableColumns, visibleCols } = useTableColumns([
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'schedule', header: 'Schedule', visible: true },
   { field: 'suspend', header: 'Suspend', visible: true },
@@ -19,10 +20,6 @@ const tableColumns = ref<TableColumn[]>([
   { field: 'lastSchedule', header: 'Last Schedule', visible: true },
   { field: 'age', header: 'Age', visible: true }
 ])
-
-const visibleCols = computed(() =>
-  Object.fromEntries(tableColumns.value.map((col) => [col.field, col.visible]))
-)
 
 const searchQuery = ref('')
 const selectedNamespace = ref('All Namespaces')
