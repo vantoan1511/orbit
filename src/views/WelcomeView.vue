@@ -36,22 +36,6 @@ const quickStartSteps = [
     >
       <!-- Animated orbit logo -->
       <div class="relative w-28 h-28 flex items-center justify-center">
-        <!-- Outer orbit ring -->
-        <div
-          class="absolute inset-0 rounded-full border-2 border-blue-500/30 animate-spin"
-          style="animation-duration: 8s"
-        ></div>
-        <!-- Inner orbit ring -->
-        <div
-          class="absolute inset-3 rounded-full border border-blue-500/20 animate-spin"
-          style="animation-duration: 5s; animation-direction: reverse"
-        ></div>
-        <!-- Satellite dot -->
-        <div
-          class="absolute top-0 left-1/2 w-3 h-3 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50 animate-spin"
-          style="animation-duration: 8s; transform-origin: 50% 56px"
-        ></div>
-        <!-- Center logo -->
         <img src="/logo.png" alt="Orbit" class="w-14 h-14 object-contain relative z-10" />
       </div>
 

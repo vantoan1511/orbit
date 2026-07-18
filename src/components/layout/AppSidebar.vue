@@ -22,7 +22,7 @@ import { Button } from 'primevue'
 import { useRoute } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
-const { activeCluster, handleAddCluster } = useCluster()
+const { activeCluster, isRefreshing, handleAddCluster } = useCluster()
 
 const handleSwitchCluster = async (clusterId: string) => {
   await kubernetesService.switchCluster(clusterId)
@@ -70,6 +70,7 @@ const { isDark, toggleTheme } = useTheme()
           v-for="cluster in k8sStore.clusters"
           :key="cluster.id"
           :label="cluster.name"
+          :loading="k8sStore.activeClusterId === cluster.id && isRefreshing"
           :icon="k8sStore.activeClusterId === cluster.id ? 'pi pi-circle-fill' : ''"
           :severity="
             k8sStore.activeClusterId === cluster.id
@@ -79,9 +80,8 @@ const { isDark, toggleTheme } = useTheme()
               : 'secondary'
           "
           fluid
-          class="truncate justify-start text-xs"
+          class="truncate justify-start text-medium"
           variant="text"
-          size="small"
           @click="handleSwitchCluster(cluster.id)"
         />
 
