@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import Chart from 'primevue/chart'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { computed, onMounted, ref } from 'vue'
 import { Boxes, Server, CheckCircle2, TrendingUp, AlertTriangle } from '@lucide/vue'
-import { mockDeployments } from './mockDeployments'
 
-const deployments = ref(mockDeployments)
+const k8sStore = useKubernetesStore()
+const deployments = computed(() => k8sStore.deployments)
 
 const totals = computed(() => {
   const total = deployments.value.length
@@ -39,18 +40,11 @@ const totals = computed(() => {
 })
 
 // Doughnut chart configurations
-const availableChartData = ref()
-const progressingChartData = ref()
-const failedChartData = ref()
+const isDark = ref(false)
 const miniChartOptions = ref()
 
 onMounted(() => {
-  const isDark = document.documentElement.classList.contains('my-app-dark')
-
-  const runningColor = isDark ? '#46d16e' : '#28a745'
-  const pendingColor = isDark ? '#ffc54d' : '#f4a100'
-  const failedColor = isDark ? '#ff6b6b' : '#d64545'
-  const trackColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+  isDark.value = document.documentElement.classList.contains('my-app-dark')
 
   miniChartOptions.value = {
     responsive: true,
@@ -61,8 +55,12 @@ onMounted(() => {
       tooltip: { enabled: false }
     }
   }
+})
 
-  availableChartData.value = {
+const availableChartData = computed(() => {
+  const runningColor = isDark.value ? '#46d16e' : '#28a745'
+  const trackColor = isDark.value ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+  return {
     datasets: [
       {
         data: [totals.value.running, totals.value.total - totals.value.running],
@@ -71,8 +69,12 @@ onMounted(() => {
       }
     ]
   }
+})
 
-  progressingChartData.value = {
+const progressingChartData = computed(() => {
+  const pendingColor = isDark.value ? '#ffc54d' : '#f4a100'
+  const trackColor = isDark.value ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+  return {
     datasets: [
       {
         data: [totals.value.progressing, totals.value.total - totals.value.progressing],
@@ -81,8 +83,12 @@ onMounted(() => {
       }
     ]
   }
+})
 
-  failedChartData.value = {
+const failedChartData = computed(() => {
+  const failedColor = isDark.value ? '#ff6b6b' : '#d64545'
+  const trackColor = isDark.value ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'
+  return {
     datasets: [
       {
         data: [totals.value.failed, totals.value.total - totals.value.failed],
