@@ -33,9 +33,7 @@ const handleSwitchCluster = async (clusterId: string) => {
 
 const handleAddCluster = async () => {
   try {
-    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File', {
-      filters: [{ name: 'Kubeconfig', extensions: ['*', 'yaml', 'yml', 'conf'] }]
-    })
+    const selectedFiles = await os.showOpenDialog('Select Kubeconfig File')
     if (selectedFiles && selectedFiles.length > 0 && selectedFiles[0]) {
       await kubernetesService.addCluster(selectedFiles[0])
     }
