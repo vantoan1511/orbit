@@ -384,33 +384,55 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       }
     }
 
-    if (kind === 'Service') updateClusterScoped(services, data as ServiceInfo, 'uid')
-    else if (kind === 'Deployment') updateNamespaced(deployments, data as DeploymentInfo)
-    else if (kind === 'Pod') updateNamespaced(pods, data as PodInfo)
-    else if (kind === 'StatefulSet') updateNamespaced(statefulSets, data as StatefulSetInfo)
-    else if (kind === 'DaemonSet') updateNamespaced(daemonSets, data as DaemonSetInfo)
-    else if (kind === 'ReplicaSet') updateNamespaced(replicaSets, data as ReplicaSetInfo)
-    else if (kind === 'Job') updateNamespaced(jobs, data as JobInfo)
-    else if (kind === 'CronJob') updateNamespaced(cronJobs, data as CronJobInfo)
-    else if (kind === 'Namespace') updateClusterScoped(namespaceList, data as NamespaceInfo, 'name')
-    else if (kind === 'ConfigMap') updateNamespaced(configMaps, data as ConfigMapInfo)
-    else if (kind === 'Secret') updateNamespaced(secrets, data as SecretInfo)
-    else if (kind === 'Event') updateClusterScoped(events, data as EventInfo, 'uid')
-    else if (kind === 'PersistentVolume')
-      updateClusterScoped(persistentVolumes, data as PersistentVolumeInfo, 'name')
-    else if (kind === 'PersistentVolumeClaim')
-      updateNamespaced(persistentVolumeClaims, data as PersistentVolumeClaimInfo)
-    else if (kind === 'StorageClass')
-      updateClusterScoped(storageClasses, data as StorageClassInfo, 'name')
-    else if (kind === 'Policy') {
-      const policyData = data as PolicyInfo
-      if (action === 'Applied') {
-        const index = policies.value.findIndex((x) => x.uid === policyData.uid)
-        if (index !== -1) policies.value.splice(index, 1, policyData)
-        else policies.value.push(policyData)
-      } else if (action === 'Deleted') {
-        policies.value = policies.value.filter((x) => x.uid !== policyData.uid)
-      }
+    switch (kind) {
+      case 'Service':
+        updateClusterScoped(services, data as ServiceInfo, 'uid')
+        break
+      case 'Deployment':
+        updateNamespaced(deployments, data as DeploymentInfo)
+        break
+      case 'Pod':
+        updateNamespaced(pods, data as PodInfo)
+        break
+      case 'StatefulSet':
+        updateNamespaced(statefulSets, data as StatefulSetInfo)
+        break
+      case 'DaemonSet':
+        updateNamespaced(daemonSets, data as DaemonSetInfo)
+        break
+      case 'ReplicaSet':
+        updateNamespaced(replicaSets, data as ReplicaSetInfo)
+        break
+      case 'Job':
+        updateNamespaced(jobs, data as JobInfo)
+        break
+      case 'CronJob':
+        updateNamespaced(cronJobs, data as CronJobInfo)
+        break
+      case 'Namespace':
+        updateClusterScoped(namespaceList, data as NamespaceInfo, 'name')
+        break
+      case 'ConfigMap':
+        updateNamespaced(configMaps, data as ConfigMapInfo)
+        break
+      case 'Secret':
+        updateNamespaced(secrets, data as SecretInfo)
+        break
+      case 'Event':
+        updateClusterScoped(events, data as EventInfo, 'uid')
+        break
+      case 'PersistentVolume':
+        updateClusterScoped(persistentVolumes, data as PersistentVolumeInfo, 'name')
+        break
+      case 'PersistentVolumeClaim':
+        updateNamespaced(persistentVolumeClaims, data as PersistentVolumeClaimInfo)
+        break
+      case 'StorageClass':
+        updateClusterScoped(storageClasses, data as StorageClassInfo, 'name')
+        break
+      case 'Policy':
+        updateClusterScoped(policies, data as PolicyInfo, 'uid')
+        break
     }
   }
 
