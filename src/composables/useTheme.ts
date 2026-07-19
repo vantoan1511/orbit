@@ -4,7 +4,7 @@ import { ref } from 'vue'
 const isDark = ref(true)
 
 export function useTheme() {
-  const toggleTheme = () => {
+  const toggleTheme = (): void => {
     isDark.value = !isDark.value
     const html = document.documentElement
     html.classList.toggle('my-app-dark', isDark.value)
