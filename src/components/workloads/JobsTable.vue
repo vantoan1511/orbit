@@ -13,6 +13,10 @@ import Column from 'primevue/column'
 import Select from 'primevue/select'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { MoreVertical } from '@lucide/vue'
+import Button from 'primevue/button'
 
 const k8sStore = useKubernetesStore()
 
@@ -84,6 +88,22 @@ const onRowClick = (event: { data: JobInfo }) => {
   selectedWorkload.value = event.data
   drawerVisible.value = true
 }
+
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<JobInfo | null>(null)
+
+const toggleActionMenu = (event: Event, data: JobInfo) => {
+  event.stopPropagation()
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
+}
+
+const { actionMenuItems } = useWorkloadActions(
+  selectedActionRow,
+  drawerVisible,
+  selectedWorkload,
+  'Job'
+)
 </script>
 
 <template>
@@ -191,9 +211,26 @@ const onRowClick = (event: { data: JobInfo }) => {
       </template>
     </Column>
 
+    <!-- Actions Column -->
+    <Column class="p-3 text-center w-12 shrink-0">
+      <template #body="{ data }">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          title="Actions"
+          @click="toggleActionMenu($event, data)"
+        >
+          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+        </Button>
+      </template>
+    </Column>
+
     <!-- Drawer -->
     <template #drawer>
       <WorkloadDetailsDrawer v-model:visible="drawerVisible" :workload="selectedWorkload" />
+      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
     </template>
   </ResourceDataTable>
 </template>
