@@ -5,7 +5,8 @@ import {
   extensions as neuExtensions,
   filesystem as neuFilesystem,
   init as neuInit,
-  os as neuOs
+  os as neuOs,
+  storage as neuStorage
 } from '@neutralinojs/lib'
 
 /**
@@ -139,5 +140,20 @@ const CORE_ENGINE_ID = 'vantoan1511.orbit.core.engine'
 export const coreEngine = {
   dispatch(event: string, data?: unknown) {
     return extensions.dispatch(CORE_ENGINE_ID, event, data)
+  }
+}
+
+/**
+ * Safe wrapper for Neutralino storage API
+ */
+export const storage = {
+  setData(key: string, data?: string | null) {
+    return neuStorage.setData(key, data)
+  },
+  getData(key: string) {
+    return neuStorage.getData(key)
+  },
+  getKeys() {
+    return neuStorage.getKeys()
   }
 }
