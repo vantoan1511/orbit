@@ -12,25 +12,41 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
   const toast = useToast()
   const router = useRouter()
 
-  const actionMenuItems = computed<MenuItem[]>(() => [
-    {
-      label: 'View Logs',
-      icon: 'pi pi-compass',
-      command: () => {
-        if (selectedActionRow.value) {
-          drawerVisible.value = false // close details drawer
-          router.push({
-            name: 'logs',
-            query: {
-              namespace: selectedActionRow.value.namespace || 'default',
-              workload: selectedActionRow.value.name,
-              kind: kind || 'Deployment'
-            }
-          })
+  const actionMenuItems = computed<MenuItem[]>(() => {
+    const items: MenuItem[] = []
+    const resourceKind = kind || 'Deployment'
+
+    // Logs - supported for Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, Pod
+    const supportsLogs = [
+      'Deployment',
+      'StatefulSet',
+      'DaemonSet',
+      'ReplicaSet',
+      'Job',
+      'Pod'
+    ].includes(resourceKind)
+    if (supportsLogs) {
+      items.push({
+        label: 'View Logs',
+        icon: 'pi pi-compass',
+        command: () => {
+          if (selectedActionRow.value) {
+            drawerVisible.value = false // close details drawer
+            router.push({
+              name: 'logs',
+              query: {
+                namespace: selectedActionRow.value.namespace || 'default',
+                workload: selectedActionRow.value.name,
+                kind: resourceKind
+              }
+            })
+          }
         }
-      }
-    },
-    {
+      })
+    }
+
+    // View Details - all resources
+    items.push({
       label: 'View Details',
       icon: 'pi pi-info',
       command: () => {
@@ -39,23 +55,44 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
           drawerVisible.value = true
         }
       }
-    },
-    {
-      separator: true
-    },
-    {
-      label: 'Redeploy',
-      icon: 'pi pi-refresh',
-      command: () => {
-        toast.add({
-          severity: 'info',
-          summary: 'Redeploy',
-          detail: `Redeploy triggered for ${selectedActionRow.value?.name}`,
-          life: 3000
-        })
-      }
-    },
-    {
+    })
+
+    items.push({ separator: true })
+
+    // Redeploy - Deployment, StatefulSet, DaemonSet
+    if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(resourceKind)) {
+      items.push({
+        label: 'Redeploy',
+        icon: 'pi pi-refresh',
+        command: () => {
+          toast.add({
+            severity: 'info',
+            summary: 'Redeploy',
+            detail: `Redeploy triggered for ${selectedActionRow.value?.name}`,
+            life: 3000
+          })
+        }
+      })
+    }
+
+    // Restart - Pods
+    if (resourceKind === 'Pod') {
+      items.push({
+        label: 'Restart',
+        icon: 'pi pi-power-off',
+        command: () => {
+          toast.add({
+            severity: 'info',
+            summary: 'Restart Pod',
+            detail: `Restart triggered for pod: ${selectedActionRow.value?.name}`,
+            life: 3000
+          })
+        }
+      })
+    }
+
+    // Edit - all resources
+    items.push({
       label: 'Edit',
       icon: 'pi pi-file-edit',
       command: () => {
@@ -66,36 +103,45 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
           life: 3000
         })
       }
-    },
-    {
-      label: 'Scale',
-      icon: 'pi pi-sliders-h',
-      command: () => {
-        toast.add({
-          severity: 'info',
-          summary: 'Scale',
-          detail: `Scale triggered for ${selectedActionRow.value?.name}`,
-          life: 3000
-        })
-      }
-    },
-    {
-      separator: true
-    },
-    {
-      label: 'Delete',
+    })
+
+    // Scale - Deployment, StatefulSet, ReplicaSet
+    if (['Deployment', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
+      items.push({
+        label: 'Scale',
+        icon: 'pi pi-sliders-h',
+        command: () => {
+          toast.add({
+            severity: 'info',
+            summary: 'Scale',
+            detail: `Scale triggered for ${selectedActionRow.value?.name}`,
+            life: 3000
+          })
+        }
+      })
+    }
+
+    items.push({ separator: true })
+
+    // Delete / Terminate
+    const deleteLabel = resourceKind === 'Pod' ? 'Terminate' : 'Delete'
+    const deleteSeverity = resourceKind === 'Pod' ? 'warn' : 'warn' // both warn but structured separately if needed
+    items.push({
+      label: deleteLabel,
       icon: 'pi pi-trash',
       class: 'text-red-400 hover:text-red-300',
       command: () => {
         toast.add({
-          severity: 'warn',
-          summary: 'Delete',
-          detail: `Delete triggered for ${selectedActionRow.value?.name}`,
+          severity: deleteSeverity,
+          summary: deleteLabel,
+          detail: `${deleteLabel} triggered for ${selectedActionRow.value?.name}`,
           life: 3000
         })
       }
-    }
-  ])
+    })
+
+    return items
+  })
 
   return {
     actionMenuItems

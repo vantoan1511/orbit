@@ -4,19 +4,19 @@ import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { PodInfo } from '@/types/kubernetes'
-import { Power, Trash2 } from '@lucide/vue'
+import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
-const toast = useToast()
 const k8sStore = useKubernetesStore()
 
 const { tableColumns, visibleCols } = useTableColumns([
@@ -66,15 +66,16 @@ const onRowClick = (event: { data: PodInfo }) => {
   drawerVisible.value = true
 }
 
-const handleActionClick = (event: Event, action: string, podName: string) => {
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<PodInfo | null>(null)
+
+const toggleActionMenu = (event: Event, data: PodInfo) => {
   event.stopPropagation()
-  toast.add({
-    severity: action === 'Terminate' ? 'warn' : 'info',
-    summary: `${action} Pod`,
-    detail: `Action triggered for pod: ${podName}`,
-    life: 3000
-  })
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
 }
+
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, drawerVisible, selectedPod, 'Pod')
 </script>
 
 <template>
@@ -223,36 +224,25 @@ const handleActionClick = (event: Event, action: string, podName: string) => {
     ></Column>
 
     <!-- Actions Column -->
-    <Column class="p-3 text-center">
+    <Column class="p-3 text-center w-12 shrink-0">
       <template #body="{ data }">
-        <div class="flex items-center justify-center gap-1">
-          <Button
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            title="Terminate Pod"
-            @click="handleActionClick($event, 'Terminate', data.name)"
-          >
-            <Trash2 class="w-3.5 h-3.5 text-rose-400" />
-          </Button>
-          <Button
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            title="Restart Pod"
-            @click="handleActionClick($event, 'Restart', data.name)"
-          >
-            <Power class="w-3.5 h-3.5 text-amber-400" />
-          </Button>
-        </div>
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          title="Actions"
+          @click="toggleActionMenu($event, data)"
+        >
+          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+        </Button>
       </template>
     </Column>
 
     <!-- Drawer -->
     <template #drawer>
       <PodDetailsDrawer v-model:visible="drawerVisible" :pod="selectedPod" />
+      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
     </template>
   </ResourceDataTable>
 </template>
