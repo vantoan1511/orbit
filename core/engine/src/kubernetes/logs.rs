@@ -90,32 +90,59 @@ pub async fn get_workload_pods(
     let selector = match workload_kind {
         "Deployment" => {
             let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
-            api.get(workload_name).await?.spec.and_then(|s| s.selector.match_labels)
+            api.get(workload_name).await?.spec.map(|s| s.selector)
         }
         "StatefulSet" => {
             let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
-            api.get(workload_name).await?.spec.and_then(|s| s.selector.match_labels)
+            api.get(workload_name).await?.spec.map(|s| s.selector)
         }
         "DaemonSet" => {
             let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
-            api.get(workload_name).await?.spec.and_then(|s| s.selector.match_labels)
+            api.get(workload_name).await?.spec.map(|s| s.selector)
         }
         "ReplicaSet" => {
             let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
-            api.get(workload_name).await?.spec.and_then(|s| s.selector.match_labels)
+            api.get(workload_name).await?.spec.map(|s| s.selector)
         }
         "Job" => {
             let api: Api<Job> = Api::namespaced(client.clone(), namespace);
-            api.get(workload_name).await?.spec.and_then(|s| s.selector.and_then(|sel| sel.match_labels))
+            api.get(workload_name).await?.spec.and_then(|s| s.selector)
         }
         _ => None,
     };
 
     if let Some(sel) = selector {
-        let selector_str = sel.iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<String>>()
-            .join(",");
+        let mut parts = Vec::new();
+        if let Some(match_labels) = sel.match_labels {
+            for (k, v) in match_labels {
+                parts.push(format!("{}={}", k, v));
+            }
+        }
+        if let Some(match_expressions) = sel.match_expressions {
+            for req in match_expressions {
+                let key = req.key;
+                match req.operator.as_str() {
+                    "In" => {
+                        if let Some(values) = req.values {
+                            parts.push(format!("{} in ({})", key, values.join(",")));
+                        }
+                    }
+                    "NotIn" => {
+                        if let Some(values) = req.values {
+                            parts.push(format!("{} notin ({})", key, values.join(",")));
+                        }
+                    }
+                    "Exists" => {
+                        parts.push(key);
+                    }
+                    "DoesNotExist" => {
+                        parts.push(format!("!{}", key));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let selector_str = parts.join(",");
         let lp = kube::api::ListParams::default().labels(&selector_str);
         let list = pods_api.list(&lp).await?;
         for p in list {
