@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import Drawer from 'primevue/drawer'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
 import { Clock, Tag } from '@lucide/vue'
+import Drawer from 'primevue/drawer'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import { computed, ref } from 'vue'
 
 import type {
-  WorkloadInfo,
   CronJobInfo,
-  JobInfo,
+  DaemonSetReplicas,
   DeploymentInfo,
-  DaemonSetReplicas
+  JobInfo,
+  WorkloadInfo
 } from '../../types/kubernetes'
 
 const props = defineProps<{
@@ -530,7 +530,7 @@ ${specSection}
               <div class="relative pl-4 border-l border-(--border) space-y-4 ml-2">
                 <div class="relative">
                   <span
-                    class="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-(--bg-card)"
+                    class="absolute -left-5.25 top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-4 ring-(--bg-card)"
                   ></span>
                   <div class="text-xs font-semibold text-(--text-primary)">SyncLoop</div>
                   <div class="text-[10px] text-(--text-muted) mt-0.5">
