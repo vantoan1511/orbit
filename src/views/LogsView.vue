@@ -135,9 +135,9 @@ const handleLogLine = (data: { pod: string; container: string; line: string }) =
     timestamp
   })
 
-  // Limit memory usage
-  if (logLines.value.length > maxLogLines) {
-    logLines.value.shift()
+  // Limit memory usage (prune in batches of 100 to minimize reallocations)
+  if (logLines.value.length > maxLogLines + 100) {
+    logLines.value = logLines.value.slice(-maxLogLines)
   }
 
   scrollToBottom()
