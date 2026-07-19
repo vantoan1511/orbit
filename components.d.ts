@@ -76,4 +76,7 @@ declare module 'vue' {
     WorkloadMetricsCards: typeof import('./src/components/workloads/WorkloadMetricsCards.vue')['default']
     WorkloadSummaries: typeof import('./src/components/dashboard/WorkloadSummaries.vue')['default']
   }
+  export interface GlobalDirectives {
+    Tooltip: typeof import('primevue/tooltip')['default']
+  }
 }
