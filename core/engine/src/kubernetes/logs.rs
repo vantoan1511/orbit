@@ -24,6 +24,7 @@ pub async fn stream_pod_logs(
         follow: true,
         container: container.clone(),
         tail_lines,
+        timestamps: true,
         ..Default::default()
     };
 

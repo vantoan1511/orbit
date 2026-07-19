@@ -56,7 +56,15 @@ export function useLogStream(options: {
       /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s?/
     const match = rawLine.match(tsRegex)
     if (match) {
-      timestamp = match[1]
+      const rawTimestamp = match[1]
+      if (rawTimestamp) {
+        try {
+          const date = new Date(rawTimestamp)
+          timestamp = isNaN(date.getTime()) ? rawTimestamp : date.toLocaleString()
+        } catch {
+          timestamp = rawTimestamp
+        }
+      }
       text = rawLine.replace(tsRegex, '')
     }
 
