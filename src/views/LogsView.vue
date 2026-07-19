@@ -413,21 +413,54 @@ const PRESETS: Record<string, HighlightRule[]> = {
   ]
 }
 
-const presetOptions = [
-  { label: 'Standard', value: 'standard' },
-  { label: 'Java (SLF4J/Logback)', value: 'java' },
-  { label: 'Go (Logrus/Zap)', value: 'go' },
-  { label: 'JSON Logs', value: 'json' },
-  { label: 'None', value: 'none' }
-]
-
 const showRulesDialog = ref(false)
 const selectedPreset = ref<string>('standard')
 const customRules = ref<HighlightRule[]>([])
+const customPresets = ref<Record<string, HighlightRule[]>>({})
+const newPresetName = ref<string>('')
+
+const presetOptions = computed(() => {
+  const options = [
+    {
+      label: 'Standard Presets',
+      items: [
+        { label: 'Standard', value: 'standard' },
+        { label: 'Java (SLF4J/Logback)', value: 'java' },
+        { label: 'Go (Logrus/Zap)', value: 'go' },
+        { label: 'JSON Logs', value: 'json' },
+        { label: 'None', value: 'none' }
+      ]
+    }
+  ]
+
+  const customItems = Object.keys(customPresets.value).map((name) => ({
+    label: name,
+    value: `custom:${name}`
+  }))
+
+  if (customItems.length > 0) {
+    options.push({
+      label: 'Custom Presets',
+      items: customItems
+    })
+  }
+
+  return options
+})
 
 const activeRules = computed<HighlightRule[]>(() => {
-  const preset = PRESETS[selectedPreset.value] || []
+  let preset: HighlightRule[] = []
+  if (selectedPreset.value.startsWith('custom:')) {
+    const presetName = selectedPreset.value.replace('custom:', '')
+    preset = customPresets.value[presetName] || []
+  } else {
+    preset = PRESETS[selectedPreset.value] || []
+  }
   return [...preset, ...customRules.value]
+})
+
+const isCustomPresetActive = computed(() => {
+  return selectedPreset.value.startsWith('custom:')
 })
 
 const colorOptions = [
@@ -442,6 +475,13 @@ const colorOptions = [
 
 const loadRules = async () => {
   try {
+    const savedCustomPresets = await storage.getData('orbit_log_custom_presets').catch(() => null)
+    if (savedCustomPresets) {
+      customPresets.value = JSON.parse(savedCustomPresets)
+    } else {
+      customPresets.value = {}
+    }
+
     const savedPreset = await storage.getData('orbit_log_highlight_preset').catch(() => null)
     if (savedPreset) {
       selectedPreset.value = savedPreset
@@ -458,6 +498,7 @@ const loadRules = async () => {
   } catch {
     selectedPreset.value = 'standard'
     customRules.value = []
+    customPresets.value = {}
   }
 }
 
@@ -465,6 +506,7 @@ const saveRules = async () => {
   try {
     await storage.setData('orbit_log_highlight_preset', selectedPreset.value)
     await storage.setData('orbit_log_highlight_rules', JSON.stringify(customRules.value))
+    await storage.setData('orbit_log_custom_presets', JSON.stringify(customPresets.value))
   } catch (err) {
     console.error('Failed to save log highlight rules', err)
   }
@@ -487,6 +529,30 @@ const deleteCustomRule = (id: string) => {
   if (index !== -1) {
     customRules.value.splice(index, 1)
     saveRules()
+  }
+}
+
+const saveCustomPreset = async () => {
+  const name = newPresetName.value.trim()
+  if (!name) return
+
+  const rulesToSave = customRules.value.map((rule) => ({
+    ...rule,
+    isPreset: true
+  }))
+
+  customPresets.value[name] = rulesToSave
+  selectedPreset.value = `custom:${name}`
+  newPresetName.value = ''
+  await saveRules()
+}
+
+const deleteCustomPreset = async () => {
+  if (selectedPreset.value.startsWith('custom:')) {
+    const name = selectedPreset.value.replace('custom:', '')
+    delete customPresets.value[name]
+    selectedPreset.value = 'standard'
+    await saveRules()
   }
 }
 
@@ -767,17 +833,45 @@ const getLogLevelColor = (text: string) => {
           can be edited/deleted.
         </p>
         <div
-          class="flex items-center gap-3 bg-(--bg-hover)/10 p-3 border border-(--border) rounded-lg"
+          class="flex flex-wrap items-center justify-between gap-4 bg-(--bg-hover)/10 p-3 border border-(--border) rounded-lg"
         >
-          <label class="text-xs font-semibold text-(--text-secondary)">Rule Preset:</label>
-          <Select
-            v-model="selectedPreset"
-            :options="presetOptions"
-            optionLabel="label"
-            optionValue="value"
-            class="text-xs min-w-48 bg-(--bg-card) border-(--border)"
-            @change="saveRules"
-          />
+          <div class="flex items-center gap-3">
+            <label class="text-xs font-semibold text-(--text-secondary)">Rule Preset:</label>
+            <Select
+              v-model="selectedPreset"
+              :options="presetOptions"
+              optionLabel="label"
+              optionValue="value"
+              optionGroupLabel="label"
+              optionGroupChildren="items"
+              class="text-xs min-w-48 bg-(--bg-card) border-(--border)"
+              @change="saveRules"
+            />
+            <Button
+              v-if="isCustomPresetActive"
+              icon="pi pi-trash"
+              severity="danger"
+              variant="text"
+              size="small"
+              v-tooltip="'Delete this custom preset'"
+              @click="deleteCustomPreset"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <InputText
+              v-model="newPresetName"
+              placeholder="Preset name..."
+              class="text-xs bg-(--bg-card) border-(--border) w-40"
+            />
+            <Button
+              label="Save Custom Rules as Preset"
+              icon="pi pi-save"
+              size="small"
+              severity="secondary"
+              :disabled="!customRules.length || !newPresetName.trim()"
+              @click="saveCustomPreset"
+            />
+          </div>
         </div>
         <div class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
           <div
