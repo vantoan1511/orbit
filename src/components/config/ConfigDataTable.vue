@@ -116,12 +116,13 @@ const toggleActionMenu = (event: Event, data: ConfigMapInfo | SecretInfo) => {
 
 const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedResource,
-  activeKind
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: activeKind,
+  onViewDetails: (row) => {
+    selectedResource.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

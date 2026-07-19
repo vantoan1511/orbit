@@ -98,12 +98,13 @@ const toggleActionMenu = (event: Event, data: StatefulSetInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedWorkload,
-  'StatefulSet'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'StatefulSet',
+  onViewDetails: (row) => {
+    selectedWorkload.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

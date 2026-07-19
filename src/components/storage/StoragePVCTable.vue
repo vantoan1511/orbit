@@ -55,7 +55,6 @@ const refreshTable = () => {
 
 const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
 const selectedActionRow = ref<PersistentVolumeClaimInfo | null>(null)
-const dummyDrawerVisible = ref(false)
 
 const toggleActionMenu = (event: Event, data: PersistentVolumeClaimInfo) => {
   event.stopPropagation()
@@ -63,12 +62,9 @@ const toggleActionMenu = (event: Event, data: PersistentVolumeClaimInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  dummyDrawerVisible,
-  ref(null),
-  'PersistentVolumeClaim'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'PersistentVolumeClaim'
+})
 </script>
 
 <template>

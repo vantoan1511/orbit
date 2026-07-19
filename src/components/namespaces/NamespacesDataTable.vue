@@ -18,7 +18,7 @@ import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { computed, onMounted, ref, type Ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
@@ -182,12 +182,13 @@ const toggleActionMenu = (event: Event, data: MappedNamespaceInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedNamespace as Ref<MappedNamespaceInfo | null>,
-  'Namespace'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'Namespace',
+  onViewDetails: (row) => {
+    selectedNamespace.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

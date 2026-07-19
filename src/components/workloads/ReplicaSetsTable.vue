@@ -97,12 +97,13 @@ const toggleActionMenu = (event: Event, data: ReplicaSetInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedWorkload,
-  'ReplicaSet'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'ReplicaSet',
+  onViewDetails: (row) => {
+    selectedWorkload.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

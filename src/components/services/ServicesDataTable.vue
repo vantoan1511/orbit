@@ -84,12 +84,13 @@ const toggleActionMenu = (event: Event, data: ServiceInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedService,
-  'Service'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'Service',
+  onViewDetails: (row) => {
+    selectedService.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

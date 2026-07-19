@@ -102,12 +102,13 @@ const toggleActionMenu = (event: Event, data: DeploymentInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedWorkload,
-  'Deployment'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'Deployment',
+  onViewDetails: (row) => {
+    selectedWorkload.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>
