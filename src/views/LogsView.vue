@@ -245,20 +245,190 @@ interface HighlightRule {
   color: string
   bold: boolean
   caseSensitive: boolean
+  isRegex: boolean
+  isPreset?: boolean
 }
 
-const DEFAULT_RULES: HighlightRule[] = [
-  { id: '1', pattern: 'error', color: 'rose', bold: true, caseSensitive: false },
-  { id: '2', pattern: 'fail', color: 'rose', bold: true, caseSensitive: false },
-  { id: '3', pattern: 'err:', color: 'rose', bold: true, caseSensitive: false },
-  { id: '4', pattern: 'warn', color: 'amber', bold: true, caseSensitive: false },
-  { id: '5', pattern: 'warning', color: 'amber', bold: true, caseSensitive: false },
-  { id: '6', pattern: 'info', color: 'emerald', bold: true, caseSensitive: false },
-  { id: '7', pattern: 'debug', color: 'emerald', bold: true, caseSensitive: false }
+const PRESETS: Record<string, HighlightRule[]> = {
+  standard: [
+    {
+      id: 'p-std-1',
+      pattern: '\\b(error|fail|severe|fatal)\\b',
+      color: 'rose',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-std-2',
+      pattern: '\\b(warn|warning)\\b',
+      color: 'amber',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-std-3',
+      pattern: '\\binfo\\b',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-std-4',
+      pattern: '\\bdebug\\b',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    }
+  ],
+  java: [
+    {
+      id: 'p-java-1',
+      pattern: '\\b(ERROR|FATAL|SEVERE)\\b',
+      color: 'rose',
+      bold: true,
+      caseSensitive: true,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-java-2',
+      pattern: '\\b(WARN|WARNING)\\b',
+      color: 'amber',
+      bold: true,
+      caseSensitive: true,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-java-3',
+      pattern: '\\b(INFO|CONFIG)\\b',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: true,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-java-4',
+      pattern: '\\b(DEBUG|FINE|FINER|FINEST)\\b',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: true,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-java-5',
+      pattern: '\\bTRACE\\b',
+      color: 'gray',
+      bold: false,
+      caseSensitive: true,
+      isRegex: true,
+      isPreset: true
+    }
+  ],
+  go: [
+    {
+      id: 'p-go-1',
+      pattern: '\\b(panic|fatal|error)\\b',
+      color: 'rose',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-go-2',
+      pattern: '\\b(warning|warn)\\b',
+      color: 'amber',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-go-3',
+      pattern: '\\binfo\\b',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-go-4',
+      pattern: '\\bdebug\\b',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    }
+  ],
+  json: [
+    {
+      id: 'p-json-1',
+      pattern: '"(level|lvl)"\\s*:\\s*"(error|fatal|panic)"',
+      color: 'rose',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-json-2',
+      pattern: '"(level|lvl)"\\s*:\\s*"(warn|warning)"',
+      color: 'amber',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-json-3',
+      pattern: '"(level|lvl)"\\s*:\\s*"(info|information)"',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    },
+    {
+      id: 'p-json-4',
+      pattern: '"(level|lvl)"\\s*:\\s*"(debug|trace)"',
+      color: 'emerald',
+      bold: true,
+      caseSensitive: false,
+      isRegex: true,
+      isPreset: true
+    }
+  ]
+}
+
+const presetOptions = [
+  { label: 'Standard', value: 'standard' },
+  { label: 'Java (SLF4J/Logback)', value: 'java' },
+  { label: 'Go (Logrus/Zap)', value: 'go' },
+  { label: 'JSON Logs', value: 'json' },
+  { label: 'None', value: 'none' }
 ]
 
 const showRulesDialog = ref(false)
-const rules = ref<HighlightRule[]>([])
+const selectedPreset = ref<string>('standard')
+const customRules = ref<HighlightRule[]>([])
+
+const activeRules = computed<HighlightRule[]>(() => {
+  const preset = PRESETS[selectedPreset.value] || []
+  return [...preset, ...customRules.value]
+})
 
 const colorOptions = [
   { label: 'Red', value: 'rose' },
@@ -272,48 +442,70 @@ const colorOptions = [
 
 const loadRules = async () => {
   try {
-    const saved = await storage.getData('orbit_log_highlight_rules')
-    if (saved) {
-      rules.value = JSON.parse(saved)
+    const savedPreset = await storage.getData('orbit_log_highlight_preset').catch(() => null)
+    if (savedPreset) {
+      selectedPreset.value = savedPreset
     } else {
-      rules.value = [...DEFAULT_RULES]
+      selectedPreset.value = 'standard'
     }
-  } catch (err) {
-    // Typically means key doesn't exist in storage
-    rules.value = [...DEFAULT_RULES]
+
+    const savedRules = await storage.getData('orbit_log_highlight_rules').catch(() => null)
+    if (savedRules) {
+      customRules.value = JSON.parse(savedRules)
+    } else {
+      customRules.value = []
+    }
+  } catch {
+    selectedPreset.value = 'standard'
+    customRules.value = []
   }
 }
 
 const saveRules = async () => {
   try {
-    await storage.setData('orbit_log_highlight_rules', JSON.stringify(rules.value))
+    await storage.setData('orbit_log_highlight_preset', selectedPreset.value)
+    await storage.setData('orbit_log_highlight_rules', JSON.stringify(customRules.value))
   } catch (err) {
     console.error('Failed to save log highlight rules', err)
   }
 }
 
 const addRule = () => {
-  rules.value.push({
+  customRules.value.push({
     id: Date.now().toString(),
     pattern: '',
     color: 'rose',
     bold: false,
-    caseSensitive: false
+    caseSensitive: false,
+    isRegex: false
   })
   saveRules()
 }
 
-const deleteRule = (index: number) => {
-  rules.value.splice(index, 1)
-  saveRules()
+const deleteCustomRule = (id: string) => {
+  const index = customRules.value.findIndex((r) => r.id === id)
+  if (index !== -1) {
+    customRules.value.splice(index, 1)
+    saveRules()
+  }
 }
 
 const getLogLevelColor = (text: string) => {
-  const matched = rules.value.find((rule) => {
+  const matched = activeRules.value.find((rule) => {
     if (!rule.pattern) return false
-    const matchText = rule.caseSensitive ? text : text.toLowerCase()
-    const pattern = rule.caseSensitive ? rule.pattern : rule.pattern.toLowerCase()
-    return matchText.includes(pattern)
+    if (rule.isRegex) {
+      try {
+        const flags = rule.caseSensitive ? '' : 'i'
+        const regex = new RegExp(rule.pattern, flags)
+        return regex.test(text)
+      } catch {
+        return false
+      }
+    } else {
+      const matchText = rule.caseSensitive ? text : text.toLowerCase()
+      const pattern = rule.caseSensitive ? rule.pattern : rule.pattern.toLowerCase()
+      return matchText.includes(pattern)
+    }
   })
 
   if (matched) {
@@ -566,23 +758,43 @@ const getLogLevelColor = (text: string) => {
       v-model:visible="showRulesDialog"
       modal
       header="Highlight Rules"
-      :style="{ width: '550px' }"
       class="bg-(--bg-card) border border-(--border)"
+      :style="{ width: '900px', maxWidth: '90vw' }"
     >
       <div class="flex flex-col gap-4">
         <p class="text-xs text-(--text-muted)">
-          Define search patterns to style log lines dynamically.
+          Define search patterns to style log lines dynamically. Presets are read-only; custom rules
+          can be edited/deleted.
         </p>
+        <div
+          class="flex items-center gap-3 bg-(--bg-hover)/10 p-3 border border-(--border) rounded-lg"
+        >
+          <label class="text-xs font-semibold text-(--text-secondary)">Rule Preset:</label>
+          <Select
+            v-model="selectedPreset"
+            :options="presetOptions"
+            optionLabel="label"
+            optionValue="value"
+            class="text-xs min-w-48 bg-(--bg-card) border-(--border)"
+            @change="saveRules"
+          />
+        </div>
         <div class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
           <div
-            v-for="(rule, index) in rules"
+            v-for="rule in activeRules"
             :key="rule.id"
-            class="flex items-center gap-2 p-2 bg-(--bg-hover)/20 border border-(--border) rounded-lg"
+            class="flex items-center gap-2 p-2 border rounded-lg"
+            :class="
+              rule.isPreset
+                ? 'bg-(--bg-hover)/5 border-dashed border-(--border-muted) opacity-80'
+                : 'bg-(--bg-hover)/20 border-(--border)'
+            "
           >
             <InputText
               v-model="rule.pattern"
               placeholder="Pattern..."
               class="text-xs bg-(--bg-card) border-(--border) flex-1"
+              :disabled="rule.isPreset"
               @change="saveRules"
             />
             <Select
@@ -591,6 +803,7 @@ const getLogLevelColor = (text: string) => {
               optionLabel="label"
               optionValue="value"
               class="text-xs min-w-28 bg-(--bg-card) border-(--border)"
+              :disabled="rule.isPreset"
               @change="saveRules"
             />
             <div class="flex items-center gap-1.5 ml-1">
@@ -599,6 +812,7 @@ const getLogLevelColor = (text: string) => {
                 :inputId="'bold-' + rule.id"
                 binary
                 class="border-(--border)"
+                :disabled="rule.isPreset"
                 @change="saveRules"
               />
               <label
@@ -613,6 +827,7 @@ const getLogLevelColor = (text: string) => {
                 :inputId="'cs-' + rule.id"
                 binary
                 class="border-(--border)"
+                :disabled="rule.isPreset"
                 @change="saveRules"
               />
               <label
@@ -621,13 +836,32 @@ const getLogLevelColor = (text: string) => {
                 >CS</label
               >
             </div>
+            <div class="flex items-center gap-1.5 ml-1">
+              <Checkbox
+                v-model="rule.isRegex"
+                :inputId="'rx-' + rule.id"
+                binary
+                class="border-(--border)"
+                :disabled="rule.isPreset"
+                @change="saveRules"
+              />
+              <label
+                :for="'rx-' + rule.id"
+                class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+                >Regex</label
+              >
+            </div>
             <Button
+              v-if="!rule.isPreset"
               icon="pi pi-trash"
               severity="danger"
               variant="text"
               size="small"
-              @click="deleteRule(index)"
+              @click="deleteCustomRule(rule.id)"
             />
+            <span v-else class="text-[10px] uppercase font-bold text-(--text-muted) px-2"
+              >Preset</span
+            >
           </div>
         </div>
         <div class="flex justify-between items-center mt-2">

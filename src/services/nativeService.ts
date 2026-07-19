@@ -148,7 +148,7 @@ export const coreEngine = {
  */
 export const storage = {
   setData(key: string, data?: string | null) {
-    return neuStorage.setData(key, data)
+    return neuStorage.setData(key, data ?? null)
   },
   getData(key: string) {
     return neuStorage.getData(key)
