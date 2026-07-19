@@ -7,7 +7,7 @@ const props = defineProps<{
   items: MenuItem[]
 }>()
 
-const menuModel = computed(() => props.items as unknown as MenuItem[])
+const menuModel = computed(() => props.items)
 
 const menuRef = ref<InstanceType<typeof Menu> | null>(null)
 
@@ -32,7 +32,6 @@ defineExpose({
         v-bind="menuProps.action"
         class="flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)/20 rounded-md transition-colors cursor-pointer select-none"
         :class="[item.class]"
-        @click="item.command?.({ originalEvent: $event, item })"
       >
         <i v-if="item.icon" :class="item.icon" class="w-4 h-4 shrink-0" />
         <span>{{ item.label }}</span>

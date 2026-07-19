@@ -11,6 +11,18 @@ export function useWorkloadActions<T extends { name: string }>(
 
   const actionMenuItems = computed<MenuItem[]>(() => [
     {
+      label: 'View Logs',
+      icon: 'pi pi-compass',
+      command: () => {
+        toast.add({
+          severity: 'info',
+          summary: 'View Logs',
+          detail: `View Logs triggered for ${selectedActionRow.value?.name}`,
+          life: 3000
+        })
+      }
+    },
+    {
       label: 'View Details',
       icon: 'pi pi-info',
       command: () => {
@@ -21,8 +33,23 @@ export function useWorkloadActions<T extends { name: string }>(
       }
     },
     {
-      label: 'Edit (YAML)',
-      icon: 'pi pi-pencil',
+      separator: true
+    },
+    {
+      label: 'Redeploy',
+      icon: 'pi pi-refresh',
+      command: () => {
+        toast.add({
+          severity: 'info',
+          summary: 'Redeploy',
+          detail: `Redeploy triggered for ${selectedActionRow.value?.name}`,
+          life: 3000
+        })
+      }
+    },
+    {
+      label: 'Edit',
+      icon: 'pi pi-file-edit',
       command: () => {
         toast.add({
           severity: 'info',
@@ -34,7 +61,7 @@ export function useWorkloadActions<T extends { name: string }>(
     },
     {
       label: 'Scale',
-      icon: 'pi pi-scale',
+      icon: 'pi pi-sliders-h',
       command: () => {
         toast.add({
           severity: 'info',
@@ -45,22 +72,11 @@ export function useWorkloadActions<T extends { name: string }>(
       }
     },
     {
-      label: 'View Logs',
-      icon: 'pi pi-scroll',
-      class:
-        'text-violet-400 hover:text-violet-300 font-semibold border border-violet-500/20 bg-violet-500/5',
-      command: () => {
-        toast.add({
-          severity: 'info',
-          summary: 'View Logs',
-          detail: `View Logs triggered for ${selectedActionRow.value?.name}`,
-          life: 3000
-        })
-      }
+      separator: true
     },
     {
       label: 'Delete',
-      icon: 'pi pi-bin',
+      icon: 'pi pi-trash',
       class: 'text-red-400 hover:text-red-300',
       command: () => {
         toast.add({
