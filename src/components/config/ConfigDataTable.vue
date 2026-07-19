@@ -11,11 +11,13 @@ import { FileText, Lock, MoreVertical } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import { useToast } from 'primevue/usetoast'
 import { computed, ref, watch } from 'vue'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import Button from 'primevue/button'
 
-const toast = useToast()
+// Removed toast import/usage
 
 const props = defineProps<{
   activeTab: 'configmaps' | 'secrets'
@@ -103,15 +105,23 @@ const onRowClick = (event: { data: ConfigMapInfo | SecretInfo }) => {
   drawerVisible.value = true
 }
 
-const handleActionClick = (event: Event, action: string, resourceName: string) => {
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<ConfigMapInfo | SecretInfo | null>(null)
+
+const toggleActionMenu = (event: Event, data: ConfigMapInfo | SecretInfo) => {
   event.stopPropagation()
-  toast.add({
-    severity: 'info',
-    summary: action,
-    detail: `Action triggered for: ${resourceName}`,
-    life: 3000
-  })
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
 }
+
+const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
+
+const { actionMenuItems } = useWorkloadActions(
+  selectedActionRow,
+  drawerVisible,
+  selectedResource,
+  activeKind
+)
 </script>
 
 <template>
@@ -254,7 +264,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     ></Column>
 
     <!-- Actions Column -->
-    <Column class="p-3 text-center">
+    <Column class="p-3 text-center w-12 shrink-0">
       <template #body="{ data }">
         <Button
           severity="secondary"
@@ -262,7 +272,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
           size="small"
           class="p-1"
           title="Actions"
-          @click="handleActionClick($event, 'Show Actions Menu', data.name)"
+          @click="toggleActionMenu($event, data)"
         >
           <MoreVertical class="w-4 h-4 text-(--text-muted)" />
         </Button>
@@ -272,6 +282,7 @@ const handleActionClick = (event: Event, action: string, resourceName: string) =
     <!-- Drawer -->
     <template #drawer>
       <ConfigDetailsDrawer v-model:visible="drawerVisible" :resource="selectedResource" />
+      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
     </template>
   </ResourceDataTable>
 </template>

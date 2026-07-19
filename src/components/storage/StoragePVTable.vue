@@ -5,8 +5,19 @@ import Column from 'primevue/column'
 import Select from 'primevue/select'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
-import { Search, Info, RefreshCw, Settings2, Database, AlertCircle } from '@lucide/vue'
+import {
+  Search,
+  Info,
+  RefreshCw,
+  Settings2,
+  Database,
+  AlertCircle,
+  MoreVertical
+} from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import type { PersistentVolumeInfo } from '@/types/kubernetes'
 
 const k8sStore = useKubernetesStore()
 const pvs = computed(() => k8sStore.persistentVolumes)
@@ -52,6 +63,23 @@ const refreshTable = () => {
   selectedStorageClass.value = 'All Storage Classes'
   selectedStatus.value = 'All Statuses'
 }
+
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<PersistentVolumeInfo | null>(null)
+const dummyDrawerVisible = ref(false)
+
+const toggleActionMenu = (event: Event, data: PersistentVolumeInfo) => {
+  event.stopPropagation()
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
+}
+
+const { actionMenuItems } = useWorkloadActions(
+  selectedActionRow,
+  dummyDrawerVisible,
+  ref(null),
+  'PersistentVolume'
+)
 </script>
 
 <template>
@@ -192,6 +220,24 @@ const refreshTable = () => {
 
       <!-- Age Column -->
       <Column field="age" header="Age" class="p-2.5 text-(--text-muted) font-mono"></Column>
+
+      <!-- Actions Column -->
+      <Column class="p-3 text-center w-12 shrink-0">
+        <template #body="{ data }">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            title="Actions"
+            @click="toggleActionMenu($event, data)"
+          >
+            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          </Button>
+        </template>
+      </Column>
     </DataTable>
+
+    <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
   </div>
 </template>
