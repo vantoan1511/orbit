@@ -7,6 +7,7 @@ pub struct KubeManager {
     pub active_client: Option<Client>,
     pub watch_cancel: Option<tokio::sync::watch::Sender<bool>>,
     pub active_context_healthy: bool,
+    pub log_cancel: Vec<tokio::sync::oneshot::Sender<()>>,
 }
 
 impl KubeManager {
@@ -17,6 +18,7 @@ impl KubeManager {
             active_client: None,
             watch_cancel: None,
             active_context_healthy: false,
+            log_cancel: Vec::new(),
         };
         
         // Try reading default kubeconfig

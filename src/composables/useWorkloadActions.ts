@@ -1,25 +1,33 @@
 import type { MenuItem } from 'primevue/menuitem'
 import { useToast } from 'primevue/usetoast'
 import { computed, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 export function useWorkloadActions<T extends { name: string }>(
   selectedActionRow: Ref<T | null>,
   drawerVisible: Ref<boolean>,
-  selectedWorkload: Ref<T | null>
+  selectedWorkload: Ref<T | null>,
+  kind?: string
 ) {
   const toast = useToast()
+  const router = useRouter()
 
   const actionMenuItems = computed<MenuItem[]>(() => [
     {
       label: 'View Logs',
       icon: 'pi pi-compass',
       command: () => {
-        toast.add({
-          severity: 'info',
-          summary: 'View Logs',
-          detail: `View Logs triggered for ${selectedActionRow.value?.name}`,
-          life: 3000
-        })
+        if (selectedActionRow.value) {
+          drawerVisible.value = false // close details drawer
+          router.push({
+            name: 'logs',
+            query: {
+              namespace: (selectedActionRow.value as any).namespace || 'default',
+              workload: selectedActionRow.value.name,
+              kind: kind || 'Deployment'
+            }
+          })
+        }
       }
     },
     {
