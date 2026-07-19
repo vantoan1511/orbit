@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { kubernetesService } from '@/services/kubernetesService'
-import { events } from '@/services/nativeService'
+import { events, storage } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { ArrowLeft } from '@lucide/vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
+import Dialog from 'primevue/dialog'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -202,7 +203,8 @@ const downloadLogs = () => {
 }
 
 // Event Listeners
-onMounted(() => {
+onMounted(async () => {
+  await loadRules()
   events.on(OrbitEvents.LogLineReceived, handleLogLine)
   startStreaming()
 })
@@ -237,12 +239,117 @@ watch(selectedNamespace, () => {
   selectedWorkloadName.value = workloads.value[0] || ''
 })
 
+interface HighlightRule {
+  id: string
+  pattern: string
+  color: string
+  bold: boolean
+  caseSensitive: boolean
+}
+
+const DEFAULT_RULES: HighlightRule[] = [
+  { id: '1', pattern: 'error', color: 'rose', bold: true, caseSensitive: false },
+  { id: '2', pattern: 'fail', color: 'rose', bold: true, caseSensitive: false },
+  { id: '3', pattern: 'err:', color: 'rose', bold: true, caseSensitive: false },
+  { id: '4', pattern: 'warn', color: 'amber', bold: true, caseSensitive: false },
+  { id: '5', pattern: 'warning', color: 'amber', bold: true, caseSensitive: false },
+  { id: '6', pattern: 'info', color: 'emerald', bold: true, caseSensitive: false },
+  { id: '7', pattern: 'debug', color: 'emerald', bold: true, caseSensitive: false }
+]
+
+const showRulesDialog = ref(false)
+const rules = ref<HighlightRule[]>([])
+
+const colorOptions = [
+  { label: 'Red', value: 'rose' },
+  { label: 'Orange', value: 'amber' },
+  { label: 'Green', value: 'emerald' },
+  { label: 'Blue', value: 'sky' },
+  { label: 'Purple', value: 'purple' },
+  { label: 'Pink', value: 'fuchsia' },
+  { label: 'Gray', value: 'gray' }
+]
+
+const loadRules = async () => {
+  try {
+    const saved = await storage.getData('orbit_log_highlight_rules')
+    if (saved) {
+      rules.value = JSON.parse(saved)
+    } else {
+      rules.value = [...DEFAULT_RULES]
+    }
+  } catch (err) {
+    // Typically means key doesn't exist in storage
+    rules.value = [...DEFAULT_RULES]
+  }
+}
+
+const saveRules = async () => {
+  try {
+    await storage.setData('orbit_log_highlight_rules', JSON.stringify(rules.value))
+  } catch (err) {
+    console.error('Failed to save log highlight rules', err)
+  }
+}
+
+const addRule = () => {
+  rules.value.push({
+    id: Date.now().toString(),
+    pattern: '',
+    color: 'rose',
+    bold: false,
+    caseSensitive: false
+  })
+  saveRules()
+}
+
+const deleteRule = (index: number) => {
+  rules.value.splice(index, 1)
+  saveRules()
+}
+
 const getLogLevelColor = (text: string) => {
-  const lower = text.toLowerCase()
-  if (lower.includes('error') || lower.includes('fail') || lower.includes('err:'))
-    return 'text-rose-500 font-bold'
-  if (lower.includes('warn') || lower.includes('warning')) return 'text-amber-500 font-bold'
-  if (lower.includes('info') || lower.includes('debug')) return 'text-emerald-500 font-bold'
+  const matched = rules.value.find((rule) => {
+    if (!rule.pattern) return false
+    const matchText = rule.caseSensitive ? text : text.toLowerCase()
+    const pattern = rule.caseSensitive ? rule.pattern : rule.pattern.toLowerCase()
+    return matchText.includes(pattern)
+  })
+
+  if (matched) {
+    let classes = ''
+    switch (matched.color) {
+      case 'rose':
+        classes = 'text-rose-500'
+        break
+      case 'amber':
+        classes = 'text-amber-500'
+        break
+      case 'emerald':
+        classes = 'text-emerald-500'
+        break
+      case 'sky':
+        classes = 'text-sky-500'
+        break
+      case 'purple':
+        classes = 'text-purple-500'
+        break
+      case 'fuchsia':
+        classes = 'text-fuchsia-500'
+        break
+      case 'gray':
+        classes = 'text-zinc-400'
+        break
+      default:
+        classes = 'text-(--text-secondary)'
+        break
+    }
+    if (matched.bold) {
+      classes += ' font-bold'
+    }
+    return classes
+  }
+
   return 'text-(--text-secondary)'
 }
 </script>
@@ -375,6 +482,14 @@ const getLogLevelColor = (text: string) => {
 
       <div class="flex justify-center items-center gap-2">
         <Button
+          icon="pi pi-palette"
+          size="small"
+          severity="secondary"
+          variant="text"
+          @click="showRulesDialog = true"
+          title="Highlight Rules"
+        />
+        <Button
           icon="pi pi-download"
           size="small"
           severity="secondary"
@@ -445,5 +560,88 @@ const getLogLevelColor = (text: string) => {
         </div>
       </div>
     </div>
+
+    <!-- Highlight Rules Config Dialog -->
+    <Dialog
+      v-model:visible="showRulesDialog"
+      modal
+      header="Highlight Rules"
+      :style="{ width: '550px' }"
+      class="bg-(--bg-card) border border-(--border)"
+    >
+      <div class="flex flex-col gap-4">
+        <p class="text-xs text-(--text-muted)">
+          Define search patterns to style log lines dynamically.
+        </p>
+        <div class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
+          <div
+            v-for="(rule, index) in rules"
+            :key="rule.id"
+            class="flex items-center gap-2 p-2 bg-(--bg-hover)/20 border border-(--border) rounded-lg"
+          >
+            <InputText
+              v-model="rule.pattern"
+              placeholder="Pattern..."
+              class="text-xs bg-(--bg-card) border-(--border) flex-1"
+              @change="saveRules"
+            />
+            <Select
+              v-model="rule.color"
+              :options="colorOptions"
+              optionLabel="label"
+              optionValue="value"
+              class="text-xs min-w-28 bg-(--bg-card) border-(--border)"
+              @change="saveRules"
+            />
+            <div class="flex items-center gap-1.5 ml-1">
+              <Checkbox
+                v-model="rule.bold"
+                :inputId="'bold-' + rule.id"
+                binary
+                class="border-(--border)"
+                @change="saveRules"
+              />
+              <label
+                :for="'bold-' + rule.id"
+                class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+                >Bold</label
+              >
+            </div>
+            <div class="flex items-center gap-1.5 ml-1">
+              <Checkbox
+                v-model="rule.caseSensitive"
+                :inputId="'cs-' + rule.id"
+                binary
+                class="border-(--border)"
+                @change="saveRules"
+              />
+              <label
+                :for="'cs-' + rule.id"
+                class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+                >CS</label
+              >
+            </div>
+            <Button
+              icon="pi pi-trash"
+              severity="danger"
+              variant="text"
+              size="small"
+              @click="deleteRule(index)"
+            />
+          </div>
+        </div>
+        <div class="flex justify-between items-center mt-2">
+          <Button
+            label="Add Rule"
+            icon="pi pi-plus"
+            size="small"
+            severity="secondary"
+            variant="text"
+            @click="addRule"
+          />
+          <Button label="Close" size="small" variant="text" @click="showRulesDialog = false" />
+        </div>
+      </div>
+    </Dialog>
   </div>
 </template>

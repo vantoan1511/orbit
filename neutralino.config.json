@@ -33,7 +33,12 @@
     "events.dispatch",
     "events.broadcast",
     "os.showOpenDialog",
-    "os.open"
+    "os.open",
+    "storage.setData",
+    "storage.getData",
+    "storage.removeData",
+    "storage.clear",
+    "storage.getKeys"
   ],
   "extensions": [
     {
