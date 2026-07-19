@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn stream_pod_logs(
     client: Client,
     writer: Arc<Mutex<WsWriter>>,
