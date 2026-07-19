@@ -106,6 +106,12 @@ pub enum OrbitEvent {
     ErrorOccurred {
         message: String,
     },
+    #[serde(rename = "logLineReceived")]
+    LogLineReceived {
+        pod: String,
+        container: String,
+        line: String,
+    },
     #[serde(rename = "updateCheckFinished")]
     UpdateCheckFinished {
         has_update: bool,

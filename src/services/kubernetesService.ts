@@ -139,5 +139,26 @@ export const kubernetesService = {
    */
   async addCluster(filePath: string): Promise<void> {
     await coreEngine.dispatch('addCluster', { filePath })
+  },
+
+  /**
+   * Start streaming logs for a pod or workload container
+   */
+  async streamLogs(params: {
+    namespace: string
+    workload: string
+    kind: string
+    container?: string
+    pod?: string
+    tailLines?: number
+  }): Promise<void> {
+    await coreEngine.dispatch('streamLogs', params)
+  },
+
+  /**
+   * Stop streaming logs
+   */
+  async stopLogs(): Promise<void> {
+    await coreEngine.dispatch('stopLogs')
   }
 }

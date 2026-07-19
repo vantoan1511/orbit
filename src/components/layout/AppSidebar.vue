@@ -31,6 +31,7 @@ const handleSwitchCluster = async (clusterId: string) => {
 // Navigation links
 const navLinks = [
   { name: 'Overview', icon: LayoutDashboard, path: '/' },
+  { name: 'Logs', icon: LayoutDashboard, path: '/logs' },
   { name: 'Nodes', icon: Server, path: '/nodes' },
   { name: 'Workloads', icon: Boxes, path: '/workloads' },
   { name: 'Pods', icon: Box, path: '/pods' },

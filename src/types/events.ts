@@ -108,6 +108,11 @@ export interface OrbitEventMap {
   errorOccurred: {
     message: string
   }
+  logLineReceived: {
+    pod: string
+    container: string
+    line: string
+  }
   updateCheckFinished: {
     has_update: boolean
     manifest: UpdateManifest
@@ -147,6 +152,7 @@ export const OrbitEvents = {
   ResourceUpdated: 'resourceUpdated',
   PodMetricsUpdated: 'podMetricsUpdated',
   ErrorOccurred: 'errorOccurred',
+  LogLineReceived: 'logLineReceived',
   UpdateCheckFinished: 'updateCheckFinished',
   UpdateDownloadProgress: 'updateDownloadProgress',
   UpdateReady: 'updateReady'

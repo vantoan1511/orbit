@@ -797,6 +797,102 @@ pub fn dispatch(
                 }
             });
         }
+        "streamLogs" => {
+            tokio::spawn(async move {
+                let namespace = data.as_ref()
+                    .and_then(|d| d.get("namespace").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .unwrap_or_else(|| "default".to_string());
+                let workload_name = data.as_ref()
+                    .and_then(|d| d.get("workload").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .unwrap_or_default();
+                let workload_kind = data.as_ref()
+                    .and_then(|d| d.get("kind").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .unwrap_or_else(|| "Deployment".to_string());
+                let container = data.as_ref()
+                    .and_then(|d| d.get("container").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .filter(|s| !s.is_empty() && s != "All" && s != "all");
+                let pod_name = data.as_ref()
+                    .and_then(|d| d.get("pod").cloned())
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                    .filter(|s| !s.is_empty() && s != "All" && s != "all");
+                let tail_lines = data.as_ref()
+                    .and_then(|d| d.get("tailLines").cloned())
+                    .and_then(|v| v.as_i64());
+
+                let mut w_manager = manager.write().await;
+                for cancel in w_manager.log_cancel.drain(..) {
+                    let _ = cancel.send(());
+                }
+
+                let client = match w_manager.active_client.clone() {
+                    Some(c) => c,
+                    None => {
+                        let _ = Bridge::send_event(
+                            &writer,
+                            &token,
+                            &OrbitEvent::ErrorOccurred {
+                                message: "No active cluster client found".to_string(),
+                            },
+                        ).await;
+                        return;
+                    }
+                };
+
+                let pods_to_stream = if let Some(specific_pod) = pod_name {
+                    vec![specific_pod]
+                } else {
+                    match crate::kubernetes::get_workload_pods(&client, &namespace, &workload_name, &workload_kind).await {
+                        Ok(p) => p,
+                        Err(e) => {
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to find pods for workload: {}", e),
+                                },
+                            ).await;
+                            return;
+                        }
+                    }
+                };
+
+                for pod in pods_to_stream {
+                    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+                    w_manager.log_cancel.push(cancel_tx);
+
+                    let client_clone = client.clone();
+                    let writer_clone = writer.clone();
+                    let token_clone = token.clone();
+                    let ns_clone = namespace.clone();
+                    let container_clone = container.clone();
+
+                    tokio::spawn(async move {
+                        crate::kubernetes::stream_pod_logs(
+                            client_clone,
+                            writer_clone,
+                            token_clone,
+                            ns_clone,
+                            pod,
+                            container_clone,
+                            tail_lines,
+                            cancel_rx,
+                        ).await;
+                    });
+                }
+            });
+        }
+        "stopLogs" => {
+            tokio::spawn(async move {
+                let mut w_manager = manager.write().await;
+                for cancel in w_manager.log_cancel.drain(..) {
+                    let _ = cancel.send(());
+                }
+            });
+        }
         _ => {}
     }
 }
