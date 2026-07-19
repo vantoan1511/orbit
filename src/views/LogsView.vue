@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
-import { Play, Pause, Trash2, ArrowLeft, Download, Maximize2 } from '@lucide/vue'
-import Select from 'primevue/select'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { OrbitEvents } from '@/types/events'
+import { ArrowLeft } from '@lucide/vue'
+import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
-import Button from 'primevue/button'
+import Select from 'primevue/select'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()
@@ -27,57 +28,69 @@ const showTimestamps = ref<boolean>(true)
 const isPaused = ref<boolean>(false)
 const isFullscreen = ref<boolean>(false)
 
-const logLines = ref<Array<{ pod: string; container: string; text: string; timestamp?: string }>>([])
+const logLines = ref<Array<{ pod: string; container: string; text: string; timestamp?: string }>>(
+  []
+)
 const maxLogLines = 2000
 const terminalRef = ref<HTMLDivElement | null>(null)
 
 // Dropdown options
-const namespaces = computed(() => k8sStore.namespaces.filter(n => n !== 'All Namespaces'))
+const namespaces = computed(() => k8sStore.namespaces.filter((n) => n !== 'All Namespaces'))
 
 const workloads = computed(() => {
   const ns = selectedNamespace.value
   if (selectedWorkloadKind.value === 'Deployment') {
-    return k8sStore.deployments.filter(d => d.namespace === ns).map(d => d.name)
+    return k8sStore.deployments.filter((d) => d.namespace === ns).map((d) => d.name)
   } else if (selectedWorkloadKind.value === 'StatefulSet') {
-    return k8sStore.statefulSets.filter(s => s.namespace === ns).map(s => s.name)
+    return k8sStore.statefulSets.filter((s) => s.namespace === ns).map((s) => s.name)
   } else if (selectedWorkloadKind.value === 'DaemonSet') {
-    return k8sStore.daemonSets.filter(d => d.namespace === ns).map(d => d.name)
+    return k8sStore.daemonSets.filter((d) => d.namespace === ns).map((d) => d.name)
   } else if (selectedWorkloadKind.value === 'ReplicaSet') {
-    return k8sStore.replicaSets.filter(r => r.namespace === ns).map(r => r.name)
+    return k8sStore.replicaSets.filter((r) => r.namespace === ns).map((r) => r.name)
   } else if (selectedWorkloadKind.value === 'Job') {
-    return k8sStore.jobs.filter(j => j.namespace === ns).map(j => j.name)
+    return k8sStore.jobs.filter((j) => j.namespace === ns).map((j) => j.name)
   } else if (selectedWorkloadKind.value === 'CronJob') {
-    return k8sStore.cronJobs.filter(c => c.namespace === ns).map(c => c.name)
+    return k8sStore.cronJobs.filter((c) => c.namespace === ns).map((c) => c.name)
   }
   return []
 })
 
-const workloadKinds = ['Deployment', 'StatefulSet', 'DaemonSet', 'ReplicaSet', 'Job', 'CronJob', 'Pod']
+const workloadKinds = [
+  'Deployment',
+  'StatefulSet',
+  'DaemonSet',
+  'ReplicaSet',
+  'Job',
+  'CronJob',
+  'Pod'
+]
 
 const workloadPods = computed(() => {
   if (!selectedWorkloadName.value) return []
   if (selectedWorkloadKind.value === 'Pod') {
-    const pod = k8sStore.pods.find(p => p.name === selectedWorkloadName.value && p.namespace === selectedNamespace.value)
+    const pod = k8sStore.pods.find(
+      (p) => p.name === selectedWorkloadName.value && p.namespace === selectedNamespace.value
+    )
     return pod ? [pod] : []
   }
-  return k8sStore.pods.filter(p => 
-    p.namespace === selectedNamespace.value && 
-    p.name.startsWith(selectedWorkloadName.value + '-')
+  return k8sStore.pods.filter(
+    (p) =>
+      p.namespace === selectedNamespace.value && p.name.startsWith(selectedWorkloadName.value + '-')
   )
 })
 
 const podOptions = computed(() => {
-  return ['All', ...workloadPods.value.map(p => p.name)]
+  return ['All', ...workloadPods.value.map((p) => p.name)]
 })
 
 const containerOptions = computed(() => {
   const options = new Set<string>()
   if (selectedPodName.value && selectedPodName.value !== 'All') {
-    const pod = k8sStore.pods.find(p => p.name === selectedPodName.value)
-    pod?.containers?.forEach(c => options.add(c.name))
+    const pod = k8sStore.pods.find((p) => p.name === selectedPodName.value)
+    pod?.containers?.forEach((c) => options.add(c.name))
   } else {
-    workloadPods.value.forEach(p => {
-      p.containers?.forEach(c => options.add(c.name))
+    workloadPods.value.forEach((p) => {
+      p.containers?.forEach((c) => options.add(c.name))
     })
   }
   return ['All', ...Array.from(options)]
@@ -95,7 +108,7 @@ const tailLinesOptions = [
 const startStreaming = async () => {
   logLines.value = []
   await kubernetesService.stopLogs()
-  
+
   if (!selectedNamespace.value || !selectedWorkloadName.value) return
 
   await kubernetesService.streamLogs({
@@ -114,7 +127,8 @@ const parseLogLine = (rawLine: string) => {
   let timestamp: string | undefined
 
   // RFC3339 timestamp regex (e.g. 2025-07-18T17:42:31.123Z)
-  const tsRegex = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s?/
+  const tsRegex =
+    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\s?/
   const match = rawLine.match(tsRegex)
   if (match) {
     timestamp = match[1]
@@ -155,7 +169,7 @@ const scrollToBottom = () => {
 const filteredLogLines = computed(() => {
   if (!searchQuery.value) return logLines.value
 
-  return logLines.value.filter(line => {
+  return logLines.value.filter((line) => {
     if (isRegex.value) {
       try {
         const regex = new RegExp(searchQuery.value, 'i')
@@ -174,9 +188,9 @@ const clearLogs = () => {
 
 const downloadLogs = () => {
   const content = filteredLogLines.value
-    .map(l => `${l.timestamp ? l.timestamp + ' ' : ''}[${l.pod}/${l.container}] ${l.text}`)
+    .map((l) => `${l.timestamp ? l.timestamp + ' ' : ''}[${l.pod}/${l.container}] ${l.text}`)
     .join('\n')
-  
+
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -189,19 +203,29 @@ const downloadLogs = () => {
 
 // Event Listeners
 onMounted(() => {
-  events.on('logLineReceived', handleLogLine)
+  events.on(OrbitEvents.LogLineReceived, handleLogLine)
   startStreaming()
 })
 
 onUnmounted(async () => {
-  events.off('logLineReceived', handleLogLine)
+  events.off(OrbitEvents.LogLineReceived, handleLogLine)
   await kubernetesService.stopLogs()
 })
 
 // Watchers to trigger restart of logs stream
-watch([selectedNamespace, selectedWorkloadName, selectedWorkloadKind, selectedPodName, selectedContainerName, tailLines], () => {
-  startStreaming()
-})
+watch(
+  [
+    selectedNamespace,
+    selectedWorkloadName,
+    selectedWorkloadKind,
+    selectedPodName,
+    selectedContainerName,
+    tailLines
+  ],
+  () => {
+    startStreaming()
+  }
+)
 
 watch(selectedWorkloadKind, () => {
   // Reset selected workload when changing kind
@@ -215,7 +239,8 @@ watch(selectedNamespace, () => {
 
 const getLogLevelColor = (text: string) => {
   const lower = text.toLowerCase()
-  if (lower.includes('error') || lower.includes('fail') || lower.includes('err:')) return 'text-rose-500 font-bold'
+  if (lower.includes('error') || lower.includes('fail') || lower.includes('err:'))
+    return 'text-rose-500 font-bold'
   if (lower.includes('warn') || lower.includes('warning')) return 'text-amber-500 font-bold'
   if (lower.includes('info') || lower.includes('debug')) return 'text-emerald-500 font-bold'
   return 'text-(--text-secondary)'
@@ -223,11 +248,20 @@ const getLogLevelColor = (text: string) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 h-[calc(100vh-6rem)]" :class="{ 'fixed inset-0 z-50 bg-(--bg-card) p-6 h-screen': isFullscreen }">
+  <div
+    class="flex flex-col gap-4 h-[calc(100vh-6rem)]"
+    :class="{ 'fixed inset-0 z-50 bg-(--bg-card) p-6 h-screen': isFullscreen }"
+  >
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <Button severity="secondary" variant="text" size="small" @click="router.back()" v-if="!isFullscreen">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          @click="router.back()"
+          v-if="!isFullscreen"
+        >
           <ArrowLeft class="w-4 h-4" />
         </Button>
         <div>
@@ -235,93 +269,151 @@ const getLogLevelColor = (text: string) => {
           <p class="text-xs text-(--text-muted)">Stream logs from your container in real-time</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <Button severity="secondary" size="small" @click="downloadLogs" title="Download Logs">
-          <Download class="w-4 h-4 mr-1" /> Download
-        </Button>
-        <Button severity="secondary" size="small" @click="isFullscreen = !isFullscreen" title="Fullscreen">
-          <Maximize2 class="w-4 h-4 mr-1" /> {{ isFullscreen ? 'Exit Fullscreen' : 'Fullscreen' }}
-        </Button>
-      </div>
     </div>
 
     <!-- Filters Bar -->
-    <div class="flex flex-wrap items-center gap-3 p-3 bg-(--bg-hover)/20 border border-(--border) rounded-xl">
+    <div
+      class="flex flex-wrap items-center gap-3 p-3 bg-(--bg-hover)/20 border border-(--border) rounded-xl"
+    >
       <div class="flex flex-col gap-1">
         <label class="text-[10px] font-bold text-(--text-muted) uppercase">Namespace</label>
-        <Select v-model="selectedNamespace" :options="namespaces" class="text-xs min-w-36 bg-(--bg-card) border-(--border)" />
+        <Select
+          v-model="selectedNamespace"
+          :options="namespaces"
+          class="text-xs min-w-36 bg-(--bg-card) border-(--border)"
+        />
       </div>
 
       <div class="flex flex-col gap-1">
         <label class="text-[10px] font-bold text-(--text-muted) uppercase">Kind</label>
-        <Select v-model="selectedWorkloadKind" :options="workloadKinds" class="text-xs min-w-32 bg-(--bg-card) border-(--border)" />
+        <Select
+          v-model="selectedWorkloadKind"
+          :options="workloadKinds"
+          class="text-xs min-w-32 bg-(--bg-card) border-(--border)"
+        />
       </div>
 
       <div class="flex flex-col gap-1">
         <label class="text-[10px] font-bold text-(--text-muted) uppercase">Workload</label>
-        <Select v-model="selectedWorkloadName" :options="workloads" class="text-xs min-w-44 bg-(--bg-card) border-(--border)" />
+        <Select
+          v-model="selectedWorkloadName"
+          :options="workloads"
+          class="text-xs min-w-44 bg-(--bg-card) border-(--border)"
+        />
       </div>
 
       <div class="flex flex-col gap-1">
         <label class="text-[10px] font-bold text-(--text-muted) uppercase">Pod</label>
-        <Select v-model="selectedPodName" :options="podOptions" class="text-xs min-w-44 bg-(--bg-card) border-(--border)" />
+        <Select
+          v-model="selectedPodName"
+          :options="podOptions"
+          class="text-xs min-w-44 bg-(--bg-card) border-(--border)"
+        />
       </div>
 
       <div class="flex flex-col gap-1">
         <label class="text-[10px] font-bold text-(--text-muted) uppercase">Container</label>
-        <Select v-model="selectedContainerName" :options="containerOptions" class="text-xs min-w-36 bg-(--bg-card) border-(--border)" />
+        <Select
+          v-model="selectedContainerName"
+          :options="containerOptions"
+          class="text-xs min-w-36 bg-(--bg-card) border-(--border)"
+        />
       </div>
 
       <div class="flex flex-col gap-1">
         <label class="text-[10px] font-bold text-(--text-muted) uppercase">Lines</label>
-        <Select v-model="tailLines" :options="tailLinesOptions" optionLabel="label" optionValue="value" class="text-xs min-w-28 bg-(--bg-card) border-(--border)" />
+        <Select
+          v-model="tailLines"
+          :options="tailLinesOptions"
+          optionLabel="label"
+          optionValue="value"
+          class="text-xs min-w-28 bg-(--bg-card) border-(--border)"
+        />
       </div>
     </div>
 
     <!-- Controls Bar -->
-    <div class="flex items-center justify-between gap-4 p-3 bg-(--bg-hover)/10 border border-(--border) rounded-xl">
+    <div
+      class="flex items-center justify-between gap-4 p-3 bg-(--bg-hover)/10 border border-(--border) rounded-xl"
+    >
       <div class="flex items-center gap-4 flex-1">
-        <InputText v-model="searchQuery" placeholder="Search logs..." class="text-xs bg-(--bg-card) border-(--border) w-full max-w-md" />
+        <InputText
+          v-model="searchQuery"
+          placeholder="Search logs..."
+          class="text-xs bg-(--bg-card) border-(--border) w-full max-w-md"
+        />
         <div class="flex items-center gap-2">
           <Checkbox v-model="isRegex" inputId="is-regex" binary class="border-(--border)" />
-          <label for="is-regex" class="text-xs text-(--text-secondary) cursor-pointer select-none">Regex</label>
+          <label for="is-regex" class="text-xs text-(--text-secondary) cursor-pointer select-none"
+            >Regex</label
+          >
         </div>
         <div class="flex items-center gap-2">
-          <Checkbox v-model="showTimestamps" inputId="show-timestamps" binary class="border-(--border)" />
-          <label for="show-timestamps" class="text-xs text-(--text-secondary) cursor-pointer select-none">Timestamps</label>
+          <Checkbox
+            v-model="showTimestamps"
+            inputId="show-timestamps"
+            binary
+            class="border-(--border)"
+          />
+          <label
+            for="show-timestamps"
+            class="text-xs text-(--text-secondary) cursor-pointer select-none"
+            >Timestamps</label
+          >
         </div>
       </div>
 
       <div class="flex items-center gap-2">
-        <Button :severity="isPaused ? 'success' : 'warn'" size="small" @click="isPaused = !isPaused">
-          <component :is="isPaused ? Play : Pause" class="w-4 h-4 mr-1" />
-          {{ isPaused ? 'Resume' : 'Pause' }}
-        </Button>
-        <Button severity="danger" size="small" @click="clearLogs">
-          <Trash2 class="w-4 h-4 mr-1" /> Clear
+        <Button
+          variant="text"
+          size="small"
+          :icon="isPaused ? 'pi pi-play' : 'pi pi-pause'"
+          @click="isPaused = !isPaused"
+        />
+        <Button icon="pi pi-trash" size="small" variant="text" @click="clearLogs" />
+      </div>
+
+      <div class="flex justify-center items-center gap-2">
+        <Button
+          icon="pi pi-download"
+          size="small"
+          severity="secondary"
+          variant="text"
+          :disabled="logLines.length <= 0"
+          @click="downloadLogs"
+          title="Download Logs"
+        ></Button>
+        <Button
+          size="small"
+          severity="secondary"
+          variant="text"
+          :icon="isFullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
+          @click="isFullscreen = !isFullscreen"
+          title="Fullscreen"
+        >
         </Button>
       </div>
     </div>
 
     <!-- Console Viewer -->
-    <div 
+    <div
       ref="terminalRef"
       class="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-y-auto font-mono text-xs text-zinc-300 leading-relaxed min-h-0 selection:bg-zinc-800"
     >
-      <div v-if="filteredLogLines.length === 0" class="flex flex-col items-center justify-center h-full text-zinc-500">
+      <div
+        v-if="filteredLogLines.length === 0"
+        class="flex flex-col items-center justify-center h-full text-zinc-500"
+      >
         <p>No log lines streamed or matching query.</p>
       </div>
       <div v-else class="space-y-1">
-        <div 
-          v-for="(line, idx) in filteredLogLines" 
+        <div
+          v-for="(line, idx) in filteredLogLines"
           :key="idx"
           class="flex gap-2 hover:bg-zinc-900/50 py-0.5 rounded px-1"
         >
           <!-- Timestamps -->
-          <span 
-            v-if="showTimestamps && line.timestamp" 
-            class="text-zinc-600 select-none shrink-0"
-          >
+          <span v-if="showTimestamps && line.timestamp" class="text-zinc-600 select-none shrink-0">
             {{ line.timestamp }}
           </span>
 
@@ -339,13 +431,18 @@ const getLogLevelColor = (text: string) => {
     </div>
 
     <!-- Status Bar -->
-    <div class="flex justify-between text-[10px] text-(--text-muted) px-2">
-      <div class="flex items-center gap-1.5">
-        <span class="w-2 h-2 rounded-full" :class="isPaused ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse'"></span>
+    <div
+      class="fixed bottom-0 bg-(--bg-hover)/10 border border-(--border) rounded-xl p-2 text-[10px] text-(--text-muted) px-2"
+    >
+      <div class="flex w-full justify-between items-center gap-1.5">
+        <span
+          class="w-2 h-2 rounded-full"
+          :class="isPaused ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500 animate-pulse'"
+        ></span>
         <span>{{ isPaused ? 'Streaming Paused' : 'Streaming logs...' }}</span>
-      </div>
-      <div>
-        <span>Total lines in buffer: {{ logLines.length }} / {{ maxLogLines }}</span>
+        <div>
+          <span>Total lines in buffer: {{ logLines.length }} / {{ maxLogLines }}</span>
+        </div>
       </div>
     </div>
   </div>

@@ -3,7 +3,7 @@ import { useToast } from 'primevue/usetoast'
 import { computed, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-export function useWorkloadActions<T extends { name: string }>(
+export function useWorkloadActions<T extends { name: string; namespace?: string }>(
   selectedActionRow: Ref<T | null>,
   drawerVisible: Ref<boolean>,
   selectedWorkload: Ref<T | null>,
@@ -22,7 +22,7 @@ export function useWorkloadActions<T extends { name: string }>(
           router.push({
             name: 'logs',
             query: {
-              namespace: (selectedActionRow.value as any).namespace || 'default',
+              namespace: selectedActionRow.value.namespace || 'default',
               workload: selectedActionRow.value.name,
               kind: kind || 'Deployment'
             }
