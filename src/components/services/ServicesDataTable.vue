@@ -12,11 +12,11 @@ import { ExternalLink, MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
-const toast = useToast()
 const k8sStore = useKubernetesStore()
 
 const { tableColumns, visibleCols } = useTableColumns([
@@ -75,15 +75,21 @@ const getTypeBadgeClass = (type: string) => {
   }
 }
 
-const handleActionClick = (event: Event, action: string, serviceName: string) => {
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<ServiceInfo | null>(null)
+
+const toggleActionMenu = (event: Event, data: ServiceInfo) => {
   event.stopPropagation()
-  toast.add({
-    severity: 'info',
-    summary: action,
-    detail: `Action triggered for service: ${serviceName}`,
-    life: 3000
-  })
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
 }
+
+const { actionMenuItems } = useWorkloadActions(
+  selectedActionRow,
+  drawerVisible,
+  selectedService,
+  'Service'
+)
 </script>
 
 <template>
@@ -216,7 +222,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
     ></Column>
 
     <!-- Actions Column -->
-    <Column class="p-3 text-center">
+    <Column class="p-3 text-center w-12 shrink-0">
       <template #body="{ data }">
         <Button
           severity="secondary"
@@ -224,7 +230,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
           size="small"
           class="p-1"
           title="Actions"
-          @click="handleActionClick($event, 'Show Actions Menu', data.name)"
+          @click="toggleActionMenu($event, data)"
         >
           <MoreVertical class="w-4 h-4 text-(--text-muted)" />
         </Button>
@@ -234,6 +240,7 @@ const handleActionClick = (event: Event, action: string, serviceName: string) =>
     <!-- Drawer -->
     <template #drawer>
       <ServiceDetailsDrawer v-model:visible="drawerVisible" :service="selectedService" />
+      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
     </template>
   </ResourceDataTable>
 </template>

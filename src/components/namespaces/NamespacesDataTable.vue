@@ -10,7 +10,7 @@ interface MappedNamespaceInfo extends NamespaceInfo {
   configMaps: number
   secrets: number
 }
-import { Info, MoreHorizontal, RefreshCw, Search, Settings2 } from '@lucide/vue'
+import { Info, RefreshCw, Search, Settings2 } from '@lucide/vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Column from 'primevue/column'
@@ -18,8 +18,11 @@ import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, type Ref } from 'vue'
 import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { MoreVertical } from '@lucide/vue'
 
 const store = useKubernetesStore()
 const searchQuery = ref('')
@@ -169,6 +172,22 @@ const getSparklineData = (ns: MappedNamespaceInfo) => ({
 
 // Max visible labels before showing "+N" overflow
 const MAX_VISIBLE_LABELS = 2
+
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<MappedNamespaceInfo | null>(null)
+
+const toggleActionMenu = (event: Event, data: MappedNamespaceInfo) => {
+  event.stopPropagation()
+  selectedActionRow.value = data
+  actionMenu.value?.toggle(event)
+}
+
+const { actionMenuItems } = useWorkloadActions(
+  selectedActionRow,
+  drawerVisible,
+  selectedNamespace as Ref<MappedNamespaceInfo | null>,
+  'Namespace'
+)
 </script>
 
 <template>
@@ -346,10 +365,17 @@ const MAX_VISIBLE_LABELS = 2
       </Column>
 
       <!-- Actions Column -->
-      <Column class="p-3 text-center w-10">
-        <template #body>
-          <Button severity="secondary" variant="text" size="small" class="p-1">
-            <MoreHorizontal class="w-3.5 h-3.5 text-(--text-muted)" />
+      <Column class="p-3 text-center w-12 shrink-0">
+        <template #body="{ data }">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            title="Actions"
+            @click="toggleActionMenu($event, data)"
+          >
+            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
           </Button>
         </template>
       </Column>
@@ -357,5 +383,6 @@ const MAX_VISIBLE_LABELS = 2
 
     <!-- Details Drawer -->
     <NamespaceDetailsDrawer v-model:visible="drawerVisible" :namespace="selectedNamespace" />
+    <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
   </div>
 </template>

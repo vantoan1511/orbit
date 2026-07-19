@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -9,11 +9,10 @@ import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, MoreVertical } from '@lucide/vue'
 import type { EventInfo } from '@/types/kubernetes'
 import EventDetailsDrawer from './EventDetailsDrawer.vue'
-import { useToast } from 'primevue/usetoast'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { storeToRefs } from 'pinia'
-
-const toast = useToast()
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const k8sStore = useKubernetesStore()
 const { events } = storeToRefs(k8sStore)
@@ -99,15 +98,22 @@ const getTypeBadgeClass = (type: string) => {
   }
 }
 
-const handleActionClick = (event: Event, action: string, eventName: string) => {
+const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
+const selectedActionRow = ref<(EventInfo & { name: string }) | null>(null)
+
+const toggleActionMenu = (event: Event, data: EventInfo) => {
   event.stopPropagation()
-  toast.add({
-    severity: 'info',
-    summary: action,
-    detail: `Action triggered for event on: ${eventName}`,
-    life: 3000
-  })
+  // satisfy T extends { name: string } constraint
+  selectedActionRow.value = { ...data, name: data.objectName }
+  actionMenu.value?.toggle(event)
 }
+
+const { actionMenuItems } = useWorkloadActions(
+  selectedActionRow,
+  drawerVisible,
+  selectedEvent as Ref<(EventInfo & { name: string }) | null>,
+  'Event'
+)
 </script>
 
 <template>
@@ -265,7 +271,7 @@ const handleActionClick = (event: Event, action: string, eventName: string) => {
       ></Column>
 
       <!-- Actions Column -->
-      <Column class="p-3 text-center">
+      <Column class="p-3 text-center w-12 shrink-0">
         <template #body="{ data }">
           <Button
             severity="secondary"
@@ -273,7 +279,7 @@ const handleActionClick = (event: Event, action: string, eventName: string) => {
             size="small"
             class="p-1"
             title="Actions"
-            @click="handleActionClick($event, 'Show Actions Menu', data.objectName)"
+            @click="toggleActionMenu($event, data)"
           >
             <MoreVertical class="w-4 h-4 text-(--text-muted)" />
           </Button>
@@ -281,7 +287,8 @@ const handleActionClick = (event: Event, action: string, eventName: string) => {
       </Column>
     </DataTable>
 
-    <!-- Details Slideout Drawer -->
+    <!-- Details Drawer -->
     <EventDetailsDrawer v-model:visible="drawerVisible" :event="selectedEvent" />
+    <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
   </div>
 </template>
