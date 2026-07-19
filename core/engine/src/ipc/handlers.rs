@@ -160,6 +160,21 @@ pub fn spawn_watchers(
     ));
 }
 
+
+fn get_string(data: &Option<Value>, key: &str) -> Option<String> {
+    data.as_ref()
+        .and_then(|d| d.get(key))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+}
+
+fn get_i64(data: &Option<Value>, key: &str) -> Option<i64> {
+    data.as_ref()
+        .and_then(|d| d.get(key))
+        .and_then(|v| v.as_i64())
+}
+
+
 /// Dispatches an IPC event from the frontend to the appropriate Kubernetes handler.
 /// Each arm spawns an async task so the message loop is never blocked.
 pub fn dispatch(
@@ -195,9 +210,7 @@ pub fn dispatch(
         }
         "switchCluster" => {
             tokio::spawn(async move {
-                let cluster_id = data
-                    .and_then(|d| d.get("clusterId").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let cluster_id = get_string(&data, "clusterId");
 
                 if let Some(id) = cluster_id {
                     let mut w_manager = manager.write().await;
@@ -275,9 +288,7 @@ pub fn dispatch(
         }
         "addCluster" => {
             tokio::spawn(async move {
-                let file_path = data
-                    .and_then(|d| d.get("filePath").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let file_path = get_string(&data, "filePath");
  
                 if let Some(path) = file_path {
                     let mut w_manager = manager.write().await;
@@ -371,9 +382,7 @@ pub fn dispatch(
         }
         "getPods" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -391,9 +400,7 @@ pub fn dispatch(
         }
         "getDeployments" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -411,9 +418,7 @@ pub fn dispatch(
         }
         "getStatefulSets" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -431,9 +436,7 @@ pub fn dispatch(
         }
         "getDaemonSets" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -451,9 +454,7 @@ pub fn dispatch(
         }
         "getReplicaSets" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -471,9 +472,7 @@ pub fn dispatch(
         }
         "getJobs" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -491,9 +490,7 @@ pub fn dispatch(
         }
         "getCronJobs" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -511,9 +508,7 @@ pub fn dispatch(
         }
         "getServices" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -531,9 +526,7 @@ pub fn dispatch(
         }
         "getConfigMaps" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -551,9 +544,7 @@ pub fn dispatch(
         }
         "getEvents" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -571,9 +562,7 @@ pub fn dispatch(
         }
         "getSecrets" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -607,9 +596,7 @@ pub fn dispatch(
         }
         "getPersistentVolumeClaims" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -659,9 +646,7 @@ pub fn dispatch(
         }
         "getPolicies" => {
             tokio::spawn(async move {
-                let namespace = data
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let namespace = get_string(&data, "namespace");
 
                 let client = {
                     let r_manager = manager.read().await;
@@ -679,10 +664,7 @@ pub fn dispatch(
         }
         "checkForUpdates" => {
             tokio::spawn(async move {
-                let url = data
-                    .as_ref()
-                    .and_then(|d| d.get("manifestUrl").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                let url = get_string(&data, "manifestUrl")
                     .unwrap_or_else(|| "https://raw.githubusercontent.com/vantoan1511/orbit/main/update-manifest.json".to_string());
                 
                 match crate::updater::UpdateManifest::fetch(&url).await {
@@ -715,9 +697,7 @@ pub fn dispatch(
         }
         "applyUpdate" => {
             tokio::spawn(async move {
-                let url = data
-                    .and_then(|d| d.get("url").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()));
+                let url = get_string(&data, "url");
                     
                 if let Some(url) = url {
                     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
@@ -799,29 +779,12 @@ pub fn dispatch(
         }
         "streamLogs" => {
             tokio::spawn(async move {
-                let namespace = data.as_ref()
-                    .and_then(|d| d.get("namespace").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .unwrap_or_else(|| "default".to_string());
-                let workload_name = data.as_ref()
-                    .and_then(|d| d.get("workload").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .unwrap_or_default();
-                let workload_kind = data.as_ref()
-                    .and_then(|d| d.get("kind").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .unwrap_or_else(|| "Deployment".to_string());
-                let container = data.as_ref()
-                    .and_then(|d| d.get("container").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .filter(|s| !s.is_empty() && s != "All" && s != "all");
-                let pod_name = data.as_ref()
-                    .and_then(|d| d.get("pod").cloned())
-                    .and_then(|v| v.as_str().map(|s| s.to_string()))
-                    .filter(|s| !s.is_empty() && s != "All" && s != "all");
-                let tail_lines = data.as_ref()
-                    .and_then(|d| d.get("tailLines").cloned())
-                    .and_then(|v| v.as_i64());
+                let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+                let workload_name = get_string(&data, "workload").unwrap_or_default();
+                let workload_kind = get_string(&data, "kind").unwrap_or_else(|| "Deployment".to_string());
+                let container = get_string(&data, "container").filter(|s| !s.is_empty() && s != "All" && s != "all");
+                let pod_name = get_string(&data, "pod").filter(|s| !s.is_empty() && s != "All" && s != "all");
+                let tail_lines = get_i64(&data, "tailLines");
 
                 let mut w_manager = manager.write().await;
                 for cancel in w_manager.log_cancel.drain(..) {
