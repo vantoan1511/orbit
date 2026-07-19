@@ -3,35 +3,44 @@ import { useToast } from 'primevue/usetoast'
 import { computed, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
 
+export interface WorkloadActionOptions<T> {
+  kind?: MaybeRefOrGetter<string>
+  onViewDetails?: (row: T) => void
+}
+
 export function useWorkloadActions<T extends { name: string; namespace?: string }>(
   selectedActionRow: Ref<T | null>,
-  drawerVisible: Ref<boolean>,
-  selectedWorkload: Ref<T | null>,
-  kind?: MaybeRefOrGetter<string>
+  options: WorkloadActionOptions<T> = {}
 ) {
   const toast = useToast()
   const router = useRouter()
 
+  const showToast = (
+    summary: string,
+    actionName: string = summary,
+    severity: 'info' | 'warn' = 'info'
+  ) => {
+    toast.add({
+      severity,
+      summary,
+      detail: `${actionName} triggered for ${selectedActionRow.value?.name}`,
+      life: 3000
+    })
+  }
+
   const actionMenuItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = []
-    const resourceKind = toValue(kind) || 'Deployment'
+    const resourceKind = toValue(options.kind) || 'Deployment'
 
-    // Logs - supported for Deployment, StatefulSet, DaemonSet, ReplicaSet, Job, Pod
-    const supportsLogs = [
-      'Deployment',
-      'StatefulSet',
-      'DaemonSet',
-      'ReplicaSet',
-      'Job',
-      'Pod'
-    ].includes(resourceKind)
-    if (supportsLogs) {
+    // Logs
+    if (
+      ['Deployment', 'StatefulSet', 'DaemonSet', 'ReplicaSet', 'Job', 'Pod'].includes(resourceKind)
+    ) {
       items.push({
         label: 'View Logs',
         icon: 'pi pi-compass',
         command: () => {
           if (selectedActionRow.value) {
-            drawerVisible.value = false // close details drawer
             router.push({
               name: 'logs',
               query: {
@@ -45,17 +54,14 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       })
     }
 
-    // View Details - supported for all except PersistentVolume and PersistentVolumeClaim
+    // View Details
     if (!['PersistentVolume', 'PersistentVolumeClaim'].includes(resourceKind)) {
       items.push({
         label: 'View Details',
         icon: 'pi pi-info',
         command: () => {
-          if (selectedActionRow.value) {
-            if (selectedWorkload) {
-              selectedWorkload.value = selectedActionRow.value
-            }
-            drawerVisible.value = true
+          if (selectedActionRow.value && options.onViewDetails) {
+            options.onViewDetails(selectedActionRow.value)
           }
         }
       })
@@ -63,95 +69,57 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
 
     items.push({ separator: true })
 
-    // Redeploy - Deployment, StatefulSet, DaemonSet
+    // Redeploy
     if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(resourceKind)) {
       items.push({
         label: 'Redeploy',
         icon: 'pi pi-refresh',
-        command: () => {
-          toast.add({
-            severity: 'info',
-            summary: 'Redeploy',
-            detail: `Redeploy triggered for ${selectedActionRow.value?.name}`,
-            life: 3000
-          })
-        }
+        command: () => showToast('Redeploy')
       })
     }
 
-    // Restart - Pods
+    // Restart
     if (resourceKind === 'Pod') {
       items.push({
         label: 'Restart',
         icon: 'pi pi-power-off',
-        command: () => {
-          toast.add({
-            severity: 'info',
-            summary: 'Restart Pod',
-            detail: `Restart triggered for pod: ${selectedActionRow.value?.name}`,
-            life: 3000
-          })
-        }
+        command: () => showToast('Restart Pod', 'Restart')
       })
     }
 
-    // Edit - supported for all except Event
+    // Edit
     if (resourceKind !== 'Event') {
       items.push({
         label: 'Edit',
         icon: 'pi pi-file-edit',
-        command: () => {
-          toast.add({
-            severity: 'info',
-            summary: 'Edit YAML',
-            detail: `Edit YAML triggered for ${selectedActionRow.value?.name}`,
-            life: 3000
-          })
-        }
+        command: () => showToast('Edit YAML')
       })
     }
 
-    // Scale - Deployment, StatefulSet, ReplicaSet
+    // Scale
     if (['Deployment', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
       items.push({
         label: 'Scale',
         icon: 'pi pi-sliders-h',
-        command: () => {
-          toast.add({
-            severity: 'info',
-            summary: 'Scale',
-            detail: `Scale triggered for ${selectedActionRow.value?.name}`,
-            life: 3000
-          })
-        }
+        command: () => showToast('Scale')
       })
     }
 
     items.push({ separator: true })
 
-    // Delete / Terminate - supported for all except Event
+    // Delete / Terminate
     if (resourceKind !== 'Event') {
       const deleteLabel = resourceKind === 'Pod' ? 'Terminate' : 'Delete'
-      const deleteSeverity = resourceKind === 'Pod' ? 'warn' : 'warn' // both warn but structured separately if needed
       items.push({
         label: deleteLabel,
         icon: 'pi pi-trash',
         class: 'text-red-400 hover:text-red-300',
-        command: () => {
-          toast.add({
-            severity: deleteSeverity,
-            summary: deleteLabel,
-            detail: `${deleteLabel} triggered for ${selectedActionRow.value?.name}`,
-            life: 3000
-          })
-        }
+        command: () => showToast(deleteLabel, deleteLabel, 'warn')
       })
     }
 
     return items
   })
 
-  return {
-    actionMenuItems
-  }
+  return { actionMenuItems }
 }

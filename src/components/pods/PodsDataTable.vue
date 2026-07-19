@@ -75,7 +75,13 @@ const toggleActionMenu = (event: Event, data: PodInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, drawerVisible, selectedPod, 'Pod')
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'Pod',
+  onViewDetails: (row) => {
+    selectedPod.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

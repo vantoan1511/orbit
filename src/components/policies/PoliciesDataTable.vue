@@ -93,12 +93,13 @@ const toggleActionMenu = (event: Event, data: PolicyInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedPolicy,
-  'Policy'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'Policy',
+  onViewDetails: (row) => {
+    selectedPolicy.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
@@ -108,12 +108,9 @@ const toggleActionMenu = (event: Event, data: EventInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedEvent as Ref<(EventInfo & { name: string }) | null>,
-  'Event'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'Event'
+})
 </script>
 
 <template>

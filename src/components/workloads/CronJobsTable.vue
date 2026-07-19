@@ -98,12 +98,13 @@ const toggleActionMenu = (event: Event, data: CronJobInfo) => {
   actionMenu.value?.toggle(event)
 }
 
-const { actionMenuItems } = useWorkloadActions(
-  selectedActionRow,
-  drawerVisible,
-  selectedWorkload,
-  'CronJob'
-)
+const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
+  kind: 'CronJob',
+  onViewDetails: (row) => {
+    selectedWorkload.value = row
+    drawerVisible.value = true
+  }
+})
 </script>
 
 <template>
