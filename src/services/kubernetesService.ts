@@ -175,6 +175,10 @@ export const kubernetesService = {
     await coreEngine.dispatch('redeployResource', params)
   },
 
+  async deleteResource(params: { namespace: string; kind: string; name: string }): Promise<void> {
+    await coreEngine.dispatch('deleteResource', params)
+  },
+
   async restartPod(params: { namespace: string; name: string }): Promise<void> {
     await coreEngine.dispatch('restartPod', params)
   }
