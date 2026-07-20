@@ -41,8 +41,12 @@ jobs:
         run: npm run package
       - name: Package Update Zip
         run: |
-          cd dist\orbit
-          Compress-Archive -Path resources.neu, bin\orbit-engine.exe, bin\orbit-apply.exe -DestinationPath ..\orbit-update.zip
+          New-Item -ItemType Directory -Force -Path dist\update-staging\bin
+          copy dist\orbit\resources.neu dist\update-staging\
+          copy dist\orbit\bin\orbit-engine.exe dist\update-staging\bin\
+          copy dist\orbit\bin\orbit-apply.exe dist\update-staging\bin\
+          Compress-Archive -Path dist\update-staging\* -DestinationPath dist\orbit-update.zip
+          Remove-Item -Recurse -Force dist\update-staging
       - name: Get Version
         id: version
         run: |
