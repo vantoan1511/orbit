@@ -24,13 +24,36 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
   const showToast = (
     summary: string,
     actionName: string = summary,
-    severity: 'info' | 'warn' = 'info'
+    actionSeverity: 'info' | 'warn' = 'info'
   ) => {
     toast.add({
-      severity,
+      severity: actionSeverity,
       summary,
       detail: `${actionName} triggered for ${selectedActionRow.value?.name}`,
       life: 3000
+    })
+  }
+
+  const confirmAction = (
+    message: string,
+    header: string,
+    acceptLabel: string,
+    acceptCallback: () => Promise<void>
+  ) => {
+    confirm.require({
+      message,
+      header,
+      icon: 'pi pi-exclamation-triangle',
+      rejectProps: {
+        label: 'Cancel',
+        severity: 'secondary',
+        outlined: true
+      },
+      acceptProps: {
+        label: acceptLabel,
+        severity: 'danger'
+      },
+      accept: acceptCallback
     })
   }
 
@@ -83,20 +106,11 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         command: () => {
           const row = selectedActionRow.value
           if (!row) return
-          confirm.require({
-            message: `Are you sure you want to redeploy ${resourceKind} "${row.name}"?`,
-            header: 'Confirm Redeploy',
-            icon: 'pi pi-exclamation-triangle',
-            rejectProps: {
-              label: 'Cancel',
-              severity: 'secondary',
-              outlined: true
-            },
-            acceptProps: {
-              label: 'Redeploy',
-              severity: 'danger'
-            },
-            accept: async () => {
+          confirmAction(
+            `Are you sure you want to redeploy ${resourceKind} "${row.name}"?`,
+            'Confirm Redeploy',
+            'Redeploy',
+            async () => {
               try {
                 await kubernetesService.redeployResource({
                   namespace: row.namespace || 'default',
@@ -112,7 +126,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                 })
               }
             }
-          })
+          )
         }
       })
     }
@@ -125,20 +139,11 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         command: () => {
           const row = selectedActionRow.value
           if (!row) return
-          confirm.require({
-            message: `Are you sure you want to restart (delete) Pod "${row.name}"?`,
-            header: 'Confirm Restart',
-            icon: 'pi pi-exclamation-triangle',
-            rejectProps: {
-              label: 'Cancel',
-              severity: 'secondary',
-              outlined: true
-            },
-            acceptProps: {
-              label: 'Restart',
-              severity: 'danger'
-            },
-            accept: async () => {
+          confirmAction(
+            `Are you sure you want to restart (delete) Pod "${row.name}"?`,
+            'Confirm Restart',
+            'Restart',
+            async () => {
               try {
                 await kubernetesService.restartPod({
                   namespace: row.namespace || 'default',
@@ -153,7 +158,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                 })
               }
             }
-          })
+          )
         }
       })
     }
@@ -231,21 +236,14 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         command: () => {
           const row = selectedActionRow.value
           if (!row) return
-          confirm.require({
-            message: `Are you sure you want to ${deleteLabel.toLowerCase()} ${resourceKind} "${row.name}"?`,
-            header: `Confirm ${deleteLabel}`,
-            icon: 'pi pi-exclamation-triangle',
-            rejectProps: {
-              label: 'Cancel',
-              severity: 'secondary',
-              outlined: true
-            },
-            acceptProps: {
-              label: deleteLabel,
-              severity: 'danger'
-            },
-            accept: async () => {
+          confirmAction(
+            `Are you sure you want to ${deleteLabel.toLowerCase()} ${resourceKind} "${row.name}"?`,
+            `Confirm ${deleteLabel}`,
+            deleteLabel,
+            async () => {
               try {
+                // Note: This try/catch only handles IPC dispatch transport failures.
+                // Kubernetes API errors are handled globally by App.vue listening to OrbitEvents.ErrorOccurred.
                 await kubernetesService.deleteResource({
                   namespace: row.namespace || 'default',
                   kind: resourceKind,
@@ -260,7 +258,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                 })
               }
             }
-          })
+          )
         }
       })
     }
