@@ -1,7 +1,11 @@
 import type { MenuItem } from 'primevue/menuitem'
 import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
+import { useDialog } from 'primevue/usedialog'
 import { computed, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
+import { kubernetesService } from '@/services/kubernetesService'
+import ScaleDialog from '@/components/shared/ScaleDialog.vue'
 
 export interface WorkloadActionOptions<T> {
   kind?: MaybeRefOrGetter<string>
@@ -13,6 +17,8 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
   options: WorkloadActionOptions<T> = {}
 ) {
   const toast = useToast()
+  const confirm = useConfirm()
+  const dialog = useDialog()
   const router = useRouter()
 
   const showToast = (
@@ -74,7 +80,40 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       items.push({
         label: 'Redeploy',
         icon: 'pi pi-refresh',
-        command: () => showToast('Redeploy')
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+          confirm.require({
+            message: `Are you sure you want to redeploy ${resourceKind} "${row.name}"?`,
+            header: 'Confirm Redeploy',
+            icon: 'pi pi-exclamation-triangle',
+            rejectProps: {
+              label: 'Cancel',
+              severity: 'secondary',
+              outlined: true
+            },
+            acceptProps: {
+              label: 'Redeploy',
+              severity: 'danger'
+            },
+            accept: async () => {
+              try {
+                await kubernetesService.redeployResource({
+                  namespace: row.namespace || 'default',
+                  kind: resourceKind,
+                  name: row.name
+                })
+              } catch (e: any) {
+                toast.add({
+                  severity: 'error',
+                  summary: 'Error',
+                  detail: e.message || 'Failed to redeploy',
+                  life: 5000
+                })
+              }
+            }
+          })
+        }
       })
     }
 
@@ -83,7 +122,39 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       items.push({
         label: 'Restart',
         icon: 'pi pi-power-off',
-        command: () => showToast('Restart Pod', 'Restart')
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+          confirm.require({
+            message: `Are you sure you want to restart (delete) Pod "${row.name}"?`,
+            header: 'Confirm Restart',
+            icon: 'pi pi-exclamation-triangle',
+            rejectProps: {
+              label: 'Cancel',
+              severity: 'secondary',
+              outlined: true
+            },
+            acceptProps: {
+              label: 'Restart',
+              severity: 'danger'
+            },
+            accept: async () => {
+              try {
+                await kubernetesService.restartPod({
+                  namespace: row.namespace || 'default',
+                  name: row.name
+                })
+              } catch (e: any) {
+                toast.add({
+                  severity: 'error',
+                  summary: 'Error',
+                  detail: e.message || 'Failed to restart pod',
+                  life: 5000
+                })
+              }
+            }
+          })
+        }
       })
     }
 
@@ -101,7 +172,50 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       items.push({
         label: 'Scale',
         icon: 'pi pi-sliders-h',
-        command: () => showToast('Scale')
+        command: () => {
+          const row = selectedActionRow.value as any
+          if (!row) return
+          
+          let currentReplicas = 1
+          if (row.replicas && typeof row.replicas.desired === 'number') {
+            currentReplicas = row.replicas.desired
+          }
+
+          dialog.open(ScaleDialog, {
+            props: {
+              header: `Scale ${resourceKind}`,
+              style: {
+                width: '320px'
+              },
+              modal: true
+            },
+            data: {
+              name: row.name,
+              kind: resourceKind,
+              currentReplicas
+            },
+            onClose: async (options) => {
+              const newReplicas = options?.data
+              if (typeof newReplicas === 'number') {
+                try {
+                  await kubernetesService.scaleResource({
+                    namespace: row.namespace || 'default',
+                    kind: resourceKind,
+                    name: row.name,
+                    replicas: newReplicas
+                  })
+                } catch (e: any) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e.message || 'Failed to scale',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
       })
     }
 

@@ -23,6 +23,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import ConfirmDialog from 'primevue/confirmdialog'
+import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
@@ -129,6 +130,15 @@ const handleErrorOccurred = (payload: { message: string }) => {
   })
 }
 
+const handleCommandSucceeded = (payload: { message: string }) => {
+  toast.add({
+    severity: 'success',
+    summary: 'Success',
+    detail: payload.message,
+    life: 3000
+  })
+}
+
 onMounted(() => {
   // Initialize dark mode by default
   document.documentElement.classList.add('my-app-dark')
@@ -155,6 +165,7 @@ onMounted(() => {
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
+  events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
 })
 
 onUnmounted(() => {
@@ -179,6 +190,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
+  events.off(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
 })
 </script>
 
@@ -186,6 +198,7 @@ onUnmounted(() => {
   <AppLayout />
   <Toast />
   <ConfirmDialog />
+  <DynamicDialog />
   <UpdaterNotifications />
 </template>
 
