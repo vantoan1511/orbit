@@ -935,13 +935,24 @@ pub fn dispatch(
                 let kind = get_string(&data, "kind").unwrap_or_default();
                 let name = get_string(&data, "name").unwrap_or_default();
 
+                if kind.is_empty() || name.is_empty() {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: "Failed to delete: kind and name must not be empty".to_string(),
+                        },
+                    ).await;
+                    return;
+                }
+
                 let client = {
                     let r_manager = manager.read().await;
                     r_manager.active_client.clone()
                 };
 
-                if let Some(ref client) = client {
-                    match crate::kubernetes::delete_resource(client, &namespace, &kind, &name).await {
+                if let Some(client) = client {
+                    match crate::kubernetes::delete_resource(&client, &namespace, &kind, &name).await {
                         Ok(()) => {
                             let _ = Bridge::send_event(
                                 &writer,
@@ -962,6 +973,14 @@ pub fn dispatch(
                             ).await;
                         }
                     }
+                } else {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: "Failed to delete: no active Kubernetes client".to_string(),
+                        },
+                    ).await;
                 }
             });
         }
