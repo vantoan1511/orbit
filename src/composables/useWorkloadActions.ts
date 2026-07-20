@@ -228,7 +228,40 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         label: deleteLabel,
         icon: 'pi pi-trash',
         class: 'text-red-400 hover:text-red-300',
-        command: () => showToast(deleteLabel, deleteLabel, 'warn')
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+          confirm.require({
+            message: `Are you sure you want to ${deleteLabel.toLowerCase()} ${resourceKind} "${row.name}"?`,
+            header: `Confirm ${deleteLabel}`,
+            icon: 'pi pi-exclamation-triangle',
+            rejectProps: {
+              label: 'Cancel',
+              severity: 'secondary',
+              outlined: true
+            },
+            acceptProps: {
+              label: deleteLabel,
+              severity: 'danger'
+            },
+            accept: async () => {
+              try {
+                await kubernetesService.deleteResource({
+                  namespace: row.namespace || 'default',
+                  kind: resourceKind,
+                  name: row.name
+                })
+              } catch (e) {
+                toast.add({
+                  severity: 'error',
+                  summary: 'Error',
+                  detail: e instanceof Error ? e.message : `Failed to ${deleteLabel.toLowerCase()}`,
+                  life: 5000
+                })
+              }
+            }
+          })
+        }
       })
     }
 

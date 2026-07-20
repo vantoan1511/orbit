@@ -13,6 +13,7 @@ pub mod policies;
 pub mod watchers;
 pub mod metrics;
 pub mod logs;
+pub mod delete;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;
@@ -25,6 +26,7 @@ pub use services::list_services;
 pub use events::list_events;
 pub use policies::*;
 pub use logs::{stream_pod_logs, get_workload_pods};
+pub use delete::delete_resource;
 
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
