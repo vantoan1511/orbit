@@ -28,23 +28,7 @@ const {
 } = useLogSelection()
 
 const logHighlighting = useLogHighlighting()
-const {
-  showRulesDialog,
-  selectedPreset,
-  customRules,
-  newPresetName,
-  presetOptions,
-  activeRules,
-  isCustomPresetActive,
-  colorOptions,
-  loadRules,
-  saveRules,
-  addRule,
-  deleteCustomRule,
-  saveCustomPreset,
-  deleteCustomPreset,
-  getLogLevelColor
-} = logHighlighting
+const { showRulesDialog, loadRules, getLogLevelColor } = logHighlighting
 
 const {
   logLines,

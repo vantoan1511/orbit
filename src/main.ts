@@ -33,19 +33,25 @@ app.use(PrimeVue, {
   },
   pt: {
     dialog: {
-      root: { class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden' },
+      root: {
+        class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden'
+      },
       header: { class: 'p-4 border-b border-(--border)' },
       content: { class: 'p-4' },
       footer: { class: 'p-4 border-t border-(--border) flex justify-end gap-2' }
     },
     dynamicdialog: {
-      root: { class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden' },
+      root: {
+        class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden'
+      },
       header: { class: 'p-4 border-b border-(--border)' },
       content: { class: 'p-4' },
       footer: { class: 'p-4 border-t border-(--border) flex justify-end gap-2' }
     },
     confirmdialog: {
-      root: { class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden' },
+      root: {
+        class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden'
+      },
       header: { class: 'p-4 border-b border-(--border)' },
       content: { class: 'p-4' },
       footer: { class: 'p-4 border-t border-(--border) flex justify-end gap-2' }

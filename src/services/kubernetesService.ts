@@ -171,18 +171,11 @@ export const kubernetesService = {
     await coreEngine.dispatch('scaleResource', params)
   },
 
-  async redeployResource(params: {
-    namespace: string
-    kind: string
-    name: string
-  }): Promise<void> {
+  async redeployResource(params: { namespace: string; kind: string; name: string }): Promise<void> {
     await coreEngine.dispatch('redeployResource', params)
   },
 
-  async restartPod(params: {
-    namespace: string
-    name: string
-  }): Promise<void> {
+  async restartPod(params: { namespace: string; name: string }): Promise<void> {
     await coreEngine.dispatch('restartPod', params)
   }
 }
