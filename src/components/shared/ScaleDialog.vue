@@ -46,9 +46,9 @@ const handleScale = () => {
       />
     </div>
 
-    <div class="scale-dialog-footer">
-      <Button label="Cancel" severity="secondary" @click="handleCancel" />
-      <Button label="Scale" severity="primary" @click="handleScale" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button label="Cancel" severity="secondary" size="small" @click="handleCancel" />
+      <Button label="Scale" severity="primary" size="small" @click="handleScale" />
     </div>
   </div>
 </template>
