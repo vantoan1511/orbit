@@ -103,11 +103,11 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                   kind: resourceKind,
                   name: row.name
                 })
-              } catch (e: any) {
+              } catch (e) {
                 toast.add({
                   severity: 'error',
                   summary: 'Error',
-                  detail: e.message || 'Failed to redeploy',
+                  detail: e instanceof Error ? e.message : 'Failed to redeploy',
                   life: 5000
                 })
               }
@@ -144,11 +144,11 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                   namespace: row.namespace || 'default',
                   name: row.name
                 })
-              } catch (e: any) {
+              } catch (e) {
                 toast.add({
                   severity: 'error',
                   summary: 'Error',
-                  detail: e.message || 'Failed to restart pod',
+                  detail: e instanceof Error ? e.message : 'Failed to restart pod',
                   life: 5000
                 })
               }
@@ -173,9 +173,9 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         label: 'Scale',
         icon: 'pi pi-sliders-h',
         command: () => {
-          const row = selectedActionRow.value as any
+          const row = selectedActionRow.value as (T & { replicas?: { desired?: number } }) | null
           if (!row) return
-          
+
           let currentReplicas = 1
           if (row.replicas && typeof row.replicas.desired === 'number') {
             currentReplicas = row.replicas.desired
@@ -204,11 +204,11 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                     name: row.name,
                     replicas: newReplicas
                   })
-                } catch (e: any) {
+                } catch (e) {
                   toast.add({
                     severity: 'error',
                     summary: 'Error',
-                    detail: e.message || 'Failed to scale',
+                    detail: e instanceof Error ? e.message : 'Failed to scale',
                     life: 5000
                   })
                 }

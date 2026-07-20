@@ -1,9 +1,19 @@
 <script setup lang="ts">
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
-import { inject, onMounted, ref } from 'vue'
+import { inject, onMounted, ref, type Ref } from 'vue'
 
-const dialogRef = inject<any>('dialogRef')
+const dialogRef = inject<
+  | Ref<{
+      data: {
+        currentReplicas?: number
+        name?: string
+        kind?: string
+      }
+      close: (data?: number) => void
+    }>
+  | undefined
+>('dialogRef')
 const replicas = ref<number>(1)
 const resourceName = ref<string>('')
 const resourceKind = ref<string>('')
@@ -47,7 +57,13 @@ const handleScale = () => {
     </div>
 
     <div class="flex justify-end gap-2 mt-4">
-      <Button type="button" label="Cancel" severity="secondary" size="small" @click="handleCancel" />
+      <Button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        size="small"
+        @click="handleCancel"
+      />
       <Button type="submit" label="Scale" severity="primary" size="small" />
     </div>
   </form>
