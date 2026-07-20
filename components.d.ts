@@ -30,6 +30,7 @@ declare module 'vue' {
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
     JobsTable: typeof import('./src/components/workloads/JobsTable.vue')['default']
+    LogHighlightRulesDialog: typeof import('./src/components/logs/LogHighlightRulesDialog.vue')['default']
     NamespaceBadge: typeof import('./src/components/shared/NamespaceBadge.vue')['default']
     NamespaceDetailsDrawer: typeof import('./src/components/namespaces/NamespaceDetailsDrawer.vue')['default']
     NamespaceFilter: typeof import('./src/components/shared/NamespaceFilter.vue')['default']
