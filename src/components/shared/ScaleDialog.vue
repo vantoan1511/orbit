@@ -26,7 +26,7 @@ const handleScale = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 p-1">
+  <form @submit.prevent="handleScale" class="flex flex-col gap-4 p-1">
     <p class="text-xs text-(--text-secondary)">
       Scale <span class="font-semibold text-(--text-primary)">{{ resourceName }}</span> ({{
         resourceKind
@@ -47,8 +47,8 @@ const handleScale = () => {
     </div>
 
     <div class="flex justify-end gap-2 mt-4">
-      <Button label="Cancel" severity="secondary" size="small" @click="handleCancel" />
-      <Button label="Scale" severity="primary" size="small" @click="handleScale" />
+      <Button type="button" label="Cancel" severity="secondary" size="small" @click="handleCancel" />
+      <Button type="submit" label="Scale" severity="primary" size="small" />
     </div>
-  </div>
+  </form>
 </template>
