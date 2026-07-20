@@ -13,6 +13,7 @@ import { Noir } from './theme/orbitTheme'
 
 import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
+import DialogService from 'primevue/dialogservice'
 
 const app = createApp(App)
 
@@ -33,6 +34,7 @@ app.use(PrimeVue, {
 })
 app.use(ToastService)
 app.use(ConfirmationService)
+app.use(DialogService)
 
 app.mount('#app')
 

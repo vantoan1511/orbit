@@ -856,6 +856,114 @@ pub fn dispatch(
                 }
             });
         }
+        "scaleResource" => {
+            tokio::spawn(async move {
+                let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+                let kind = get_string(&data, "kind").unwrap_or_default();
+                let name = get_string(&data, "name").unwrap_or_default();
+                let replicas = get_i64(&data, "replicas").unwrap_or(1) as i32;
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+
+                if let Some(ref client) = client {
+                    match crate::kubernetes::workloads::scale_resource(client, &namespace, &kind, &name, replicas).await {
+                        Ok(()) => {
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::CommandSucceeded {
+                                    message: format!("Scaled {} {} to {} replicas", kind, name, replicas),
+                                },
+                            ).await;
+                        }
+                        Err(e) => {
+                            log::error!("Error scaling {}: {:?}", kind, e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to scale: {}", e),
+                                },
+                            ).await;
+                        }
+                    }
+                }
+            });
+        }
+        "redeployResource" => {
+            tokio::spawn(async move {
+                let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+                let kind = get_string(&data, "kind").unwrap_or_default();
+                let name = get_string(&data, "name").unwrap_or_default();
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+
+                if let Some(ref client) = client {
+                    match crate::kubernetes::workloads::redeploy_resource(client, &namespace, &kind, &name).await {
+                        Ok(()) => {
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::CommandSucceeded {
+                                    message: format!("Redeployed {} {}", kind, name),
+                                },
+                            ).await;
+                        }
+                        Err(e) => {
+                            log::error!("Error redeploying {}: {:?}", kind, e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to redeploy: {}", e),
+                                },
+                            ).await;
+                        }
+                    }
+                }
+            });
+        }
+        "restartPod" => {
+            tokio::spawn(async move {
+                let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+                let name = get_string(&data, "name").unwrap_or_default();
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+
+                if let Some(ref client) = client {
+                    match crate::kubernetes::workloads::delete_pod(client, &namespace, &name).await {
+                        Ok(()) => {
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::CommandSucceeded {
+                                    message: format!("Restarted Pod {}", name),
+                                },
+                            ).await;
+                        }
+                        Err(e) => {
+                            log::error!("Error restarting Pod {}: {:?}", name, e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to restart pod: {}", e),
+                                },
+                            ).await;
+                        }
+                    }
+                }
+            });
+        }
         _ => {}
     }
 }

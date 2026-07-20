@@ -195,7 +195,7 @@
 }
 
 .p-dialog {
-  background: var(--bg-primary) !important;
+  background: var(--bg-card) !important;
   border: 1px solid var(--border) !important;
   border-radius: 12px !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
@@ -206,7 +206,7 @@
 }
 
 .p-dialog-header {
-  background: var(--bg-primary) !important;
+  background: var(--bg-card) !important;
   padding: 1.25rem 1.5rem 0.5rem 1.5rem !important;
   color: var(--text-primary) !important;
   font-weight: 600 !important;
@@ -217,7 +217,7 @@
 }
 
 .p-dialog-content {
-  background: var(--bg-primary) !important;
+  background: var(--bg-card) !important;
   padding: 0.5rem 1.5rem 1.25rem 1.5rem !important;
   color: var(--text-secondary) !important;
   font-size: 0.875rem !important;
@@ -260,11 +260,71 @@
 .p-dialog-footer .p-confirmdialog-accept-button {
   background: var(--text-primary) !important;
   border: 1px solid var(--text-primary) !important;
-  color: var(--bg-primary) !important;
+  color: var(--bg-card) !important;
 }
 
 .p-dialog-footer .p-button-primary:hover,
 .p-dialog-footer .p-confirmdialog-accept-button:hover {
+  background: var(--text-secondary) !important;
+  border-color: var(--text-secondary) !important;
+}
+
+/* Danger accept button overrides */
+.p-dialog-footer .p-confirmdialog-accept-button.p-button-danger,
+.p-dialog-footer .p-confirmdialog-accept-button.p-button-severity-danger {
+  background: var(--danger) !important;
+  border-color: var(--danger) !important;
+  color: #ffffff !important;
+}
+
+.p-dialog-footer .p-confirmdialog-accept-button.p-button-danger:hover,
+.p-dialog-footer .p-confirmdialog-accept-button.p-button-severity-danger:hover {
+  background: color-mix(in srgb, var(--danger) 80%, black) !important;
+  border-color: color-mix(in srgb, var(--danger) 80%, black) !important;
+}
+
+/* Dynamic dialog custom footer to match confirm dialog layout */
+.scale-dialog-footer {
+  background: var(--bg-hover);
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 1.5rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  margin-bottom: -1.25rem;
+  margin-top: 1.5rem;
+}
+
+.scale-dialog-footer button {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.875rem !important;
+  border-radius: 6px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s !important;
+  cursor: pointer;
+}
+
+.scale-dialog-footer .p-button-secondary {
+  background: transparent !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text-secondary) !important;
+}
+
+.scale-dialog-footer .p-button-secondary:hover {
+  background: var(--bg-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.scale-dialog-footer .p-button-primary {
+  background: var(--text-primary) !important;
+  border: 1px solid var(--text-primary) !important;
+  color: var(--bg-card) !important;
+}
+
+.scale-dialog-footer .p-button-primary:hover {
   background: var(--text-secondary) !important;
   border-color: var(--text-secondary) !important;
 }

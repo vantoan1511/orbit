@@ -1,5 +1,5 @@
 use kube::{
-    api::{Api, ListParams},
+    api::{Api, ListParams, Patch, PatchParams, DeleteParams},
     Client,
 };
 use k8s_openapi::api::core::v1::Pod;
@@ -290,4 +290,94 @@ pub async fn list_replicasets(client: &Client, namespace: Option<String>) -> Res
     }
 
     Ok(list)
+}
+
+pub async fn scale_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+    replicas: i32,
+) -> Result<(), kube::Error> {
+    let patch = serde_json::json!({
+        "spec": {
+            "replicas": replicas
+        }
+    });
+    let patch_params = PatchParams::default();
+
+    match kind {
+        "Deployment" => {
+            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+        }
+        "StatefulSet" => {
+            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+        }
+        "ReplicaSet" => {
+            let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+        }
+        _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported scale resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        })),
+    }
+    Ok(())
+}
+
+pub async fn redeploy_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+) -> Result<(), kube::Error> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let patch = serde_json::json!({
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": now
+                    }
+                }
+            }
+        }
+    });
+    let patch_params = PatchParams::default();
+
+    match kind {
+        "Deployment" => {
+            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+        }
+        "StatefulSet" => {
+            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+        }
+        "DaemonSet" => {
+            let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+        }
+        _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported redeploy resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        })),
+    }
+    Ok(())
+}
+
+pub async fn delete_pod(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+) -> Result<(), kube::Error> {
+    let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
+    api.delete(name, &DeleteParams::default()).await?;
+    Ok(())
 }

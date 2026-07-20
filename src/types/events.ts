@@ -124,6 +124,9 @@ export interface OrbitEventMap {
   updateReady: {
     component: string
   }
+  commandSucceeded: {
+    message: string
+  }
 }
 
 export const OrbitEvents = {
@@ -155,7 +158,8 @@ export const OrbitEvents = {
   LogLineReceived: 'logLineReceived',
   UpdateCheckFinished: 'updateCheckFinished',
   UpdateDownloadProgress: 'updateDownloadProgress',
-  UpdateReady: 'updateReady'
+  UpdateReady: 'updateReady',
+  CommandSucceeded: 'commandSucceeded'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

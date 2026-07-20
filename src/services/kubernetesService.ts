@@ -160,5 +160,29 @@ export const kubernetesService = {
    */
   async stopLogs(): Promise<void> {
     await coreEngine.dispatch('stopLogs')
+  },
+
+  async scaleResource(params: {
+    namespace: string
+    kind: string
+    name: string
+    replicas: number
+  }): Promise<void> {
+    await coreEngine.dispatch('scaleResource', params)
+  },
+
+  async redeployResource(params: {
+    namespace: string
+    kind: string
+    name: string
+  }): Promise<void> {
+    await coreEngine.dispatch('redeployResource', params)
+  },
+
+  async restartPod(params: {
+    namespace: string
+    name: string
+  }): Promise<void> {
+    await coreEngine.dispatch('restartPod', params)
   }
 }

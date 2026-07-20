@@ -117,6 +117,10 @@ pub enum OrbitEvent {
         has_update: bool,
         manifest: crate::updater::UpdateManifest,
     },
+    #[serde(rename = "commandSucceeded")]
+    CommandSucceeded {
+        message: String,
+    },
     #[serde(rename = "updateDownloadProgress")]
     UpdateDownloadProgress {
         component: String,
