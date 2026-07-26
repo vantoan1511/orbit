@@ -280,7 +280,7 @@ watch(
                     variant="text"
                     icon="pi pi-plus"
                     label="Add"
-                    class="text-xs cursor-pointer !text-blue-500 hover:!text-blue-400"
+                    class="text-xs cursor-pointer text-blue-500! hover:text-blue-400!"
                     @click="formValues.labels.push({ key: '', value: '' })"
                   />
                 </div>
@@ -320,7 +320,7 @@ watch(
                     variant="text"
                     icon="pi pi-plus"
                     label="Add"
-                    class="text-xs cursor-pointer !text-blue-500 hover:!text-blue-400"
+                    class="text-xs cursor-pointer text-blue-500! hover:text-blue-400!"
                     @click="formValues.annotations.push({ key: '', value: '' })"
                   />
                 </div>
