@@ -8,6 +8,17 @@ use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use serde_json::Value;
 
+fn to_json_val<T: serde::Serialize>(val: &T, kind: &str) -> Result<Value, kube::Error> {
+    serde_json::to_value(val).map_err(|e| {
+        kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Failed to serialize {}: {}", kind, e),
+            reason: "InternalError".to_string(),
+            code: 500,
+        })
+    })
+}
+
 pub async fn get_resource_raw(
     client: &Client,
     namespace: &str,
@@ -18,62 +29,62 @@ pub async fn get_resource_raw(
         "Pod" => {
             let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "Deployment" => {
             let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "StatefulSet" => {
             let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "DaemonSet" => {
             let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "ReplicaSet" => {
             let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "Job" => {
             let api: Api<Job> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "CronJob" => {
             let api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "Service" => {
             let api: Api<Service> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "ConfigMap" => {
             let api: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "Secret" => {
             let api: Api<Secret> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "PersistentVolumeClaim" => {
             let api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         "NetworkPolicy" => {
             let api: Api<NetworkPolicy> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
-            Ok(serde_json::to_value(&resource).unwrap())
+            to_json_val(&resource, kind)
         }
         _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),

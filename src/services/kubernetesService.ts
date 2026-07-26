@@ -191,7 +191,7 @@ export const kubernetesService = {
     namespace: string
     kind: string
     name: string
-    data: any
+    data: Record<string, unknown>
   }): Promise<void> {
     await coreEngine.dispatch('applyResource', params)
   }

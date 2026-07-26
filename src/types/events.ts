@@ -130,7 +130,7 @@ export interface OrbitEventMap {
   resourceRawData: {
     kind: string
     name: string
-    data: any
+    data: Record<string, unknown>
   }
 }
 

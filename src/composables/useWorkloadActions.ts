@@ -21,19 +21,6 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
   const dialog = useDialog()
   const router = useRouter()
 
-  const showToast = (
-    summary: string,
-    actionName: string = summary,
-    actionSeverity: 'info' | 'warn' = 'info'
-  ) => {
-    toast.add({
-      severity: actionSeverity,
-      summary,
-      detail: `${actionName} triggered for ${selectedActionRow.value?.name}`,
-      life: 3000
-    })
-  }
-
   const confirmAction = (
     message: string,
     header: string,
