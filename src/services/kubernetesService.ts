@@ -181,5 +181,18 @@ export const kubernetesService = {
 
   async restartPod(params: { namespace: string; name: string }): Promise<void> {
     await coreEngine.dispatch('restartPod', params)
+  },
+
+  async getResourceRaw(params: { namespace: string; kind: string; name: string }): Promise<void> {
+    await coreEngine.dispatch('getResourceRaw', params)
+  },
+
+  async applyResource(params: {
+    namespace: string
+    kind: string
+    name: string
+    data: any
+  }): Promise<void> {
+    await coreEngine.dispatch('applyResource', params)
   }
 }

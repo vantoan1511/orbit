@@ -168,7 +168,18 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       items.push({
         label: 'Edit',
         icon: 'pi pi-file-edit',
-        command: () => showToast('Edit YAML')
+        command: () => {
+          if (selectedActionRow.value) {
+            router.push({
+              name: 'edit-workload',
+              params: {
+                kind: resourceKind,
+                namespace: selectedActionRow.value.namespace || 'default',
+                name: selectedActionRow.value.name
+              }
+            })
+          }
+        }
       })
     }
 

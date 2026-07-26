@@ -23,6 +23,7 @@ declare module 'vue' {
     CronJobsTable: typeof import('./src/components/workloads/CronJobsTable.vue')['default']
     DaemonSetsTable: typeof import('./src/components/workloads/DaemonSetsTable.vue')['default']
     DataTable: typeof import('primevue/datatable')['default']
+    DeploymentEditForm: typeof import('./src/components/workloads/DeploymentEditForm.vue')['default']
     DeploymentsTable: typeof import('./src/components/workloads/DeploymentsTable.vue')['default']
     EventDetailsDrawer: typeof import('./src/components/events/EventDetailsDrawer.vue')['default']
     EventMetricsCards: typeof import('./src/components/events/EventMetricsCards.vue')['default']

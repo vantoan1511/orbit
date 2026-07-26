@@ -17,6 +17,7 @@
     "format": "prettier --write ."
   },
   "dependencies": {
+    "@guolao/vue-monaco-editor": "^1.6.0",
     "@lucide/vue": "^1.23.0",
     "@neutralinojs/lib": "^6.8.0",
     "@primeuix/themes": "^2.0.3",
@@ -28,7 +29,8 @@
     "tailwindcss": "^4.3.2",
     "tailwindcss-primeui": "^0.6.1",
     "vue": "^3.5.31",
-    "vue-router": "^5.0.4"
+    "vue-router": "^5.0.4",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@neutralinojs/neu": "^11.7.2",

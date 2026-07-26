@@ -130,4 +130,10 @@ pub enum OrbitEvent {
     UpdateReady {
         component: String,
     },
+    #[serde(rename = "resourceRawData")]
+    ResourceRawData {
+        kind: String,
+        name: String,
+        data: serde_json::Value,
+    },
 }

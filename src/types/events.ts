@@ -127,6 +127,11 @@ export interface OrbitEventMap {
   commandSucceeded: {
     message: string
   }
+  resourceRawData: {
+    kind: string
+    name: string
+    data: any
+  }
 }
 
 export const OrbitEvents = {
@@ -159,7 +164,8 @@ export const OrbitEvents = {
   UpdateCheckFinished: 'updateCheckFinished',
   UpdateDownloadProgress: 'updateDownloadProgress',
   UpdateReady: 'updateReady',
-  CommandSucceeded: 'commandSucceeded'
+  CommandSucceeded: 'commandSucceeded',
+  ResourceRawData: 'resourceRawData'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

@@ -25,6 +25,12 @@ const router = createRouter({
       component: () => import('../views/WorkloadsView.vue')
     },
     {
+      path: '/workloads/:kind/:namespace/:name/edit',
+      name: 'edit-workload',
+      component: () => import('../views/EditView.vue'),
+      props: true
+    },
+    {
       path: '/pods',
       name: 'pods',
       component: () => import('../views/PodsView.vue')
