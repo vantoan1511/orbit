@@ -323,7 +323,8 @@ watch(
             lineHeight: 22,
             scrollBeyondLastLine: false,
             roundedSelection: false,
-            padding: { top: 16 }
+            padding: { top: 16 },
+            readOnly: isSaving
           }"
           class="h-full w-full"
         />

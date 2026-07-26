@@ -141,3 +141,26 @@ pub async fn apply_resource(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct DummyResource {
+        name: String,
+        replicas: u32,
+    }
+
+    #[test]
+    fn test_to_json_val_success() {
+        let dummy = DummyResource {
+            name: "test-dep".to_string(),
+            replicas: 3,
+        };
+        let val = to_json_val(&dummy, "Deployment").expect("Serialization should succeed");
+        assert_eq!(val["name"], "test-dep");
+        assert_eq!(val["replicas"], 3);
+    }
+}
