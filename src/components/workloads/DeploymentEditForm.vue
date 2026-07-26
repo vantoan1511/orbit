@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { ref, watch, toRaw, computed } from 'vue'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
-import Select from 'primevue/select'
-import InputText from 'primevue/inputtext'
-import InputNumber from 'primevue/inputnumber'
-import ToggleSwitch from 'primevue/toggleswitch'
 import Button from 'primevue/button'
+import InputNumber from 'primevue/inputnumber'
+import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import ToggleSwitch from 'primevue/toggleswitch'
+import { computed, ref, toRaw, watch } from 'vue'
 
 const props = defineProps<{
   rawData: Record<string, unknown> | null
@@ -416,17 +416,18 @@ const removePortItem = (container: ContainerFormState, index: number) => {
               Deployment Scaling
             </h3>
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="flex gap-4">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-(--text-secondary)">Replicas</label>
                 <InputNumber
                   v-model="replicas"
-                  :min="0"
-                  :max="1000"
                   showButtons
                   buttonLayout="horizontal"
-                  class="w-full"
-                  inputClass="w-full px-2 py-1.5 bg-(--bg-primary) border border-(--border) text-xs text-(--text-primary) text-center"
+                  inputClass="bg-(--bg-primary) border border-(--border) text-xs text-(--text-primary) text-center"
+                  increment-button-class="bg-(--bg-primary) border border-(--border)"
+                  decrement-button-class="bg-(--bg-primary) border border-(--border)"
+                  :min="0"
+                  :max="1000"
                   @update:model-value="handleFieldChange"
                   @change="handleFieldChange"
                 />
@@ -436,17 +437,15 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 <label class="text-xs font-medium text-(--text-secondary)">Paused</label>
                 <div class="flex items-center gap-2 mt-1">
                   <ToggleSwitch v-model="paused" @change="handleFieldChange" />
-                  <span class="text-xs text-(--text-muted)">{{
-                    paused ? 'Deployment Paused' : 'Active'
-                  }}</span>
+                  <span class="text-xs text-(--text-muted)">
+                    {{ paused ? 'Deployment Paused' : 'Active' }}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <hr class="border-(--border)" />
-
-          <div class="flex flex-col gap-3">
+          <div class="flex flex-col gap-3 mt-3">
             <h3 class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider">
               Deployment Strategy
             </h3>
@@ -456,7 +455,7 @@ const removePortItem = (container: ContainerFormState, index: number) => {
               <Select
                 v-model="strategyType"
                 :options="['RollingUpdate', 'Recreate']"
-                class="w-full text-xs"
+                class="bg-(--bg-primary) border border-(--border)"
                 @change="handleFieldChange"
               />
             </div>
@@ -587,12 +586,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                 @input="handleFieldChange"
               />
-              <button
+              <Button
+                icon="pi pi-times"
+                variant="text"
+                severity="danger"
+                size="small"
+                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                 @click="removeKV(deploymentLabels, idx)"
-                class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-              >
-                <i class="pi pi-times text-xs"></i>
-              </button>
+              />
             </div>
           </div>
 
@@ -631,12 +632,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                 @input="handleFieldChange"
               />
-              <button
+              <Button
+                icon="pi pi-times"
+                variant="text"
+                severity="danger"
+                size="small"
+                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                 @click="removeKV(deploymentAnnotations, idx)"
-                class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-              >
-                <i class="pi pi-times text-xs"></i>
-              </button>
+              />
             </div>
           </div>
 
@@ -678,12 +681,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                 @input="handleFieldChange"
               />
-              <button
+              <Button
+                icon="pi pi-times"
+                variant="text"
+                severity="danger"
+                size="small"
+                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                 @click="removeKV(podLabels, idx)"
-                class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-              >
-                <i class="pi pi-times text-xs"></i>
-              </button>
+              />
             </div>
           </div>
 
@@ -722,12 +727,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                 @input="handleFieldChange"
               />
-              <button
+              <Button
+                icon="pi pi-times"
+                variant="text"
+                severity="danger"
+                size="small"
+                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                 @click="removeKV(podAnnotations, idx)"
-                class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-              >
-                <i class="pi pi-times text-xs"></i>
-              </button>
+              />
             </div>
           </div>
         </TabPanel>
@@ -757,7 +764,7 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 <Select
                   v-model="restartPolicy"
                   :options="['Always', 'OnFailure', 'Never']"
-                  class="w-full text-xs"
+                  class="bg-(--bg-primary) border border-(--border) text-xs"
                   @change="handleFieldChange"
                 />
               </div>
@@ -815,12 +822,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                 @input="handleFieldChange"
               />
-              <button
+              <Button
+                icon="pi pi-times"
+                variant="text"
+                severity="danger"
+                size="small"
+                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                 @click="removeKV(nodeSelector, idx)"
-                class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-              >
-                <i class="pi pi-times text-xs"></i>
-              </button>
+              />
             </div>
           </div>
         </TabPanel>
@@ -833,19 +842,16 @@ const removePortItem = (container: ContainerFormState, index: number) => {
             class="flex items-center gap-2 border-b border-(--border) pb-2"
           >
             <span class="text-xs font-medium text-(--text-secondary)">Container:</span>
-            <button
+            <Button
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
+              :label="c.name || `Container ${idx + 1}`"
+              size="small"
+              :variant="activeContainerIndex === idx ? undefined : 'text'"
+              :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
+              class="px-2.5! py-1! text-xs cursor-pointer"
               @click="activeContainerIndex = idx"
-              class="px-2.5 py-1 text-xs rounded-md transition-colors cursor-pointer"
-              :class="
-                activeContainerIndex === idx
-                  ? 'bg-blue-600 text-white font-medium'
-                  : 'bg-(--bg-primary) text-(--text-secondary) hover:bg-(--bg-hover)'
-              "
-            >
-              {{ c.name || `Container ${idx + 1}` }}
-            </button>
+            />
           </div>
 
           <div v-if="currentContainer" class="flex flex-col gap-5">
@@ -872,7 +878,7 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                   <Select
                     v-model="currentContainer.imagePullPolicy"
                     :options="['Always', 'IfNotPresent', 'Never']"
-                    class="w-full text-xs"
+                    class="bg-(--bg-primary) border border-(--border)"
                     @change="handleFieldChange"
                   />
                 </div>
@@ -991,12 +997,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                     class="w-full px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                     @input="handleFieldChange"
                   />
-                  <button
+                  <Button
+                    icon="pi pi-times"
+                    variant="text"
+                    severity="danger"
+                    size="small"
+                    class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                     @click="removeCommandItem(currentContainer, cIdx)"
-                    class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                  >
-                    <i class="pi pi-times text-xs"></i>
-                  </button>
+                  />
                 </div>
               </div>
 
@@ -1027,12 +1035,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                     class="w-full px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
                     @input="handleFieldChange"
                   />
-                  <button
+                  <Button
+                    icon="pi pi-times"
+                    variant="text"
+                    severity="danger"
+                    size="small"
+                    class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                     @click="removeArgItem(currentContainer, aIdx)"
-                    class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                  >
-                    <i class="pi pi-times text-xs"></i>
-                  </button>
+                  />
                 </div>
               </div>
             </div>
@@ -1082,12 +1092,14 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                   class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs font-mono"
                   @input="handleFieldChange"
                 />
-                <button
+                <Button
+                  icon="pi pi-times"
+                  variant="text"
+                  severity="danger"
+                  size="small"
+                  class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                   @click="removeKV(currentContainer.env, eIdx)"
-                  class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                >
-                  <i class="pi pi-times text-xs"></i>
-                </button>
+                />
               </div>
             </div>
 
@@ -1130,15 +1142,17 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                 <Select
                   v-model="p.protocol"
                   :options="['TCP', 'UDP', 'SCTP']"
-                  class="w-1/3 text-xs"
+                  class="bg-(--bg-primary) border border-(--border) w-1/3 text-xs"
                   @change="handleFieldChange"
                 />
-                <button
+                <Button
+                  icon="pi pi-times"
+                  variant="text"
+                  severity="danger"
+                  size="small"
+                  class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
                   @click="removePortItem(currentContainer, pIdx)"
-                  class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                >
-                  <i class="pi pi-times text-xs"></i>
-                </button>
+                />
               </div>
             </div>
           </div>

@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
-import { useToast } from 'primevue/usetoast'
-import ToggleSwitch from 'primevue/toggleswitch'
-import * as yaml from 'yaml'
 import VueMonacoEditor from '@guolao/vue-monaco-editor'
+import ToggleSwitch from 'primevue/toggleswitch'
+import { useToast } from 'primevue/usetoast'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import * as yaml from 'yaml'
 
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
+import { useTheme } from '@/composables/useTheme'
 
 const props = defineProps<{
   kind: string
@@ -19,6 +20,7 @@ const props = defineProps<{
 
 const router = useRouter()
 const toast = useToast()
+const { isDark } = useTheme()
 
 const rawData = ref<Record<string, unknown> | null>(null)
 const yamlContent = ref('')
@@ -187,12 +189,13 @@ watch(
     <!-- Header -->
     <div class="flex items-center justify-between p-4 border-b border-(--border)">
       <div class="flex items-center gap-3">
-        <button
+        <Button
+          rounded
+          icon="pi pi-arrow-left"
+          variant="text"
+          severity="secondary"
           @click="goBack"
-          class="p-2 hover:bg-(--bg-hover) rounded-md transition-colors cursor-pointer"
-        >
-          <i class="pi pi-arrow-left text-(--text-secondary)"></i>
-        </button>
+        />
         <div>
           <h1 class="text-lg font-semibold text-(--text-primary)">Edit {{ props.kind }}</h1>
           <p class="text-sm text-(--text-secondary)">{{ props.namespace }} / {{ props.name }}</p>
@@ -207,28 +210,26 @@ watch(
           <span
             class="text-xs font-medium"
             :class="!isYamlMode ? 'text-(--text-primary)' : 'text-(--text-secondary)'"
-            >Form</span
           >
+            Form
+          </span>
           <ToggleSwitch v-model="isYamlMode" @change="handleModeToggle" />
           <span
             class="text-xs font-medium"
             :class="isYamlMode ? 'text-(--text-primary)' : 'text-(--text-secondary)'"
-            >YAML</span
           >
+            YAML
+          </span>
         </div>
 
         <div class="flex items-center gap-2">
-          <button
-            @click="goBack"
-            class="px-4 py-2 text-sm font-medium text-(--text-secondary) hover:text-(--text-primary) transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
+          <Button label="Cancel" variant="text" severity="secondary" size="small" @click="goBack" />
           <Button
-            @click="saveChanges"
+            size="small"
+            :loading="isSaving"
             :disabled="isSaving || isLoading"
             :label="isSaving ? 'Saving...' : 'Save Changes'"
-            class="px-4 py-2 text-sm font-medium"
+            @click="saveChanges"
           />
         </div>
       </div>
@@ -254,8 +255,7 @@ watch(
             <div class="flex flex-col gap-4 max-w-xl">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-(--text-secondary)">Name</label>
-                <input
-                  type="text"
+                <InputText
                   disabled
                   v-model="formValues.name"
                   class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-(--text-secondary) opacity-70"
@@ -264,8 +264,7 @@ watch(
 
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-(--text-secondary)">Namespace</label>
-                <input
-                  type="text"
+                <InputText
                   disabled
                   v-model="formValues.namespace"
                   class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-(--text-secondary) opacity-70"
@@ -276,37 +275,39 @@ watch(
               <div class="flex flex-col gap-2 mt-2">
                 <div class="flex items-center justify-between">
                   <label class="text-xs font-medium text-(--text-secondary)">Labels</label>
-                  <button
+                  <Button
+                    size="small"
+                    variant="text"
+                    icon="pi pi-plus"
+                    label="Add"
+                    class="text-xs cursor-pointer !text-blue-500 hover:!text-blue-400"
                     @click="formValues.labels.push({ key: '', value: '' })"
-                    class="text-xs text-blue-500 hover:text-blue-400 cursor-pointer flex items-center gap-1"
-                  >
-                    <i class="pi pi-plus text-[10px]"></i> Add
-                  </button>
+                  />
                 </div>
                 <div
                   v-for="(lbl, idx) in formValues.labels"
                   :key="'lbl-' + idx"
                   class="flex items-center gap-2"
                 >
-                  <input
-                    type="text"
+                  <InputText
                     v-model="lbl.key"
                     placeholder="Key"
                     class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
                   />
                   <span class="text-(--text-secondary)">=</span>
-                  <input
-                    type="text"
+                  <InputText
                     v-model="lbl.value"
                     placeholder="Value"
                     class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
                   />
-                  <button
+                  <Button
+                    icon="pi pi-times"
+                    variant="text"
+                    severity="danger"
+                    size="small"
+                    class="!p-1 text-red-400 hover:text-red-300 cursor-pointer"
                     @click="formValues.labels.splice(idx, 1)"
-                    class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                  >
-                    <i class="pi pi-times text-xs"></i>
-                  </button>
+                  />
                 </div>
               </div>
 
@@ -314,37 +315,39 @@ watch(
               <div class="flex flex-col gap-2 mt-2">
                 <div class="flex items-center justify-between">
                   <label class="text-xs font-medium text-(--text-secondary)">Annotations</label>
-                  <button
+                  <Button
+                    size="small"
+                    variant="text"
+                    icon="pi pi-plus"
+                    label="Add"
+                    class="text-xs cursor-pointer !text-blue-500 hover:!text-blue-400"
                     @click="formValues.annotations.push({ key: '', value: '' })"
-                    class="text-xs text-blue-500 hover:text-blue-400 cursor-pointer flex items-center gap-1"
-                  >
-                    <i class="pi pi-plus text-[10px]"></i> Add
-                  </button>
+                  />
                 </div>
                 <div
                   v-for="(ann, idx) in formValues.annotations"
                   :key="'ann-' + idx"
                   class="flex items-center gap-2"
                 >
-                  <input
-                    type="text"
+                  <InputText
                     v-model="ann.key"
                     placeholder="Key"
                     class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
                   />
                   <span class="text-(--text-secondary)">=</span>
-                  <input
-                    type="text"
+                  <InputText
                     v-model="ann.value"
                     placeholder="Value"
                     class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
                   />
-                  <button
+                  <Button
+                    icon="pi pi-times"
+                    variant="text"
+                    severity="danger"
+                    size="small"
+                    class="!p-1 text-red-400 hover:text-red-300 cursor-pointer"
                     @click="formValues.annotations.splice(idx, 1)"
-                    class="p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                  >
-                    <i class="pi pi-times text-xs"></i>
-                  </button>
+                  />
                 </div>
               </div>
             </div>
@@ -356,10 +359,10 @@ watch(
       <div v-else class="w-full h-full bg-[#1e1e1e]">
         <vue-monaco-editor
           v-model:value="yamlContent"
-          theme="vs-dark"
+          :theme="isDark ? 'vs-dark' : 'vs-light'"
           language="yaml"
           :options="{
-            minimap: { enabled: false },
+            minimap: { enabled: true },
             fontSize: 13,
             lineHeight: 22,
             scrollBeyondLastLine: false,
