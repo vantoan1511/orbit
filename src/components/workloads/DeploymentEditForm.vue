@@ -188,6 +188,27 @@ watch(
   { immediate: true, deep: true }
 )
 
+watch(
+  [
+    replicas,
+    paused,
+    strategyType,
+    maxSurge,
+    maxUnavailable,
+    minReadySeconds,
+    revisionHistoryLimit,
+    progressDeadlineSeconds,
+    serviceAccountName,
+    restartPolicy,
+    terminationGracePeriodSeconds
+  ],
+  () => {
+    if (!isEmitting) {
+      handleFieldChange()
+    }
+  }
+)
+
 const emitUpdate = () => {
   if (!props.rawData) return
   isEmitting = true
@@ -406,6 +427,7 @@ const removePortItem = (container: ContainerFormState, index: number) => {
                   buttonLayout="horizontal"
                   class="w-full"
                   inputClass="w-full px-2 py-1.5 bg-(--bg-primary) border border-(--border) text-xs text-(--text-primary) text-center"
+                  @update:model-value="handleFieldChange"
                   @change="handleFieldChange"
                 />
               </div>
