@@ -27,8 +27,9 @@ Before generating code:
 3. Reuse existing modules whenever possible.
 4. Keep changes focused and minimal.
 5. Avoid unrelated refactoring.
-6. Explain trade-offs when multiple implementations are reasonable.
-7. Always check-out to another branch for features implementing or bugs fixing, never work on main/master.
+6. Never perform self-initiated or unrequested refactoring; touch existing code only when explicitly asked or strictly required for the requested change.
+7. Explain trade-offs when multiple implementations are reasonable.
+8. Always check-out to another branch for features implementing or bugs fixing, never work on main/master.
 
 Never invent APIs that do not exist.
 
@@ -153,6 +154,7 @@ Use:
 - TypeScript
 - composables
 - reusable components
+- PrimeVue v4 components (`Button`, `InputText`, `InputNumber`, `Select`, `ToggleSwitch`, etc.) over raw HTML elements or custom controls
 
 Avoid:
 
@@ -160,6 +162,7 @@ Avoid:
 - large components
 - business logic inside views
 - direct IPC calls scattered across components
+- raw HTML inputs/buttons (`<button>`, `<input>`, `<select>`) or reinventions of controls already available in PrimeVue
 
 Components should remain focused on rendering.
 
