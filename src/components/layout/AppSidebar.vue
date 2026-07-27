@@ -9,11 +9,13 @@ import {
   Activity,
   Box,
   Boxes,
+  CircleCheck,
   FileText,
   FolderOpen,
   HardDrive,
   LayoutDashboard,
   Network,
+  Plus,
   Server,
   Settings,
   Settings2,
@@ -71,9 +73,7 @@ const { isDark, toggleTheme } = useTheme()
         <Button
           v-for="cluster in k8sStore.clusters"
           :key="cluster.id"
-          :label="cluster.name"
           :loading="k8sStore.activeClusterId === cluster.id && isRefreshing"
-          :icon="k8sStore.activeClusterId === cluster.id ? 'pi pi-circle-fill' : ''"
           :severity="
             k8sStore.activeClusterId === cluster.id
               ? activeCluster?.status === 'healthy'
@@ -82,10 +82,14 @@ const { isDark, toggleTheme } = useTheme()
               : 'secondary'
           "
           fluid
-          class="truncate justify-start text-medium"
+          class="truncate justify-start text-xs font-medium"
           variant="text"
+          size="small"
           @click="handleSwitchCluster(cluster.id)"
-        />
+        >
+          <CircleCheck :size="13" />
+          {{ cluster.name }}
+        </Button>
 
         <!-- Empty state when no clusters are configured -->
         <p v-if="k8sStore.clusters.length === 0" class="text-xs text-(--text-muted) px-3 py-1">
@@ -98,8 +102,12 @@ const { isDark, toggleTheme } = useTheme()
           label="Add Cluster"
           severity="secondary"
           size="small"
+          class="text-xs font-medium"
           @click="handleAddCluster"
-        />
+        >
+          <Plus :size="13" />
+          <span>Add cluster</span>
+        </Button>
       </div>
     </div>
 
@@ -112,7 +120,7 @@ const { isDark, toggleTheme } = useTheme()
         class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
         :class="[
           route.path === link.path
-            ? 'bg-(--bg-active) font-medium text-(--text-primary)'
+            ? 'bg-(--bg-active) font-medium text-(--text-primary) border-r-2 border-(--primary) rounded-r-none'
             : 'text-(--text-secondary) hover:bg-(--bg-hover)',
           k8sStore.activeClusterId === null && link.path !== '/settings'
             ? 'opacity-40 pointer-events-none'
