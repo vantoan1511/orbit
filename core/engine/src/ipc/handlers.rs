@@ -243,34 +243,6 @@ pub fn dispatch(
                             if let Some(ref client) = client {
                                 spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
                             }
-
-                            // Refresh all resources for the new active client
-                            if let Some(ref client) = client {
-                                if let Ok(namespaces) = kubernetes::list_namespaces(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NamespacesUpdated { namespaces }).await;
-                                }
-                                if let Ok(pods) = kubernetes::list_pods(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PodsUpdated { pods }).await;
-                                }
-                                if let Ok(persistent_volumes) = kubernetes::list_pvs(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumesUpdated { persistent_volumes }).await;
-                                }
-                                if let Ok(persistent_volume_claims) = kubernetes::list_pvcs(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims }).await;
-                                }
-                                if let Ok(storage_classes) = kubernetes::list_storage_classes(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StorageClassesUpdated { storage_classes }).await;
-                                }
-                                if let Ok(nodes) = kubernetes::list_nodes(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
-                                }
-                                if let Ok(events) = kubernetes::list_events(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
-                                }
-                                if let Ok(policies) = kubernetes::list_policies(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PoliciesUpdated { policies }).await;
-                                }
-                            }
                         }
                         Err(e) => {
                             log::error!("Error switching cluster: {:?}", e);
@@ -320,34 +292,6 @@ pub fn dispatch(
                             // Spawn watchers and metrics poller for the new cluster.
                             if let Some(ref client) = client {
                                 spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
-                            }
-
-                            // Refresh all resources for the new active client
-                            if let Some(ref client) = client {
-                                if let Ok(namespaces) = kubernetes::list_namespaces(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NamespacesUpdated { namespaces }).await;
-                                }
-                                if let Ok(pods) = kubernetes::list_pods(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PodsUpdated { pods }).await;
-                                }
-                                if let Ok(persistent_volumes) = kubernetes::list_pvs(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumesUpdated { persistent_volumes }).await;
-                                }
-                                if let Ok(persistent_volume_claims) = kubernetes::list_pvcs(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims }).await;
-                                }
-                                if let Ok(storage_classes) = kubernetes::list_storage_classes(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StorageClassesUpdated { storage_classes }).await;
-                                }
-                                if let Ok(nodes) = kubernetes::list_nodes(client).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
-                                }
-                                if let Ok(events) = kubernetes::list_events(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
-                                }
-                                if let Ok(policies) = kubernetes::list_policies(client, None).await {
-                                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PoliciesUpdated { policies }).await;
-                                }
                             }
                         }
                         Err(e) => {
