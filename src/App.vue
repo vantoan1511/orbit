@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
@@ -28,7 +29,6 @@ import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
-import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 
 const k8sStore = useKubernetesStore()
 const toast = useToast()
@@ -139,7 +139,30 @@ const handleCommandSucceeded = (payload: { message: string }) => {
   })
 }
 
+const handleContextMenu = (e: MouseEvent) => {
+  const target = e.target as HTMLElement | null
+  if (!target) {
+    e.preventDefault()
+    return
+  }
+
+  const isEditable =
+    (target.tagName === 'INPUT' &&
+      ['text', 'search', 'password', 'email', 'number', 'url'].includes(
+        (target as HTMLInputElement).type
+      )) ||
+    target.tagName === 'TEXTAREA' ||
+    target.isContentEditable
+
+  if (!isEditable) {
+    e.preventDefault()
+  }
+}
+
 onMounted(() => {
+  // Disable default browser context menu globally for non-input elements
+  window.addEventListener('contextmenu', handleContextMenu)
+
   // Initialize dark mode by default
   document.documentElement.classList.add('my-app-dark')
   document.documentElement.setAttribute('data-theme', 'dark')
@@ -169,6 +192,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('contextmenu', handleContextMenu)
+
   events.off(OrbitEvents.EngineConnected, handleEngineConnected)
   events.off(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.off(OrbitEvents.PodsUpdated, handlePodsUpdated)
