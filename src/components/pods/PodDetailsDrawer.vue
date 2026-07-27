@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import Drawer from 'primevue/drawer'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
-import Chart from 'primevue/chart'
-import { Clock, Tag, Server, Shield, Activity, FileCode } from '@lucide/vue'
+import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import type { PodInfo } from '@/types/kubernetes'
+import { Activity, Clock, FileCode, Server, Shield } from '@lucide/vue'
+import Chart from 'primevue/chart'
+import Drawer from 'primevue/drawer'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import { ref, watch } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -347,49 +348,13 @@ const getStatusBadgeClass = (status: string) => {
               </div>
 
               <!-- Labels & Annotations -->
-              <div>
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                  Labels
-                </h3>
-                <div class="flex flex-wrap gap-2">
-                  <div
-                    v-for="(val, key) in props.pod.labels"
-                    :key="key"
-                    class="flex items-center gap-1 bg-violet-500/5 border border-violet-500/10 rounded-md text-[10px] px-2 py-0.5 text-violet-400 font-mono"
-                  >
-                    <Tag class="w-3 h-3" />
-                    <span>{{ key }}={{ val }}</span>
-                  </div>
-                  <div
-                    v-if="!props.pod.labels || Object.keys(props.pod.labels).length === 0"
-                    class="text-xs text-(--text-muted)"
-                  >
-                    No labels configured.
-                  </div>
-                </div>
-              </div>
+              <KeyValueBadgeList :items="props.pod.labels" title="Labels" variant="tag" />
 
-              <div>
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                  Annotations
-                </h3>
-                <div class="space-y-1.5">
-                  <div
-                    v-for="(val, key) in props.pod.annotations"
-                    :key="key"
-                    class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-(--text-secondary) flex justify-between gap-4"
-                  >
-                    <span class="text-(--text-muted) truncate shrink-0">{{ key }}</span>
-                    <span class="truncate text-right">{{ val }}</span>
-                  </div>
-                  <div
-                    v-if="!props.pod.annotations || Object.keys(props.pod.annotations).length === 0"
-                    class="text-xs text-(--text-muted)"
-                  >
-                    No annotations configured.
-                  </div>
-                </div>
-              </div>
+              <KeyValueBadgeList
+                :items="props.pod.annotations"
+                title="Annotations"
+                variant="list"
+              />
             </TabPanel>
 
             <!-- CONTAINERS PANEL -->

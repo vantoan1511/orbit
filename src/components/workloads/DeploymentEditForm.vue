@@ -11,6 +11,11 @@ import Tabs from 'primevue/tabs'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, ref, toRaw, watch } from 'vue'
 
+import ContainerPortsEditor from '@/components/shared/ContainerPortsEditor.vue'
+import ContainerResourcesEditor from '@/components/shared/ContainerResourcesEditor.vue'
+import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
+import StringListEditor from '@/components/shared/StringListEditor.vue'
+
 const props = defineProps<{
   rawData: Record<string, unknown> | null
 }>()
@@ -355,47 +360,6 @@ const handleFieldChange = () => {
 }
 
 const currentContainer = computed(() => containers.value[activeContainerIndex.value] || null)
-
-// Helper methods for arrays
-const addKV = (list: { key: string; value: string }[]) => {
-  list.push({ key: '', value: '' })
-  handleFieldChange()
-}
-
-const removeKV = (list: { key: string; value: string }[], index: number) => {
-  list.splice(index, 1)
-  handleFieldChange()
-}
-
-const addCommandItem = (container: ContainerFormState) => {
-  container.command.push('')
-  handleFieldChange()
-}
-
-const removeCommandItem = (container: ContainerFormState, index: number) => {
-  container.command.splice(index, 1)
-  handleFieldChange()
-}
-
-const addArgItem = (container: ContainerFormState) => {
-  container.args.push('')
-  handleFieldChange()
-}
-
-const removeArgItem = (container: ContainerFormState, index: number) => {
-  container.args.splice(index, 1)
-  handleFieldChange()
-}
-
-const addPortItem = (container: ContainerFormState) => {
-  container.ports.push({ name: '', containerPort: 80, protocol: 'TCP' })
-  handleFieldChange()
-}
-
-const removePortItem = (container: ContainerFormState, index: number) => {
-  container.ports.splice(index, 1)
-  handleFieldChange()
-}
 </script>
 
 <template>
@@ -554,189 +518,42 @@ const removePortItem = (container: ContainerFormState, index: number) => {
         <!-- METADATA TAB -->
         <TabPanel value="metadata" class="flex flex-col gap-5">
           <!-- Deployment Labels -->
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                >Deployment Labels</label
-              >
-              <Button
-                size="small"
-                variant="text"
-                icon="pi pi-plus"
-                label="Add"
-                class="text-xs cursor-pointer"
-                @click="addKV(deploymentLabels)"
-              />
-            </div>
-            <div
-              v-for="(lbl, idx) in deploymentLabels"
-              :key="'dlbl-' + idx"
-              class="flex items-center gap-2"
-            >
-              <InputText
-                v-model="lbl.key"
-                placeholder="Key"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <span class="text-(--text-secondary)">=</span>
-              <InputText
-                v-model="lbl.value"
-                placeholder="Value"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <Button
-                icon="pi pi-times"
-                variant="text"
-                severity="danger"
-                size="small"
-                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                @click="removeKV(deploymentLabels, idx)"
-              />
-            </div>
-          </div>
+          <KeyValueEditor
+            v-model="deploymentLabels"
+            title="Deployment Labels"
+            add-label="Add Label"
+            @update:model-value="handleFieldChange"
+          />
 
           <hr class="border-(--border)" />
 
           <!-- Deployment Annotations -->
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                >Deployment Annotations</label
-              >
-              <Button
-                size="small"
-                variant="text"
-                icon="pi pi-plus"
-                label="Add"
-                class="text-xs cursor-pointer"
-                @click="addKV(deploymentAnnotations)"
-              />
-            </div>
-            <div
-              v-for="(ann, idx) in deploymentAnnotations"
-              :key="'dann-' + idx"
-              class="flex items-center gap-2"
-            >
-              <InputText
-                v-model="ann.key"
-                placeholder="Key"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <span class="text-(--text-secondary)">=</span>
-              <InputText
-                v-model="ann.value"
-                placeholder="Value"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <Button
-                icon="pi pi-times"
-                variant="text"
-                severity="danger"
-                size="small"
-                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                @click="removeKV(deploymentAnnotations, idx)"
-              />
-            </div>
-          </div>
+          <KeyValueEditor
+            v-model="deploymentAnnotations"
+            title="Deployment Annotations"
+            add-label="Add Annotation"
+            @update:model-value="handleFieldChange"
+          />
 
           <hr class="border-(--border)" />
 
           <!-- Pod Labels -->
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <div>
-                <label class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                  >Pod Template Labels</label
-                >
-                <p class="text-[11px] text-(--text-muted)">Must include all selector labels</p>
-              </div>
-              <Button
-                size="small"
-                variant="text"
-                icon="pi pi-plus"
-                label="Add"
-                class="text-xs cursor-pointer"
-                @click="addKV(podLabels)"
-              />
-            </div>
-            <div
-              v-for="(lbl, idx) in podLabels"
-              :key="'plbl-' + idx"
-              class="flex items-center gap-2"
-            >
-              <InputText
-                v-model="lbl.key"
-                placeholder="Key"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <span class="text-(--text-secondary)">=</span>
-              <InputText
-                v-model="lbl.value"
-                placeholder="Value"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <Button
-                icon="pi pi-times"
-                variant="text"
-                severity="danger"
-                size="small"
-                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                @click="removeKV(podLabels, idx)"
-              />
-            </div>
-          </div>
+          <KeyValueEditor
+            v-model="podLabels"
+            title="Pod Template Labels"
+            add-label="Add Label"
+            @update:model-value="handleFieldChange"
+          />
 
           <hr class="border-(--border)" />
 
           <!-- Pod Annotations -->
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <label class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                >Pod Template Annotations</label
-              >
-              <Button
-                size="small"
-                variant="text"
-                icon="pi pi-plus"
-                label="Add"
-                class="text-xs cursor-pointer"
-                @click="addKV(podAnnotations)"
-              />
-            </div>
-            <div
-              v-for="(ann, idx) in podAnnotations"
-              :key="'pann-' + idx"
-              class="flex items-center gap-2"
-            >
-              <InputText
-                v-model="ann.key"
-                placeholder="Key"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <span class="text-(--text-secondary)">=</span>
-              <InputText
-                v-model="ann.value"
-                placeholder="Value"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <Button
-                icon="pi pi-times"
-                variant="text"
-                severity="danger"
-                size="small"
-                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                @click="removeKV(podAnnotations, idx)"
-              />
-            </div>
-          </div>
+          <KeyValueEditor
+            v-model="podAnnotations"
+            title="Pod Template Annotations"
+            add-label="Add Annotation"
+            @update:model-value="handleFieldChange"
+          />
         </TabPanel>
 
         <!-- POD SPEC TAB -->
@@ -787,51 +604,12 @@ const removePortItem = (container: ContainerFormState, index: number) => {
           <hr class="border-(--border)" />
 
           <!-- Node Selector -->
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <div>
-                <label class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                  >Node Selector</label
-                >
-                <p class="text-[11px] text-(--text-muted)">Constraints for target node labels</p>
-              </div>
-              <Button
-                size="small"
-                variant="text"
-                icon="pi pi-plus"
-                label="Add"
-                class="text-xs cursor-pointer"
-                @click="addKV(nodeSelector)"
-              />
-            </div>
-            <div
-              v-for="(node, idx) in nodeSelector"
-              :key="'node-' + idx"
-              class="flex items-center gap-2"
-            >
-              <InputText
-                v-model="node.key"
-                placeholder="Key"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <span class="text-(--text-secondary)">=</span>
-              <InputText
-                v-model="node.value"
-                placeholder="Value"
-                class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                @input="handleFieldChange"
-              />
-              <Button
-                icon="pi pi-times"
-                variant="text"
-                severity="danger"
-                size="small"
-                class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                @click="removeKV(nodeSelector, idx)"
-              />
-            </div>
-          </div>
+          <KeyValueEditor
+            v-model="nodeSelector"
+            title="Node Selector"
+            add-label="Add Constraint"
+            @update:model-value="handleFieldChange"
+          />
         </TabPanel>
 
         <!-- CONTAINERS TAB -->
@@ -908,253 +686,65 @@ const removePortItem = (container: ContainerFormState, index: number) => {
             <hr class="border-(--border)" />
 
             <!-- Resource Limits & Requests -->
-            <div class="flex flex-col gap-3">
-              <h3 class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider">
-                Resources
-              </h3>
-
-              <div class="grid grid-cols-2 gap-4">
-                <!-- Requests -->
-                <div
-                  class="flex flex-col gap-2 p-3 bg-(--bg-primary) border border-(--border) rounded-md"
-                >
-                  <span class="text-xs font-semibold text-(--text-secondary)">Requests</span>
-                  <div class="flex flex-col gap-1.5">
-                    <label class="text-[11px] text-(--text-muted)">CPU (e.g. 100m)</label>
-                    <InputText
-                      v-model="currentContainer.cpuRequest"
-                      placeholder="100m"
-                      class="px-2 py-1 bg-(--bg-card) border border-(--border) text-xs"
-                      @input="handleFieldChange"
-                    />
-                  </div>
-                  <div class="flex flex-col gap-1.5">
-                    <label class="text-[11px] text-(--text-muted)">Memory (e.g. 128Mi)</label>
-                    <InputText
-                      v-model="currentContainer.memoryRequest"
-                      placeholder="128Mi"
-                      class="px-2 py-1 bg-(--bg-card) border border-(--border) text-xs"
-                      @input="handleFieldChange"
-                    />
-                  </div>
-                </div>
-
-                <!-- Limits -->
-                <div
-                  class="flex flex-col gap-2 p-3 bg-(--bg-primary) border border-(--border) rounded-md"
-                >
-                  <span class="text-xs font-semibold text-(--text-secondary)">Limits</span>
-                  <div class="flex flex-col gap-1.5">
-                    <label class="text-[11px] text-(--text-muted)">CPU (e.g. 500m)</label>
-                    <InputText
-                      v-model="currentContainer.cpuLimit"
-                      placeholder="500m"
-                      class="px-2 py-1 bg-(--bg-card) border border-(--border) text-xs"
-                      @input="handleFieldChange"
-                    />
-                  </div>
-                  <div class="flex flex-col gap-1.5">
-                    <label class="text-[11px] text-(--text-muted)">Memory (e.g. 512Mi)</label>
-                    <InputText
-                      v-model="currentContainer.memoryLimit"
-                      placeholder="512Mi"
-                      class="px-2 py-1 bg-(--bg-card) border border-(--border) text-xs"
-                      @input="handleFieldChange"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ContainerResourcesEditor
+              v-model:cpu-request="currentContainer.cpuRequest"
+              v-model:memory-request="currentContainer.memoryRequest"
+              v-model:cpu-limit="currentContainer.cpuLimit"
+              v-model:memory-limit="currentContainer.memoryLimit"
+              @update:cpu-request="handleFieldChange"
+              @update:memory-request="handleFieldChange"
+              @update:cpu-limit="handleFieldChange"
+              @update:memory-limit="handleFieldChange"
+            />
 
             <hr class="border-(--border)" />
 
             <!-- Command & Args -->
             <div class="flex flex-col gap-4">
-              <!-- Command -->
-              <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                  <label
-                    class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                    >Command</label
-                  >
-                  <Button
-                    size="small"
-                    variant="text"
-                    icon="pi pi-plus"
-                    label="Add Cmd"
-                    class="text-xs cursor-pointer"
-                    @click="addCommandItem(currentContainer)"
-                  />
-                </div>
-                <div
-                  v-for="(_, cIdx) in currentContainer.command"
-                  :key="'cmd-' + cIdx"
-                  class="flex items-center gap-2"
-                >
-                  <InputText
-                    v-model="currentContainer.command[cIdx]"
-                    placeholder="/bin/sh"
-                    class="w-full px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                    @input="handleFieldChange"
-                  />
-                  <Button
-                    icon="pi pi-times"
-                    variant="text"
-                    severity="danger"
-                    size="small"
-                    class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                    @click="removeCommandItem(currentContainer, cIdx)"
-                  />
-                </div>
-              </div>
+              <StringListEditor
+                v-model="currentContainer.command"
+                title="Command"
+                placeholder="/bin/sh"
+                add-label="Add Cmd"
+                @update:model-value="handleFieldChange"
+              />
 
-              <!-- Args -->
-              <div class="flex flex-col gap-2">
-                <div class="flex items-center justify-between">
-                  <label
-                    class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                    >Args</label
-                  >
-                  <Button
-                    size="small"
-                    variant="text"
-                    icon="pi pi-plus"
-                    label="Add Arg"
-                    class="text-xs cursor-pointer"
-                    @click="addArgItem(currentContainer)"
-                  />
-                </div>
-                <div
-                  v-for="(_, aIdx) in currentContainer.args"
-                  :key="'arg-' + aIdx"
-                  class="flex items-center gap-2"
-                >
-                  <InputText
-                    v-model="currentContainer.args[aIdx]"
-                    placeholder="-c"
-                    class="w-full px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                    @input="handleFieldChange"
-                  />
-                  <Button
-                    icon="pi pi-times"
-                    variant="text"
-                    severity="danger"
-                    size="small"
-                    class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                    @click="removeArgItem(currentContainer, aIdx)"
-                  />
-                </div>
-              </div>
+              <StringListEditor
+                v-model="currentContainer.args"
+                title="Args"
+                placeholder="-c"
+                add-label="Add Arg"
+                @update:model-value="handleFieldChange"
+              />
             </div>
 
             <hr class="border-(--border)" />
 
             <!-- Environment Variables -->
-            <div class="flex flex-col gap-2">
-              <div class="flex items-center justify-between">
-                <div>
-                  <label
-                    class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                    >Environment Variables</label
-                  >
-                  <p
-                    v-if="currentContainer.preservedValueFromEnv.length > 0"
-                    class="text-[11px] text-(--text-muted)"
-                  >
-                    ({{ currentContainer.preservedValueFromEnv.length }} valueFrom env var(s)
-                    preserved)
-                  </p>
-                </div>
-                <Button
-                  size="small"
-                  variant="text"
-                  icon="pi pi-plus"
-                  label="Add Env"
-                  class="text-xs cursor-pointer"
-                  @click="addKV(currentContainer.env)"
-                />
-              </div>
-              <div
-                v-for="(e, eIdx) in currentContainer.env"
-                :key="'cenv-' + eIdx"
-                class="flex items-center gap-2"
+            <div>
+              <p
+                v-if="currentContainer.preservedValueFromEnv.length > 0"
+                class="text-[11px] text-(--text-muted) mb-1"
               >
-                <InputText
-                  v-model="e.key"
-                  placeholder="NAME"
-                  class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs font-mono"
-                  @input="handleFieldChange"
-                />
-                <span class="text-(--text-secondary)">=</span>
-                <InputText
-                  v-model="e.value"
-                  placeholder="VALUE"
-                  class="w-1/2 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs font-mono"
-                  @input="handleFieldChange"
-                />
-                <Button
-                  icon="pi pi-times"
-                  variant="text"
-                  severity="danger"
-                  size="small"
-                  class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                  @click="removeKV(currentContainer.env, eIdx)"
-                />
-              </div>
+                ({{ currentContainer.preservedValueFromEnv.length }} valueFrom env var(s) preserved)
+              </p>
+              <KeyValueEditor
+                v-model="currentContainer.env"
+                title="Environment Variables"
+                key-placeholder="NAME"
+                value-placeholder="VALUE"
+                add-label="Add Env"
+                @update:model-value="handleFieldChange"
+              />
             </div>
 
             <hr class="border-(--border)" />
 
             <!-- Container Ports -->
-            <div class="flex flex-col gap-2">
-              <div class="flex items-center justify-between">
-                <label class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider"
-                  >Container Ports</label
-                >
-                <Button
-                  size="small"
-                  variant="text"
-                  icon="pi pi-plus"
-                  label="Add Port"
-                  class="text-xs cursor-pointer"
-                  @click="addPortItem(currentContainer)"
-                />
-              </div>
-              <div
-                v-for="(p, pIdx) in currentContainer.ports"
-                :key="'cport-' + pIdx"
-                class="flex items-center gap-2"
-              >
-                <InputText
-                  v-model="p.name"
-                  placeholder="Name"
-                  class="w-1/3 px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                  @input="handleFieldChange"
-                />
-                <InputNumber
-                  v-model="p.containerPort"
-                  :min="1"
-                  :max="65535"
-                  class="w-1/3"
-                  inputClass="w-full px-2 py-1 bg-(--bg-primary) border border-(--border) text-xs"
-                  @change="handleFieldChange"
-                />
-                <Select
-                  v-model="p.protocol"
-                  :options="['TCP', 'UDP', 'SCTP']"
-                  class="bg-(--bg-primary) border border-(--border) w-1/3 text-xs"
-                  @change="handleFieldChange"
-                />
-                <Button
-                  icon="pi pi-times"
-                  variant="text"
-                  severity="danger"
-                  size="small"
-                  class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
-                  @click="removePortItem(currentContainer, pIdx)"
-                />
-              </div>
-            </div>
+            <ContainerPortsEditor
+              v-model="currentContainer.ports"
+              @update:model-value="handleFieldChange"
+            />
           </div>
         </TabPanel>
       </TabPanels>
