@@ -309,23 +309,25 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   async function loadInitialData() {
     if (isEngineReady.value) {
-      await kubernetesService.getClusters()
-      await kubernetesService.getNamespaces()
-      await kubernetesService.getPods()
-      await kubernetesService.getDeployments()
-      await kubernetesService.getStatefulSets()
-      await kubernetesService.getDaemonSets()
-      await kubernetesService.getJobs()
-      await kubernetesService.getCronJobs()
-      await kubernetesService.getNodes()
-      await kubernetesService.getServices()
-      await fetchConfigMaps()
-      await fetchSecrets()
-      await fetchPersistentVolumes()
-      await fetchPersistentVolumeClaims()
-      await fetchStorageClasses()
-      await fetchEvents()
-      await fetchPolicies()
+      await Promise.all([
+        kubernetesService.getClusters(),
+        kubernetesService.getNamespaces(),
+        kubernetesService.getPods(),
+        kubernetesService.getDeployments(),
+        kubernetesService.getStatefulSets(),
+        kubernetesService.getDaemonSets(),
+        kubernetesService.getJobs(),
+        kubernetesService.getCronJobs(),
+        kubernetesService.getNodes(),
+        kubernetesService.getServices(),
+        fetchConfigMaps(),
+        fetchSecrets(),
+        fetchPersistentVolumes(),
+        fetchPersistentVolumeClaims(),
+        fetchStorageClasses(),
+        fetchEvents(),
+        fetchPolicies()
+      ])
     }
   }
 
