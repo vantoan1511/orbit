@@ -45,6 +45,7 @@ const emit = defineEmits<{
   (e: 'update:columns', val: TableColumn[]): void
   (e: 'refresh'): void
   (e: 'row-click', event: any): void
+  (e: 'row-contextmenu', event: any): void
 }>()
 
 const onSearchUpdate = (val: string | undefined) => {
@@ -189,6 +190,7 @@ const isIndeterminate = computed(() => {
       paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
       :currentPageReportTemplate="reportTemplate"
       @row-click="emit('row-click', $event)"
+      @row-contextmenu="emit('row-contextmenu', $event)"
     >
       <template #empty>
         <slot name="empty">
