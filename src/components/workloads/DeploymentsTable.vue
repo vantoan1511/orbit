@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
@@ -102,6 +102,13 @@ const toggleActionMenu = (event: Event, data: DeploymentInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: DeploymentInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Deployment',
   onViewDetails: (row) => {
@@ -122,6 +129,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="loading"
     @refresh="fetchDeployments"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

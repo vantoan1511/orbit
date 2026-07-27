@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContextMenu from 'primevue/contextmenu'
 import Menu from 'primevue/menu'
 import type { MenuItem } from 'primevue/menuitem'
 import { computed, ref } from 'vue'
@@ -10,12 +11,24 @@ const props = defineProps<{
 const menuModel = computed(() => props.items)
 
 const menuRef = ref<InstanceType<typeof Menu> | null>(null)
+const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
+
+const show = (event: Event) => {
+  contextMenuRef.value?.show(event)
+}
+
+const hide = () => {
+  menuRef.value?.hide()
+  contextMenuRef.value?.hide()
+}
 
 const toggle = (event: Event) => {
   menuRef.value?.toggle(event)
 }
 
 defineExpose({
+  show,
+  hide,
   toggle
 })
 </script>
@@ -38,4 +51,21 @@ defineExpose({
       </button>
     </template>
   </Menu>
+
+  <ContextMenu
+    ref="contextMenuRef"
+    :model="menuModel"
+    class="min-w-44 bg-(--bg-card) border border-(--border) p-1 rounded-lg shadow-lg"
+  >
+    <template #item="{ item, props: menuProps }">
+      <button
+        v-bind="menuProps.action"
+        class="flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-(--text-secondary) hover:text-(--text-primary) hover:bg-(--bg-hover)/20 rounded-md transition-colors cursor-pointer select-none"
+        :class="[item.class]"
+      >
+        <i v-if="item.icon" :class="item.icon" class="w-4 h-4 shrink-0" />
+        <span>{{ item.label }}</span>
+      </button>
+    </template>
+  </ContextMenu>
 </template>
