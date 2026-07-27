@@ -45,7 +45,7 @@ const emit = defineEmits<{
   (e: 'update:columns', val: TableColumn[]): void
   (e: 'refresh'): void
   (e: 'row-click', event: any): void
-  (e: 'row-contextmenu', event: any): void
+  (e: 'row-contextmenu', event: { originalEvent: Event; data: any; index?: number }): void
 }>()
 
 const onSearchUpdate = (val: string | undefined) => {

@@ -7,6 +7,7 @@ import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { DeploymentInfo } from '@/types/kubernetes'
@@ -90,8 +91,6 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
   selectedWorkload.value = event.data
   drawerVisible.value = true
 }
-
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
 const selectedActionRow = ref<DeploymentInfo | null>(null)
