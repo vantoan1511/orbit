@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import Drawer from 'primevue/drawer'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
-import { Clock, Tag, Server, Shield, FileCode, Eye, EyeOff } from '@lucide/vue'
+import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
+import { Clock, Eye, EyeOff, FileCode, Server, Shield, Tag } from '@lucide/vue'
+import Drawer from 'primevue/drawer'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import { ref, watch } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -177,16 +178,13 @@ ${Object.entries(res.data)
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
                       <div class="text-xs text-(--text-secondary) font-medium">Labels</div>
-                      <div class="col-span-2 flex flex-wrap gap-1">
+                      <div class="col-span-2">
+                        <KeyValueBadgeList :items="props.resource.labels" variant="tag" />
                         <span
-                          v-for="(val, key) in props.resource.labels"
-                          :key="key"
-                          class="font-mono text-[10px] bg-(--bg-hover) text-(--text-secondary) border border-(--border) px-1.5 py-0.5 rounded"
-                        >
-                          {{ key }}={{ val }}
-                        </span>
-                        <span
-                          v-if="Object.keys(props.resource.labels).length === 0"
+                          v-if="
+                            !props.resource.labels ||
+                            Object.keys(props.resource.labels).length === 0
+                          "
                           class="text-xs text-(--text-muted)"
                         >
                           None

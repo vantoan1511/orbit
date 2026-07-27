@@ -8,6 +8,9 @@ import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { computed, ref } from 'vue'
 
+import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ReplicasProgressBar from '@/components/shared/ReplicasProgressBar.vue'
+
 import type {
   CronJobInfo,
   DaemonSetReplicas,
@@ -288,79 +291,18 @@ ${specSection}
             <!-- OVERVIEW PANEL -->
             <TabPanel value="overview" class="space-y-6">
               <!-- Replicas Progress Bars -->
-              <div v-if="replicas">
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                  Replicas Status
-                </h3>
-                <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 space-y-4">
-                  <div>
-                    <div class="flex justify-between text-xs mb-1">
-                      <span class="text-(--text-secondary) font-medium">Desired Replicas</span>
-                      <span class="font-mono font-bold text-(--text-primary)">{{
-                        desiredReplicas
-                      }}</span>
-                    </div>
-                    <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-                      <div class="h-full rounded-full bg-blue-500" style="width: 100%"></div>
-                    </div>
-                  </div>
+              <ReplicasProgressBar
+                v-if="replicas"
+                :desired="desiredReplicas"
+                :current="currentReplicas"
+                :ready="readyReplicas"
+                :available="availableReplicas"
+              />
 
-                  <div>
-                    <div class="flex justify-between text-xs mb-1">
-                      <span class="text-(--text-secondary) font-medium">Current Replicas</span>
-                      <span class="font-mono font-bold text-(--text-primary)">{{
-                        currentReplicas
-                      }}</span>
-                    </div>
-                    <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-                      <div
-                        class="h-full rounded-full bg-indigo-500"
-                        :style="{
-                          width:
-                            (desiredReplicas ? (currentReplicas! / desiredReplicas) * 100 : 0) + '%'
-                        }"
-                      ></div>
-                    </div>
-                  </div>
+              <!-- Labels & Annotations -->
+              <KeyValueBadgeList :items="workloadLabels" title="Labels" variant="tag" />
 
-                  <div v-if="readyReplicas !== undefined">
-                    <div class="flex justify-between text-xs mb-1">
-                      <span class="text-(--text-secondary) font-medium">Ready Replicas</span>
-                      <span class="font-mono font-bold text-(--text-primary)">{{
-                        readyReplicas
-                      }}</span>
-                    </div>
-                    <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-                      <div
-                        class="h-full rounded-full bg-emerald-500"
-                        :style="{
-                          width:
-                            (desiredReplicas ? (readyReplicas / desiredReplicas) * 100 : 0) + '%'
-                        }"
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div v-if="availableReplicas !== undefined">
-                    <div class="flex justify-between text-xs mb-1">
-                      <span class="text-(--text-secondary) font-medium">Available Replicas</span>
-                      <span class="font-mono font-bold text-(--text-primary)">{{
-                        availableReplicas
-                      }}</span>
-                    </div>
-                    <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-                      <div
-                        class="h-full rounded-full bg-emerald-500"
-                        :style="{
-                          width:
-                            (desiredReplicas ? (availableReplicas / desiredReplicas) * 100 : 0) +
-                            '%'
-                        }"
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <KeyValueBadgeList :items="workloadAnnotations" title="Annotations" variant="list" />
 
               <!-- Job Status -->
               <div v-if="completions">

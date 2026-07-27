@@ -9,6 +9,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
+import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -272,84 +273,15 @@ watch(
               </div>
 
               <!-- Labels -->
-              <div class="flex flex-col gap-2 mt-2">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-medium text-(--text-secondary)">Labels</label>
-                  <Button
-                    size="small"
-                    variant="text"
-                    icon="pi pi-plus"
-                    label="Add"
-                    class="text-xs cursor-pointer text-blue-500! hover:text-blue-400!"
-                    @click="formValues.labels.push({ key: '', value: '' })"
-                  />
-                </div>
-                <div
-                  v-for="(lbl, idx) in formValues.labels"
-                  :key="'lbl-' + idx"
-                  class="flex items-center gap-2"
-                >
-                  <InputText
-                    v-model="lbl.key"
-                    placeholder="Key"
-                    class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
-                  />
-                  <span class="text-(--text-secondary)">=</span>
-                  <InputText
-                    v-model="lbl.value"
-                    placeholder="Value"
-                    class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
-                  />
-                  <Button
-                    icon="pi pi-times"
-                    variant="text"
-                    severity="danger"
-                    size="small"
-                    class="!p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                    @click="formValues.labels.splice(idx, 1)"
-                  />
-                </div>
-              </div>
+              <KeyValueEditor v-model="formValues.labels" title="Labels" add-label="Add Label" />
 
               <!-- Annotations -->
-              <div class="flex flex-col gap-2 mt-2">
-                <div class="flex items-center justify-between">
-                  <label class="text-xs font-medium text-(--text-secondary)">Annotations</label>
-                  <Button
-                    size="small"
-                    variant="text"
-                    icon="pi pi-plus"
-                    label="Add"
-                    class="text-xs cursor-pointer text-blue-500! hover:text-blue-400!"
-                    @click="formValues.annotations.push({ key: '', value: '' })"
-                  />
-                </div>
-                <div
-                  v-for="(ann, idx) in formValues.annotations"
-                  :key="'ann-' + idx"
-                  class="flex items-center gap-2"
-                >
-                  <InputText
-                    v-model="ann.key"
-                    placeholder="Key"
-                    class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
-                  />
-                  <span class="text-(--text-secondary)">=</span>
-                  <InputText
-                    v-model="ann.value"
-                    placeholder="Value"
-                    class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
-                  />
-                  <Button
-                    icon="pi pi-times"
-                    variant="text"
-                    severity="danger"
-                    size="small"
-                    class="!p-1 text-red-400 hover:text-red-300 cursor-pointer"
-                    @click="formValues.annotations.splice(idx, 1)"
-                  />
-                </div>
-              </div>
+              <KeyValueEditor
+                v-model="formValues.annotations"
+                title="Annotations"
+                add-label="Add Annotation"
+                class="mt-2"
+              />
             </div>
           </div>
         </div>

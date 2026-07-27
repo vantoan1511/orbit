@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import Drawer from 'primevue/drawer'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
-import TabPanel from 'primevue/tabpanel'
-import { Clock, Tag, Server, Shield, Activity, FileCode, ExternalLink } from '@lucide/vue'
+import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import type { ServiceInfo } from '@/types/kubernetes'
+import { Activity, Clock, ExternalLink, FileCode, Server, Shield, Tag } from '@lucide/vue'
+import Drawer from 'primevue/drawer'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import { ref } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -253,27 +254,7 @@ const getTypeBadgeClass = (type: string) => {
               </div>
 
               <!-- Labels Section -->
-              <div class="space-y-3">
-                <h3
-                  class="text-xs font-bold text-(--text-muted) uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <Tag class="w-3.5 h-3.5" />
-                  <span>Labels</span>
-                </h3>
-                <div class="flex flex-wrap gap-2">
-                  <div
-                    v-for="(val, key) in props.service.labels"
-                    :key="key"
-                    class="flex items-center text-xs border border-(--border) bg-(--bg-hover)/20 rounded-lg overflow-hidden"
-                  >
-                    <span
-                      class="px-2 py-1 bg-(--bg-hover)/40 border-r border-(--border) text-(--text-secondary) font-medium"
-                      >{{ key }}</span
-                    >
-                    <span class="px-2 py-1 font-mono text-(--text-primary)">{{ val }}</span>
-                  </div>
-                </div>
-              </div>
+              <KeyValueBadgeList :items="props.service.labels" title="Labels" variant="tag" />
             </TabPanel>
 
             <!-- ENDPOINTS PANEL -->
