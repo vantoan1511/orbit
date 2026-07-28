@@ -1,7 +1,6 @@
 changelog:
   exclude:
     labels:
-      - chore
       - duplicate
       - invalid
       - question
@@ -10,12 +9,23 @@ changelog:
     - title: "🚀 Features"
       labels:
         - enhancement
+        - "feature*"
+        - "feat*"
     - title: "🐛 Bug Fixes"
       labels:
         - bug
+        - "fix*"
     - title: "📚 Documentation"
       labels:
         - documentation
-    - title: "🛠 Maintenance"
+        - "docs*"
+    - title: "🛠 Maintenance & Refactoring"
       labels:
         - chore
+        - "chore*"
+        - "refactor*"
+        - "perf*"
+    - title: "🧰 Other Changes"
+      labels:
+        - "*"
+
