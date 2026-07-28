@@ -14,6 +14,7 @@ declare module 'vue' {
     AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
     AppHeader: typeof import('./src/components/layout/AppHeader.vue')['default']
     AppLayout: typeof import('./src/components/layout/AppLayout.vue')['default']
+    AppLoadingScreen: typeof import('./src/components/layout/AppLoadingScreen.vue')['default']
     AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
     Button: typeof import('primevue/button')['default']
     Column: typeof import('primevue/column')['default']

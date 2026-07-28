@@ -26,6 +26,7 @@ import { computed, onScopeDispose, ref, watch } from 'vue'
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
+  const isAppLoading = ref(true)
   const pods = ref<PodInfo[]>([])
   const deployments = ref<DeploymentInfo[]>([])
   const statefulSets = ref<StatefulSetInfo[]>([])
@@ -95,6 +96,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setEngineReady(ready: boolean) {
     isEngineReady.value = ready
+  }
+
+  function setAppLoading(loading: boolean) {
+    isAppLoading.value = loading
   }
 
   function setPods(newPods: PodInfo[]) {
@@ -460,6 +465,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   return {
     isEngineReady,
+    isAppLoading,
     pods,
     deployments,
     statefulSets,
@@ -488,6 +494,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     clusters,
     activeClusterId,
     setEngineReady,
+    setAppLoading,
     setPods,
     setDeployments,
     setStatefulSets,
