@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
-import ReplicasProgressBar from '@/components/shared/ReplicasProgressBar.vue'
+import WorkloadEventsTab from '@/components/workloads/WorkloadEventsTab.vue'
+import WorkloadOverviewTab from '@/components/workloads/WorkloadOverviewTab.vue'
+import WorkloadPodsTab from '@/components/workloads/WorkloadPodsTab.vue'
+import WorkloadYamlTab from '@/components/workloads/WorkloadYamlTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type { CronJobInfo, DaemonSetReplicas, JobInfo, WorkloadInfo } from '@/types/kubernetes'
-import { Activity, Check, Clock, Copy, FileCode, Info, Layers, Server, Terminal } from '@lucide/vue'
+import { Activity, Clock, FileCode, Layers, Server, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
@@ -235,7 +237,6 @@ watch(
   }
 )
 
-// Generate a clean fallback YAML representation
 const generateYaml = (w: WorkloadInfo) => {
   const kind = getWorkloadKind(w)
   const labelsStr = w.labels
@@ -267,8 +268,8 @@ const generateYaml = (w: WorkloadInfo) => {
         image: ${j.images?.[0] || 'unknown'}
       restartPolicy: OnFailure`
   } else {
-    const obj = w as unknown as Record<string, unknown>
-    const reps = obj.replicas as Record<string, number> | undefined
+    const reps = (w as unknown as Record<string, unknown>).replicas as
+      Record<string, number> | undefined
     specSection = `spec:
   replicas: ${reps?.desired ?? 1}
   selector:
@@ -430,267 +431,55 @@ const copyYaml = async () => {
 
           <TabPanels class="p-6 flex-1 overflow-y-auto min-h-0">
             <!-- OVERVIEW PANEL -->
-            <TabPanel value="overview" class="space-y-6">
-              <!-- Replicas Progress Bars -->
-              <ReplicasProgressBar
-                v-if="replicas"
-                :desired="desiredReplicas"
-                :current="currentReplicas"
-                :ready="readyReplicas"
-                :available="availableReplicas"
+            <TabPanel value="overview">
+              <WorkloadOverviewTab
+                :workload="props.workload"
+                :workload-kind="workloadKind"
+                :workload-namespace="workloadNamespace"
+                :workload-age="workloadAge"
+                :workload-status="workloadStatus"
+                :replicas="replicas"
+                :desired-replicas="desiredReplicas"
+                :current-replicas="currentReplicas"
+                :ready-replicas="readyReplicas"
+                :available-replicas="availableReplicas"
+                :completions="completions"
+                :duration="duration"
+                :schedule="schedule"
+                :suspend="suspend"
+                :active="active"
+                :last-schedule="lastSchedule"
+                :strategy="strategy"
+                :min-ready-seconds="minReadySeconds"
+                :revision-history="revisionHistory"
+                :workload-images="workloadImages"
+                :workload-labels="workloadLabels"
+                :workload-annotations="workloadAnnotations"
               />
-
-              <!-- Job Status -->
-              <div v-if="completions !== undefined">
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                  Job Status
-                </h3>
-                <div
-                  class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3"
-                >
-                  <div class="flex justify-between">
-                    <span class="text-(--text-secondary) font-medium">Completions</span>
-                    <span class="font-mono font-bold text-(--text-primary)">{{ completions }}</span>
-                  </div>
-                  <div v-if="duration" class="flex justify-between">
-                    <span class="text-(--text-secondary) font-medium">Duration</span>
-                    <span class="font-mono text-(--text-primary)">{{ duration }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- CronJob Schedule -->
-              <div v-if="schedule">
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                  CronJob Schedule
-                </h3>
-                <div
-                  class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3"
-                >
-                  <div class="flex justify-between">
-                    <span class="text-(--text-secondary) font-medium">Schedule</span>
-                    <span class="font-mono font-bold text-(--text-primary)">{{ schedule }}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-(--text-secondary) font-medium">Suspend</span>
-                    <span class="font-mono text-(--text-primary)">{{
-                      suspend ? 'True' : 'False'
-                    }}</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-(--text-secondary) font-medium">Active Jobs</span>
-                    <span class="font-mono text-(--text-primary)">{{ active ?? 0 }}</span>
-                  </div>
-                  <div v-if="lastSchedule" class="flex justify-between">
-                    <span class="text-(--text-secondary) font-medium">Last Schedule</span>
-                    <span class="font-mono text-(--text-primary)">{{ lastSchedule }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Configuration Metadata Grid -->
-              <div>
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
-                  Configuration
-                </h3>
-                <div
-                  class="grid grid-cols-2 gap-4 bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 text-xs"
-                >
-                  <div>
-                    <span class="text-(--text-muted) block mb-0.5">Kind</span>
-                    <span class="font-semibold text-(--text-secondary)">{{ workloadKind }}</span>
-                  </div>
-                  <div>
-                    <span class="text-(--text-muted) block mb-0.5">Namespace</span>
-                    <span class="font-semibold text-(--text-secondary)">{{
-                      workloadNamespace
-                    }}</span>
-                  </div>
-                  <div>
-                    <span class="text-(--text-muted) block mb-0.5">Age</span>
-                    <span class="font-semibold text-(--text-secondary)">{{ workloadAge }}</span>
-                  </div>
-                  <div>
-                    <span class="text-(--text-muted) block mb-0.5">Status</span>
-                    <span class="font-semibold text-(--text-secondary)">{{ workloadStatus }}</span>
-                  </div>
-                  <div v-if="strategy">
-                    <span class="text-(--text-muted) block mb-0.5">Strategy</span>
-                    <span
-                      class="font-semibold text-(--text-secondary) truncate block"
-                      :title="strategy"
-                    >
-                      {{ strategy }}
-                    </span>
-                  </div>
-                  <div v-if="minReadySeconds !== undefined">
-                    <span class="text-(--text-muted) block mb-0.5">Min Ready Seconds</span>
-                    <span class="font-mono text-(--text-secondary)">{{ minReadySeconds }}s</span>
-                  </div>
-                  <div v-if="revisionHistory !== undefined">
-                    <span class="text-(--text-muted) block mb-0.5">Revision History Limit</span>
-                    <span class="font-mono text-(--text-secondary)">{{ revisionHistory }}</span>
-                  </div>
-                  <div class="col-span-2" v-if="workloadImages && workloadImages.length">
-                    <span class="text-(--text-muted) block mb-0.5">Container Images</span>
-                    <div class="flex flex-wrap gap-1.5 mt-1">
-                      <span
-                        v-for="img in workloadImages"
-                        :key="img"
-                        class="bg-(--bg-hover) text-(--text-secondary) font-mono text-[10px] px-2 py-0.5 rounded border border-(--border) truncate max-w-full"
-                        :title="img"
-                      >
-                        {{ img }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Labels & Annotations (Rendered ONCE) -->
-              <KeyValueBadgeList :items="workloadLabels" title="Labels" variant="tag" />
-
-              <KeyValueBadgeList :items="workloadAnnotations" title="Annotations" variant="list" />
             </TabPanel>
 
             <!-- PODS PANEL -->
-            <TabPanel value="pods" class="space-y-4">
-              <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
-                Active Pods ({{ workloadPods.length }})
-              </div>
-              <div class="space-y-2.5">
-                <template v-if="workloadPods.length > 0">
-                  <div
-                    v-for="pod in workloadPods"
-                    :key="pod.name"
-                    class="flex items-center justify-between p-3.5 bg-(--bg-hover)/30 border border-(--border) rounded-xl hover:bg-(--bg-hover)/50 transition-colors"
-                  >
-                    <div class="flex items-center gap-3 min-w-0">
-                      <span
-                        class="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse"
-                        :class="getStatusBadgeClass(pod.status)"
-                      ></span>
-                      <div class="min-w-0">
-                        <span
-                          class="text-xs font-semibold text-(--text-primary) font-mono truncate block"
-                          :title="pod.name"
-                        >
-                          {{ pod.name }}
-                        </span>
-                        <div
-                          class="flex items-center gap-3 text-[10px] text-(--text-muted) font-mono mt-0.5"
-                        >
-                          <span>IP: {{ pod.ip || 'N/A' }}</span>
-                          <span>Node: {{ pod.node || 'N/A' }}</span>
-                          <span v-if="pod.restarts !== undefined"
-                            >Restarts: {{ pod.restarts }}</span
-                          >
-                          <span>Age: {{ pod.age }}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      severity="secondary"
-                      size="small"
-                      variant="text"
-                      class="text-xs shrink-0"
-                      title="View Logs"
-                      @click="viewPodLogs(pod.name)"
-                    >
-                      <Terminal class="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </template>
-                <div
-                  v-else
-                  class="text-center py-10 text-xs text-(--text-muted) flex flex-col items-center gap-2"
-                >
-                  <Info class="w-8 h-8 text-(--text-muted)/50" />
-                  <span>No active pods found for this workload.</span>
-                </div>
-              </div>
+            <TabPanel value="pods">
+              <WorkloadPodsTab
+                :pods="workloadPods"
+                :get-status-badge-class="getStatusBadgeClass"
+                @view-pod-logs="viewPodLogs"
+              />
             </TabPanel>
 
             <!-- EVENTS PANEL -->
-            <TabPanel value="events" class="space-y-4">
-              <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
-                Recent Events ({{ workloadEvents.length }})
-              </div>
-              <div
-                v-if="workloadEvents.length > 0"
-                class="relative pl-4 border-l border-(--border) space-y-4 ml-2"
-              >
-                <div v-for="(ev, idx) in workloadEvents" :key="idx" class="relative">
-                  <span
-                    class="absolute -left-5.25 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-(--bg-card)"
-                    :class="ev.type === 'Warning' ? 'bg-rose-500' : 'bg-emerald-500'"
-                  ></span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-semibold text-(--text-primary)">{{ ev.reason }}</span>
-                    <span
-                      class="text-[9px] px-1.5 py-0.2 rounded font-mono border"
-                      :class="
-                        ev.type === 'Warning'
-                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                      "
-                    >
-                      {{ ev.type }}
-                    </span>
-                    <span v-if="ev.count > 1" class="text-[9px] text-(--text-muted) font-mono">
-                      (x{{ ev.count }})
-                    </span>
-                  </div>
-                  <div class="text-[10px] text-(--text-muted) mt-0.5">
-                    {{ ev.message }}
-                  </div>
-                  <div
-                    class="text-[9px] font-mono text-(--text-muted) mt-1 flex items-center gap-2"
-                  >
-                    <span>Object: {{ ev.objectKind }}/{{ ev.objectName }}</span>
-                    <span>•</span>
-                    <span>Source: {{ ev.source }}</span>
-                    <span>•</span>
-                    <span>{{ ev.lastSeen || ev.time || 'recent' }}</span>
-                  </div>
-                </div>
-              </div>
-              <div
-                v-else
-                class="text-center py-10 text-xs text-(--text-muted) flex flex-col items-center gap-2"
-              >
-                <Info class="w-8 h-8 text-(--text-muted)/50" />
-                <span>No recent events recorded for this workload.</span>
-              </div>
+            <TabPanel value="events">
+              <WorkloadEventsTab :events="workloadEvents" />
             </TabPanel>
 
             <!-- YAML PANEL -->
-            <TabPanel value="yaml" class="h-full flex flex-col space-y-3">
-              <div class="flex items-center justify-between">
-                <span class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-                  Live Kubernetes Manifest
-                </span>
-                <Button
-                  severity="secondary"
-                  size="small"
-                  variant="outlined"
-                  class="text-xs"
-                  @click="copyYaml"
-                >
-                  <Component :is="copied ? Check : Copy" class="w-3.5 h-3.5 mr-1.5" />
-                  <span>{{ copied ? 'Copied!' : 'Copy YAML' }}</span>
-                </Button>
-              </div>
-
-              <div
-                class="flex-1 min-h-64 bg-zinc-950 rounded-lg border border-zinc-800 p-4 overflow-auto font-mono text-[10px] text-zinc-300 leading-relaxed"
-              >
-                <div v-if="isYamlLoading" class="text-zinc-500 italic py-4 text-center">
-                  Loading live YAML manifest...
-                </div>
-                <pre v-else>{{ displayedYaml }}</pre>
-              </div>
+            <TabPanel value="yaml" class="h-full">
+              <WorkloadYamlTab
+                :displayed-yaml="displayedYaml"
+                :is-yaml-loading="isYamlLoading"
+                :copied="copied"
+                @copy-yaml="copyYaml"
+              />
             </TabPanel>
           </TabPanels>
         </Tabs>
