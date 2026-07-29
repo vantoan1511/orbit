@@ -115,7 +115,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search jobs or images..."
     emptyMessage="No jobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} jobs"
-    :loading="loading"
+    :loading="loading || k8sStore.jobsLoading"
     @refresh="fetchJobs"
     @row-click="onRowClick"
   >

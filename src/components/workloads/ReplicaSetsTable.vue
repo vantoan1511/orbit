@@ -114,7 +114,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search replicasets or images..."
     emptyMessage="No replicasets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} replicasets"
-    :loading="loading"
+    :loading="loading || k8sStore.replicaSetsLoading"
     @refresh="fetchReplicaSets"
     @row-click="onRowClick"
   >
