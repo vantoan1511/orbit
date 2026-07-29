@@ -101,7 +101,6 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search services..."
     emptyMessage="No services found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} services"
-    :rows="12"
     :loading="k8sStore.servicesLoading"
     @refresh="handleRefresh"
     @row-click="onRowClick"
