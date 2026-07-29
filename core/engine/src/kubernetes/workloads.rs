@@ -46,21 +46,21 @@ pub fn map_pod(p: &Pod) -> models::PodInfo {
             let mut ready_str = "false".to_string();
             let mut restarts = 0;
 
-            if let Some(statuses) = container_statuses {
-                if let Some(cs) = statuses.iter().find(|s| s.name == c_name) {
-                    ready_str = cs.ready.to_string();
-                    restarts = cs.restart_count;
-                    total_restarts += restarts;
+            if let Some(statuses) = container_statuses
+                && let Some(cs) = statuses.iter().find(|s| s.name == c_name)
+            {
+                ready_str = cs.ready.to_string();
+                restarts = cs.restart_count;
+                total_restarts += restarts;
 
-                    if let Some(state) = &cs.state {
-                        if state.running.is_some() {
-                            status_str = "Running".to_string();
-                        } else if let Some(term) = &state.terminated {
-                            let reason = term.reason.as_deref().unwrap_or("Terminated");
-                            status_str = format!("Terminated ({})", reason);
-                        } else if let Some(waiting) = &state.waiting {
-                            status_str = waiting.reason.clone().unwrap_or_else(|| "Waiting".to_string());
-                        }
+                if let Some(state) = &cs.state {
+                    if state.running.is_some() {
+                        status_str = "Running".to_string();
+                    } else if let Some(term) = &state.terminated {
+                        let reason = term.reason.as_deref().unwrap_or("Terminated");
+                        status_str = format!("Terminated ({})", reason);
+                    } else if let Some(waiting) = &state.waiting {
+                        status_str = waiting.reason.clone().unwrap_or_else(|| "Waiting".to_string());
                     }
                 }
             }
