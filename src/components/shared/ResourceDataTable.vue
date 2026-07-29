@@ -5,7 +5,8 @@ import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
-import { computed, ref } from 'vue'
+import Select from 'primevue/select'
+import { computed, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
@@ -17,6 +18,7 @@ const props = withDefaults(
     searchQuery?: string
     searchPlaceholder?: string
     rows?: number
+    rowsPerPageOptions?: number[]
     emptyMessage?: string
     reportTemplate?: string
     loading?: boolean
@@ -24,12 +26,14 @@ const props = withDefaults(
     hideActions?: boolean
     hideRefresh?: boolean
     hideConfig?: boolean
+    hideRowsPerPage?: boolean
     columns?: TableColumn[]
   }>(),
   {
     searchQuery: '',
     searchPlaceholder: 'Search...',
-    rows: 10,
+    rows: 25,
+    rowsPerPageOptions: () => [25, 50, 100, 200],
     emptyMessage: 'No records found matching the filter criteria.',
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
@@ -37,6 +41,7 @@ const props = withDefaults(
     hideActions: false,
     hideRefresh: false,
     hideConfig: false,
+    hideRowsPerPage: false,
     columns: () => []
   }
 )
@@ -44,10 +49,26 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'update:searchQuery', val: string): void
   (e: 'update:columns', val: TableColumn[]): void
+  (e: 'update:rows', val: number): void
   (e: 'refresh'): void
   (e: 'row-click', event: any): void
   (e: 'row-contextmenu', event: { originalEvent: Event; data: any; index?: number }): void
 }>()
+
+const rowsPerPage = ref(props.rowsPerPageOptions.includes(props.rows) ? props.rows : 25)
+
+watch(rowsPerPage, (newVal) => {
+  emit('update:rows', newVal)
+})
+
+watch(
+  () => props.rows,
+  (newRows) => {
+    if (newRows && props.rowsPerPageOptions.includes(newRows)) {
+      rowsPerPage.value = newRows
+    }
+  }
+)
 
 const onSearchUpdate = (val: string | undefined) => {
   emit('update:searchQuery', val ?? '')
@@ -106,6 +127,15 @@ const isIndeterminate = computed(() => {
       <!-- Toggles and Actions -->
       <div class="flex items-center gap-4 self-end md:self-auto" v-if="!hideActions">
         <slot name="actions-left"></slot>
+
+        <div v-if="!hideRowsPerPage" class="flex items-center gap-2">
+          <span class="text-xs text-(--text-secondary) font-medium">Rows:</span>
+          <Select
+            v-model="rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="text-xs w-20 bg-(--bg-hover)/30 border-(--border)"
+          />
+        </div>
 
         <div class="flex items-center gap-1">
           <Button
@@ -183,7 +213,7 @@ const isIndeterminate = computed(() => {
 
     <!-- Loading Skeleton or Data Table -->
     <slot name="loading" v-if="loading">
-      <ResourceTableSkeleton :rows="rows" :columns="columns?.length || 6" />
+      <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
     </slot>
 
     <!-- Data Table -->
@@ -191,7 +221,8 @@ const isIndeterminate = computed(() => {
       v-else
       :value="data"
       paginator
-      :rows="rows"
+      v-model:rows="rowsPerPage"
+      :rowsPerPageOptions="rowsPerPageOptions"
       class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"
       tableClass="w-full text-left text-xs border-collapse"
       paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
