@@ -16,6 +16,76 @@ pub fn map_pod(p: &Pod) -> models::PodInfo {
 
     let age = format_age(&p.metadata.creation_timestamp);
 
+    let node = p.spec.as_ref().and_then(|s| s.node_name.clone());
+    let ip = p.status.as_ref().and_then(|s| s.pod_ip.clone());
+    let node_ip = p.status.as_ref().and_then(|s| s.host_ip.clone());
+    let qos_class = p.status.as_ref().and_then(|s| s.qos_class.clone());
+
+    let controlled_by = p.metadata.owner_references.as_ref()
+        .and_then(|owners| owners.first())
+        .map(|o| format!("{}/{}", o.kind, o.name));
+
+    let labels = p.metadata.labels.clone().unwrap_or_default();
+    let annotations = p.metadata.annotations.clone().unwrap_or_default();
+
+    let mut containers = Vec::new();
+    let mut images = Vec::new();
+    let mut total_restarts = 0;
+
+    let container_statuses = p.status.as_ref().and_then(|s| s.container_statuses.as_ref());
+
+    if let Some(spec) = p.spec.as_ref() {
+        for c in &spec.containers {
+            let c_name = c.name.clone();
+            let c_image = c.image.clone().unwrap_or_default();
+            if !c_image.is_empty() && !images.contains(&c_image) {
+                images.push(c_image.clone());
+            }
+
+            let mut status_str = "Waiting".to_string();
+            let mut ready_str = "false".to_string();
+            let mut restarts = 0;
+
+            if let Some(statuses) = container_statuses {
+                if let Some(cs) = statuses.iter().find(|s| s.name == c_name) {
+                    ready_str = cs.ready.to_string();
+                    restarts = cs.restart_count;
+                    total_restarts += restarts;
+
+                    if let Some(state) = &cs.state {
+                        if state.running.is_some() {
+                            status_str = "Running".to_string();
+                        } else if let Some(term) = &state.terminated {
+                            let reason = term.reason.as_deref().unwrap_or("Terminated");
+                            status_str = format!("Terminated ({})", reason);
+                        } else if let Some(waiting) = &state.waiting {
+                            status_str = waiting.reason.clone().unwrap_or_else(|| "Waiting".to_string());
+                        }
+                    }
+                }
+            }
+
+            let mut ports_str = None;
+            if let Some(ports) = &c.ports {
+                let port_list: Vec<String> = ports.iter()
+                    .map(|port| format!("{}/{}", port.container_port, port.protocol.as_deref().unwrap_or("TCP")))
+                    .collect();
+                if !port_list.is_empty() {
+                    ports_str = Some(port_list.join(", "));
+                }
+            }
+
+            containers.push(models::PodContainer {
+                name: c_name,
+                image: c_image,
+                status: status_str,
+                ready: ready_str,
+                restarts,
+                ports: ports_str,
+            });
+        }
+    }
+
     models::PodInfo {
         name,
         namespace: namespace_name,
@@ -23,6 +93,16 @@ pub fn map_pod(p: &Pod) -> models::PodInfo {
         age,
         cpu: None,
         memory: None,
+        node,
+        restarts: total_restarts,
+        images,
+        labels,
+        annotations,
+        ip,
+        node_ip,
+        controlled_by,
+        qos_class,
+        containers,
     }
 }
 
