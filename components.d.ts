@@ -85,8 +85,12 @@ declare module 'vue' {
     TopConsumers: typeof import('./src/components/dashboard/TopConsumers.vue')['default']
     UpdaterNotifications: typeof import('./src/components/UpdaterNotifications.vue')['default']
     WorkloadDetailsDrawer: typeof import('./src/components/workloads/WorkloadDetailsDrawer.vue')['default']
+    WorkloadEventsTab: typeof import('./src/components/workloads/WorkloadEventsTab.vue')['default']
     WorkloadMetricsCards: typeof import('./src/components/workloads/WorkloadMetricsCards.vue')['default']
+    WorkloadOverviewTab: typeof import('./src/components/workloads/WorkloadOverviewTab.vue')['default']
+    WorkloadPodsTab: typeof import('./src/components/workloads/WorkloadPodsTab.vue')['default']
     WorkloadSummaries: typeof import('./src/components/dashboard/WorkloadSummaries.vue')['default']
+    WorkloadYamlTab: typeof import('./src/components/workloads/WorkloadYamlTab.vue')['default']
   }
   export interface GlobalDirectives {
     Tooltip: typeof import('primevue/tooltip')['default']
