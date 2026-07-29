@@ -5,13 +5,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
-import type {
-  CronJobInfo,
-  DaemonSetReplicas,
-  DeploymentInfo,
-  JobInfo,
-  WorkloadInfo
-} from '@/types/kubernetes'
+import type { CronJobInfo, DaemonSetReplicas, JobInfo, WorkloadInfo } from '@/types/kubernetes'
 import { Activity, Check, Clock, Copy, FileCode, Info, Layers, Server, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
@@ -57,24 +51,17 @@ const workloadKind = computed(() => {
   return props.workload ? getWorkloadKind(props.workload) : 'Workload'
 })
 
-const getTypeBadgeClass = (kind: string) => {
-  switch (kind) {
-    case 'Deployment':
-      return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-    case 'StatefulSet':
-      return 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-    case 'DaemonSet':
-      return 'bg-teal-500/10 text-teal-400 border-teal-500/20'
-    case 'ReplicaSet':
-      return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
-    case 'Job':
-      return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-    case 'CronJob':
-      return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
-    default:
-      return 'bg-gray-500/10 text-gray-400 border-gray-500/20'
-  }
+const TYPE_BADGE_CLASSES: Record<string, string> = {
+  Deployment: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  StatefulSet: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+  DaemonSet: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
+  ReplicaSet: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+  Job: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  CronJob: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
 }
+
+const getTypeBadgeClass = (kind: string) =>
+  TYPE_BADGE_CLASSES[kind] ?? 'bg-gray-500/10 text-gray-400 border-gray-500/20'
 
 const workloadStatus = computed(() => {
   if (!props.workload) return 'Active'
@@ -84,22 +71,17 @@ const workloadStatus = computed(() => {
   return 'Active'
 })
 
-const getStatusBadgeClass = (status: string) => {
-  switch (status) {
-    case 'Running':
-    case 'Succeeded':
-    case 'Active':
-      return 'bg-emerald-500'
-    case 'Progressing':
-    case 'Pending':
-      return 'bg-amber-500'
-    case 'Failed':
-    case 'CrashLoopBackOff':
-      return 'bg-rose-500'
-    default:
-      return 'bg-emerald-500'
-  }
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  Running: 'bg-emerald-500',
+  Succeeded: 'bg-emerald-500',
+  Active: 'bg-emerald-500',
+  Progressing: 'bg-amber-500',
+  Pending: 'bg-amber-500',
+  Failed: 'bg-rose-500',
+  CrashLoopBackOff: 'bg-rose-500'
 }
+
+const getStatusBadgeClass = (status: string) => STATUS_BADGE_CLASSES[status] ?? 'bg-emerald-500'
 
 const workloadNamespace = computed(() => props.workload?.namespace ?? '')
 const workloadName = computed(() => props.workload?.name ?? '')
@@ -108,110 +90,40 @@ const workloadLabels = computed(() => props.workload?.labels ?? {})
 const workloadAnnotations = computed(() => props.workload?.annotations ?? {})
 const workloadImages = computed(() => props.workload?.images ?? [])
 
-const replicas = computed(() => {
-  if (!props.workload) return null
-  if ('replicas' in props.workload) {
-    return props.workload.replicas
+const getProp = <T,>(key: string): T | undefined => {
+  if (props.workload && key in props.workload) {
+    return (props.workload as unknown as Record<string, unknown>)[key] as T
   }
-  return null
-})
+  return undefined
+}
 
+const replicas = computed(() => getProp<DaemonSetReplicas>('replicas') ?? null)
 const desiredReplicas = computed(() => replicas.value?.desired)
 const currentReplicas = computed(() => replicas.value?.current)
-const readyReplicas = computed(() => {
-  if (replicas.value && 'ready' in replicas.value) {
-    return (replicas.value as DaemonSetReplicas).ready
-  }
-  return undefined
-})
+const readyReplicas = computed(() =>
+  replicas.value && 'ready' in replicas.value
+    ? (replicas.value as DaemonSetReplicas).ready
+    : undefined
+)
 
-const available = computed(() => {
-  if (!props.workload) return undefined
-  if ('available' in props.workload) {
-    return (props.workload as DeploymentInfo).available
-  }
-  return undefined
-})
+const available = computed(() => getProp<number>('available'))
+const availableReplicas = computed(() =>
+  available.value !== undefined
+    ? available.value
+    : replicas.value && 'available' in replicas.value
+      ? (replicas.value as DaemonSetReplicas).available
+      : undefined
+)
 
-const availableReplicas = computed(() => {
-  if (available.value !== undefined) return available.value
-  if (replicas.value && 'available' in replicas.value) {
-    return (replicas.value as DaemonSetReplicas).available
-  }
-  return undefined
-})
-
-const completions = computed(() => {
-  if (!props.workload) return undefined
-  if ('completions' in props.workload) {
-    return (props.workload as JobInfo).completions
-  }
-  return undefined
-})
-
-const duration = computed(() => {
-  if (!props.workload) return undefined
-  if ('duration' in props.workload) {
-    return (props.workload as JobInfo).duration
-  }
-  return undefined
-})
-
-const schedule = computed(() => {
-  if (!props.workload) return undefined
-  if ('schedule' in props.workload) {
-    return (props.workload as CronJobInfo).schedule
-  }
-  return undefined
-})
-
-const suspend = computed(() => {
-  if (!props.workload) return undefined
-  if ('suspend' in props.workload) {
-    return (props.workload as CronJobInfo).suspend
-  }
-  return undefined
-})
-
-const active = computed(() => {
-  if (!props.workload) return undefined
-  if ('active' in props.workload) {
-    return (props.workload as CronJobInfo).active
-  }
-  return undefined
-})
-
-const lastSchedule = computed(() => {
-  if (!props.workload) return undefined
-  if ('lastSchedule' in props.workload) {
-    return (props.workload as CronJobInfo).lastSchedule
-  }
-  return undefined
-})
-
-const strategy = computed(() => {
-  if (!props.workload) return undefined
-  if ('strategy' in props.workload) {
-    return (props.workload as DeploymentInfo).strategy
-  }
-  return undefined
-})
-
-const minReadySeconds = computed(() => {
-  if (!props.workload) return undefined
-  if ('minReadySeconds' in props.workload) {
-    return (props.workload as DeploymentInfo).minReadySeconds
-  }
-  return undefined
-})
-
-const revisionHistory = computed(() => {
-  if (!props.workload) return undefined
-  if ('revisionHistory' in props.workload) {
-    return (props.workload as DeploymentInfo).revisionHistory
-  }
-  return undefined
-})
+const completions = computed(() => getProp<string>('completions'))
+const duration = computed(() => getProp<string>('duration'))
+const schedule = computed(() => getProp<string>('schedule'))
+const suspend = computed(() => getProp<boolean>('suspend'))
+const active = computed(() => getProp<number>('active'))
+const lastSchedule = computed(() => getProp<string>('lastSchedule'))
+const strategy = computed(() => getProp<string>('strategy'))
+const minReadySeconds = computed(() => getProp<number>('minReadySeconds'))
+const revisionHistory = computed(() => getProp<number>('revisionHistory'))
 
 // Real Pods matching workload
 const workloadPods = computed(() => {
