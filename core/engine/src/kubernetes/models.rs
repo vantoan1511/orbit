@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PodContainer {
+    pub name: String,
+    pub image: String,
+    pub status: String,
+    pub ready: String,
+    pub restarts: i32,
+    pub ports: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct PodInfo {
     pub name: String,
     pub namespace: String,
@@ -8,6 +20,19 @@ pub struct PodInfo {
     pub age: String,
     pub cpu: Option<String>,
     pub memory: Option<String>,
+    pub node: Option<String>,
+    pub restarts: i32,
+    pub images: Vec<String>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    pub ip: Option<String>,
+    #[serde(rename = "nodeIP")]
+    pub node_ip: Option<String>,
+    #[serde(rename = "controlledBy")]
+    pub controlled_by: Option<String>,
+    #[serde(rename = "qosClass")]
+    pub qos_class: Option<String>,
+    pub containers: Vec<PodContainer>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
