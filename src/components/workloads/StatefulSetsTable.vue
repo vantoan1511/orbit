@@ -115,7 +115,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search statefulsets or images..."
     emptyMessage="No statefulsets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} statefulsets"
-    :loading="loading"
+    :loading="loading || k8sStore.statefulSetsLoading"
     @refresh="fetchStatefulSets"
     @row-click="onRowClick"
   >

@@ -10,6 +10,7 @@ import type { PolicyInfo } from '@/types/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import PolicyDetailsDrawer from './PolicyDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const k8sStore = useKubernetesStore()
@@ -159,9 +160,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     </div>
 
     <!-- Data Table -->
+    <ResourceTableSkeleton v-if="k8sStore.policiesLoading" :columns="4" />
     <DataTable
+      v-else
       :value="filteredPolicies"
-      :loading="k8sStore.policiesLoading"
       paginator
       :rows="12"
       class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"

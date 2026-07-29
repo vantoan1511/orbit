@@ -116,7 +116,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search daemonsets or images..."
     emptyMessage="No daemonsets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} daemonsets"
-    :loading="loading"
+    :loading="loading || k8sStore.daemonSetsLoading"
     @refresh="fetchDaemonSets"
     @row-click="onRowClick"
   >

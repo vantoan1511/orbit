@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
@@ -20,7 +21,9 @@ const nodes = computed(() => k8sStore.nodes)
     </div>
 
     <!-- PrimeVue DataTable -->
+    <ResourceTableSkeleton v-if="k8sStore.nodesLoading" :columns="8" />
     <DataTable
+      v-else
       :value="nodes"
       paginator
       :rows="5"
@@ -29,6 +32,9 @@ const nodes = computed(() => k8sStore.nodes)
       paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
       currentPageReportTemplate="Showing {first} to {last} of {totalRecords} nodes"
     >
+      <template #empty>
+        <div class="text-center py-8 text-(--text-muted)">No nodes found in cluster.</div>
+      </template>
       <!-- Name Column -->
       <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
         <template #body="{ data }">

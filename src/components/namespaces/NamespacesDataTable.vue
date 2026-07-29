@@ -21,6 +21,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, onMounted, ref } from 'vue'
 import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { MoreVertical } from '@lucide/vue'
 
@@ -234,7 +235,13 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         </div>
 
         <div class="flex items-center gap-1">
-          <Button severity="secondary" variant="text" size="small" class="p-1">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            :loading="store.namespacesLoading"
+          >
             <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
@@ -245,7 +252,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     </div>
 
     <!-- Data Table -->
+    <ResourceTableSkeleton v-if="store.namespacesLoading" :columns="6" />
     <DataTable
+      v-else
       :value="filteredNamespaces"
       paginator
       :rows="20"

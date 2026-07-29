@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import { Search, Info, RefreshCw, Settings2, FileSpreadsheet, MoreVertical } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import type { PersistentVolumeClaimInfo } from '@/types/kubernetes'
 
@@ -110,7 +111,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
       <!-- Action buttons -->
       <div class="flex items-center gap-1 self-end sm:self-auto">
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="refreshTable">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="refreshTable"
+          :loading="k8sStore.persistentVolumeClaimsLoading"
+        >
           <RefreshCw class="w-3.5 h-3.5 text-(--text-secondary)" />
         </Button>
         <Button severity="secondary" variant="text" size="small" class="p-1">
@@ -120,7 +128,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     </div>
 
     <!-- DataTable -->
+    <ResourceTableSkeleton v-if="k8sStore.persistentVolumeClaimsLoading" :columns="6" />
     <DataTable
+      v-else
       :value="filteredPVCs"
       class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
       tableClass="w-full text-left text-xs border-collapse"

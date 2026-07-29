@@ -12,6 +12,7 @@ import EventDetailsDrawer from './EventDetailsDrawer.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { storeToRefs } from 'pinia'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const k8sStore = useKubernetesStore()
@@ -162,6 +163,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             size="small"
             class="p-1"
             @click="handleRefresh"
+            :loading="k8sStore.eventsLoading"
           >
             <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
           </Button>
@@ -173,7 +175,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     </div>
 
     <!-- Data Table -->
+    <ResourceTableSkeleton v-if="k8sStore.eventsLoading" :columns="6" />
     <DataTable
+      v-else
       :value="filteredEvents"
       paginator
       :rows="12"

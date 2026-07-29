@@ -16,6 +16,7 @@ import {
 } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import type { PersistentVolumeInfo } from '@/types/kubernetes'
 
@@ -121,7 +122,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
       <!-- Action buttons -->
       <div class="flex items-center gap-1 self-end sm:self-auto">
-        <Button severity="secondary" variant="text" size="small" class="p-1" @click="refreshTable">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1"
+          @click="refreshTable"
+          :loading="k8sStore.persistentVolumesLoading"
+        >
           <RefreshCw class="w-3.5 h-3.5 text-(--text-secondary)" />
         </Button>
         <Button severity="secondary" variant="text" size="small" class="p-1">
@@ -131,7 +139,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     </div>
 
     <!-- DataTable -->
+    <ResourceTableSkeleton v-if="k8sStore.persistentVolumesLoading" :columns="6" />
     <DataTable
+      v-else
       :value="filteredPVs"
       class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
       tableClass="w-full text-left text-xs border-collapse"

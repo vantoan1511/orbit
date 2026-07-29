@@ -7,6 +7,7 @@ import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
 import { computed, ref } from 'vue'
 
+import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -180,8 +181,14 @@ const isIndeterminate = computed(() => {
       </div>
     </div>
 
+    <!-- Loading Skeleton or Data Table -->
+    <slot name="loading" v-if="loading">
+      <ResourceTableSkeleton :rows="rows" :columns="columns?.length || 6" />
+    </slot>
+
     <!-- Data Table -->
     <DataTable
+      v-else
       :value="data"
       paginator
       :rows="rows"

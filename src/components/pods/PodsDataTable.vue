@@ -92,6 +92,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search pods, images or nodes..."
     emptyMessage="No pods found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} pods"
+    :loading="k8sStore.podsLoading"
     @row-click="onRowClick"
   >
     <!-- Filters -->

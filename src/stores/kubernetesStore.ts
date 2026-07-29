@@ -44,6 +44,16 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const secretsLoading = ref(false)
   const eventsLoading = ref(false)
   const policiesLoading = ref(false)
+  const podsLoading = ref(false)
+  const deploymentsLoading = ref(false)
+  const statefulSetsLoading = ref(false)
+  const daemonSetsLoading = ref(false)
+  const replicaSetsLoading = ref(false)
+  const jobsLoading = ref(false)
+  const cronJobsLoading = ref(false)
+  const nodesLoading = ref(false)
+  const servicesLoading = ref(false)
+  const namespacesLoading = ref(false)
   const persistentVolumes = ref<PersistentVolumeInfo[]>([])
   const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
   const storageClasses = ref<StorageClassInfo[]>([])
@@ -104,38 +114,47 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setPods(newPods: PodInfo[]) {
     pods.value = newPods
+    podsLoading.value = false
   }
 
   function setDeployments(newDeployments: DeploymentInfo[]) {
     deployments.value = newDeployments
+    deploymentsLoading.value = false
   }
 
   function setStatefulSets(newStatefulSets: StatefulSetInfo[]) {
     statefulSets.value = newStatefulSets
+    statefulSetsLoading.value = false
   }
 
   function setDaemonSets(newDaemonSets: DaemonSetInfo[]) {
     daemonSets.value = newDaemonSets
+    daemonSetsLoading.value = false
   }
 
   function setReplicaSets(newReplicaSets: ReplicaSetInfo[]) {
     replicaSets.value = newReplicaSets
+    replicaSetsLoading.value = false
   }
 
   function setJobs(newJobs: JobInfo[]) {
     jobs.value = newJobs
+    jobsLoading.value = false
   }
 
   function setCronJobs(newCronJobs: CronJobInfo[]) {
     cronJobs.value = newCronJobs
+    cronJobsLoading.value = false
   }
 
   function setNodes(newNodes: NodeInfo[]) {
     nodes.value = newNodes
+    nodesLoading.value = false
   }
 
   function setServices(newServices: ServiceInfo[]) {
     services.value = newServices
+    servicesLoading.value = false
   }
 
   function setConfigMaps(newConfigMaps: ConfigMapInfo[]) {
@@ -207,6 +226,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setNamespaces(newNamespaces: NamespaceInfo[]) {
     namespaceList.value = newNamespaces
+    namespacesLoading.value = false
   }
 
   function setClusters(newClusters: ClusterInfo[]) {
@@ -233,6 +253,23 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     storageClasses.value = []
     events.value = []
     policies.value = []
+    podsLoading.value = true
+    deploymentsLoading.value = true
+    statefulSetsLoading.value = true
+    daemonSetsLoading.value = true
+    replicaSetsLoading.value = true
+    jobsLoading.value = true
+    cronJobsLoading.value = true
+    nodesLoading.value = true
+    servicesLoading.value = true
+    configMapsLoading.value = true
+    secretsLoading.value = true
+    persistentVolumesLoading.value = true
+    persistentVolumeClaimsLoading.value = true
+    storageClassesLoading.value = true
+    eventsLoading.value = true
+    policiesLoading.value = true
+    namespacesLoading.value = true
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
 
@@ -314,6 +351,17 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   async function loadInitialData() {
     if (isEngineReady.value) {
+      podsLoading.value = true
+      deploymentsLoading.value = true
+      statefulSetsLoading.value = true
+      daemonSetsLoading.value = true
+      replicaSetsLoading.value = true
+      jobsLoading.value = true
+      cronJobsLoading.value = true
+      nodesLoading.value = true
+      servicesLoading.value = true
+      namespacesLoading.value = true
+
       await Promise.all([
         kubernetesService.getClusters(),
         kubernetesService.getNamespaces(),
@@ -489,6 +537,16 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     persistentVolumesLoading,
     persistentVolumeClaimsLoading,
     storageClassesLoading,
+    podsLoading,
+    deploymentsLoading,
+    statefulSetsLoading,
+    daemonSetsLoading,
+    replicaSetsLoading,
+    jobsLoading,
+    cronJobsLoading,
+    nodesLoading,
+    servicesLoading,
+    namespacesLoading,
     namespaces,
     namespaceList,
     clusters,

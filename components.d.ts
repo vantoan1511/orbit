@@ -58,6 +58,7 @@ declare module 'vue' {
     ReplicasProgressBar: typeof import('./src/components/shared/ReplicasProgressBar.vue')['default']
     ResourceActionMenu: typeof import('./src/components/shared/ResourceActionMenu.vue')['default']
     ResourceDataTable: typeof import('./src/components/shared/ResourceDataTable.vue')['default']
+    ResourceTableSkeleton: typeof import('./src/components/shared/ResourceTableSkeleton.vue')['default']
     ResourceUsage: typeof import('./src/components/dashboard/ResourceUsage.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']

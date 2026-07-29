@@ -141,6 +141,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         : 'Showing {first} to {last} of {totalRecords} secrets'
     "
     :rows="12"
+    :loading="
+      props.activeTab === 'configmaps' ? k8sStore.configMapsLoading : k8sStore.secretsLoading
+    "
     @refresh="handleRefresh"
     @row-click="onRowClick"
   >

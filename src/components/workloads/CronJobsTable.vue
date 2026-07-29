@@ -115,7 +115,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     searchPlaceholder="Search cronjobs or images..."
     emptyMessage="No cronjobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} cronjobs"
-    :loading="loading"
+    :loading="loading || k8sStore.cronJobsLoading"
     @refresh="fetchCronJobs"
     @row-click="onRowClick"
   >
