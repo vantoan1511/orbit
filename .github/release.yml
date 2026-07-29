@@ -5,26 +5,43 @@ changelog:
       - invalid
       - question
       - wontfix
+      - ignore-for-release
   categories:
     - title: "🚀 Features"
       labels:
+        - feat
+        - feature
         - enhancement
-        - "feature*"
         - "feat*"
+        - "feature*"
     - title: "🐛 Bug Fixes"
       labels:
+        - fix
         - bug
+        - bugfix
         - "fix*"
+        - "bug*"
     - title: "📚 Documentation"
       labels:
+        - docs
         - documentation
         - "docs*"
+        - "doc*"
     - title: "🛠 Maintenance & Refactoring"
       labels:
         - chore
+        - refactor
+        - perf
+        - ci
+        - build
+        - test
+        - style
         - "chore*"
         - "refactor*"
         - "perf*"
+        - "ci*"
+        - "build*"
+        - "test*"
     - title: "🧰 Other Changes"
       labels:
         - "*"
