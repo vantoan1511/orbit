@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
-import { watch, onMounted, ref } from 'vue'
-import { useToast } from 'primevue/usetoast'
 import { app } from '@neutralinojs/lib'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
+import { useToast } from 'primevue/usetoast'
+import { onMounted, ref, watch } from 'vue'
 
 const updaterStore = useUpdaterStore()
 const toast = useToast()
@@ -66,10 +66,10 @@ watch(
             :label="
               updaterStore.isDownloading
                 ? `Downloading... ${updaterStore.downloadProgress}%`
-                : 'Apply & Restart'
+                : 'View Details'
             "
             :disabled="updaterStore.isDownloading"
-            @click="updaterStore.applyUpdate()"
+            @click="updaterStore.showUpdateDialog = true"
           ></Button>
         </div>
       </div>

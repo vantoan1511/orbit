@@ -1,19 +1,66 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UpdateManifest {
     pub version: String,
     pub url: String,
+    #[serde(default)]
+    pub release_notes: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct GithubReleaseResponse {
+    body: Option<String>,
 }
 
 impl UpdateManifest {
     /// Fetch the latest update manifest from the given URL.
     pub async fn fetch(url: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let manifest = reqwest::get(url)
+        let mut manifest = reqwest::get(url)
             .await?
             .json::<UpdateManifest>()
             .await?;
+
+        if manifest.release_notes.is_none() || manifest.release_notes.as_deref() == Some("") {
+            if let Some(notes) = Self::fetch_github_release_notes(&manifest.version).await {
+                manifest.release_notes = Some(notes);
+            } else {
+                manifest.release_notes = Some("No release notes provided for this version.".to_string());
+            }
+        }
+
         Ok(manifest)
+    }
+
+    async fn fetch_github_release_notes(version: &str) -> Option<String> {
+        let tag = if version.starts_with('v') {
+            version.to_string()
+        } else {
+            format!("v{}", version)
+        };
+        let api_url = format!("https://api.github.com/repos/vantoan1511/orbit/releases/tags/{}", tag);
+
+        let client = reqwest::Client::builder()
+            .user_agent("orbit-engine")
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .ok()?;
+
+        let resp = client.get(&api_url).send().await.ok()?;
+        if resp.status().is_success() {
+            let release = resp.json::<GithubReleaseResponse>().await.ok()?;
+            release.body
+        } else {
+            // Fallback: try latest release endpoint if specific tag lookup fails
+            let fallback_url = "https://api.github.com/repos/vantoan1511/orbit/releases/latest";
+            let resp = client.get(fallback_url).send().await.ok()?;
+            if resp.status().is_success() {
+                let release = resp.json::<GithubReleaseResponse>().await.ok()?;
+                release.body
+            } else {
+                None
+            }
+        }
     }
 
     /// Check if an update is available.

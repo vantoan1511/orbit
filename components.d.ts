@@ -86,6 +86,7 @@ declare module 'vue' {
     Tabs: typeof import('primevue/tabs')['default']
     Toast: typeof import('primevue/toast')['default']
     TopConsumers: typeof import('./src/components/dashboard/TopConsumers.vue')['default']
+    UpdaterDialog: typeof import('./src/components/UpdaterDialog.vue')['default']
     UpdaterNotifications: typeof import('./src/components/UpdaterNotifications.vue')['default']
     WorkloadDetailsDrawer: typeof import('./src/components/workloads/WorkloadDetailsDrawer.vue')['default']
     WorkloadEventsTab: typeof import('./src/components/workloads/WorkloadEventsTab.vue')['default']
