@@ -11,6 +11,7 @@ export const useUpdaterStore = defineStore('updater', () => {
   const isDownloading = ref(false)
   const downloadProgress = ref(0)
   const updateReady = ref<string | null>(null) // 'app'
+  const showUpdateDialog = ref(false)
 
   function checkForUpdates() {
     isChecking.value = true
@@ -29,6 +30,9 @@ export const useUpdaterStore = defineStore('updater', () => {
       isChecking.value = false
       hasUpdate.value = data.has_update
       manifest.value = data.manifest
+      if (data.has_update) {
+        showUpdateDialog.value = true
+      }
     })
 
     updaterService.onUpdateDownloadProgress((data) => {
@@ -50,6 +54,7 @@ export const useUpdaterStore = defineStore('updater', () => {
     isDownloading,
     downloadProgress,
     updateReady,
+    showUpdateDialog,
     checkForUpdates,
     applyUpdate,
     initListeners

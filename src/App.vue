@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -225,6 +226,7 @@ onUnmounted(() => {
   <ConfirmDialog />
   <DynamicDialog />
   <UpdaterNotifications />
+  <UpdaterDialog />
 </template>
 
 <style>

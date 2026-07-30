@@ -27,6 +27,7 @@ export interface ComponentVersion {
 export interface UpdateManifest {
   version: string
   url: string
+  release_notes?: string
 }
 
 export interface OrbitEventMap {

@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { app } from '@/services/nativeService'
 import { useUpdaterStore } from '@/stores/updater'
 import Button from 'primevue/button'
-import { ref, onMounted } from 'vue'
-import { app } from '@/services/nativeService'
+import { onMounted, ref } from 'vue'
 
 const updaterStore = useUpdaterStore()
 const appVersion = ref('')
@@ -106,12 +106,21 @@ onMounted(async () => {
               Version {{ updaterStore.manifest?.version }} is ready to install. This requires
               restarting Orbit.
             </p>
-            <Button
-              size="small"
-              severity="info"
-              label="Update & Restart"
-              @click="updaterStore.applyUpdate()"
-            />
+            <div class="flex gap-2">
+              <Button
+                size="small"
+                severity="secondary"
+                variant="outlined"
+                label="Release Notes"
+                @click="updaterStore.showUpdateDialog = true"
+              />
+              <Button
+                size="small"
+                severity="info"
+                label="Update & Restart"
+                @click="updaterStore.applyUpdate()"
+              />
+            </div>
           </div>
         </div>
       </div>
