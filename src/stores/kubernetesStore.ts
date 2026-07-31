@@ -369,6 +369,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         kubernetesService.getDeployments(),
         kubernetesService.getStatefulSets(),
         kubernetesService.getDaemonSets(),
+        kubernetesService.getReplicaSets(),
         kubernetesService.getJobs(),
         kubernetesService.getCronJobs(),
         kubernetesService.getNodes(),
