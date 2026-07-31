@@ -46,6 +46,7 @@ declare module 'vue' {
     NamespacesDataTable: typeof import('./src/components/namespaces/NamespacesDataTable.vue')['default']
     NodeMetricsCards: typeof import('./src/components/nodes/NodeMetricsCards.vue')['default']
     NodesTable: typeof import('./src/components/nodes/NodesTable.vue')['default']
+    NotificationDrawer: typeof import('./src/components/layout/NotificationDrawer.vue')['default']
     PodContainersTab: typeof import('./src/components/pods/PodContainersTab.vue')['default']
     PodDetailsDrawer: typeof import('./src/components/pods/PodDetailsDrawer.vue')['default']
     PodMetricsCards: typeof import('./src/components/pods/PodMetricsCards.vue')['default']

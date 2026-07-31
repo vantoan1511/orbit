@@ -4,6 +4,7 @@ import { useTheme } from '@/composables/useTheme'
 import { kubernetesService } from '@/services/kubernetesService'
 import { os } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useNotificationStore } from '@/stores/notificationStore'
 import { VERSION } from '@/version'
 import {
   Activity,
@@ -25,6 +26,7 @@ import { Button } from 'primevue'
 import { useRoute } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
+const notificationStore = useNotificationStore()
 const { activeCluster, isRefreshing, handleAddCluster } = useCluster()
 
 const handleSwitchCluster = async (clusterId: string) => {
@@ -152,7 +154,24 @@ const { isDark, toggleTheme } = useTheme()
         />
 
         <!-- Notifications -->
-        <Button rounded variant="text" icon="pi pi-bell" />
+        <div class="relative inline-flex">
+          <Button
+            rounded
+            variant="text"
+            icon="pi pi-bell"
+            :aria-label="'Notifications'"
+            @click="notificationStore.toggleDrawer()"
+          />
+          <span
+            v-if="notificationStore.unreadCount > 0"
+            class="absolute top-1 right-1 flex h-2 w-2 pointer-events-none"
+          >
+            <span
+              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"
+            ></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+          </span>
+        </div>
 
         <!-- Profile -->
         <Button rounded variant="text" icon="pi pi-user" />
