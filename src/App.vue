@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import NotificationDrawer from '@/components/layout/NotificationDrawer.vue'
 import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useNotificationStore } from '@/stores/notificationStore'
 import { OrbitEvents } from '@/types/events'
 import type {
   ClusterInfo,
@@ -32,6 +34,7 @@ import { onMounted, onUnmounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
 
 const k8sStore = useKubernetesStore()
+const notificationStore = useNotificationStore()
 const toast = useToast()
 
 const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: string }) => {
@@ -39,6 +42,12 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
     k8sStore.setEngineReady(true)
   } else {
     k8sStore.setEngineReady(false)
+    notificationStore.addNotification({
+      title: 'Engine Error',
+      message: payload.message || 'Failed to connect to backend engine',
+      severity: 'error',
+      category: 'system'
+    })
   }
 }
 
@@ -129,6 +138,12 @@ const handleErrorOccurred = (payload: { message: string }) => {
     detail: payload.message,
     life: 5000
   })
+  notificationStore.addNotification({
+    title: 'Error',
+    message: payload.message,
+    severity: 'error',
+    category: 'system'
+  })
 }
 
 const handleCommandSucceeded = (payload: { message: string }) => {
@@ -137,6 +152,12 @@ const handleCommandSucceeded = (payload: { message: string }) => {
     summary: 'Success',
     detail: payload.message,
     life: 3000
+  })
+  notificationStore.addNotification({
+    title: 'Command Succeeded',
+    message: payload.message,
+    severity: 'success',
+    category: 'command'
   })
 }
 
@@ -227,6 +248,7 @@ onUnmounted(() => {
   <DynamicDialog />
   <UpdaterNotifications />
   <UpdaterDialog />
+  <NotificationDrawer />
 </template>
 
 <style>
