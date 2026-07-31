@@ -60,7 +60,9 @@ const fetchReplicaSets = async () => {
 }
 
 onMounted(() => {
-  fetchReplicaSets()
+  if (k8sStore.replicaSets.length === 0 && !k8sStore.replicaSetsLoading) {
+    fetchReplicaSets()
+  }
 })
 
 watch(selectedNamespace, () => {

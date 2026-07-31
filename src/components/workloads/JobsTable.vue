@@ -61,7 +61,9 @@ const fetchJobs = async () => {
 }
 
 onMounted(() => {
-  fetchJobs()
+  if (k8sStore.jobs.length === 0 && !k8sStore.jobsLoading) {
+    fetchJobs()
+  }
 })
 
 watch(selectedNamespace, () => {

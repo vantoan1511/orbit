@@ -62,7 +62,9 @@ const fetchDaemonSets = async () => {
 }
 
 onMounted(() => {
-  fetchDaemonSets()
+  if (k8sStore.daemonSets.length === 0 && !k8sStore.daemonSetsLoading) {
+    fetchDaemonSets()
+  }
 })
 
 watch(selectedNamespace, () => {
