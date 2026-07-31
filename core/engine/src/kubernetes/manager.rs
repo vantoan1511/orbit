@@ -1,5 +1,6 @@
 use kube::{Client, config::{Kubeconfig, KubeConfigOptions, Config}};
 use crate::kubernetes::models::ClusterInfo;
+use crate::config::OrbitConfig;
 
 pub struct KubeManager {
     pub kubeconfig: Option<Kubeconfig>,
@@ -8,10 +9,13 @@ pub struct KubeManager {
     pub watch_cancel: Option<tokio::sync::watch::Sender<bool>>,
     pub active_context_healthy: bool,
     pub log_cancel: Vec<tokio::sync::oneshot::Sender<()>>,
+    pub config: OrbitConfig,
 }
 
 impl KubeManager {
     pub async fn new() -> Self {
+        let config = OrbitConfig::load();
+
         let mut manager = Self {
             kubeconfig: None,
             active_context: None,
@@ -19,6 +23,7 @@ impl KubeManager {
             watch_cancel: None,
             active_context_healthy: false,
             log_cancel: Vec::new(),
+            config,
         };
         
         // Try reading default kubeconfig
@@ -27,6 +32,13 @@ impl KubeManager {
             // Intentionally do not connect — user must explicitly select a cluster
         }
         
+        // Reload persisted custom kubeconfig files
+        for path in manager.config.custom_kubeconfig_paths.clone() {
+            if let Err(e) = manager.merge_kubeconfig_from_path(&path) {
+                log::warn!("Failed to load persisted kubeconfig from {}: {}", path, e);
+            }
+        }
+
         manager
     }
 
@@ -86,7 +98,9 @@ impl KubeManager {
         Ok(())
     }
 
-    pub async fn add_kubeconfig_file(&mut self, file_path: &str) -> Result<(), String> {
+    /// Read a kubeconfig from `file_path` and merge its contexts, clusters, and auth_infos into `self.kubeconfig`.
+    /// Does not auto-switch context and does not modify persistent configuration.
+    pub fn merge_kubeconfig_from_path(&mut self, file_path: &str) -> Result<(), String> {
         let path = std::path::Path::new(file_path);
         if !path.exists() {
             return Err("Provided kubeconfig path does not exist".to_string());
@@ -118,6 +132,16 @@ impl KubeManager {
         } else {
             self.kubeconfig = Some(new_config);
         }
+
+        Ok(())
+    }
+
+    pub async fn add_kubeconfig_file(&mut self, file_path: &str) -> Result<(), String> {
+        self.merge_kubeconfig_from_path(file_path)?;
+
+        if let Err(e) = self.config.add_kubeconfig_path(file_path) {
+            log::warn!("Failed to persist kubeconfig path {}: {}", file_path, e);
+        }
         
         // Try to switch to the new config's current context if none is active
         if self.active_context.is_none() {
@@ -132,5 +156,71 @@ impl KubeManager {
         }
         
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_kubeconfig_nonexistent_file() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let result = manager.merge_kubeconfig_from_path("/nonexistent/path/to/kubeconfig");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Provided kubeconfig path does not exist");
+    }
+
+    #[test]
+    fn test_merge_kubeconfig_from_temp_file() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join("orbit_test_kubeconfig.yaml");
+        let sample_yaml = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test-user
+  user: {}
+"#;
+        std::fs::write(&file_path, sample_yaml).unwrap();
+
+        let result = manager.merge_kubeconfig_from_path(file_path.to_str().unwrap());
+        assert!(result.is_ok());
+
+        let clusters = manager.get_clusters();
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].name, "test-context");
+
+        let _ = std::fs::remove_file(file_path);
     }
 }
