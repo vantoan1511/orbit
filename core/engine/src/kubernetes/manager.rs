@@ -73,40 +73,39 @@ impl KubeManager {
         let mut auth_type = "None".to_string();
         let mut server_url = None;
 
-        if let Some(ref config) = self.kubeconfig {
-            if let Some(ref ctx_name) = active_context {
-                if let Some(named_ctx) = config.contexts.iter().find(|c| &c.name == ctx_name) {
-                    if let Some(ref ctx) = named_ctx.context {
-                        user_name = ctx.user.clone();
-                        cluster_name = Some(ctx.cluster.clone());
+        if let (Some(config), Some(ctx_name)) = (&self.kubeconfig, &active_context) {
+            let named_ctx = config.contexts.iter().find(|c| &c.name == ctx_name);
+            let ctx = named_ctx.and_then(|c| c.context.as_ref());
 
-                        if let Some(ref u_name) = user_name {
-                            if let Some(named_auth) = config.auth_infos.iter().find(|a| &a.name == u_name) {
-                                if let Some(ref auth) = named_auth.auth_info {
-                                    if auth.client_certificate.is_some() || auth.client_certificate_data.is_some() {
-                                        auth_type = "Certificate".to_string();
-                                    } else if auth.token.is_some() || auth.token_file.is_some() {
-                                        auth_type = "Token".to_string();
-                                    } else if auth.exec.is_some() {
-                                        auth_type = "Exec Plugin".to_string();
-                                    } else if auth.auth_provider.is_some() {
-                                        auth_type = "OIDC".to_string();
-                                    } else if auth.username.is_some() {
-                                        auth_type = "Basic Auth".to_string();
-                                    } else {
-                                        auth_type = "Configured".to_string();
-                                    }
-                                }
-                            }
-                        }
+            if let Some(ctx) = ctx {
+                user_name = ctx.user.clone();
+                cluster_name = Some(ctx.cluster.clone());
 
-                        if let Some(ref c_name) = cluster_name {
-                            if let Some(named_cl) = config.clusters.iter().find(|cl| &cl.name == c_name) {
-                                if let Some(ref cl) = named_cl.cluster {
-                                    server_url = cl.server.clone();
-                                }
-                            }
+                if let Some(u_name) = &user_name {
+                    let named_auth = config.auth_infos.iter().find(|a| &a.name == u_name);
+                    let auth = named_auth.and_then(|a| a.auth_info.as_ref());
+                    if let Some(auth) = auth {
+                        if auth.client_certificate.is_some() || auth.client_certificate_data.is_some() {
+                            auth_type = "Certificate".to_string();
+                        } else if auth.token.is_some() || auth.token_file.is_some() {
+                            auth_type = "Token".to_string();
+                        } else if auth.exec.is_some() {
+                            auth_type = "Exec Plugin".to_string();
+                        } else if auth.auth_provider.is_some() {
+                            auth_type = "OIDC".to_string();
+                        } else if auth.username.is_some() {
+                            auth_type = "Basic Auth".to_string();
+                        } else {
+                            auth_type = "Configured".to_string();
                         }
+                    }
+                }
+
+                if let Some(c_name) = &cluster_name {
+                    let named_cl = config.clusters.iter().find(|cl| &cl.name == c_name);
+                    let cl = named_cl.and_then(|cl| cl.cluster.as_ref());
+                    if let Some(cl) = cl {
+                        server_url = cl.server.clone();
                     }
                 }
             }
@@ -124,11 +123,15 @@ impl KubeManager {
         }
         for path in &self.config.custom_kubeconfig_paths {
             let norm = OrbitConfig::normalize_path(path);
-            if !kubeconfig_paths.iter().any(|p| p.eq_ignore_ascii_case(&norm)) {
+            let is_duplicate = if cfg!(windows) {
+                kubeconfig_paths.iter().any(|p| p.eq_ignore_ascii_case(&norm))
+            } else {
+                kubeconfig_paths.iter().any(|p| p == &norm)
+            };
+            if !is_duplicate {
                 kubeconfig_paths.push(norm);
             }
         }
-
 
         let k8s_version = if self.active_context.is_some() {
             if self.active_context_healthy {

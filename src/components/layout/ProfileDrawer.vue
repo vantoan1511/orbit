@@ -68,7 +68,7 @@ const getAuthTypeColorClass = (authType: string) => {
                 : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
             "
           >
-            {{ activeCluster?.status === 'healthy' ? 'Connected' : 'Offline' }}
+            {{ profileStore.profile.k8sVersion }}
           </span>
         </div>
       </div>
