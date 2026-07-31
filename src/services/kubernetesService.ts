@@ -128,6 +128,13 @@ export const kubernetesService = {
   },
 
   /**
+   * Request active user profile details
+   */
+  async getUserProfile(): Promise<void> {
+    await coreEngine.dispatch('getUserProfile')
+  },
+
+  /**
    * Switch active context/cluster
    */
   async switchCluster(clusterId: string): Promise<void> {

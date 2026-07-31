@@ -5,6 +5,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { os } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { useProfileStore } from '@/stores/profileStore'
 import { VERSION } from '@/version'
 import {
   Activity,
@@ -27,6 +28,7 @@ import { useRoute } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()
+const profileStore = useProfileStore()
 const { activeCluster, isRefreshing, handleAddCluster } = useCluster()
 
 const handleSwitchCluster = async (clusterId: string) => {
@@ -174,7 +176,13 @@ const { isDark, toggleTheme } = useTheme()
         </div>
 
         <!-- Profile -->
-        <Button rounded variant="text" icon="pi pi-user" />
+        <Button
+          rounded
+          variant="text"
+          icon="pi pi-user"
+          :aria-label="'User Profile'"
+          @click="profileStore.toggleDrawer()"
+        />
       </div>
     </div>
     <div class="flex items-center justify-center gap-2">

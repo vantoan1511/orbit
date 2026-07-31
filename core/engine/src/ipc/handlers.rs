@@ -208,6 +208,17 @@ pub fn dispatch(
                 ).await;
             });
         }
+        "getUserProfile" => {
+            tokio::spawn(async move {
+                let r_manager = manager.read().await;
+                let profile = r_manager.get_user_profile();
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::UserProfileUpdated { profile },
+                ).await;
+            });
+        }
         "switchCluster" => {
             tokio::spawn(async move {
                 let cluster_id = get_string(&data, "clusterId");
@@ -218,6 +229,7 @@ pub fn dispatch(
                         Ok(()) => {
                             let active_cluster_id = w_manager.active_context.clone();
                             let clusters = w_manager.get_clusters();
+                            let profile = w_manager.get_user_profile();
                             let client = w_manager.active_client.clone();
 
                             if let Some(cancel) = w_manager.watch_cancel.take() {
@@ -237,6 +249,12 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ClustersUpdated { clusters },
+                            ).await;
+
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::UserProfileUpdated { profile },
                             ).await;
 
                             // Spawn watchers and metrics poller for the new cluster.

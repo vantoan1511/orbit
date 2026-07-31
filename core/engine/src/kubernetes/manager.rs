@@ -1,6 +1,7 @@
 use kube::{Client, config::{Kubeconfig, KubeConfigOptions, Config}};
-use crate::kubernetes::models::ClusterInfo;
+use crate::kubernetes::models::{ClusterInfo, UserProfileInfo};
 use crate::config::OrbitConfig;
+
 
 pub struct KubeManager {
     pub kubeconfig: Option<Kubeconfig>,
@@ -63,6 +64,88 @@ impl KubeManager {
             }
         }
         clusters
+    }
+
+    pub fn get_user_profile(&self) -> UserProfileInfo {
+        let active_context = self.active_context.clone();
+        let mut user_name = None;
+        let mut cluster_name = None;
+        let mut auth_type = "None".to_string();
+        let mut server_url = None;
+
+        if let Some(ref config) = self.kubeconfig {
+            if let Some(ref ctx_name) = active_context {
+                if let Some(named_ctx) = config.contexts.iter().find(|c| &c.name == ctx_name) {
+                    if let Some(ref ctx) = named_ctx.context {
+                        user_name = ctx.user.clone();
+                        cluster_name = Some(ctx.cluster.clone());
+
+                        if let Some(ref u_name) = user_name {
+                            if let Some(named_auth) = config.auth_infos.iter().find(|a| &a.name == u_name) {
+                                if let Some(ref auth) = named_auth.auth_info {
+                                    if auth.client_certificate.is_some() || auth.client_certificate_data.is_some() {
+                                        auth_type = "Certificate".to_string();
+                                    } else if auth.token.is_some() || auth.token_file.is_some() {
+                                        auth_type = "Token".to_string();
+                                    } else if auth.exec.is_some() {
+                                        auth_type = "Exec Plugin".to_string();
+                                    } else if auth.auth_provider.is_some() {
+                                        auth_type = "OIDC".to_string();
+                                    } else if auth.username.is_some() {
+                                        auth_type = "Basic Auth".to_string();
+                                    } else {
+                                        auth_type = "Configured".to_string();
+                                    }
+                                }
+                            }
+                        }
+
+                        if let Some(ref c_name) = cluster_name {
+                            if let Some(named_cl) = config.clusters.iter().find(|cl| &cl.name == c_name) {
+                                if let Some(ref cl) = named_cl.cluster {
+                                    server_url = cl.server.clone();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut kubeconfig_paths = Vec::new();
+        if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+            let mut default_path = std::path::PathBuf::from(home);
+            default_path.push(".kube");
+            default_path.push("config");
+            if default_path.exists() {
+                kubeconfig_paths.push(default_path.to_string_lossy().to_string());
+            }
+        }
+        for path in &self.config.custom_kubeconfig_paths {
+            if !kubeconfig_paths.contains(path) {
+                kubeconfig_paths.push(path.clone());
+            }
+        }
+
+        let k8s_version = if self.active_context.is_some() {
+            if self.active_context_healthy {
+                Some("Connected".to_string())
+            } else {
+                Some("Offline".to_string())
+            }
+        } else {
+            None
+        };
+
+        UserProfileInfo {
+            active_context,
+            user_name,
+            auth_type,
+            cluster_name,
+            server_url,
+            kubeconfig_paths,
+            k8s_version,
+        }
     }
 
     pub async fn refresh_active_cluster_health(&mut self) {
@@ -223,4 +306,25 @@ users:
 
         let _ = std::fs::remove_file(file_path);
     }
+
+    #[test]
+    fn test_get_user_profile_default() {
+        let manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let profile = manager.get_user_profile();
+        assert_eq!(profile.active_context, None);
+        assert_eq!(profile.user_name, None);
+        assert_eq!(profile.auth_type, "None");
+        assert_eq!(profile.cluster_name, None);
+        assert_eq!(profile.server_url, None);
+    }
 }
+

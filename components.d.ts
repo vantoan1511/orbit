@@ -55,6 +55,7 @@ declare module 'vue' {
     PoliciesDataTable: typeof import('./src/components/policies/PoliciesDataTable.vue')['default']
     PoliciesMetricsCards: typeof import('./src/components/policies/PoliciesMetricsCards.vue')['default']
     PolicyDetailsDrawer: typeof import('./src/components/policies/PolicyDetailsDrawer.vue')['default']
+    ProfileDrawer: typeof import('./src/components/layout/ProfileDrawer.vue')['default']
     ReplicaSetsTable: typeof import('./src/components/workloads/ReplicaSetsTable.vue')['default']
     ReplicasProgressBar: typeof import('./src/components/shared/ReplicasProgressBar.vue')['default']
     ResourceActionMenu: typeof import('./src/components/shared/ResourceActionMenu.vue')['default']
