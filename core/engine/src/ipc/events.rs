@@ -61,7 +61,6 @@ pub enum OrbitEvent {
         profile: crate::kubernetes::models::UserProfileInfo,
     },
     #[serde(rename = "nodesUpdated")]
-
     NodesUpdated {
         nodes: Vec<crate::kubernetes::models::NodeInfo>,
     },
