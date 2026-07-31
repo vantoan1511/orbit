@@ -43,6 +43,19 @@ pub struct ClusterInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserProfileInfo {
+    pub active_context: Option<String>,
+    pub user_name: Option<String>,
+    pub auth_type: String,
+    pub cluster_name: Option<String>,
+    pub server_url: Option<String>,
+    pub kubeconfig_paths: Vec<String>,
+    pub k8s_version: Option<String>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Replicas {
     pub current: i32,
     pub desired: i32,

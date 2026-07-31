@@ -56,7 +56,12 @@ pub enum OrbitEvent {
     ActiveClusterChanged {
         active_cluster_id: Option<String>,
     },
+    #[serde(rename = "userProfileUpdated")]
+    UserProfileUpdated {
+        profile: crate::kubernetes::models::UserProfileInfo,
+    },
     #[serde(rename = "nodesUpdated")]
+
     NodesUpdated {
         nodes: Vec<crate::kubernetes::models::NodeInfo>,
     },

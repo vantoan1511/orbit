@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import NotificationDrawer from '@/components/layout/NotificationDrawer.vue'
+import ProfileDrawer from '@/components/layout/ProfileDrawer.vue'
 import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useNotificationStore } from '@/stores/notificationStore'
+import { useProfileStore } from '@/stores/profileStore'
 import { OrbitEvents } from '@/types/events'
+import type { UserProfileInfo } from '@/types/profile'
 import type {
   ClusterInfo,
   ConfigMapInfo,
@@ -35,11 +38,13 @@ import AppLayout from './components/layout/AppLayout.vue'
 
 const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()
+const profileStore = useProfileStore()
 const toast = useToast()
 
 const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: string }) => {
   if (payload.status === 'ready') {
     k8sStore.setEngineReady(true)
+    profileStore.fetchProfile()
   } else {
     k8sStore.setEngineReady(false)
     notificationStore.addNotification({
@@ -49,6 +54,10 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
       category: 'system'
     })
   }
+}
+
+const handleUserProfileUpdated = (payload: { profile: UserProfileInfo }) => {
+  profileStore.setProfile(payload.profile)
 }
 
 const handleNamespacesUpdated = (payload: { namespaces: NamespaceInfo[] }) => {
@@ -209,6 +218,7 @@ onMounted(() => {
   events.on(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated)
   events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
+  events.on(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
   events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
 })
@@ -236,6 +246,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
+  events.off(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
   events.off(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
 })
@@ -249,6 +260,7 @@ onUnmounted(() => {
   <UpdaterNotifications />
   <UpdaterDialog />
   <NotificationDrawer />
+  <ProfileDrawer />
 </template>
 
 <style>

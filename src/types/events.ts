@@ -19,6 +19,8 @@ import type {
   StorageClassInfo
 } from './kubernetes'
 
+import type { UserProfileInfo } from './profile'
+
 export interface ComponentVersion {
   version: string
   url: string
@@ -40,6 +42,9 @@ export interface OrbitEventMap {
   }
   pong: {
     reply: string
+  }
+  userProfileUpdated: {
+    profile: UserProfileInfo
   }
   namespacesUpdated: {
     namespaces: NamespaceInfo[]
@@ -149,6 +154,7 @@ export const OrbitEvents = {
   CronJobsUpdated: 'cronJobsUpdated',
   ClustersUpdated: 'clustersUpdated',
   ActiveClusterChanged: 'activeClusterChanged',
+  UserProfileUpdated: 'userProfileUpdated',
   NodesUpdated: 'nodesUpdated',
   ServicesUpdated: 'servicesUpdated',
   ConfigMapsUpdated: 'configMapsUpdated',
