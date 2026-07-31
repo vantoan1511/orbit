@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import WorkloadMetricsCards from '../components/workloads/WorkloadMetricsCards.vue'
 import DeploymentsTable from '../components/workloads/DeploymentsTable.vue'
 import StatefulSetsTable from '../components/workloads/StatefulSetsTable.vue'
@@ -9,6 +9,11 @@ import JobsTable from '../components/workloads/JobsTable.vue'
 import CronJobsTable from '../components/workloads/CronJobsTable.vue'
 
 const activeTab = ref('deployments')
+const visitedTabs = ref(new Set(['deployments']))
+
+watch(activeTab, (newTab) => {
+  visitedTabs.value.add(newTab)
+})
 </script>
 
 <template>
@@ -26,7 +31,7 @@ const activeTab = ref('deployments')
       <TabPanels class="pt-6">
         <!-- Deployments Tab -->
         <TabPanel value="deployments">
-          <div class="flex flex-col gap-6">
+          <div v-if="visitedTabs.has('deployments')" class="flex flex-col gap-6">
             <WorkloadMetricsCards />
             <DeploymentsTable />
           </div>
@@ -34,27 +39,27 @@ const activeTab = ref('deployments')
 
         <!-- StatefulSets Tab -->
         <TabPanel value="statefulsets">
-          <StatefulSetsTable />
+          <StatefulSetsTable v-if="visitedTabs.has('statefulsets')" />
         </TabPanel>
 
         <!-- DaemonSets Tab -->
         <TabPanel value="daemonsets">
-          <DaemonSetsTable />
+          <DaemonSetsTable v-if="visitedTabs.has('daemonsets')" />
         </TabPanel>
 
         <!-- ReplicaSets Tab -->
         <TabPanel value="replicasets">
-          <ReplicaSetsTable />
+          <ReplicaSetsTable v-if="visitedTabs.has('replicasets')" />
         </TabPanel>
 
         <!-- Jobs Tab -->
         <TabPanel value="jobs">
-          <JobsTable />
+          <JobsTable v-if="visitedTabs.has('jobs')" />
         </TabPanel>
 
         <!-- CronJobs Tab -->
         <TabPanel value="cronjobs">
-          <CronJobsTable />
+          <CronJobsTable v-if="visitedTabs.has('cronjobs')" />
         </TabPanel>
       </TabPanels>
     </Tabs>

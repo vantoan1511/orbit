@@ -60,7 +60,9 @@ const fetchCronJobs = async () => {
 }
 
 onMounted(() => {
-  fetchCronJobs()
+  if (k8sStore.cronJobs.length === 0 && !k8sStore.cronJobsLoading) {
+    fetchCronJobs()
+  }
 })
 
 watch(selectedNamespace, () => {

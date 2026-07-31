@@ -59,7 +59,9 @@ const fetchStatefulSets = async () => {
 }
 
 onMounted(() => {
-  fetchStatefulSets()
+  if (k8sStore.statefulSets.length === 0 && !k8sStore.statefulSetsLoading) {
+    fetchStatefulSets()
+  }
 })
 
 watch(selectedNamespace, () => {

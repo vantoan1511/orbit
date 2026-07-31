@@ -62,7 +62,9 @@ const fetchDeployments = async () => {
 }
 
 onMounted(() => {
-  fetchDeployments()
+  if (k8sStore.deployments.length === 0 && !k8sStore.deploymentsLoading) {
+    fetchDeployments()
+  }
 })
 
 // Refetch when namespace changes

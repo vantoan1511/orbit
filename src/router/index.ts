@@ -1,3 +1,16 @@
+import ConfigView from '@/views/ConfigView.vue'
+import DashboardView from '@/views/DashboardView.vue'
+import EditView from '@/views/EditView.vue'
+import EventsView from '@/views/EventsView.vue'
+import LogsView from '@/views/LogsView.vue'
+import NamespacesView from '@/views/NamespacesView.vue'
+import NodesView from '@/views/NodesView.vue'
+import PodsView from '@/views/PodsView.vue'
+import PoliciesView from '@/views/PoliciesView.vue'
+import ServicesView from '@/views/ServicesView.vue'
+import SettingsView from '@/views/SettingsView.vue'
+import StorageView from '@/views/StorageView.vue'
+import WorkloadsView from '@/views/WorkloadsView.vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import WelcomeView from '../views/WelcomeView.vue'
 
@@ -7,7 +20,7 @@ const router = createRouter({
     {
       path: '/',
       name: 'dashboard',
-      component: () => import('../views/DashboardView.vue')
+      component: DashboardView
     },
     {
       path: '/welcome',
@@ -17,63 +30,63 @@ const router = createRouter({
     {
       path: '/nodes',
       name: 'nodes',
-      component: () => import('../views/NodesView.vue')
+      component: NodesView
     },
     {
       path: '/workloads',
       name: 'workloads',
-      component: () => import('../views/WorkloadsView.vue')
+      component: WorkloadsView
     },
     {
       path: '/workloads/:kind/:namespace/:name/edit',
       name: 'edit-workload',
-      component: () => import('../views/EditView.vue'),
+      component: EditView,
       props: true
     },
     {
       path: '/pods',
       name: 'pods',
-      component: () => import('../views/PodsView.vue')
+      component: PodsView
     },
     {
       path: '/services',
       name: 'services',
-      component: () => import('../views/ServicesView.vue')
+      component: ServicesView
     },
     {
       path: '/config',
       name: 'configmaps-secrets',
-      component: () => import('../views/ConfigView.vue')
+      component: ConfigView
     },
     {
       path: '/storage',
       name: 'storage',
-      component: () => import('../views/StorageView.vue')
+      component: StorageView
     },
     {
       path: '/namespaces',
       name: 'namespaces',
-      component: () => import('../views/NamespacesView.vue')
+      component: NamespacesView
     },
     {
       path: '/events',
       name: 'events',
-      component: () => import('../views/EventsView.vue')
+      component: EventsView
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('../views/SettingsView.vue')
+      component: SettingsView
     },
     {
       path: '/policies',
       name: 'policies',
-      component: () => import('../views/PoliciesView.vue')
+      component: PoliciesView
     },
     {
       path: '/logs',
       name: 'logs',
-      component: () => import('../views/LogsView.vue')
+      component: LogsView
     }
   ]
 })
