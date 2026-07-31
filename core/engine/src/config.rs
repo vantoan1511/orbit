@@ -63,11 +63,27 @@ impl OrbitConfig {
         Ok(())
     }
 
+    /// Normalizes a file path string for cross-platform comparisons (canonicalizing slashes and casing).
+    pub fn normalize_path(path_str: &str) -> String {
+        if let Ok(canonical) = std::fs::canonicalize(path_str) {
+            let s = canonical.to_string_lossy().to_string();
+            let clean = if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                stripped.to_string()
+            } else {
+                s
+            };
+            clean.replace('\\', "/")
+        } else {
+            path_str.replace('\\', "/")
+        }
+    }
+
     /// Add a custom kubeconfig file path to the configuration and save it.
     /// If the path is already present, it will not be duplicated.
     pub fn add_kubeconfig_path(&mut self, path: &str) -> Result<(), String> {
-        if !self.custom_kubeconfig_paths.iter().any(|p| p == path) {
-            self.custom_kubeconfig_paths.push(path.to_string());
+        let norm_path = Self::normalize_path(path);
+        if !self.custom_kubeconfig_paths.iter().any(|p| Self::normalize_path(p).eq_ignore_ascii_case(&norm_path)) {
+            self.custom_kubeconfig_paths.push(norm_path);
             self.save()?;
         }
         Ok(())
@@ -98,12 +114,15 @@ mod tests {
     #[test]
     fn test_add_kubeconfig_path_unique_in_memory() {
         let mut config = OrbitConfig::default();
-        // Test pushing paths without invoking disk save
-        if !config.custom_kubeconfig_paths.iter().any(|p| p == "/a/b/c") {
-            config.custom_kubeconfig_paths.push("/a/b/c".to_string());
-        }
-        if !config.custom_kubeconfig_paths.iter().any(|p| p == "/a/b/c") {
-            config.custom_kubeconfig_paths.push("/a/b/c".to_string());
+        let path1 = "C:\\Users\\test\\.kube\\config";
+        let path2 = "C:/Users/test/.kube/config";
+        let norm1 = OrbitConfig::normalize_path(path1);
+        let norm2 = OrbitConfig::normalize_path(path2);
+        assert_eq!(norm1, norm2);
+
+        config.custom_kubeconfig_paths.push(norm1.clone());
+        if !config.custom_kubeconfig_paths.iter().any(|p| OrbitConfig::normalize_path(p).eq_ignore_ascii_case(&norm2)) {
+            config.custom_kubeconfig_paths.push(norm2);
         }
         assert_eq!(config.custom_kubeconfig_paths.len(), 1);
     }

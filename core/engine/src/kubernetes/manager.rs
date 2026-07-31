@@ -118,14 +118,17 @@ impl KubeManager {
             default_path.push(".kube");
             default_path.push("config");
             if default_path.exists() {
-                kubeconfig_paths.push(default_path.to_string_lossy().to_string());
+                let norm = OrbitConfig::normalize_path(&default_path.to_string_lossy());
+                kubeconfig_paths.push(norm);
             }
         }
         for path in &self.config.custom_kubeconfig_paths {
-            if !kubeconfig_paths.contains(path) {
-                kubeconfig_paths.push(path.clone());
+            let norm = OrbitConfig::normalize_path(path);
+            if !kubeconfig_paths.iter().any(|p| p.eq_ignore_ascii_case(&norm)) {
+                kubeconfig_paths.push(norm);
             }
         }
+
 
         let k8s_version = if self.active_context.is_some() {
             if self.active_context_healthy {
