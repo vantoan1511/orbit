@@ -15,7 +15,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="space-y-4">
-    <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
+    <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1">
       Active Pods ({{ pods.length }})
     </div>
     <div class="space-y-2.5">
@@ -32,12 +32,12 @@ const emit = defineEmits<{
             ></span>
             <div class="min-w-0">
               <span
-                class="text-xs font-semibold text-(--text-primary) font-mono truncate block"
+                class="text-xs font-semibold text-primary font-mono truncate block"
                 :title="pod.name"
               >
                 {{ pod.name }}
               </span>
-              <div class="flex items-center gap-3 text-[10px] text-(--text-muted) font-mono mt-0.5">
+              <div class="flex items-center gap-3 text-[10px] text-muted-color font-mono mt-0.5">
                 <span>IP: {{ pod.ip || 'N/A' }}</span>
                 <span>Node: {{ pod.node || 'N/A' }}</span>
                 <span v-if="pod.restarts !== undefined">Restarts: {{ pod.restarts }}</span>
@@ -60,9 +60,9 @@ const emit = defineEmits<{
       </template>
       <div
         v-else
-        class="text-center py-10 text-xs text-(--text-muted) flex flex-col items-center gap-2"
+        class="text-center py-10 text-xs text-muted-color flex flex-col items-center gap-2"
       >
-        <Info class="w-8 h-8 text-(--text-muted)/50" />
+        <Info class="w-8 h-8 text-muted-color/50" />
         <span>No active pods found for this workload.</span>
       </div>
     </div>

@@ -89,15 +89,15 @@ const handleDeleteCachedContexts = () => {
       class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col gap-6"
     >
       <div class="border-b border-(--border) pb-4">
-        <h3 class="text-base font-semibold text-(--text-primary)">General Settings</h3>
-        <p class="text-xs text-(--text-muted) mt-1">
+        <h3 class="text-base font-semibold text-primary">General Settings</h3>
+        <p class="text-xs text-muted-color mt-1">
           Configure startup, updates, and core application behaviors.
         </p>
       </div>
 
       <!-- Startup Section -->
       <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-(--text-primary)">Startup</h4>
+        <h4 class="text-sm font-semibold text-primary">Startup</h4>
         <div class="flex flex-col gap-3">
           <div class="flex items-start gap-3">
             <Checkbox
@@ -113,7 +113,7 @@ const handleDeleteCachedContexts = () => {
               >
                 Launch Orbit on system startup
               </label>
-              <span class="text-[11px] text-(--text-muted)"
+              <span class="text-[11px] text-muted-color"
                 >Automatically start the application when you log in.</span
               >
             </div>
@@ -133,7 +133,7 @@ const handleDeleteCachedContexts = () => {
               >
                 Start minimized to system tray
               </label>
-              <span class="text-[11px] text-(--text-muted)"
+              <span class="text-[11px] text-muted-color"
                 >Keep Orbit running in the background when launched.</span
               >
             </div>
@@ -145,14 +145,14 @@ const handleDeleteCachedContexts = () => {
 
       <!-- Updates Section -->
       <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-(--text-primary)">Updates</h4>
+        <h4 class="text-sm font-semibold text-primary">Updates</h4>
         <div class="flex flex-col gap-4">
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col">
               <span class="text-xs font-semibold text-(--text-secondary)"
                 >Automatically check for updates</span
               >
-              <span class="text-[11px] text-(--text-muted)"
+              <span class="text-[11px] text-muted-color"
                 >Get notified when a new version of Orbit is available.</span
               >
             </div>
@@ -166,7 +166,7 @@ const handleDeleteCachedContexts = () => {
               :options="channels"
               class="text-xs w-full bg-(--bg-hover)/30 border-(--border)"
             />
-            <span class="text-[11px] text-(--text-muted)"
+            <span class="text-[11px] text-muted-color"
               >Choose Beta or Nightly to test experimental features early.</span
             >
           </div>
@@ -177,18 +177,16 @@ const handleDeleteCachedContexts = () => {
 
       <!-- Kubeconfig Section -->
       <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-(--text-primary)">Kubeconfig</h4>
+        <h4 class="text-sm font-semibold text-primary">Kubeconfig</h4>
         <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-2">
             <label class="text-xs font-semibold text-(--text-secondary)">Default Path</label>
             <div class="flex gap-2">
               <div class="relative flex-1">
-                <Folder
-                  class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)"
-                />
+                <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
                 <InputText
                   v-model="kubeconfigPath"
-                  class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                  class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
                 />
               </div>
               <Button
@@ -199,7 +197,7 @@ const handleDeleteCachedContexts = () => {
                 Reload
               </Button>
             </div>
-            <span class="text-[11px] text-(--text-muted)"
+            <span class="text-[11px] text-muted-color"
               >Orbit will monitor this path for Kubernetes config changes.</span
             >
           </div>
@@ -210,13 +208,13 @@ const handleDeleteCachedContexts = () => {
 
       <!-- Telemetry Section -->
       <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-(--text-primary)">Telemetry</h4>
+        <h4 class="text-sm font-semibold text-primary">Telemetry</h4>
         <div class="flex items-center justify-between gap-4">
           <div class="flex flex-col">
             <span class="text-xs font-semibold text-(--text-secondary)"
               >Share anonymous usage statistics</span
             >
-            <span class="text-[11px] text-(--text-muted)"
+            <span class="text-[11px] text-muted-color"
               >Help us improve Orbit by sending telemetry data. No secrets or PII are
               collected.</span
             >
@@ -233,7 +231,7 @@ const handleDeleteCachedContexts = () => {
           <AlertTriangle class="w-4 h-4" />
           <h3 class="text-base font-semibold">Danger Zone</h3>
         </div>
-        <p class="text-xs text-(--text-muted) mt-1">
+        <p class="text-xs text-muted-color mt-1">
           Actions here can result in data loss or configuration resetting.
         </p>
       </div>

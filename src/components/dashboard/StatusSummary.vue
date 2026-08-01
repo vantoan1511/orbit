@@ -12,34 +12,50 @@ const readyNodesCount = computed(() => store.nodes.filter((n) => n.status === 'R
 const namespacesCount = computed(() => store.namespaceList.length)
 const kubernetesVersion = computed(() => store.nodes[0]?.version || 'Unknown')
 
+type ClusterStatusKey = 'unknown' | 'degraded' | 'healthy'
+
+const statusRecord: Record<
+  ClusterStatusKey,
+  { text: string; icon: typeof HelpCircle; iconClass: string; bgClass: string }
+> = {
+  unknown: {
+    text: 'Unknown',
+    icon: HelpCircle,
+    iconClass: 'text-slate-400',
+    bgClass: 'bg-slate-500/10'
+  },
+  degraded: {
+    text: 'Degraded',
+    icon: AlertTriangle,
+    iconClass: 'text-amber-500',
+    bgClass: 'bg-amber-500/10'
+  },
+  healthy: {
+    text: 'Healthy',
+    icon: CheckCircle2,
+    iconClass: 'text-emerald-500',
+    bgClass: 'bg-emerald-500/10'
+  }
+}
+
 const clusterStatusInfo = computed(() => {
   const total = totalNodesCount.value
   const ready = readyNodesCount.value
 
-  if (total === 0) {
-    return {
-      text: 'Unknown',
-      subtext: 'No nodes found',
-      icon: HelpCircle,
-      iconClass: 'text-slate-400',
-      bgClass: 'bg-slate-500/10'
-    }
-  } else if (ready < total) {
-    return {
-      text: 'Degraded',
-      subtext: `${total - ready} of ${total} nodes not ready`,
-      icon: AlertTriangle,
-      iconClass: 'text-amber-500',
-      bgClass: 'bg-amber-500/10'
-    }
-  } else {
-    return {
-      text: 'Healthy',
-      subtext: 'All systems normal',
-      icon: CheckCircle2,
-      iconClass: 'text-emerald-500',
-      bgClass: 'bg-emerald-500/10'
-    }
+  const statusKey: ClusterStatusKey =
+    total === 0 ? 'unknown' : ready < total ? 'degraded' : 'healthy'
+
+  const info = statusRecord[statusKey]
+  const subtext =
+    statusKey === 'unknown'
+      ? 'No nodes found'
+      : statusKey === 'degraded'
+        ? `${total - ready} of ${total} nodes not ready`
+        : 'All systems normal'
+
+  return {
+    ...info,
+    subtext
   }
 })
 
@@ -59,7 +75,7 @@ const cards = computed(() => [
     icon: KubernetesIcon,
     iconBgClass: 'bg-sky-500/10',
     iconClass: 'text-sky-500',
-    valueClass: 'text-(--text-primary)'
+    valueClass: 'text-primary'
   },
   {
     label: 'Nodes',
@@ -69,7 +85,7 @@ const cards = computed(() => [
     icon: Server,
     iconBgClass: 'bg-violet-500/10',
     iconClass: 'text-violet-400',
-    valueClass: 'text-(--text-primary)'
+    valueClass: 'text-primary'
   },
   {
     label: 'Namespaces',
@@ -78,7 +94,7 @@ const cards = computed(() => [
     icon: LayoutGrid,
     iconBgClass: 'bg-amber-500/10',
     iconClass: 'text-amber-400',
-    valueClass: 'text-(--text-primary)'
+    valueClass: 'text-primary'
   }
 ])
 </script>

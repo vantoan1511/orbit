@@ -57,7 +57,7 @@ const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
-  <aside class="w-64 flex flex-col h-screen text-(--text-primary) select-none">
+  <aside class="w-64 flex flex-col h-screen text-primary select-none">
     <!-- Brand Header -->
     <div class="h-16 px-6 flex items-center gap-3">
       <!-- Orbit Icon Logo -->

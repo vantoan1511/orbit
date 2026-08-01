@@ -112,12 +112,12 @@ const isIndeterminate = computed(() => {
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64" v-if="!hideSearch">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
           <InputText
             :model-value="searchQuery"
             @update:model-value="onSearchUpdate"
             :placeholder="searchPlaceholder"
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
 
@@ -160,7 +160,7 @@ const isIndeterminate = computed(() => {
             <Settings2 class="w-4 h-4 text-(--text-secondary)" />
           </Button>
           <Popover ref="configPopover">
-            <div class="flex flex-col gap-2 p-3 min-w-48 bg-(--bg-card) text-(--text-primary)">
+            <div class="flex flex-col gap-2 p-3 min-w-48 bg-(--bg-card) text-primary">
               <div
                 class="font-semibold text-xs border-b border-(--border) pb-1.5 text-(--text-secondary)"
               >
@@ -180,7 +180,7 @@ const isIndeterminate = computed(() => {
                   />
                   <label
                     for="col-all"
-                    class="text-xs cursor-pointer select-none font-semibold text-(--text-primary) w-full"
+                    class="text-xs cursor-pointer select-none font-semibold text-primary w-full"
                   >
                     All
                   </label>
@@ -232,8 +232,8 @@ const isIndeterminate = computed(() => {
     >
       <template #empty>
         <slot name="empty">
-          <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
-            <Info class="w-8 h-8 text-(--text-muted)/50" />
+          <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+            <Info class="w-8 h-8 text-muted-color/50" />
             <span>{{ emptyMessage }}</span>
           </div>
         </slot>

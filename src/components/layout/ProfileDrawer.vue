@@ -43,7 +43,7 @@ const getAuthTypeColorClass = (authType: string) => {
     case 'OIDC':
       return 'text-purple-400 bg-purple-500/10 border-purple-500/20'
     default:
-      return 'text-(--text-muted) bg-(--bg-hover) border-(--border)'
+      return 'text-muted-color bg-(--bg-hover) border-(--border)'
   }
 }
 </script>
@@ -58,7 +58,7 @@ const getAuthTypeColorClass = (authType: string) => {
     <template #header>
       <div class="flex items-center justify-between w-full pr-2">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-lg text-(--text-primary) font-ui">User Profile</span>
+          <span class="font-bold text-lg text-primary font-ui">User Profile</span>
           <span
             v-if="profileStore.profile?.k8sVersion"
             class="text-xs font-semibold px-2 py-0.5 rounded-full border"
@@ -82,10 +82,10 @@ const getAuthTypeColorClass = (authType: string) => {
             <UserCheck :size="20" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-(--text-muted) uppercase tracking-wider">
+            <div class="text-xs font-medium text-muted-color uppercase tracking-wider">
               Kubernetes Identity
             </div>
-            <div class="text-base font-bold text-(--text-primary) truncate">
+            <div class="text-base font-bold text-primary truncate">
               {{ profileStore.profile?.userName || 'Default Identity' }}
             </div>
           </div>
@@ -101,29 +101,29 @@ const getAuthTypeColorClass = (authType: string) => {
         <div class="space-y-2.5 pt-2 border-t border-(--border)/60 text-xs">
           <!-- Active Context -->
           <div class="flex items-center justify-between">
-            <span class="text-(--text-muted) flex items-center gap-1.5">
+            <span class="text-muted-color flex items-center gap-1.5">
               <ShieldCheck :size="14" />
               Active Context
             </span>
-            <span class="font-mono font-medium text-(--text-primary) truncate max-w-48">
+            <span class="font-mono font-medium text-primary truncate max-w-48">
               {{ profileStore.profile?.activeContext || 'None' }}
             </span>
           </div>
 
           <!-- Active Cluster -->
           <div class="flex items-center justify-between">
-            <span class="text-(--text-muted) flex items-center gap-1.5">
+            <span class="text-muted-color flex items-center gap-1.5">
               <Server :size="14" />
               Cluster Name
             </span>
-            <span class="font-mono font-medium text-(--text-primary) truncate max-w-48">
+            <span class="font-mono font-medium text-primary truncate max-w-48">
               {{ profileStore.profile?.clusterName || 'None' }}
             </span>
           </div>
 
           <!-- Server Endpoint -->
           <div v-if="profileStore.profile?.serverUrl" class="space-y-1">
-            <span class="text-(--text-muted) flex items-center gap-1.5">
+            <span class="text-muted-color flex items-center gap-1.5">
               <ExternalLink :size="14" />
               API Server Endpoint
             </span>
@@ -138,7 +138,7 @@ const getAuthTypeColorClass = (authType: string) => {
 
       <!-- Kubeconfig Sources -->
       <div class="space-y-2">
-        <div class="text-xs font-bold text-(--text-muted) uppercase tracking-wider px-1">
+        <div class="text-xs font-bold text-muted-color uppercase tracking-wider px-1">
           Loaded Kubeconfig Paths
         </div>
         <div
@@ -152,11 +152,11 @@ const getAuthTypeColorClass = (authType: string) => {
             :key="path"
             class="flex items-center gap-2 p-2.5 rounded-lg bg-(--bg-sidebar)/40 border border-(--border) text-xs font-mono text-(--text-secondary) truncate"
           >
-            <FileText :size="14" class="shrink-0 text-(--text-muted)" />
+            <FileText :size="14" class="shrink-0 text-muted-color" />
             <span class="truncate">{{ path }}</span>
           </div>
         </div>
-        <div v-else class="text-xs text-(--text-muted) px-2 py-1">
+        <div v-else class="text-xs text-muted-color px-2 py-1">
           No custom kubeconfig paths loaded.
         </div>
       </div>
@@ -164,10 +164,10 @@ const getAuthTypeColorClass = (authType: string) => {
       <!-- Cluster Context Switcher -->
       <div class="space-y-3">
         <div class="flex items-center justify-between px-1">
-          <span class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">
+          <span class="text-xs font-bold text-muted-color uppercase tracking-wider">
             Available Clusters
           </span>
-          <span class="text-xs text-(--text-muted) font-mono">
+          <span class="text-xs text-muted-color font-mono">
             {{ k8sStore.clusters.length }} total
           </span>
         </div>

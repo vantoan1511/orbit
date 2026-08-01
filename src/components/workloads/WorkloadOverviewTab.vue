@@ -42,86 +42,86 @@ defineProps<{
 
     <!-- Job Status -->
     <div v-if="completions !== undefined">
-      <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+      <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         Job Status
       </h3>
       <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3">
         <div class="flex justify-between">
           <span class="text-(--text-secondary) font-medium">Completions</span>
-          <span class="font-mono font-bold text-(--text-primary)">{{ completions }}</span>
+          <span class="font-mono font-bold text-primary">{{ completions }}</span>
         </div>
         <div v-if="duration" class="flex justify-between">
           <span class="text-(--text-secondary) font-medium">Duration</span>
-          <span class="font-mono text-(--text-primary)">{{ duration }}</span>
+          <span class="font-mono text-primary">{{ duration }}</span>
         </div>
       </div>
     </div>
 
     <!-- CronJob Schedule -->
     <div v-if="schedule">
-      <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+      <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         CronJob Schedule
       </h3>
       <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3">
         <div class="flex justify-between">
           <span class="text-(--text-secondary) font-medium">Schedule</span>
-          <span class="font-mono font-bold text-(--text-primary)">{{ schedule }}</span>
+          <span class="font-mono font-bold text-primary">{{ schedule }}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-(--text-secondary) font-medium">Suspend</span>
-          <span class="font-mono text-(--text-primary)">{{ suspend ? 'True' : 'False' }}</span>
+          <span class="font-mono text-primary">{{ suspend ? 'True' : 'False' }}</span>
         </div>
         <div class="flex justify-between">
           <span class="text-(--text-secondary) font-medium">Active Jobs</span>
-          <span class="font-mono text-(--text-primary)">{{ active ?? 0 }}</span>
+          <span class="font-mono text-primary">{{ active ?? 0 }}</span>
         </div>
         <div v-if="lastSchedule" class="flex justify-between">
           <span class="text-(--text-secondary) font-medium">Last Schedule</span>
-          <span class="font-mono text-(--text-primary)">{{ lastSchedule }}</span>
+          <span class="font-mono text-primary">{{ lastSchedule }}</span>
         </div>
       </div>
     </div>
 
     <!-- Configuration Metadata Grid -->
     <div>
-      <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+      <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         Configuration
       </h3>
       <div
         class="grid grid-cols-2 gap-4 bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 text-xs"
       >
         <div>
-          <span class="text-(--text-muted) block mb-0.5">Kind</span>
+          <span class="text-muted-color block mb-0.5">Kind</span>
           <span class="font-semibold text-(--text-secondary)">{{ workloadKind }}</span>
         </div>
         <div>
-          <span class="text-(--text-muted) block mb-0.5">Namespace</span>
+          <span class="text-muted-color block mb-0.5">Namespace</span>
           <span class="font-semibold text-(--text-secondary)">{{ workloadNamespace }}</span>
         </div>
         <div>
-          <span class="text-(--text-muted) block mb-0.5">Age</span>
+          <span class="text-muted-color block mb-0.5">Age</span>
           <span class="font-semibold text-(--text-secondary)">{{ workloadAge }}</span>
         </div>
         <div>
-          <span class="text-(--text-muted) block mb-0.5">Status</span>
+          <span class="text-muted-color block mb-0.5">Status</span>
           <span class="font-semibold text-(--text-secondary)">{{ workloadStatus }}</span>
         </div>
         <div v-if="strategy">
-          <span class="text-(--text-muted) block mb-0.5">Strategy</span>
+          <span class="text-muted-color block mb-0.5">Strategy</span>
           <span class="font-semibold text-(--text-secondary) truncate block" :title="strategy">
             {{ strategy }}
           </span>
         </div>
         <div v-if="minReadySeconds !== undefined">
-          <span class="text-(--text-muted) block mb-0.5">Min Ready Seconds</span>
+          <span class="text-muted-color block mb-0.5">Min Ready Seconds</span>
           <span class="font-mono text-(--text-secondary)">{{ minReadySeconds }}s</span>
         </div>
         <div v-if="revisionHistory !== undefined">
-          <span class="text-(--text-muted) block mb-0.5">Revision History Limit</span>
+          <span class="text-muted-color block mb-0.5">Revision History Limit</span>
           <span class="font-mono text-(--text-secondary)">{{ revisionHistory }}</span>
         </div>
         <div class="col-span-2" v-if="workloadImages && workloadImages.length">
-          <span class="text-(--text-muted) block mb-0.5">Container Images</span>
+          <span class="text-muted-color block mb-0.5">Container Images</span>
           <div class="flex flex-wrap gap-1.5 mt-1">
             <span
               v-for="img in workloadImages"

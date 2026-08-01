@@ -122,7 +122,7 @@ watch(scCapacityData, updateChart, { immediate: true })
     <!-- Storage Classes Mini List -->
     <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm">
       <div
-        class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider mb-4 flex items-center gap-2"
+        class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
         <Layers class="w-4 h-4 text-amber-400" />
         Storage Classes ({{ storageClasses.length }})
@@ -135,10 +135,10 @@ watch(scCapacityData, updateChart, { immediate: true })
           class="flex items-center justify-between p-2.5 rounded-lg border border-(--border) bg-(--bg-hover)/10 hover:bg-(--bg-hover)/30 transition-colors"
         >
           <div class="min-w-0">
-            <div class="text-xs font-semibold text-(--text-primary) font-mono truncate">
+            <div class="text-xs font-semibold text-primary font-mono truncate">
               {{ sc.name }}
             </div>
-            <div class="text-[10px] text-(--text-muted) truncate mt-0.5">{{ sc.provisioner }}</div>
+            <div class="text-[10px] text-muted-color truncate mt-0.5">{{ sc.provisioner }}</div>
           </div>
           <div class="flex flex-col items-end shrink-0">
             <span class="text-[10px] font-mono text-(--text-secondary)">{{
@@ -162,7 +162,7 @@ watch(scCapacityData, updateChart, { immediate: true })
     <!-- Capacity by StorageClass Donut -->
     <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm">
       <div
-        class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider mb-4 flex items-center gap-2"
+        class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
         <PieChart class="w-4 h-4 text-violet-400" />
         Capacity by SC (GiB)
@@ -180,8 +180,8 @@ watch(scCapacityData, updateChart, { immediate: true })
 
         <!-- Total Label overlay -->
         <div class="absolute flex flex-col items-center justify-center pointer-events-none">
-          <span class="text-2xl font-bold text-(--text-primary)">2,620</span>
-          <span class="text-[9px] uppercase font-bold text-(--text-muted) tracking-wider"
+          <span class="text-2xl font-bold text-primary">2,620</span>
+          <span class="text-[9px] uppercase font-bold text-muted-color tracking-wider"
             >Total GiB</span
           >
         </div>
@@ -191,7 +191,7 @@ watch(scCapacityData, updateChart, { immediate: true })
     <!-- Volume Status Grid -->
     <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm">
       <div
-        class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider mb-4 flex items-center gap-2"
+        class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
         <Activity class="w-4 h-4 text-emerald-400" />
         Volume Status
@@ -199,25 +199,25 @@ watch(scCapacityData, updateChart, { immediate: true })
 
       <div class="grid grid-cols-2 gap-3 text-center">
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
-          <div class="text-[10px] text-(--text-muted) font-semibold uppercase tracking-wider">
+          <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Bound
           </div>
           <div class="text-lg font-bold text-emerald-500 mt-0.5">{{ statusCounts.Bound }}</div>
         </div>
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
-          <div class="text-[10px] text-(--text-muted) font-semibold uppercase tracking-wider">
+          <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Available
           </div>
           <div class="text-lg font-bold text-blue-500 mt-0.5">{{ statusCounts.Available }}</div>
         </div>
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
-          <div class="text-[10px] text-(--text-muted) font-semibold uppercase tracking-wider">
+          <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Released
           </div>
           <div class="text-lg font-bold text-amber-500 mt-0.5">{{ statusCounts.Released }}</div>
         </div>
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
-          <div class="text-[10px] text-(--text-muted) font-semibold uppercase tracking-wider">
+          <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Failed
           </div>
           <div class="text-lg font-bold text-rose-500 mt-0.5">{{ statusCounts.Failed }}</div>

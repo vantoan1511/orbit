@@ -75,7 +75,7 @@ const updateValue = (index: number, newValue: string) => {
       />
     </div>
 
-    <div v-if="modelValue.length === 0" class="text-xs text-(--text-muted) italic py-1">
+    <div v-if="modelValue.length === 0" class="text-xs text-muted-color italic py-1">
       No items defined.
     </div>
 
@@ -84,7 +84,7 @@ const updateValue = (index: number, newValue: string) => {
         :model-value="item.key"
         :placeholder="keyPlaceholder"
         :disabled="disabled || readonlyKeys"
-        class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+        class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
         @update:model-value="(val) => updateKey(idx, val ?? '')"
       />
       <span class="text-(--text-secondary)">=</span>
@@ -92,7 +92,7 @@ const updateValue = (index: number, newValue: string) => {
         :model-value="item.value"
         :placeholder="valuePlaceholder"
         :disabled="disabled"
-        class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+        class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
         @update:model-value="(val) => updateValue(idx, val ?? '')"
       />
       <Button

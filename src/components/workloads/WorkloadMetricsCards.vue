@@ -113,10 +113,10 @@ const failedChartData = computed(() => {
           <Boxes class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Total Deployments
           </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
+          <div class="text-2xl font-bold mt-1 text-primary">
             {{ totals.total }}
           </div>
         </div>
@@ -135,19 +135,17 @@ const failedChartData = computed(() => {
           <Server class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Replicas
           </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
+          <div class="text-2xl font-bold mt-1 text-primary">
             {{ totals.currentReplicas }}
-            <span class="text-sm font-normal text-(--text-muted)"
-              >/ {{ totals.desiredReplicas }}</span
-            >
+            <span class="text-sm font-normal text-muted-color">/ {{ totals.desiredReplicas }}</span>
           </div>
         </div>
       </div>
       <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
+        <div class="flex justify-between text-[10px] text-muted-color mb-1 font-mono">
           <span
             >{{ Math.round((totals.currentReplicas / totals.desiredReplicas) * 100) }}%
             desired</span
@@ -173,19 +171,17 @@ const failedChartData = computed(() => {
           <TrendingUp class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Up-To-Date
           </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
+          <div class="text-2xl font-bold mt-1 text-primary">
             {{ totals.upToDateReplicas }}
-            <span class="text-sm font-normal text-(--text-muted)"
-              >/ {{ totals.currentReplicas }}</span
-            >
+            <span class="text-sm font-normal text-muted-color">/ {{ totals.currentReplicas }}</span>
           </div>
         </div>
       </div>
       <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
+        <div class="flex justify-between text-[10px] text-muted-color mb-1 font-mono">
           <span
             >{{ Math.round((totals.upToDateReplicas / totals.currentReplicas) * 100) }}%
             synchronized</span
@@ -211,7 +207,7 @@ const failedChartData = computed(() => {
           <CheckCircle2 class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Available
           </div>
           <div class="text-2xl font-bold mt-1 text-emerald-500">
@@ -233,7 +229,7 @@ const failedChartData = computed(() => {
           >
         </div>
       </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
+      <div class="mt-4 text-[10px] text-muted-color font-medium">
         {{ totals.running }} of {{ totals.total }} deployments healthy
       </div>
     </div>
@@ -249,7 +245,7 @@ const failedChartData = computed(() => {
           <TrendingUp class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Updating
           </div>
           <div class="text-2xl font-bold mt-1 text-amber-500">
@@ -271,7 +267,7 @@ const failedChartData = computed(() => {
           >
         </div>
       </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
+      <div class="mt-4 text-[10px] text-muted-color font-medium">
         {{ totals.progressing }} deployment rolling out
       </div>
     </div>
@@ -287,9 +283,7 @@ const failedChartData = computed(() => {
           <AlertTriangle class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Failed
-          </div>
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">Failed</div>
           <div class="text-2xl font-bold mt-1 text-rose-500">
             {{ totals.failed }}
           </div>

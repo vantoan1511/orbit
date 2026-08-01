@@ -10,7 +10,7 @@ const activeTab = ref('general')
   <div class="flex flex-col h-full">
     <!-- Header/Title -->
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold tracking-tight text-(--text-primary)">Settings</h2>
+      <h2 class="text-xl font-bold tracking-tight text-primary">Settings</h2>
     </div>
 
     <!-- Tabs Navigation -->
@@ -34,7 +34,7 @@ const activeTab = ref('general')
         <!-- Placeholder Tabs -->
         <TabPanel value="clusters">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Clusters settings coming soon.
           </div>
@@ -42,7 +42,7 @@ const activeTab = ref('general')
 
         <TabPanel value="preferences">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Preferences coming soon.
           </div>
@@ -50,7 +50,7 @@ const activeTab = ref('general')
 
         <TabPanel value="appearance">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Appearance settings coming soon.
           </div>
@@ -58,7 +58,7 @@ const activeTab = ref('general')
 
         <TabPanel value="notifications">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Notifications settings coming soon.
           </div>
@@ -66,7 +66,7 @@ const activeTab = ref('general')
 
         <TabPanel value="proxy">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Proxy settings coming soon.
           </div>

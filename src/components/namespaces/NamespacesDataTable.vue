@@ -199,11 +199,11 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
           <InputText
             v-model="searchQuery"
             placeholder="Search namespaces..."
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
 
@@ -265,14 +265,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       @row-click="onRowClick"
     >
       <template #empty>
-        <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
-          <Info class="w-8 h-8 text-(--text-muted)/50" />
+        <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+          <Info class="w-8 h-8 text-muted-color/50" />
           <span>No namespaces found matching the filter criteria.</span>
         </div>
       </template>
 
       <!-- Name Column -->
-      <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+      <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
         <template #body="{ data }">
           <div class="flex items-center gap-2">
             <span class="font-semibold hover:text-violet-400 transition-colors">{{
@@ -307,7 +307,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Column field="pods" header="Pods" sortable class="p-3">
         <template #body="{ data }">
           <div class="flex items-center gap-3">
-            <span class="font-mono text-(--text-primary) min-w-6">{{ data.pods }}</span>
+            <span class="font-mono text-primary min-w-6">{{ data.pods }}</span>
             <div class="w-16 h-6 shrink-0" v-if="sparklineOptions">
               <Chart
                 type="line"
@@ -349,7 +349,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       </Column>
 
       <!-- Age Column -->
-      <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"> </Column>
+      <Column field="age" header="Age" sortable class="p-3 text-muted-color font-mono"> </Column>
 
       <!-- Labels Column -->
       <Column field="labels" header="Labels" class="p-3">
@@ -385,7 +385,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             title="Actions"
             @click="toggleActionMenu($event, data)"
           >
-            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+            <MoreVertical class="w-4 h-4 text-muted-color" />
           </Button>
         </template>
       </Column>

@@ -12,10 +12,8 @@ const nodes = computed(() => k8sStore.nodes)
     class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm transition-all duration-200"
   >
     <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
-      <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider">
-        Nodes List
-      </div>
-      <div class="text-xs text-(--text-muted) font-medium">
+      <div class="text-sm font-semibold text-primary uppercase tracking-wider">Nodes List</div>
+      <div class="text-xs text-muted-color font-medium">
         Showing all {{ nodes.length }} nodes in cluster
       </div>
     </div>
@@ -33,10 +31,10 @@ const nodes = computed(() => k8sStore.nodes)
       currentPageReportTemplate="Showing {first} to {last} of {totalRecords} nodes"
     >
       <template #empty>
-        <div class="text-center py-8 text-(--text-muted)">No nodes found in cluster.</div>
+        <div class="text-center py-8 text-muted-color">No nodes found in cluster.</div>
       </template>
       <!-- Name Column -->
-      <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+      <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
         <template #body="{ data }">
           <span class="font-semibold">{{ data.name }}</span>
         </template>
@@ -69,7 +67,7 @@ const nodes = computed(() => k8sStore.nodes)
       </Column>
 
       <!-- Version Column -->
-      <Column field="version" header="Version" class="p-3 font-mono text-(--text-muted)"></Column>
+      <Column field="version" header="Version" class="p-3 font-mono text-muted-color"></Column>
 
       <!-- CPU Column -->
       <Column field="cpuPct" header="CPU" sortable class="p-3 min-w-35">
@@ -77,7 +75,7 @@ const nodes = computed(() => k8sStore.nodes)
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
               <span>{{ Number(data.cpuPct.toFixed(1)) }}%</span>
-              <span class="text-(--text-muted) text-[10px]"
+              <span class="text-muted-color text-[10px]"
                 >{{ data.cpuUsed }} / {{ data.cpuTotal }}C</span
               >
             </div>
@@ -97,7 +95,7 @@ const nodes = computed(() => k8sStore.nodes)
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
               <span>{{ Number(data.memPct.toFixed(1)) }}%</span>
-              <span class="text-(--text-muted) text-[10px]"
+              <span class="text-muted-color text-[10px]"
                 >{{ data.memUsed }} / {{ data.memTotal }}G</span
               >
             </div>
@@ -117,7 +115,7 @@ const nodes = computed(() => k8sStore.nodes)
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-(--text-secondary)">
               <span>{{ Math.round((data.podsCount / data.podsLimit) * 100) }}%</span>
-              <span class="text-(--text-muted) text-[10px]"
+              <span class="text-muted-color text-[10px]"
                 >{{ data.podsCount }} / {{ data.podsLimit }}</span
               >
             </div>

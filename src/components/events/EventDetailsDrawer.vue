@@ -83,12 +83,12 @@ const getTypeBadgeClass = (type: string) => {
                   : 'bg-red-500'
             "
           ></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
+          <span class="text-xs font-bold uppercase tracking-wider text-muted-color">
             {{ props.event.type }}
           </span>
         </div>
         <div
-          class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
+          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
           ns/{{ props.event.namespace }}
         </div>
@@ -105,12 +105,12 @@ const getTypeBadgeClass = (type: string) => {
       <!-- Title/Message Section -->
       <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
         <h2
-          class="text-sm font-semibold text-(--text-primary) font-ui mb-2 break-words"
+          class="text-sm font-semibold text-primary font-ui mb-2 break-words"
           :title="props.event.message"
         >
           {{ props.event.message }}
         </h2>
-        <div class="text-xs text-(--text-muted) flex items-center gap-2">
+        <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
           <span>Last Seen: {{ props.event.lastSeen }}</span>
         </div>
@@ -141,7 +141,7 @@ const getTypeBadgeClass = (type: string) => {
             <TabPanel value="overview" class="space-y-6">
               <!-- General Info Grid -->
               <div class="space-y-4">
-                <h3 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">
+                <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
                   Event Properties
                 </h3>
                 <div
@@ -149,50 +149,46 @@ const getTypeBadgeClass = (type: string) => {
                 >
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Namespace</span>
-                    <span class="col-span-2 font-mono text-(--text-primary)">{{
+                    <span class="col-span-2 font-mono text-primary">{{
                       props.event.namespace
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Involved Object</span>
-                    <span class="col-span-2 text-(--text-primary)">
+                    <span class="col-span-2 text-primary">
                       <span class="font-semibold text-violet-400">{{ props.event.objectKind }}</span
                       >/{{ props.event.objectName }}
                     </span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Reason</span>
-                    <span class="col-span-2 text-(--text-primary) font-mono">{{
-                      props.event.reason
-                    }}</span>
+                    <span class="col-span-2 text-primary font-mono">{{ props.event.reason }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Source Component</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.event.source }}</span>
+                    <span class="col-span-2 text-primary">{{ props.event.source }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">First Timestamp</span>
-                    <span class="col-span-2 text-(--text-primary)">{{
-                      props.event.firstSeen
-                    }}</span>
+                    <span class="col-span-2 text-primary">{{ props.event.firstSeen }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Last Timestamp</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.event.lastSeen }}</span>
+                    <span class="col-span-2 text-primary">{{ props.event.lastSeen }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Occurrence Count</span>
-                    <span class="col-span-2 text-(--text-primary) font-mono font-bold">{{
+                    <span class="col-span-2 text-primary font-mono font-bold">{{
                       props.event.count
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">Type</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.event.type }}</span>
+                    <span class="col-span-2 text-primary">{{ props.event.type }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-(--text-secondary) font-semibold">UID</span>
-                    <span class="col-span-2 font-mono text-[10px] text-(--text-primary)">{{
+                    <span class="col-span-2 font-mono text-[10px] text-primary">{{
                       props.event.uid
                     }}</span>
                   </div>
@@ -202,7 +198,7 @@ const getTypeBadgeClass = (type: string) => {
               <!-- Labels Section -->
               <div class="space-y-3" v-if="Object.keys(props.event.labels).length > 0">
                 <h3
-                  class="text-xs font-bold text-(--text-muted) uppercase tracking-wider flex items-center gap-1.5"
+                  class="text-xs font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
                 >
                   <Tag class="w-3.5 h-3.5" />
                   <span>Labels</span>
@@ -217,7 +213,7 @@ const getTypeBadgeClass = (type: string) => {
                       class="px-2 py-1 bg-(--bg-hover)/40 border-r border-(--border) text-(--text-secondary) font-medium"
                       >{{ key }}</span
                     >
-                    <span class="px-2 py-1 font-mono text-(--text-primary)">{{ val }}</span>
+                    <span class="px-2 py-1 font-mono text-primary">{{ val }}</span>
                   </div>
                 </div>
               </div>

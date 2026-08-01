@@ -46,7 +46,7 @@ const metrics = computed(() => {
         value: String(items.length),
         subtext: `Across ${uniqueNamespaces} ${uniqueNamespaces === 1 ? 'namespace' : 'namespaces'}`,
         icon: FileText,
-        iconClass: 'bg-(--bg-hover) text-(--text-muted)'
+        iconClass: 'bg-(--bg-hover) text-muted-color'
       },
       {
         title: 'Total Size',
@@ -80,7 +80,7 @@ const metrics = computed(() => {
         value: String(items.length),
         subtext: `Across ${uniqueNamespaces} ${uniqueNamespaces === 1 ? 'namespace' : 'namespaces'}`,
         icon: Lock,
-        iconClass: 'bg-(--bg-hover) text-(--text-muted)'
+        iconClass: 'bg-(--bg-hover) text-muted-color'
       },
       {
         title: 'Total Size',
@@ -122,13 +122,13 @@ const metrics = computed(() => {
         <component :is="metric.icon" class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           {{ metric.title }}
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ metric.value }}
         </div>
-        <div class="text-[10px]" :class="metric.subtextClass || 'text-(--text-muted)'">
+        <div class="text-[10px]" :class="metric.subtextClass || 'text-muted-color'">
           {{ metric.subtext }}
         </div>
       </div>

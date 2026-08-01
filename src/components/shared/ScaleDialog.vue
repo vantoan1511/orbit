@@ -38,9 +38,8 @@ const handleScale = () => {
 <template>
   <form @submit.prevent="handleScale" class="flex flex-col gap-4 p-1">
     <p class="text-xs text-(--text-secondary)">
-      Scale <span class="font-semibold text-(--text-primary)">{{ resourceName }}</span> ({{
-        resourceKind
-      }}) to the desired number of replicas:
+      Scale <span class="font-semibold text-primary">{{ resourceName }}</span> ({{ resourceKind }})
+      to the desired number of replicas:
     </p>
 
     <div class="flex flex-col gap-2">

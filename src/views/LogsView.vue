@@ -71,8 +71,8 @@ const {
           <ArrowLeft class="w-4 h-4" />
         </Button>
         <div>
-          <h2 class="text-xl font-bold tracking-tight text-(--text-primary)">Logs</h2>
-          <p class="text-xs text-(--text-muted)">Stream logs from your container in real-time</p>
+          <h2 class="text-xl font-bold tracking-tight text-primary">Logs</h2>
+          <p class="text-xs text-muted-color">Stream logs from your container in real-time</p>
         </div>
       </div>
     </div>
@@ -82,7 +82,7 @@ const {
       class="flex flex-wrap items-center gap-3 p-3 bg-(--bg-hover)/20 border border-(--border) rounded-xl"
     >
       <div class="flex flex-col gap-1">
-        <label class="text-[10px] font-bold text-(--text-muted) uppercase">Namespace</label>
+        <label class="text-[10px] font-bold text-muted-color uppercase">Namespace</label>
         <Select
           v-model="selectedNamespace"
           :options="namespaces"
@@ -91,7 +91,7 @@ const {
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-[10px] font-bold text-(--text-muted) uppercase">Kind</label>
+        <label class="text-[10px] font-bold text-muted-color uppercase">Kind</label>
         <Select
           v-model="selectedWorkloadKind"
           :options="workloadKinds"
@@ -100,7 +100,7 @@ const {
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-[10px] font-bold text-(--text-muted) uppercase">Workload</label>
+        <label class="text-[10px] font-bold text-muted-color uppercase">Workload</label>
         <Select
           v-model="selectedWorkloadName"
           :options="workloads"
@@ -109,7 +109,7 @@ const {
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-[10px] font-bold text-(--text-muted) uppercase">Pod</label>
+        <label class="text-[10px] font-bold text-muted-color uppercase">Pod</label>
         <Select
           v-model="selectedPodName"
           :options="podOptions"
@@ -118,7 +118,7 @@ const {
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-[10px] font-bold text-(--text-muted) uppercase">Container</label>
+        <label class="text-[10px] font-bold text-muted-color uppercase">Container</label>
         <Select
           v-model="selectedContainerName"
           :options="containerOptions"
@@ -127,7 +127,7 @@ const {
       </div>
 
       <div class="flex flex-col gap-1">
-        <label class="text-[10px] font-bold text-(--text-muted) uppercase">Lines</label>
+        <label class="text-[10px] font-bold text-muted-color uppercase">Lines</label>
         <Select
           v-model="tailLines"
           :options="tailLinesOptions"
@@ -246,7 +246,7 @@ const {
 
     <!-- Status Bar -->
     <div
-      class="fixed bottom-0 bg-(--bg-hover)/10 border border-(--border) rounded-xl p-2 text-[10px] text-(--text-muted) px-2"
+      class="fixed bottom-0 bg-(--bg-hover)/10 border border-(--border) rounded-xl p-2 text-[10px] text-muted-color px-2"
     >
       <div class="flex w-full justify-between items-center gap-1.5">
         <span

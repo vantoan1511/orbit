@@ -16,7 +16,7 @@ const route = useRoute()
 <template>
   <Transition name="page" mode="out-in">
     <AppLoadingScreen v-if="k8sStore.isAppLoading" @complete="k8sStore.setAppLoading(false)" />
-    <div v-else class="flex h-screen w-screen overflow-hidden text-(--text-primary) font-sans">
+    <div v-else class="flex h-screen w-screen overflow-hidden text-primary font-sans">
       <!-- Sidebar -->
       <AppSidebar />
 

@@ -37,18 +37,18 @@ const otherPct = computed(() =>
       class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-(--text-muted)"
+        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color"
       >
         <Bell class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Total Events
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ totalCount }}
         </div>
-        <div class="text-[10px] text-(--text-muted) mt-0.5">Active cluster events</div>
+        <div class="text-[10px] text-muted-color mt-0.5">Active cluster events</div>
       </div>
     </div>
 
@@ -62,10 +62,10 @@ const otherPct = computed(() =>
         <CheckCircle class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Normal
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ normalCount }}
         </div>
         <div class="text-[10px] text-emerald-400 font-medium mt-0.5">{{ normalPct }}%</div>
@@ -82,10 +82,10 @@ const otherPct = computed(() =>
         <AlertTriangle class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Warning
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ warningCount }}
         </div>
         <div class="text-[10px] text-amber-400 font-medium mt-0.5">{{ warningPct }}%</div>
@@ -100,10 +100,8 @@ const otherPct = computed(() =>
         <XCircle class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
-          Error
-        </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">Error</div>
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ errorCount }}
         </div>
         <div class="text-[10px] text-red-400 font-medium mt-0.5">{{ errorPct }}%</div>
@@ -120,10 +118,8 @@ const otherPct = computed(() =>
         <Info class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
-          Other
-        </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">Other</div>
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ otherCount }}
         </div>
         <div class="text-[10px] text-blue-400 font-medium mt-0.5">{{ otherPct }}%</div>

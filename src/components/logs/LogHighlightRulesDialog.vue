@@ -26,7 +26,7 @@ const newPresetName = props.highlighting.newPresetName
     :style="{ width: '900px', maxWidth: '90vw' }"
   >
     <div class="flex flex-col gap-4">
-      <p class="text-xs text-(--text-muted)">
+      <p class="text-xs text-muted-color">
         Define search patterns to style log lines dynamically. Presets are read-only; custom rules
         can be edited/deleted.
       </p>
@@ -111,7 +111,7 @@ const newPresetName = props.highlighting.newPresetName
             />
             <label
               :for="'bold-' + rule.id"
-              class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+              class="text-[10px] uppercase font-bold text-muted-color cursor-pointer select-none"
               >Bold</label
             >
           </div>
@@ -126,7 +126,7 @@ const newPresetName = props.highlighting.newPresetName
             />
             <label
               :for="'cs-' + rule.id"
-              class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+              class="text-[10px] uppercase font-bold text-muted-color cursor-pointer select-none"
               >CS</label
             >
           </div>
@@ -141,7 +141,7 @@ const newPresetName = props.highlighting.newPresetName
             />
             <label
               :for="'rx-' + rule.id"
-              class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+              class="text-[10px] uppercase font-bold text-muted-color cursor-pointer select-none"
               >Regex</label
             >
           </div>
@@ -153,9 +153,7 @@ const newPresetName = props.highlighting.newPresetName
             size="small"
             @click="highlighting.deleteCustomRule(rule.id)"
           />
-          <span v-else class="text-[10px] uppercase font-bold text-(--text-muted) px-2"
-            >Preset</span
-          >
+          <span v-else class="text-[10px] uppercase font-bold text-muted-color px-2">Preset</span>
         </div>
       </div>
       <div class="flex justify-between items-center mt-2">

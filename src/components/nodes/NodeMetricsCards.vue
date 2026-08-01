@@ -107,17 +107,15 @@ const cards = computed(() => {
           <component :is="card.icon" class="w-6 h-6" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             {{ card.title }}
           </div>
           <div
             class="text-2xl font-bold mt-1"
-            :class="
-              card.title === 'Node Pressures' ? 'text-emerald-500 text-lg' : 'text-(--text-primary)'
-            "
+            :class="card.title === 'Node Pressures' ? 'text-emerald-500 text-lg' : 'text-primary'"
           >
             {{ card.value }}
-            <span v-if="card.subvalue" class="text-sm text-(--text-muted) font-normal">
+            <span v-if="card.subvalue" class="text-sm text-muted-color font-normal">
               {{ card.subvalue }}
             </span>
           </div>
@@ -127,7 +125,7 @@ const cards = computed(() => {
       <!-- Bottom Section: Progress or Detail -->
       <div class="mt-4">
         <template v-if="card.progress !== undefined">
-          <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
+          <div class="flex justify-between text-[10px] text-muted-color mb-1 font-mono">
             <span>{{ card.detail }}</span>
           </div>
           <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -139,7 +137,7 @@ const cards = computed(() => {
           </div>
         </template>
         <template v-else-if="card.isPressure">
-          <div class="text-[10px] text-(--text-muted) flex gap-2">
+          <div class="text-[10px] text-muted-color flex gap-2">
             <span v-for="p in card.pressures" :key="p.name" class="flex items-center gap-1">
               <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{{ p.name }}
             </span>

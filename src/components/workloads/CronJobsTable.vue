@@ -141,7 +141,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
       <template #body="{ data }">
         <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
       </template>
@@ -166,7 +166,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="schedule"
       header="Schedule"
       sortable
-      class="p-3 font-mono text-(--text-primary)"
+      class="p-3 font-mono text-primary"
     ></Column>
 
     <!-- Suspend Column -->
@@ -217,7 +217,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Actions Column -->
@@ -231,7 +231,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           title="Actions"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
       </template>
     </Column>

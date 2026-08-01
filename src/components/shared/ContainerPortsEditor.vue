@@ -66,7 +66,7 @@ const updatePortField = <K extends keyof ContainerPortItem>(
       />
     </div>
 
-    <div v-if="modelValue.length === 0" class="text-xs text-(--text-muted) italic py-1">
+    <div v-if="modelValue.length === 0" class="text-xs text-muted-color italic py-1">
       No ports configured.
     </div>
 
@@ -75,7 +75,7 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :model-value="port.name"
         placeholder="Port Name (e.g. http)"
         :disabled="disabled"
-        class="w-1/3 px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+        class="w-1/3 px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
         @update:model-value="(val) => updatePortField(idx, 'name', val ?? '')"
       />
       <InputNumber
@@ -85,7 +85,7 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :min="1"
         :max="65535"
         class="w-1/3 text-xs"
-        input-class="w-full px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+        input-class="w-full px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
         @update:model-value="(val) => updatePortField(idx, 'containerPort', Number(val ?? 80))"
       />
       <Select

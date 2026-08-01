@@ -25,10 +25,10 @@ defineProps<{
 
     <!-- Title & Age section -->
     <div class="p-4 border-b border-(--border) bg-(--bg-hover)/50 rounded-lg">
-      <h2 class="text-lg font-bold text-(--text-primary) font-ui truncate mb-1">
+      <h2 class="text-lg font-bold text-primary font-ui truncate mb-1">
         {{ name }}
       </h2>
-      <div v-if="age" class="text-xs text-(--text-muted) flex items-center gap-2">
+      <div v-if="age" class="text-xs text-muted-color flex items-center gap-2">
         <Clock class="w-3.5 h-3.5" />
         <span>Age: {{ age }}</span>
       </div>

@@ -24,7 +24,7 @@ const emit = defineEmits<{
 
 <template>
   <div class="flex flex-col gap-3">
-    <h3 class="text-xs font-semibold text-(--text-primary) uppercase tracking-wider">
+    <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
       Resource Requests & Limits
     </h3>
 
@@ -35,7 +35,7 @@ const emit = defineEmits<{
           :model-value="cpuRequest"
           placeholder="e.g. 100m or 0.5"
           :disabled="disabled"
-          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
           @update:model-value="(val) => emit('update:cpuRequest', val ?? '')"
         />
       </div>
@@ -46,7 +46,7 @@ const emit = defineEmits<{
           :model-value="memoryRequest"
           placeholder="e.g. 128Mi or 1Gi"
           :disabled="disabled"
-          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
           @update:model-value="(val) => emit('update:memoryRequest', val ?? '')"
         />
       </div>
@@ -57,7 +57,7 @@ const emit = defineEmits<{
           :model-value="cpuLimit"
           placeholder="e.g. 500m or 1"
           :disabled="disabled"
-          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
           @update:model-value="(val) => emit('update:cpuLimit', val ?? '')"
         />
       </div>
@@ -68,7 +68,7 @@ const emit = defineEmits<{
           :model-value="memoryLimit"
           placeholder="e.g. 512Mi or 2Gi"
           :disabled="disabled"
-          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+          class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
           @update:model-value="(val) => emit('update:memoryLimit', val ?? '')"
         />
       </div>

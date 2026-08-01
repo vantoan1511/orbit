@@ -50,18 +50,18 @@ const namespacesCount = computed(() => {
       class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-(--text-muted)"
+        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color"
       >
         <Network class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Total Services
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ totalServices }}
         </div>
-        <div class="text-[10px] text-(--text-muted) mt-0.5">
+        <div class="text-[10px] text-muted-color mt-0.5">
           Across {{ namespacesCount }} namespaces
         </div>
       </div>
@@ -77,10 +77,10 @@ const namespacesCount = computed(() => {
         <Circle class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Cluster IP
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ clusterIPCount }}
         </div>
         <div class="text-[10px] text-emerald-400 font-medium mt-0.5">{{ clusterIPPct }}</div>
@@ -97,10 +97,10 @@ const namespacesCount = computed(() => {
         <Cpu class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           NodePort
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ nodePortCount }}
         </div>
         <div class="text-[10px] text-blue-400 font-medium mt-0.5">{{ nodePortPct }}</div>
@@ -117,10 +117,10 @@ const namespacesCount = computed(() => {
         <Cloud class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           LoadBalancer
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ loadBalancerCount }}
         </div>
         <div class="text-[10px] text-violet-400 font-medium mt-0.5">{{ loadBalancerPct }}</div>
@@ -137,10 +137,10 @@ const namespacesCount = computed(() => {
         <Globe class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           External Name
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ externalNameCount }}
         </div>
         <div class="text-[10px] text-amber-400 font-medium mt-0.5">{{ externalNamePct }}</div>

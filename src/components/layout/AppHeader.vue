@@ -79,7 +79,7 @@ const cloudProvider = computed(() => {
             </h1>
           </OverlayBadge>
         </template>
-        <h1 v-else class="text-2xl font-bold text-(--text-muted) font-ui tracking-tight">
+        <h1 v-else class="text-2xl font-bold text-muted-color font-ui tracking-tight">
           No active cluster
         </h1>
       </div>

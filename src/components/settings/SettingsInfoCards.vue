@@ -70,21 +70,19 @@ const handleClearAllData = () => {
     >
       <div class="flex items-center gap-2 pb-3 border-b border-(--border)">
         <Hexagon class="w-4 h-4 text-violet-500" />
-        <h4 class="text-xs font-bold text-(--text-primary) uppercase tracking-wider">
-          Current Context
-        </h4>
+        <h4 class="text-xs font-bold text-primary uppercase tracking-wider">Current Context</h4>
       </div>
 
       <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Context Name</span>
-          <span class="text-xs font-semibold text-(--text-primary) truncate max-w-44">{{
+          <span class="text-xs text-muted-color">Context Name</span>
+          <span class="text-xs font-semibold text-primary truncate max-w-44">{{
             currentContext.name
           }}</span>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Active Namespace</span>
+          <span class="text-xs text-muted-color">Active Namespace</span>
           <span
             class="text-xs font-mono font-semibold bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded text-[10px]"
           >
@@ -93,7 +91,7 @@ const handleClearAllData = () => {
         </div>
 
         <div class="flex flex-col gap-1">
-          <span class="text-xs text-(--text-muted)">Server Address</span>
+          <span class="text-xs text-muted-color">Server Address</span>
           <span
             class="text-[10px] font-mono text-(--text-secondary) bg-(--bg-hover)/20 p-2 rounded border border-(--border) truncate"
           >
@@ -102,14 +100,14 @@ const handleClearAllData = () => {
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Auth User</span>
-          <span class="text-xs font-semibold text-(--text-primary) truncate max-w-40">{{
+          <span class="text-xs text-muted-color">Auth User</span>
+          <span class="text-xs font-semibold text-primary truncate max-w-40">{{
             currentContext.user
           }}</span>
         </div>
 
         <div class="flex items-center justify-between pt-2 border-t border-(--border)">
-          <span class="text-xs text-(--text-muted)">Status</span>
+          <span class="text-xs text-muted-color">Status</span>
           <span class="flex items-center gap-1.5 text-emerald-500 font-semibold text-xs">
             <CheckCircle2 class="w-3.5 h-3.5" />
             Connected
@@ -124,38 +122,28 @@ const handleClearAllData = () => {
     >
       <div class="flex items-center gap-2 pb-3 border-b border-(--border)">
         <FileText class="w-4 h-4 text-sky-500" />
-        <h4 class="text-xs font-bold text-(--text-primary) uppercase tracking-wider">
-          Kubeconfig Details
-        </h4>
+        <h4 class="text-xs font-bold text-primary uppercase tracking-wider">Kubeconfig Details</h4>
       </div>
 
       <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Total Contexts</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
-            kubeconfigInfo.contextsCount
-          }}</span>
+          <span class="text-xs text-muted-color">Total Contexts</span>
+          <span class="text-xs font-semibold text-primary">{{ kubeconfigInfo.contextsCount }}</span>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Total Clusters</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
-            kubeconfigInfo.clustersCount
-          }}</span>
+          <span class="text-xs text-muted-color">Total Clusters</span>
+          <span class="text-xs font-semibold text-primary">{{ kubeconfigInfo.clustersCount }}</span>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Total Users</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
-            kubeconfigInfo.usersCount
-          }}</span>
+          <span class="text-xs text-muted-color">Total Users</span>
+          <span class="text-xs font-semibold text-primary">{{ kubeconfigInfo.usersCount }}</span>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">File Size</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
-            kubeconfigInfo.fileSize
-          }}</span>
+          <span class="text-xs text-muted-color">File Size</span>
+          <span class="text-xs font-semibold text-primary">{{ kubeconfigInfo.fileSize }}</span>
         </div>
       </div>
     </div>
@@ -166,29 +154,25 @@ const handleClearAllData = () => {
     >
       <div class="flex items-center gap-2 pb-3 border-b border-(--border)">
         <Database class="w-4 h-4 text-emerald-500" />
-        <h4 class="text-xs font-bold text-(--text-primary) uppercase tracking-wider">
-          Data Management
-        </h4>
+        <h4 class="text-xs font-bold text-primary uppercase tracking-wider">Data Management</h4>
       </div>
 
       <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Cached Objects</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
+          <span class="text-xs text-muted-color">Cached Objects</span>
+          <span class="text-xs font-semibold text-primary">{{
             dataManagementInfo.cachedObjects
           }}</span>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Cache Size</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
-            dataManagementInfo.cacheSize
-          }}</span>
+          <span class="text-xs text-muted-color">Cache Size</span>
+          <span class="text-xs font-semibold text-primary">{{ dataManagementInfo.cacheSize }}</span>
         </div>
 
         <div class="flex items-center justify-between">
-          <span class="text-xs text-(--text-muted)">Last Synced</span>
-          <span class="text-xs font-semibold text-(--text-primary)">{{
+          <span class="text-xs text-muted-color">Last Synced</span>
+          <span class="text-xs font-semibold text-primary">{{
             dataManagementInfo.lastSynced
           }}</span>
         </div>

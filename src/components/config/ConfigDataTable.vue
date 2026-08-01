@@ -167,7 +167,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
       <template #body="{ data }">
         <div class="flex items-center gap-2">
           <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-sky-400" />
@@ -227,7 +227,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3 text-center"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-primary)">{{ data.keysCount }}</span>
+        <span class="font-mono text-primary">{{ data.keysCount }}</span>
       </template>
     </Column>
 
@@ -237,7 +237,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="size"
       header="Size"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Mounted In Column -->
@@ -251,7 +251,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <template #body="{ data }">
         <span
           class="font-mono font-semibold"
-          :class="data.mountedPods > 0 ? 'text-emerald-400' : 'text-(--text-muted)'"
+          :class="data.mountedPods > 0 ? 'text-emerald-400' : 'text-muted-color'"
         >
           {{ data.mountedPods }} {{ data.mountedPods === 1 ? 'pod' : 'pods' }}
         </span>
@@ -264,7 +264,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Actions Column -->
@@ -278,7 +278,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           title="Actions"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
       </template>
     </Column>

@@ -331,12 +331,12 @@ const copyYaml = async () => {
             class="w-2.5 h-2.5 rounded-full animate-pulse"
             :class="getStatusBadgeClass(workloadStatus)"
           ></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
+          <span class="text-xs font-bold uppercase tracking-wider text-muted-color">
             {{ workloadStatus || 'Active' }}
           </span>
         </div>
         <div
-          class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
+          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
           ns/{{ workloadNamespace }}
         </div>
@@ -355,13 +355,10 @@ const copyYaml = async () => {
         class="p-6 border-b border-(--border) bg-(--bg-hover)/50 flex items-start justify-between gap-4"
       >
         <div>
-          <h2
-            class="text-xl font-bold text-(--text-primary) font-ui truncate mb-1"
-            :title="workloadName"
-          >
+          <h2 class="text-xl font-bold text-primary font-ui truncate mb-1" :title="workloadName">
             {{ workloadName }}
           </h2>
-          <div class="text-xs text-(--text-muted) flex items-center gap-2">
+          <div class="text-xs text-muted-color flex items-center gap-2">
             <Clock class="w-3.5 h-3.5" />
             <span>Age: {{ workloadAge }}</span>
           </div>

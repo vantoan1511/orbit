@@ -117,7 +117,7 @@ const consumers = computed<ConsumerItem[]>(() => {
             <tr
               v-for="item in consumers"
               :key="item.pod"
-              class="text-(--text-secondary) hover:text-(--text-primary)"
+              class="text-(--text-secondary) hover:text-primary"
             >
               <td class="py-2.5 font-medium truncate max-w-25" :title="item.pod">
                 {{ item.pod }}

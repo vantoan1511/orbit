@@ -92,15 +92,15 @@ onMounted(() => {
           <FolderOpen class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Total Namespaces
           </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
+          <div class="text-2xl font-bold mt-1 text-primary">
             {{ totalNamespaces }}
           </div>
         </div>
       </div>
-      <div class="text-[10px] text-(--text-muted) font-medium">Across the cluster</div>
+      <div class="text-[10px] text-muted-color font-medium">Across the cluster</div>
     </div>
 
     <!-- Card 2: Active -->
@@ -115,7 +115,7 @@ onMounted(() => {
             <CheckCircle2 class="w-5 h-5" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Active
             </div>
             <div class="text-2xl font-bold mt-1 text-emerald-500">{{ activeCount }}</div>
@@ -130,7 +130,7 @@ onMounted(() => {
           />
         </div>
       </div>
-      <div class="text-[10px] text-(--text-muted) font-medium">
+      <div class="text-[10px] text-muted-color font-medium">
         {{ totalNamespaces ? Math.round((activeCount / totalNamespaces) * 1000) / 10 : 0 }}%
       </div>
     </div>
@@ -147,7 +147,7 @@ onMounted(() => {
             <Loader2 class="w-5 h-5 animate-spin" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Terminating
             </div>
             <div class="text-2xl font-bold mt-1 text-amber-500">{{ terminatingCount }}</div>
@@ -162,7 +162,7 @@ onMounted(() => {
           />
         </div>
       </div>
-      <div class="text-[10px] text-(--text-muted) font-medium">
+      <div class="text-[10px] text-muted-color font-medium">
         {{ totalNamespaces ? Math.round((terminatingCount / totalNamespaces) * 1000) / 10 : 0 }}%
       </div>
     </div>
@@ -179,7 +179,7 @@ onMounted(() => {
             <XCircle class="w-5 h-5" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Failed
             </div>
             <div class="text-2xl font-bold mt-1 text-rose-500">{{ failedCount }}</div>
@@ -194,7 +194,7 @@ onMounted(() => {
           />
         </div>
       </div>
-      <div class="text-[10px] text-(--text-muted) font-medium">0%</div>
+      <div class="text-[10px] text-muted-color font-medium">0%</div>
     </div>
 
     <!-- Card 5: System -->
@@ -209,7 +209,7 @@ onMounted(() => {
             <Shield class="w-5 h-5" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               System
             </div>
             <div class="text-2xl font-bold mt-1 text-blue-400">{{ systemCount }}</div>
@@ -224,7 +224,7 @@ onMounted(() => {
           />
         </div>
       </div>
-      <div class="text-[10px] text-(--text-muted) font-medium">
+      <div class="text-[10px] text-muted-color font-medium">
         {{ totalNamespaces ? Math.round((systemCount / totalNamespaces) * 1000) / 10 : 0 }}%
       </div>
     </div>

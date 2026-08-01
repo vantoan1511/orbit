@@ -17,10 +17,7 @@ withDefaults(
 
 <template>
   <div v-if="items && Object.keys(items).length > 0">
-    <h3
-      v-if="title"
-      class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3"
-    >
+    <h3 v-if="title" class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
       {{ title }}
     </h3>
 
@@ -43,7 +40,7 @@ withDefaults(
         :key="key"
         class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-(--text-secondary) flex justify-between gap-4"
       >
-        <span class="text-(--text-muted) truncate shrink-0">{{ key }}</span>
+        <span class="text-muted-color truncate shrink-0">{{ key }}</span>
         <span class="truncate text-right">{{ val }}</span>
       </div>
     </div>

@@ -18,7 +18,7 @@ const isRunning = (status: string) => {
 
 <template>
   <div class="space-y-4">
-    <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-1">
+    <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1">
       Containers ({{ containers.length }})
     </div>
 
@@ -38,10 +38,7 @@ const isRunning = (status: string) => {
                   : 'bg-rose-500 ring-4 ring-rose-500/20'
               "
             ></span>
-            <span
-              class="text-xs font-bold text-(--text-primary) font-mono truncate"
-              :title="c.name"
-            >
+            <span class="text-xs font-bold text-primary font-mono truncate" :title="c.name">
               {{ c.name }}
             </span>
             <span
@@ -73,32 +70,29 @@ const isRunning = (status: string) => {
           class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-(--border)/50 text-xs"
         >
           <div>
-            <div class="text-[10px] text-(--text-muted)">Image</div>
-            <div class="font-mono text-(--text-primary) truncate" :title="c.image">
+            <div class="text-[10px] text-muted-color">Image</div>
+            <div class="font-mono text-primary truncate" :title="c.image">
               {{ c.image }}
             </div>
           </div>
           <div>
-            <div class="text-[10px] text-(--text-muted)">Ports</div>
-            <div class="font-mono text-(--text-primary)">{{ c.ports || '-' }}</div>
+            <div class="text-[10px] text-muted-color">Ports</div>
+            <div class="font-mono text-primary">{{ c.ports || '-' }}</div>
           </div>
           <div>
-            <div class="text-[10px] text-(--text-muted)">Restarts</div>
-            <div class="font-mono text-(--text-primary)">{{ c.restarts }}</div>
+            <div class="text-[10px] text-muted-color">Restarts</div>
+            <div class="font-mono text-primary">{{ c.restarts }}</div>
           </div>
           <div>
-            <div class="text-[10px] text-(--text-muted)">Status</div>
-            <div class="font-semibold text-(--text-primary)">{{ c.status }}</div>
+            <div class="text-[10px] text-muted-color">Status</div>
+            <div class="font-semibold text-primary">{{ c.status }}</div>
           </div>
         </div>
       </div>
     </template>
 
-    <div
-      v-else
-      class="text-center py-10 text-xs text-(--text-muted) flex flex-col items-center gap-2"
-    >
-      <Info class="w-8 h-8 text-(--text-muted)/50" />
+    <div v-else class="text-center py-10 text-xs text-muted-color flex flex-col items-center gap-2">
+      <Info class="w-8 h-8 text-muted-color/50" />
       <span>No container specs found for this pod.</span>
     </div>
   </div>

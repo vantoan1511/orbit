@@ -28,14 +28,14 @@ const availablePct = computed(() => {
 
 <template>
   <div v-if="desired !== undefined">
-    <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+    <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
       Replicas Status
     </h3>
     <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 space-y-4">
       <div>
         <div class="flex justify-between text-xs mb-1">
           <span class="text-(--text-secondary) font-medium">Desired Replicas</span>
-          <span class="font-mono font-bold text-(--text-primary)">{{ desired }}</span>
+          <span class="font-mono font-bold text-primary">{{ desired }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
           <div class="h-full rounded-full bg-blue-500" style="width: 100%"></div>
@@ -45,7 +45,7 @@ const availablePct = computed(() => {
       <div v-if="current !== undefined">
         <div class="flex justify-between text-xs mb-1">
           <span class="text-(--text-secondary) font-medium">Current Replicas</span>
-          <span class="font-mono font-bold text-(--text-primary)">{{ current }}</span>
+          <span class="font-mono font-bold text-primary">{{ current }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
           <div class="h-full rounded-full bg-indigo-500" :style="{ width: currentPct + '%' }"></div>
@@ -55,7 +55,7 @@ const availablePct = computed(() => {
       <div v-if="ready !== undefined">
         <div class="flex justify-between text-xs mb-1">
           <span class="text-(--text-secondary) font-medium">Ready Replicas</span>
-          <span class="font-mono font-bold text-(--text-primary)">{{ ready }}</span>
+          <span class="font-mono font-bold text-primary">{{ ready }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
           <div class="h-full rounded-full bg-emerald-500" :style="{ width: readyPct + '%' }"></div>
@@ -65,7 +65,7 @@ const availablePct = computed(() => {
       <div v-if="available !== undefined">
         <div class="flex justify-between text-xs mb-1">
           <span class="text-(--text-secondary) font-medium">Available Replicas</span>
-          <span class="font-mono font-bold text-(--text-primary)">{{ available }}</span>
+          <span class="font-mono font-bold text-primary">{{ available }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
           <div class="h-full rounded-full bg-teal-500" :style="{ width: availablePct + '%' }"></div>

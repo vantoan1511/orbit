@@ -198,7 +198,7 @@ watch(
           @click="goBack"
         />
         <div>
-          <h1 class="text-lg font-semibold text-(--text-primary)">Edit {{ props.kind }}</h1>
+          <h1 class="text-lg font-semibold text-primary">Edit {{ props.kind }}</h1>
           <p class="text-sm text-(--text-secondary)">{{ props.namespace }} / {{ props.name }}</p>
         </div>
       </div>
@@ -210,14 +210,14 @@ watch(
         >
           <span
             class="text-xs font-medium"
-            :class="!isYamlMode ? 'text-(--text-primary)' : 'text-(--text-secondary)'"
+            :class="!isYamlMode ? 'text-primary' : 'text-(--text-secondary)'"
           >
             Form
           </span>
           <ToggleSwitch v-model="isYamlMode" @change="handleModeToggle" />
           <span
             class="text-xs font-medium"
-            :class="isYamlMode ? 'text-(--text-primary)' : 'text-(--text-secondary)'"
+            :class="isYamlMode ? 'text-primary' : 'text-(--text-secondary)'"
           >
             YAML
           </span>
@@ -249,7 +249,7 @@ watch(
 
         <div v-else class="w-full h-full overflow-y-auto p-4 flex flex-col gap-6">
           <div>
-            <h2 class="text-sm font-semibold text-(--text-primary) mb-3 uppercase tracking-wider">
+            <h2 class="text-sm font-semibold text-primary mb-3 uppercase tracking-wider">
               Metadata
             </h2>
 

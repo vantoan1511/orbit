@@ -81,7 +81,7 @@ const formatRelativeTime = (timestamp: number): string => {
     <template #header>
       <div class="flex items-center justify-between w-full pr-2">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-lg text-(--text-primary) font-ui">Notifications</span>
+          <span class="font-bold text-lg text-primary font-ui">Notifications</span>
           <span
             v-if="notificationStore.unreadCount > 0"
             class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20"
@@ -106,7 +106,7 @@ const formatRelativeTime = (timestamp: number): string => {
             :disabled="notificationStore.unreadCount === 0"
             @click="notificationStore.markAllAsRead"
           >
-            <CheckCheck class="w-3.5 h-3.5 mr-1 text-(--text-muted)" />
+            <CheckCheck class="w-3.5 h-3.5 mr-1 text-muted-color" />
             <span>Mark all read</span>
           </Button>
         </div>
@@ -140,10 +140,10 @@ const formatRelativeTime = (timestamp: number): string => {
             <!-- Empty State -->
             <div
               v-if="filteredNotifications.length === 0"
-              class="flex flex-col items-center justify-center p-12 text-center text-(--text-muted)"
+              class="flex flex-col items-center justify-center p-12 text-center text-muted-color"
             >
               <BellOff class="w-10 h-10 mb-3 opacity-40" />
-              <p class="text-sm font-semibold text-(--text-primary)">No notifications</p>
+              <p class="text-sm font-semibold text-primary">No notifications</p>
               <p class="text-xs mt-1 max-w-xs">
                 When background events, errors, or command updates occur, they will appear here.
               </p>
@@ -179,13 +179,13 @@ const formatRelativeTime = (timestamp: number): string => {
                         class="w-2 h-2 rounded-full bg-rose-500 shrink-0"
                         title="Unread"
                       ></span>
-                      <span class="text-xs font-bold text-(--text-primary) truncate">
+                      <span class="text-xs font-bold text-primary truncate">
                         {{ item.title }}
                       </span>
                     </div>
 
                     <div class="flex items-center gap-1 shrink-0">
-                      <span class="text-[10px] font-medium text-(--text-muted)">
+                      <span class="text-[10px] font-medium text-muted-color">
                         {{ formatRelativeTime(item.timestamp) }}
                       </span>
                       <Button
@@ -193,7 +193,7 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5 h-5 p-0 text-(--text-muted) hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        class="w-5 h-5 p-0 text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
                         @click.stop="notificationStore.removeNotification(item.id)"
                       />
                     </div>
@@ -211,10 +211,10 @@ const formatRelativeTime = (timestamp: number): string => {
             <!-- Empty State for Unread -->
             <div
               v-if="filteredNotifications.length === 0"
-              class="flex flex-col items-center justify-center p-12 text-center text-(--text-muted)"
+              class="flex flex-col items-center justify-center p-12 text-center text-muted-color"
             >
               <Check class="w-10 h-10 mb-3 opacity-40 text-emerald-500" />
-              <p class="text-sm font-semibold text-(--text-primary)">All caught up!</p>
+              <p class="text-sm font-semibold text-primary">All caught up!</p>
               <p class="text-xs mt-1">You have no unread notifications.</p>
             </div>
 
@@ -239,13 +239,13 @@ const formatRelativeTime = (timestamp: number): string => {
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-1.5 min-w-0">
                       <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Unread"></span>
-                      <span class="text-xs font-bold text-(--text-primary) truncate">
+                      <span class="text-xs font-bold text-primary truncate">
                         {{ item.title }}
                       </span>
                     </div>
 
                     <div class="flex items-center gap-1 shrink-0">
-                      <span class="text-[10px] font-medium text-(--text-muted)">
+                      <span class="text-[10px] font-medium text-muted-color">
                         {{ formatRelativeTime(item.timestamp) }}
                       </span>
                       <Button
@@ -253,7 +253,7 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5 h-5 p-0 text-(--text-muted) hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        class="w-5 h-5 p-0 text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
                         @click.stop="notificationStore.removeNotification(item.id)"
                       />
                     </div>

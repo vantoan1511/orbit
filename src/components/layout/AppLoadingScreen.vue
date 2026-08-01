@@ -84,7 +84,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="flex flex-col items-center justify-center h-screen w-screen bg-(--bg-app) text-(--text-primary) font-sans select-none overflow-hidden p-8"
+    class="flex flex-col items-center justify-center h-screen w-screen bg-(--bg-app) text-primary font-sans select-none overflow-hidden p-8"
   >
     <!-- Center branding -->
     <div class="flex flex-col items-center justify-center">
@@ -92,17 +92,17 @@ onUnmounted(() => {
         <img src="/logo.png" alt="Orbit" class="w-24 h-24 object-contain relative z-10" />
       </div>
 
-      <h1 class="text-4xl font-bold tracking-tight text-(--text-primary) font-ui mb-2">Orbit</h1>
+      <h1 class="text-4xl font-bold tracking-tight text-primary font-ui mb-2">Orbit</h1>
 
       <div class="flex flex-col items-center gap-1.5 text-xs font-semibold tracking-[0.2em] mb-12">
         <span class="text-(--text-secondary)">EXPLORE. MONITOR. MANAGE.</span>
-        <span class="text-(--text-primary)">KUBERNETES.</span>
+        <span class="text-primary">KUBERNETES.</span>
       </div>
     </div>
 
     <!-- Above bar: Fact -->
     <div class="flex items-start gap-3 w-full max-w-md min-h-12 text-left mb-6">
-      <Lightbulb class="w-5 h-5 text-(--text-primary) shrink-0 mt-0.5" />
+      <Lightbulb class="w-5 h-5 text-primary shrink-0 mt-0.5" />
       <Transition name="rollout" mode="out-in">
         <p :key="currentFactIndex" class="text-xs text-(--text-secondary) leading-relaxed">
           {{ facts[currentFactIndex] }}
@@ -120,7 +120,7 @@ onUnmounted(() => {
 
     <!-- Below bar: Tip -->
     <div class="flex items-start gap-3 w-full max-w-md min-h-12 text-left mt-6">
-      <Rocket class="w-5 h-5 text-(--text-primary) shrink-0 mt-0.5" />
+      <Rocket class="w-5 h-5 text-primary shrink-0 mt-0.5" />
       <Transition name="rollout" mode="out-in">
         <p :key="currentTipIndex" class="text-xs text-(--text-secondary) leading-relaxed">
           {{ tips[currentTipIndex] }}

@@ -11,7 +11,7 @@ const { isRefreshing, refreshCluster } = useCluster()
       <ServerOff class="w-12 h-12 text-rose-500" />
     </div>
 
-    <h2 class="text-2xl font-bold text-(--text-primary) mb-2 tracking-tight">Cluster is Offline</h2>
+    <h2 class="text-2xl font-bold text-primary mb-2 tracking-tight">Cluster is Offline</h2>
 
     <p class="text-sm text-(--text-secondary) max-w-md mb-6 leading-relaxed">
       Unable to connect to the selected cluster. Please check if your Kubernetes cluster is running,
