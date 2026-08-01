@@ -22,23 +22,25 @@ const route = useRoute()
 
       <!-- Main Content Area -->
       <div class="flex-1 flex flex-col h-full overflow-hidden">
-        <!-- Header -->
-        <AppHeader />
+        <main class="bg-(--bg-app) flex-1 h-full overflow-y-auto relative">
+          <!-- Header -->
+          <AppHeader />
 
-        <main class="bg-(--bg-app) flex-1 overflow-y-auto p-8">
-          <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
-            <OfflineClusterView
-              v-if="
-                activeCluster && activeCluster.status !== 'healthy' && route.path !== '/settings'
-              "
-            />
-            <RouterView v-else v-slot="{ Component }">
-              <transition name="page" mode="out-in">
-                <component :is="Component" />
-              </transition>
-            </RouterView>
-          </template>
-          <WelcomeView v-else />
+          <div class="p-8">
+            <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
+              <OfflineClusterView
+                v-if="
+                  activeCluster && activeCluster.status !== 'healthy' && route.path !== '/settings'
+                "
+              />
+              <RouterView v-else v-slot="{ Component }">
+                <transition name="page" mode="out-in">
+                  <component :is="Component" />
+                </transition>
+              </RouterView>
+            </template>
+            <WelcomeView v-else />
+          </div>
         </main>
       </div>
     </div>

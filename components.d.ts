@@ -13,7 +13,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
     AppHeader: typeof import('./src/components/layout/AppHeader.vue')['default']
-    AppIcon: typeof import('./src/components/shared/AppIcon.vue')['default']
     AppLayout: typeof import('./src/components/layout/AppLayout.vue')['default']
     AppLoadingScreen: typeof import('./src/components/layout/AppLoadingScreen.vue')['default']
     AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
@@ -37,7 +36,6 @@ declare module 'vue' {
     EventsDataTable: typeof import('./src/components/events/EventsDataTable.vue')['default']
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
-    Icon: typeof import('./src/components/shared/Icon.vue')['default']
     InputText: typeof import('primevue/inputtext')['default']
     JobsTable: typeof import('./src/components/workloads/JobsTable.vue')['default']
     KeyValueBadgeList: typeof import('./src/components/shared/KeyValueBadgeList.vue')['default']
@@ -61,7 +59,6 @@ declare module 'vue' {
     PoliciesMetricsCards: typeof import('./src/components/policies/PoliciesMetricsCards.vue')['default']
     PolicyDetailsDrawer: typeof import('./src/components/policies/PolicyDetailsDrawer.vue')['default']
     ProfileDrawer: typeof import('./src/components/layout/ProfileDrawer.vue')['default']
-    RefreshButton: typeof import('./src/components/shared/RefreshButton.vue')['default']
     ReplicaSetsTable: typeof import('./src/components/workloads/ReplicaSetsTable.vue')['default']
     ReplicasProgressBar: typeof import('./src/components/shared/ReplicasProgressBar.vue')['default']
     ResourceActionMenu: typeof import('./src/components/shared/ResourceActionMenu.vue')['default']

@@ -66,7 +66,7 @@ const cloudProvider = computed(() => {
 
 <template>
   <header
-    class="px-8 py-4 flex flex-col gap-3 select-none backdrop-blur-xl bg-surface-0/70 dark:bg-surface-950/70 border-b border-surface-200/50 dark:border-surface-800/50 sticky top-0 z-10"
+    class="px-8 py-4 flex flex-col gap-3 select-none backdrop-blur-sm bg-surface-0/50 dark:bg-surface-950/50 border-b border-surface-200/60 dark:border-surface-800/60 sticky top-0 z-20 transition-colors duration-200"
   >
     <!-- Top Row -->
     <div class="flex items-center justify-between">
