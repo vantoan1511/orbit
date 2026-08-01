@@ -11,7 +11,7 @@ import {
   Activity,
   Box,
   Boxes,
-  CircleCheck,
+  Check,
   FileText,
   FolderOpen,
   HardDrive,
@@ -57,11 +57,9 @@ const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
-  <aside
-    class="w-64 bg-(--bg-sidebar) border-r border-(--border) flex flex-col h-screen text-(--text-primary) select-none"
-  >
+  <aside class="w-64 flex flex-col h-screen text-(--text-primary) select-none">
     <!-- Brand Header -->
-    <div class="h-16 px-6 flex items-center gap-3 border-b border-(--border)">
+    <div class="h-16 px-6 flex items-center gap-3">
       <!-- Orbit Icon Logo -->
       <img src="/logo.png" alt="Orbit Logo" class="w-8 h-8 object-contain" />
 
@@ -69,8 +67,8 @@ const { isDark, toggleTheme } = useTheme()
     </div>
 
     <!-- Clusters Section -->
-    <div class="p-4 border-b border-(--border)">
-      <div class="text-[10px] font-bold text-(--text-muted) tracking-wider uppercase mb-2 px-2">
+    <div class="p-4">
+      <div class="text-sm font-bold text-muted-color tracking-wider uppercase mb-2 px-2">
         Clusters
       </div>
       <div class="flex flex-col gap-2">
@@ -86,31 +84,22 @@ const { isDark, toggleTheme } = useTheme()
               : 'secondary'
           "
           fluid
-          class="truncate justify-start text-xs font-medium"
+          class="truncate justify-start font-semibold"
           variant="text"
-          size="small"
           @click="handleSwitchCluster(cluster.id)"
         >
-          <CircleCheck :size="13" />
+          <Check v-if="k8sStore.activeClusterId === cluster.id" :size="16" />
           {{ cluster.name }}
         </Button>
 
         <!-- Empty state when no clusters are configured -->
-        <p v-if="k8sStore.clusters.length === 0" class="text-xs text-(--text-muted) px-3 py-1">
+        <p v-if="k8sStore.clusters.length === 0" class="text-sm text-muted-color px-3 py-1">
           No clusters added yet
         </p>
 
-        <Button
-          fluid
-          icon="pi pi-plus"
-          label="Add Cluster"
-          severity="secondary"
-          size="small"
-          class="text-xs font-medium"
-          @click="handleAddCluster"
-        >
-          <Plus :size="13" />
-          <span>Add cluster</span>
+        <Button fluid severity="contrast" size="small" @click="handleAddCluster">
+          <Plus :size="16" />
+          <span class="text-sm font-semibold">Add cluster</span>
         </Button>
       </div>
     </div>
@@ -121,23 +110,23 @@ const { isDark, toggleTheme } = useTheme()
         v-for="link in navLinks"
         :key="link.name"
         :to="link.path"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
+        class="flex items-center gap-3 px-3 py-3 rounded-lg rounded-r-none text-sm transition-all duration-200"
         :class="[
           route.path === link.path
-            ? 'bg-(--bg-active) font-medium text-(--text-primary) border-r-2 border-(--primary) rounded-r-none'
-            : 'text-(--text-secondary) hover:bg-(--bg-hover)',
+            ? 'bg-(--bg-active) text-primary border-r-3'
+            : 'text-muted-color hover:bg-(--bg-hover)',
           k8sStore.activeClusterId === null && link.path !== '/settings'
             ? 'opacity-40 pointer-events-none'
             : ''
         ]"
       >
         <component :is="link.icon" class="w-4 h-4 shrink-0" />
-        <span>{{ link.name }}</span>
+        <span :class="route.path === link.path ? 'font-bold' : 'font-medium'">{{ link.name }}</span>
       </router-link>
     </nav>
 
     <!-- Bottom Footer -->
-    <div class="p-4 border-t border-(--border) flex items-center justify-around bg-(--bg-sidebar)">
+    <div class="p-4 flex items-center justify-around">
       <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
         <Button
@@ -186,7 +175,7 @@ const { isDark, toggleTheme } = useTheme()
       </div>
     </div>
     <div class="flex items-center justify-center gap-2">
-      <span class="text-[10px] text-(--text-muted) font-mono">{{ VERSION }}</span>
+      <span class="text-xs text-muted-color font-mono">{{ VERSION }}</span>
     </div>
   </aside>
 </template>

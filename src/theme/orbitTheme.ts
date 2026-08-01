@@ -1,8 +1,10 @@
 import { definePreset } from '@primeuix/themes'
 
 import Aura from '@primeuix/themes/aura'
+import Material from '@primeuix/themes/material'
+import type { Preset } from '@primeuix/themes/types'
 
-export const Noir = definePreset(Aura, {
+const NoirPreset: Preset = {
   semantic: {
     focusRing: {
       width: '2px',
@@ -54,4 +56,6 @@ export const Noir = definePreset(Aura, {
       }
     }
   }
-})
+}
+
+export const Noir = definePreset(Material, NoirPreset)

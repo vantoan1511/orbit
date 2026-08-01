@@ -16,10 +16,7 @@ const route = useRoute()
 <template>
   <Transition name="page" mode="out-in">
     <AppLoadingScreen v-if="k8sStore.isAppLoading" @complete="k8sStore.setAppLoading(false)" />
-    <div
-      v-else
-      class="flex h-screen w-screen overflow-hidden bg-(--bg-app) text-(--text-primary) font-sans"
-    >
+    <div v-else class="flex h-screen w-screen overflow-hidden text-(--text-primary) font-sans">
       <!-- Sidebar -->
       <AppSidebar />
 
@@ -28,7 +25,7 @@ const route = useRoute()
         <!-- Header -->
         <AppHeader />
 
-        <main class="flex-1 overflow-y-auto p-8">
+        <main class="bg-(--bg-app) flex-1 overflow-y-auto p-8">
           <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
             <OfflineClusterView
               v-if="

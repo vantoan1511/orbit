@@ -3,12 +3,7 @@
 @custom-variant dark (&:where(.my-app-dark, .my-app-dark *));
 
 @theme {
-  --pod-running: #3fb950;
-  --pod-pending: #f4a100;
-  --pod-failed: #e5534b;
-  --pod-unknown: #808080;
 
-  --namespace: #8e6bff;
   --deployment: #4f8cff;
   --daemonset: #e07a5f;
   --statefulset: #00b8d9;
@@ -45,8 +40,8 @@
      Backgrounds
      =========================== */
 
-  --bg-app: #f5f6f8;
-  --bg-sidebar: #eceef2;
+  --bg-app: #f8fafc;
+  --bg-sidebar: #ffffff;
   --bg-panel: #ffffff;
   --bg-card: #ffffff;
   --bg-hover: #e8ebef;
@@ -114,7 +109,7 @@
      Backgrounds
      =========================== */
 
-  --bg-app: #0b0d0f;
+  --bg-app: #020617;
   --bg-sidebar: #0d1012;
   --bg-panel: #0b0d0f;
   --bg-card: #0e1012;

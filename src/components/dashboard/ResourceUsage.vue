@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import Chart from 'primevue/chart'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import Chart from 'primevue/chart'
+import { computed, onMounted, ref } from 'vue'
 
 const store = useKubernetesStore()
 
@@ -142,10 +142,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <div
-    class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm transition-all duration-200"
-  >
-    <div class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-6">
+  <div class="bg-(--bg-card) p-6">
+    <div class="text-sm font-semibold text-primary uppercase tracking-wider mb-6">
       Resource Usage
     </div>
 
@@ -154,10 +152,10 @@ onMounted(() => {
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <div class="flex flex-col">
-            <span class="text-xs text-[var(--text-muted)] font-medium">CPU Usage</span>
-            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">{{ cpuPct }}%</span>
+            <span class="text-xs text-muted-color font-medium">CPU Usage</span>
+            <span class="text-2xl font-bold text-primary mt-1">{{ cpuPct }}%</span>
           </div>
-          <span class="text-xs text-[var(--text-muted)] font-mono"
+          <span class="text-xs text-muted-color font-mono"
             >{{ usedCpu.toFixed(2) }} / {{ totalCpu.toFixed(2) }} cores</span
           >
         </div>
@@ -171,10 +169,10 @@ onMounted(() => {
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
           <div class="flex flex-col">
-            <span class="text-xs text-[var(--text-muted)] font-medium">Memory Usage</span>
-            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">{{ memPct }}%</span>
+            <span class="text-xs text-muted-color font-medium">Memory Usage</span>
+            <span class="text-2xl font-bold text-primary mt-1">{{ memPct }}%</span>
           </div>
-          <span class="text-xs text-[var(--text-muted)] font-mono"
+          <span class="text-xs text-muted-color font-mono"
             >{{ usedMem.toFixed(2) }} / {{ totalMem.toFixed(2) }} GiB</span
           >
         </div>

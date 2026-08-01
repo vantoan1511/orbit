@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useCluster } from '@/composables/useCluster'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { Clock, Cloud } from '@lucide/vue'
+import { Clock, Cloud, RefreshCwIcon } from '@lucide/vue'
 import { computed } from 'vue'
+import { KubernetesIcon } from 'vue3-simple-icons'
 
 const kubernetesStore = useKubernetesStore()
 const { activeCluster, isRefreshing, refreshCluster, lastUpdatedAt } = useCluster()
@@ -65,30 +66,18 @@ const cloudProvider = computed(() => {
 
 <template>
   <header
-    class="bg-(--bg-app) border-b border-(--border) px-8 py-4 flex flex-col gap-3 select-none"
+    class="px-8 py-4 flex flex-col gap-3 select-none backdrop-blur-xl bg-surface-0/70 dark:bg-surface-950/70 border-b border-surface-200/50 dark:border-surface-800/50 sticky top-0 z-10"
   >
     <!-- Top Row -->
     <div class="flex items-center justify-between">
       <!-- Left side: Cluster info & status -->
       <div class="flex items-center gap-4">
         <template v-if="activeCluster !== null">
-          <h1 class="text-2xl font-bold text-(--text-primary) font-ui tracking-tight">
-            {{ activeCluster.name }}
-          </h1>
-          <div
-            class="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border transition-all duration-200"
-            :class="
-              activeCluster.status === 'healthy'
-                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                : 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-            "
-          >
-            <span
-              class="w-1.5 h-1.5 rounded-full"
-              :class="activeCluster.status === 'healthy' ? 'bg-emerald-500' : 'bg-rose-500'"
-            ></span>
-            <span>{{ activeCluster.status === 'healthy' ? 'Healthy' : 'Offline' }}</span>
-          </div>
+          <OverlayBadge :severity="activeCluster.status === 'healthy' ? 'success' : 'error'">
+            <h1 class="pr-3 text-2xl font-bold font-ui tracking-tight">
+              {{ activeCluster.name }}
+            </h1>
+          </OverlayBadge>
         </template>
         <h1 v-else class="text-2xl font-bold text-(--text-muted) font-ui tracking-tight">
           No active cluster
@@ -97,51 +86,44 @@ const cloudProvider = computed(() => {
 
       <!-- Right side: Last updated, Refresh, Actions -->
       <div v-if="activeCluster" class="flex items-center gap-3">
-        <span class="text-xs text-(--text-muted)">Last updated: {{ lastUpdatedDisplay }}</span>
+        <span class="text-sm text-muted-color">Last updated: {{ lastUpdatedDisplay }}</span>
         <Button
-          icon="pi pi-sync"
+          rounded
           variant="text"
           size="small"
           :loading="isRefreshing"
           :disabled="activeCluster === null"
           @click="refreshCluster"
-        />
+        >
+          <template #icon>
+            <RefreshCwIcon :size="16" />
+          </template>
+        </Button>
       </div>
     </div>
 
     <!-- Bottom Row (Sub-metadata) — only shown when a cluster is active and healthy -->
     <div
       v-if="activeCluster !== null && activeCluster.status === 'healthy'"
-      class="flex items-center gap-6 text-xs text-(--text-secondary) font-medium"
+      class="flex items-center gap-6 text-xs font-semibold tracking-wider"
     >
       <!-- Kubernetes Version -->
       <div class="flex items-center gap-2">
-        <!-- SVG Kubernetes Icon -->
-        <svg class="w-4 h-4 text-sky-500" viewBox="0 0 24 24" fill="currentColor">
-          <path
-            d="M12 2.69l5.66 3.27v6.54L12 15.77 6.34 12.5V5.96L12 2.69m0-1.8L5 4.96v7.88l7 4.04 7-4.04V4.96l-7-4.07zM12 17.5v5.69"
-          />
-          <path
-            d="M5.34 13.5L2 11.58V5.37l7.34-4.24v6.23L5.34 9.48v4.02m0 2l-3.34-1.92V7.37L9.34 3.13v2.23L5.34 7.48v8.02z"
-            class="opacity-70"
-          />
-        </svg>
+        <KubernetesIcon :size="13" />
         <span>Kubernetes {{ kubernetesVersion }}</span>
       </div>
 
       <!-- Cloud Provider -->
-      <div class="flex items-center gap-2 border-l border-(--border) pl-6">
-        <Cloud class="w-4 h-4 text-orange-400" />
-        <span class="font-semibold text-(--text-muted) uppercase text-[10px] tracking-wider">{{
-          cloudProvider.provider
-        }}</span>
-        <span class="text-(--text-muted)">/</span>
+      <div class="flex items-center gap-2 border-l pl-6">
+        <Cloud :size="13" />
+        <span class="uppercase">{{ cloudProvider.provider }}</span>
+        <span>/</span>
         <span>{{ cloudProvider.platform }}</span>
       </div>
 
       <!-- Uptime -->
-      <div class="flex items-center gap-2 border-l border-(--border) pl-6">
-        <Clock class="w-4 h-4 text-indigo-400" />
+      <div class="flex items-center gap-2 border-l pl-6">
+        <Clock :size="13" />
         <span>Uptime: {{ clusterUptime }}</span>
       </div>
     </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { computed } from 'vue'
 
 const store = useKubernetesStore()
 
@@ -84,64 +84,62 @@ const nodeHealth = computed(() => {
 <template>
   <div class="flex flex-col gap-6">
     <!-- Pod Health Card -->
-    <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm transition-all duration-200 flex flex-col justify-between h-[13.5rem]"
-    >
+    <div class="bg-(--bg-card) p-5 flex flex-col justify-between h-54">
       <div>
-        <div class="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-4">
+        <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-4">
           Pod Health
         </div>
 
         <!-- Metrics Grid -->
         <div class="grid grid-cols-4 gap-2 mb-6">
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.running.dot"></span>
               <span>Running</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ podHealth.running.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ podHealth.running.pct }}%
             </div>
           </div>
 
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.pending.dot"></span>
               <span>Pending</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ podHealth.pending.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ podHealth.pending.pct }}%
             </div>
           </div>
 
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.failed.dot"></span>
               <span>Failed</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ podHealth.failed.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ podHealth.failed.pct }}%
             </div>
           </div>
 
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.crashLoop.dot"></span>
               <span class="truncate">CrashLoop</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ podHealth.crashLoop.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ podHealth.crashLoop.pct }}%
             </div>
           </div>
@@ -149,7 +147,7 @@ const nodeHealth = computed(() => {
       </div>
 
       <!-- Segmented Progress Bar -->
-      <div class="w-full h-3 rounded-full bg-[var(--bg-hover)] overflow-hidden flex">
+      <div class="w-full h-3 rounded-full bg-(--bg-hover) overflow-hidden flex">
         <div
           :style="{ width: podHealth.running.pct + '%' }"
           :class="podHealth.running.color"
@@ -174,51 +172,49 @@ const nodeHealth = computed(() => {
     </div>
 
     <!-- Node Health Card -->
-    <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm transition-all duration-200 flex flex-col justify-between h-[13.5rem]"
-    >
+    <div class="bg-(--bg-card) p-5 flex flex-col justify-between h-54">
       <div>
-        <div class="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-4">
+        <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-4">
           Node Health
         </div>
 
         <!-- Metrics Grid -->
         <div class="grid grid-cols-3 gap-4 mb-6">
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.ready.dot"></span>
               <span>Ready</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ nodeHealth.ready.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ nodeHealth.ready.pct }}%
             </div>
           </div>
 
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.notReady.dot"></span>
               <span>NotReady</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ nodeHealth.notReady.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ nodeHealth.notReady.pct }}%
             </div>
           </div>
 
           <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] font-medium">
+            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
               <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.cordoned.dot"></span>
               <span>Cordoned</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-[var(--text-primary)]">
+            <div class="text-xl font-bold mt-1.5 text-primary">
               {{ nodeHealth.cordoned.count }}
             </div>
-            <div class="text-[10px] text-[var(--text-muted)] font-medium mt-0.5">
+            <div class="text-[10px] text-muted-color font-medium mt-0.5">
               {{ nodeHealth.cordoned.pct }}%
             </div>
           </div>
@@ -226,7 +222,7 @@ const nodeHealth = computed(() => {
       </div>
 
       <!-- Segmented Progress Bar -->
-      <div class="w-full h-3 rounded-full bg-[var(--bg-hover)] overflow-hidden flex">
+      <div class="w-full h-3 rounded-full bg-(--bg-hover) overflow-hidden flex">
         <div
           :style="{ width: nodeHealth.ready.pct + '%' }"
           :class="nodeHealth.ready.color"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Layers, Database, Box, ClipboardList, HardDrive, Clock } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { Box, ClipboardList, Clock, Database, HardDrive, Layers } from '@lucide/vue'
+import { computed } from 'vue'
 
 const store = useKubernetesStore()
 
@@ -68,38 +68,32 @@ const items = computed(() => {
 
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-    <div
-      v-for="item in items"
-      :key="item.title"
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-5 shadow-sm hover:border-[var(--border-strong)] transition-all duration-200 flex flex-col justify-between"
-    >
-      <!-- Top Section -->
-      <div class="flex items-center justify-between mb-4">
-        <!-- Icon wrapper -->
-        <div class="p-2 rounded-lg" :class="item.iconColor">
-          <component :is="item.icon" class="w-5 h-5" />
+    <Card v-for="item in items" :key="item.title">
+      <template #title>
+        <div class="flex items-center justify-between mb-4">
+          <div class="p-2 rounded-lg" :class="item.iconColor">
+            <component :is="item.icon" class="w-5 h-5" />
+          </div>
         </div>
-      </div>
-
-      <!-- Count and title -->
-      <div>
-        <div class="text-[10px] font-bold text-[var(--text-muted)] tracking-wider uppercase">
+      </template>
+      <template #subtitle>
+        <div class="text-sm font-bold text-muted-color tracking-wider uppercase">
           {{ item.title }}
         </div>
-        <div class="text-3xl font-bold text-[var(--text-primary)] mt-1 font-ui">
+      </template>
+      <template #content>
+        <div class="text-3xl font-bold text-primary mt-1 font-ui">
           {{ item.count }}
         </div>
-      </div>
-
-      <!-- Footer Info Badge -->
-      <div
-        class="mt-4 flex items-center justify-between text-xs border-t border-[var(--border)] pt-3"
-      >
-        <span class="text-[var(--text-muted)] font-medium">{{ item.statusLabel }}</span>
-        <span class="px-2 py-0.5 rounded text-xs font-bold" :class="item.statusColor">
-          {{ item.statusVal }}
-        </span>
-      </div>
-    </div>
+      </template>
+      <template #footer>
+        <div class="mt-4 flex items-center justify-between text-xs border-t border-surface pt-3">
+          <span class="text-muted-color font-medium">{{ item.statusLabel }}</span>
+          <span class="px-2 py-0.5 rounded text-xs font-bold" :class="item.statusColor">
+            {{ item.statusVal }}
+          </span>
+        </div>
+      </template>
+    </Card>
   </div>
 </template>
