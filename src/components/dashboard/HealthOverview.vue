@@ -79,161 +79,64 @@ const nodeHealth = computed(() => {
     }
   }
 })
+
+const healthSections = computed(() => [
+  {
+    title: 'Pod Health',
+    gridCols: 'grid-cols-4',
+    items: [
+      { label: 'Running', ...podHealth.value.running },
+      { label: 'Pending', ...podHealth.value.pending },
+      { label: 'Failed', ...podHealth.value.failed },
+      { label: 'CrashLoop', ...podHealth.value.crashLoop }
+    ]
+  },
+  {
+    title: 'Node Health',
+    gridCols: 'grid-cols-3',
+    items: [
+      { label: 'Ready', ...nodeHealth.value.ready },
+      { label: 'NotReady', ...nodeHealth.value.notReady },
+      { label: 'Cordoned', ...nodeHealth.value.cordoned }
+    ]
+  }
+])
 </script>
 
 <template>
   <div class="flex flex-col gap-6">
-    <!-- Pod Health Card -->
-    <div class="bg-(--bg-card) p-5 flex flex-col justify-between h-54">
-      <div>
-        <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-4">
-          Pod Health
+    <Card v-for="section in healthSections" :key="section.title">
+      <template #title>
+        <div class="text-sm font-semibold text-primary uppercase tracking-wider">
+          {{ section.title }}
         </div>
-
-        <!-- Metrics Grid -->
-        <div class="grid grid-cols-4 gap-2 mb-6">
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.running.dot"></span>
-              <span>Running</span>
+      </template>
+      <template #content>
+        <div class="grid gap-2" :class="section.gridCols">
+          <div v-for="item in section.items" :key="item.label" class="flex flex-col">
+            <div class="flex items-center gap-1.5 text-xs text-muted-color font-medium">
+              <span class="w-2.5 h-2.5 rounded-full" :class="item.dot"></span>
+              <span class="truncate">{{ item.label }}</span>
             </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ podHealth.running.count }}
+            <div class="text-2xl font-bold mt-1.5 text-primary">
+              {{ item.count }}
             </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ podHealth.running.pct }}%
-            </div>
-          </div>
-
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.pending.dot"></span>
-              <span>Pending</span>
-            </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ podHealth.pending.count }}
-            </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ podHealth.pending.pct }}%
-            </div>
-          </div>
-
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.failed.dot"></span>
-              <span>Failed</span>
-            </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ podHealth.failed.count }}
-            </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ podHealth.failed.pct }}%
-            </div>
-          </div>
-
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="podHealth.crashLoop.dot"></span>
-              <span class="truncate">CrashLoop</span>
-            </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ podHealth.crashLoop.count }}
-            </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ podHealth.crashLoop.pct }}%
-            </div>
+            <div class="text-xs text-muted-color font-medium mt-0.5">{{ item.pct }}%</div>
           </div>
         </div>
-      </div>
-
-      <!-- Segmented Progress Bar -->
-      <div class="w-full h-3 rounded-full bg-(--bg-hover) overflow-hidden flex">
-        <div
-          :style="{ width: podHealth.running.pct + '%' }"
-          :class="podHealth.running.color"
-          title="Running"
-        ></div>
-        <div
-          :style="{ width: podHealth.pending.pct + '%' }"
-          :class="podHealth.pending.color"
-          title="Pending"
-        ></div>
-        <div
-          :style="{ width: podHealth.failed.pct + '%' }"
-          :class="podHealth.failed.color"
-          title="Failed"
-        ></div>
-        <div
-          :style="{ width: podHealth.crashLoop.pct + '%' }"
-          :class="podHealth.crashLoop.color"
-          title="CrashLoop"
-        ></div>
-      </div>
-    </div>
-
-    <!-- Node Health Card -->
-    <div class="bg-(--bg-card) p-5 flex flex-col justify-between h-54">
-      <div>
-        <div class="text-xs font-semibold text-primary uppercase tracking-wider mb-4">
-          Node Health
+      </template>
+      <template #footer>
+        <!-- Segmented Progress Bar -->
+        <div class="w-full h-3 rounded-full overflow-hidden flex">
+          <div
+            v-for="item in section.items"
+            :key="item.label"
+            :style="{ width: item.pct + '%' }"
+            :class="item.color"
+            :title="item.label"
+          ></div>
         </div>
-
-        <!-- Metrics Grid -->
-        <div class="grid grid-cols-3 gap-4 mb-6">
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.ready.dot"></span>
-              <span>Ready</span>
-            </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ nodeHealth.ready.count }}
-            </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ nodeHealth.ready.pct }}%
-            </div>
-          </div>
-
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.notReady.dot"></span>
-              <span>NotReady</span>
-            </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ nodeHealth.notReady.count }}
-            </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ nodeHealth.notReady.pct }}%
-            </div>
-          </div>
-
-          <div class="flex flex-col">
-            <div class="flex items-center gap-1.5 text-xs text-(--text-secondary) font-medium">
-              <span class="w-2.5 h-2.5 rounded-full" :class="nodeHealth.cordoned.dot"></span>
-              <span>Cordoned</span>
-            </div>
-            <div class="text-xl font-bold mt-1.5 text-primary">
-              {{ nodeHealth.cordoned.count }}
-            </div>
-            <div class="text-[10px] text-muted-color font-medium mt-0.5">
-              {{ nodeHealth.cordoned.pct }}%
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Segmented Progress Bar -->
-      <div class="w-full h-3 rounded-full bg-(--bg-hover) overflow-hidden flex">
-        <div
-          :style="{ width: nodeHealth.ready.pct + '%' }"
-          :class="nodeHealth.ready.color"
-          title="Ready"
-        ></div>
-        <div
-          :style="{ width: nodeHealth.cordoned.pct + '%' }"
-          :class="nodeHealth.cordoned.color"
-          title="Cordoned"
-        ></div>
-      </div>
-    </div>
+      </template>
+    </Card>
   </div>
 </template>
