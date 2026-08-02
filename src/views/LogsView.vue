@@ -33,7 +33,6 @@ const { showRulesDialog, loadRules, getLogLevelColor } = logHighlighting
 const {
   logLines,
   maxLogLines,
-  terminalRef,
   searchQuery,
   isRegex,
   showTimestamps,

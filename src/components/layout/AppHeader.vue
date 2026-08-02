@@ -90,13 +90,12 @@ const cloudProvider = computed(() => {
         <Button
           rounded
           variant="text"
-          size="small"
           :loading="isRefreshing"
           :disabled="activeCluster === null"
           @click="refreshCluster"
         >
           <template #icon>
-            <RefreshCwIcon :size="16" />
+            <RefreshCwIcon :size="13" />
           </template>
         </Button>
       </div>

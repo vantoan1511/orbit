@@ -18,9 +18,9 @@ defineProps<{
 </script>
 
 <template>
-  <div class="bg-(--bg-card) p-5 flex flex-col justify-between">
-    <div>
-      <div class="flex items-center justify-between mb-4">
+  <Card>
+    <template #title>
+      <div class="flex items-center justify-between">
         <div class="text-sm font-semibold text-primary uppercase tracking-wider">
           {{ title }}
         </div>
@@ -31,8 +31,9 @@ defineProps<{
           <span>View all</span>
         </router-link>
       </div>
-
-      <div class="divide-y divide-(--border)">
+    </template>
+    <template #content>
+      <div class="divide-y divide-dashed divide-surface-500">
         <div
           v-for="(item, index) in items"
           :key="item.uid || index"
@@ -52,6 +53,6 @@ defineProps<{
           </div>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </Card>
 </template>

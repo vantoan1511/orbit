@@ -83,13 +83,10 @@ const consumers = computed<ConsumerItem[]>(() => {
 </script>
 
 <template>
-  <div class="bg-(--bg-card) p-5 flex flex-col justify-between h-full">
-    <div>
-      <!-- Header with Tabs -->
-      <div class="flex items-center justify-between mb-5 flex-wrap gap-2">
+  <Card>
+    <template #title>
+      <div class="flex items-center justify-between">
         <div class="text-sm font-semibold text-primary uppercase tracking-wider">Top Consumers</div>
-
-        <!-- Tab Selector -->
         <SelectButton
           v-model="activeTab"
           size="small"
@@ -97,62 +94,71 @@ const consumers = computed<ConsumerItem[]>(() => {
           :options="tabOptions"
           option-label="label"
           option-value="value"
-        />
+        >
+          <template #option="slotProps">
+            <span class="text-xs">{{ slotProps.option.label }}</span>
+          </template>
+        </SelectButton>
       </div>
-
-      <!-- Table -->
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm border-collapse">
-          <thead>
-            <tr class="text-muted-color font-semibold border-b border-(--border) pb-2">
-              <th class="pb-2 font-medium">Pod</th>
-              <th class="pb-2 font-medium">Namespace</th>
-              <th class="pb-2 font-medium" :class="{ 'text-right': activeTab === 'restarts' }">
-                {{ metricHeaderLabel }}
-              </th>
-              <th v-if="activeTab !== 'restarts'" class="pb-2 font-medium text-right">Usage (%)</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-(--border)/50">
-            <tr
-              v-for="item in consumers"
-              :key="item.pod"
-              class="text-(--text-secondary) hover:text-primary"
-            >
-              <td class="py-2.5 font-medium truncate max-w-25" :title="item.pod">
-                {{ item.pod }}
-              </td>
-              <td class="py-2.5 text-muted-color">{{ item.namespace }}</td>
-              <td class="py-2.5 font-mono" :class="{ 'text-right': activeTab === 'restarts' }">
-                {{ item.value }}
-              </td>
-              <td v-if="activeTab !== 'restarts'" class="py-2.5 text-right font-mono">
-                <div class="flex items-center justify-end gap-2">
-                  <span class="w-8 text-right">{{ item.pct }}%</span>
-                  <div
-                    class="w-16 h-1.5 rounded-full bg-(--bg-hover) overflow-hidden hidden sm:block"
-                  >
+    </template>
+    <template #content>
+      <div>
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead>
+              <tr class="text-muted-color font-semibold border-b border-surface-500 pb-2">
+                <th class="pb-2 font-medium">Pod</th>
+                <th class="pb-2 font-medium">Namespace</th>
+                <th class="pb-2 font-medium" :class="{ 'text-right': activeTab === 'restarts' }">
+                  {{ metricHeaderLabel }}
+                </th>
+                <th v-if="activeTab !== 'restarts'" class="pb-2 font-medium text-right">
+                  Usage (%)
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-dashed divide-surface-500">
+              <tr
+                v-for="item in consumers"
+                :key="item.pod"
+                class="text-surface-500 hover:text-primary"
+              >
+                <td class="py-2.5 font-medium truncate max-w-25" :title="item.pod">
+                  {{ item.pod }}
+                </td>
+                <td class="py-2.5 text-muted-color">{{ item.namespace }}</td>
+                <td class="py-2.5 font-mono" :class="{ 'text-right': activeTab === 'restarts' }">
+                  {{ item.value }}
+                </td>
+                <td v-if="activeTab !== 'restarts'" class="py-2.5 text-right font-mono">
+                  <div class="flex items-center justify-end gap-2">
+                    <span class="w-8 text-right">{{ item.pct }}%</span>
                     <div
-                      :style="{ width: item.pct + '%' }"
-                      :class="item.color"
-                      class="h-full"
-                    ></div>
+                      class="w-16 h-1.5 rounded-full bg-(--bg-hover) overflow-hidden hidden sm:block"
+                    >
+                      <div
+                        :style="{ width: item.pct + '%' }"
+                        :class="item.color"
+                        class="h-full"
+                      ></div>
+                    </div>
                   </div>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-
-    <!-- View All Link -->
-    <router-link
-      to="/pods"
-      class="text-sm hover:underline flex items-center justify-between font-semibold mt-4 pt-4 w-full"
-    >
-      <span>View all resource usage</span>
-      <ArrowRight class="w-3.5 h-3.5" />
-    </router-link>
-  </div>
+    </template>
+    <template #footer>
+      <router-link
+        to="/pods"
+        class="text-xs text-muted-color hover:underline flex justify-between font-semibold w-full mt-5"
+      >
+        <span>View all resource usage</span>
+        <ArrowRight :size="13" />
+      </router-link>
+    </template>
+  </Card>
 </template>

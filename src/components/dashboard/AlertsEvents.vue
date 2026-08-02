@@ -62,7 +62,7 @@ const warnings = computed<EventListItem[]>(() => {
 const normalEvents = computed<EventListItem[]>(() => {
   return kubernetesStore.events
     .filter((e) => e.type === 'Normal')
-    .slice(0, 7)
+    .slice(0, 5)
     .map((e) => ({
       uid: e.uid,
       icon: getEventIcon(e.objectKind),

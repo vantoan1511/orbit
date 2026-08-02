@@ -22,7 +22,7 @@ const route = useRoute()
 
       <!-- Main Content Area -->
       <div class="flex-1 flex flex-col h-full overflow-hidden">
-        <main class="bg-(--bg-app) flex-1 h-full overflow-y-auto relative">
+        <main class="flex-1 h-full overflow-y-auto relative">
           <!-- Header -->
           <AppHeader />
 

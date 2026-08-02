@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import { useRouter } from 'vue-router'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
+import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import { ArrowLeft } from '@lucide/vue'
 
 const activeTab = ref('general')
+
+const router = useRouter()
 </script>
 
 <template>
   <div class="flex flex-col h-full">
     <!-- Header/Title -->
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold tracking-tight text-primary">Settings</h2>
+      <div class="flex items-center gap-3">
+        <Button severity="secondary" variant="text" size="small" @click="router.back()">
+          <ArrowLeft class="w-4 h-4" />
+        </Button>
+        <h2 class="text-xl font-bold tracking-tight text-primary">Settings</h2>
+      </div>
     </div>
 
     <!-- Tabs Navigation -->

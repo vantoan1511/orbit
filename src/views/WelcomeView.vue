@@ -78,7 +78,6 @@ const quickStartSteps = [
           id="welcome-add-cluster-btn"
           icon="pi pi-plus"
           label="Add Cluster"
-          severity="secondary"
           @click="handleAddCluster"
         />
         <p class="text-sm font-semibold text-(--text-secondary)">
@@ -95,7 +94,7 @@ const quickStartSteps = [
       <h2 class="text-sm font-semibold text-primary mb-5">Quick start</h2>
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
         <div v-for="item in quickStartSteps" :key="item.step" class="flex flex-col gap-2">
-          <component :is="item.icon" class="w-5 h-5 text-blue-500" />
+          <component :is="item.icon" class="w-5 h-5 text-primary" />
           <span class="text-sm font-semibold text-primary">{{ item.step }}</span>
           <p class="text-xs text-(--text-secondary) leading-relaxed">{{ item.description }}</p>
         </div>

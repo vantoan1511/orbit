@@ -106,23 +106,33 @@ const { isDark, toggleTheme } = useTheme()
 
     <!-- Navigation Section -->
     <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-      <router-link
+      <Button
         v-for="link in navLinks"
         :key="link.name"
-        :to="link.path"
-        class="flex items-center gap-3 px-3 py-3 rounded-lg rounded-r-none text-sm transition-all duration-200"
-        :class="[
-          route.path === link.path
-            ? 'bg-(--bg-active) text-primary border-r-3'
-            : 'text-muted-color hover:bg-(--bg-hover)',
-          k8sStore.activeClusterId === null && link.path !== '/settings'
-            ? 'opacity-40 pointer-events-none'
-            : ''
-        ]"
+        v-slot="slotProps"
+        as-child
+        fluid
+        variant="link"
       >
-        <component :is="link.icon" class="w-4 h-4 shrink-0" />
-        <span :class="route.path === link.path ? 'font-bold' : 'font-medium'">{{ link.name }}</span>
-      </router-link>
+        <router-link
+          :to="link.path"
+          :class="[
+            slotProps.class,
+            route.path === link.path
+              ? 'bg-primary-200! dark:bg-primary-700! border-l-primary! border-l-3! rounded-l-lg! translate-x-3'
+              : 'text-muted-color hover:bg-surface-100 dark:hover:bg-surface-800',
+            'flex! items-center! justify-start! transition-all duration-200'
+          ]"
+        >
+          <component :is="link.icon" class="w-4 h-4 shrink-0" />
+          <span
+            :class="route.path === link.path ? 'font-bold!' : 'font-medium!'"
+            class="text-nowrap"
+          >
+            {{ link.name }}
+          </span>
+        </router-link>
+      </Button>
     </nav>
 
     <!-- Bottom Footer -->
@@ -150,18 +160,11 @@ const { isDark, toggleTheme } = useTheme()
             rounded
             variant="text"
             icon="pi pi-bell"
+            badge-severity="danger"
             :aria-label="'Notifications'"
+            :badge="notificationStore.unreadCount.toString()"
             @click="notificationStore.toggleDrawer()"
           />
-          <span
-            v-if="notificationStore.unreadCount > 0"
-            class="absolute top-1 right-1 flex h-2 w-2 pointer-events-none"
-          >
-            <span
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"
-            ></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-          </span>
         </div>
 
         <!-- Profile -->
