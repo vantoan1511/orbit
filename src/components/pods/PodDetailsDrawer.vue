@@ -174,7 +174,7 @@ const viewPodLogs = (containerName?: string) => {
           <div class="min-w-0">
             <div class="flex items-center gap-2">
               <h3
-                class="text-base font-bold text-(--text-primary) font-mono truncate max-w-70"
+                class="text-base font-bold text-primary font-mono truncate max-w-70"
                 :title="pod.name"
               >
                 {{ pod.name }}
@@ -185,7 +185,7 @@ const viewPodLogs = (containerName?: string) => {
                 Pod
               </span>
             </div>
-            <div class="flex items-center gap-2 text-xs text-(--text-muted) font-mono mt-0.5">
+            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
               <span>ns: {{ pod.namespace }}</span>
             </div>
           </div>

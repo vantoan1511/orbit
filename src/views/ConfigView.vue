@@ -17,7 +17,7 @@ onMounted(async () => {
   <div class="flex flex-col gap-6">
     <!-- Header/Title -->
     <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold tracking-tight text-(--text-primary)">ConfigMaps & Secrets</h2>
+      <h2 class="text-xl font-bold tracking-tight text-primary">ConfigMaps & Secrets</h2>
     </div>
 
     <!-- Content Tabs Layout -->

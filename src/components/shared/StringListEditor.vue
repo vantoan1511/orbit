@@ -44,7 +44,7 @@ const updateItem = (index: number, val: string) => {
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label v-if="title" class="text-xs font-medium text-(--text-secondary)">{{ title }}</label>
+      <label v-if="title" class="text-xs font-medium text-muted-color">{{ title }}</label>
       <Button
         v-if="!disabled"
         size="small"
@@ -55,7 +55,7 @@ const updateItem = (index: number, val: string) => {
       />
     </div>
 
-    <div v-if="modelValue.length === 0" class="text-xs text-(--text-muted) italic py-1">
+    <div v-if="modelValue.length === 0" class="text-xs text-muted-color italic py-1">
       No items defined.
     </div>
 
@@ -64,7 +64,7 @@ const updateItem = (index: number, val: string) => {
         :model-value="item"
         :placeholder="placeholder"
         :disabled="disabled"
-        class="flex-1 px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-primary)"
+        class="flex-1 px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
         @update:model-value="(val) => updateItem(idx, val ?? '')"
       />
       <Button

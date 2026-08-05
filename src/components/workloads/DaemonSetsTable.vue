@@ -142,7 +142,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
       <template #body="{ data }">
         <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
       </template>
@@ -171,7 +171,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Desired/Current Column -->
     <Column v-if="visibleCols['desiredCurrent']" header="Desired/Current" class="p-3">
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">
+        <span class="font-mono text-muted-color">
           {{ data.replicas.desired }} / {{ data.replicas.current }}
         </span>
       </template>
@@ -197,7 +197,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Images Column -->
@@ -207,7 +207,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="img in data.images"
             :key="img"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-(--text-secondary) text-[10px] border border-(--border) font-mono truncate max-w-full"
+            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
             :title="img"
           >
             {{ img.split('/').pop() }}
@@ -227,7 +227,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           title="Actions"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
       </template>
     </Column>

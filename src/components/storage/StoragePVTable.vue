@@ -83,7 +83,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-5">
     <div class="flex items-center justify-between">
       <div
-        class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider flex items-center gap-2"
+        class="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2"
       >
         <Database class="w-4 h-4 text-violet-400" />
         Persistent Volumes ({{ filteredPVs.length }})
@@ -95,13 +95,11 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <div class="flex items-center gap-2.5 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-56">
-          <Search
-            class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-(--text-muted)"
-          />
+          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-color" />
           <InputText
             v-model="searchQuery"
             placeholder="Search PVs..."
-            class="pl-8 pr-3 py-1.5 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            class="pl-8 pr-3 py-1.5 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
 
@@ -130,10 +128,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           @click="refreshTable"
           :loading="k8sStore.persistentVolumesLoading"
         >
-          <RefreshCw class="w-3.5 h-3.5 text-(--text-secondary)" />
+          <RefreshCw class="w-3.5 h-3.5 text-muted-color" />
         </Button>
         <Button severity="secondary" variant="text" size="small" class="p-1">
-          <Settings2 class="w-3.5 h-3.5 text-(--text-secondary)" />
+          <Settings2 class="w-3.5 h-3.5 text-muted-color" />
         </Button>
       </div>
     </div>
@@ -147,14 +145,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       tableClass="w-full text-left text-xs border-collapse"
     >
       <template #empty>
-        <div class="text-center py-8 text-(--text-muted) flex flex-col items-center gap-2">
-          <Info class="w-6 h-6 text-(--text-muted)/50" />
+        <div class="text-center py-8 text-muted-color flex flex-col items-center gap-2">
+          <Info class="w-6 h-6 text-muted-color/50" />
           <span>No Persistent Volumes found matching the filters.</span>
         </div>
       </template>
 
       <!-- Name Column -->
-      <Column field="name" header="Name" class="font-medium p-2.5 text-(--text-primary)">
+      <Column field="name" header="Name" class="font-medium p-2.5 text-primary">
         <template #body="{ data }">
           <div class="flex items-center gap-1.5">
             <span
@@ -173,21 +171,13 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       </Column>
 
       <!-- Capacity Column -->
-      <Column
-        field="capacity"
-        header="Capacity"
-        class="p-2.5 font-mono text-(--text-primary)"
-      ></Column>
+      <Column field="capacity" header="Capacity" class="p-2.5 font-mono text-primary"></Column>
 
       <!-- Access Mode Column -->
-      <Column
-        field="accessMode"
-        header="Access Mode"
-        class="p-2.5 text-(--text-secondary)"
-      ></Column>
+      <Column field="accessMode" header="Access Mode" class="p-2.5 text-muted-color"></Column>
 
       <!-- Reclaim Policy Column -->
-      <Column field="reclaimPolicy" header="Reclaim" class="p-2.5 text-(--text-muted)"></Column>
+      <Column field="reclaimPolicy" header="Reclaim" class="p-2.5 text-muted-color"></Column>
 
       <!-- Storage Class Column -->
       <Column field="storageClass" header="Storage Class" class="p-2.5">
@@ -225,7 +215,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       </Column>
 
       <!-- Age Column -->
-      <Column field="age" header="Age" class="p-2.5 text-(--text-muted) font-mono"></Column>
+      <Column field="age" header="Age" class="p-2.5 text-muted-color font-mono"></Column>
 
       <!-- Actions Column -->
       <Column class="p-3 text-center w-12 shrink-0">
@@ -238,7 +228,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             title="Actions"
             @click="toggleActionMenu($event, data)"
           >
-            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+            <MoreVertical class="w-4 h-4 text-muted-color" />
           </Button>
         </template>
       </Column>

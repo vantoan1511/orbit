@@ -1,14 +1,15 @@
 import { definePreset } from '@primeuix/themes'
 
 import Aura from '@primeuix/themes/aura'
+import type { Preset } from '@primeuix/themes/types'
 
-export const Noir = definePreset(Aura, {
+const NoirPreset: Preset = {
   semantic: {
     focusRing: {
       width: '2px',
       style: 'dashed',
       color: '{primary.color}',
-      offset: '5px'
+      offset: '2px'
     },
     primary: {
       50: '{zinc.50}',
@@ -40,10 +41,10 @@ export const Noir = definePreset(Aura, {
       },
       dark: {
         primary: {
-          color: '{zinc.50}',
-          inverseColor: '{zinc.950}',
-          hoverColor: '{zinc.100}',
-          activeColor: '{zinc.200}'
+          color: '{slate.50}',
+          inverseColor: '{slate.950}',
+          hoverColor: '{slate.100}',
+          activeColor: '{slate.200}'
         },
         highlight: {
           background: 'rgba(250, 250, 250, .16)',
@@ -54,4 +55,6 @@ export const Noir = definePreset(Aura, {
       }
     }
   }
-})
+}
+
+export const Noir = definePreset(Aura, NoirPreset)

@@ -17,7 +17,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
   <div class="flex flex-col gap-6">
     <!-- Header/Title -->
     <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold tracking-tight text-(--text-primary)">Storage</h2>
+      <h2 class="text-xl font-bold tracking-tight text-primary">Storage</h2>
     </div>
 
     <!-- Content Tabs Layout -->
@@ -61,7 +61,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
             <div
               class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-5"
             >
-              <div class="text-sm font-semibold text-(--text-primary) uppercase tracking-wider">
+              <div class="text-sm font-semibold text-primary uppercase tracking-wider">
                 Storage Classes
               </div>
               <DataTable
@@ -69,7 +69,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
                 class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
                 tableClass="w-full text-left text-xs border-collapse"
               >
-                <Column field="name" header="Name" class="font-medium p-3 text-(--text-primary)">
+                <Column field="name" header="Name" class="font-medium p-3 text-primary">
                   <template #body="{ data }">
                     <span class="font-semibold font-mono">{{ data.name }}</span>
                   </template>
@@ -77,17 +77,17 @@ const storageClasses = computed(() => k8sStore.storageClasses)
                 <Column
                   field="provisioner"
                   header="Provisioner"
-                  class="p-3 font-mono text-(--text-secondary)"
+                  class="p-3 font-mono text-muted-color"
                 ></Column>
                 <Column
                   field="reclaimPolicy"
                   header="Reclaim Policy"
-                  class="p-3 text-(--text-muted)"
+                  class="p-3 text-muted-color"
                 ></Column>
                 <Column
                   field="volumeBindingMode"
                   header="Volume Binding Mode"
-                  class="p-3 text-(--text-secondary)"
+                  class="p-3 text-muted-color"
                 ></Column>
                 <Column field="allowVolumeExpansion" header="Allow Volume Expansion" class="p-3">
                   <template #body="{ data }">
@@ -103,7 +103,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
                     </span>
                   </template>
                 </Column>
-                <Column field="age" header="Age" class="p-3 text-(--text-muted) font-mono"></Column>
+                <Column field="age" header="Age" class="p-3 text-muted-color font-mono"></Column>
               </DataTable>
             </div>
           </div>

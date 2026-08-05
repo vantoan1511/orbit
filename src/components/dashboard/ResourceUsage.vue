@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import Chart from 'primevue/chart'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import Chart from 'primevue/chart'
+import { computed, onMounted, ref } from 'vue'
 
 const store = useKubernetesStore()
 
@@ -139,50 +139,55 @@ onMounted(() => {
     }
   }
 })
+
+const metrics = computed(() => [
+  {
+    title: 'CPU Usage',
+    percentage: cpuPct.value,
+    used: usedCpu.value,
+    total: totalCpu.value,
+    unit: 'cores',
+    chartData: cpuChartData.value
+  },
+  {
+    title: 'Memory Usage',
+    percentage: memPct.value,
+    used: usedMem.value,
+    total: totalMem.value,
+    unit: 'GiB',
+    chartData: memChartData.value
+  }
+])
 </script>
 
 <template>
-  <div
-    class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl p-6 shadow-sm transition-all duration-200"
-  >
-    <div class="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider mb-6">
-      Resource Usage
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <!-- CPU Column -->
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <div class="flex flex-col">
-            <span class="text-xs text-[var(--text-muted)] font-medium">CPU Usage</span>
-            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">{{ cpuPct }}%</span>
+  <Card>
+    <template #title>
+      <div class="text-sm uppercase font-semibold text-primary tracking-wider">Resource Usage</div>
+    </template>
+    <template #content>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div v-for="metric in metrics" :key="metric.title" class="flex flex-col gap-2">
+          <div class="flex items-center justify-between">
+            <div class="flex flex-col">
+              <span class="text-xs text-muted-color font-medium">{{ metric.title }}</span>
+              <span class="text-2xl font-bold text-primary mt-1">{{ metric.percentage }}%</span>
+            </div>
+            <span class="text-xs text-muted-color font-mono">
+              {{ metric.used.toFixed(2) }} / {{ metric.total.toFixed(2) }} {{ metric.unit }}
+            </span>
           </div>
-          <span class="text-xs text-[var(--text-muted)] font-mono"
-            >{{ usedCpu.toFixed(2) }} / {{ totalCpu.toFixed(2) }} cores</span
-          >
-        </div>
-        <!-- Chart Wrapper -->
-        <div class="h-44 w-full mt-2">
-          <Chart type="line" :data="cpuChartData" :options="chartOptions" class="h-full w-full" />
+          <!-- Chart Wrapper -->
+          <div class="h-44 w-full mt-2">
+            <Chart
+              type="line"
+              :data="metric.chartData"
+              :options="chartOptions"
+              class="h-full w-full"
+            />
+          </div>
         </div>
       </div>
-
-      <!-- Memory Column -->
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center justify-between">
-          <div class="flex flex-col">
-            <span class="text-xs text-[var(--text-muted)] font-medium">Memory Usage</span>
-            <span class="text-2xl font-bold text-[var(--text-primary)] mt-1">{{ memPct }}%</span>
-          </div>
-          <span class="text-xs text-[var(--text-muted)] font-mono"
-            >{{ usedMem.toFixed(2) }} / {{ totalMem.toFixed(2) }} GiB</span
-          >
-        </div>
-        <!-- Chart Wrapper -->
-        <div class="h-44 w-full mt-2">
-          <Chart type="line" :data="memChartData" :options="chartOptions" class="h-full w-full" />
-        </div>
-      </div>
-    </div>
-  </div>
+    </template>
+  </Card>
 </template>

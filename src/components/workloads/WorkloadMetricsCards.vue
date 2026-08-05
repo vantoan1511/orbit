@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import Chart from 'primevue/chart'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { AlertTriangle, Boxes, CheckCircle2, Server, TrendingUp } from '@lucide/vue'
+import Chart from 'primevue/chart'
 import { computed, onMounted, ref } from 'vue'
-import { Boxes, Server, CheckCircle2, TrendingUp, AlertTriangle } from '@lucide/vue'
 
 const k8sStore = useKubernetesStore()
 const deployments = computed(() => k8sStore.deployments)
@@ -98,218 +98,152 @@ const failedChartData = computed(() => {
     ]
   }
 })
+
+const cardItems = computed(() => [
+  {
+    title: 'Total Deployments',
+    value: totals.value.total,
+    totalValue: null,
+    icon: Boxes,
+    iconClass: 'text-violet-400 bg-violet-500/10',
+    valueClass: 'text-primary',
+    type: 'simple',
+    footerText: 'All controllers active',
+    footerClass: 'text-emerald-500'
+  },
+  {
+    title: 'Replicas',
+    value: totals.value.currentReplicas,
+    totalValue: totals.value.desiredReplicas,
+    icon: Server,
+    iconClass: 'text-blue-400 bg-blue-500/10',
+    valueClass: 'text-primary',
+    type: 'progress',
+    percentValue: Math.round(
+      (totals.value.currentReplicas / (totals.value.desiredReplicas || 1)) * 100
+    ),
+    progressClass: 'bg-blue-500',
+    footerText: 'desired'
+  },
+  {
+    title: 'Up-To-Date',
+    value: totals.value.upToDateReplicas,
+    totalValue: totals.value.currentReplicas,
+    icon: TrendingUp,
+    iconClass: 'text-cyan-400 bg-cyan-500/10',
+    valueClass: 'text-primary',
+    type: 'progress',
+    percentValue: Math.round(
+      (totals.value.upToDateReplicas / (totals.value.currentReplicas || 1)) * 100
+    ),
+    progressClass: 'bg-cyan-500',
+    footerText: 'synchronized'
+  },
+  {
+    title: 'Available',
+    value: totals.value.running,
+    totalValue: null,
+    icon: CheckCircle2,
+    iconClass: 'text-emerald-400 bg-emerald-500/10',
+    valueClass: 'text-emerald-500',
+    type: 'chart',
+    chartData: availableChartData.value,
+    percentValue: Math.round((totals.value.running / (totals.value.total || 1)) * 100),
+    percentColorClass: 'text-emerald-500',
+    footerText: `${totals.value.running} of ${totals.value.total} deployments healthy`,
+    footerClass: 'text-muted-color'
+  },
+  {
+    title: 'Updating',
+    value: totals.value.progressing,
+    totalValue: null,
+    icon: TrendingUp,
+    iconClass: 'text-amber-400 bg-amber-500/10',
+    valueClass: 'text-amber-500',
+    type: 'chart',
+    chartData: progressingChartData.value,
+    percentValue: Math.round((totals.value.progressing / (totals.value.total || 1)) * 100),
+    percentColorClass: 'text-amber-500',
+    footerText: `${totals.value.progressing} deployment rolling out`,
+    footerClass: 'text-muted-color'
+  },
+  {
+    title: 'Failed',
+    value: totals.value.failed,
+    totalValue: null,
+    icon: AlertTriangle,
+    iconClass: 'text-rose-400 bg-rose-500/10',
+    valueClass: 'text-rose-500',
+    type: 'chart',
+    chartData: failedChartData.value,
+    percentValue: Math.round((totals.value.failed / (totals.value.total || 1)) * 100),
+    percentColorClass: 'text-rose-500',
+    footerText: 'Requires operator attention',
+    footerClass: 'text-rose-500'
+  }
+])
 </script>
 
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
-    <!-- Card 1: Total Deployments -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
-        >
-          <Boxes class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Total Deployments
-          </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
-            {{ totals.total }}
-          </div>
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-emerald-500 font-medium">All controllers active</div>
-    </div>
-
-    <!-- Card 2: Replicas Status -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-blue-400 bg-blue-500/10"
-        >
-          <Server class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Replicas
-          </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
-            {{ totals.currentReplicas }}
-            <span class="text-sm font-normal text-(--text-muted)"
-              >/ {{ totals.desiredReplicas }}</span
-            >
-          </div>
-        </div>
-      </div>
-      <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
-          <span
-            >{{ Math.round((totals.currentReplicas / totals.desiredReplicas) * 100) }}%
-            desired</span
-          >
-        </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
+    <Card v-for="(card, index) in cardItems" :key="index">
+      <template #content>
+        <div class="flex items-center gap-4">
           <div
-            class="h-full rounded-full bg-blue-500"
-            :style="{ width: (totals.currentReplicas / totals.desiredReplicas) * 100 + '%' }"
-          ></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 3: Up to Date Replicas -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-cyan-400 bg-cyan-500/10"
-        >
-          <TrendingUp class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Up-To-Date
-          </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
-            {{ totals.upToDateReplicas }}
-            <span class="text-sm font-normal text-(--text-muted)"
-              >/ {{ totals.currentReplicas }}</span
-            >
-          </div>
-        </div>
-      </div>
-      <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
-          <span
-            >{{ Math.round((totals.upToDateReplicas / totals.currentReplicas) * 100) }}%
-            synchronized</span
+            :class="[
+              'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+              card.iconClass
+            ]"
           >
-        </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
+            <component :is="card.icon" class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-bold text-muted-color uppercase tracking-wider">
+              {{ card.title }}
+            </div>
+            <div :class="['text-2xl font-bold mt-1', card.valueClass]">
+              {{ card.value }}
+              <span v-if="card.totalValue !== null" class="text-sm font-normal text-muted-color">
+                / {{ card.totalValue }}
+              </span>
+            </div>
+          </div>
           <div
-            class="h-full rounded-full bg-cyan-500"
-            :style="{ width: (totals.upToDateReplicas / totals.currentReplicas) * 100 + '%' }"
-          ></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Card 4: Available (Doughnut Chart) -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
-        >
-          <CheckCircle2 class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Available
-          </div>
-          <div class="text-2xl font-bold mt-1 text-emerald-500">
-            {{ totals.running }}
-          </div>
-        </div>
-        <div
-          class="w-10 h-10 relative shrink-0 flex items-center justify-center"
-          v-if="availableChartData"
-        >
-          <Chart
-            type="doughnut"
-            :data="availableChartData"
-            :options="miniChartOptions"
-            class="w-full h-full"
-          />
-          <span class="absolute text-[9px] font-bold text-emerald-500"
-            >{{ Math.round((totals.running / totals.total) * 100) }}%</span
+            v-if="card.type === 'chart' && card.chartData"
+            class="w-13 h-13 relative shrink-0 flex items-center justify-center"
           >
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
-        {{ totals.running }} of {{ totals.total }} deployments healthy
-      </div>
-    </div>
-
-    <!-- Card 5: Progressing (Doughnut Chart) -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
-        >
-          <TrendingUp class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Updating
-          </div>
-          <div class="text-2xl font-bold mt-1 text-amber-500">
-            {{ totals.progressing }}
+            <Chart
+              type="doughnut"
+              :data="card.chartData"
+              :options="miniChartOptions"
+              class="w-full h-full"
+            />
+            <span :class="['absolute text-xs font-bold', card.percentColorClass]">
+              {{ card.percentValue }}%
+            </span>
           </div>
         </div>
-        <div
-          class="w-10 h-10 relative shrink-0 flex items-center justify-center"
-          v-if="progressingChartData"
-        >
-          <Chart
-            type="doughnut"
-            :data="progressingChartData"
-            :options="miniChartOptions"
-            class="w-full h-full"
-          />
-          <span class="absolute text-[9px] font-bold text-amber-500"
-            >{{ Math.round((totals.progressing / totals.total) * 100) }}%</span
-          >
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
-        {{ totals.progressing }} deployment rolling out
-      </div>
-    </div>
-
-    <!-- Card 6: Failed (Doughnut Chart) -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
-        >
-          <AlertTriangle class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
-            Failed
-          </div>
-          <div class="text-2xl font-bold mt-1 text-rose-500">
-            {{ totals.failed }}
+      </template>
+      <template #footer>
+        <div class="mt-4">
+          <template v-if="card.type === 'progress'">
+            <div class="flex justify-between text-xs text-muted-color mb-1 font-mono">
+              <span>{{ card.percentValue }}% {{ card.footerText }}</span>
+            </div>
+            <div
+              class="w-full h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden"
+            >
+              <div
+                :class="['h-full rounded-full', card.progressClass]"
+                :style="{ width: card.percentValue + '%' }"
+              ></div>
+            </div>
+          </template>
+          <div v-else :class="['text-xs font-medium', card.footerClass]">
+            {{ card.footerText }}
           </div>
         </div>
-        <div
-          class="w-10 h-10 relative shrink-0 flex items-center justify-center"
-          v-if="failedChartData"
-        >
-          <Chart
-            type="doughnut"
-            :data="failedChartData"
-            :options="miniChartOptions"
-            class="w-full h-full"
-          />
-          <span class="absolute text-[9px] font-bold text-rose-500"
-            >{{ Math.round((totals.failed / totals.total) * 100) }}%</span
-          >
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-rose-500 font-medium">Requires operator attention</div>
-    </div>
+      </template>
+    </Card>
   </div>
 </template>

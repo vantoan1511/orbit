@@ -17,6 +17,7 @@ declare module 'vue' {
     AppLoadingScreen: typeof import('./src/components/layout/AppLoadingScreen.vue')['default']
     AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
     Button: typeof import('primevue/button')['default']
+    Card: typeof import('primevue/card')['default']
     Column: typeof import('primevue/column')['default']
     ConfigDataTable: typeof import('./src/components/config/ConfigDataTable.vue')['default']
     ConfigDetailsDrawer: typeof import('./src/components/config/ConfigDetailsDrawer.vue')['default']
@@ -30,10 +31,13 @@ declare module 'vue' {
     DeploymentsTable: typeof import('./src/components/workloads/DeploymentsTable.vue')['default']
     DrawerHeader: typeof import('./src/components/shared/DrawerHeader.vue')['default']
     EventDetailsDrawer: typeof import('./src/components/events/EventDetailsDrawer.vue')['default']
+    EventListCard: typeof import('./src/components/dashboard/EventListCard.vue')['default']
     EventMetricsCards: typeof import('./src/components/events/EventMetricsCards.vue')['default']
     EventsDataTable: typeof import('./src/components/events/EventsDataTable.vue')['default']
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
+    IconField: typeof import('primevue/iconfield')['default']
+    InputIcon: typeof import('primevue/inputicon')['default']
     InputText: typeof import('primevue/inputtext')['default']
     JobsTable: typeof import('./src/components/workloads/JobsTable.vue')['default']
     KeyValueBadgeList: typeof import('./src/components/shared/KeyValueBadgeList.vue')['default']
@@ -47,6 +51,7 @@ declare module 'vue' {
     NodeMetricsCards: typeof import('./src/components/nodes/NodeMetricsCards.vue')['default']
     NodesTable: typeof import('./src/components/nodes/NodesTable.vue')['default']
     NotificationDrawer: typeof import('./src/components/layout/NotificationDrawer.vue')['default']
+    OverlayBadge: typeof import('primevue/overlaybadge')['default']
     PodContainersTab: typeof import('./src/components/pods/PodContainersTab.vue')['default']
     PodDetailsDrawer: typeof import('./src/components/pods/PodDetailsDrawer.vue')['default']
     PodMetricsCards: typeof import('./src/components/pods/PodMetricsCards.vue')['default']
@@ -65,6 +70,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScaleDialog: typeof import('./src/components/shared/ScaleDialog.vue')['default']
+    SelectButton: typeof import('primevue/selectbutton')['default']
     ServiceDetailsDrawer: typeof import('./src/components/services/ServiceDetailsDrawer.vue')['default']
     ServiceMetricsCards: typeof import('./src/components/services/ServiceMetricsCards.vue')['default']
     ServicesDataTable: typeof import('./src/components/services/ServicesDataTable.vue')['default']
@@ -73,6 +79,7 @@ declare module 'vue' {
     SettingsInfoCards: typeof import('./src/components/settings/SettingsInfoCards.vue')['default']
     StatefulSetsTable: typeof import('./src/components/workloads/StatefulSetsTable.vue')['default']
     StatusBadge: typeof import('./src/components/shared/StatusBadge.vue')['default']
+    StatusCard: typeof import('./src/components/dashboard/StatusCard.vue')['default']
     StatusSummary: typeof import('./src/components/dashboard/StatusSummary.vue')['default']
     StorageClassesSidebar: typeof import('./src/components/storage/StorageClassesSidebar.vue')['default']
     StorageMetricsCards: typeof import('./src/components/storage/StorageMetricsCards.vue')['default']
@@ -99,6 +106,7 @@ declare module 'vue' {
     WorkloadYamlTab: typeof import('./src/components/workloads/WorkloadYamlTab.vue')['default']
   }
   export interface GlobalDirectives {
+    Ripple: typeof import('primevue/ripple')['default']
     Tooltip: typeof import('primevue/tooltip')['default']
   }
 }

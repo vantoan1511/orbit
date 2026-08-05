@@ -172,10 +172,10 @@ const annotationsExpanded = ref(false)
     <div v-if="props.namespace" class="h-full flex flex-col">
       <!-- Title Section -->
       <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
-        <h2 class="text-lg font-bold text-(--text-primary) font-ui truncate mb-1">
+        <h2 class="text-lg font-bold text-primary font-ui truncate mb-1">
           {{ props.namespace.name }}
         </h2>
-        <div class="text-xs text-(--text-muted) flex items-center gap-2">
+        <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
           <span>Age: {{ props.namespace.age }}</span>
         </div>
@@ -213,20 +213,20 @@ const annotationsExpanded = ref(false)
             <TabPanel value="overview" class="space-y-6">
               <!-- General Section -->
               <div>
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
                   General
                 </h3>
                 <div
                   class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-2.5 text-xs font-ui"
                 >
                   <div class="flex justify-between items-center">
-                    <span class="text-(--text-muted)">Name</span>
-                    <span class="font-semibold text-(--text-primary) font-mono">{{
+                    <span class="text-muted-color">Name</span>
+                    <span class="font-semibold text-primary font-mono">{{
                       props.namespace.name
                     }}</span>
                   </div>
                   <div class="flex justify-between items-center">
-                    <span class="text-(--text-muted)">Status</span>
+                    <span class="text-muted-color">Status</span>
                     <div class="flex items-center gap-1.5">
                       <span
                         class="w-1.5 h-1.5 rounded-full"
@@ -240,16 +240,16 @@ const annotationsExpanded = ref(false)
                     </div>
                   </div>
                   <div class="flex justify-between items-center">
-                    <span class="text-(--text-muted)">Created</span>
-                    <span class="text-(--text-secondary)">{{ props.namespace.created }}</span>
+                    <span class="text-muted-color">Created</span>
+                    <span class="text-muted-color">{{ props.namespace.created }}</span>
                   </div>
                   <div class="flex justify-between items-center">
-                    <span class="text-(--text-muted)">Age</span>
-                    <span class="font-mono text-(--text-secondary)">{{ props.namespace.age }}</span>
+                    <span class="text-muted-color">Age</span>
+                    <span class="font-mono text-muted-color">{{ props.namespace.age }}</span>
                   </div>
                   <div class="flex justify-between items-start gap-4">
-                    <span class="text-(--text-muted) shrink-0">UID</span>
-                    <span class="font-mono text-(--text-muted) text-[10px] truncate text-right">{{
+                    <span class="text-muted-color shrink-0">UID</span>
+                    <span class="font-mono text-muted-color text-[10px] truncate text-right">{{
                       props.namespace.uid
                     }}</span>
                   </div>
@@ -258,7 +258,7 @@ const annotationsExpanded = ref(false)
 
               <!-- Labels Section -->
               <div>
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-3">
+                <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
                   Labels
                 </h3>
                 <div class="flex flex-wrap gap-2">
@@ -272,7 +272,7 @@ const annotationsExpanded = ref(false)
                   </div>
                   <div
                     v-if="Object.keys(props.namespace.labels).length === 0"
-                    class="text-xs text-(--text-muted)"
+                    class="text-xs text-muted-color"
                   >
                     No labels configured.
                   </div>
@@ -282,12 +282,12 @@ const annotationsExpanded = ref(false)
               <!-- Annotations Section -->
               <div>
                 <div class="flex items-center justify-between mb-3">
-                  <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+                  <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                     Annotations
                   </h3>
                   <button
                     v-if="Object.keys(props.namespace.annotations).length > 0"
-                    class="text-[10px] text-(--text-muted) hover:text-(--text-secondary) transition-colors"
+                    class="text-[10px] text-muted-color hover:text-muted-color transition-colors"
                     @click="annotationsExpanded = !annotationsExpanded"
                   >
                     {{ Object.keys(props.namespace.annotations).length }}
@@ -298,21 +298,21 @@ const annotationsExpanded = ref(false)
                   <div
                     v-for="(val, key) in props.namespace.annotations"
                     :key="key"
-                    class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-(--text-secondary) flex justify-between gap-4"
+                    class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-muted-color flex justify-between gap-4"
                   >
-                    <span class="text-(--text-muted) truncate shrink-0">{{ key }}</span>
+                    <span class="text-muted-color truncate shrink-0">{{ key }}</span>
                     <span class="truncate text-right">{{ val }}</span>
                   </div>
                 </div>
                 <div
                   v-else-if="Object.keys(props.namespace.annotations).length === 0"
-                  class="text-xs text-(--text-muted)"
+                  class="text-xs text-muted-color"
                 >
                   No annotations configured.
                 </div>
                 <div
                   v-else
-                  class="text-[10px] text-(--text-muted) cursor-pointer hover:text-(--text-secondary)"
+                  class="text-[10px] text-muted-color cursor-pointer hover:text-muted-color"
                   @click="annotationsExpanded = true"
                 >
                   {{ Object.keys(props.namespace.annotations).length }} annotation(s) — click to
@@ -323,16 +323,16 @@ const annotationsExpanded = ref(false)
               <!-- Resource Usage Section -->
               <div>
                 <div class="flex items-center justify-between mb-3">
-                  <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+                  <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                     Resource Usage
                   </h3>
-                  <span v-if="props.namespace.cpuUsage" class="text-[10px] text-(--text-muted)"
+                  <span v-if="props.namespace.cpuUsage" class="text-[10px] text-muted-color"
                     >Last 1 hour</span
                   >
                 </div>
                 <div
                   v-if="!props.namespace.cpuUsage"
-                  class="bg-(--bg-hover)/20 border border-(--border) border-dashed rounded-xl p-6 text-center text-xs text-(--text-muted)"
+                  class="bg-(--bg-hover)/20 border border-(--border) border-dashed rounded-xl p-6 text-center text-xs text-muted-color"
                 >
                   Resource usage metrics are currently unavailable. Dynamic metric monitoring is
                   planned for a future update.
@@ -343,7 +343,7 @@ const annotationsExpanded = ref(false)
                     class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 flex flex-col gap-2"
                   >
                     <div class="flex justify-between items-center text-xs">
-                      <span class="text-(--text-muted) font-semibold">CPU Usage</span>
+                      <span class="text-muted-color font-semibold">CPU Usage</span>
                       <span class="font-mono font-bold text-violet-400">
                         {{ props.namespace.cpuUsage }} ({{ props.namespace.cpuPercent }}%)
                       </span>
@@ -363,7 +363,7 @@ const annotationsExpanded = ref(false)
                     class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 flex flex-col gap-2"
                   >
                     <div class="flex justify-between items-center text-xs">
-                      <span class="text-(--text-muted) font-semibold">Memory Usage</span>
+                      <span class="text-muted-color font-semibold">Memory Usage</span>
                       <span class="font-mono font-bold text-blue-400">
                         {{ props.namespace.memoryUsage }} ({{ props.namespace.memoryPercent }}%)
                       </span>
@@ -383,7 +383,7 @@ const annotationsExpanded = ref(false)
               <!-- View YAML link -->
               <div class="pt-2 border-t border-(--border)">
                 <button
-                  class="text-xs text-(--text-muted) hover:text-(--text-secondary) transition-colors flex items-center gap-1.5"
+                  class="text-xs text-muted-color hover:text-muted-color transition-colors flex items-center gap-1.5"
                 >
                   <FileCode class="w-3.5 h-3.5" />
                   <span>View YAML</span>
@@ -394,15 +394,15 @@ const annotationsExpanded = ref(false)
             <!-- RESOURCE QUOTAS PANEL -->
             <TabPanel value="quotas" class="space-y-6">
               <div v-if="props.namespace.resourceQuota" class="space-y-5">
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+                <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Resource Quotas
                 </h3>
 
                 <!-- CPU Quota -->
                 <div class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-3">
                   <div class="flex justify-between items-center text-xs">
-                    <span class="text-(--text-muted) font-semibold">CPU</span>
-                    <span class="font-mono text-(--text-secondary)">{{
+                    <span class="text-muted-color font-semibold">CPU</span>
+                    <span class="font-mono text-muted-color">{{
                       props.namespace.resourceQuota.cpuUsed
                     }}</span>
                   </div>
@@ -412,7 +412,7 @@ const annotationsExpanded = ref(false)
                       :style="{ width: props.namespace.resourceQuota.cpuPercent + '%' }"
                     ></div>
                   </div>
-                  <div class="flex justify-between text-[10px] text-(--text-muted) font-mono">
+                  <div class="flex justify-between text-[10px] text-muted-color font-mono">
                     <span>{{ props.namespace.resourceQuota.cpuRequest }} request</span>
                     <span
                       :class="
@@ -430,8 +430,8 @@ const annotationsExpanded = ref(false)
                 <!-- Memory Quota -->
                 <div class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-3">
                   <div class="flex justify-between items-center text-xs">
-                    <span class="text-(--text-muted) font-semibold">Memory</span>
-                    <span class="font-mono text-(--text-secondary)">{{
+                    <span class="text-muted-color font-semibold">Memory</span>
+                    <span class="font-mono text-muted-color">{{
                       props.namespace.resourceQuota.memoryUsed
                     }}</span>
                   </div>
@@ -441,7 +441,7 @@ const annotationsExpanded = ref(false)
                       :style="{ width: props.namespace.resourceQuota.memoryPercent + '%' }"
                     ></div>
                   </div>
-                  <div class="flex justify-between text-[10px] text-(--text-muted) font-mono">
+                  <div class="flex justify-between text-[10px] text-muted-color font-mono">
                     <span>{{ props.namespace.resourceQuota.memoryRequest }} request</span>
                     <span
                       :class="
@@ -462,9 +462,9 @@ const annotationsExpanded = ref(false)
                 v-else
                 class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-8 text-center flex flex-col items-center gap-3"
               >
-                <BarChart2 class="w-8 h-8 text-(--text-muted)/40" />
-                <div class="text-sm font-semibold text-(--text-secondary)">No Resource Quotas</div>
-                <div class="text-xs text-(--text-muted) max-w-xs">
+                <BarChart2 class="w-8 h-8 text-muted-color/40" />
+                <div class="text-sm font-semibold text-muted-color">No Resource Quotas</div>
+                <div class="text-xs text-muted-color max-w-xs">
                   This namespace has no resource quotas configured.
                 </div>
               </div>
@@ -473,7 +473,7 @@ const annotationsExpanded = ref(false)
             <!-- LIMIT RANGES PANEL -->
             <TabPanel value="limitranges" class="space-y-4">
               <div v-if="props.namespace.limitRanges && props.namespace.limitRanges.length > 0">
-                <h3 class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider mb-4">
+                <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-4">
                   Limit Ranges
                 </h3>
                 <div
@@ -482,9 +482,7 @@ const annotationsExpanded = ref(false)
                   class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 mb-3"
                 >
                   <div class="flex items-center justify-between mb-3">
-                    <span class="text-xs font-semibold text-(--text-primary) font-mono">{{
-                      lr.type
-                    }}</span>
+                    <span class="text-xs font-semibold text-primary font-mono">{{ lr.type }}</span>
                     <span
                       class="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono"
                     >
@@ -493,20 +491,20 @@ const annotationsExpanded = ref(false)
                   </div>
                   <div class="grid grid-cols-2 gap-2 text-[10px]">
                     <div>
-                      <span class="text-(--text-muted) block">Min</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.min }}</span>
+                      <span class="text-muted-color block">Min</span>
+                      <span class="font-mono text-muted-color">{{ lr.min }}</span>
                     </div>
                     <div>
-                      <span class="text-(--text-muted) block">Max</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.max }}</span>
+                      <span class="text-muted-color block">Max</span>
+                      <span class="font-mono text-muted-color">{{ lr.max }}</span>
                     </div>
                     <div>
-                      <span class="text-(--text-muted) block">Default</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.default }}</span>
+                      <span class="text-muted-color block">Default</span>
+                      <span class="font-mono text-muted-color">{{ lr.default }}</span>
                     </div>
                     <div>
-                      <span class="text-(--text-muted) block">Default Request</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.defaultRequest }}</span>
+                      <span class="text-muted-color block">Default Request</span>
+                      <span class="font-mono text-muted-color">{{ lr.defaultRequest }}</span>
                     </div>
                   </div>
                 </div>
@@ -517,9 +515,9 @@ const annotationsExpanded = ref(false)
                 v-else
                 class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-8 text-center flex flex-col items-center gap-3"
               >
-                <Layers class="w-8 h-8 text-(--text-muted)/40" />
-                <div class="text-sm font-semibold text-(--text-secondary)">No Limit Ranges</div>
-                <div class="text-xs text-(--text-muted) max-w-xs">
+                <Layers class="w-8 h-8 text-muted-color/40" />
+                <div class="text-sm font-semibold text-muted-color">No Limit Ranges</div>
+                <div class="text-xs text-muted-color max-w-xs">
                   This namespace has no limit ranges configured.
                 </div>
               </div>

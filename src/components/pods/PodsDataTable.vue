@@ -115,7 +115,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
       <template #body="{ data }">
         <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
       </template>
@@ -145,7 +145,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <Column v-if="visibleCols['node']" field="node" header="Node" sortable class="p-3">
       <template #body="{ data }">
         <span
-          class="text-(--text-secondary) font-mono truncate block max-w-44"
+          class="text-muted-color font-mono truncate block max-w-44"
           :title="data.node || 'N/A'"
         >
           {{ data.node ? data.node.split('.')[0] : 'N/A' }}
@@ -167,7 +167,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           :class="
             (data.restarts || 0) > 0
               ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-              : 'text-(--text-muted)'
+              : 'text-muted-color'
           "
         >
           {{ data.restarts || 0 }}
@@ -180,8 +180,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-24">
           <div class="flex justify-between font-mono text-[10px]">
-            <span class="text-(--text-secondary)">{{ data.cpu || '-' }}</span>
-            <span class="text-(--text-muted)" v-if="data.cpu && data.cpu !== '-'"
+            <span class="text-muted-color">{{ data.cpu || '-' }}</span>
+            <span class="text-muted-color" v-if="data.cpu && data.cpu !== '-'"
               >{{ data.cpuPct || 0 }}%</span
             >
           </div>
@@ -203,8 +203,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-24">
           <div class="flex justify-between font-mono text-[10px]">
-            <span class="text-(--text-secondary)">{{ data.memory || '-' }}</span>
-            <span class="text-(--text-muted)" v-if="data.memory && data.memory !== '-'"
+            <span class="text-muted-color">{{ data.memory || '-' }}</span>
+            <span class="text-muted-color" v-if="data.memory && data.memory !== '-'"
               >{{ data.memoryPct || 0 }}%</span
             >
           </div>
@@ -227,7 +227,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Actions Column -->
@@ -241,7 +241,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           title="Actions"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
       </template>
     </Column>

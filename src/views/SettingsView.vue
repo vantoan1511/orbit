@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import { useRouter } from 'vue-router'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
+import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import { ArrowLeft } from '@lucide/vue'
 
 const activeTab = ref('general')
+
+const router = useRouter()
 </script>
 
 <template>
   <div class="flex flex-col h-full">
     <!-- Header/Title -->
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold tracking-tight text-(--text-primary)">Settings</h2>
+      <div class="flex items-center gap-3">
+        <Button severity="secondary" variant="text" size="small" @click="router.back()">
+          <ArrowLeft class="w-4 h-4" />
+        </Button>
+        <h2 class="text-xl font-bold tracking-tight text-primary">Settings</h2>
+      </div>
     </div>
 
     <!-- Tabs Navigation -->
@@ -34,7 +43,7 @@ const activeTab = ref('general')
         <!-- Placeholder Tabs -->
         <TabPanel value="clusters">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Clusters settings coming soon.
           </div>
@@ -42,7 +51,7 @@ const activeTab = ref('general')
 
         <TabPanel value="preferences">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Preferences coming soon.
           </div>
@@ -50,7 +59,7 @@ const activeTab = ref('general')
 
         <TabPanel value="appearance">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Appearance settings coming soon.
           </div>
@@ -58,7 +67,7 @@ const activeTab = ref('general')
 
         <TabPanel value="notifications">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Notifications settings coming soon.
           </div>
@@ -66,7 +75,7 @@ const activeTab = ref('general')
 
         <TabPanel value="proxy">
           <div
-            class="text-(--text-muted) flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
           >
             Proxy settings coming soon.
           </div>

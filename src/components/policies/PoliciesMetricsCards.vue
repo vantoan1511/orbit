@@ -30,18 +30,18 @@ const disabledPct = computed(() =>
       class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
     >
       <div
-        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-(--text-muted)"
+        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color"
       >
         <FileText class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Total Policies
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ totalCount }}
         </div>
-        <div class="text-[10px] text-(--text-muted) mt-0.5">Active cluster policies</div>
+        <div class="text-[10px] text-muted-color mt-0.5">Active cluster policies</div>
       </div>
     </div>
 
@@ -55,10 +55,10 @@ const disabledPct = computed(() =>
         <Shield class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Enforced
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ enforcedCount }}
         </div>
         <div class="text-[10px] text-emerald-400 font-medium mt-0.5">{{ enforcedPct }}%</div>
@@ -75,10 +75,10 @@ const disabledPct = computed(() =>
         <ShieldAlert class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Audit Only
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ auditCount }}
         </div>
         <div class="text-[10px] text-blue-400 font-medium mt-0.5">{{ auditPct }}%</div>
@@ -95,10 +95,10 @@ const disabledPct = computed(() =>
         <ShieldOff class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Disabled
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ disabledCount }}
         </div>
         <div class="text-[10px] text-gray-400 font-medium mt-0.5">{{ disabledPct }}%</div>
@@ -113,10 +113,10 @@ const disabledPct = computed(() =>
         <AlertTriangle class="w-5 h-5" />
       </div>
       <div>
-        <div class="text-[11px] font-semibold text-(--text-muted) uppercase tracking-wider">
+        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
           Violations
         </div>
-        <div class="text-2xl font-bold text-(--text-primary) font-mono mt-0.5">
+        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
           {{ violationsCount }}
         </div>
         <div class="text-[10px] text-red-400 font-medium mt-0.5">Last 7 days</div>

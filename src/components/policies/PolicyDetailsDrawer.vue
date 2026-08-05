@@ -56,19 +56,19 @@ const getStatusBadgeClass = (status: string) => {
                   : 'bg-gray-500'
             "
           ></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
+          <span class="text-xs font-bold uppercase tracking-wider text-muted-color">
             {{ props.policy.type }}
           </span>
         </div>
         <div
           v-if="props.policy.namespace !== '-'"
-          class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
+          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
           ns/{{ props.policy.namespace }}
         </div>
         <div
           v-else
-          class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
+          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
           Cluster Scope
         </div>
@@ -85,12 +85,12 @@ const getStatusBadgeClass = (status: string) => {
       <!-- Title/Message Section -->
       <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
         <h2
-          class="text-sm font-semibold text-(--text-primary) font-ui mb-2 break-words"
+          class="text-sm font-semibold text-primary font-ui mb-2 break-words"
           :title="props.policy.description"
         >
           {{ props.policy.description }}
         </h2>
-        <div class="text-xs text-(--text-muted) flex items-center gap-2">
+        <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
           <span>Last Updated: {{ props.policy.lastUpdated }}</span>
         </div>
@@ -121,56 +121,50 @@ const getStatusBadgeClass = (status: string) => {
             <TabPanel value="overview" class="space-y-6">
               <!-- General Info Grid -->
               <div class="space-y-4">
-                <h3 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">
+                <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
                   Policy Properties
                 </h3>
                 <div
                   class="border border-(--border) rounded-xl overflow-hidden divide-y divide-(--border) bg-(--bg-hover)/10 text-xs"
                 >
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Name</span>
-                    <span class="col-span-2 font-mono text-(--text-primary)">{{
-                      props.policy.name
-                    }}</span>
+                    <span class="text-muted-color font-semibold">Name</span>
+                    <span class="col-span-2 font-mono text-primary">{{ props.policy.name }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Type</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.policy.type }}</span>
+                    <span class="text-muted-color font-semibold">Type</span>
+                    <span class="col-span-2 text-primary">{{ props.policy.type }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Scope</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.policy.scope }}</span>
+                    <span class="text-muted-color font-semibold">Scope</span>
+                    <span class="col-span-2 text-primary">{{ props.policy.scope }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3" v-if="props.policy.namespace !== '-'">
-                    <span class="text-(--text-secondary) font-semibold">Namespace</span>
-                    <span class="col-span-2 text-(--text-primary) font-mono">{{
+                    <span class="text-muted-color font-semibold">Namespace</span>
+                    <span class="col-span-2 text-primary font-mono">{{
                       props.policy.namespace
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Status</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.policy.status }}</span>
+                    <span class="text-muted-color font-semibold">Status</span>
+                    <span class="col-span-2 text-primary">{{ props.policy.status }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Mode</span>
-                    <span class="col-span-2 text-(--text-primary) font-mono">{{
-                      props.policy.mode
-                    }}</span>
+                    <span class="text-muted-color font-semibold">Mode</span>
+                    <span class="col-span-2 text-primary font-mono">{{ props.policy.mode }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Violations (7d)</span>
+                    <span class="text-muted-color font-semibold">Violations (7d)</span>
                     <span
                       class="col-span-2 font-mono font-bold"
-                      :class="
-                        props.policy.violations > 0 ? 'text-red-400' : 'text-(--text-primary)'
-                      "
+                      :class="props.policy.violations > 0 ? 'text-red-400' : 'text-primary'"
                     >
                       {{ props.policy.violations }}
                     </span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">UID</span>
-                    <span class="col-span-2 font-mono text-[10px] text-(--text-primary)">{{
+                    <span class="text-muted-color font-semibold">UID</span>
+                    <span class="col-span-2 font-mono text-[10px] text-primary">{{
                       props.policy.uid
                     }}</span>
                   </div>

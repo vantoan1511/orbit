@@ -11,7 +11,7 @@ import {
   Activity,
   Box,
   Boxes,
-  CircleCheck,
+  Check,
   FileText,
   FolderOpen,
   HardDrive,
@@ -57,11 +57,9 @@ const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
-  <aside
-    class="w-64 bg-(--bg-sidebar) border-r border-(--border) flex flex-col h-screen text-(--text-primary) select-none"
-  >
+  <aside class="w-64 flex flex-col h-screen text-primary select-none">
     <!-- Brand Header -->
-    <div class="h-16 px-6 flex items-center gap-3 border-b border-(--border)">
+    <div class="h-16 px-6 flex items-center gap-3">
       <!-- Orbit Icon Logo -->
       <img src="/logo.png" alt="Orbit Logo" class="w-8 h-8 object-contain" />
 
@@ -69,8 +67,8 @@ const { isDark, toggleTheme } = useTheme()
     </div>
 
     <!-- Clusters Section -->
-    <div class="p-4 border-b border-(--border)">
-      <div class="text-[10px] font-bold text-(--text-muted) tracking-wider uppercase mb-2 px-2">
+    <div class="p-4">
+      <div class="text-sm font-bold text-muted-color tracking-wider uppercase mb-2 px-2">
         Clusters
       </div>
       <div class="flex flex-col gap-2">
@@ -86,58 +84,60 @@ const { isDark, toggleTheme } = useTheme()
               : 'secondary'
           "
           fluid
-          class="truncate justify-start text-xs font-medium"
+          class="truncate justify-start font-semibold"
           variant="text"
-          size="small"
           @click="handleSwitchCluster(cluster.id)"
         >
-          <CircleCheck :size="13" />
+          <Check v-if="k8sStore.activeClusterId === cluster.id" :size="16" />
           {{ cluster.name }}
         </Button>
 
         <!-- Empty state when no clusters are configured -->
-        <p v-if="k8sStore.clusters.length === 0" class="text-xs text-(--text-muted) px-3 py-1">
+        <p v-if="k8sStore.clusters.length === 0" class="text-sm text-muted-color px-3 py-1">
           No clusters added yet
         </p>
 
-        <Button
-          fluid
-          icon="pi pi-plus"
-          label="Add Cluster"
-          severity="secondary"
-          size="small"
-          class="text-xs font-medium"
-          @click="handleAddCluster"
-        >
-          <Plus :size="13" />
-          <span>Add cluster</span>
+        <Button fluid severity="contrast" size="small" @click="handleAddCluster">
+          <Plus :size="16" />
+          <span class="text-sm font-semibold">Add cluster</span>
         </Button>
       </div>
     </div>
 
     <!-- Navigation Section -->
     <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-      <router-link
+      <Button
         v-for="link in navLinks"
         :key="link.name"
-        :to="link.path"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200"
-        :class="[
-          route.path === link.path
-            ? 'bg-(--bg-active) font-medium text-(--text-primary) border-r-2 border-(--primary) rounded-r-none'
-            : 'text-(--text-secondary) hover:bg-(--bg-hover)',
-          k8sStore.activeClusterId === null && link.path !== '/settings'
-            ? 'opacity-40 pointer-events-none'
-            : ''
-        ]"
+        v-slot="slotProps"
+        as-child
+        fluid
+        variant="link"
       >
-        <component :is="link.icon" class="w-4 h-4 shrink-0" />
-        <span>{{ link.name }}</span>
-      </router-link>
+        <router-link
+          :to="link.path"
+          :class="[
+            slotProps.class,
+            route.path === link.path
+              ? 'bg-primary-200! dark:bg-primary-700! border-l-primary! border-l-3! rounded-l-lg! translate-x-3'
+              : 'text-muted-color hover:bg-surface-100 dark:hover:bg-surface-800',
+            'flex! items-center! justify-start! transition-all duration-200',
+            k8sStore.activeClusterId === null && link.path !== '/settings' ? 'hidden!' : ''
+          ]"
+        >
+          <component :is="link.icon" class="w-4 h-4 shrink-0" />
+          <span
+            :class="route.path === link.path ? 'font-bold!' : 'font-medium!'"
+            class="text-nowrap"
+          >
+            {{ link.name }}
+          </span>
+        </router-link>
+      </Button>
     </nav>
 
     <!-- Bottom Footer -->
-    <div class="p-4 border-t border-(--border) flex items-center justify-around bg-(--bg-sidebar)">
+    <div class="p-4 flex items-center justify-around">
       <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
         <Button
@@ -161,18 +161,11 @@ const { isDark, toggleTheme } = useTheme()
             rounded
             variant="text"
             icon="pi pi-bell"
+            badge-severity="danger"
             :aria-label="'Notifications'"
+            :badge="notificationStore.unreadCount.toString()"
             @click="notificationStore.toggleDrawer()"
           />
-          <span
-            v-if="notificationStore.unreadCount > 0"
-            class="absolute top-1 right-1 flex h-2 w-2 pointer-events-none"
-          >
-            <span
-              class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"
-            ></span>
-            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-          </span>
         </div>
 
         <!-- Profile -->
@@ -186,7 +179,7 @@ const { isDark, toggleTheme } = useTheme()
       </div>
     </div>
     <div class="flex items-center justify-center gap-2">
-      <span class="text-[10px] text-(--text-muted) font-mono">{{ VERSION }}</span>
+      <span class="text-xs text-muted-color font-mono">{{ VERSION }}</span>
     </div>
   </aside>
 </template>

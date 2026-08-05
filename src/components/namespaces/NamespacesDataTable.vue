@@ -199,11 +199,11 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
           <InputText
             v-model="searchQuery"
             placeholder="Search namespaces..."
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
 
@@ -228,7 +228,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
           <label
             for="system-ns-toggle"
-            class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+            class="text-xs font-semibold text-muted-color cursor-pointer select-none"
           >
             Show system namespaces
           </label>
@@ -242,10 +242,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             class="p-1"
             :loading="store.namespacesLoading"
           >
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+            <RefreshCw class="w-4 h-4 text-muted-color" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+            <Settings2 class="w-4 h-4 text-muted-color" />
           </Button>
         </div>
       </div>
@@ -265,14 +265,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       @row-click="onRowClick"
     >
       <template #empty>
-        <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
-          <Info class="w-8 h-8 text-(--text-muted)/50" />
+        <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+          <Info class="w-8 h-8 text-muted-color/50" />
           <span>No namespaces found matching the filter criteria.</span>
         </div>
       </template>
 
       <!-- Name Column -->
-      <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+      <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
         <template #body="{ data }">
           <div class="flex items-center gap-2">
             <span class="font-semibold hover:text-violet-400 transition-colors">{{
@@ -307,7 +307,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Column field="pods" header="Pods" sortable class="p-3">
         <template #body="{ data }">
           <div class="flex items-center gap-3">
-            <span class="font-mono text-(--text-primary) min-w-6">{{ data.pods }}</span>
+            <span class="font-mono text-primary min-w-6">{{ data.pods }}</span>
             <div class="w-16 h-6 shrink-0" v-if="sparklineOptions">
               <Chart
                 type="line"
@@ -321,35 +321,35 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       </Column>
 
       <!-- Workloads Column -->
-      <Column field="workloads" header="Workloads" sortable class="p-3 text-(--text-secondary)">
+      <Column field="workloads" header="Workloads" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.workloads }}</span>
         </template>
       </Column>
 
       <!-- Services Column -->
-      <Column field="services" header="Services" sortable class="p-3 text-(--text-secondary)">
+      <Column field="services" header="Services" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.services }}</span>
         </template>
       </Column>
 
       <!-- ConfigMaps Column -->
-      <Column field="configMaps" header="ConfigMaps" sortable class="p-3 text-(--text-secondary)">
+      <Column field="configMaps" header="ConfigMaps" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.configMaps }}</span>
         </template>
       </Column>
 
       <!-- Secrets Column -->
-      <Column field="secrets" header="Secrets" sortable class="p-3 text-(--text-secondary)">
+      <Column field="secrets" header="Secrets" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.secrets }}</span>
         </template>
       </Column>
 
       <!-- Age Column -->
-      <Column field="age" header="Age" sortable class="p-3 text-(--text-muted) font-mono"> </Column>
+      <Column field="age" header="Age" sortable class="p-3 text-muted-color font-mono"> </Column>
 
       <!-- Labels Column -->
       <Column field="labels" header="Labels" class="p-3">
@@ -360,7 +360,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
                 Object.entries(data.labels).slice(0, MAX_VISIBLE_LABELS)
               )"
               :key="key"
-              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-(--text-secondary) border border-(--border) whitespace-nowrap"
+              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
             >
               {{ key }}: {{ val }}
             </span>
@@ -385,7 +385,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             title="Actions"
             @click="toggleActionMenu($event, data)"
           >
-            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+            <MoreVertical class="w-4 h-4 text-muted-color" />
           </Button>
         </template>
       </Column>

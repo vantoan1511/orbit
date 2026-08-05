@@ -23,13 +23,12 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
       return {
         text: trimmed.replace(/^#+\s*/, ''),
-        class:
-          'font-bold text-(--text-primary) text-base mt-3 first:mt-0 pb-1 border-b border-(--border)'
+        class: 'font-bold text-primary text-base mt-3 first:mt-0 pb-1 border-b border-(--border)'
       }
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       return {
         text: '• ' + trimmed.substring(2),
-        class: 'pl-2 text-(--text-secondary) leading-snug'
+        class: 'pl-2 text-muted-color leading-snug'
       }
     } else if (trimmed.length === 0) {
       return {
@@ -39,7 +38,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     } else {
       return {
         text: trimmed,
-        class: 'text-(--text-secondary) leading-normal'
+        class: 'text-muted-color leading-normal'
       }
     }
   })
@@ -64,7 +63,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <h3 class="text-lg font-bold text-(--text-primary)">
+            <h3 class="text-lg font-bold text-primary">
               Orbit v{{ updaterStore.manifest?.version || '' }}
             </h3>
             <span
@@ -73,7 +72,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
               New Release
             </span>
           </div>
-          <p class="text-xs text-(--text-muted) mt-0.5">
+          <p class="text-xs text-muted-color mt-0.5">
             A new version of Orbit is available. Review the release notes below to install or
             dismiss.
           </p>
@@ -82,7 +81,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
 
       <!-- Release Notes Section -->
       <div>
-        <h4 class="text-xs font-semibold uppercase tracking-wider text-(--text-secondary) mb-2">
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-color mb-2">
           Release Notes
         </h4>
         <div
@@ -93,7 +92,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
               {{ block.text }}
             </div>
           </template>
-          <div v-else class="text-(--text-muted) italic text-xs py-2">
+          <div v-else class="text-muted-color italic text-xs py-2">
             No release notes provided for this version.
           </div>
         </div>
@@ -102,7 +101,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       <!-- Download Progress Bar -->
       <div v-if="updaterStore.isDownloading" class="pt-2 border-t border-(--border)">
         <div class="flex justify-between items-center text-xs mb-1.5">
-          <span class="font-medium text-(--text-secondary)">Downloading update...</span>
+          <span class="font-medium text-muted-color">Downloading update...</span>
           <span class="font-bold text-(--primary-500)">{{ updaterStore.downloadProgress }}%</span>
         </div>
         <div

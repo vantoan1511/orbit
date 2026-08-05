@@ -138,11 +138,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Status Select -->
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <Select v-model="selectedStatus" :options="statuses" class="text-sm min-w-40" />
     </template>
 
     <!-- Actions Left -->
@@ -152,9 +148,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
       <template #body="{ data }">
-        <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
+        <span class="font-semibold transition-colors">{{ data.name }}</span>
       </template>
     </Column>
 
@@ -181,9 +177,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Replicas Column -->
     <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-2 font-mono text-(--text-secondary)">
+        <div class="flex items-center gap-2 font-mono text-muted-color">
           <span class="font-bold">{{ data.replicas.current }}</span>
-          <span class="text-(--text-muted)">/</span>
+          <span class="text-muted-color">/</span>
           <span>{{ data.replicas.desired }}</span>
         </div>
       </template>
@@ -216,7 +212,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">{{ data.upToDate }}</span>
+        <span class="font-mono text-muted-color">{{ data.upToDate }}</span>
       </template>
     </Column>
 
@@ -226,7 +222,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Images Column -->
@@ -236,7 +232,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="img in data.images"
             :key="img"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-(--text-secondary) text-[10px] border border-(--border) font-mono truncate max-w-full"
+            class="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-700 text-muted-color text-xs font-mono truncate max-w-full"
             :title="img"
           >
             {{ img.split('/').pop() }}
@@ -256,7 +252,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           title="Actions"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
       </template>
     </Column>

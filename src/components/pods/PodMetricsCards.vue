@@ -121,17 +121,17 @@ const unknownChartData = computed(() => {
           <Box class="w-5 h-5" />
         </div>
         <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Total Pods
           </div>
-          <div class="text-2xl font-bold mt-1 text-(--text-primary)">
+          <div class="text-2xl font-bold mt-1 text-primary">
             {{ totalPods }}
-            <span class="text-sm font-normal text-(--text-muted)">/ {{ maxPods }} [■]</span>
+            <span class="text-sm font-normal text-muted-color">/ {{ maxPods }} [■]</span>
           </div>
         </div>
       </div>
       <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-(--text-muted) mb-1 font-mono">
+        <div class="flex justify-between text-[10px] text-muted-color mb-1 font-mono">
           <span>{{ Math.round((totalPods / maxPods) * 100) }}% Limit</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -155,7 +155,7 @@ const unknownChartData = computed(() => {
             <CheckCircle2 class="w-5 h-5" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Running
             </div>
             <div class="text-2xl font-bold mt-1 text-emerald-500">
@@ -172,7 +172,7 @@ const unknownChartData = computed(() => {
           />
         </div>
       </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
+      <div class="mt-4 text-[10px] text-muted-color font-medium">
         {{ Math.round((runningCount / totalPods) * 1000) / 10 }}% of total workloads active
       </div>
     </div>
@@ -189,7 +189,7 @@ const unknownChartData = computed(() => {
             <Loader2 class="w-5 h-5 animate-spin" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Pending
             </div>
             <div class="text-2xl font-bold mt-1 text-amber-500">
@@ -206,7 +206,7 @@ const unknownChartData = computed(() => {
           />
         </div>
       </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
+      <div class="mt-4 text-[10px] text-muted-color font-medium">
         {{ Math.round((pendingCount / totalPods) * 1000) / 10 }}% scheduler queues occupied
       </div>
     </div>
@@ -223,7 +223,7 @@ const unknownChartData = computed(() => {
             <AlertTriangle class="w-5 h-5" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Failed
             </div>
             <div class="text-2xl font-bold mt-1 text-rose-500">
@@ -255,7 +255,7 @@ const unknownChartData = computed(() => {
             <HelpCircle class="w-5 h-5" />
           </div>
           <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Unknown
             </div>
             <div class="text-2xl font-bold mt-1 text-gray-400">
@@ -272,7 +272,7 @@ const unknownChartData = computed(() => {
           />
         </div>
       </div>
-      <div class="mt-4 text-[10px] text-(--text-muted) font-medium">
+      <div class="mt-4 text-[10px] text-muted-color font-medium">
         Unreachable or lost nodes status
       </div>
     </div>

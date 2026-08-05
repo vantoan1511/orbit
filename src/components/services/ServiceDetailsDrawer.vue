@@ -84,12 +84,10 @@ const getTypeBadgeClass = (type: string) => {
       <div class="flex items-center gap-3 w-full" v-if="props.service">
         <div class="flex items-center gap-1.5">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
-            Active
-          </span>
+          <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
         </div>
         <div
-          class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
+          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
           ns/{{ props.service.namespace }}
         </div>
@@ -106,12 +104,12 @@ const getTypeBadgeClass = (type: string) => {
       <!-- Title Section -->
       <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
         <h2
-          class="text-lg font-bold text-(--text-primary) font-ui truncate mb-1"
+          class="text-lg font-bold text-primary font-ui truncate mb-1"
           :title="props.service.name"
         >
           {{ props.service.name }}
         </h2>
-        <div class="text-xs text-(--text-muted) flex items-center gap-2">
+        <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
           <span>Age: {{ props.service.age }}</span>
         </div>
@@ -156,29 +154,25 @@ const getTypeBadgeClass = (type: string) => {
             <TabPanel value="overview" class="space-y-6">
               <!-- General Info Grid -->
               <div class="space-y-4">
-                <h3 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">
-                  General
-                </h3>
+                <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">General</h3>
                 <div
                   class="border border-(--border) rounded-xl overflow-hidden divide-y divide-(--border) bg-(--bg-hover)/10 text-xs"
                 >
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Namespace</span>
-                    <span class="col-span-2 font-mono text-(--text-primary)">{{
+                    <span class="text-muted-color font-semibold">Namespace</span>
+                    <span class="col-span-2 font-mono text-primary">{{
                       props.service.namespace
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Cluster IP</span>
-                    <span class="col-span-2 font-mono text-(--text-primary)">{{
+                    <span class="text-muted-color font-semibold">Cluster IP</span>
+                    <span class="col-span-2 font-mono text-primary">{{
                       props.service.clusterIP
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">External IP</span>
-                    <span
-                      class="col-span-2 font-mono text-(--text-primary) flex items-center gap-1.5"
-                    >
+                    <span class="text-muted-color font-semibold">External IP</span>
+                    <span class="col-span-2 font-mono text-primary flex items-center gap-1.5">
                       {{ props.service.externalIP }}
                       <ExternalLink
                         v-if="props.service.externalIP !== '-'"
@@ -187,38 +181,30 @@ const getTypeBadgeClass = (type: string) => {
                     </span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Type</span>
-                    <span class="col-span-2 font-mono text-(--text-primary)">{{
-                      props.service.type
-                    }}</span>
+                    <span class="text-muted-color font-semibold">Type</span>
+                    <span class="col-span-2 font-mono text-primary">{{ props.service.type }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Session Affinity</span>
-                    <span class="col-span-2 text-(--text-primary)">{{
-                      props.service.sessionAffinity
-                    }}</span>
+                    <span class="text-muted-color font-semibold">Session Affinity</span>
+                    <span class="col-span-2 text-primary">{{ props.service.sessionAffinity }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold"
-                      >Internal Traffic Policy</span
-                    >
-                    <span class="col-span-2 text-(--text-primary)">{{
+                    <span class="text-muted-color font-semibold">Internal Traffic Policy</span>
+                    <span class="col-span-2 text-primary">{{
                       props.service.internalTrafficPolicy
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Created</span>
-                    <span class="col-span-2 text-(--text-primary)">{{
-                      props.service.created
-                    }}</span>
+                    <span class="text-muted-color font-semibold">Created</span>
+                    <span class="col-span-2 text-primary">{{ props.service.created }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Age</span>
-                    <span class="col-span-2 text-(--text-primary)">{{ props.service.age }}</span>
+                    <span class="text-muted-color font-semibold">Age</span>
+                    <span class="col-span-2 text-primary">{{ props.service.age }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">UID</span>
-                    <span class="col-span-2 font-mono text-[10px] text-(--text-primary)">{{
+                    <span class="text-muted-color font-semibold">UID</span>
+                    <span class="col-span-2 font-mono text-[10px] text-primary">{{
                       props.service.uid
                     }}</span>
                   </div>
@@ -228,7 +214,7 @@ const getTypeBadgeClass = (type: string) => {
               <!-- Selector Section -->
               <div class="space-y-3">
                 <h3
-                  class="text-xs font-bold text-(--text-muted) uppercase tracking-wider flex items-center gap-1.5"
+                  class="text-xs font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
                 >
                   <Tag class="w-3.5 h-3.5" />
                   <span>Selector</span>
@@ -247,7 +233,7 @@ const getTypeBadgeClass = (type: string) => {
                   </div>
                   <span
                     v-if="Object.keys(props.service.selector).length === 0"
-                    class="text-xs text-(--text-muted) italic"
+                    class="text-xs text-muted-color italic"
                     >None</span
                   >
                 </div>
@@ -259,7 +245,7 @@ const getTypeBadgeClass = (type: string) => {
 
             <!-- ENDPOINTS PANEL -->
             <TabPanel value="endpoints" class="space-y-4">
-              <h3 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">
+              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
                 Target Endpoints
               </h3>
               <div class="border border-(--border) rounded-xl p-4 bg-(--bg-hover)/10">
@@ -267,13 +253,13 @@ const getTypeBadgeClass = (type: string) => {
                   <li
                     v-for="(ep, idx) in props.service.endpointsList"
                     :key="idx"
-                    class="font-mono text-xs text-(--text-primary) flex items-center gap-2"
+                    class="font-mono text-xs text-primary flex items-center gap-2"
                   >
                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     {{ ep }}
                   </li>
                 </ul>
-                <div v-else class="text-xs text-(--text-muted) italic">
+                <div v-else class="text-xs text-muted-color italic">
                   No active endpoints (ExternalName or selectorless service).
                 </div>
               </div>
@@ -281,7 +267,7 @@ const getTypeBadgeClass = (type: string) => {
 
             <!-- PORTS PANEL -->
             <TabPanel value="ports" class="space-y-4">
-              <h3 class="text-xs font-bold text-(--text-muted) uppercase tracking-wider">
+              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
                 Port Mappings
               </h3>
               <div
@@ -290,7 +276,7 @@ const getTypeBadgeClass = (type: string) => {
                 <table class="w-full text-left border-collapse">
                   <thead>
                     <tr
-                      class="bg-(--bg-hover)/40 border-b border-(--border) text-(--text-muted) font-semibold"
+                      class="bg-(--bg-hover)/40 border-b border-(--border) text-muted-color font-semibold"
                     >
                       <th class="p-3">Port</th>
                       <th class="p-3">Target Port</th>
@@ -302,9 +288,9 @@ const getTypeBadgeClass = (type: string) => {
                     <tr
                       v-for="(port, idx) in props.service.portsList"
                       :key="idx"
-                      class="text-(--text-secondary) hover:bg-(--bg-hover)/10"
+                      class="text-muted-color hover:bg-(--bg-hover)/10"
                     >
-                      <td class="p-3 font-mono text-(--text-primary)">{{ port.port }}</td>
+                      <td class="p-3 font-mono text-primary">{{ port.port }}</td>
                       <td class="p-3 font-mono">{{ port.targetPort }}</td>
                       <td class="p-3 font-semibold">{{ port.protocol }}</td>
                       <td class="p-3 font-mono">{{ port.nodePort || '-' }}</td>

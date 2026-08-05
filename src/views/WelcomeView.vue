@@ -41,10 +41,8 @@ const quickStartSteps = [
 
       <!-- Headline -->
       <div class="flex flex-col gap-2 max-w-md">
-        <h1 class="text-3xl font-bold tracking-tight text-(--text-primary) font-ui">
-          Welcome to Orbit
-        </h1>
-        <p class="text-sm text-(--text-secondary) leading-relaxed">
+        <h1 class="text-3xl font-bold tracking-tight text-primary font-ui">Welcome to Orbit</h1>
+        <p class="text-sm text-muted-color leading-relaxed">
           Orbit helps you explore, monitor, and manage<br />
           your Kubernetes clusters from a single, intuitive interface.
         </p>
@@ -56,10 +54,10 @@ const quickStartSteps = [
       >
         <span class="text-xl leading-none mt-0.5">👈</span>
         <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-(--text-primary)"
+          <span class="text-sm font-semibold text-primary"
             >Click on a cluster to start browsing</span
           >
-          <span class="text-xs text-(--text-secondary)">
+          <span class="text-xs text-muted-color">
             Select a cluster from the list on the left to view its overview and start managing your
             resources.
           </span>
@@ -67,7 +65,7 @@ const quickStartSteps = [
       </div>
 
       <!-- Or divider -->
-      <div class="flex items-center gap-4 text-(--text-muted) text-xs w-72">
+      <div class="flex items-center gap-4 text-muted-color text-xs w-72">
         <div class="flex-1 h-px bg-(--border)"></div>
         <span>or</span>
         <div class="flex-1 h-px bg-(--border)"></div>
@@ -80,13 +78,12 @@ const quickStartSteps = [
           id="welcome-add-cluster-btn"
           icon="pi pi-plus"
           label="Add Cluster"
-          severity="secondary"
           @click="handleAddCluster"
         />
-        <p class="text-sm font-semibold text-(--text-secondary)">
+        <p class="text-sm font-semibold text-muted-color">
           No clusters yet? Add one to get started.
         </p>
-        <p class="text-xs text-(--text-muted) max-w-xs">
+        <p class="text-xs text-muted-color max-w-xs">
           You can add a cluster using your kubeconfig file or connect to a remote cluster.
         </p>
       </div>
@@ -94,19 +91,19 @@ const quickStartSteps = [
 
     <!-- Quick start section -->
     <div class="border-t border-(--border) bg-(--bg-card) px-8 py-6 select-none">
-      <h2 class="text-sm font-semibold text-(--text-primary) mb-5">Quick start</h2>
+      <h2 class="text-sm font-semibold text-primary mb-5">Quick start</h2>
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
         <div v-for="item in quickStartSteps" :key="item.step" class="flex flex-col gap-2">
-          <component :is="item.icon" class="w-5 h-5 text-blue-500" />
-          <span class="text-sm font-semibold text-(--text-primary)">{{ item.step }}</span>
-          <p class="text-xs text-(--text-secondary) leading-relaxed">{{ item.description }}</p>
+          <component :is="item.icon" class="w-5 h-5 text-primary" />
+          <span class="text-sm font-semibold text-primary">{{ item.step }}</span>
+          <p class="text-xs text-muted-color leading-relaxed">{{ item.description }}</p>
         </div>
       </div>
     </div>
 
     <!-- Privacy footer -->
     <div
-      class="border-t border-(--border) px-8 py-3 flex items-center justify-center gap-2 text-xs text-(--text-muted) select-none"
+      class="border-t border-(--border) px-8 py-3 flex items-center justify-center gap-2 text-xs text-muted-color select-none"
     >
       <Lock class="w-3.5 h-3.5" />
       <span>

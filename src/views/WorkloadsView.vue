@@ -19,7 +19,8 @@ watch(activeTab, (newTab) => {
 <template>
   <div class="flex flex-col gap-6">
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-(--border)">
+      <TabList class="border-b border-surface">
+        <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
         <Tab value="deployments" class="px-5 py-3 text-sm font-semibold">Deployments</Tab>
         <Tab value="statefulsets" class="px-5 py-3 text-sm font-semibold">StatefulSets</Tab>
         <Tab value="daemonsets" class="px-5 py-3 text-sm font-semibold">DaemonSets</Tab>
@@ -29,12 +30,14 @@ watch(activeTab, (newTab) => {
       </TabList>
 
       <TabPanels class="pt-6">
+        <!-- Overview Tab -->
+        <TabPanel value="overview">
+          <WorkloadMetricsCards v-if="visitedTabs.has('overview')" />
+        </TabPanel>
+
         <!-- Deployments Tab -->
         <TabPanel value="deployments">
-          <div v-if="visitedTabs.has('deployments')" class="flex flex-col gap-6">
-            <WorkloadMetricsCards />
-            <DeploymentsTable />
-          </div>
+          <DeploymentsTable v-if="visitedTabs.has('deployments')" />
         </TabPanel>
 
         <!-- StatefulSets Tab -->

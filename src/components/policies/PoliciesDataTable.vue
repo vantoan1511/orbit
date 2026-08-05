@@ -110,11 +110,11 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
           <InputText
             v-model="searchQuery"
             placeholder="Search policies..."
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
 
@@ -148,12 +148,12 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             "
           >
             <RefreshCw
-              class="w-4 h-4 text-(--text-secondary)"
+              class="w-4 h-4 text-muted-color"
               :class="{ 'animate-spin text-violet-400': k8sStore.policiesLoading }"
             />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+            <Settings2 class="w-4 h-4 text-muted-color" />
           </Button>
         </div>
       </div>
@@ -173,19 +173,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       @row-click="onRowClick"
     >
       <template #empty>
-        <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
-          <Info class="w-8 h-8 text-(--text-muted)/50" />
+        <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+          <Info class="w-8 h-8 text-muted-color/50" />
           <span>No policies found matching the filter criteria.</span>
         </div>
       </template>
 
       <!-- Name Column -->
-      <Column
-        field="name"
-        header="Name"
-        sortable
-        class="p-3 font-semibold text-(--text-primary) min-w-48"
-      >
+      <Column field="name" header="Name" sortable class="p-3 font-semibold text-primary min-w-48">
         <template #body="{ data }">
           <div class="flex flex-col">
             <span
@@ -201,26 +196,24 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Type Column -->
       <Column field="type" header="Type" sortable class="p-3">
         <template #body="{ data }">
-          <span class="text-(--text-secondary)">{{ data.type }}</span>
+          <span class="text-muted-color">{{ data.type }}</span>
         </template>
       </Column>
 
       <!-- Scope Column -->
       <Column field="scope" header="Scope" sortable class="p-3">
         <template #body="{ data }">
-          <span class="text-[10px] text-(--text-muted) uppercase font-semibold">{{
-            data.scope
-          }}</span>
+          <span class="text-[10px] text-muted-color uppercase font-semibold">{{ data.scope }}</span>
         </template>
       </Column>
 
       <!-- Namespace Column -->
       <Column field="namespace" header="Namespace" sortable class="p-3">
         <template #body="{ data }">
-          <span v-if="data.namespace !== '-'" class="font-mono text-(--text-muted)">{{
+          <span v-if="data.namespace !== '-'" class="font-mono text-muted-color">{{
             data.namespace
           }}</span>
-          <span v-else class="text-(--text-muted)">-</span>
+          <span v-else class="text-muted-color">-</span>
         </template>
       </Column>
 
@@ -239,7 +232,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Mode Column -->
       <Column field="mode" header="Mode" sortable class="p-3">
         <template #body="{ data }">
-          <span class="font-mono text-(--text-secondary)">{{ data.mode }}</span>
+          <span class="font-mono text-muted-color">{{ data.mode }}</span>
         </template>
       </Column>
 
@@ -248,7 +241,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         <template #body="{ data }">
           <span
             class="font-mono font-bold"
-            :class="data.violations > 0 ? 'text-red-400' : 'text-(--text-primary)'"
+            :class="data.violations > 0 ? 'text-red-400' : 'text-primary'"
           >
             {{ data.violations }}
           </span>
@@ -260,7 +253,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         field="lastUpdated"
         header="Last Updated"
         sortable
-        class="p-3 text-(--text-muted) font-mono"
+        class="p-3 text-muted-color font-mono"
       >
         <template #body="{ data }">
           <span>{{ data.lastUpdated }}</span>
@@ -278,7 +271,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             title="Actions"
             @click="toggleActionMenu($event, data)"
           >
-            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+            <MoreVertical class="w-4 h-4 text-muted-color" />
           </Button>
         </template>
       </Column>

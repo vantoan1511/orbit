@@ -125,7 +125,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-(--text-primary)">
+    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
       <template #body="{ data }">
         <div class="flex items-center gap-2">
           <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
@@ -170,7 +170,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">{{ data.clusterIP }}</span>
+        <span class="font-mono text-muted-color">{{ data.clusterIP }}</span>
       </template>
     </Column>
 
@@ -184,7 +184,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     >
       <template #body="{ data }">
         <div class="flex items-center gap-1">
-          <span class="font-mono text-(--text-secondary)">{{ data.externalIP }}</span>
+          <span class="font-mono text-muted-color">{{ data.externalIP }}</span>
           <ExternalLink
             v-if="data.externalIP !== '-'"
             class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
@@ -196,7 +196,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Ports Column -->
     <Column v-if="visibleCols['ports']" field="ports" header="Ports" sortable class="p-3">
       <template #body="{ data }">
-        <span class="font-mono text-(--text-muted) whitespace-pre-line">{{ data.ports }}</span>
+        <span class="font-mono text-muted-color whitespace-pre-line">{{ data.ports }}</span>
       </template>
     </Column>
 
@@ -219,7 +219,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-(--text-muted) font-mono"
+      class="p-3 text-muted-color font-mono"
     ></Column>
 
     <!-- Actions Column -->
@@ -233,7 +233,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           title="Actions"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
       </template>
     </Column>

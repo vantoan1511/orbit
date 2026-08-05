@@ -22,19 +22,16 @@ const newPresetName = props.highlighting.newPresetName
     v-model:visible="visible"
     modal
     header="Highlight Rules"
-    class="bg-(--bg-card) border border-(--border)"
     :style="{ width: '900px', maxWidth: '90vw' }"
   >
     <div class="flex flex-col gap-4">
-      <p class="text-xs text-(--text-muted)">
+      <p class="text-sm text-muted-color">
         Define search patterns to style log lines dynamically. Presets are read-only; custom rules
         can be edited/deleted.
       </p>
-      <div
-        class="flex flex-wrap items-center justify-between gap-4 bg-(--bg-hover)/10 p-3 border border-(--border) rounded-lg"
-      >
+      <div class="flex flex-wrap items-center justify-between gap-4 p-3">
         <div class="flex items-center gap-3">
-          <label class="text-xs font-semibold text-(--text-secondary)">Rule Preset:</label>
+          <label class="text-sm font-semibold text-muted-color">Rule Preset:</label>
           <Select
             v-model="selectedPreset"
             :options="highlighting.presetOptions.value"
@@ -42,7 +39,7 @@ const newPresetName = props.highlighting.newPresetName
             optionValue="value"
             optionGroupLabel="label"
             optionGroupChildren="items"
-            class="text-xs min-w-48 bg-(--bg-card) border-(--border)"
+            class="text-sm min-w-48"
             @change="highlighting.saveRules"
           />
           <Button
@@ -56,15 +53,10 @@ const newPresetName = props.highlighting.newPresetName
           />
         </div>
         <div class="flex items-center gap-2">
-          <InputText
-            v-model="newPresetName"
-            placeholder="Preset name..."
-            class="text-xs bg-(--bg-card) border-(--border) w-40"
-          />
+          <InputText v-model="newPresetName" placeholder="Preset name..." class="text-sm w-40" />
           <Button
-            label="Save Custom Rules as Preset"
+            label="Save"
             icon="pi pi-save"
-            size="small"
             severity="secondary"
             :disabled="
               !highlighting.customRules.value.length || !highlighting.newPresetName.value.trim()
@@ -77,17 +69,12 @@ const newPresetName = props.highlighting.newPresetName
         <div
           v-for="rule in highlighting.activeRules.value"
           :key="rule.id"
-          class="flex items-center gap-2 p-2 border rounded-lg"
-          :class="
-            rule.isPreset
-              ? 'bg-(--bg-hover)/5 border-dashed border-(--border-muted) opacity-80'
-              : 'bg-(--bg-hover)/20 border-(--border)'
-          "
+          class="flex items-center gap-2 p-2"
         >
           <InputText
             v-model="rule.pattern"
             placeholder="Pattern..."
-            class="text-xs bg-(--bg-card) border-(--border) flex-1"
+            class="text-sm flex-1 cursor-not-allowed"
             :disabled="rule.isPreset"
             @change="highlighting.saveRules"
           />
@@ -96,7 +83,7 @@ const newPresetName = props.highlighting.newPresetName
             :options="highlighting.colorOptions"
             optionLabel="label"
             optionValue="value"
-            class="text-xs min-w-28 bg-(--bg-card) border-(--border)"
+            class="text-sm min-w-30 cursor-not-allowed"
             :disabled="rule.isPreset"
             @change="highlighting.saveRules"
           />
@@ -105,13 +92,12 @@ const newPresetName = props.highlighting.newPresetName
               v-model="rule.bold"
               :inputId="'bold-' + rule.id"
               binary
-              class="border-(--border)"
               :disabled="rule.isPreset"
               @change="highlighting.saveRules"
             />
             <label
               :for="'bold-' + rule.id"
-              class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+              class="text-sm uppercase font-bold text-muted-color cursor-pointer select-none"
               >Bold</label
             >
           </div>
@@ -120,13 +106,12 @@ const newPresetName = props.highlighting.newPresetName
               v-model="rule.caseSensitive"
               :inputId="'cs-' + rule.id"
               binary
-              class="border-(--border)"
               :disabled="rule.isPreset"
               @change="highlighting.saveRules"
             />
             <label
               :for="'cs-' + rule.id"
-              class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+              class="text-sm uppercase font-bold text-muted-color cursor-pointer select-none"
               >CS</label
             >
           </div>
@@ -135,13 +120,12 @@ const newPresetName = props.highlighting.newPresetName
               v-model="rule.isRegex"
               :inputId="'rx-' + rule.id"
               binary
-              class="border-(--border)"
               :disabled="rule.isPreset"
               @change="highlighting.saveRules"
             />
             <label
               :for="'rx-' + rule.id"
-              class="text-[10px] uppercase font-bold text-(--text-muted) cursor-pointer select-none"
+              class="text-sm uppercase font-bold text-muted-color cursor-pointer select-none"
               >Regex</label
             >
           </div>
@@ -150,12 +134,8 @@ const newPresetName = props.highlighting.newPresetName
             icon="pi pi-trash"
             severity="danger"
             variant="text"
-            size="small"
             @click="highlighting.deleteCustomRule(rule.id)"
           />
-          <span v-else class="text-[10px] uppercase font-bold text-(--text-muted) px-2"
-            >Preset</span
-          >
         </div>
       </div>
       <div class="flex justify-between items-center mt-2">

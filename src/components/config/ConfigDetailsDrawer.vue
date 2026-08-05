@@ -94,12 +94,10 @@ ${Object.entries(res.data)
       <div class="flex items-center gap-3 w-full" v-if="props.resource">
         <div class="flex items-center gap-1.5">
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-(--text-muted)">
-            Active
-          </span>
+          <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
         </div>
         <div
-          class="text-xs text-(--text-muted) font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
+          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
         >
           ns/{{ props.resource.namespace }}
         </div>
@@ -122,12 +120,12 @@ ${Object.entries(res.data)
       <!-- Title Section -->
       <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
         <h2
-          class="text-lg font-bold text-(--text-primary) font-ui truncate mb-1"
+          class="text-lg font-bold text-primary font-ui truncate mb-1"
           :title="props.resource.name"
         >
           {{ props.resource.name }}
         </h2>
-        <div class="text-xs text-(--text-muted) flex items-center gap-2">
+        <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
           <span>Age: {{ props.resource.age }}</span>
         </div>
@@ -166,18 +164,18 @@ ${Object.entries(res.data)
               <div class="flex flex-col gap-6">
                 <!-- General Section -->
                 <div>
-                  <h3 class="text-xs font-bold uppercase text-(--text-muted) tracking-wider mb-3">
+                  <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">
                     General
                   </h3>
                   <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Namespace</div>
-                      <div class="col-span-2 text-xs text-(--text-primary) font-mono">
+                      <div class="text-xs text-muted-color font-medium">Namespace</div>
+                      <div class="col-span-2 text-xs text-primary font-mono">
                         {{ props.resource.namespace }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Labels</div>
+                      <div class="text-xs text-muted-color font-medium">Labels</div>
                       <div class="col-span-2">
                         <KeyValueBadgeList :items="props.resource.labels" variant="tag" />
                         <span
@@ -185,35 +183,33 @@ ${Object.entries(res.data)
                             !props.resource.labels ||
                             Object.keys(props.resource.labels).length === 0
                           "
-                          class="text-xs text-(--text-muted)"
+                          class="text-xs text-muted-color"
                         >
                           None
                         </span>
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Annotations</div>
-                      <div class="col-span-2 text-xs text-(--text-primary)">
+                      <div class="text-xs text-muted-color font-medium">Annotations</div>
+                      <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.annotations }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Created</div>
-                      <div class="col-span-2 text-xs text-(--text-primary)">
+                      <div class="text-xs text-muted-color font-medium">Created</div>
+                      <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.created }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Age</div>
-                      <div class="col-span-2 text-xs text-(--text-primary)">
+                      <div class="text-xs text-muted-color font-medium">Age</div>
+                      <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.age }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">
-                        Resource Version
-                      </div>
-                      <div class="col-span-2 text-xs text-(--text-primary) font-mono">
+                      <div class="text-xs text-muted-color font-medium">Resource Version</div>
+                      <div class="col-span-2 text-xs text-primary font-mono">
                         {{ props.resource.resourceVersion }}
                       </div>
                     </div>
@@ -222,31 +218,31 @@ ${Object.entries(res.data)
 
                 <!-- Details Section -->
                 <div>
-                  <h3 class="text-xs font-bold uppercase text-(--text-muted) tracking-wider mb-3">
+                  <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">
                     Details
                   </h3>
                   <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Data Keys</div>
-                      <div class="col-span-2 text-xs text-(--text-primary)">
+                      <div class="text-xs text-muted-color font-medium">Data Keys</div>
+                      <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.keysCount }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Size</div>
-                      <div class="col-span-2 text-xs text-(--text-primary) font-mono">
+                      <div class="text-xs text-muted-color font-medium">Size</div>
+                      <div class="col-span-2 text-xs text-primary font-mono">
                         {{ props.resource.size }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Mounted In</div>
-                      <div class="col-span-2 text-xs text-(--text-primary)">
+                      <div class="text-xs text-muted-color font-medium">Mounted In</div>
+                      <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.mountedPods }} pods
                       </div>
                     </div>
                     <div class="grid grid-cols-3 p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Immutable</div>
-                      <div class="col-span-2 text-xs text-(--text-primary)">
+                      <div class="text-xs text-muted-color font-medium">Immutable</div>
+                      <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.immutable ? 'True' : 'False' }}
                       </div>
                     </div>
@@ -256,7 +252,7 @@ ${Object.entries(res.data)
                 <!-- Used By Section -->
                 <div>
                   <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-xs font-bold uppercase text-(--text-muted) tracking-wider">
+                    <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider">
                       Used By
                     </h3>
                     <a
@@ -277,7 +273,7 @@ ${Object.entries(res.data)
                     >
                       <div class="flex items-center gap-2">
                         <Tag class="w-3.5 h-3.5 text-violet-400" />
-                        <span class="text-xs font-mono text-(--text-primary) truncate max-w-72">
+                        <span class="text-xs font-mono text-primary truncate max-w-72">
                           {{ pod.name }}
                         </span>
                       </div>
@@ -294,7 +290,7 @@ ${Object.entries(res.data)
                     </div>
                     <div
                       v-if="props.resource.usedBy.length === 0"
-                      class="p-6 text-center text-xs text-(--text-muted)"
+                      class="p-6 text-center text-xs text-muted-color"
                     >
                       No pods currently referencing this configuration.
                     </div>
@@ -319,7 +315,7 @@ ${Object.entries(res.data)
                     <button
                       v-if="isSecret(props.resource)"
                       @click="toggleRevealKey(key)"
-                      class="p-1 rounded text-(--text-muted) hover:text-(--text-primary) hover:bg-(--bg-hover) transition-all duration-200"
+                      class="p-1 rounded text-muted-color hover:text-primary hover:bg-(--bg-hover) transition-all duration-200"
                       title="Toggle visibility"
                     >
                       <EyeOff v-if="revealedKeys[key]" class="w-3.5 h-3.5" />
@@ -328,7 +324,7 @@ ${Object.entries(res.data)
                   </div>
 
                   <pre
-                    class="text-xs font-mono p-2 rounded bg-(--bg-card) border border-(--border) overflow-x-auto whitespace-pre-wrap break-all select-all text-(--text-primary)"
+                    class="text-xs font-mono p-2 rounded bg-(--bg-card) border border-(--border) overflow-x-auto whitespace-pre-wrap break-all select-all text-primary"
                     >{{
                       isSecret(props.resource)
                         ? revealedKeys[key]
@@ -343,7 +339,7 @@ ${Object.entries(res.data)
             <!-- YAML Panel -->
             <TabPanel value="yaml">
               <pre
-                class="text-xs font-mono p-4 rounded-lg bg-(--bg-card) border border-(--border) text-(--text-primary) overflow-x-auto whitespace-pre select-all"
+                class="text-xs font-mono p-4 rounded-lg bg-(--bg-card) border border-(--border) text-primary overflow-x-auto whitespace-pre select-all"
                 >{{ generateYaml(props.resource) }}</pre>
             </TabPanel>
           </TabPanels>

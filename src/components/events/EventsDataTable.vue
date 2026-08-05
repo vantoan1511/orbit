@@ -121,11 +121,11 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-(--text-muted)" />
+          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
           <InputText
             v-model="searchQuery"
             placeholder="Search events..."
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-(--text-primary) rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
           />
         </div>
 
@@ -150,7 +150,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
           <label
             for="system-ns-toggle"
-            class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+            class="text-xs font-semibold text-muted-color cursor-pointer select-none"
           >
             Show system namespaces
           </label>
@@ -165,10 +165,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             @click="handleRefresh"
             :loading="k8sStore.eventsLoading"
           >
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+            <RefreshCw class="w-4 h-4 text-muted-color" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+            <Settings2 class="w-4 h-4 text-muted-color" />
           </Button>
         </div>
       </div>
@@ -188,19 +188,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       @row-click="onRowClick"
     >
       <template #empty>
-        <div class="text-center py-10 text-(--text-muted) flex flex-col items-center gap-2">
-          <Info class="w-8 h-8 text-(--text-muted)/50" />
+        <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+          <Info class="w-8 h-8 text-muted-color/50" />
           <span>No events found matching the filter criteria.</span>
         </div>
       </template>
 
       <!-- Time Column -->
-      <Column
-        field="time"
-        header="Time"
-        sortable
-        class="p-3 text-(--text-muted) font-mono min-w-16"
-      >
+      <Column field="time" header="Time" sortable class="p-3 text-muted-color font-mono min-w-16">
         <template #body="{ data }">
           <span>{{ data.time }}</span>
         </template>
@@ -219,12 +214,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       </Column>
 
       <!-- Reason Column -->
-      <Column
-        field="reason"
-        header="Reason"
-        sortable
-        class="p-3 font-semibold text-(--text-primary)"
-      >
+      <Column field="reason" header="Reason" sortable class="p-3 font-semibold text-primary">
         <template #body="{ data }">
           <span class="font-mono">{{ data.reason }}</span>
         </template>
@@ -234,7 +224,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Column field="objectName" header="Object" sortable class="p-3">
         <template #body="{ data }">
           <div class="flex flex-col">
-            <span class="text-[10px] text-(--text-muted) uppercase font-semibold">{{
+            <span class="text-[10px] text-muted-color uppercase font-semibold">{{
               data.objectKind
             }}</span>
             <span
@@ -250,7 +240,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Message Column -->
       <Column field="message" header="Message" class="p-3 max-w-xs md:max-w-md">
         <template #body="{ data }">
-          <span class="text-(--text-secondary) block truncate" :title="data.message">
+          <span class="text-muted-color block truncate" :title="data.message">
             {{ data.message }}
           </span>
         </template>
@@ -259,7 +249,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Namespace Column -->
       <Column field="namespace" header="Namespace" sortable class="p-3">
         <template #body="{ data }">
-          <span class="font-mono text-(--text-muted)">{{ data.namespace }}</span>
+          <span class="font-mono text-muted-color">{{ data.namespace }}</span>
         </template>
       </Column>
 
@@ -268,7 +258,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         field="source"
         header="Source"
         sortable
-        class="p-3 font-mono text-(--text-muted)"
+        class="p-3 font-mono text-muted-color"
       ></Column>
 
       <!-- Actions Column -->
@@ -282,7 +272,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             title="Actions"
             @click="toggleActionMenu($event, data)"
           >
-            <MoreVertical class="w-4 h-4 text-(--text-muted)" />
+            <MoreVertical class="w-4 h-4 text-muted-color" />
           </Button>
         </template>
       </Column>

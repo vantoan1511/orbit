@@ -53,7 +53,7 @@ const metrics = computed(() => {
       value: formatCapacity(totalCapGiB),
       subtext: `${totalPVs} Total Volumes`,
       icon: Database,
-      iconClass: 'bg-(--bg-hover) text-(--text-muted)'
+      iconClass: 'bg-(--bg-hover) text-muted-color'
     },
     {
       title: 'Used Capacity',
@@ -104,15 +104,13 @@ const metrics = computed(() => {
         <component :is="metric.icon" class="w-4.5 h-4.5" />
       </div>
       <div class="min-w-0">
-        <div
-          class="text-[10px] font-semibold text-(--text-muted) uppercase tracking-wider truncate"
-        >
+        <div class="text-[10px] font-semibold text-muted-color uppercase tracking-wider truncate">
           {{ metric.title }}
         </div>
-        <div class="text-xl font-bold text-(--text-primary) font-mono mt-0.5 truncate">
+        <div class="text-xl font-bold text-primary font-mono mt-0.5 truncate">
           {{ metric.value }}
         </div>
-        <div class="text-[9px] truncate" :class="metric.subtextClass || 'text-(--text-muted)'">
+        <div class="text-[9px] truncate" :class="metric.subtextClass || 'text-muted-color'">
           {{ metric.subtext }}
         </div>
       </div>

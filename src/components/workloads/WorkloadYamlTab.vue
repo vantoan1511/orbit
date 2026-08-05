@@ -16,7 +16,7 @@ const emit = defineEmits<{
 <template>
   <div class="h-full flex flex-col space-y-3">
     <div class="flex items-center justify-between">
-      <span class="text-[10px] font-bold text-(--text-muted) uppercase tracking-wider">
+      <span class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
         Live Kubernetes Manifest
       </span>
       <Button
