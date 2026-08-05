@@ -129,6 +129,9 @@ export const extensions = {
 export const app = {
   getConfig() {
     return neuApp.getConfig()
+  },
+  restartProcess() {
+    return neuApp.restartProcess()
   }
 }
 

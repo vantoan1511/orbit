@@ -37,6 +37,7 @@ export interface OrbitEventMap {
     status: 'ready' | 'error'
     message: string
   }
+  engineTimeout: Record<string, never>
   ping: {
     message: string
   }
@@ -142,6 +143,7 @@ export interface OrbitEventMap {
 
 export const OrbitEvents = {
   EngineConnected: 'engineConnected',
+  EngineTimeout: 'engineTimeout',
   Ping: 'ping',
   Pong: 'pong',
   NamespacesUpdated: 'namespacesUpdated',
