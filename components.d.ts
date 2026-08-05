@@ -106,7 +106,6 @@ declare module 'vue' {
     WorkloadYamlTab: typeof import('./src/components/workloads/WorkloadYamlTab.vue')['default']
   }
   export interface GlobalDirectives {
-    Ripple: typeof import('primevue/ripple')['default']
     Tooltip: typeof import('primevue/tooltip')['default']
   }
 }

@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { OrbitEvents } from '@/types/events'
 import { Lightbulb, Rocket } from '@lucide/vue'
 import { onMounted, onUnmounted, ref } from 'vue'
 
@@ -41,6 +43,7 @@ let finishTimeout: number | undefined
 
 const startTime = Date.now()
 const MIN_DISPLAY_TIME_MS = 2500
+const ENGINE_TIMEOUT_MS = 15000
 
 onMounted(() => {
   // Roll out facts and tips every 3 seconds
@@ -54,7 +57,24 @@ onMounted(() => {
     const elapsed = Date.now() - startTime
     const engineReady = k8sStore.isEngineReady
 
-    if (!engineReady || elapsed < MIN_DISPLAY_TIME_MS) {
+    if (!engineReady) {
+      if (elapsed > ENGINE_TIMEOUT_MS) {
+        window.clearInterval(progressInterval)
+        finishTimeout = window.setTimeout(() => {
+          k8sStore.setAppLoading(false)
+          emit('complete')
+          window.setTimeout(() => {
+            events.dispatch(OrbitEvents.EngineTimeout, {})
+          }, 500)
+        }, 350)
+        return
+      }
+
+      if (progress.value < 90) {
+        const step = Math.max(1, Math.floor((90 - progress.value) * 0.15))
+        progress.value = Math.min(90, progress.value + step)
+      }
+    } else if (elapsed < MIN_DISPLAY_TIME_MS) {
       // Gradually creep towards 90%
       if (progress.value < 90) {
         const step = Math.max(1, Math.floor((90 - progress.value) * 0.15))

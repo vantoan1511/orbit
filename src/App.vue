@@ -3,12 +3,11 @@ import NotificationDrawer from '@/components/layout/NotificationDrawer.vue'
 import ProfileDrawer from '@/components/layout/ProfileDrawer.vue'
 import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
-import { events } from '@/services/nativeService'
+import { app, events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
 import { OrbitEvents } from '@/types/events'
-import type { UserProfileInfo } from '@/types/profile'
 import type {
   ClusterInfo,
   ConfigMapInfo,
@@ -29,9 +28,11 @@ import type {
   StatefulSetInfo,
   StorageClassInfo
 } from '@/types/kubernetes'
+import type { UserProfileInfo } from '@/types/profile'
 import ConfirmDialog from 'primevue/confirmdialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
+import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
@@ -40,6 +41,7 @@ const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
 const toast = useToast()
+const confirm = useConfirm()
 
 const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: string }) => {
   if (payload.status === 'ready') {
@@ -170,6 +172,24 @@ const handleCommandSucceeded = (payload: { message: string }) => {
   })
 }
 
+const handleEngineTimeout = () => {
+  confirm.require({
+    header: 'Connection Timeout',
+    message: 'Cannot connect to Orbit Engine. Please restart the application.',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: {
+      style: { display: 'none' }
+    },
+    acceptProps: {
+      label: 'Restart',
+      severity: 'primary'
+    },
+    accept: () => {
+      app.restartProcess()
+    }
+  })
+}
+
 const handleContextMenu = (e: MouseEvent) => {
   const target = e.target as HTMLElement | null
   if (!target) {
@@ -221,6 +241,7 @@ onMounted(() => {
   events.on(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated)
   events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
   events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
+  events.on(OrbitEvents.EngineTimeout, handleEngineTimeout)
 })
 
 onUnmounted(() => {
@@ -249,6 +270,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
   events.off(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
+  events.off(OrbitEvents.EngineTimeout, handleEngineTimeout)
 })
 </script>
 

@@ -28,6 +28,7 @@
     "app.broadcast",
     "app.exit",
     "app.getConfig",
+    "app.restartProcess",
     "events.on",
     "events.off",
     "events.dispatch",
