@@ -13,7 +13,7 @@ const { isRefreshing, refreshCluster } = useCluster()
 
     <h2 class="text-2xl font-bold text-primary mb-2 tracking-tight">Cluster is Offline</h2>
 
-    <p class="text-sm text-(--text-secondary) max-w-md mb-6 leading-relaxed">
+    <p class="text-sm text-muted-color max-w-md mb-6 leading-relaxed">
       Unable to connect to the selected cluster. Please check if your Kubernetes cluster is running,
       verify your network settings, and check that your kubeconfig credentials are still valid.
     </p>

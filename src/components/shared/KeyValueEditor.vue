@@ -63,7 +63,7 @@ const updateValue = (index: number, newValue: string) => {
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label v-if="title" class="text-xs font-medium text-(--text-secondary)">{{ title }}</label>
+      <label v-if="title" class="text-xs font-medium text-muted-color">{{ title }}</label>
       <Button
         v-if="!disabled"
         size="small"
@@ -87,7 +87,7 @@ const updateValue = (index: number, newValue: string) => {
         class="w-1/2 px-2 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
         @update:model-value="(val) => updateKey(idx, val ?? '')"
       />
-      <span class="text-(--text-secondary)">=</span>
+      <span class="text-muted-color">=</span>
       <InputText
         :model-value="item.value"
         :placeholder="valuePlaceholder"

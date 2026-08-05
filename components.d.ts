@@ -36,6 +36,8 @@ declare module 'vue' {
     EventsDataTable: typeof import('./src/components/events/EventsDataTable.vue')['default']
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
+    IconField: typeof import('primevue/iconfield')['default']
+    InputIcon: typeof import('primevue/inputicon')['default']
     InputText: typeof import('primevue/inputtext')['default']
     JobsTable: typeof import('./src/components/workloads/JobsTable.vue')['default']
     KeyValueBadgeList: typeof import('./src/components/shared/KeyValueBadgeList.vue')['default']

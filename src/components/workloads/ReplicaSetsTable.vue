@@ -169,7 +169,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Replicas Column -->
     <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-2 font-mono text-(--text-secondary)">
+        <div class="flex items-center gap-2 font-mono text-muted-color">
           <span class="font-bold">{{ data.replicas.current }}</span>
           <span class="text-muted-color">/</span>
           <span>{{ data.replicas.desired }}</span>
@@ -193,7 +193,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="img in data.images"
             :key="img"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-(--text-secondary) text-[10px] border border-(--border) font-mono truncate max-w-full"
+            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
             :title="img"
           >
             {{ img.split('/').pop() }}

@@ -63,7 +63,7 @@
 /* ==========================================================================
    Select Components Styling (Orbit Theme)
    ========================================================================== */
-.p-select {
+/* .p-select {
   background: var(--bg-card) !important;
   border: 1px solid var(--border) !important;
   border-radius: 8px !important;
@@ -135,7 +135,7 @@
   background: var(--bg-active) !important;
   color: var(--text-primary) !important;
   font-weight: 600 !important;
-}
+} */
 
 /* Paginator RowsPerPageDropdown override */
 .p-paginator .p-select {

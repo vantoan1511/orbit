@@ -93,7 +93,7 @@ const handleClearAllData = () => {
         <div class="flex flex-col gap-1">
           <span class="text-xs text-muted-color">Server Address</span>
           <span
-            class="text-[10px] font-mono text-(--text-secondary) bg-(--bg-hover)/20 p-2 rounded border border-(--border) truncate"
+            class="text-[10px] font-mono text-muted-color bg-(--bg-hover)/20 p-2 rounded border border-(--border) truncate"
           >
             {{ currentContext.server }}
           </span>

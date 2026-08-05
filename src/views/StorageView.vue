@@ -77,7 +77,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
                 <Column
                   field="provisioner"
                   header="Provisioner"
-                  class="p-3 font-mono text-(--text-secondary)"
+                  class="p-3 font-mono text-muted-color"
                 ></Column>
                 <Column
                   field="reclaimPolicy"
@@ -87,7 +87,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
                 <Column
                   field="volumeBindingMode"
                   header="Volume Binding Mode"
-                  class="p-3 text-(--text-secondary)"
+                  class="p-3 text-muted-color"
                 ></Column>
                 <Column field="allowVolumeExpansion" header="Allow Volume Expansion" class="p-3">
                   <template #body="{ data }">

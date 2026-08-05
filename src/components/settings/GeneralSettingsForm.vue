@@ -109,7 +109,7 @@ const handleDeleteCachedContexts = () => {
             <div class="flex flex-col">
               <label
                 for="launch-startup"
-                class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+                class="text-xs font-semibold text-muted-color cursor-pointer select-none"
               >
                 Launch Orbit on system startup
               </label>
@@ -129,7 +129,7 @@ const handleDeleteCachedContexts = () => {
             <div class="flex flex-col">
               <label
                 for="start-minimized"
-                class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+                class="text-xs font-semibold text-muted-color cursor-pointer select-none"
               >
                 Start minimized to system tray
               </label>
@@ -149,7 +149,7 @@ const handleDeleteCachedContexts = () => {
         <div class="flex flex-col gap-4">
           <div class="flex items-center justify-between gap-4">
             <div class="flex flex-col">
-              <span class="text-xs font-semibold text-(--text-secondary)"
+              <span class="text-xs font-semibold text-muted-color"
                 >Automatically check for updates</span
               >
               <span class="text-[11px] text-muted-color"
@@ -160,7 +160,7 @@ const handleDeleteCachedContexts = () => {
           </div>
 
           <div class="flex flex-col gap-2 max-w-sm">
-            <label class="text-xs font-semibold text-(--text-secondary)">Update Channel</label>
+            <label class="text-xs font-semibold text-muted-color">Update Channel</label>
             <Select
               v-model="updateChannel"
               :options="channels"
@@ -180,7 +180,7 @@ const handleDeleteCachedContexts = () => {
         <h4 class="text-sm font-semibold text-primary">Kubeconfig</h4>
         <div class="flex flex-col gap-3">
           <div class="flex flex-col gap-2">
-            <label class="text-xs font-semibold text-(--text-secondary)">Default Path</label>
+            <label class="text-xs font-semibold text-muted-color">Default Path</label>
             <div class="flex gap-2">
               <div class="relative flex-1">
                 <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
@@ -211,7 +211,7 @@ const handleDeleteCachedContexts = () => {
         <h4 class="text-sm font-semibold text-primary">Telemetry</h4>
         <div class="flex items-center justify-between gap-4">
           <div class="flex flex-col">
-            <span class="text-xs font-semibold text-(--text-secondary)"
+            <span class="text-xs font-semibold text-muted-color"
               >Share anonymous usage statistics</span
             >
             <span class="text-[11px] text-muted-color"

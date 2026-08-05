@@ -150,7 +150,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
           <label
             for="system-ns-toggle"
-            class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+            class="text-xs font-semibold text-muted-color cursor-pointer select-none"
           >
             Show system namespaces
           </label>
@@ -165,10 +165,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             @click="handleRefresh"
             :loading="k8sStore.eventsLoading"
           >
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+            <RefreshCw class="w-4 h-4 text-muted-color" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+            <Settings2 class="w-4 h-4 text-muted-color" />
           </Button>
         </div>
       </div>
@@ -240,7 +240,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Message Column -->
       <Column field="message" header="Message" class="p-3 max-w-xs md:max-w-md">
         <template #body="{ data }">
-          <span class="text-(--text-secondary) block truncate" :title="data.message">
+          <span class="text-muted-color block truncate" :title="data.message">
             {{ data.message }}
           </span>
         </template>

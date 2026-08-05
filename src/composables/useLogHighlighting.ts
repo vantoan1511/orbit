@@ -362,7 +362,7 @@ export function useLogHighlighting() {
           classes = 'text-zinc-400'
           break
         default:
-          classes = 'text-(--text-secondary)'
+          classes = 'text-muted-color'
           break
       }
       if (matched.bold) {
@@ -371,7 +371,7 @@ export function useLogHighlighting() {
       return classes
     }
 
-    return 'text-(--text-secondary)'
+    return 'text-muted-color'
   }
 
   return {

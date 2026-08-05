@@ -9,7 +9,7 @@ const NoirPreset: Preset = {
       width: '2px',
       style: 'dashed',
       color: '{primary.color}',
-      offset: '5px'
+      offset: '2px'
     },
     primary: {
       50: '{zinc.50}',
@@ -41,10 +41,10 @@ const NoirPreset: Preset = {
       },
       dark: {
         primary: {
-          color: '{zinc.50}',
-          inverseColor: '{zinc.950}',
-          hoverColor: '{zinc.100}',
-          activeColor: '{zinc.200}'
+          color: '{slate.50}',
+          inverseColor: '{slate.950}',
+          hoverColor: '{slate.100}',
+          activeColor: '{slate.200}'
         },
         highlight: {
           background: 'rgba(250, 250, 250, .16)',

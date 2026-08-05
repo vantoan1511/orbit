@@ -36,15 +36,15 @@ onMounted(async () => {
 
       <div class="flex flex-col gap-3">
         <div class="flex justify-between items-center py-2 border-b border-(--border)">
-          <span class="text-sm font-medium text-(--text-secondary)">Version</span>
+          <span class="text-sm font-medium text-muted-color">Version</span>
           <span class="text-sm text-primary">{{ appVersion || 'Loading...' }}</span>
         </div>
         <div class="flex justify-between items-center py-2 border-b border-(--border)">
-          <span class="text-sm font-medium text-(--text-secondary)">Architecture</span>
+          <span class="text-sm font-medium text-muted-color">Architecture</span>
           <span class="text-sm text-primary">x64</span>
         </div>
         <div class="flex justify-between items-center py-2">
-          <span class="text-sm font-medium text-(--text-secondary)">Author</span>
+          <span class="text-sm font-medium text-muted-color">Author</span>
           <span class="text-sm text-primary">vantoan1511</span>
         </div>
       </div>
@@ -82,7 +82,7 @@ onMounted(async () => {
       <!-- Show progress if downloading -->
       <div v-if="updaterStore.isDownloading" class="mt-4">
         <div class="flex justify-between text-sm mb-1">
-          <span class="text-(--text-secondary)">Downloading update...</span>
+          <span class="text-muted-color">Downloading update...</span>
           <span class="text-primary">{{ updaterStore.downloadProgress }}%</span>
         </div>
         <div class="w-full bg-(--surface-ground) rounded-full h-1.5 border border-(--border)">

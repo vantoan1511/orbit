@@ -241,11 +241,11 @@ const annotationsExpanded = ref(false)
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-muted-color">Created</span>
-                    <span class="text-(--text-secondary)">{{ props.namespace.created }}</span>
+                    <span class="text-muted-color">{{ props.namespace.created }}</span>
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-muted-color">Age</span>
-                    <span class="font-mono text-(--text-secondary)">{{ props.namespace.age }}</span>
+                    <span class="font-mono text-muted-color">{{ props.namespace.age }}</span>
                   </div>
                   <div class="flex justify-between items-start gap-4">
                     <span class="text-muted-color shrink-0">UID</span>
@@ -287,7 +287,7 @@ const annotationsExpanded = ref(false)
                   </h3>
                   <button
                     v-if="Object.keys(props.namespace.annotations).length > 0"
-                    class="text-[10px] text-muted-color hover:text-(--text-secondary) transition-colors"
+                    class="text-[10px] text-muted-color hover:text-muted-color transition-colors"
                     @click="annotationsExpanded = !annotationsExpanded"
                   >
                     {{ Object.keys(props.namespace.annotations).length }}
@@ -298,7 +298,7 @@ const annotationsExpanded = ref(false)
                   <div
                     v-for="(val, key) in props.namespace.annotations"
                     :key="key"
-                    class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-(--text-secondary) flex justify-between gap-4"
+                    class="p-2 rounded bg-(--bg-hover)/50 border border-(--border) text-[10px] font-mono text-muted-color flex justify-between gap-4"
                   >
                     <span class="text-muted-color truncate shrink-0">{{ key }}</span>
                     <span class="truncate text-right">{{ val }}</span>
@@ -312,7 +312,7 @@ const annotationsExpanded = ref(false)
                 </div>
                 <div
                   v-else
-                  class="text-[10px] text-muted-color cursor-pointer hover:text-(--text-secondary)"
+                  class="text-[10px] text-muted-color cursor-pointer hover:text-muted-color"
                   @click="annotationsExpanded = true"
                 >
                   {{ Object.keys(props.namespace.annotations).length }} annotation(s) — click to
@@ -383,7 +383,7 @@ const annotationsExpanded = ref(false)
               <!-- View YAML link -->
               <div class="pt-2 border-t border-(--border)">
                 <button
-                  class="text-xs text-muted-color hover:text-(--text-secondary) transition-colors flex items-center gap-1.5"
+                  class="text-xs text-muted-color hover:text-muted-color transition-colors flex items-center gap-1.5"
                 >
                   <FileCode class="w-3.5 h-3.5" />
                   <span>View YAML</span>
@@ -402,7 +402,7 @@ const annotationsExpanded = ref(false)
                 <div class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-3">
                   <div class="flex justify-between items-center text-xs">
                     <span class="text-muted-color font-semibold">CPU</span>
-                    <span class="font-mono text-(--text-secondary)">{{
+                    <span class="font-mono text-muted-color">{{
                       props.namespace.resourceQuota.cpuUsed
                     }}</span>
                   </div>
@@ -431,7 +431,7 @@ const annotationsExpanded = ref(false)
                 <div class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-3">
                   <div class="flex justify-between items-center text-xs">
                     <span class="text-muted-color font-semibold">Memory</span>
-                    <span class="font-mono text-(--text-secondary)">{{
+                    <span class="font-mono text-muted-color">{{
                       props.namespace.resourceQuota.memoryUsed
                     }}</span>
                   </div>
@@ -463,7 +463,7 @@ const annotationsExpanded = ref(false)
                 class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-8 text-center flex flex-col items-center gap-3"
               >
                 <BarChart2 class="w-8 h-8 text-muted-color/40" />
-                <div class="text-sm font-semibold text-(--text-secondary)">No Resource Quotas</div>
+                <div class="text-sm font-semibold text-muted-color">No Resource Quotas</div>
                 <div class="text-xs text-muted-color max-w-xs">
                   This namespace has no resource quotas configured.
                 </div>
@@ -492,19 +492,19 @@ const annotationsExpanded = ref(false)
                   <div class="grid grid-cols-2 gap-2 text-[10px]">
                     <div>
                       <span class="text-muted-color block">Min</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.min }}</span>
+                      <span class="font-mono text-muted-color">{{ lr.min }}</span>
                     </div>
                     <div>
                       <span class="text-muted-color block">Max</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.max }}</span>
+                      <span class="font-mono text-muted-color">{{ lr.max }}</span>
                     </div>
                     <div>
                       <span class="text-muted-color block">Default</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.default }}</span>
+                      <span class="font-mono text-muted-color">{{ lr.default }}</span>
                     </div>
                     <div>
                       <span class="text-muted-color block">Default Request</span>
-                      <span class="font-mono text-(--text-secondary)">{{ lr.defaultRequest }}</span>
+                      <span class="font-mono text-muted-color">{{ lr.defaultRequest }}</span>
                     </div>
                   </div>
                 </div>
@@ -516,7 +516,7 @@ const annotationsExpanded = ref(false)
                 class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-8 text-center flex flex-col items-center gap-3"
               >
                 <Layers class="w-8 h-8 text-muted-color/40" />
-                <div class="text-sm font-semibold text-(--text-secondary)">No Limit Ranges</div>
+                <div class="text-sm font-semibold text-muted-color">No Limit Ranges</div>
                 <div class="text-xs text-muted-color max-w-xs">
                   This namespace has no limit ranges configured.
                 </div>

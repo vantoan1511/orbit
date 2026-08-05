@@ -44,7 +44,7 @@ const updateItem = (index: number, val: string) => {
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label v-if="title" class="text-xs font-medium text-(--text-secondary)">{{ title }}</label>
+      <label v-if="title" class="text-xs font-medium text-muted-color">{{ title }}</label>
       <Button
         v-if="!disabled"
         size="small"

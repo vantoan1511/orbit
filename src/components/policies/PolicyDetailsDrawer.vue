@@ -128,33 +128,33 @@ const getStatusBadgeClass = (status: string) => {
                   class="border border-(--border) rounded-xl overflow-hidden divide-y divide-(--border) bg-(--bg-hover)/10 text-xs"
                 >
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Name</span>
+                    <span class="text-muted-color font-semibold">Name</span>
                     <span class="col-span-2 font-mono text-primary">{{ props.policy.name }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Type</span>
+                    <span class="text-muted-color font-semibold">Type</span>
                     <span class="col-span-2 text-primary">{{ props.policy.type }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Scope</span>
+                    <span class="text-muted-color font-semibold">Scope</span>
                     <span class="col-span-2 text-primary">{{ props.policy.scope }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3" v-if="props.policy.namespace !== '-'">
-                    <span class="text-(--text-secondary) font-semibold">Namespace</span>
+                    <span class="text-muted-color font-semibold">Namespace</span>
                     <span class="col-span-2 text-primary font-mono">{{
                       props.policy.namespace
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Status</span>
+                    <span class="text-muted-color font-semibold">Status</span>
                     <span class="col-span-2 text-primary">{{ props.policy.status }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Mode</span>
+                    <span class="text-muted-color font-semibold">Mode</span>
                     <span class="col-span-2 text-primary font-mono">{{ props.policy.mode }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Violations (7d)</span>
+                    <span class="text-muted-color font-semibold">Violations (7d)</span>
                     <span
                       class="col-span-2 font-mono font-bold"
                       :class="props.policy.violations > 0 ? 'text-red-400' : 'text-primary'"
@@ -163,7 +163,7 @@ const getStatusBadgeClass = (status: string) => {
                     </span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">UID</span>
+                    <span class="text-muted-color font-semibold">UID</span>
                     <span class="col-span-2 font-mono text-[10px] text-primary">{{
                       props.policy.uid
                     }}</span>

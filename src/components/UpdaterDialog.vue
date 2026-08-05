@@ -28,7 +28,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       return {
         text: '• ' + trimmed.substring(2),
-        class: 'pl-2 text-(--text-secondary) leading-snug'
+        class: 'pl-2 text-muted-color leading-snug'
       }
     } else if (trimmed.length === 0) {
       return {
@@ -38,7 +38,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     } else {
       return {
         text: trimmed,
-        class: 'text-(--text-secondary) leading-normal'
+        class: 'text-muted-color leading-normal'
       }
     }
   })
@@ -81,7 +81,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
 
       <!-- Release Notes Section -->
       <div>
-        <h4 class="text-xs font-semibold uppercase tracking-wider text-(--text-secondary) mb-2">
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-color mb-2">
           Release Notes
         </h4>
         <div
@@ -101,7 +101,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       <!-- Download Progress Bar -->
       <div v-if="updaterStore.isDownloading" class="pt-2 border-t border-(--border)">
         <div class="flex justify-between items-center text-xs mb-1.5">
-          <span class="font-medium text-(--text-secondary)">Downloading update...</span>
+          <span class="font-medium text-muted-color">Downloading update...</span>
           <span class="font-bold text-(--primary-500)">{{ updaterStore.downloadProgress }}%</span>
         </div>
         <div

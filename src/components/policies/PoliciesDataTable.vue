@@ -148,12 +148,12 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             "
           >
             <RefreshCw
-              class="w-4 h-4 text-(--text-secondary)"
+              class="w-4 h-4 text-muted-color"
               :class="{ 'animate-spin text-violet-400': k8sStore.policiesLoading }"
             />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+            <Settings2 class="w-4 h-4 text-muted-color" />
           </Button>
         </div>
       </div>
@@ -196,7 +196,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Type Column -->
       <Column field="type" header="Type" sortable class="p-3">
         <template #body="{ data }">
-          <span class="text-(--text-secondary)">{{ data.type }}</span>
+          <span class="text-muted-color">{{ data.type }}</span>
         </template>
       </Column>
 
@@ -232,7 +232,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <!-- Mode Column -->
       <Column field="mode" header="Mode" sortable class="p-3">
         <template #body="{ data }">
-          <span class="font-mono text-(--text-secondary)">{{ data.mode }}</span>
+          <span class="font-mono text-muted-color">{{ data.mode }}</span>
         </template>
       </Column>
 

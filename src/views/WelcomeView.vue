@@ -42,7 +42,7 @@ const quickStartSteps = [
       <!-- Headline -->
       <div class="flex flex-col gap-2 max-w-md">
         <h1 class="text-3xl font-bold tracking-tight text-primary font-ui">Welcome to Orbit</h1>
-        <p class="text-sm text-(--text-secondary) leading-relaxed">
+        <p class="text-sm text-muted-color leading-relaxed">
           Orbit helps you explore, monitor, and manage<br />
           your Kubernetes clusters from a single, intuitive interface.
         </p>
@@ -57,7 +57,7 @@ const quickStartSteps = [
           <span class="text-sm font-semibold text-primary"
             >Click on a cluster to start browsing</span
           >
-          <span class="text-xs text-(--text-secondary)">
+          <span class="text-xs text-muted-color">
             Select a cluster from the list on the left to view its overview and start managing your
             resources.
           </span>
@@ -80,7 +80,7 @@ const quickStartSteps = [
           label="Add Cluster"
           @click="handleAddCluster"
         />
-        <p class="text-sm font-semibold text-(--text-secondary)">
+        <p class="text-sm font-semibold text-muted-color">
           No clusters yet? Add one to get started.
         </p>
         <p class="text-xs text-muted-color max-w-xs">
@@ -96,7 +96,7 @@ const quickStartSteps = [
         <div v-for="item in quickStartSteps" :key="item.step" class="flex flex-col gap-2">
           <component :is="item.icon" class="w-5 h-5 text-primary" />
           <span class="text-sm font-semibold text-primary">{{ item.step }}</span>
-          <p class="text-xs text-(--text-secondary) leading-relaxed">{{ item.description }}</p>
+          <p class="text-xs text-muted-color leading-relaxed">{{ item.description }}</p>
         </div>
       </div>
     </div>

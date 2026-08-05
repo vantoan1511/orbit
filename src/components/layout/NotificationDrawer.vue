@@ -199,7 +199,7 @@ const formatRelativeTime = (timestamp: number): string => {
                     </div>
                   </div>
 
-                  <p class="text-xs text-(--text-secondary) mt-1 wrap-break-word leading-relaxed">
+                  <p class="text-xs text-muted-color mt-1 wrap-break-word leading-relaxed">
                     {{ item.message }}
                   </p>
                 </div>
@@ -259,7 +259,7 @@ const formatRelativeTime = (timestamp: number): string => {
                     </div>
                   </div>
 
-                  <p class="text-xs text-(--text-secondary) mt-1 wrap-break-word leading-relaxed">
+                  <p class="text-xs text-muted-color mt-1 wrap-break-word leading-relaxed">
                     {{ item.message }}
                   </p>
                 </div>

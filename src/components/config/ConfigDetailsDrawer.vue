@@ -169,13 +169,13 @@ ${Object.entries(res.data)
                   </h3>
                   <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Namespace</div>
+                      <div class="text-xs text-muted-color font-medium">Namespace</div>
                       <div class="col-span-2 text-xs text-primary font-mono">
                         {{ props.resource.namespace }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Labels</div>
+                      <div class="text-xs text-muted-color font-medium">Labels</div>
                       <div class="col-span-2">
                         <KeyValueBadgeList :items="props.resource.labels" variant="tag" />
                         <span
@@ -190,27 +190,25 @@ ${Object.entries(res.data)
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Annotations</div>
+                      <div class="text-xs text-muted-color font-medium">Annotations</div>
                       <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.annotations }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Created</div>
+                      <div class="text-xs text-muted-color font-medium">Created</div>
                       <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.created }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Age</div>
+                      <div class="text-xs text-muted-color font-medium">Age</div>
                       <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.age }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">
-                        Resource Version
-                      </div>
+                      <div class="text-xs text-muted-color font-medium">Resource Version</div>
                       <div class="col-span-2 text-xs text-primary font-mono">
                         {{ props.resource.resourceVersion }}
                       </div>
@@ -225,25 +223,25 @@ ${Object.entries(res.data)
                   </h3>
                   <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Data Keys</div>
+                      <div class="text-xs text-muted-color font-medium">Data Keys</div>
                       <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.keysCount }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Size</div>
+                      <div class="text-xs text-muted-color font-medium">Size</div>
                       <div class="col-span-2 text-xs text-primary font-mono">
                         {{ props.resource.size }}
                       </div>
                     </div>
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Mounted In</div>
+                      <div class="text-xs text-muted-color font-medium">Mounted In</div>
                       <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.mountedPods }} pods
                       </div>
                     </div>
                     <div class="grid grid-cols-3 p-3">
-                      <div class="text-xs text-(--text-secondary) font-medium">Immutable</div>
+                      <div class="text-xs text-muted-color font-medium">Immutable</div>
                       <div class="col-span-2 text-xs text-primary">
                         {{ props.resource.immutable ? 'True' : 'False' }}
                       </div>

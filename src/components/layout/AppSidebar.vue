@@ -121,7 +121,8 @@ const { isDark, toggleTheme } = useTheme()
             route.path === link.path
               ? 'bg-primary-200! dark:bg-primary-700! border-l-primary! border-l-3! rounded-l-lg! translate-x-3'
               : 'text-muted-color hover:bg-surface-100 dark:hover:bg-surface-800',
-            'flex! items-center! justify-start! transition-all duration-200'
+            'flex! items-center! justify-start! transition-all duration-200',
+            k8sStore.activeClusterId === null && link.path !== '/settings' ? 'hidden!' : ''
           ]"
         >
           <component :is="link.icon" class="w-4 h-4 shrink-0" />

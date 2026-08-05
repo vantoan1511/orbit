@@ -141,9 +141,7 @@ watch(scCapacityData, updateChart, { immediate: true })
             <div class="text-[10px] text-muted-color truncate mt-0.5">{{ sc.provisioner }}</div>
           </div>
           <div class="flex flex-col items-end shrink-0">
-            <span class="text-[10px] font-mono text-(--text-secondary)">{{
-              sc.reclaimPolicy
-            }}</span>
+            <span class="text-[10px] font-mono text-muted-color">{{ sc.reclaimPolicy }}</span>
             <span
               class="text-[9px] px-1.5 py-0.5 rounded mt-1 font-semibold"
               :class="

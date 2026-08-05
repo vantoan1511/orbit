@@ -128,7 +128,7 @@ const getAuthTypeColorClass = (authType: string) => {
               API Server Endpoint
             </span>
             <div
-              class="p-2 rounded bg-(--bg-card) border border-(--border) font-mono text-[11px] text-(--text-secondary) truncate select-all"
+              class="p-2 rounded bg-(--bg-card) border border-(--border) font-mono text-[11px] text-muted-color truncate select-all"
             >
               {{ profileStore.profile.serverUrl }}
             </div>
@@ -150,7 +150,7 @@ const getAuthTypeColorClass = (authType: string) => {
           <div
             v-for="path in profileStore.profile.kubeconfigPaths"
             :key="path"
-            class="flex items-center gap-2 p-2.5 rounded-lg bg-(--bg-sidebar)/40 border border-(--border) text-xs font-mono text-(--text-secondary) truncate"
+            class="flex items-center gap-2 p-2.5 rounded-lg bg-(--bg-sidebar)/40 border border-(--border) text-xs font-mono text-muted-color truncate"
           >
             <FileText :size="14" class="shrink-0 text-muted-color" />
             <span class="truncate">{{ path }}</span>

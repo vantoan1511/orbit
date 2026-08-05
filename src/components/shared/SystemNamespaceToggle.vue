@@ -9,7 +9,7 @@ const modelValue = defineModel<boolean>({ required: true })
     <ToggleSwitch v-model="modelValue" inputId="system-ns-toggle" />
     <label
       for="system-ns-toggle"
-      class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+      class="text-sm font-semibold text-muted-color cursor-pointer select-none"
     >
       Show System
     </label>

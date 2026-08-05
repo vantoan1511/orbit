@@ -194,7 +194,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3 text-center"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">{{ data.active }}</span>
+        <span class="font-mono text-muted-color">{{ data.active }}</span>
       </template>
     </Column>
 
@@ -204,7 +204,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="lastSchedule"
       header="Last Schedule"
       sortable
-      class="p-3 font-mono text-(--text-secondary)"
+      class="p-3 font-mono text-muted-color"
     >
       <template #body="{ data }">
         <span>{{ data.lastSchedule || '-' }}</span>

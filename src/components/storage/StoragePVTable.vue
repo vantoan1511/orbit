@@ -128,10 +128,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           @click="refreshTable"
           :loading="k8sStore.persistentVolumesLoading"
         >
-          <RefreshCw class="w-3.5 h-3.5 text-(--text-secondary)" />
+          <RefreshCw class="w-3.5 h-3.5 text-muted-color" />
         </Button>
         <Button severity="secondary" variant="text" size="small" class="p-1">
-          <Settings2 class="w-3.5 h-3.5 text-(--text-secondary)" />
+          <Settings2 class="w-3.5 h-3.5 text-muted-color" />
         </Button>
       </div>
     </div>
@@ -174,11 +174,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Column field="capacity" header="Capacity" class="p-2.5 font-mono text-primary"></Column>
 
       <!-- Access Mode Column -->
-      <Column
-        field="accessMode"
-        header="Access Mode"
-        class="p-2.5 text-(--text-secondary)"
-      ></Column>
+      <Column field="accessMode" header="Access Mode" class="p-2.5 text-muted-color"></Column>
 
       <!-- Reclaim Policy Column -->
       <Column field="reclaimPolicy" header="Reclaim" class="p-2.5 text-muted-color"></Column>

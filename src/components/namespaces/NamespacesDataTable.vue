@@ -228,7 +228,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <ToggleSwitch v-model="showSystemNamespaces" inputId="system-ns-toggle" />
           <label
             for="system-ns-toggle"
-            class="text-xs font-semibold text-(--text-secondary) cursor-pointer select-none"
+            class="text-xs font-semibold text-muted-color cursor-pointer select-none"
           >
             Show system namespaces
           </label>
@@ -242,10 +242,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
             class="p-1"
             :loading="store.namespacesLoading"
           >
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
+            <RefreshCw class="w-4 h-4 text-muted-color" />
           </Button>
           <Button severity="secondary" variant="text" size="small" class="p-1">
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
+            <Settings2 class="w-4 h-4 text-muted-color" />
           </Button>
         </div>
       </div>
@@ -321,28 +321,28 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       </Column>
 
       <!-- Workloads Column -->
-      <Column field="workloads" header="Workloads" sortable class="p-3 text-(--text-secondary)">
+      <Column field="workloads" header="Workloads" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.workloads }}</span>
         </template>
       </Column>
 
       <!-- Services Column -->
-      <Column field="services" header="Services" sortable class="p-3 text-(--text-secondary)">
+      <Column field="services" header="Services" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.services }}</span>
         </template>
       </Column>
 
       <!-- ConfigMaps Column -->
-      <Column field="configMaps" header="ConfigMaps" sortable class="p-3 text-(--text-secondary)">
+      <Column field="configMaps" header="ConfigMaps" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.configMaps }}</span>
         </template>
       </Column>
 
       <!-- Secrets Column -->
-      <Column field="secrets" header="Secrets" sortable class="p-3 text-(--text-secondary)">
+      <Column field="secrets" header="Secrets" sortable class="p-3 text-muted-color">
         <template #body="{ data }">
           <span class="font-mono">{{ data.secrets }}</span>
         </template>
@@ -360,7 +360,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
                 Object.entries(data.labels).slice(0, MAX_VISIBLE_LABELS)
               )"
               :key="key"
-              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-(--text-secondary) border border-(--border) whitespace-nowrap"
+              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
             >
               {{ key }}: {{ val }}
             </span>

@@ -382,7 +382,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 
             <div class="flex gap-4">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Replicas</label>
+                <label class="text-xs font-medium text-muted-color">Replicas</label>
                 <InputNumber
                   v-model="replicas"
                   showButtons
@@ -398,7 +398,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5 justify-center">
-                <label class="text-xs font-medium text-(--text-secondary)">Paused</label>
+                <label class="text-xs font-medium text-muted-color">Paused</label>
                 <div class="flex items-center gap-2 mt-1">
                   <ToggleSwitch v-model="paused" @change="handleFieldChange" />
                   <span class="text-xs text-muted-color">
@@ -415,7 +415,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             </h3>
 
             <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-medium text-(--text-secondary)">Strategy Type</label>
+              <label class="text-xs font-medium text-muted-color">Strategy Type</label>
               <Select
                 v-model="strategyType"
                 :options="['RollingUpdate', 'Recreate']"
@@ -426,7 +426,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 
             <div v-if="strategyType === 'RollingUpdate'" class="grid grid-cols-2 gap-4 mt-1">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Max Surge</label>
+                <label class="text-xs font-medium text-muted-color">Max Surge</label>
                 <InputText
                   v-model="maxSurge"
                   placeholder="e.g. 25% or 1"
@@ -436,7 +436,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Max Unavailable</label>
+                <label class="text-xs font-medium text-muted-color">Max Unavailable</label>
                 <InputText
                   v-model="maxUnavailable"
                   placeholder="e.g. 25% or 0"
@@ -456,7 +456,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 
             <div class="grid grid-cols-3 gap-3">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Min Ready Secs</label>
+                <label class="text-xs font-medium text-muted-color">Min Ready Secs</label>
                 <InputNumber
                   v-model="minReadySeconds"
                   :min="0"
@@ -467,7 +467,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Rev History Limit</label>
+                <label class="text-xs font-medium text-muted-color">Rev History Limit</label>
                 <InputNumber
                   v-model="revisionHistoryLimit"
                   :min="0"
@@ -478,7 +478,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Progress Deadline</label>
+                <label class="text-xs font-medium text-muted-color">Progress Deadline</label>
                 <InputNumber
                   v-model="progressDeadlineSeconds"
                   :min="0"
@@ -507,7 +507,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               <span
                 v-for="(s, idx) in selectorLabels"
                 :key="'sel-' + idx"
-                class="px-2 py-1 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-(--text-secondary) font-mono"
+                class="px-2 py-1 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-muted-color font-mono"
               >
                 {{ s.key }}={{ s.value }}
               </span>
@@ -564,9 +564,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             </h3>
 
             <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-medium text-(--text-secondary)"
-                >Service Account Name</label
-              >
+              <label class="text-xs font-medium text-muted-color">Service Account Name</label>
               <InputText
                 v-model="serviceAccountName"
                 placeholder="e.g. default"
@@ -577,7 +575,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 
             <div class="grid grid-cols-2 gap-4">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Restart Policy</label>
+                <label class="text-xs font-medium text-muted-color">Restart Policy</label>
                 <Select
                   v-model="restartPolicy"
                   :options="['Always', 'OnFailure', 'Never']"
@@ -587,7 +585,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)"
+                <label class="text-xs font-medium text-muted-color"
                   >Termination Grace Period (s)</label
                 >
                 <InputNumber
@@ -619,7 +617,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             v-if="containers.length > 1"
             class="flex items-center gap-2 border-b border-(--border) pb-2"
           >
-            <span class="text-xs font-medium text-(--text-secondary)">Container:</span>
+            <span class="text-xs font-medium text-muted-color">Container:</span>
             <Button
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
@@ -641,7 +639,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 
               <div class="grid grid-cols-2 gap-4">
                 <div class="flex flex-col gap-1.5">
-                  <label class="text-xs font-medium text-(--text-secondary)">Container Name</label>
+                  <label class="text-xs font-medium text-muted-color">Container Name</label>
                   <InputText
                     v-model="currentContainer.name"
                     class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
@@ -650,9 +648,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </div>
 
                 <div class="flex flex-col gap-1.5">
-                  <label class="text-xs font-medium text-(--text-secondary)"
-                    >Image Pull Policy</label
-                  >
+                  <label class="text-xs font-medium text-muted-color">Image Pull Policy</label>
                   <Select
                     v-model="currentContainer.imagePullPolicy"
                     :options="['Always', 'IfNotPresent', 'Never']"
@@ -663,7 +659,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Image</label>
+                <label class="text-xs font-medium text-muted-color">Image</label>
                 <InputText
                   v-model="currentContainer.image"
                   placeholder="e.g. nginx:latest"
@@ -673,7 +669,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Working Directory</label>
+                <label class="text-xs font-medium text-muted-color">Working Directory</label>
                 <InputText
                   v-model="currentContainer.workingDir"
                   placeholder="e.g. /app"

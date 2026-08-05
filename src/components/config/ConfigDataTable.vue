@@ -197,7 +197,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="(val, key) in data.labels"
             :key="key"
-            class="font-mono text-[9px] bg-(--bg-hover) text-(--text-secondary) border border-(--border) px-1.5 py-0.5 rounded"
+            class="font-mono text-[9px] bg-(--bg-hover) text-muted-color border border-(--border) px-1.5 py-0.5 rounded"
           >
             {{ key }}: {{ val }}
           </span>
@@ -214,7 +214,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">{{ data.type }}</span>
+        <span class="font-mono text-muted-color">{{ data.type }}</span>
       </template>
     </Column>
 

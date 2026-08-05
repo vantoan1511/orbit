@@ -145,7 +145,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <Column v-if="visibleCols['node']" field="node" header="Node" sortable class="p-3">
       <template #body="{ data }">
         <span
-          class="text-(--text-secondary) font-mono truncate block max-w-44"
+          class="text-muted-color font-mono truncate block max-w-44"
           :title="data.node || 'N/A'"
         >
           {{ data.node ? data.node.split('.')[0] : 'N/A' }}
@@ -180,7 +180,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-24">
           <div class="flex justify-between font-mono text-[10px]">
-            <span class="text-(--text-secondary)">{{ data.cpu || '-' }}</span>
+            <span class="text-muted-color">{{ data.cpu || '-' }}</span>
             <span class="text-muted-color" v-if="data.cpu && data.cpu !== '-'"
               >{{ data.cpuPct || 0 }}%</span
             >
@@ -203,7 +203,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-24">
           <div class="flex justify-between font-mono text-[10px]">
-            <span class="text-(--text-secondary)">{{ data.memory || '-' }}</span>
+            <span class="text-muted-color">{{ data.memory || '-' }}</span>
             <span class="text-muted-color" v-if="data.memory && data.memory !== '-'"
               >{{ data.memoryPct || 0 }}%</span
             >

@@ -170,7 +170,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">{{ data.clusterIP }}</span>
+        <span class="font-mono text-muted-color">{{ data.clusterIP }}</span>
       </template>
     </Column>
 
@@ -184,7 +184,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     >
       <template #body="{ data }">
         <div class="flex items-center gap-1">
-          <span class="font-mono text-(--text-secondary)">{{ data.externalIP }}</span>
+          <span class="font-mono text-muted-color">{{ data.externalIP }}</span>
           <ExternalLink
             v-if="data.externalIP !== '-'"
             class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"

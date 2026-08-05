@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
     <div class="grid grid-cols-2 gap-4">
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-(--text-secondary)">CPU Request</label>
+        <label class="text-xs font-medium text-muted-color">CPU Request</label>
         <InputText
           :model-value="cpuRequest"
           placeholder="e.g. 100m or 0.5"
@@ -41,7 +41,7 @@ const emit = defineEmits<{
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-(--text-secondary)">Memory Request</label>
+        <label class="text-xs font-medium text-muted-color">Memory Request</label>
         <InputText
           :model-value="memoryRequest"
           placeholder="e.g. 128Mi or 1Gi"
@@ -52,7 +52,7 @@ const emit = defineEmits<{
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-(--text-secondary)">CPU Limit</label>
+        <label class="text-xs font-medium text-muted-color">CPU Limit</label>
         <InputText
           :model-value="cpuLimit"
           placeholder="e.g. 500m or 1"
@@ -63,7 +63,7 @@ const emit = defineEmits<{
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-(--text-secondary)">Memory Limit</label>
+        <label class="text-xs font-medium text-muted-color">Memory Limit</label>
         <InputText
           :model-value="memoryLimit"
           placeholder="e.g. 512Mi or 2Gi"

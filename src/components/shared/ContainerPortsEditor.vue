@@ -54,7 +54,7 @@ const updatePortField = <K extends keyof ContainerPortItem>(
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
-      <label class="text-xs font-medium text-(--text-secondary)">Container Ports</label>
+      <label class="text-xs font-medium text-muted-color">Container Ports</label>
       <Button
         v-if="!disabled"
         size="small"

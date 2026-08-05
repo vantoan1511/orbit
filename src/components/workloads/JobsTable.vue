@@ -173,7 +173,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="completions"
       header="Completions"
       sortable
-      class="p-3 font-mono text-(--text-secondary)"
+      class="p-3 font-mono text-muted-color"
     ></Column>
 
     <!-- Duration Column -->
@@ -182,7 +182,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="duration"
       header="Duration"
       sortable
-      class="p-3 font-mono text-(--text-secondary)"
+      class="p-3 font-mono text-muted-color"
     >
       <template #body="{ data }">
         <span>{{ data.duration || '-' }}</span>
@@ -205,7 +205,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="img in data.images"
             :key="img"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-(--text-secondary) text-[10px] border border-(--border) font-mono truncate max-w-full"
+            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
             :title="img"
           >
             {{ img.split('/').pop() }}

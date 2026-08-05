@@ -199,7 +199,7 @@ watch(
         />
         <div>
           <h1 class="text-lg font-semibold text-primary">Edit {{ props.kind }}</h1>
-          <p class="text-sm text-(--text-secondary)">{{ props.namespace }} / {{ props.name }}</p>
+          <p class="text-sm text-muted-color">{{ props.namespace }} / {{ props.name }}</p>
         </div>
       </div>
 
@@ -210,14 +210,14 @@ watch(
         >
           <span
             class="text-xs font-medium"
-            :class="!isYamlMode ? 'text-primary' : 'text-(--text-secondary)'"
+            :class="!isYamlMode ? 'text-primary' : 'text-muted-color'"
           >
             Form
           </span>
           <ToggleSwitch v-model="isYamlMode" @change="handleModeToggle" />
           <span
             class="text-xs font-medium"
-            :class="isYamlMode ? 'text-primary' : 'text-(--text-secondary)'"
+            :class="isYamlMode ? 'text-primary' : 'text-muted-color'"
           >
             YAML
           </span>
@@ -238,7 +238,7 @@ watch(
 
     <!-- Content -->
     <div v-if="isLoading" class="flex-1 flex items-center justify-center">
-      <i class="pi pi-spin pi-spinner text-3xl text-(--text-secondary)"></i>
+      <i class="pi pi-spin pi-spinner text-3xl text-muted-color"></i>
     </div>
     <div v-else class="flex-1 flex overflow-hidden">
       <!-- Form Mode -->
@@ -255,20 +255,20 @@ watch(
 
             <div class="flex flex-col gap-4 max-w-xl">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Name</label>
+                <label class="text-xs font-medium text-muted-color">Name</label>
                 <InputText
                   disabled
                   v-model="formValues.name"
-                  class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-(--text-secondary) opacity-70"
+                  class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-muted-color opacity-70"
                 />
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-(--text-secondary)">Namespace</label>
+                <label class="text-xs font-medium text-muted-color">Namespace</label>
                 <InputText
                   disabled
                   v-model="formValues.namespace"
-                  class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-(--text-secondary) opacity-70"
+                  class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-muted-color opacity-70"
                 />
               </div>
 

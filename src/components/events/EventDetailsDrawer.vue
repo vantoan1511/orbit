@@ -148,46 +148,46 @@ const getTypeBadgeClass = (type: string) => {
                   class="border border-(--border) rounded-xl overflow-hidden divide-y divide-(--border) bg-(--bg-hover)/10 text-xs"
                 >
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Namespace</span>
+                    <span class="text-muted-color font-semibold">Namespace</span>
                     <span class="col-span-2 font-mono text-primary">{{
                       props.event.namespace
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Involved Object</span>
+                    <span class="text-muted-color font-semibold">Involved Object</span>
                     <span class="col-span-2 text-primary">
                       <span class="font-semibold text-violet-400">{{ props.event.objectKind }}</span
                       >/{{ props.event.objectName }}
                     </span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Reason</span>
+                    <span class="text-muted-color font-semibold">Reason</span>
                     <span class="col-span-2 text-primary font-mono">{{ props.event.reason }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Source Component</span>
+                    <span class="text-muted-color font-semibold">Source Component</span>
                     <span class="col-span-2 text-primary">{{ props.event.source }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">First Timestamp</span>
+                    <span class="text-muted-color font-semibold">First Timestamp</span>
                     <span class="col-span-2 text-primary">{{ props.event.firstSeen }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Last Timestamp</span>
+                    <span class="text-muted-color font-semibold">Last Timestamp</span>
                     <span class="col-span-2 text-primary">{{ props.event.lastSeen }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Occurrence Count</span>
+                    <span class="text-muted-color font-semibold">Occurrence Count</span>
                     <span class="col-span-2 text-primary font-mono font-bold">{{
                       props.event.count
                     }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">Type</span>
+                    <span class="text-muted-color font-semibold">Type</span>
                     <span class="col-span-2 text-primary">{{ props.event.type }}</span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
-                    <span class="text-(--text-secondary) font-semibold">UID</span>
+                    <span class="text-muted-color font-semibold">UID</span>
                     <span class="col-span-2 font-mono text-[10px] text-primary">{{
                       props.event.uid
                     }}</span>
@@ -210,7 +210,7 @@ const getTypeBadgeClass = (type: string) => {
                     class="flex items-center text-xs border border-(--border) bg-(--bg-hover)/20 rounded-lg overflow-hidden"
                   >
                     <span
-                      class="px-2 py-1 bg-(--bg-hover)/40 border-r border-(--border) text-(--text-secondary) font-medium"
+                      class="px-2 py-1 bg-(--bg-hover)/40 border-r border-(--border) text-muted-color font-medium"
                       >{{ key }}</span
                     >
                     <span class="px-2 py-1 font-mono text-primary">{{ val }}</span>

@@ -34,7 +34,7 @@ const availablePct = computed(() => {
     <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 space-y-4">
       <div>
         <div class="flex justify-between text-xs mb-1">
-          <span class="text-(--text-secondary) font-medium">Desired Replicas</span>
+          <span class="text-muted-color font-medium">Desired Replicas</span>
           <span class="font-mono font-bold text-primary">{{ desired }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -44,7 +44,7 @@ const availablePct = computed(() => {
 
       <div v-if="current !== undefined">
         <div class="flex justify-between text-xs mb-1">
-          <span class="text-(--text-secondary) font-medium">Current Replicas</span>
+          <span class="text-muted-color font-medium">Current Replicas</span>
           <span class="font-mono font-bold text-primary">{{ current }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -54,7 +54,7 @@ const availablePct = computed(() => {
 
       <div v-if="ready !== undefined">
         <div class="flex justify-between text-xs mb-1">
-          <span class="text-(--text-secondary) font-medium">Ready Replicas</span>
+          <span class="text-muted-color font-medium">Ready Replicas</span>
           <span class="font-mono font-bold text-primary">{{ ready }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
@@ -64,7 +64,7 @@ const availablePct = computed(() => {
 
       <div v-if="available !== undefined">
         <div class="flex justify-between text-xs mb-1">
-          <span class="text-(--text-secondary) font-medium">Available Replicas</span>
+          <span class="text-muted-color font-medium">Available Replicas</span>
           <span class="font-mono font-bold text-primary">{{ available }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">

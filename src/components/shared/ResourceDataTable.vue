@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Info, RefreshCw, Search, Settings2 } from '@lucide/vue'
+import { Info, RefreshCw, Settings2 } from '@lucide/vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
@@ -104,146 +104,141 @@ const isIndeterminate = computed(() => {
 </script>
 
 <template>
-  <div
-    class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col gap-6 transition-all duration-200"
-  >
-    <!-- Filter Toolbar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-      <div class="flex items-center gap-3 flex-wrap">
-        <!-- Search -->
-        <div class="relative min-w-64" v-if="!hideSearch">
-          <Search class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
-          <InputText
-            :model-value="searchQuery"
-            @update:model-value="onSearchUpdate"
-            :placeholder="searchPlaceholder"
-            class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-          />
-        </div>
-
-        <slot name="filters"></slot>
-      </div>
-
-      <!-- Toggles and Actions -->
-      <div class="flex items-center gap-4 self-end md:self-auto" v-if="!hideActions">
-        <slot name="actions-left"></slot>
-
-        <div v-if="!hideRowsPerPage" class="flex items-center gap-2">
-          <span class="text-xs text-(--text-secondary) font-medium">Rows:</span>
-          <Select
-            v-model="rowsPerPage"
-            :options="rowsPerPageOptions"
-            class="text-xs w-20 bg-(--bg-hover)/30 border-(--border)"
-          />
-        </div>
-
-        <div class="flex items-center gap-1">
-          <Button
-            v-if="!hideRefresh"
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            @click="emit('refresh')"
-            :loading="loading"
-          >
-            <RefreshCw class="w-4 h-4 text-(--text-secondary)" />
-          </Button>
-          <Button
-            v-if="!hideConfig"
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            @click="toggleConfig"
-          >
-            <Settings2 class="w-4 h-4 text-(--text-secondary)" />
-          </Button>
-          <Popover ref="configPopover">
-            <div class="flex flex-col gap-2 p-3 min-w-48 bg-(--bg-card) text-primary">
-              <div
-                class="font-semibold text-xs border-b border-(--border) pb-1.5 text-(--text-secondary)"
-              >
-                Configure Columns
-              </div>
-              <div class="flex flex-col gap-1.5 pt-1">
-                <div
-                  class="flex items-center gap-2 py-0.5 hover:bg-(--bg-hover)/20 rounded px-1 border-b border-(--border)/50"
-                >
-                  <Checkbox
-                    inputId="col-all"
-                    :modelValue="allSelected"
-                    @update:modelValue="allSelected = $event"
-                    :binary="true"
-                    :indeterminate="isIndeterminate"
-                    size="small"
-                  />
-                  <label
-                    for="col-all"
-                    class="text-xs cursor-pointer select-none font-semibold text-primary w-full"
-                  >
-                    All
-                  </label>
-                </div>
-                <div
-                  v-for="col in columns"
-                  :key="col.field"
-                  class="flex items-center gap-2 py-0.5 hover:bg-(--bg-hover)/20 rounded px-1"
-                >
-                  <Checkbox
-                    :inputId="`col-${col.field}`"
-                    :modelValue="col.visible"
-                    @update:modelValue="onToggleColumn(col.field, $event)"
-                    :binary="true"
-                    size="small"
-                  />
-                  <label
-                    :for="`col-${col.field}`"
-                    class="text-xs cursor-pointer select-none font-medium text-(--text-secondary) w-full"
-                  >
-                    {{ col.header }}
-                  </label>
-                </div>
-              </div>
-            </div>
-          </Popover>
-        </div>
-      </div>
-    </div>
-
-    <!-- Loading Skeleton or Data Table -->
-    <slot name="loading" v-if="loading">
-      <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
-    </slot>
-
-    <!-- Data Table -->
-    <DataTable
-      v-else
-      :value="data"
-      paginator
-      v-model:rows="rowsPerPage"
-      :rowsPerPageOptions="rowsPerPageOptions"
-      class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden cursor-pointer"
-      tableClass="w-full text-left text-xs border-collapse"
-      paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-      :currentPageReportTemplate="reportTemplate"
-      @row-click="emit('row-click', $event)"
-      @row-contextmenu="emit('row-contextmenu', $event)"
-    >
-      <template #empty>
-        <slot name="empty">
-          <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
-            <Info class="w-8 h-8 text-muted-color/50" />
-            <span>{{ emptyMessage }}</span>
+  <Card>
+    <template #title>
+      <!-- Filter Toolbar -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- Search -->
+          <div class="relative min-w-64" v-if="!hideSearch">
+            <IconField>
+              <InputIcon class="pi pi-search" />
+              <InputText
+                :model-value="searchQuery"
+                :placeholder="searchPlaceholder"
+                @update:model-value="onSearchUpdate"
+                fluid
+              />
+            </IconField>
           </div>
-        </slot>
-      </template>
 
-      <!-- Pass columns down -->
-      <slot></slot>
-    </DataTable>
+          <slot name="filters"></slot>
+        </div>
 
-    <!-- Details slideout drawer -->
-    <slot name="drawer"></slot>
-  </div>
+        <!-- Toggles and Actions -->
+        <div class="flex items-center gap-4 self-end md:self-auto" v-if="!hideActions">
+          <slot name="actions-left"></slot>
+
+          <div v-if="!hideRowsPerPage" class="flex items-center gap-2">
+            <span class="text-sm font-medium text-muted-color">Rows:</span>
+            <Select v-model="rowsPerPage" :options="rowsPerPageOptions" class="text-xs min-w-20" />
+          </div>
+
+          <div class="flex items-center gap-1">
+            <Button
+              v-if="!hideRefresh"
+              severity="secondary"
+              variant="text"
+              size="small"
+              class="p-1"
+              @click="emit('refresh')"
+              :loading="loading"
+            >
+              <RefreshCw class="w-4 h-4 text-muted-color" />
+            </Button>
+            <Button
+              v-if="!hideConfig"
+              severity="secondary"
+              variant="text"
+              size="small"
+              class="p-1"
+              @click="toggleConfig"
+            >
+              <Settings2 class="w-4 h-4 text-muted-color" />
+            </Button>
+            <Popover ref="configPopover">
+              <div class="flex flex-col gap-2 p-3 min-w-48 text-primary">
+                <div class="font-semibold text-sm border-b border-surface pb-1.5 text-muted-color">
+                  Configure Columns
+                </div>
+                <div class="flex flex-col gap-1.5 pt-1">
+                  <div class="flex items-center gap-2 py-0.5 hover:bg-surface-200/20 rounded px-1">
+                    <Checkbox
+                      inputId="col-all"
+                      :modelValue="allSelected"
+                      @update:modelValue="allSelected = $event"
+                      :binary="true"
+                      :indeterminate="isIndeterminate"
+                      size="small"
+                    />
+                    <label
+                      for="col-all"
+                      class="text-sm cursor-pointer select-none font-semibold text-primary w-full"
+                    >
+                      All
+                    </label>
+                  </div>
+                  <div
+                    v-for="col in columns"
+                    :key="col.field"
+                    class="flex items-center gap-2 py-0.5 rounded px-1"
+                  >
+                    <Checkbox
+                      :inputId="`col-${col.field}`"
+                      :modelValue="col.visible"
+                      @update:modelValue="onToggleColumn(col.field, $event)"
+                      :binary="true"
+                      size="small"
+                    />
+                    <label
+                      :for="`col-${col.field}`"
+                      class="text-sm cursor-pointer select-none font-medium text-muted-color w-full"
+                    >
+                      {{ col.header }}
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </Popover>
+          </div>
+        </div>
+      </div>
+    </template>
+    <template #content>
+      <!-- Loading Skeleton or Data Table -->
+      <slot name="loading" v-if="loading">
+        <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
+      </slot>
+
+      <!-- Data Table -->
+      <DataTable
+        v-else
+        :value="data"
+        paginator
+        v-model:rows="rowsPerPage"
+        :rowsPerPageOptions="rowsPerPageOptions"
+        class="p-datatable-sm border border-surface rounded-lg overflow-hidden cursor-pointer"
+        tableClass="w-full text-left text-xs border-collapse"
+        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+        :currentPageReportTemplate="reportTemplate"
+        @row-click="emit('row-click', $event)"
+        @row-contextmenu="emit('row-contextmenu', $event)"
+      >
+        <template #empty>
+          <slot name="empty">
+            <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+              <Info class="w-8 h-8 text-muted-color/50" />
+              <span>{{ emptyMessage }}</span>
+            </div>
+          </slot>
+        </template>
+
+        <!-- Pass columns down -->
+        <slot></slot>
+      </DataTable>
+
+      <!-- Details slideout drawer -->
+      <slot name="drawer"></slot>
+    </template>
+  </Card>
 </template>

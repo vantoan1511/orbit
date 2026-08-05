@@ -171,7 +171,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Desired/Current Column -->
     <Column v-if="visibleCols['desiredCurrent']" header="Desired/Current" class="p-3">
       <template #body="{ data }">
-        <span class="font-mono text-(--text-secondary)">
+        <span class="font-mono text-muted-color">
           {{ data.replicas.desired }} / {{ data.replicas.current }}
         </span>
       </template>
@@ -207,7 +207,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="img in data.images"
             :key="img"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-(--text-secondary) text-[10px] border border-(--border) font-mono truncate max-w-full"
+            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
             :title="img"
           >
             {{ img.split('/').pop() }}

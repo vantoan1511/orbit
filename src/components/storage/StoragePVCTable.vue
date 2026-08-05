@@ -117,10 +117,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           @click="refreshTable"
           :loading="k8sStore.persistentVolumeClaimsLoading"
         >
-          <RefreshCw class="w-3.5 h-3.5 text-(--text-secondary)" />
+          <RefreshCw class="w-3.5 h-3.5 text-muted-color" />
         </Button>
         <Button severity="secondary" variant="text" size="small" class="p-1">
-          <Settings2 class="w-3.5 h-3.5 text-(--text-secondary)" />
+          <Settings2 class="w-3.5 h-3.5 text-muted-color" />
         </Button>
       </div>
     </div>
@@ -179,7 +179,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         <template #body="{ data }">
           <span
             v-if="data.volume"
-            class="font-mono text-(--text-secondary) truncate max-w-44 block"
+            class="font-mono text-muted-color truncate max-w-44 block"
             :title="data.volume"
           >
             {{ data.volume }}
@@ -192,11 +192,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Column field="capacity" header="Request" class="p-2.5 font-mono text-primary"></Column>
 
       <!-- Access Mode Column -->
-      <Column
-        field="accessMode"
-        header="Access Mode"
-        class="p-2.5 text-(--text-secondary)"
-      ></Column>
+      <Column field="accessMode" header="Access Mode" class="p-2.5 text-muted-color"></Column>
 
       <!-- Storage Class Column -->
       <Column field="storageClass" header="Storage Class" class="p-2.5">
