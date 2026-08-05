@@ -34,5 +34,9 @@ fn main() {
         if let Err(e) = res.compile() {
             println!("cargo:warning=Failed to compile Windows resources: {}", e);
         }
+
+        // Re-run if these files change
+        println!("cargo:rerun-if-changed=../../neutralino.config.json");
+        println!("cargo:rerun-if-changed=../../public/favicon.ico");
     }
 }
