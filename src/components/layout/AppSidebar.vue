@@ -42,7 +42,7 @@ const navLinks = [
   { name: 'Nodes', icon: Server, path: '/nodes' },
   { name: 'Workloads', icon: Boxes, path: '/workloads' },
   { name: 'Pods', icon: Box, path: '/pods' },
-  { name: 'Services', icon: Network, path: '/services' },
+  { name: 'Network', icon: Network, path: '/network' },
   { name: 'ConfigMaps & Secrets', icon: Settings2, path: '/config' },
   { name: 'Storage', icon: HardDrive, path: '/storage' },
   { name: 'Namespaces', icon: FolderOpen, path: '/namespaces' },

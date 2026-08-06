@@ -68,6 +68,10 @@ pub enum OrbitEvent {
     ServicesUpdated {
         services: Vec<crate::kubernetes::models::ServiceInfo>,
     },
+    #[serde(rename = "ingressesUpdated")]
+    IngressesUpdated {
+        ingresses: Vec<crate::kubernetes::models::IngressInfo>,
+    },
     #[serde(rename = "configMapsUpdated")]
     ConfigMapsUpdated {
         config_maps: Vec<crate::kubernetes::models::ConfigMapInfo>,

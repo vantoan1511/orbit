@@ -23,6 +23,13 @@ pub fn spawn_watchers(
     ));
 
     tokio::spawn(crate::kubernetes::watchers::watch_resource::<
+        k8s_openapi::api::networking::v1::Ingress, _, _,
+    >(
+        client.clone(), writer.clone(), token.clone(), "Ingress".to_string(), rx.clone(),
+        crate::kubernetes::ingresses::map_ingress,
+    ));
+
+    tokio::spawn(crate::kubernetes::watchers::watch_resource::<
         k8s_openapi::api::apps::v1::Deployment, _, _,
     >(
         client.clone(), writer.clone(), token.clone(), "Deployment".to_string(), rx.clone(),
@@ -482,6 +489,24 @@ pub fn dispatch(
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ServicesUpdated { services }).await;
                         }
                         Err(e) => { log::error!("Error listing services: {:?}", e); }
+                    }
+                }
+            });
+        }
+        "getIngresses" => {
+            tokio::spawn(async move {
+                let namespace = get_string(&data, "namespace");
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+                if let Some(ref client) = client {
+                    match kubernetes::list_ingresses(client, namespace).await {
+                        Ok(ingresses) => {
+                            let _ = Bridge::send_event(&writer, &token, &OrbitEvent::IngressesUpdated { ingresses }).await;
+                        }
+                        Err(e) => { log::error!("Error listing ingresses: {:?}", e); }
                     }
                 }
             });

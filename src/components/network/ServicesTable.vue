@@ -13,7 +13,7 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
 import { computed, ref } from 'vue'
-import ServiceDetailsDrawer from './ServiceDetailsDrawer.vue'
+import ServiceDetailsDrawer from '@/components/services/ServiceDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 

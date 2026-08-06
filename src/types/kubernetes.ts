@@ -184,6 +184,21 @@ export interface ServiceInfo {
   events: ServiceEvent[]
 }
 
+export interface IngressInfo {
+  name: string
+  namespace: string
+  className?: string
+  hosts: string
+  address: string
+  ports: string
+  age: string
+  created: string
+  uid: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
+  rulesSummary: string[]
+}
+
 export interface UsedByPod {
   name: string
   status: 'Running' | 'Pending' | 'Failed' | 'Completed' | string
