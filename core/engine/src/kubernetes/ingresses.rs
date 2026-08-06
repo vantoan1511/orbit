@@ -19,27 +19,31 @@ pub fn map_ingress(ing: &Ingress) -> models::IngressInfo {
     let class_name = spec.and_then(|sp| sp.ingress_class_name.clone());
 
     // Extract hosts and rules summary
-    let mut hosts_vec = Vec::new();
+    let mut hosts_vec: Vec<String> = Vec::new();
     let mut rules_summary = Vec::new();
 
-    if let Some(spec) = spec {
-        if let Some(rules) = &spec.rules {
-            for rule in rules {
-                if let Some(host) = &rule.host {
-                    if !hosts_vec.contains(host) {
-                        hosts_vec.push(host.clone());
-                    }
-                }
-                if let Some(http) = &rule.http {
-                    for path in &http.paths {
-                        let p = path.path.as_deref().unwrap_or("/");
-                        let backend = match &path.backend.service {
-                            Some(svc) => format!("{}:{}", svc.name, svc.port.as_ref().and_then(|p| p.number).map(|n| n.to_string()).or_else(|| svc.port.as_ref().and_then(|p| p.name.clone())).unwrap_or_else(|| "*".to_string())),
-                            None => "unknown".to_string(),
-                        };
-                        let host_str = rule.host.as_deref().unwrap_or("*");
-                        rules_summary.push(format!("{} -> {} ({})", host_str, p, backend));
-                    }
+    if let Some(rules) = spec.and_then(|sp| sp.rules.as_ref()) {
+        for rule in rules {
+            if let Some(host) = rule.host.as_ref().filter(|h| !hosts_vec.contains(h)) {
+                hosts_vec.push(host.clone());
+            }
+            if let Some(http) = &rule.http {
+                for path in &http.paths {
+                    let p = path.path.as_deref().unwrap_or("/");
+                    let port_str = path
+                        .backend
+                        .service
+                        .as_ref()
+                        .and_then(|svc| svc.port.as_ref())
+                        .and_then(|p| p.number.map(|n| n.to_string()).or_else(|| p.name.clone()))
+                        .unwrap_or_else(|| "*".to_string());
+
+                    let backend = match &path.backend.service {
+                        Some(svc) => format!("{}:{}", svc.name, port_str),
+                        None => "unknown".to_string(),
+                    };
+                    let host_str = rule.host.as_deref().unwrap_or("*");
+                    rules_summary.push(format!("{} -> {} ({})", host_str, p, backend));
                 }
             }
         }
@@ -53,16 +57,17 @@ pub fn map_ingress(ing: &Ingress) -> models::IngressInfo {
 
     // Extract LoadBalancer address or IP
     let mut address_vec = Vec::new();
-    if let Some(status) = &ing.status {
-        if let Some(lb) = &status.load_balancer {
-            if let Some(ingress_status) = &lb.ingress {
-                for ing_stat in ingress_status {
-                    if let Some(ip) = &ing_stat.ip {
-                        address_vec.push(ip.clone());
-                    } else if let Some(hostname) = &ing_stat.hostname {
-                        address_vec.push(hostname.clone());
-                    }
-                }
+    if let Some(ingress_status) = ing
+        .status
+        .as_ref()
+        .and_then(|s| s.load_balancer.as_ref())
+        .and_then(|lb| lb.ingress.as_ref())
+    {
+        for ing_stat in ingress_status {
+            if let Some(ip) = &ing_stat.ip {
+                address_vec.push(ip.clone());
+            } else if let Some(hostname) = &ing_stat.hostname {
+                address_vec.push(hostname.clone());
             }
         }
     }
@@ -75,12 +80,8 @@ pub fn map_ingress(ing: &Ingress) -> models::IngressInfo {
 
     // Extract ports (80, 443 if TLS present)
     let mut ports_vec = vec!["80"];
-    if let Some(spec) = spec {
-        if let Some(tls) = &spec.tls {
-            if !tls.is_empty() {
-                ports_vec.push("443");
-            }
-        }
+    if let Some(_tls) = spec.and_then(|sp| sp.tls.as_ref()).filter(|t| !t.is_empty()) {
+        ports_vec.push("443");
     }
     let ports = ports_vec.join(", ");
 
