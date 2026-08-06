@@ -8,6 +8,7 @@ import type {
   DaemonSetInfo,
   DeploymentInfo,
   EventInfo,
+  IngressInfo,
   JobInfo,
   NamespaceInfo,
   NodeInfo,
@@ -36,6 +37,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const cronJobs = ref<CronJobInfo[]>([])
   const nodes = ref<NodeInfo[]>([])
   const services = ref<ServiceInfo[]>([])
+  const ingresses = ref<IngressInfo[]>([])
   const configMaps = ref<ConfigMapInfo[]>([])
   const secrets = ref<SecretInfo[]>([])
   const events = ref<EventInfo[]>([])
@@ -53,6 +55,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const cronJobsLoading = ref(false)
   const nodesLoading = ref(false)
   const servicesLoading = ref(false)
+  const ingressesLoading = ref(false)
   const namespacesLoading = ref(false)
   const persistentVolumes = ref<PersistentVolumeInfo[]>([])
   const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
@@ -157,6 +160,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     servicesLoading.value = false
   }
 
+  function setIngresses(newIngresses: IngressInfo[]) {
+    ingresses.value = newIngresses
+    ingressesLoading.value = false
+  }
+
   function setConfigMaps(newConfigMaps: ConfigMapInfo[]) {
     configMaps.value = newConfigMaps
     configMapsLoading.value = false
@@ -246,6 +254,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobs.value = []
     nodes.value = []
     services.value = []
+    ingresses.value = []
     configMaps.value = []
     secrets.value = []
     persistentVolumes.value = []
@@ -262,6 +271,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobsLoading.value = true
     nodesLoading.value = true
     servicesLoading.value = true
+    ingressesLoading.value = true
     configMapsLoading.value = true
     secretsLoading.value = true
     persistentVolumesLoading.value = true
@@ -276,6 +286,16 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     // Load data for the newly selected cluster
     if (id !== null) {
       loadInitialData()
+    }
+  }
+
+  async function fetchIngresses(namespace?: string) {
+    ingressesLoading.value = true
+    try {
+      await kubernetesService.getIngresses(namespace)
+    } catch (error) {
+      ingressesLoading.value = false
+      throw error
     }
   }
 
@@ -374,6 +394,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         kubernetesService.getCronJobs(),
         kubernetesService.getNodes(),
         kubernetesService.getServices(),
+        fetchIngresses(),
         fetchConfigMaps(),
         fetchSecrets(),
         fetchPersistentVolumes(),
@@ -547,6 +568,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobsLoading,
     nodesLoading,
     servicesLoading,
+    ingresses,
+    ingressesLoading,
     namespacesLoading,
     namespaces,
     namespaceList,
@@ -563,6 +586,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setCronJobs,
     setNodes,
     setServices,
+    setIngresses,
     setConfigMaps,
     setSecrets,
     setEvents,
@@ -580,6 +604,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setNamespaces,
     setClusters,
     setActiveClusterId,
+    fetchIngresses,
     fetchConfigMaps,
     fetchSecrets,
     fetchEvents,

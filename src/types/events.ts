@@ -5,6 +5,7 @@ import type {
   DaemonSetInfo,
   DeploymentInfo,
   EventInfo,
+  IngressInfo,
   JobInfo,
   NamespaceInfo,
   NodeInfo,
@@ -83,6 +84,9 @@ export interface OrbitEventMap {
   servicesUpdated: {
     services: ServiceInfo[]
   }
+  ingressesUpdated: {
+    ingresses: IngressInfo[]
+  }
   configMapsUpdated: {
     config_maps: ConfigMapInfo[]
   }
@@ -159,6 +163,7 @@ export const OrbitEvents = {
   UserProfileUpdated: 'userProfileUpdated',
   NodesUpdated: 'nodesUpdated',
   ServicesUpdated: 'servicesUpdated',
+  IngressesUpdated: 'ingressesUpdated',
   ConfigMapsUpdated: 'configMapsUpdated',
   SecretsUpdated: 'secretsUpdated',
   EventsUpdated: 'eventsUpdated',

@@ -219,6 +219,23 @@ pub struct ServiceInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct IngressInfo {
+    pub name: String,
+    pub namespace: String,
+    pub class_name: Option<String>,
+    pub hosts: String,
+    pub address: String,
+    pub ports: String,
+    pub age: String,
+    pub created: String,
+    pub uid: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    pub rules_summary: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct UsedByPod {
     pub name: String,
     pub status: String,

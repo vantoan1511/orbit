@@ -7,7 +7,7 @@ import NamespacesView from '@/views/NamespacesView.vue'
 import NodesView from '@/views/NodesView.vue'
 import PodsView from '@/views/PodsView.vue'
 import PoliciesView from '@/views/PoliciesView.vue'
-import ServicesView from '@/views/ServicesView.vue'
+import NetworkView from '@/views/NetworkView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 import StorageView from '@/views/StorageView.vue'
 import WorkloadsView from '@/views/WorkloadsView.vue'
@@ -49,9 +49,9 @@ const router = createRouter({
       component: PodsView
     },
     {
-      path: '/services',
-      name: 'services',
-      component: ServicesView
+      path: '/network',
+      name: 'network',
+      component: NetworkView
     },
     {
       path: '/config',

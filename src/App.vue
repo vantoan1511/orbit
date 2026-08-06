@@ -15,6 +15,7 @@ import type {
   DaemonSetInfo,
   DeploymentInfo,
   EventInfo,
+  IngressInfo,
   JobInfo,
   NamespaceInfo,
   NodeInfo,
@@ -100,6 +101,10 @@ const handleNodesUpdated = (payload: { nodes: NodeInfo[] }) => {
 
 const handleServicesUpdated = (payload: { services: ServiceInfo[] }) => {
   k8sStore.setServices(payload.services)
+}
+
+const handleIngressesUpdated = (payload: { ingresses: IngressInfo[] }) => {
+  k8sStore.setIngresses(payload.ingresses)
 }
 
 const handleConfigMapsUpdated = (payload: { config_maps: ConfigMapInfo[] }) => {
@@ -229,6 +234,7 @@ onMounted(() => {
   events.on(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
   events.on(OrbitEvents.NodesUpdated, handleNodesUpdated)
   events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated)
+  events.on(OrbitEvents.IngressesUpdated, handleIngressesUpdated)
   events.on(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
   events.on(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
   events.on(OrbitEvents.EventsUpdated, handleEventsUpdated)
@@ -258,6 +264,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
   events.off(OrbitEvents.NodesUpdated, handleNodesUpdated)
   events.off(OrbitEvents.ServicesUpdated, handleServicesUpdated)
+  events.off(OrbitEvents.IngressesUpdated, handleIngressesUpdated)
   events.off(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
   events.off(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
   events.off(OrbitEvents.EventsUpdated, handleEventsUpdated)
