@@ -43,4 +43,3 @@ onMounted(async () => {
     </Tabs>
   </ViewLayout>
 </template>
-

@@ -66,65 +66,66 @@ const cloudProvider = computed(() => {
 
 <template>
   <header
-    class="px-8 py-4 flex flex-col gap-3 select-none backdrop-blur-sm bg-surface-0/50 dark:bg-surface-950/50 border-b border-surface-200/60 dark:border-surface-800/60 sticky top-0 z-20 transition-colors duration-200"
+    class="px-6 py-3 flex items-center justify-between gap-4 select-none backdrop-blur-sm bg-surface-0/50 dark:bg-surface-950/50 border-b border-surface-200/60 dark:border-surface-800/60 sticky top-0 z-20"
   >
-    <!-- Top Row -->
-    <div class="flex items-center justify-between">
-      <!-- Left side: Cluster info & status -->
-      <div class="flex items-center gap-4">
+    <!-- Left side: Cluster info & inline metadata -->
+    <div class="flex items-center gap-6 min-w-0">
+      <div class="flex items-center gap-4 shrink-0">
         <template v-if="activeCluster !== null">
           <OverlayBadge :severity="activeCluster.status === 'healthy' ? 'success' : 'error'">
-            <h1 class="pr-3 text-2xl font-bold font-ui tracking-tight">
+            <h1 class="pr-3 text-lg font-bold font-ui tracking-tight truncate">
               {{ activeCluster.name }}
             </h1>
           </OverlayBadge>
         </template>
-        <h1 v-else class="text-2xl font-bold text-muted-color font-ui tracking-tight">
+        <h1 v-else class="text-lg font-bold text-muted-color font-ui tracking-tight">
           No active cluster
         </h1>
       </div>
 
-      <!-- Right side: Last updated, Refresh, Actions -->
-      <div v-if="activeCluster" class="flex items-center gap-3">
-        <span class="text-sm text-muted-color">Last updated: {{ lastUpdatedDisplay }}</span>
-        <Button
-          rounded
-          variant="text"
-          :loading="isRefreshing"
-          :disabled="activeCluster === null"
-          @click="refreshCluster"
-        >
-          <template #icon>
-            <RefreshCwIcon :size="13" />
-          </template>
-        </Button>
+      <!-- Metadata inline — only shown when cluster is active and healthy -->
+      <div
+        v-if="activeCluster !== null && activeCluster.status === 'healthy'"
+        class="flex items-center gap-4 text-xs font-semibold tracking-wider text-muted-color shrink-0"
+      >
+        <div class="h-3 w-px bg-surface-300 dark:bg-surface-700"></div>
+
+        <!-- Kubernetes Version -->
+        <div class="flex items-center gap-1.5">
+          <KubernetesIcon :size="13" />
+          <span>K8s {{ kubernetesVersion }}</span>
+        </div>
+
+        <!-- Cloud Provider -->
+        <div class="flex items-center gap-1.5">
+          <Cloud :size="13" />
+          <span class="uppercase">{{ cloudProvider.provider }}</span>
+          <span>/</span>
+          <span>{{ cloudProvider.platform }}</span>
+        </div>
+
+        <!-- Uptime -->
+        <div class="flex items-center gap-1.5">
+          <Clock :size="13" />
+          <span>{{ clusterUptime }}</span>
+        </div>
       </div>
     </div>
 
-    <!-- Bottom Row (Sub-metadata) — only shown when a cluster is active and healthy -->
-    <div
-      v-if="activeCluster !== null && activeCluster.status === 'healthy'"
-      class="flex items-center gap-6 text-xs font-semibold tracking-wider"
-    >
-      <!-- Kubernetes Version -->
-      <div class="flex items-center gap-2">
-        <KubernetesIcon :size="13" />
-        <span>Kubernetes {{ kubernetesVersion }}</span>
-      </div>
-
-      <!-- Cloud Provider -->
-      <div class="flex items-center gap-2 border-l pl-6">
-        <Cloud :size="13" />
-        <span class="uppercase">{{ cloudProvider.provider }}</span>
-        <span>/</span>
-        <span>{{ cloudProvider.platform }}</span>
-      </div>
-
-      <!-- Uptime -->
-      <div class="flex items-center gap-2 border-l pl-6">
-        <Clock :size="13" />
-        <span>Uptime: {{ clusterUptime }}</span>
-      </div>
+    <!-- Right side: Last updated & Refresh -->
+    <div v-if="activeCluster" class="flex items-center gap-3 shrink-0">
+      <span class="text-xs text-muted-color">Updated {{ lastUpdatedDisplay }}</span>
+      <Button
+        rounded
+        variant="text"
+        :loading="isRefreshing"
+        :disabled="activeCluster === null"
+        @click="refreshCluster"
+      >
+        <template #icon>
+          <RefreshCwIcon :size="13" />
+        </template>
+      </Button>
     </div>
   </header>
 </template>

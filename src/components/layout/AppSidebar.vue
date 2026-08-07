@@ -68,9 +68,7 @@ const { isDark, toggleTheme } = useTheme()
 
     <!-- Clusters Section -->
     <div class="p-4">
-      <div class="text-sm font-bold text-muted-color tracking-wider uppercase mb-2 px-2">
-        Clusters
-      </div>
+      <div class="font-bold text-muted-color tracking-wider uppercase mb-2 px-2">Clusters</div>
       <div class="flex flex-col gap-2">
         <Button
           v-for="cluster in k8sStore.clusters"

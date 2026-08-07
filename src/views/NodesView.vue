@@ -10,4 +10,3 @@ import NodesTable from '../components/nodes/NodesTable.vue'
     <NodesTable />
   </ViewLayout>
 </template>
-

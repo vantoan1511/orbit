@@ -10,4 +10,3 @@ import NamespacesDataTable from '../components/namespaces/NamespacesDataTable.vu
     <NamespacesDataTable />
   </ViewLayout>
 </template>
-

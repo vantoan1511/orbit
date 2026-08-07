@@ -29,4 +29,3 @@ import WorkloadSummaries from '../components/dashboard/WorkloadSummaries.vue'
     <WorkloadSummaries />
   </ViewLayout>
 </template>
-
