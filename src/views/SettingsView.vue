@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
 import { ArrowLeft } from '@lucide/vue'
@@ -11,20 +12,16 @@ const router = useRouter()
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Header/Title -->
-    <div class="flex items-center justify-between mb-6">
-      <div class="flex items-center gap-3">
-        <Button severity="secondary" variant="text" size="small" @click="router.back()">
-          <ArrowLeft class="w-4 h-4" />
-        </Button>
-        <h2 class="text-xl font-bold tracking-tight text-primary">Settings</h2>
-      </div>
-    </div>
+  <ViewLayout title="Settings">
+    <template #actions>
+      <Button severity="secondary" variant="text" size="small" @click="router.back()">
+        <ArrowLeft class="w-4 h-4" />
+      </Button>
+    </template>
 
     <!-- Tabs Navigation -->
     <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
-      <TabList class="border-b border-(--border) mb-6">
+      <TabList class="border-b border-(--border)">
         <Tab value="general" class="px-5 py-3 text-sm font-semibold">General</Tab>
         <Tab value="clusters" class="px-5 py-3 text-sm font-semibold">Clusters</Tab>
         <Tab value="preferences" class="px-5 py-3 text-sm font-semibold">Preferences</Tab>
@@ -34,7 +31,7 @@ const router = useRouter()
         <Tab value="about" class="px-5 py-3 text-sm font-semibold">About</Tab>
       </TabList>
 
-      <TabPanels class="flex-1 min-h-0 p-0 bg-transparent border-none">
+      <TabPanels class="pt-6">
         <!-- General Tab -->
         <TabPanel value="general">
           <SettingsGeneralTab />
@@ -86,5 +83,6 @@ const router = useRouter()
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>
+

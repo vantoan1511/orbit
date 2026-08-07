@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import WorkloadMetricsCards from '../components/workloads/WorkloadMetricsCards.vue'
 import DeploymentsTable from '../components/workloads/DeploymentsTable.vue'
 import StatefulSetsTable from '../components/workloads/StatefulSetsTable.vue'
@@ -17,9 +18,9 @@ watch(activeTab, (newTab) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <ViewLayout title="Workloads">
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-surface">
+      <TabList class="border-b border-(--border)">
         <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
         <Tab value="deployments" class="px-5 py-3 text-sm font-semibold">Deployments</Tab>
         <Tab value="statefulsets" class="px-5 py-3 text-sm font-semibold">StatefulSets</Tab>
@@ -66,5 +67,6 @@ watch(activeTab, (newTab) => {
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>
+

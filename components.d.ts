@@ -98,6 +98,7 @@ declare module 'vue' {
     TopConsumers: typeof import('./src/components/dashboard/TopConsumers.vue')['default']
     UpdaterDialog: typeof import('./src/components/UpdaterDialog.vue')['default']
     UpdaterNotifications: typeof import('./src/components/UpdaterNotifications.vue')['default']
+    ViewLayout: typeof import('./src/components/shared/ViewLayout.vue')['default']
     WorkloadDetailsDrawer: typeof import('./src/components/workloads/WorkloadDetailsDrawer.vue')['default']
     WorkloadEventsTab: typeof import('./src/components/workloads/WorkloadEventsTab.vue')['default']
     WorkloadMetricsCards: typeof import('./src/components/workloads/WorkloadMetricsCards.vue')['default']

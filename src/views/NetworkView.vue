@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import ServicesTable from '../components/network/ServicesTable.vue'
 import IngressesTable from '../components/network/IngressesTable.vue'
 
@@ -12,7 +13,7 @@ watch(activeTab, (newTab) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <ViewLayout title="Network">
     <Tabs v-model:value="activeTab">
       <TabList class="border-b border-(--border)">
         <Tab value="services" class="px-5 py-3 text-sm font-semibold">Services</Tab>
@@ -31,5 +32,6 @@ watch(activeTab, (newTab) => {
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>
+
