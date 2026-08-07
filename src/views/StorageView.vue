@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import StorageMetricsCards from '../components/storage/StorageMetricsCards.vue'
@@ -14,12 +15,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Header/Title -->
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold tracking-tight text-primary">Storage</h2>
-    </div>
-
+  <ViewLayout title="Storage">
     <!-- Content Tabs Layout -->
     <Tabs v-model:value="activeTab">
       <TabList class="border-b border-(--border)">
@@ -110,5 +106,6 @@ const storageClasses = computed(() => k8sStore.storageClasses)
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>
+

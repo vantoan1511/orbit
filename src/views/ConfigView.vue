@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import ConfigMetricsCards from '../components/config/ConfigMetricsCards.vue'
 import ConfigDataTable from '../components/config/ConfigDataTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -14,12 +15,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Header/Title -->
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold tracking-tight text-primary">ConfigMaps & Secrets</h2>
-    </div>
-
+  <ViewLayout title="ConfigMaps & Secrets">
     <!-- Content Tabs Layout -->
     <Tabs v-model:value="activeTab">
       <TabList class="border-b border-(--border)">
@@ -45,5 +41,6 @@ onMounted(async () => {
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>
+
