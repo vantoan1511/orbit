@@ -24,18 +24,29 @@ import {
   ShieldCheck
 } from '@lucide/vue'
 import { Button } from 'primevue'
-import { useRoute } from 'vue-router'
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
 const { activeCluster, isRefreshing, handleAddCluster } = useCluster()
+const route = useRoute()
+const router = useRouter()
+const { isDark, toggleTheme } = useTheme()
+
+const activeTab = ref<'resources' | 'clusters' | null>('resources')
+
+const toggleTab = (tab: 'resources' | 'clusters') => {
+  activeTab.value = activeTab.value === tab ? null : tab
+}
 
 const handleSwitchCluster = async (clusterId: string) => {
   await kubernetesService.switchCluster(clusterId)
+  activeTab.value = 'resources'
 }
 
-// Navigation links
+// Navigation links for Resources
 const navLinks = [
   { name: 'Overview', icon: LayoutDashboard, path: '/' },
   { name: 'Logs', icon: FileText, path: '/logs' },
@@ -47,137 +58,216 @@ const navLinks = [
   { name: 'Storage', icon: HardDrive, path: '/storage' },
   { name: 'Namespaces', icon: FolderOpen, path: '/namespaces' },
   { name: 'Events', icon: Activity, path: '/events' },
-  { name: 'Policies', icon: ShieldCheck, path: '/policies' },
-  { name: 'Settings', icon: Settings, path: '/settings' }
+  { name: 'Policies', icon: ShieldCheck, path: '/policies' }
 ]
-
-const route = useRoute()
-
-const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
-  <aside class="w-64 flex flex-col h-screen text-primary select-none">
-    <!-- Brand Header -->
-    <div class="h-16 px-6 flex items-center gap-3">
-      <!-- Orbit Icon Logo -->
-      <img src="/logo.png" alt="Orbit Logo" class="w-8 h-8 object-contain" />
+  <aside class="flex h-screen text-primary select-none bg-surface-0 dark:bg-surface-900 shadow-sm">
+    <!-- Activity Bar (Far Left Strip) -->
+    <div
+      class="w-14 flex flex-col items-center py-3 border-r border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-950 shrink-0"
+    >
+      <!-- Orbit Brand Logo -->
+      <div class="mb-4 flex items-center justify-center p-1">
+        <img src="/logo.png" alt="Orbit Logo" class="w-7 h-7 object-contain" />
+      </div>
 
-      <span class="text-xl font-bold tracking-tight font-ui">Orbit</span>
-    </div>
-
-    <!-- Clusters Section -->
-    <div class="p-4">
-      <div class="font-bold text-muted-color tracking-wider uppercase mb-2 px-2">Clusters</div>
-      <div class="flex flex-col gap-2">
+      <!-- Main Activity Items -->
+      <div class="flex flex-col gap-2 w-full px-1 items-center">
+        <!-- Resources / Explorer Tab -->
         <Button
-          v-for="cluster in k8sStore.clusters"
-          :key="cluster.id"
-          :loading="k8sStore.activeClusterId === cluster.id && isRefreshing"
-          :severity="
-            k8sStore.activeClusterId === cluster.id
-              ? activeCluster?.status === 'healthy'
-                ? 'success'
-                : 'danger'
-              : 'secondary'
-          "
-          fluid
-          class="truncate justify-start font-semibold"
+          v-tooltip.right="'Resources'"
+          rounded
           variant="text"
-          @click="handleSwitchCluster(cluster.id)"
+          :severity="activeTab === 'resources' ? 'primary' : 'secondary'"
+          :class="[
+            'w-10 h-10 flex! items-center! justify-center!',
+            activeTab === 'resources'
+              ? 'bg-primary-100! dark:bg-primary-900/40! text-primary-600! dark:text-primary-400!'
+              : 'text-muted-color'
+          ]"
+          @click="toggleTab('resources')"
         >
-          <Check v-if="k8sStore.activeClusterId === cluster.id" :size="16" />
-          {{ cluster.name }}
+          <LayoutDashboard class="w-5 h-5" />
         </Button>
 
-        <!-- Empty state when no clusters are configured -->
-        <p v-if="k8sStore.clusters.length === 0" class="text-sm text-muted-color px-3 py-1">
-          No clusters added yet
-        </p>
-
-        <Button fluid severity="contrast" size="small" @click="handleAddCluster">
-          <Plus :size="16" />
-          <span class="text-sm font-semibold">Add cluster</span>
+        <!-- Clusters Tab -->
+        <Button
+          v-tooltip.right="'Clusters'"
+          rounded
+          variant="text"
+          :severity="activeTab === 'clusters' ? 'primary' : 'secondary'"
+          :class="[
+            'w-10 h-10 flex! items-center! justify-center!',
+            activeTab === 'clusters'
+              ? 'bg-primary-100! dark:bg-primary-900/40! text-primary-600! dark:text-primary-400!'
+              : 'text-muted-color'
+          ]"
+          @click="toggleTab('clusters')"
+        >
+          <Server class="w-5 h-5" />
         </Button>
       </div>
-    </div>
 
-    <!-- Navigation Section -->
-    <nav class="flex-1 overflow-y-auto p-4 space-y-1">
-      <Button
-        v-for="link in navLinks"
-        :key="link.name"
-        v-slot="slotProps"
-        as-child
-        fluid
-        variant="link"
-      >
-        <router-link
-          :to="link.path"
+      <!-- Bottom Actions Spacer -->
+      <div class="flex-1"></div>
+
+      <!-- Bottom Activity Actions -->
+      <div class="flex flex-col gap-2 items-center w-full px-1">
+        <!-- Settings Link -->
+        <Button
+          v-tooltip.right="'Settings'"
+          rounded
+          variant="text"
           :class="[
-            slotProps.class,
-            route.path === link.path
-              ? 'bg-primary-200! dark:bg-primary-700! border-l-primary! border-l-3! rounded-l-lg! translate-x-3'
-              : 'text-muted-color hover:bg-surface-100 dark:hover:bg-surface-800',
-            'flex! items-center! justify-start! transition-all duration-200',
-            k8sStore.activeClusterId === null && link.path !== '/settings' ? 'hidden!' : ''
+            'w-10 h-10 flex! items-center! justify-center!',
+            route.path === '/settings'
+              ? 'bg-primary-100! dark:bg-primary-900/40! text-primary-600! dark:text-primary-400!'
+              : 'text-muted-color'
           ]"
+          @click="router.push('/settings')"
         >
-          <component :is="link.icon" class="w-4 h-4 shrink-0" />
-          <span
-            :class="route.path === link.path ? 'font-bold!' : 'font-medium!'"
-            class="text-nowrap"
-          >
-            {{ link.name }}
-          </span>
-        </router-link>
-      </Button>
-    </nav>
+          <Settings class="w-5 h-5" />
+        </Button>
 
-    <!-- Bottom Footer -->
-    <div class="p-4 flex items-center justify-around">
-      <div class="flex items-center gap-3">
         <!-- Theme Toggle -->
         <Button
+          v-tooltip.right="isDark ? 'Light Mode' : 'Dark Mode'"
           rounded
           variant="text"
+          class="w-10 h-10 text-muted-color"
           :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
           @click="toggleTheme"
-        />
-
-        <!-- Docs -->
-        <Button
-          rounded
-          variant="text"
-          icon="pi pi-github"
-          @click="os.open('https://github.com/vantoan1511/orbit')"
         />
 
         <!-- Notifications -->
         <div class="relative inline-flex">
           <Button
+            v-tooltip.right="'Notifications'"
             rounded
             variant="text"
+            class="w-10 h-10 text-muted-color"
             icon="pi pi-bell"
             badge-severity="danger"
-            :aria-label="'Notifications'"
-            :badge="notificationStore.unreadCount.toString()"
+            :badge="
+              notificationStore.unreadCount > 0
+                ? notificationStore.unreadCount.toString()
+                : undefined
+            "
             @click="notificationStore.toggleDrawer()"
           />
         </div>
 
-        <!-- Profile -->
+        <!-- User Profile -->
         <Button
+          v-tooltip.right="'User Profile'"
           rounded
           variant="text"
+          class="w-10 h-10 text-muted-color"
           icon="pi pi-user"
-          :aria-label="'User Profile'"
           @click="profileStore.toggleDrawer()"
+        />
+
+        <!-- GitHub Docs -->
+        <Button
+          v-tooltip.right="'GitHub Repository'"
+          rounded
+          variant="text"
+          class="w-10 h-10 text-muted-color"
+          icon="pi pi-github"
+          @click="os.open('https://github.com/vantoan1511/orbit')"
         />
       </div>
     </div>
-    <div class="flex items-center justify-center gap-2">
-      <span class="text-xs text-muted-color font-mono">{{ VERSION }}</span>
+
+    <!-- Sidebar Panel (Contextual View Panel) -->
+    <div
+      v-if="activeTab"
+      class="w-52 flex flex-col h-full overflow-hidden border-r border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900"
+    >
+      <!-- Panel Header -->
+      <div
+        class="h-14 px-4 flex items-center justify-between border-b border-surface-100 dark:border-surface-800"
+      >
+        <span class="font-bold text-xs tracking-wider uppercase text-muted-color font-ui">
+          {{ activeTab === 'resources' ? activeCluster?.name || 'Resources' : 'Clusters' }}
+        </span>
+        <span class="text-[10px] text-muted-color font-mono">{{ VERSION }}</span>
+      </div>
+
+      <!-- Panel Body: Resources Context -->
+      <nav v-if="activeTab === 'resources'" class="flex-1 overflow-y-auto p-3 space-y-1">
+        <Button
+          v-for="link in navLinks"
+          :key="link.name"
+          v-slot="slotProps"
+          as-child
+          fluid
+          variant="link"
+        >
+          <router-link
+            :to="link.path"
+            :class="[
+              slotProps.class,
+              route.path === link.path
+                ? 'bg-primary-100! dark:bg-primary-900/30! text-primary-600! dark:text-primary-400! font-bold!'
+                : 'text-muted-color hover:bg-surface-100 dark:hover:bg-surface-800 font-medium!',
+              'flex! items-center! justify-start! gap-2.5 px-3 py-2 rounded-md transition-colors text-sm',
+              k8sStore.activeClusterId === null ? 'hidden!' : ''
+            ]"
+          >
+            <component :is="link.icon" class="w-4 h-4 shrink-0" />
+            <span class="truncate">{{ link.name }}</span>
+          </router-link>
+        </Button>
+        <p v-if="k8sStore.activeClusterId === null" class="text-xs text-muted-color p-2">
+          Select or add a cluster to view resources.
+        </p>
+      </nav>
+
+      <!-- Panel Body: Clusters Context -->
+      <div
+        v-else-if="activeTab === 'clusters'"
+        class="flex-1 overflow-y-auto p-3 flex flex-col gap-2"
+      >
+        <div class="flex flex-col gap-1.5 flex-1">
+          <Button
+            v-for="cluster in k8sStore.clusters"
+            :key="cluster.id"
+            :loading="k8sStore.activeClusterId === cluster.id && isRefreshing"
+            :severity="
+              k8sStore.activeClusterId === cluster.id
+                ? activeCluster?.status === 'healthy'
+                  ? 'success'
+                  : 'danger'
+                : 'secondary'
+            "
+            fluid
+            class="truncate justify-start font-semibold text-xs py-2"
+            variant="text"
+            @click="handleSwitchCluster(cluster.id)"
+          >
+            <Check
+              v-if="k8sStore.activeClusterId === cluster.id"
+              :size="14"
+              class="shrink-0 mr-1"
+            />
+            <span class="truncate">{{ cluster.name }}</span>
+          </Button>
+
+          <!-- Empty state -->
+          <p v-if="k8sStore.clusters.length === 0" class="text-xs text-muted-color px-2 py-1">
+            No clusters added yet
+          </p>
+        </div>
+
+        <!-- Add Cluster Button -->
+        <Button fluid severity="contrast" size="small" class="mt-auto" @click="handleAddCluster">
+          <Plus :size="14" />
+          <span class="text-xs font-semibold">Add cluster</span>
+        </Button>
+      </div>
     </div>
   </aside>
 </template>
