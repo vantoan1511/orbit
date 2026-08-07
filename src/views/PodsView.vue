@@ -10,4 +10,3 @@ import PodsDataTable from '../components/pods/PodsDataTable.vue'
     <PodsDataTable />
   </ViewLayout>
 </template>
-

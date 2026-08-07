@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 
 // Shared state so it remains consistent if used in multiple components
-const isDark = ref(true)
+const isDark = ref(false)
 
 export function useTheme() {
   const toggleTheme = (): void => {

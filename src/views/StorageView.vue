@@ -108,4 +108,3 @@ const storageClasses = computed(() => k8sStore.storageClasses)
     </Tabs>
   </ViewLayout>
 </template>
-

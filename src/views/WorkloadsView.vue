@@ -69,4 +69,3 @@ watch(activeTab, (newTab) => {
     </Tabs>
   </ViewLayout>
 </template>
-

@@ -2,18 +2,18 @@ import './assets/main.css'
 
 import 'primeicons/primeicons.css'
 
-import { init } from './services/nativeService'
 import { createPinia } from 'pinia'
 import PrimeVue from 'primevue/config'
 import { createApp } from 'vue'
+import { init } from './services/nativeService'
 
 import App from './App.vue'
 import router from './router'
 import { Noir } from './theme/orbitTheme'
 
-import ToastService from 'primevue/toastservice'
 import ConfirmationService from 'primevue/confirmationservice'
 import DialogService from 'primevue/dialogservice'
+import ToastService from 'primevue/toastservice'
 
 const app = createApp(App)
 
@@ -29,32 +29,6 @@ app.use(PrimeVue, {
         name: 'primevue',
         order: 'theme, base, primevue'
       }
-    }
-  },
-  pt: {
-    dialog: {
-      root: {
-        class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden'
-      },
-      header: { class: 'p-4 border-b border-(--border)' },
-      content: { class: 'p-4' },
-      footer: { class: 'p-4 border-t border-(--border) flex justify-end gap-2' }
-    },
-    dynamicdialog: {
-      root: {
-        class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden'
-      },
-      header: { class: 'p-4 border-b border-(--border)' },
-      content: { class: 'p-4' },
-      footer: { class: 'p-4 border-t border-(--border) flex justify-end gap-2' }
-    },
-    confirmdialog: {
-      root: {
-        class: 'bg-(--bg-card) border border-(--border) shadow-xl rounded-lg overflow-hidden'
-      },
-      header: { class: 'p-4 border-b border-(--border)' },
-      content: { class: 'p-4' },
-      footer: { class: 'p-4 border-t border-(--border) flex justify-end gap-2' }
     }
   }
 })

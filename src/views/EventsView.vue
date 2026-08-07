@@ -10,4 +10,3 @@ import EventsDataTable from '../components/events/EventsDataTable.vue'
     <EventsDataTable />
   </ViewLayout>
 </template>
-
