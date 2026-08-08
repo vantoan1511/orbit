@@ -1,25 +1,35 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import DataTable from 'primevue/datatable'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import StorageMetricsCards from '../components/storage/StorageMetricsCards.vue'
 import StorageOverview from '../components/storage/StorageOverview.vue'
-import StoragePVTable from '../components/storage/StoragePVTable.vue'
 import StoragePVCTable from '../components/storage/StoragePVCTable.vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
+import StoragePVTable from '../components/storage/StoragePVTable.vue'
 
-const activeTab = ref<'overview' | 'pvs' | 'pvcs' | 'classes'>('overview')
+type StorageViewTab = 'overview' | 'pvs' | 'pvcs' | 'classes'
+
+const route = useRoute()
+const activeTab = ref<StorageViewTab>((route.query.tab as StorageViewTab) || 'overview')
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string') {
+      activeTab.value = newTab as StorageViewTab
+    }
+  },
+  { immediate: true }
+)
 const k8sStore = useKubernetesStore()
 const storageClasses = computed(() => k8sStore.storageClasses)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Header/Title -->
-    <div class="flex items-center justify-between">
-      <h2 class="text-xl font-bold tracking-tight text-primary">Storage</h2>
-    </div>
-
+  <ViewLayout title="Storage">
     <!-- Content Tabs Layout -->
     <Tabs v-model:value="activeTab">
       <TabList class="border-b border-(--border)">
@@ -110,5 +120,5 @@ const storageClasses = computed(() => k8sStore.storageClasses)
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>

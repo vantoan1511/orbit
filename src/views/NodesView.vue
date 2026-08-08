@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import NodeMetricsCards from '../components/nodes/NodeMetricsCards.vue'
 import NodesTable from '../components/nodes/NodesTable.vue'
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <ViewLayout title="Nodes">
     <NodeMetricsCards />
     <NodesTable />
-  </div>
+  </ViewLayout>
 </template>

@@ -1,6 +1,6 @@
 import { definePreset } from '@primeuix/themes'
 
-import Aura from '@primeuix/themes/aura'
+import Nora from '@primeuix/themes/nora'
 import type { Preset } from '@primeuix/themes/types'
 
 const NoirPreset: Preset = {
@@ -57,4 +57,4 @@ const NoirPreset: Preset = {
   }
 }
 
-export const Noir = definePreset(Aura, NoirPreset)
+export const Noir = definePreset(Nora, NoirPreset)

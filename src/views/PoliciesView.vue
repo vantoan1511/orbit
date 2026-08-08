@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import Tabs from 'primevue/tabs'
 import TabList from 'primevue/tablist'
 import Tab from 'primevue/tab'
@@ -13,24 +14,19 @@ const activeTab = ref('overview')
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Header/Title -->
-    <div class="flex items-center justify-between mb-6">
-      <h2 class="text-xl font-bold tracking-tight text-primary">Policies</h2>
-    </div>
-
+  <ViewLayout title="Policies">
     <!-- Tabs Navigation -->
     <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
-      <TabList class="mb-6">
-        <Tab value="overview" class="text-sm font-medium">Overview</Tab>
-        <Tab value="network" class="text-sm font-medium">Network Policies</Tab>
-        <Tab value="pod-security" class="text-sm font-medium">Pod Security</Tab>
-        <Tab value="resource" class="text-sm font-medium">Resource Policies</Tab>
-        <Tab value="rbac" class="text-sm font-medium">RBAC</Tab>
-        <Tab value="admission" class="text-sm font-medium">Admission Policies</Tab>
+      <TabList class="border-b border-(--border)">
+        <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
+        <Tab value="network" class="px-5 py-3 text-sm font-semibold">Network Policies</Tab>
+        <Tab value="pod-security" class="px-5 py-3 text-sm font-semibold">Pod Security</Tab>
+        <Tab value="resource" class="px-5 py-3 text-sm font-semibold">Resource Policies</Tab>
+        <Tab value="rbac" class="px-5 py-3 text-sm font-semibold">RBAC</Tab>
+        <Tab value="admission" class="px-5 py-3 text-sm font-semibold">Admission Policies</Tab>
       </TabList>
 
-      <TabPanels class="flex-1 min-h-0 p-0 bg-transparent border-none">
+      <TabPanels class="pt-6">
         <!-- Overview Tab -->
         <TabPanel value="overview" class="flex flex-col gap-6">
           <PoliciesMetricsCards />
@@ -79,5 +75,5 @@ const activeTab = ref('overview')
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>

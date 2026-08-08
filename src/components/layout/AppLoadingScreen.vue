@@ -42,14 +42,14 @@ let progressInterval: number | undefined
 let finishTimeout: number | undefined
 
 const startTime = Date.now()
-const MIN_DISPLAY_TIME_MS = 2500
+const MIN_DISPLAY_TIME_MS = 500
 const ENGINE_TIMEOUT_MS = 15000
 
 onMounted(() => {
   // Roll out facts and tips every 3 seconds
   rolloutInterval = window.setInterval(() => {
-    currentFactIndex.value = (currentFactIndex.value + 1) % facts.length
-    currentTipIndex.value = (currentTipIndex.value + 1) % tips.length
+    currentFactIndex.value = Math.floor(Math.random() * facts.length)
+    currentTipIndex.value = Math.floor(Math.random() * tips.length)
   }, 3000)
 
   // Smooth progress bar logic
@@ -104,7 +104,7 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="flex flex-col items-center justify-center h-screen w-screen bg-(--bg-app) text-primary font-sans select-none overflow-hidden p-8"
+    class="flex flex-col items-center justify-center h-screen w-screen text-primary font-sans select-none overflow-hidden p-8"
   >
     <!-- Center branding -->
     <div class="flex flex-col items-center justify-center">
@@ -131,7 +131,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Progress bar -->
-    <div class="w-full max-w-md h-2 bg-(--border) rounded-full overflow-hidden my-2">
+    <div class="w-full max-w-md h-2 rounded-full overflow-hidden my-2">
       <div
         class="h-full bg-linear-to-r from-primary-500 to-surface-400 rounded-full transition-all duration-300 ease-out"
         :style="{ width: `${progress}%` }"

@@ -1,15 +1,29 @@
 <script setup lang="ts">
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import { ref, watch } from 'vue'
-import WorkloadMetricsCards from '../components/workloads/WorkloadMetricsCards.vue'
-import DeploymentsTable from '../components/workloads/DeploymentsTable.vue'
-import StatefulSetsTable from '../components/workloads/StatefulSetsTable.vue'
-import DaemonSetsTable from '../components/workloads/DaemonSetsTable.vue'
-import ReplicaSetsTable from '../components/workloads/ReplicaSetsTable.vue'
-import JobsTable from '../components/workloads/JobsTable.vue'
+import { useRoute } from 'vue-router'
 import CronJobsTable from '../components/workloads/CronJobsTable.vue'
+import DaemonSetsTable from '../components/workloads/DaemonSetsTable.vue'
+import DeploymentsTable from '../components/workloads/DeploymentsTable.vue'
+import JobsTable from '../components/workloads/JobsTable.vue'
+import ReplicaSetsTable from '../components/workloads/ReplicaSetsTable.vue'
+import StatefulSetsTable from '../components/workloads/StatefulSetsTable.vue'
+import WorkloadMetricsCards from '../components/workloads/WorkloadMetricsCards.vue'
 
-const activeTab = ref('deployments')
-const visitedTabs = ref(new Set(['deployments']))
+const route = useRoute()
+const activeTab = ref((route.query.tab as string) || 'deployments')
+const visitedTabs = ref(new Set([activeTab.value]))
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string') {
+      activeTab.value = newTab
+      visitedTabs.value.add(newTab)
+    }
+  },
+  { immediate: true }
+)
 
 watch(activeTab, (newTab) => {
   visitedTabs.value.add(newTab)
@@ -17,9 +31,9 @@ watch(activeTab, (newTab) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <ViewLayout title="Workloads">
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-surface">
+      <TabList class="border-b border-(--border)">
         <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
         <Tab value="deployments" class="px-5 py-3 text-sm font-semibold">Deployments</Tab>
         <Tab value="statefulsets" class="px-5 py-3 text-sm font-semibold">StatefulSets</Tab>
@@ -66,5 +80,5 @@ watch(activeTab, (newTab) => {
         </TabPanel>
       </TabPanels>
     </Tabs>
-  </div>
+  </ViewLayout>
 </template>

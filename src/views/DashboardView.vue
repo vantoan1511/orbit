@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import StatusSummary from '../components/dashboard/StatusSummary.vue'
 import ResourceUsage from '../components/dashboard/ResourceUsage.vue'
 import HealthOverview from '../components/dashboard/HealthOverview.vue'
@@ -8,7 +9,7 @@ import WorkloadSummaries from '../components/dashboard/WorkloadSummaries.vue'
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <ViewLayout title="Dashboard">
     <!-- Top status summaries -->
     <StatusSummary />
 
@@ -26,5 +27,5 @@ import WorkloadSummaries from '../components/dashboard/WorkloadSummaries.vue'
 
     <!-- Bottom row workloads -->
     <WorkloadSummaries />
-  </div>
+  </ViewLayout>
 </template>
