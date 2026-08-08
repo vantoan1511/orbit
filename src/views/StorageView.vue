@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import ViewLayout from '@/components/shared/ViewLayout.vue'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -9,7 +10,20 @@ import StoragePVTable from '../components/storage/StoragePVTable.vue'
 import StoragePVCTable from '../components/storage/StoragePVCTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const activeTab = ref<'overview' | 'pvs' | 'pvcs' | 'classes'>('overview')
+const route = useRoute()
+const activeTab = ref<'overview' | 'pvs' | 'pvcs' | 'classes'>(
+  (route.query.tab as any) || 'overview'
+)
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string') {
+      activeTab.value = newTab as any
+    }
+  },
+  { immediate: true }
+)
 const k8sStore = useKubernetesStore()
 const storageClasses = computed(() => k8sStore.storageClasses)
 </script>

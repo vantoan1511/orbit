@@ -1,12 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import ViewLayout from '@/components/shared/ViewLayout.vue'
 import ConfigMetricsCards from '../components/config/ConfigMetricsCards.vue'
 import ConfigDataTable from '../components/config/ConfigDataTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 
-const activeTab = ref<'configmaps' | 'secrets'>('configmaps')
+const route = useRoute()
+const activeTab = ref<'configmaps' | 'secrets'>(
+  (route.query.tab as 'configmaps' | 'secrets') || 'configmaps'
+)
 const k8sStore = useKubernetesStore()
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && (newTab === 'configmaps' || newTab === 'secrets')) {
+      activeTab.value = newTab
+    }
+  },
+  { immediate: true }
+)
 
 onMounted(async () => {
   await k8sStore.fetchConfigMaps()
