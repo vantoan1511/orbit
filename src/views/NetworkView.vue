@@ -1,11 +1,24 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import ViewLayout from '@/components/shared/ViewLayout.vue'
 import ServicesTable from '../components/network/ServicesTable.vue'
 import IngressesTable from '../components/network/IngressesTable.vue'
 
-const activeTab = ref('services')
-const visitedTabs = ref(new Set(['services']))
+const route = useRoute()
+const activeTab = ref((route.query.tab as string) || 'services')
+const visitedTabs = ref(new Set([activeTab.value]))
+
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && typeof newTab === 'string') {
+      activeTab.value = newTab
+      visitedTabs.value.add(newTab)
+    }
+  },
+  { immediate: true }
+)
 
 watch(activeTab, (newTab) => {
   visitedTabs.value.add(newTab)
