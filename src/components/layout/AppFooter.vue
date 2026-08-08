@@ -65,63 +65,65 @@ const cloudProvider = computed(() => {
 </script>
 
 <template>
-  <header
-    class="flex items-center justify-between gap-4 select-none backdrop-blur-sm bg-surface-0/50 dark:bg-surface-950/50 border-b border-surface-200/60 dark:border-surface-800/60 sticky top-0 z-20"
+  <footer
+    class="flex items-center justify-between gap-4 select-none bg-surface-100 dark:bg-surface-900 border-t border-surface-200/60 dark:border-surface-800/60 px-3 py-1 text-[11px] shrink-0 z-20"
   >
     <!-- Left side: Cluster info & inline metadata -->
-    <div class="flex items-center gap-6 min-w-0">
-      <div class="flex items-center gap-4 shrink-0">
+    <div class="flex items-center gap-4 min-w-0">
+      <div class="flex items-center gap-2 shrink-0">
         <template v-if="activeCluster !== null">
-          <h1 class="ml-3 font-bold font-ui tracking-tight truncate">
+          <span class="font-semibold tracking-tight truncate">
             {{ activeCluster.name }}
-          </h1>
+          </span>
         </template>
-        <h1 v-else class="font-bold text-muted-color font-ui tracking-tight">No active cluster</h1>
+        <span v-else class="font-semibold text-muted-color tracking-tight">No active cluster</span>
       </div>
 
       <!-- Metadata inline — only shown when cluster is active and healthy -->
       <div
         v-if="activeCluster !== null && activeCluster.status === 'healthy'"
-        class="flex items-center gap-4 text-xs font-semibold tracking-wider text-muted-color shrink-0"
+        class="flex items-center gap-3 text-[11px] font-medium tracking-wider text-muted-color shrink-0"
       >
         <div class="h-3 w-px bg-surface-300 dark:bg-surface-700"></div>
 
         <!-- Kubernetes Version -->
-        <div class="flex items-center gap-1.5">
-          <KubernetesIcon :size="13" />
+        <div class="flex items-center gap-1">
+          <KubernetesIcon :size="12" />
           <span>K8s {{ kubernetesVersion }}</span>
         </div>
 
         <!-- Cloud Provider -->
-        <div class="flex items-center gap-1.5">
-          <Cloud :size="13" />
+        <div class="flex items-center gap-1">
+          <Cloud :size="12" />
           <span class="uppercase">{{ cloudProvider.provider }}</span>
           <span>/</span>
           <span>{{ cloudProvider.platform }}</span>
         </div>
 
         <!-- Uptime -->
-        <div class="flex items-center gap-1.5">
-          <Clock :size="13" />
+        <div class="flex items-center gap-1">
+          <Clock :size="12" />
           <span>{{ clusterUptime }}</span>
         </div>
       </div>
     </div>
 
     <!-- Right side: Last updated & Refresh -->
-    <div v-if="activeCluster" class="flex items-center gap-3 shrink-0">
-      <span class="text-xs text-muted-color">Updated {{ lastUpdatedDisplay }}</span>
+    <div v-if="activeCluster" class="flex items-center gap-2 shrink-0">
+      <span class="text-[11px] text-muted-color">Updated {{ lastUpdatedDisplay }}</span>
       <Button
         rounded
         variant="text"
+        size="small"
         :loading="isRefreshing"
         :disabled="activeCluster === null"
         @click="refreshCluster"
+        class="p-1! w-6! h-6!"
       >
         <template #icon>
-          <RefreshCwIcon :size="13" />
+          <RefreshCwIcon :size="12" />
         </template>
       </Button>
     </div>
-  </header>
+  </footer>
 </template>
