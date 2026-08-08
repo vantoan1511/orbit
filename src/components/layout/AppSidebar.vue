@@ -64,7 +64,7 @@ const handleClusterSwitched = () => {
 </script>
 
 <template>
-  <aside class="flex h-screen text-primary select-none">
+  <aside class="flex h-full text-primary select-none">
     <!-- Activity Bar (Far Left Strip) -->
     <AppSidebarActivityBar :active-tab="activeTab" @toggle-category="toggleCategory" />
 
