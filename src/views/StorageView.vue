@@ -1,25 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import ViewLayout from '@/components/shared/ViewLayout.vue'
-import DataTable from 'primevue/datatable'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import DataTable from 'primevue/datatable'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import StorageMetricsCards from '../components/storage/StorageMetricsCards.vue'
 import StorageOverview from '../components/storage/StorageOverview.vue'
-import StoragePVTable from '../components/storage/StoragePVTable.vue'
 import StoragePVCTable from '../components/storage/StoragePVCTable.vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
+import StoragePVTable from '../components/storage/StoragePVTable.vue'
+
+type StorageViewTab = 'overview' | 'pvs' | 'pvcs' | 'classes'
 
 const route = useRoute()
-const activeTab = ref<'overview' | 'pvs' | 'pvcs' | 'classes'>(
-  (route.query.tab as any) || 'overview'
-)
+const activeTab = ref<StorageViewTab>((route.query.tab as StorageViewTab) || 'overview')
 
 watch(
   () => route.query.tab,
   (newTab) => {
     if (newTab && typeof newTab === 'string') {
-      activeTab.value = newTab as any
+      activeTab.value = newTab as StorageViewTab
     }
   },
   { immediate: true }

@@ -66,21 +66,17 @@ const cloudProvider = computed(() => {
 
 <template>
   <header
-    class="px-6 py-3 flex items-center justify-between gap-4 select-none backdrop-blur-sm bg-surface-0/50 dark:bg-surface-950/50 border-b border-surface-200/60 dark:border-surface-800/60 sticky top-0 z-20"
+    class="flex items-center justify-between gap-4 select-none backdrop-blur-sm bg-surface-0/50 dark:bg-surface-950/50 border-b border-surface-200/60 dark:border-surface-800/60 sticky top-0 z-20"
   >
     <!-- Left side: Cluster info & inline metadata -->
     <div class="flex items-center gap-6 min-w-0">
       <div class="flex items-center gap-4 shrink-0">
         <template v-if="activeCluster !== null">
-          <OverlayBadge :severity="activeCluster.status === 'healthy' ? 'success' : 'error'">
-            <h1 class="pr-3 text-lg font-bold font-ui tracking-tight truncate">
-              {{ activeCluster.name }}
-            </h1>
-          </OverlayBadge>
+          <h1 class="ml-3 font-bold font-ui tracking-tight truncate">
+            {{ activeCluster.name }}
+          </h1>
         </template>
-        <h1 v-else class="text-lg font-bold text-muted-color font-ui tracking-tight">
-          No active cluster
-        </h1>
+        <h1 v-else class="font-bold text-muted-color font-ui tracking-tight">No active cluster</h1>
       </div>
 
       <!-- Metadata inline — only shown when cluster is active and healthy -->
