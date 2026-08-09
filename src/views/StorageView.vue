@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import ViewLayout from '@/components/shared/ViewLayout.vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import Column from 'primevue/column'
-import DataTable from 'primevue/datatable'
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import StorageClassesTable from '../components/storage/StorageClassesTable.vue'
 import StorageMetricsCards from '../components/storage/StorageMetricsCards.vue'
 import StorageOverview from '../components/storage/StorageOverview.vue'
 import StoragePVCTable from '../components/storage/StoragePVCTable.vue'
@@ -24,8 +22,6 @@ watch(
   },
   { immediate: true }
 )
-const k8sStore = useKubernetesStore()
-const storageClasses = computed(() => k8sStore.storageClasses)
 </script>
 
 <template>
@@ -61,54 +57,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
         <TabPanel value="classes">
           <div class="flex flex-col gap-6">
             <StorageMetricsCards />
-            <div
-              class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-5"
-            >
-              <div class="text-sm font-semibold text-primary uppercase tracking-wider">
-                Storage Classes
-              </div>
-              <DataTable
-                :value="storageClasses"
-                class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
-                tableClass="w-full text-left text-xs border-collapse"
-              >
-                <Column field="name" header="Name" class="font-medium p-3 text-primary">
-                  <template #body="{ data }">
-                    <span class="font-semibold font-mono">{{ data.name }}</span>
-                  </template>
-                </Column>
-                <Column
-                  field="provisioner"
-                  header="Provisioner"
-                  class="p-3 font-mono text-muted-color"
-                ></Column>
-                <Column
-                  field="reclaimPolicy"
-                  header="Reclaim Policy"
-                  class="p-3 text-muted-color"
-                ></Column>
-                <Column
-                  field="volumeBindingMode"
-                  header="Volume Binding Mode"
-                  class="p-3 text-muted-color"
-                ></Column>
-                <Column field="allowVolumeExpansion" header="Allow Volume Expansion" class="p-3">
-                  <template #body="{ data }">
-                    <span
-                      class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-                      :class="
-                        data.allowVolumeExpansion
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                          : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-                      "
-                    >
-                      {{ data.allowVolumeExpansion ? 'True' : 'False' }}
-                    </span>
-                  </template>
-                </Column>
-                <Column field="age" header="Age" class="p-3 text-muted-color font-mono"></Column>
-              </DataTable>
-            </div>
+            <StorageClassesTable />
           </div>
         </TabPanel>
       </TabPanels>

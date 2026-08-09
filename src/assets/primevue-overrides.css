@@ -8,13 +8,28 @@
 }
 
 .p-datatable-thead > tr > th {
-  background: var(--bg-hover);
-  color: var(--text-secondary);
-  border-bottom: 1px solid var(--border);
-  font-weight: 600;
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  background: var(--bg-hover) !important;
+  color: var(--text-secondary) !important;
+  border-bottom: 1px solid var(--border) !important;
+  font-weight: 600 !important;
+  font-size: 0.75rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+.p-datatable-thead > tr > th[data-p-sortable-column="true"]:hover,
+.p-datatable-thead > tr > th[data-p-sorted="true"],
+.p-datatable-thead > tr > th.p-datatable-column-sorted,
+.p-datatable-thead > tr > th.p-datatable-sortable-column:hover {
+  background: var(--bg-active) !important;
+  color: var(--text-primary) !important;
+}
+
+.p-datatable-thead > tr > th[data-p-sortable-column="true"]:hover .p-datatable-sort-icon,
+.p-datatable-thead > tr > th[data-p-sorted="true"] .p-datatable-sort-icon,
+.p-datatable-thead > tr > th.p-datatable-column-sorted .p-datatable-sort-icon,
+.p-datatable-thead > tr > th.p-datatable-sortable-column:hover .p-datatable-sort-icon {
+  color: var(--text-primary) !important;
 }
 
 .p-datatable-tbody > tr {
