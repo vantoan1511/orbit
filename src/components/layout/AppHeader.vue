@@ -109,9 +109,9 @@ const items = computed(() => {
 
 <template>
   <header
-    class="flex items-center h-12 px-6 border-b border-[var(--p-surface-200)] dark:border-[var(--p-surface-800)] bg-[var(--p-surface-0)] dark:bg-[var(--p-surface-900)] shrink-0"
+    class="flex items-center select-none bg-surface-100 dark:bg-surface-900 border-b border-surface-200/60 dark:border-surface-800/60 px-3 py-2 text-xs shrink-0 z-20"
   >
-    <Breadcrumb :home="home" :model="items" class="!p-0 !bg-transparent !border-none text-xs">
+    <Breadcrumb :home="home" :model="items" class="p-0! bg-transparent! border-none! text-xs">
       <template #item="{ item, props }">
         <router-link v-if="item.route" v-slot="{ href, navigate }" :to="item.route" custom>
           <a
