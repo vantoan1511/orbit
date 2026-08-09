@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
     AppFooter: typeof import('./src/components/layout/AppFooter.vue')['default']
+    AppHeader: typeof import('./src/components/layout/AppHeader.vue')['default']
     AppLayout: typeof import('./src/components/layout/AppLayout.vue')['default']
     AppLoadingScreen: typeof import('./src/components/layout/AppLoadingScreen.vue')['default']
     AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
@@ -92,8 +93,6 @@ declare module 'vue' {
     StoragePVTable: typeof import('./src/components/storage/StoragePVTable.vue')['default']
     StringListEditor: typeof import('./src/components/shared/StringListEditor.vue')['default']
     SystemNamespaceToggle: typeof import('./src/components/shared/SystemNamespaceToggle.vue')['default']
-    Tab: typeof import('primevue/tab')['default']
-    TabList: typeof import('primevue/tablist')['default']
     TabPanel: typeof import('primevue/tabpanel')['default']
     TabPanels: typeof import('primevue/tabpanels')['default']
     Tabs: typeof import('primevue/tabs')['default']

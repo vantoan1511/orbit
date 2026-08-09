@@ -5,6 +5,7 @@ import OfflineClusterView from '@/views/OfflineClusterView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
 import { useRoute } from 'vue-router'
 import AppFooter from './AppFooter.vue'
+import AppHeader from './AppHeader.vue'
 import AppLoadingScreen from './AppLoadingScreen.vue'
 import AppSidebar from './AppSidebar.vue'
 
@@ -23,6 +24,7 @@ const route = useRoute()
 
         <!-- Main Content Area -->
         <div class="flex-1 flex flex-col h-full overflow-hidden">
+          <AppHeader />
           <main class="flex-1 h-full overflow-y-auto relative">
             <div class="p-8">
               <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
