@@ -33,17 +33,7 @@ watch(activeTab, (newTab) => {
 <template>
   <ViewLayout title="Workloads">
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-(--border)">
-        <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
-        <Tab value="deployments" class="px-5 py-3 text-sm font-semibold">Deployments</Tab>
-        <Tab value="statefulsets" class="px-5 py-3 text-sm font-semibold">StatefulSets</Tab>
-        <Tab value="daemonsets" class="px-5 py-3 text-sm font-semibold">DaemonSets</Tab>
-        <Tab value="replicasets" class="px-5 py-3 text-sm font-semibold">ReplicaSets</Tab>
-        <Tab value="jobs" class="px-5 py-3 text-sm font-semibold">Jobs</Tab>
-        <Tab value="cronjobs" class="px-5 py-3 text-sm font-semibold">CronJobs</Tab>
-      </TabList>
-
-      <TabPanels class="pt-6">
+      <TabPanels>
         <!-- Overview Tab -->
         <TabPanel value="overview">
           <WorkloadMetricsCards v-if="visitedTabs.has('overview')" />

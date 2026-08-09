@@ -40,7 +40,7 @@ const { isDark, toggleTheme } = useTheme()
         :severity="activeTab === cat.id ? 'primary' : 'secondary'"
         :class="[
           activeTab === cat.id
-            ? 'border-r-3! border-r-primary-900 dark:border-r-primary-50'
+            ? 'border-l-3! border-l-primary-900 dark:border-l-primary-50 rounded-none!'
             : 'text-muted-color'
         ]"
         v-tooltip.right="cat.name"

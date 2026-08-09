@@ -11,16 +11,6 @@ const activeTab = ref<CategoryId | null>('clusters')
 const route = useRoute()
 const router = useRouter()
 
-const expandedKeys = ref<Record<string, boolean>>({
-  core: true,
-  workloads: true,
-  network: true,
-  storage: true,
-  config: true,
-  security: true,
-  logs: true
-})
-
 const getCategoryForRoute = (path: string): CategoryId | null => {
   if (path === '/logs') return 'logs'
   if (path === '/' || path === '/nodes' || path === '/namespaces' || path === '/events')
@@ -39,7 +29,6 @@ watch(
     const category = getCategoryForRoute(newPath)
     if (category && activeTab.value !== 'clusters') {
       activeTab.value = category
-      expandedKeys.value = { ...expandedKeys.value, [category]: true }
     }
   },
   { immediate: true }
@@ -52,7 +41,6 @@ const toggleCategory = (cat: SidebarCategory) => {
   }
 
   activeTab.value = cat.id
-  expandedKeys.value = { ...expandedKeys.value, [cat.id]: true }
   if (cat.defaultPath) {
     router.push(cat.defaultPath)
   }
@@ -70,11 +58,7 @@ const handleClusterSwitched = () => {
 
     <!-- Contextual Sidebar Panel -->
     <AppSidebarPanel :active-tab="activeTab">
-      <AppSidebarNavMenu
-        v-if="activeTab !== 'clusters'"
-        :active-tab="activeTab"
-        v-model:expanded-keys="expandedKeys"
-      />
+      <AppSidebarNavMenu v-if="activeTab !== 'clusters'" :active-tab="activeTab" />
       <AppSidebarClusters v-else @cluster-switched="handleClusterSwitched" />
     </AppSidebarPanel>
   </aside>

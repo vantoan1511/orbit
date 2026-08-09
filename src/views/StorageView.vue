@@ -32,14 +32,7 @@ const storageClasses = computed(() => k8sStore.storageClasses)
   <ViewLayout title="Storage">
     <!-- Content Tabs Layout -->
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-(--border)">
-        <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
-        <Tab value="pvs" class="px-5 py-3 text-sm font-semibold">PersistentVolumes</Tab>
-        <Tab value="pvcs" class="px-5 py-3 text-sm font-semibold">Claims (PVCs)</Tab>
-        <Tab value="classes" class="px-5 py-3 text-sm font-semibold">StorageClasses</Tab>
-      </TabList>
-
-      <TabPanels class="pt-6">
+      <TabPanels>
         <!-- Overview Tab Panel -->
         <TabPanel value="overview">
           <div class="flex flex-col gap-6">

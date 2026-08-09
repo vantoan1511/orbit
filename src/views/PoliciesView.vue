@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import ViewLayout from '@/components/shared/ViewLayout.vue'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import Tab from 'primevue/tab'
-import TabPanels from 'primevue/tabpanels'
 import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import { ref } from 'vue'
 
-import PoliciesMetricsCards from '../components/policies/PoliciesMetricsCards.vue'
 import PoliciesDataTable from '../components/policies/PoliciesDataTable.vue'
+import PoliciesMetricsCards from '../components/policies/PoliciesMetricsCards.vue'
 
 const activeTab = ref('overview')
 </script>
@@ -17,16 +15,7 @@ const activeTab = ref('overview')
   <ViewLayout title="Policies">
     <!-- Tabs Navigation -->
     <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
-      <TabList class="border-b border-(--border)">
-        <Tab value="overview" class="px-5 py-3 text-sm font-semibold">Overview</Tab>
-        <Tab value="network" class="px-5 py-3 text-sm font-semibold">Network Policies</Tab>
-        <Tab value="pod-security" class="px-5 py-3 text-sm font-semibold">Pod Security</Tab>
-        <Tab value="resource" class="px-5 py-3 text-sm font-semibold">Resource Policies</Tab>
-        <Tab value="rbac" class="px-5 py-3 text-sm font-semibold">RBAC</Tab>
-        <Tab value="admission" class="px-5 py-3 text-sm font-semibold">Admission Policies</Tab>
-      </TabList>
-
-      <TabPanels class="pt-6">
+      <TabPanels>
         <!-- Overview Tab -->
         <TabPanel value="overview" class="flex flex-col gap-6">
           <PoliciesMetricsCards />

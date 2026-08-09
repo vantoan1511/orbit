@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import ViewLayout from '@/components/shared/ViewLayout.vue'
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import ViewLayout from '@/components/shared/ViewLayout.vue'
-import ServicesTable from '../components/network/ServicesTable.vue'
 import IngressesTable from '../components/network/IngressesTable.vue'
+import ServicesTable from '../components/network/ServicesTable.vue'
 
 const route = useRoute()
 const activeTab = ref((route.query.tab as string) || 'services')
@@ -28,12 +28,7 @@ watch(activeTab, (newTab) => {
 <template>
   <ViewLayout title="Network">
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-(--border)">
-        <Tab value="services" class="px-5 py-3 text-sm font-semibold">Services</Tab>
-        <Tab value="ingresses" class="px-5 py-3 text-sm font-semibold">Ingresses</Tab>
-      </TabList>
-
-      <TabPanels class="pt-6">
+      <TabPanels>
         <!-- Services Tab -->
         <TabPanel value="services">
           <ServicesTable v-if="visitedTabs.has('services')" />
