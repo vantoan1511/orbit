@@ -1,57 +1,57 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import DataTable from 'primevue/datatable'
+import { computed, ref } from 'vue'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
-import { Search, Info, RefreshCw, Settings2, FileSpreadsheet, MoreVertical } from '@lucide/vue'
+import { MoreVertical } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
+import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { useResourceFilters } from '@/composables/useResourceFilters'
+import { useTableColumns } from '@/composables/useTableColumns'
 import type { PersistentVolumeClaimInfo } from '@/types/kubernetes'
 
 const k8sStore = useKubernetesStore()
-const pvcs = computed(() => k8sStore.persistentVolumeClaims)
 
-const searchQuery = ref('')
-const selectedNamespace = ref<string[]>([])
+const { searchQuery, selectedNamespace, filteredResources } = useResourceFilters(
+  computed(() => k8sStore.persistentVolumeClaims),
+  ['name', 'volume', 'storageClass']
+)
+
+const { tableColumns, visibleCols } = useTableColumns([
+  { field: 'name', header: 'Name', visible: true },
+  { field: 'namespace', header: 'Namespace', visible: true },
+  { field: 'volume', header: 'Volume', visible: true },
+  { field: 'capacity', header: 'Request', visible: true },
+  { field: 'accessMode', header: 'Access Mode', visible: true },
+  { field: 'storageClass', header: 'Storage Class', visible: true },
+  { field: 'status', header: 'Status', visible: true },
+  { field: 'age', header: 'Age', visible: true }
+])
+
 const selectedStatus = ref('All Statuses')
-
-const namespaces = computed(() => {
-  const ns = new Set(pvcs.value.map((pvc) => pvc.namespace))
-  return ['All Namespaces', ...Array.from(ns)]
-})
-
+const namespaces = computed(() => k8sStore.namespaces)
 const statuses = ['All Statuses', 'Bound', 'Pending', 'Lost']
 
 const filteredPVCs = computed(() => {
-  return pvcs.value.filter((pvc) => {
-    // Search Query
-    if (searchQuery.value) {
-      const query = searchQuery.value.toLowerCase()
-      if (!pvc.name.toLowerCase().includes(query)) return false
-    }
-
-    // Namespace
-    if (selectedNamespace.value.length > 0 && !selectedNamespace.value.includes(pvc.namespace)) {
-      return false
-    }
-
-    // Status
+  return filteredResources.value.filter((pvc) => {
     if (selectedStatus.value !== 'All Statuses' && pvc.status !== selectedStatus.value) {
       return false
     }
-
     return true
   })
 })
 
-const refreshTable = () => {
-  searchQuery.value = ''
-  selectedNamespace.value = []
-  selectedStatus.value = 'All Statuses'
+const handleRefresh = async () => {
+  try {
+    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
+    await k8sStore.fetchPersistentVolumeClaims(ns)
+  } catch (error) {
+    console.error('Error fetching PVCs:', error)
+  }
 }
 
 const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
@@ -69,184 +69,156 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 </script>
 
 <template>
-  <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-5">
-    <div class="flex items-center justify-between">
-      <div
-        class="text-sm font-semibold text-primary uppercase tracking-wider flex items-center gap-2"
-      >
-        <FileSpreadsheet class="w-4 h-4 text-blue-400" />
-        Persistent Volume Claims ({{ filteredPVCs.length }})
-      </div>
-    </div>
+  <ResourceDataTable
+    :data="filteredPVCs"
+    v-model:searchQuery="searchQuery"
+    v-model:columns="tableColumns"
+    searchPlaceholder="Search Claims..."
+    emptyMessage="No PVCs found matching the filter criteria."
+    reportTemplate="Showing {first} to {last} of {totalRecords} claims"
+    :loading="k8sStore.persistentVolumeClaimsLoading"
+    @refresh="handleRefresh"
+  >
+    <!-- Filters -->
+    <template #filters>
+      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
+      <Select v-model="selectedStatus" :options="statuses" class="text-xs min-w-36" />
+    </template>
 
-    <!-- Filter Toolbar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5 flex-wrap">
-        <!-- Search -->
-        <div class="relative min-w-56">
-          <Search class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-color" />
-          <InputText
-            v-model="searchQuery"
-            placeholder="Search Claims..."
-            class="pl-8 pr-3 py-1.5 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
-          />
+    <!-- Name Column -->
+    <Column
+      v-if="visibleCols['name']"
+      field="name"
+      header="Name"
+      sortable
+      class="p-3"
+      bodyClass="font-medium text-primary"
+    >
+      <template #body="{ data }">
+        <span
+          class="font-semibold hover:text-violet-400 transition-colors font-mono truncate max-w-48 block"
+          :title="data.name"
+        >
+          {{ data.name }}
+        </span>
+      </template>
+    </Column>
+
+    <!-- Namespace Column -->
+    <Column
+      v-if="visibleCols['namespace']"
+      field="namespace"
+      header="Namespace"
+      sortable
+      class="p-3"
+    >
+      <template #body="{ data }">
+        <NamespaceBadge :namespace="data.namespace" />
+      </template>
+    </Column>
+
+    <!-- Volume Column -->
+    <Column v-if="visibleCols['volume']" field="volume" header="Volume" sortable class="p-3">
+      <template #body="{ data }">
+        <span
+          v-if="data.volume"
+          class="font-mono text-muted-color truncate max-w-44 block"
+          :title="data.volume"
+        >
+          {{ data.volume }}
+        </span>
+        <span v-else class="text-muted-color italic font-mono">-</span>
+      </template>
+    </Column>
+
+    <!-- Capacity Column -->
+    <Column
+      v-if="visibleCols['capacity']"
+      field="capacity"
+      header="Request"
+      sortable
+      class="p-3"
+      bodyClass="font-mono text-primary"
+    ></Column>
+
+    <!-- Access Mode Column -->
+    <Column
+      v-if="visibleCols['accessMode']"
+      field="accessMode"
+      header="Access Mode"
+      sortable
+      class="p-3"
+      bodyClass="text-muted-color"
+    ></Column>
+
+    <!-- Storage Class Column -->
+    <Column
+      v-if="visibleCols['storageClass']"
+      field="storageClass"
+      header="Storage Class"
+      sortable
+      class="p-3"
+    >
+      <template #body="{ data }">
+        <span class="font-mono text-violet-400 font-semibold">{{ data.storageClass }}</span>
+      </template>
+    </Column>
+
+    <!-- Status Column -->
+    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
+      <template #body="{ data }">
+        <div class="flex items-center gap-1.5">
+          <span
+            class="w-1.5 h-1.5 rounded-full"
+            :class="{
+              'bg-emerald-500': data.status === 'Bound',
+              'bg-amber-500': data.status === 'Pending',
+              'bg-rose-500': data.status === 'Lost'
+            }"
+          ></span>
+          <span
+            class="font-medium"
+            :class="{
+              'text-emerald-500': data.status === 'Bound',
+              'text-amber-500': data.status === 'Pending',
+              'text-rose-500': data.status === 'Lost'
+            }"
+          >
+            {{ data.status }}
+          </span>
         </div>
+      </template>
+    </Column>
 
-        <!-- Namespace Select -->
-        <Select
-          v-model="selectedNamespace"
-          :options="namespaces"
-          class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
-        />
+    <!-- Age Column -->
+    <Column
+      v-if="visibleCols['age']"
+      field="age"
+      header="Age"
+      sortable
+      class="p-3"
+      bodyClass="text-muted-color font-mono"
+    ></Column>
 
-        <!-- Status Select -->
-        <Select
-          v-model="selectedStatus"
-          :options="statuses"
-          class="text-xs min-w-36 bg-(--bg-hover)/30 border-(--border)"
-        />
-      </div>
-
-      <!-- Action buttons -->
-      <div class="flex items-center gap-1 self-end sm:self-auto">
+    <!-- Actions Column -->
+    <Column class="p-3 text-center w-12 shrink-0">
+      <template #body="{ data }">
         <Button
           severity="secondary"
           variant="text"
           size="small"
           class="p-1"
-          @click="refreshTable"
-          :loading="k8sStore.persistentVolumeClaimsLoading"
+          title="Actions"
+          @click="toggleActionMenu($event, data)"
         >
-          <RefreshCw class="w-3.5 h-3.5 text-muted-color" />
+          <MoreVertical class="w-4 h-4 text-muted-color" />
         </Button>
-        <Button severity="secondary" variant="text" size="small" class="p-1">
-          <Settings2 class="w-3.5 h-3.5 text-muted-color" />
-        </Button>
-      </div>
-    </div>
-
-    <!-- DataTable -->
-    <ResourceTableSkeleton v-if="k8sStore.persistentVolumeClaimsLoading" :columns="6" />
-    <DataTable
-      v-else
-      :value="filteredPVCs"
-      class="p-datatable-sm border border-(--border) rounded-lg overflow-hidden"
-      tableClass="w-full text-left text-xs border-collapse"
-    >
-      <template #empty>
-        <div class="text-center py-8 text-muted-color flex flex-col items-center gap-2">
-          <Info class="w-6 h-6 text-muted-color/50" />
-          <span>No PVCs found matching the filters.</span>
-        </div>
       </template>
+    </Column>
 
-      <!-- Name Column -->
-      <Column field="name" header="Name" class="font-medium p-2.5 text-primary">
-        <template #body="{ data }">
-          <span
-            class="font-semibold hover:text-violet-400 transition-colors font-mono truncate max-w-48 block"
-            :title="data.name"
-          >
-            {{ data.name }}
-          </span>
-        </template>
-      </Column>
-
-      <!-- Namespace Column -->
-      <Column field="namespace" header="Namespace" class="p-2.5">
-        <template #body="{ data }">
-          <span
-            class="font-mono px-2 py-0.5 rounded text-[10px]"
-            :class="[
-              data.namespace === 'kube-system'
-                ? 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-                : data.namespace === 'monitoring'
-                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                  : data.namespace === 'logging'
-                    ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-                    : data.namespace === 'backend'
-                      ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
-                      : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-            ]"
-          >
-            {{ data.namespace }}
-          </span>
-        </template>
-      </Column>
-
-      <!-- Volume Column -->
-      <Column field="volume" header="Volume" class="p-2.5">
-        <template #body="{ data }">
-          <span
-            v-if="data.volume"
-            class="font-mono text-muted-color truncate max-w-44 block"
-            :title="data.volume"
-          >
-            {{ data.volume }}
-          </span>
-          <span v-else class="text-muted-color italic font-mono">-</span>
-        </template>
-      </Column>
-
-      <!-- Capacity Column -->
-      <Column field="capacity" header="Request" class="p-2.5 font-mono text-primary"></Column>
-
-      <!-- Access Mode Column -->
-      <Column field="accessMode" header="Access Mode" class="p-2.5 text-muted-color"></Column>
-
-      <!-- Storage Class Column -->
-      <Column field="storageClass" header="Storage Class" class="p-2.5">
-        <template #body="{ data }">
-          <span class="font-mono text-violet-400 font-semibold">{{ data.storageClass }}</span>
-        </template>
-      </Column>
-
-      <!-- Status Column -->
-      <Column field="status" header="Status" class="p-2.5">
-        <template #body="{ data }">
-          <div class="flex items-center gap-1.5">
-            <span
-              class="w-1.5 h-1.5 rounded-full"
-              :class="{
-                'bg-emerald-500': data.status === 'Bound',
-                'bg-amber-500': data.status === 'Pending',
-                'bg-rose-500': data.status === 'Lost'
-              }"
-            ></span>
-            <span
-              class="font-medium"
-              :class="{
-                'text-emerald-500': data.status === 'Bound',
-                'text-amber-500': data.status === 'Pending',
-                'text-rose-500': data.status === 'Lost'
-              }"
-            >
-              {{ data.status }}
-            </span>
-          </div>
-        </template>
-      </Column>
-
-      <!-- Age Column -->
-      <Column field="age" header="Age" class="p-2.5 text-muted-color font-mono"></Column>
-
-      <!-- Actions Column -->
-      <Column class="p-3 text-center w-12 shrink-0">
-        <template #body="{ data }">
-          <Button
-            severity="secondary"
-            variant="text"
-            size="small"
-            class="p-1"
-            title="Actions"
-            @click="toggleActionMenu($event, data)"
-          >
-            <MoreVertical class="w-4 h-4 text-muted-color" />
-          </Button>
-        </template>
-      </Column>
-    </DataTable>
-
-    <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
-  </div>
+    <!-- Drawer -->
+    <template #drawer>
+      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    </template>
+  </ResourceDataTable>
 </template>

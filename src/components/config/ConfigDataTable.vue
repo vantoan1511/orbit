@@ -167,7 +167,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
+    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
       <template #body="{ data }">
         <div class="flex items-center gap-2">
           <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-sky-400" />
@@ -237,7 +237,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="size"
       header="Size"
       sortable
-      class="p-3 text-muted-color font-mono"
+      class="p-3"
+      bodyClass="text-muted-color font-mono"
     ></Column>
 
     <!-- Mounted In Column -->
@@ -264,7 +265,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-muted-color font-mono"
+      class="p-3"
+      bodyClass="text-muted-color font-mono"
     ></Column>
 
     <!-- Actions Column -->

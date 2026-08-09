@@ -141,7 +141,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Columns -->
     <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="font-medium p-3 text-primary">
+    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
       <template #body="{ data }">
         <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
       </template>
@@ -184,7 +184,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       field="age"
       header="Age"
       sortable
-      class="p-3 text-muted-color font-mono"
+      class="p-3"
+      bodyClass="text-muted-color font-mono"
     ></Column>
 
     <!-- Images Column -->
