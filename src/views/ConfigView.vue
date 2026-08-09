@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import ViewLayout from '@/components/shared/ViewLayout.vue'
-import ConfigMetricsCards from '../components/config/ConfigMetricsCards.vue'
-import ConfigDataTable from '../components/config/ConfigDataTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import ConfigDataTable from '../components/config/ConfigDataTable.vue'
+import ConfigMetricsCards from '../components/config/ConfigMetricsCards.vue'
 
 const route = useRoute()
 const activeTab = ref<'configmaps' | 'secrets'>(
@@ -32,12 +32,7 @@ onMounted(async () => {
   <ViewLayout title="ConfigMaps & Secrets">
     <!-- Content Tabs Layout -->
     <Tabs v-model:value="activeTab">
-      <TabList class="border-b border-(--border)">
-        <Tab value="configmaps" class="px-5 py-3 text-sm font-semibold">ConfigMaps</Tab>
-        <Tab value="secrets" class="px-5 py-3 text-sm font-semibold">Secrets</Tab>
-      </TabList>
-
-      <TabPanels class="pt-6">
+      <TabPanels>
         <!-- ConfigMaps Tab Panel -->
         <TabPanel value="configmaps">
           <div class="flex flex-col gap-6">

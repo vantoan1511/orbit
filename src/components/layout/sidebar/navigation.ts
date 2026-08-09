@@ -1,10 +1,21 @@
 import {
   Activity,
+  Archive,
   Box,
   Boxes,
+  Clock,
+  Copy,
+  Database,
+  FileDown,
+  FileJson,
   FileText,
   FolderOpen,
+  Ghost,
+  Globe,
+  Hammer,
   HardDrive,
+  KeyRound,
+  Layers,
   LayoutDashboard,
   Network,
   Server,
@@ -75,32 +86,32 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
     {
       key: 'workloads-deployments',
       label: 'Deployments',
-      customIcon: Boxes,
+      customIcon: Layers,
       route: '/workloads?tab=deployments'
     },
     {
       key: 'workloads-statefulsets',
       label: 'StatefulSets',
-      customIcon: Boxes,
+      customIcon: Database,
       route: '/workloads?tab=statefulsets'
     },
     {
       key: 'workloads-daemonsets',
       label: 'DaemonSets',
-      customIcon: Boxes,
+      customIcon: Ghost,
       route: '/workloads?tab=daemonsets'
     },
     {
       key: 'workloads-replicasets',
       label: 'ReplicaSets',
-      customIcon: Boxes,
+      customIcon: Copy,
       route: '/workloads?tab=replicasets'
     },
-    { key: 'workloads-jobs', label: 'Jobs', customIcon: Boxes, route: '/workloads?tab=jobs' },
+    { key: 'workloads-jobs', label: 'Jobs', customIcon: Hammer, route: '/workloads?tab=jobs' },
     {
       key: 'workloads-cronjobs',
       label: 'CronJobs',
-      customIcon: Boxes,
+      customIcon: Clock,
       route: '/workloads?tab=cronjobs'
     }
   ],
@@ -114,7 +125,7 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
     {
       key: 'network-ingresses',
       label: 'Ingresses',
-      customIcon: Network,
+      customIcon: Globe,
       route: '/network?tab=ingresses'
     }
   ],
@@ -128,19 +139,19 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
     {
       key: 'storage-pvs',
       label: 'PersistentVolumes',
-      customIcon: HardDrive,
+      customIcon: Archive,
       route: '/storage?tab=pvs'
     },
     {
       key: 'storage-pvcs',
       label: 'Volume Claims',
-      customIcon: HardDrive,
+      customIcon: FileDown,
       route: '/storage?tab=pvcs'
     },
     {
       key: 'storage-classes',
       label: 'StorageClasses',
-      customIcon: HardDrive,
+      customIcon: Settings2,
       route: '/storage?tab=classes'
     }
   ],
@@ -148,13 +159,13 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
     {
       key: 'config-configmaps',
       label: 'ConfigMaps',
-      customIcon: Settings2,
+      customIcon: FileJson,
       route: '/config?tab=configmaps'
     },
     {
       key: 'config-secrets',
       label: 'Secrets',
-      customIcon: Settings2,
+      customIcon: KeyRound,
       route: '/config?tab=secrets'
     }
   ],

@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import ViewLayout from '@/components/shared/ViewLayout.vue'
+import { ArrowLeft } from '@lucide/vue'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import ViewLayout from '@/components/shared/ViewLayout.vue'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
-import { ArrowLeft } from '@lucide/vue'
 
 const activeTab = ref('general')
 
@@ -21,17 +21,7 @@ const router = useRouter()
 
     <!-- Tabs Navigation -->
     <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
-      <TabList class="border-b border-(--border)">
-        <Tab value="general" class="px-5 py-3 text-sm font-semibold">General</Tab>
-        <Tab value="clusters" class="px-5 py-3 text-sm font-semibold">Clusters</Tab>
-        <Tab value="preferences" class="px-5 py-3 text-sm font-semibold">Preferences</Tab>
-        <Tab value="appearance" class="px-5 py-3 text-sm font-semibold">Appearance</Tab>
-        <Tab value="notifications" class="px-5 py-3 text-sm font-semibold">Notifications</Tab>
-        <Tab value="proxy" class="px-5 py-3 text-sm font-semibold">Proxy</Tab>
-        <Tab value="about" class="px-5 py-3 text-sm font-semibold">About</Tab>
-      </TabList>
-
-      <TabPanels class="pt-6">
+      <TabPanels>
         <!-- General Tab -->
         <TabPanel value="general">
           <SettingsGeneralTab />
