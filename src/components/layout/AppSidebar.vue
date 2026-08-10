@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSidebarActivityBar from './sidebar/AppSidebarActivityBar.vue'
 import AppSidebarClusters from './sidebar/AppSidebarClusters.vue'
+import AppSidebarLogsMenu from './sidebar/AppSidebarLogsMenu.vue'
 import AppSidebarNavMenu from './sidebar/AppSidebarNavMenu.vue'
 import AppSidebarPanel from './sidebar/AppSidebarPanel.vue'
 import { type CategoryId, type SidebarCategory } from './sidebar/navigation'
@@ -58,7 +59,8 @@ const handleClusterSwitched = () => {
 
     <!-- Contextual Sidebar Panel -->
     <AppSidebarPanel :active-tab="activeTab">
-      <AppSidebarNavMenu v-if="activeTab !== 'clusters'" :active-tab="activeTab" />
+      <AppSidebarLogsMenu v-if="activeTab === 'logs'" />
+      <AppSidebarNavMenu v-else-if="activeTab !== 'clusters'" :active-tab="activeTab" />
       <AppSidebarClusters v-else @cluster-switched="handleClusterSwitched" />
     </AppSidebarPanel>
   </aside>

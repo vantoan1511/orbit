@@ -9,9 +9,21 @@ export function useLogSelection() {
   const selectedNamespace = ref<string>((route.query.namespace as string) || 'default')
   const selectedWorkloadName = ref<string>((route.query.workload as string) || '')
   const selectedWorkloadKind = ref<string>((route.query.kind as string) || 'Deployment')
-  const selectedPodName = ref<string>('All')
-  const selectedContainerName = ref<string>('All')
+  const selectedPodName = ref<string>((route.query.pod as string) || 'All')
+  const selectedContainerName = ref<string>((route.query.container as string) || 'All')
   const tailLines = ref<number>(100)
+
+  watch(
+    () => route.query,
+    (query) => {
+      if (query.namespace) selectedNamespace.value = query.namespace as string
+      if (query.kind) selectedWorkloadKind.value = query.kind as string
+      if (query.workload) selectedWorkloadName.value = query.workload as string
+      if (query.pod) selectedPodName.value = query.pod as string
+      if (query.container) selectedContainerName.value = query.container as string
+    },
+    { immediate: true, deep: true }
+  )
 
   // Options
   const namespaces = computed(() => k8sStore.namespaces.filter((n) => n !== 'All Namespaces'))
