@@ -58,7 +58,7 @@ const handleClusterSwitched = () => {
     <AppSidebarActivityBar :active-tab="activeTab" @toggle-category="toggleCategory" />
 
     <!-- Contextual Sidebar Panel -->
-    <AppSidebarPanel :active-tab="activeTab">
+    <AppSidebarPanel :active-tab="activeTab" @collapse="activeTab = null">
       <AppSidebarLogsMenu v-if="activeTab === 'logs'" />
       <AppSidebarNavMenu v-else-if="activeTab !== 'clusters'" :active-tab="activeTab" />
       <AppSidebarClusters v-else @cluster-switched="handleClusterSwitched" />

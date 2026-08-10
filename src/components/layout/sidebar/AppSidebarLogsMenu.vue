@@ -148,35 +148,40 @@ const selectRecentLog = (log: RecentLogInfo) => {
 <template>
   <div class="flex-1 overflow-y-auto flex flex-col text-sm select-none">
     <div v-if="k8sStore.activeClusterId !== null" class="flex flex-col h-full">
-      <Accordion :value="activeAccordion" multiple class="flex-1 flex flex-col">
+      <Accordion
+        :value="activeAccordion"
+        multiple
+        class="flex-1 flex flex-col"
+        :dt="{ panel: { border: { width: '0' } } }"
+      >
         <!-- Explorer Accordion -->
-        <AccordionPanel value="0" class="border-b border-surface-200 dark:border-surface-800">
+        <AccordionPanel value="0" class="border-none">
           <AccordionHeader
-            class="py-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color"
+            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color"
           >
             Explorer
           </AccordionHeader>
           <AccordionContent class="p-0">
             <!-- Filter Input -->
-            <div class="p-2 border-b border-surface-100 dark:border-surface-800">
+            <div class="p-1.5">
               <InputText
                 v-model="searchQuery"
                 placeholder="Filter logs..."
                 size="small"
-                class="w-full text-xs"
+                class="w-full text-sm"
               />
             </div>
 
             <!-- Tree View -->
-            <div class="py-1">
-              <div v-if="treeData.length === 0" class="text-xs text-muted-color px-3 py-2">
+            <div class="py-0.5">
+              <div v-if="treeData.length === 0" class="text-sm text-muted-color px-3 py-1">
                 No logs found
               </div>
 
               <div v-for="ns in treeData" :key="`ns:${ns.name}`" class="flex flex-col">
                 <!-- Namespace Row -->
                 <div
-                  class="flex items-center gap-1.5 px-3 py-1 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer text-xs font-medium text-surface-700 dark:text-surface-300"
+                  class="flex items-center gap-1.5 px-3 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300"
                   @click="toggleNode(`ns:${ns.name}`)"
                 >
                   <component
@@ -187,7 +192,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                   />
                   <Folder class="w-3.5 h-3.5 shrink-0 text-amber-500" />
                   <span class="truncate">{{ ns.name }}</span>
-                  <span class="ml-auto text-[10px] text-muted-color">({{ ns.pods.length }})</span>
+                  <span class="ml-auto text-xs text-muted-color">({{ ns.pods.length }})</span>
                 </div>
 
                 <!-- Namespace Pods -->
@@ -206,7 +211,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                         isCurrentLogActive(ns.name, pod.name)
                           ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
                           : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
-                        'flex items-center gap-1.5 px-3 py-1 cursor-pointer text-xs'
+                        'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
                       ]"
                       @click="toggleNode(`pod:${ns.name}/${pod.name}`)"
                     >
@@ -239,7 +244,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                           isCurrentLogActive(ns.name, pod.name, c.name)
                             ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
                             : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
-                          'flex items-center gap-1.5 px-3 py-1 cursor-pointer text-xs'
+                          'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
                         ]"
                         @click="selectLogTarget(ns.name, pod.name, c.name)"
                       >
@@ -255,17 +260,17 @@ const selectRecentLog = (log: RecentLogInfo) => {
         </AccordionPanel>
 
         <!-- Recent Accordion -->
-        <AccordionPanel value="1">
+        <AccordionPanel value="1" class="border-none">
           <AccordionHeader
-            class="py-2 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color flex justify-between items-center"
+            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color flex justify-between items-center"
           >
             <span>Recent</span>
           </AccordionHeader>
           <AccordionContent class="p-0">
-            <div class="py-1">
+            <div class="py-0.5">
               <div
                 v-if="logsStore.recentLogs.length === 0"
-                class="text-xs text-muted-color px-3 py-2"
+                class="text-sm text-muted-color px-3 py-1"
               >
                 No recent logs
               </div>
@@ -277,25 +282,25 @@ const selectRecentLog = (log: RecentLogInfo) => {
                   isCurrentLogActive(log.namespace, log.pod, log.container)
                     ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
                     : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
-                  'flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs group'
+                  'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group'
                 ]"
                 @click="selectRecentLog(log)"
               >
                 <Clock class="w-3.5 h-3.5 shrink-0 text-muted-color" />
                 <div class="flex flex-col truncate flex-1 min-w-0">
                   <span class="truncate font-medium">{{ log.pod }}</span>
-                  <span class="text-[10px] text-muted-color truncate">
+                  <span class="text-xs text-muted-color truncate">
                     {{ log.namespace }} &bull; {{ log.container }}
                   </span>
                 </div>
               </div>
 
-              <div v-if="logsStore.recentLogs.length > 0" class="p-2 flex justify-end">
+              <div v-if="logsStore.recentLogs.length > 0" class="p-1.5 flex justify-end">
                 <Button
                   severity="secondary"
                   variant="text"
                   size="small"
-                  class="text-[11px] h-6"
+                  class="text-xs h-6"
                   @click="logsStore.clearRecentLogs()"
                 >
                   <Trash2 class="w-3 h-3 mr-1" />
@@ -307,6 +312,6 @@ const selectRecentLog = (log: RecentLogInfo) => {
         </AccordionPanel>
       </Accordion>
     </div>
-    <p v-else class="text-xs text-muted-color p-2">Select or add a cluster to view logs.</p>
+    <p v-else class="text-sm text-muted-color p-2">Select or add a cluster to view logs.</p>
   </div>
 </template>
