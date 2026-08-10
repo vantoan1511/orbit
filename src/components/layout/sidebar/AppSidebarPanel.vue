@@ -1,10 +1,25 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { categories, type CategoryId } from './navigation'
+import { useResizable } from '@/composables/useResizable'
 
-const props = defineProps<{
-  activeTab: CategoryId | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    activeTab: CategoryId | null
+    minWidth?: number
+    maxWidth?: number
+    defaultWidth?: number
+    collapseThreshold?: number
+    storageKey?: string
+  }>(),
+  {
+    minWidth: 180,
+    maxWidth: 600,
+    defaultWidth: 260,
+    collapseThreshold: 90,
+    storageKey: 'orbit_sidebar_panel_width'
+  }
+)
 
 const emit = defineEmits<{
   (e: 'collapse'): void
@@ -17,66 +32,19 @@ const currentCategoryTitle = computed(() => {
 })
 
 const panelRef = ref<HTMLElement | null>(null)
-const minWidth = 180
-const maxWidth = 600
-const defaultWidth = 260
-const collapseThreshold = 90
 
-const initialWidth = parseInt(
-  localStorage.getItem('orbit_sidebar_panel_width') || `${defaultWidth}`,
-  10
-)
-const panelWidth = ref<number>(
-  isNaN(initialWidth) || initialWidth < minWidth ? defaultWidth : initialWidth
-)
-const isResizing = ref(false)
-let startLeft = 0
-let lastValidWidth = panelWidth.value
+const { width: panelWidth, startResize: triggerResize } = useResizable({
+  minWidth: props.minWidth,
+  maxWidth: props.maxWidth,
+  defaultWidth: props.defaultWidth,
+  collapseThreshold: props.collapseThreshold,
+  storageKey: props.storageKey,
+  onCollapse: () => emit('collapse')
+})
 
 const startResize = (e: MouseEvent) => {
-  e.preventDefault()
-  if (!panelRef.value) return
-  isResizing.value = true
-  startLeft = panelRef.value.getBoundingClientRect().left
-  lastValidWidth = panelWidth.value > 0 ? panelWidth.value : defaultWidth
-
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', stopResize)
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
+  triggerResize(e, panelRef.value)
 }
-
-const handleMouseMove = (e: MouseEvent) => {
-  if (!isResizing.value) return
-  const rawWidth = e.clientX - startLeft
-
-  if (rawWidth < collapseThreshold) {
-    panelWidth.value = 0
-  } else {
-    panelWidth.value = Math.max(minWidth, Math.min(maxWidth, rawWidth))
-    lastValidWidth = panelWidth.value
-  }
-}
-
-const stopResize = () => {
-  if (!isResizing.value) return
-  isResizing.value = false
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mouseup', stopResize)
-  document.body.style.cursor = ''
-  document.body.style.userSelect = ''
-
-  if (panelWidth.value < collapseThreshold) {
-    panelWidth.value = lastValidWidth >= minWidth ? lastValidWidth : defaultWidth
-    emit('collapse')
-  } else {
-    localStorage.setItem('orbit_sidebar_panel_width', panelWidth.value.toString())
-  }
-}
-
-onUnmounted(() => {
-  stopResize()
-})
 </script>
 
 <template>
