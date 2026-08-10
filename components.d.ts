@@ -19,6 +19,7 @@ declare module 'vue' {
     AppSidebar: typeof import('./src/components/layout/AppSidebar.vue')['default']
     AppSidebarActivityBar: typeof import('./src/components/layout/sidebar/AppSidebarActivityBar.vue')['default']
     AppSidebarClusters: typeof import('./src/components/layout/sidebar/AppSidebarClusters.vue')['default']
+    AppSidebarLogsMenu: typeof import('./src/components/layout/sidebar/AppSidebarLogsMenu.vue')['default']
     AppSidebarNavMenu: typeof import('./src/components/layout/sidebar/AppSidebarNavMenu.vue')['default']
     AppSidebarPanel: typeof import('./src/components/layout/sidebar/AppSidebarPanel.vue')['default']
     Button: typeof import('primevue/button')['default']

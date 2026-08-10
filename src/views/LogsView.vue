@@ -10,7 +10,11 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import { useRouter } from 'vue-router'
 
+import { useLogsStore } from '@/stores/logsStore'
+import { watch } from 'vue'
+
 const router = useRouter()
+const logsStore = useLogsStore()
 
 const {
   selectedNamespace,
@@ -26,6 +30,22 @@ const {
   containerOptions,
   tailLinesOptions
 } = useLogSelection()
+
+watch(
+  [selectedNamespace, selectedPodName, selectedContainerName],
+  ([ns, pod, container]) => {
+    if (ns && pod && pod !== 'All') {
+      logsStore.addRecentLog({
+        namespace: ns,
+        workloadKind: selectedWorkloadKind.value,
+        workloadName: selectedWorkloadName.value,
+        pod,
+        container: container || 'All'
+      })
+    }
+  },
+  { immediate: true }
+)
 
 const logHighlighting = useLogHighlighting()
 const { showRulesDialog, loadRules, getLogLevelColor } = logHighlighting
