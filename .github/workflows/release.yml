@@ -64,11 +64,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          
+
           $max_retries = 5
           $retry_count = 0
           $success = $false
-          
+
           while ($retry_count -lt $max_retries) {
             git fetch origin main
             git reset --hard origin/main
@@ -93,7 +93,7 @@ jobs:
             Start-Sleep -Seconds 3
             $retry_count++
           }
-          
+
           if (-not $success) {
             echo "Failed to push after $max_retries retries"
             exit 1
