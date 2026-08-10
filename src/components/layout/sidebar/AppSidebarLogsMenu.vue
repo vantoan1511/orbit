@@ -144,15 +144,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
   selectLogTarget(log.namespace, log.pod, log.container)
 }
 
-const highlightMatch = (text: string, query: string) => {
-  if (!query) return text
-  const escapedQuery = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
-  const regex = new RegExp(`(${escapedQuery})`, 'gi')
-  return text.replace(
-    regex,
-    '<mark class="bg-zinc-200 dark:bg-zinc-700 text-surface-900 dark:text-surface-100 px-0.5">$1</mark>'
-  )
-}
+import { highlightMatch } from '@/utils/text'
 </script>
 
 <template>
