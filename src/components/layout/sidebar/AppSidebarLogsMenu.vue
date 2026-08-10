@@ -143,6 +143,16 @@ const selectLogTarget = (ns: string, pod: string, container: string = 'All') => 
 const selectRecentLog = (log: RecentLogInfo) => {
   selectLogTarget(log.namespace, log.pod, log.container)
 }
+
+const highlightMatch = (text: string, query: string) => {
+  if (!query) return text
+  const escapedQuery = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+  const regex = new RegExp(`(${escapedQuery})`, 'gi')
+  return text.replace(
+    regex,
+    '<mark class="bg-zinc-200 dark:bg-zinc-700 text-surface-900 dark:text-surface-100 px-0.5">$1</mark>'
+  )
+}
 </script>
 
 <template>
@@ -191,7 +201,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                     class="w-3.5 h-3.5 shrink-0 text-muted-color"
                   />
                   <Folder class="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                  <span class="truncate">{{ ns.name }}</span>
+                  <span class="truncate" v-html="highlightMatch(ns.name, searchQuery)"></span>
                   <span class="ml-auto text-xs text-muted-color">({{ ns.pods.length }})</span>
                 </div>
 
@@ -227,8 +237,8 @@ const selectRecentLog = (log: RecentLogInfo) => {
                       <span
                         class="truncate flex-1"
                         @click.stop="selectLogTarget(ns.name, pod.name)"
+                        v-html="highlightMatch(pod.name, searchQuery)"
                       >
-                        {{ pod.name }}
                       </span>
                     </div>
 
@@ -249,7 +259,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                         @click="selectLogTarget(ns.name, pod.name, c.name)"
                       >
                         <Layers class="w-3.5 h-3.5 shrink-0 text-emerald-500" />
-                        <span class="truncate">{{ c.name }}</span>
+                        <span class="truncate" v-html="highlightMatch(c.name, searchQuery)"></span>
                       </div>
                     </div>
                   </div>

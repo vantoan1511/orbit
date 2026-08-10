@@ -11,7 +11,7 @@ export interface RecentLogInfo {
   timestamp: number
 }
 
-const STORAGE_KEY = 'orbit:recent_logs'
+const STORAGE_KEY = 'orbit_logs_recent_logs'
 const MAX_RECENT_LOGS = 15
 
 export const useLogsStore = defineStore('logs', () => {

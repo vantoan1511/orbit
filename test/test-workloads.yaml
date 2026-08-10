@@ -21,10 +21,10 @@ spec:
         app: test-deployment
     spec:
       containers:
-      - name: nginx
-        image: nginx:alpine
-        ports:
-        - containerPort: 80
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -32,7 +32,7 @@ metadata:
   name: test-statefulset
   namespace: orbit-test
 spec:
-  serviceName: "nginx"
+  serviceName: 'nginx'
   replicas: 2
   selector:
     matchLabels:
@@ -43,11 +43,11 @@ spec:
         app: test-statefulset
     spec:
       containers:
-      - name: nginx
-        image: nginx:alpine
-        ports:
-        - containerPort: 80
-          name: web
+        - name: nginx
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
+              name: web
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -66,15 +66,15 @@ spec:
         name: test-daemonset
     spec:
       tolerations:
-      - key: node-role.kubernetes.io/control-plane
-        operator: Exists
-        effect: NoSchedule
-      - key: node-role.kubernetes.io/master
-        operator: Exists
-        effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
       containers:
-      - name: fluentd
-        image: quay.io/fluentd_elasticsearch/fluentd:v3.0.1
+        - name: fluentd
+          image: quay.io/fluentd_elasticsearch/fluentd:v3.0.1
 ---
 apiVersion: apps/v1
 kind: ReplicaSet
@@ -94,8 +94,8 @@ spec:
         tier: frontend
     spec:
       containers:
-      - name: guestbook
-        image: qinqon/guestbook:v0.1
+        - name: guestbook
+          image: qinqon/guestbook:v0.1
 ---
 apiVersion: batch/v1
 kind: Job
@@ -106,9 +106,9 @@ spec:
   template:
     spec:
       containers:
-      - name: pi
-        image: perl:5.34.0
-        command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(2000)"]
+        - name: pi
+          image: perl:5.34.0
+          command: ['perl', '-Mbignum=bpi', '-wle', 'print bpi(2000)']
       restartPolicy: Never
   backoffLimit: 4
 ---
@@ -118,19 +118,19 @@ metadata:
   name: test-cronjob
   namespace: orbit-test
 spec:
-  schedule: "*/5 * * * *"
+  schedule: '*/5 * * * *'
   jobTemplate:
     spec:
       template:
         spec:
           containers:
-          - name: hello
-            image: busybox:1.28
-            imagePullPolicy: IfNotPresent
-            command:
-            - /bin/sh
-            - -c
-            - date; echo Hello from Orbit test!
+            - name: hello
+              image: busybox:1.28
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - date; echo Hello from Orbit test!
           restartPolicy: OnFailure
 ---
 apiVersion: v1
@@ -145,10 +145,10 @@ spec:
   selector:
     app: test-deployment
   ports:
-  - name: http
-    port: 80
-    targetPort: 80
-    protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
@@ -162,11 +162,11 @@ spec:
   selector:
     app: test-deployment
   ports:
-  - name: http
-    port: 80
-    targetPort: 80
-    nodePort: 30080
-    protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 80
+      nodePort: 30080
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
@@ -180,10 +180,10 @@ spec:
   selector:
     app: test-deployment
   ports:
-  - name: http
-    port: 80
-    targetPort: 80
-    protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
 ---
 apiVersion: v1
 kind: Service
@@ -197,14 +197,14 @@ spec:
   selector:
     app: test-deployment
   ports:
-  - name: http
-    port: 80
-    targetPort: 80
-    protocol: TCP
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
 status:
   loadBalancer:
     ingress:
-    - ip: 192.168.1.100
+      - ip: 192.168.1.100
 ---
 apiVersion: v1
 kind: Service
@@ -224,7 +224,7 @@ metadata:
     app: test-app
     env: development
 data:
-  database.url: "postgresql://localhost:5432/db"
+  database.url: 'postgresql://localhost:5432/db'
   app.properties: |
     server.port=8080
     logging.level.org.springframework=INFO
@@ -270,7 +270,7 @@ spec:
     storage: 10Gi
   volumeMode: Filesystem
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: orbit-storage-class
   local:
@@ -278,13 +278,13 @@ spec:
   nodeAffinity:
     required:
       nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - docker-desktop
-          - minikube
-          - kind-control-plane
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - docker-desktop
+                - minikube
+                - kind-control-plane
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -295,7 +295,7 @@ spec:
     storage: 20Gi
   volumeMode: Filesystem
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: orbit-storage-class
   local:
@@ -303,13 +303,13 @@ spec:
   nodeAffinity:
     required:
       nodeSelectorTerms:
-      - matchExpressions:
-        - key: kubernetes.io/hostname
-          operator: In
-          values:
-          - docker-desktop
-          - minikube
-          - kind-control-plane
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - docker-desktop
+                - minikube
+                - kind-control-plane
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -318,7 +318,7 @@ metadata:
   namespace: orbit-test
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   volumeName: orbit-pv-1
   resources:
     requests:
@@ -332,10 +332,9 @@ metadata:
   namespace: orbit-test
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
   volumeName: orbit-pv-2
   resources:
     requests:
       storage: 20Gi
   storageClassName: orbit-storage-class
-

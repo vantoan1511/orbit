@@ -7,27 +7,27 @@ changelog:
       - wontfix
       - ignore-for-release
   categories:
-    - title: "🚀 Features"
+    - title: '🚀 Features'
       labels:
         - feat
         - feature
         - enhancement
-        - "feat*"
-        - "feature*"
-    - title: "🐛 Bug Fixes"
+        - 'feat*'
+        - 'feature*'
+    - title: '🐛 Bug Fixes'
       labels:
         - fix
         - bug
         - bugfix
-        - "fix*"
-        - "bug*"
-    - title: "📚 Documentation"
+        - 'fix*'
+        - 'bug*'
+    - title: '📚 Documentation'
       labels:
         - docs
         - documentation
-        - "docs*"
-        - "doc*"
-    - title: "🛠 Maintenance & Refactoring"
+        - 'docs*'
+        - 'doc*'
+    - title: '🛠 Maintenance & Refactoring'
       labels:
         - chore
         - refactor
@@ -36,13 +36,12 @@ changelog:
         - build
         - test
         - style
-        - "chore*"
-        - "refactor*"
-        - "perf*"
-        - "ci*"
-        - "build*"
-        - "test*"
-    - title: "🧰 Other Changes"
+        - 'chore*'
+        - 'refactor*'
+        - 'perf*'
+        - 'ci*'
+        - 'build*'
+        - 'test*'
+    - title: '🧰 Other Changes'
       labels:
-        - "*"
-
+        - '*'

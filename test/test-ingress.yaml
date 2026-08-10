@@ -15,16 +15,16 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: app.example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: test-clusterip-service
-            port:
-              number: 80
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: test-clusterip-service
+                port:
+                  number: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -36,31 +36,31 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-  - hosts:
-    - api.example.com
-    - web.example.com
-    secretName: test-tls-secret
+    - hosts:
+        - api.example.com
+        - web.example.com
+      secretName: test-tls-secret
   rules:
-  - host: api.example.com
-    http:
-      paths:
-      - path: /v1
-        pathType: Prefix
-        backend:
-          service:
-            name: test-clusterip-service
-            port:
-              number: 80
-  - host: web.example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: test-nodeport-service
-            port:
-              number: 80
+    - host: api.example.com
+      http:
+        paths:
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: test-clusterip-service
+                port:
+                  number: 80
+    - host: web.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: test-nodeport-service
+                port:
+                  number: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -72,18 +72,18 @@ metadata:
 spec:
   ingressClassName: haproxy
   rules:
-  - host: orbit-dashboard.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: test-clusterip-service
-            port:
-              number: 80
+    - host: orbit-dashboard.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: test-clusterip-service
+                port:
+                  number: 80
 status:
   loadBalancer:
     ingress:
-    - ip: 10.0.0.150
-      hostname: lb.orbit.local
+      - ip: 10.0.0.150
+        hostname: lb.orbit.local
