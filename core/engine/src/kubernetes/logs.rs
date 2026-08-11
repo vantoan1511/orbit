@@ -100,8 +100,8 @@ pub async fn stream_pod_logs(
             &writer,
             &token,
             &OrbitEvent::LogLinesChunkReceived {
-                pod: pod_name.clone(),
-                container: container.clone().unwrap_or_default(),
+                pod: pod_name,
+                container: container.unwrap_or_default(),
                 lines: buffer,
             },
         ).await;

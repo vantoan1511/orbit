@@ -56,6 +56,7 @@ const {
   isFullscreen,
   isFollowing,
   filteredLogLines,
+  virtualScrollerRef,
   clearLogs,
   downloadLogs
 } = useLogStream({
@@ -67,6 +68,9 @@ const {
   tailLines,
   onMountedCallback: loadRules
 })
+
+// Fixed row height for VirtualScroller; must stay in sync with item padding/font.
+const LOG_ITEM_HEIGHT = 28
 </script>
 
 <template>
@@ -178,7 +182,6 @@ const {
 
     <!-- Console Viewer -->
     <div
-      ref="terminalRef"
       class="flex-1 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed min-h-0 selection:bg-surface-200 dark:selection:bg-primary-700 h-full overflow-hidden"
     >
       <div
@@ -189,14 +192,15 @@ const {
       </div>
       <VirtualScroller
         v-else
+        ref="virtualScrollerRef"
         :items="filteredLogLines"
-        :itemSize="28"
-        class="h-full w-full overflow-y-auto"
+        :itemSize="LOG_ITEM_HEIGHT"
+        class="h-full w-full"
       >
         <template #item="{ item: line, options }">
           <div
             :style="{ height: options.itemSize + 'px' }"
-            class="flex gap-2 hover:bg-surface-100 dark:hover:bg-primary-800 py-0.5 rounded px-1 items-center whitespace-nowrap overflow-x-auto"
+            class="flex gap-2 hover:bg-surface-100 dark:hover:bg-primary-800 py-0.5 rounded px-1 items-center whitespace-nowrap overflow-hidden"
           >
             <!-- Timestamps -->
             <span
