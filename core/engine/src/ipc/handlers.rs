@@ -933,6 +933,9 @@ pub fn dispatch(
                 let workload_kind = get_string(&data, "kind").unwrap_or_else(|| "Deployment".to_string());
                 let container = get_string(&data, "container").filter(|s| !s.is_empty() && s != "All" && s != "all");
                 let pod_name = get_string(&data, "pod").filter(|s| !s.is_empty() && s != "All" && s != "all");
+                // A tailLines value <= 0 is the frontend sentinel for "fetch all lines"
+                // (TAIL_ALL_LINES = -1). Mapping to None instructs the Kubernetes log API
+                // to return the full log history without a tail cap.
                 let tail_lines = match get_i64(&data, "tailLines") {
                     Some(v) if v > 0 => Some(v),
                     _ => None,

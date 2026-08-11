@@ -1,7 +1,8 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick, type Ref } from 'vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
-import { OrbitEvents } from '@/types/events'
+import { OrbitEvents, TAIL_ALL_LINES } from '@/types/events'
+import type { VirtualScrollerMethods } from 'primevue/virtualscroller'
 
 export interface LogLine {
   pod: string
@@ -21,7 +22,9 @@ export function useLogStream(options: {
 }) {
   const logLines = ref<LogLine[]>([])
   const maxLogLines = 2000
-  const terminalRef = ref<HTMLDivElement | null>(null)
+  // Maximum lines retained in All mode to prevent unbounded memory growth.
+  const maxLogLinesAll = 100_000
+  const virtualScrollerRef = ref<VirtualScrollerMethods | null>(null)
 
   const searchQuery = ref<string>('')
   const isRegex = ref<boolean>(false)
@@ -83,7 +86,11 @@ export function useLogStream(options: {
       timestamp
     })
 
-    if (options.tailLines.value !== -1 && logLines.value.length > maxLogLines + 100) {
+    if (options.tailLines.value === TAIL_ALL_LINES) {
+      if (logLines.value.length > maxLogLinesAll) {
+        logLines.value = logLines.value.slice(-maxLogLinesAll)
+      }
+    } else if (logLines.value.length > maxLogLines + 100) {
       logLines.value = logLines.value.slice(-maxLogLines)
     }
 
@@ -107,7 +114,11 @@ export function useLogStream(options: {
 
     logLines.value.push(...parsedLines)
 
-    if (options.tailLines.value !== -1 && logLines.value.length > maxLogLines + 100) {
+    if (options.tailLines.value === TAIL_ALL_LINES) {
+      if (logLines.value.length > maxLogLinesAll) {
+        logLines.value = logLines.value.slice(-maxLogLinesAll)
+      }
+    } else if (logLines.value.length > maxLogLines + 100) {
       logLines.value = logLines.value.slice(-maxLogLines)
     }
 
@@ -118,8 +129,8 @@ export function useLogStream(options: {
 
   const scrollToBottom = () => {
     nextTick(() => {
-      if (terminalRef.value) {
-        terminalRef.value.scrollTop = terminalRef.value.scrollHeight
+      if (virtualScrollerRef.value && filteredLogLines.value.length > 0) {
+        virtualScrollerRef.value.scrollToIndex(filteredLogLines.value.length - 1)
       }
     })
   }
@@ -163,6 +174,8 @@ export function useLogStream(options: {
     if (options.onMountedCallback) {
       await options.onMountedCallback()
     }
+    // LogLineReceived is kept for backward compatibility; stream_pod_logs now
+    // always emits LogLinesChunkReceived (even for single lines).
     events.on(OrbitEvents.LogLineReceived, handleLogLine)
     events.on(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
     startStreaming()
@@ -191,7 +204,7 @@ export function useLogStream(options: {
   return {
     logLines,
     maxLogLines,
-    terminalRef,
+    virtualScrollerRef,
     searchQuery,
     isRegex,
     showTimestamps,

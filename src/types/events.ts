@@ -150,6 +150,9 @@ export interface OrbitEventMap {
   }
 }
 
+/** Sentinel value for the tailLines IPC field meaning "fetch all log lines". */
+export const TAIL_ALL_LINES = -1 as const
+
 export const OrbitEvents = {
   EngineConnected: 'engineConnected',
   EngineTimeout: 'engineTimeout',
