@@ -148,6 +148,7 @@ const handleActiveClusterChanged = (payload: { active_cluster_id: string | null 
 }
 
 const handleErrorOccurred = (payload: { message: string }) => {
+  k8sStore.resetAllLoading()
   toast.add({
     severity: 'error',
     summary: 'Error',

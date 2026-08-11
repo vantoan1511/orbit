@@ -228,6 +228,28 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     storageClassesLoading.value = loading
   }
 
+  function resetAllLoading() {
+    isAppLoading.value = false
+    podsLoading.value = false
+    deploymentsLoading.value = false
+    statefulSetsLoading.value = false
+    daemonSetsLoading.value = false
+    replicaSetsLoading.value = false
+    jobsLoading.value = false
+    cronJobsLoading.value = false
+    nodesLoading.value = false
+    servicesLoading.value = false
+    ingressesLoading.value = false
+    namespacesLoading.value = false
+    configMapsLoading.value = false
+    secretsLoading.value = false
+    eventsLoading.value = false
+    policiesLoading.value = false
+    persistentVolumesLoading.value = false
+    persistentVolumeClaimsLoading.value = false
+    storageClassesLoading.value = false
+  }
+
   const namespaces = computed(() => {
     return ['All Namespaces', ...namespaceList.value.map((n) => n.name)]
   })
@@ -577,6 +599,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     activeClusterId,
     setEngineReady,
     setAppLoading,
+    resetAllLoading,
     setPods,
     setDeployments,
     setStatefulSets,
