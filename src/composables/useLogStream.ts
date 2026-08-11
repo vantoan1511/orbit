@@ -83,7 +83,31 @@ export function useLogStream(options: {
       timestamp
     })
 
-    if (logLines.value.length > maxLogLines + 100) {
+    if (options.tailLines.value !== -1 && logLines.value.length > maxLogLines + 100) {
+      logLines.value = logLines.value.slice(-maxLogLines)
+    }
+
+    if (isFollowing.value) {
+      scrollToBottom()
+    }
+  }
+
+  const handleLogLinesChunk = (data: { pod: string; container: string; lines: string[] }) => {
+    if (isPaused.value) return
+
+    const parsedLines: LogLine[] = data.lines.map((rawLine) => {
+      const { text, timestamp } = parseLogLine(rawLine)
+      return {
+        pod: data.pod,
+        container: data.container,
+        text,
+        timestamp
+      }
+    })
+
+    logLines.value.push(...parsedLines)
+
+    if (options.tailLines.value !== -1 && logLines.value.length > maxLogLines + 100) {
       logLines.value = logLines.value.slice(-maxLogLines)
     }
 
@@ -140,11 +164,13 @@ export function useLogStream(options: {
       await options.onMountedCallback()
     }
     events.on(OrbitEvents.LogLineReceived, handleLogLine)
+    events.on(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
     startStreaming()
   })
 
   onUnmounted(async () => {
     events.off(OrbitEvents.LogLineReceived, handleLogLine)
+    events.off(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
     await kubernetesService.stopLogs()
   })
 

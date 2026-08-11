@@ -44,24 +44,44 @@ pub async fn stream_pod_logs(
     };
 
     let mut lines = log_stream.lines();
+    let mut buffer: Vec<String> = Vec::new();
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
 
     loop {
         tokio::select! {
             _ = &mut cancel_rx => {
                 break;
             }
+            _ = interval.tick() => {
+                if !buffer.is_empty() {
+                    let chunk = std::mem::take(&mut buffer);
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::LogLinesChunkReceived {
+                            pod: pod_name.clone(),
+                            container: container.clone().unwrap_or_default(),
+                            lines: chunk,
+                        },
+                    ).await;
+                }
+            }
             res = lines.next() => {
                 match res {
                     Some(Ok(line)) => {
-                        let _ = Bridge::send_event(
-                            &writer,
-                            &token,
-                            &OrbitEvent::LogLineReceived {
-                                pod: pod_name.clone(),
-                                container: container.clone().unwrap_or_default(),
-                                line,
-                            },
-                        ).await;
+                        buffer.push(line);
+                        if buffer.len() >= 500 {
+                            let chunk = std::mem::take(&mut buffer);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::LogLinesChunkReceived {
+                                    pod: pod_name.clone(),
+                                    container: container.clone().unwrap_or_default(),
+                                    lines: chunk,
+                                },
+                            ).await;
+                        }
                     }
                     Some(Err(e)) => {
                         log::error!("Error reading log stream: {}", e);
@@ -73,6 +93,18 @@ pub async fn stream_pod_logs(
                 }
             }
         }
+    }
+
+    if !buffer.is_empty() {
+        let _ = Bridge::send_event(
+            &writer,
+            &token,
+            &OrbitEvent::LogLinesChunkReceived {
+                pod: pod_name.clone(),
+                container: container.clone().unwrap_or_default(),
+                lines: buffer,
+            },
+        ).await;
     }
 }
 

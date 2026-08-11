@@ -933,7 +933,10 @@ pub fn dispatch(
                 let workload_kind = get_string(&data, "kind").unwrap_or_else(|| "Deployment".to_string());
                 let container = get_string(&data, "container").filter(|s| !s.is_empty() && s != "All" && s != "all");
                 let pod_name = get_string(&data, "pod").filter(|s| !s.is_empty() && s != "All" && s != "all");
-                let tail_lines = get_i64(&data, "tailLines");
+                let tail_lines = match get_i64(&data, "tailLines") {
+                    Some(v) if v > 0 => Some(v),
+                    _ => None,
+                };
 
                 let mut w_manager = manager.write().await;
                 for cancel in w_manager.log_cancel.drain(..) {
