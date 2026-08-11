@@ -93,7 +93,8 @@ export function useLogSelection() {
     { label: '100 lines', value: 100 },
     { label: '250 lines', value: 250 },
     { label: '500 lines', value: 500 },
-    { label: '1000 lines', value: 1000 }
+    { label: '1000 lines', value: 1000 },
+    { label: 'All', value: -1 }
   ]
 
   watch(selectedWorkloadKind, () => {

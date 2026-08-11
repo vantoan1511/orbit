@@ -120,6 +120,12 @@ pub enum OrbitEvent {
         container: String,
         line: String,
     },
+    #[serde(rename = "logLinesChunkReceived")]
+    LogLinesChunkReceived {
+        pod: String,
+        container: String,
+        lines: Vec<String>,
+    },
     #[serde(rename = "updateCheckFinished")]
     UpdateCheckFinished {
         has_update: bool,

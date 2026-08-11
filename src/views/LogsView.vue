@@ -9,6 +9,7 @@ import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import VirtualScroller from 'primevue/virtualscroller'
 import { useRouter } from 'vue-router'
 
 import { useLogsStore } from '@/stores/logsStore'
@@ -178,7 +179,7 @@ const {
     <!-- Console Viewer -->
     <div
       ref="terminalRef"
-      class="flex-1 dark:bg-zinc-950 rounded p-3 overflow-y-auto font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed min-h-0 selection:bg-surface-200 dark:selection:bg-primary-700"
+      class="flex-1 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed min-h-0 selection:bg-surface-200 dark:selection:bg-primary-700 h-full overflow-hidden"
     >
       <div
         v-if="filteredLogLines.length === 0"
@@ -186,28 +187,37 @@ const {
       >
         <p>No log lines streamed or matching query.</p>
       </div>
-      <div v-else class="space-y-1">
-        <div
-          v-for="(line, idx) in filteredLogLines"
-          :key="idx"
-          class="flex gap-2 hover:bg-surface-100 dark:hover:bg-primary-800 py-0.5 rounded px-1"
-        >
-          <!-- Timestamps -->
-          <span v-if="showTimestamps && line.timestamp" class="text-zinc-600 select-none shrink-0">
-            {{ line.timestamp }}
-          </span>
+      <VirtualScroller
+        v-else
+        :items="filteredLogLines"
+        :itemSize="28"
+        class="h-full w-full overflow-y-auto"
+      >
+        <template #item="{ item: line, options }">
+          <div
+            :style="{ height: options.itemSize + 'px' }"
+            class="flex gap-2 hover:bg-surface-100 dark:hover:bg-primary-800 py-0.5 rounded px-1 items-center whitespace-nowrap overflow-x-auto"
+          >
+            <!-- Timestamps -->
+            <span
+              v-if="showTimestamps && line.timestamp"
+              class="text-zinc-600 select-none shrink-0"
+            >
+              {{ line.timestamp }}
+            </span>
 
-          <!-- Origin Pod/Container Badge -->
-          <span class="text-surface-500 font-bold shrink-0 select-none">
-            [{{ line.pod.split('-').pop() }}/{{ line.container }}]
-          </span>
+            <!-- Origin Pod/Container Badge -->
+            <span class="text-surface-500 font-bold shrink-0 select-none">
+              [{{ line.pod.split('-').pop() }}/{{ line.container }}]
+            </span>
 
-          <!-- Log Content -->
-          <span class="break-all whitespace-pre-wrap flex-1" :class="getLogLevelColor(line.text)">
-            {{ line.text }}
-          </span>
-        </div>
-      </div>
+            <!-- Log Content -->
+            <span class="flex-1" :class="getLogLevelColor(line.text)">
+              {{ line.text }}
+            </span>
+          </div>
+        </template>
+      </VirtualScroller>
     </div>
 
     <!-- Highlight Rules Config Dialog -->
