@@ -33,21 +33,26 @@ pub async fn watch_resource<K, M, F>(
         let mut flush_interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
         flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
+        async fn flush_buffer(buffer: &mut Vec<OrbitEvent>, writer: &Arc<Mutex<WsWriter>>, ipc_token: &str) {
+            if !buffer.is_empty() {
+                let batch = std::mem::take(buffer);
+                for event in &batch {
+                    let _ = Bridge::send_event(writer, ipc_token, event).await;
+                }
+            }
+        }
+
         loop {
             tokio::select! {
                 res = cancel_rx.changed() => {
                     if res.is_ok() && *cancel_rx.borrow() {
                         log::info!("Stopping watcher for {}", kind);
+                        flush_buffer(&mut buffer, &writer, &ipc_token).await;
                         break 'outer;
                     }
                 }
                 _ = flush_interval.tick() => {
-                    if !buffer.is_empty() {
-                        let batch = std::mem::take(&mut buffer);
-                        for event in &batch {
-                            let _ = Bridge::send_event(&writer, &ipc_token, event).await;
-                        }
-                    }
+                    flush_buffer(&mut buffer, &writer, &ipc_token).await;
                 }
                 event = stream.next() => {
                     match event {
@@ -61,10 +66,7 @@ pub async fn watch_resource<K, M, F>(
                                     data,
                                 });
                                 if buffer.len() >= 100 {
-                                    let batch = std::mem::take(&mut buffer);
-                                    for evt in &batch {
-                                        let _ = Bridge::send_event(&writer, &ipc_token, evt).await;
-                                    }
+                                    flush_buffer(&mut buffer, &writer, &ipc_token).await;
                                 }
                             }
                         }
@@ -78,14 +80,12 @@ pub async fn watch_resource<K, M, F>(
                                     data,
                                 });
                                 if buffer.len() >= 100 {
-                                    let batch = std::mem::take(&mut buffer);
-                                    for evt in &batch {
-                                        let _ = Bridge::send_event(&writer, &ipc_token, evt).await;
-                                    }
+                                    flush_buffer(&mut buffer, &writer, &ipc_token).await;
                                 }
                             }
                         }
                         Some(Ok(watcher::Event::InitDone)) => {
+                            flush_buffer(&mut buffer, &writer, &ipc_token).await;
                             log::info!("Watcher initial sync done for {}", kind);
                         }
                         Some(Ok(_)) => {}

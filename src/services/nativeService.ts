@@ -74,6 +74,8 @@ export const os = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const eventHandlerMap = new Map<string, Map<any, any>>()
 
+const INTERCEPTOR_KEY = Symbol('interceptor')
+
 // rAF-based batch queue for resourceUpdated events only.
 // Prevents multiple Vue reactivity cycles per animation frame.
 const resourceUpdateQueue: Array<OrbitEventMap['resourceUpdated']> = []
@@ -86,7 +88,7 @@ function flushResourceUpdateQueue() {
   const handlers = eventHandlerMap.get(OrbitEvents.ResourceUpdated)
   if (!handlers) return
   for (const [key, wrapper] of handlers) {
-    if (key === '__interceptor__') continue
+    if (key === INTERCEPTOR_KEY) continue
     for (const payload of batch) {
       wrapper({ detail: payload })
     }
@@ -119,7 +121,7 @@ export const events = {
           }
         }
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handlers.set('__interceptor__', interceptor as any)
+        handlers.set(INTERCEPTOR_KEY, interceptor as any)
         neuEvents.on(event, interceptor)
       }
       handlers.set(handler, wrapper)
@@ -140,9 +142,8 @@ export const events = {
       const handlers = eventHandlerMap.get(event)
       if (handlers) {
         handlers.delete(handler)
-        const realHandlers = [...handlers.keys()].filter((k) => k !== '__interceptor__')
-        if (realHandlers.length === 0) {
-          const interceptor = handlers.get('__interceptor__')
+        if (handlers.size <= 1) {
+          const interceptor = handlers.get(INTERCEPTOR_KEY)
           if (interceptor) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             neuEvents.off(event, interceptor as any)
