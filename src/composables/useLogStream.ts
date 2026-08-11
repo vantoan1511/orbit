@@ -28,6 +28,7 @@ export function useLogStream(options: {
   const showTimestamps = ref<boolean>(true)
   const isPaused = ref<boolean>(false)
   const isFullscreen = ref<boolean>(false)
+  const isFollowing = ref<boolean>(true)
 
   const startStreaming = async () => {
     logLines.value = []
@@ -86,7 +87,9 @@ export function useLogStream(options: {
       logLines.value = logLines.value.slice(-maxLogLines)
     }
 
-    scrollToBottom()
+    if (isFollowing.value) {
+      scrollToBottom()
+    }
   }
 
   const scrollToBottom = () => {
@@ -168,6 +171,7 @@ export function useLogStream(options: {
     showTimestamps,
     isPaused,
     isFullscreen,
+    isFollowing,
     filteredLogLines,
     clearLogs,
     downloadLogs

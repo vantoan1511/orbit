@@ -8,6 +8,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import ToggleSwitch from 'primevue/toggleswitch'
 import { useRouter } from 'vue-router'
 
 import { useLogsStore } from '@/stores/logsStore'
@@ -52,6 +53,7 @@ const {
   showTimestamps,
   isPaused,
   isFullscreen,
+  isFollowing,
   filteredLogLines,
   clearLogs,
   downloadLogs
@@ -107,6 +109,18 @@ const {
                 for="show-timestamps"
                 class="text-xs text-muted-color cursor-pointer select-none"
                 >Timestamps</label
+              >
+            </div>
+            <div class="flex items-center gap-1.5">
+              <ToggleSwitch
+                v-model="isFollowing"
+                inputId="is-following"
+                class="scale-75 origin-left"
+              />
+              <label
+                for="is-following"
+                class="text-xs text-muted-color cursor-pointer select-none -ml-1"
+                >Follow</label
               >
             </div>
             <div class="flex items-center gap-1.5">
