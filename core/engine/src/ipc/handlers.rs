@@ -344,7 +344,16 @@ pub fn dispatch(
                         Ok(namespaces) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NamespacesUpdated { namespaces }).await;
                         }
-                        Err(e) => { log::error!("Error listing namespaces: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing namespaces: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list namespaces: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -362,7 +371,16 @@ pub fn dispatch(
                         Ok(pods) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PodsUpdated { pods }).await;
                         }
-                        Err(e) => { log::error!("Error listing pods: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing pods: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list pods: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -380,7 +398,16 @@ pub fn dispatch(
                         Ok(deployments) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::DeploymentsUpdated { deployments }).await;
                         }
-                        Err(e) => { log::error!("Error listing deployments: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing deployments: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list deployments: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -398,7 +425,16 @@ pub fn dispatch(
                         Ok(stateful_sets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StatefulSetsUpdated { stateful_sets }).await;
                         }
-                        Err(e) => { log::error!("Error listing statefulsets: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing statefulsets: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list statefulsets: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -416,7 +452,16 @@ pub fn dispatch(
                         Ok(daemon_sets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::DaemonSetsUpdated { daemon_sets }).await;
                         }
-                        Err(e) => { log::error!("Error listing daemonsets: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing daemonsets: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list daemonsets: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -434,7 +479,16 @@ pub fn dispatch(
                         Ok(replica_sets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ReplicaSetsUpdated { replica_sets }).await;
                         }
-                        Err(e) => { log::error!("Error listing replicasets: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing replicasets: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list replicasets: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -452,7 +506,16 @@ pub fn dispatch(
                         Ok(jobs) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::JobsUpdated { jobs }).await;
                         }
-                        Err(e) => { log::error!("Error listing jobs: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing jobs: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list jobs: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -470,7 +533,16 @@ pub fn dispatch(
                         Ok(cron_jobs) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::CronJobsUpdated { cron_jobs }).await;
                         }
-                        Err(e) => { log::error!("Error listing cronjobs: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing cronjobs: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list cronjobs: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -488,7 +560,16 @@ pub fn dispatch(
                         Ok(services) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ServicesUpdated { services }).await;
                         }
-                        Err(e) => { log::error!("Error listing services: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing services: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list services: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -506,7 +587,16 @@ pub fn dispatch(
                         Ok(ingresses) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::IngressesUpdated { ingresses }).await;
                         }
-                        Err(e) => { log::error!("Error listing ingresses: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing ingresses: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list ingresses: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -524,7 +614,16 @@ pub fn dispatch(
                         Ok(config_maps) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ConfigMapsUpdated { config_maps }).await;
                         }
-                        Err(e) => { log::error!("Error listing configmaps: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing configmaps: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list configmaps: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -542,7 +641,16 @@ pub fn dispatch(
                         Ok(events) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::EventsUpdated { events }).await;
                         }
-                        Err(e) => { log::error!("Error listing events: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing events: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list events: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -560,7 +668,16 @@ pub fn dispatch(
                         Ok(secrets) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::SecretsUpdated { secrets }).await;
                         }
-                        Err(e) => { log::error!("Error listing secrets: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing secrets: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list secrets: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -576,7 +693,16 @@ pub fn dispatch(
                         Ok(persistent_volumes) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumesUpdated { persistent_volumes }).await;
                         }
-                        Err(e) => { log::error!("Error listing persistent volumes: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing persistent volumes: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list persistent volumes: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -594,7 +720,16 @@ pub fn dispatch(
                         Ok(persistent_volume_claims) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims }).await;
                         }
-                        Err(e) => { log::error!("Error listing persistent volume claims: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing persistent volume claims: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list persistent volume claims: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -610,7 +745,16 @@ pub fn dispatch(
                         Ok(storage_classes) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StorageClassesUpdated { storage_classes }).await;
                         }
-                        Err(e) => { log::error!("Error listing storage classes: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing storage classes: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list storage classes: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -626,7 +770,16 @@ pub fn dispatch(
                         Ok(nodes) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::NodesUpdated { nodes }).await;
                         }
-                        Err(e) => { log::error!("Error listing nodes: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing nodes: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list nodes: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });
@@ -644,7 +797,16 @@ pub fn dispatch(
                         Ok(policies) => {
                             let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PoliciesUpdated { policies }).await;
                         }
-                        Err(e) => { log::error!("Error listing policies: {:?}", e); }
+                        Err(e) => {
+                            log::error!("Error listing policies: {:?}", e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to list policies: {}", e),
+                                },
+                            ).await;
+                        }
                     }
                 }
             });

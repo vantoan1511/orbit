@@ -22,64 +22,68 @@ pub async fn watch_resource<K, M, F>(
     M: Serialize + Send + Sync + 'static,
     F: Fn(&K) -> M + Send + Sync + 'static,
 {
-    let api = Api::<K>::all(client);
-    let mut stream = watcher(api, watcher::Config::default()).boxed();
-
     log::info!("Starting watcher for {}", kind);
 
-    loop {
-        tokio::select! {
-            res = cancel_rx.changed() => {
-                if res.is_ok() && *cancel_rx.borrow() {
-                    log::info!("Stopping watcher for {}", kind);
-                    break;
+    'outer: loop {
+        let api = Api::<K>::all(client.clone());
+        let mut stream = watcher(api, watcher::Config::default()).boxed();
+
+        loop {
+            tokio::select! {
+                res = cancel_rx.changed() => {
+                    if res.is_ok() && *cancel_rx.borrow() {
+                        log::info!("Stopping watcher for {}", kind);
+                        break 'outer;
+                    }
                 }
-            }
-            event = stream.next() => {
-                match event {
-                    Some(Ok(watcher::Event::Apply(obj))) | Some(Ok(watcher::Event::InitApply(obj))) => {
-                        let mapped = mapper(&obj);
-                        if let Ok(data) = serde_json::to_value(&mapped) {
-                            log::debug!("Watcher Applied {} {:?}", kind, data);
-                            let _ = Bridge::send_event(
-                                &writer,
-                                &ipc_token,
-                                &OrbitEvent::ResourceUpdated {
-                                    kind: kind.clone(),
-                                    action: "Applied".to_string(),
-                                    data,
-                                }
-                            ).await;
+                event = stream.next() => {
+                    match event {
+                        Some(Ok(watcher::Event::Apply(obj))) | Some(Ok(watcher::Event::InitApply(obj))) => {
+                            let mapped = mapper(&obj);
+                            if let Ok(data) = serde_json::to_value(&mapped) {
+                                log::debug!("Watcher Applied {} {:?}", kind, data);
+                                let _ = Bridge::send_event(
+                                    &writer,
+                                    &ipc_token,
+                                    &OrbitEvent::ResourceUpdated {
+                                        kind: kind.clone(),
+                                        action: "Applied".to_string(),
+                                        data,
+                                    }
+                                ).await;
+                            }
                         }
-                    }
-                    Some(Ok(watcher::Event::Delete(obj))) => {
-                        let mapped = mapper(&obj);
-                        if let Ok(data) = serde_json::to_value(&mapped) {
-                            log::debug!("Watcher Deleted {} {:?}", kind, data);
-                            let _ = Bridge::send_event(
-                                &writer,
-                                &ipc_token,
-                                &OrbitEvent::ResourceUpdated {
-                                    kind: kind.clone(),
-                                    action: "Deleted".to_string(),
-                                    data,
-                                }
-                            ).await;
+                        Some(Ok(watcher::Event::Delete(obj))) => {
+                            let mapped = mapper(&obj);
+                            if let Ok(data) = serde_json::to_value(&mapped) {
+                                log::debug!("Watcher Deleted {} {:?}", kind, data);
+                                let _ = Bridge::send_event(
+                                    &writer,
+                                    &ipc_token,
+                                    &OrbitEvent::ResourceUpdated {
+                                        kind: kind.clone(),
+                                        action: "Deleted".to_string(),
+                                        data,
+                                    }
+                                ).await;
+                            }
                         }
-                    }
-                    Some(Ok(watcher::Event::InitDone)) => {
-                        log::info!("Watcher initial sync done for {}", kind);
-                    }
-                    Some(Ok(_)) => {}
-                    Some(Err(e)) => {
-                        log::error!("Watcher error for {}: {:?}", kind, e);
-                    }
-                    None => {
-                        log::info!("Watcher stream ended for {}", kind);
-                        break;
+                        Some(Ok(watcher::Event::InitDone)) => {
+                            log::info!("Watcher initial sync done for {}", kind);
+                        }
+                        Some(Ok(_)) => {}
+                        Some(Err(e)) => {
+                            log::error!("Watcher error for {}: {:?}", kind, e);
+                        }
+                        None => {
+                            log::info!("Watcher stream ended for {}. Reconnecting...", kind);
+                            break;
+                        }
                     }
                 }
             }
         }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
     }
 }
