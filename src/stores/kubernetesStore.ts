@@ -535,6 +535,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
+  function applyResourceBatch(
+    batch: Array<{ kind: string; action: 'Applied' | 'Deleted'; data: ResourceInfo }>
+  ) {
+    for (const payload of batch) {
+      onResourceUpdated(payload)
+    }
+  }
+
   function onPodMetricsUpdated(payload: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
   }) {
@@ -636,6 +644,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     fetchPersistentVolumeClaims,
     fetchStorageClasses,
     loadInitialData,
+    applyResourceBatch,
     cpuHistory,
     memHistory
   }
