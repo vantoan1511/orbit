@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
@@ -14,7 +14,7 @@ import type { IngressInfo } from '@/types/kubernetes'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
 

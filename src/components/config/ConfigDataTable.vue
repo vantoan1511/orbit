@@ -106,8 +106,9 @@ const onRowClick = (event: { data: ConfigMapInfo | SecretInfo }) => {
   drawerVisible.value = true
 }
 
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<ConfigMapInfo | SecretInfo>()
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } = useResourceActionMenu<
+  ConfigMapInfo | SecretInfo
+>()
 
 const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
 
