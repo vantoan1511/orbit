@@ -99,6 +99,13 @@ const toggleActionMenu = (event: Event, data: ReplicaSetInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: ReplicaSetInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'ReplicaSet',
   onViewDetails: (row) => {
@@ -119,6 +126,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="loading || k8sStore.replicaSetsLoading"
     @refresh="fetchReplicaSets"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

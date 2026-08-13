@@ -84,6 +84,13 @@ const toggleActionMenu = (event: Event, data: ServiceInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: ServiceInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Service',
   onViewDetails: (row) => {
@@ -104,6 +111,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="k8sStore.servicesLoading"
     @refresh="handleRefresh"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>
