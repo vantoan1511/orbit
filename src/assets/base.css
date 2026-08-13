@@ -4,17 +4,26 @@
 
 @theme {
   /* Kubernetes Workloads & Resources */
-  --deployment: var(--deployment);
-  --daemonset: var(--daemonset);
-  --statefulset: var(--statefulset);
-  --job: var(--job);
-  --pod: var(--pod);
-  --replicaset: var(--replicaset);
-  --node: var(--node);
-  --secret: var(--secret);
-  --configmap: var(--configmap);
-  --service: var(--service);
-  --ingress: var(--ingress);
+  --color-deployment: #3b82f6;
+  --color-daemonset: #f97316;
+  --color-statefulset: #06b6d4;
+  --color-job: #a855f7;
+  --color-pod: #10b981;
+  --color-replicaset: #8b5cf6;
+  --color-node: #6366f1;
+  --color-secret: #ec4899;
+  --color-configmap: #eab308;
+  --color-service: #14b8a6;
+  --color-ingress: #f43f5e;
+
+  /* Z-Index Scale */
+  --z-sticky: 100;
+  --z-dropdown: 1000;
+  --z-overlay: 1030;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
 
   /* Typography */
   --font-ui: "Inter", "Manrope", system-ui, -apple-system, sans-serif;
@@ -223,5 +232,18 @@
   --configmap: #facc15;
   --service: #2dd4bf;
   --ingress: #fb7185;
+
+  /* Tailwind Color Overrides */
+  --color-deployment: #60a5fa;
+  --color-daemonset: #fb923c;
+  --color-statefulset: #22d3ee;
+  --color-job: #c084fc;
+  --color-pod: #34d399;
+  --color-replicaset: #a78bfa;
+  --color-node: #818cf8;
+  --color-secret: #f472b6;
+  --color-configmap: #facc15;
+  --color-service: #2dd4bf;
+  --color-ingress: #fb7185;
 }
 
