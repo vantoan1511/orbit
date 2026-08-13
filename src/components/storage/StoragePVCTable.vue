@@ -63,6 +63,13 @@ const toggleActionMenu = (event: Event, data: PersistentVolumeClaimInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: PersistentVolumeClaimInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'PersistentVolumeClaim'
 })
@@ -78,6 +85,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     reportTemplate="Showing {first} to {last} of {totalRecords} claims"
     :loading="k8sStore.persistentVolumeClaimsLoading"
     @refresh="handleRefresh"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

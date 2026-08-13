@@ -101,6 +101,13 @@ const toggleActionMenu = (event: Event, data: DaemonSetInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: DaemonSetInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'DaemonSet',
   onViewDetails: (row) => {
@@ -121,6 +128,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="loading || k8sStore.daemonSetsLoading"
     @refresh="fetchDaemonSets"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

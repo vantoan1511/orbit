@@ -199,6 +199,13 @@ const toggleActionMenu = (event: Event, data: MappedNamespaceInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: MappedNamespaceInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Namespace',
   onViewDetails: (row) => {
@@ -219,6 +226,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="store.namespacesLoading"
     @refresh="handleRefresh"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

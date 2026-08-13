@@ -42,6 +42,13 @@ const toggleActionMenu = (event: Event, data: IngressInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: IngressInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Ingress'
 })
@@ -57,6 +64,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     reportTemplate="Showing {first} to {last} of {totalRecords} ingresses"
     :loading="k8sStore.ingressesLoading"
     @refresh="handleRefresh"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

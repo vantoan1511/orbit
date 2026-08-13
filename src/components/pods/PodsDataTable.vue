@@ -75,6 +75,13 @@ const toggleActionMenu = (event: Event, data: PodInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: PodInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Pod',
   onViewDetails: (row) => {
@@ -94,6 +101,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     reportTemplate="Showing {first} to {last} of {totalRecords} pods"
     :loading="k8sStore.podsLoading"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

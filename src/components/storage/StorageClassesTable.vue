@@ -48,6 +48,16 @@ const toggleActionMenu = (event: Event, data: StorageClassInfo & { namespace: st
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: {
+  originalEvent: Event
+  data: StorageClassInfo & { namespace: string }
+}) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'StorageClass'
 })
@@ -63,6 +73,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     reportTemplate="Showing {first} to {last} of {totalRecords} classes"
     :loading="k8sStore.storageClassesLoading"
     @refresh="handleRefresh"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Name Column -->
     <Column

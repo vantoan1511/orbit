@@ -114,6 +114,13 @@ const toggleActionMenu = (event: Event, data: ConfigMapInfo | SecretInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: ConfigMapInfo | SecretInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
@@ -146,6 +153,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     "
     @refresh="handleRefresh"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

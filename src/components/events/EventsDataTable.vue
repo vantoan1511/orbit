@@ -91,6 +91,13 @@ const toggleActionMenu = (event: Event, data: EventInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: EventInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = { ...event.data, name: event.data.objectName }
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Event'
 })
@@ -107,6 +114,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="k8sStore.eventsLoading"
     @refresh="handleRefresh"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

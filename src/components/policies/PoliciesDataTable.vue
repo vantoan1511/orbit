@@ -92,6 +92,13 @@ const toggleActionMenu = (event: Event, data: PolicyInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: PolicyInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Policy',
   onViewDetails: (row) => {
@@ -112,6 +119,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="k8sStore.policiesLoading"
     @refresh="handleRefresh"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>

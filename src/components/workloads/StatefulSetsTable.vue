@@ -100,6 +100,13 @@ const toggleActionMenu = (event: Event, data: StatefulSetInfo) => {
   actionMenu.value?.toggle(event)
 }
 
+const onRowContextMenu = (event: { originalEvent: Event; data: StatefulSetInfo }) => {
+  event.originalEvent?.stopPropagation()
+  event.originalEvent?.preventDefault()
+  selectedActionRow.value = event.data
+  actionMenu.value?.show(event.originalEvent)
+}
+
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'StatefulSet',
   onViewDetails: (row) => {
@@ -120,6 +127,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     :loading="loading || k8sStore.statefulSetsLoading"
     @refresh="fetchStatefulSets"
     @row-click="onRowClick"
+    @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
     <template #filters>
