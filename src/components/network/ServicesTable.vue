@@ -15,6 +15,7 @@ import Select from 'primevue/select'
 import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from '@/components/services/ServiceDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const k8sStore = useKubernetesStore()
@@ -75,21 +76,8 @@ const getTypeBadgeClass = (type: string) => {
   }
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<ServiceInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: ServiceInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: ServiceInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<ServiceInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Service',

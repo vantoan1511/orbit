@@ -14,6 +14,7 @@ import Select from 'primevue/select'
 import { computed, ref, watch } from 'vue'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import Button from 'primevue/button'
 
@@ -105,21 +106,8 @@ const onRowClick = (event: { data: ConfigMapInfo | SecretInfo }) => {
   drawerVisible.value = true
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<ConfigMapInfo | SecretInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: ConfigMapInfo | SecretInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: ConfigMapInfo | SecretInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<ConfigMapInfo | SecretInfo>()
 
 const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
 

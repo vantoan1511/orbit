@@ -9,6 +9,7 @@ import EventDetailsDrawer from './EventDetailsDrawer.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { storeToRefs } from 'pinia'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
@@ -82,8 +83,9 @@ const getTypeBadgeClass = (type: string) => {
   }
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<(EventInfo & { name: string }) | null>(null)
+const actionMenuRef = useResourceActionMenu<EventInfo & { name: string }>()
+const actionMenu = actionMenuRef.actionMenu
+const selectedActionRow = actionMenuRef.selectedActionRow
 
 const toggleActionMenu = (event: Event, data: EventInfo) => {
   event.stopPropagation()
