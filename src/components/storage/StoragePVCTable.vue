@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import { MoreVertical } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
@@ -54,21 +55,8 @@ const handleRefresh = async () => {
   }
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<PersistentVolumeClaimInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: PersistentVolumeClaimInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: PersistentVolumeClaimInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<PersistentVolumeClaimInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'PersistentVolumeClaim'

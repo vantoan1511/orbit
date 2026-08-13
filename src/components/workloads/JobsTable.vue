@@ -14,6 +14,7 @@ import Select from 'primevue/select'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -91,21 +92,8 @@ const onRowClick = (event: { data: JobInfo }) => {
   drawerVisible.value = true
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<JobInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: JobInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: JobInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<JobInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Job',

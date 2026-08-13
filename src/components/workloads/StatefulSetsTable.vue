@@ -5,6 +5,7 @@ import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { kubernetesService } from '@/services/kubernetesService'
@@ -91,21 +92,8 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
 
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<StatefulSetInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: StatefulSetInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: StatefulSetInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<StatefulSetInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'StatefulSet',

@@ -2,6 +2,7 @@
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
@@ -94,21 +95,8 @@ const onRowClick = (event: { data: DeploymentInfo }) => {
   drawerVisible.value = true
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<DeploymentInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: DeploymentInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: DeploymentInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<DeploymentInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Deployment',

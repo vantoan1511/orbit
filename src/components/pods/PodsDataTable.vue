@@ -5,6 +5,7 @@ import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -66,21 +67,8 @@ const onRowClick = (event: { data: PodInfo }) => {
   drawerVisible.value = true
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<PodInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: PodInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: PodInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<PodInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Pod',

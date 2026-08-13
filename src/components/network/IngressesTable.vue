@@ -4,6 +4,7 @@ import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
@@ -33,21 +34,8 @@ const handleRefresh = async () => {
   await kubernetesService.getIngresses()
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<IngressInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: IngressInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: IngressInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<IngressInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Ingress'

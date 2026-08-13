@@ -14,6 +14,7 @@ import Select from 'primevue/select'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -92,21 +93,8 @@ const onRowClick = (event: { data: DaemonSetInfo }) => {
   drawerVisible.value = true
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<DaemonSetInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: DaemonSetInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: DaemonSetInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<DaemonSetInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'DaemonSet',

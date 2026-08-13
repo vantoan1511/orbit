@@ -8,6 +8,7 @@ import type { PolicyInfo } from '@/types/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import PolicyDetailsDrawer from './PolicyDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
@@ -83,21 +84,8 @@ const getStatusBadgeClass = (status: string) => {
   }
 }
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<PolicyInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: PolicyInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: PolicyInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<PolicyInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Policy',

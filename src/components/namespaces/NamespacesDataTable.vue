@@ -10,6 +10,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import type { NamespaceInfo } from '@/types/kubernetes'
 import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
@@ -190,21 +191,8 @@ const getSparklineData = (ns: MappedNamespaceInfo) => ({
 // Max visible labels before showing "+N" overflow
 const MAX_VISIBLE_LABELS = 2
 
-const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-const selectedActionRow = ref<MappedNamespaceInfo | null>(null)
-
-const toggleActionMenu = (event: Event, data: MappedNamespaceInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = data
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: MappedNamespaceInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = event.data
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
+  useResourceActionMenu<MappedNamespaceInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'Namespace',
