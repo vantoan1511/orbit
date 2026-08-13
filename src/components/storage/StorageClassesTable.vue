@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import Column from 'primevue/column'
-import Button from 'primevue/button'
-import { MoreVertical } from '@lucide/vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { StorageClassInfo } from '@/types/kubernetes'
+import { MoreVertical } from '@lucide/vue'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
 
@@ -40,8 +40,9 @@ const handleRefresh = async () => {
   }
 }
 
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<StorageClassInfo & { namespace: string }>()
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } = useResourceActionMenu<
+  StorageClassInfo & { namespace: string }
+>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   kind: 'StorageClass'
