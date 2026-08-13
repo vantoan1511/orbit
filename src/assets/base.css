@@ -3,11 +3,18 @@
 @custom-variant dark (&:where(.my-app-dark, .my-app-dark *));
 
 @theme {
-
-  --deployment: #4f8cff;
-  --daemonset: #e07a5f;
-  --statefulset: #00b8d9;
-  --job: #c084fc;
+  /* Kubernetes Workloads & Resources */
+  --deployment: var(--deployment);
+  --daemonset: var(--daemonset);
+  --statefulset: var(--statefulset);
+  --job: var(--job);
+  --pod: var(--pod);
+  --replicaset: var(--replicaset);
+  --node: var(--node);
+  --secret: var(--secret);
+  --configmap: var(--configmap);
+  --service: var(--service);
+  --ingress: var(--ingress);
 
   /* Typography */
   --font-ui: "Inter", "Manrope", system-ui, -apple-system, sans-serif;
@@ -24,9 +31,25 @@
     margin: 0;
     font-weight: normal;
   }
+
+  ::selection {
+    background-color: var(--selection);
+  }
 }
 
 :root {
+  /* ===========================
+     Z-Index Scale
+     =========================== */
+
+  --z-sticky: 100;
+  --z-dropdown: 1000;
+  --z-overlay: 1030;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-toast: 1080;
+
   /* ===========================
      Brand
      =========================== */
@@ -82,7 +105,6 @@
      =========================== */
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-
   --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 
   /* ===========================
@@ -90,12 +112,32 @@
      =========================== */
 
   --success: #28a745;
+  --success-soft: rgba(40, 167, 69, 0.12);
   --warning: #f4a100;
+  --warning-soft: rgba(244, 161, 0, 0.12);
   --danger: #d64545;
+  --danger-soft: rgba(214, 69, 69, 0.12);
   --info: #3d8bff;
+  --info-soft: rgba(61, 139, 255, 0.12);
+
+  /* ===========================
+     Kubernetes Resources
+     =========================== */
+
+  --deployment: #3b82f6;
+  --daemonset: #f97316;
+  --statefulset: #06b6d4;
+  --job: #a855f7;
+  --pod: #10b981;
+  --replicaset: #8b5cf6;
+  --node: #6366f1;
+  --secret: #ec4899;
+  --configmap: #eab308;
+  --service: #14b8a6;
+  --ingress: #f43f5e;
 }
 
-[data-theme="dark"] {
+.my-app-dark {
   /* ===========================
      Brand
      =========================== */
@@ -113,15 +155,15 @@
   --bg-sidebar: #0d1012;
   --bg-panel: #0b0d0f;
   --bg-card: #0e1012;
-  --bg-hover: #262a31;
-  --bg-active: #1b1e21;
+  --bg-hover: #1e2228;
+  --bg-active: #15181c;
 
   /* ===========================
      Borders
      =========================== */
 
   --border: #212427;
-  --border-strong: #2e3134;
+  --border-strong: #2a2d31;
 
   /* ===========================
      Text
@@ -151,7 +193,6 @@
      =========================== */
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
-
   --shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
 
   /* ===========================
@@ -159,7 +200,28 @@
      =========================== */
 
   --success: #46d16e;
+  --success-soft: rgba(70, 209, 110, 0.14);
   --warning: #ffc54d;
+  --warning-soft: rgba(255, 197, 77, 0.14);
   --danger: #ff6b6b;
+  --danger-soft: rgba(255, 107, 107, 0.14);
   --info: #6aa8ff;
+  --info-soft: rgba(106, 168, 255, 0.14);
+
+  /* ===========================
+     Kubernetes Resources
+     =========================== */
+
+  --deployment: #60a5fa;
+  --daemonset: #fb923c;
+  --statefulset: #22d3ee;
+  --job: #c084fc;
+  --pod: #34d399;
+  --replicaset: #a78bfa;
+  --node: #818cf8;
+  --secret: #f472b6;
+  --configmap: #facc15;
+  --service: #2dd4bf;
+  --ingress: #fb7185;
 }
+
