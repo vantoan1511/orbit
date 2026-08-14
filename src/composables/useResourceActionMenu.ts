@@ -1,4 +1,4 @@
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import type ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { ref } from 'vue'
 
 /**
@@ -10,20 +10,20 @@ import { ref } from 'vue'
  * - `toggleActionMenu` for the three-dots button click
  * - `onRowContextMenu` for the right-click row event
  */
-export function useResourceActionMenu<T>() {
+export function useResourceActionMenu<T, R = T>(mapRow?: (row: T) => R) {
   const actionMenu = ref<InstanceType<typeof ResourceActionMenu> | null>(null)
-  const selectedActionRow = ref<T | null>(null)
+  const selectedActionRow = ref<R | null>(null)
 
   const toggleActionMenu = (event: Event, data: T) => {
     event.stopPropagation()
-    selectedActionRow.value = data
+    selectedActionRow.value = (mapRow ? mapRow(data) : data) as unknown as R
     actionMenu.value?.toggle(event)
   }
 
   const onRowContextMenu = (event: { originalEvent: Event; data: T }) => {
     event.originalEvent?.stopPropagation()
     event.originalEvent?.preventDefault()
-    selectedActionRow.value = event.data
+    selectedActionRow.value = (mapRow ? mapRow(event.data) : event.data) as unknown as R
     actionMenu.value?.show(event.originalEvent)
   }
 
