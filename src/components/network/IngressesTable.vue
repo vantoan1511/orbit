@@ -14,7 +14,8 @@ import type { IngressInfo } from '@/types/kubernetes'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import IngressDetailsDrawer from './IngressDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
 
@@ -30,15 +31,28 @@ const { tableColumns, visibleCols } = useTableColumns([
 const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
   useResourceFilters(computed(() => k8sStore.ingresses))
 
+// Drawer state
+const drawerVisible = ref(false)
+const selectedIngress = ref<IngressInfo | null>(null)
+
 const handleRefresh = async () => {
   await kubernetesService.getIngresses()
+}
+
+const onRowClick = (event: { data: IngressInfo }) => {
+  selectedIngress.value = event.data
+  drawerVisible.value = true
 }
 
 const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
   useResourceActionMenu<IngressInfo>()
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'Ingress'
+  kind: 'Ingress',
+  onViewDetails: (row) => {
+    selectedIngress.value = row
+    drawerVisible.value = true
+  }
 })
 </script>
 
@@ -52,6 +66,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     reportTemplate="Showing {first} to {last} of {totalRecords} ingresses"
     :loading="k8sStore.ingressesLoading"
     @refresh="handleRefresh"
+    @row-click="onRowClick"
     @row-contextmenu="onRowContextMenu"
   >
     <!-- Filters -->
@@ -151,6 +166,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
     <!-- Drawer -->
     <template #drawer>
+      <IngressDetailsDrawer v-model:visible="drawerVisible" :ingress="selectedIngress" />
       <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
     </template>
   </ResourceDataTable>
