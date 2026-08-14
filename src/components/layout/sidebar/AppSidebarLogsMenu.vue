@@ -148,24 +148,39 @@ import { highlightMatch } from '@/utils/text'
 </script>
 
 <template>
-  <div class="flex-1 overflow-y-auto flex flex-col text-sm select-none">
-    <div v-if="k8sStore.activeClusterId !== null" class="flex flex-col h-full">
+  <div class="flex-1 overflow-hidden flex flex-col text-sm select-none">
+    <div v-if="k8sStore.activeClusterId !== null" class="flex flex-col h-full min-h-0">
       <Accordion
         :value="activeAccordion"
         multiple
-        class="flex-1 flex flex-col"
-        :dt="{ panel: { border: { width: '0' } } }"
+        class="flex-1 flex flex-col min-h-0 !gap-0"
+        :dt="{
+          panel: { border: { width: '0', color: 'transparent' }, borderRadius: '0' },
+          header: {
+            border: { width: '0', color: 'transparent' },
+            borderRadius: '0',
+            padding: '0.375rem 0.75rem'
+          },
+          content: { border: { width: '0', color: 'transparent' }, borderRadius: '0', padding: '0' }
+        }"
       >
         <!-- Explorer Accordion -->
-        <AccordionPanel value="0" class="border-none">
+        <AccordionPanel
+          value="0"
+          class="!border-none !rounded-none flex flex-col min-h-0"
+          :class="[activeAccordion.includes('0') ? 'flex-1' : 'shrink-0']"
+        >
           <AccordionHeader
-            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color"
+            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color shrink-0 !rounded-none !border-none"
           >
             Explorer
           </AccordionHeader>
-          <AccordionContent class="p-0">
+          <AccordionContent
+            class="p-0 flex-1 flex flex-col min-h-0"
+            :pt="{ content: 'p-0 flex flex-col h-full min-h-0' }"
+          >
             <!-- Filter Input -->
-            <div class="p-1.5">
+            <div class="p-1.5 shrink-0">
               <InputText
                 v-model="searchQuery"
                 placeholder="Filter logs..."
@@ -175,83 +190,88 @@ import { highlightMatch } from '@/utils/text'
             </div>
 
             <!-- Tree View -->
-            <div class="py-0.5">
-              <div v-if="treeData.length === 0" class="text-sm text-muted-color px-3 py-1">
-                No logs found
-              </div>
-
-              <div v-for="ns in treeData" :key="`ns:${ns.name}`" class="flex flex-col">
-                <!-- Namespace Row -->
-                <div
-                  class="flex items-center gap-1.5 px-3 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300"
-                  @click="toggleNode(`ns:${ns.name}`)"
-                >
-                  <component
-                    :is="
-                      isNodeExpanded(`ns:${ns.name}`) || searchQuery ? ChevronDown : ChevronRight
-                    "
-                    class="w-3.5 h-3.5 shrink-0 text-muted-color"
-                  />
-                  <Folder class="w-3.5 h-3.5 shrink-0 text-amber-500" />
-                  <span class="truncate" v-html="highlightMatch(ns.name, searchQuery)"></span>
-                  <span class="ml-auto text-xs text-muted-color">({{ ns.pods.length }})</span>
+            <div class="py-0.5 overflow-x-auto overflow-y-auto flex-1 min-h-0">
+              <div class="w-max min-w-full">
+                <div v-if="treeData.length === 0" class="text-sm text-muted-color px-3 py-1">
+                  No logs found
                 </div>
 
-                <!-- Namespace Pods -->
-                <div
-                  v-if="isNodeExpanded(`ns:${ns.name}`) || searchQuery"
-                  class="flex flex-col pl-4"
-                >
+                <div v-for="ns in treeData" :key="`ns:${ns.name}`" class="flex flex-col">
+                  <!-- Namespace Row -->
                   <div
-                    v-for="pod in ns.pods"
-                    :key="`pod:${ns.name}/${pod.name}`"
-                    class="flex flex-col"
+                    class="flex items-center gap-1.5 px-3 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300"
+                    @click="toggleNode(`ns:${ns.name}`)"
                   >
-                    <!-- Pod Row -->
-                    <div
-                      :class="[
-                        isCurrentLogActive(ns.name, pod.name)
-                          ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                          : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
-                        'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
-                      ]"
-                      @click="toggleNode(`pod:${ns.name}/${pod.name}`)"
-                    >
-                      <component
-                        :is="
-                          isNodeExpanded(`pod:${ns.name}/${pod.name}`) || searchQuery
-                            ? ChevronDown
-                            : ChevronRight
-                        "
-                        class="w-3.5 h-3.5 shrink-0 text-muted-color"
-                      />
-                      <Box class="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                      <span
-                        class="truncate flex-1"
-                        @click.stop="selectLogTarget(ns.name, pod.name)"
-                        v-html="highlightMatch(pod.name, searchQuery)"
-                      >
-                      </span>
-                    </div>
+                    <component
+                      :is="
+                        isNodeExpanded(`ns:${ns.name}`) || searchQuery ? ChevronDown : ChevronRight
+                      "
+                      class="w-3.5 h-3.5 shrink-0 text-muted-color"
+                    />
+                    <Folder class="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                    <span class="truncate" v-html="highlightMatch(ns.name, searchQuery)"></span>
+                    <span class="ml-auto text-xs text-muted-color">({{ ns.pods.length }})</span>
+                  </div>
 
-                    <!-- Pod Containers -->
+                  <!-- Namespace Pods -->
+                  <div
+                    v-if="isNodeExpanded(`ns:${ns.name}`) || searchQuery"
+                    class="flex flex-col pl-4"
+                  >
                     <div
-                      v-if="isNodeExpanded(`pod:${ns.name}/${pod.name}`) || searchQuery"
-                      class="flex flex-col pl-4"
+                      v-for="pod in ns.pods"
+                      :key="`pod:${ns.name}/${pod.name}`"
+                      class="flex flex-col"
                     >
+                      <!-- Pod Row -->
                       <div
-                        v-for="c in pod.containers"
-                        :key="`container:${ns.name}/${pod.name}/${c.name}`"
                         :class="[
-                          isCurrentLogActive(ns.name, pod.name, c.name)
+                          isCurrentLogActive(ns.name, pod.name)
                             ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                            : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
+                            : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
                           'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
                         ]"
-                        @click="selectLogTarget(ns.name, pod.name, c.name)"
+                        @click="toggleNode(`pod:${ns.name}/${pod.name}`)"
                       >
-                        <Layers class="w-3.5 h-3.5 shrink-0 text-emerald-500" />
-                        <span class="truncate" v-html="highlightMatch(c.name, searchQuery)"></span>
+                        <component
+                          :is="
+                            isNodeExpanded(`pod:${ns.name}/${pod.name}`) || searchQuery
+                              ? ChevronDown
+                              : ChevronRight
+                          "
+                          class="w-3.5 h-3.5 shrink-0 text-muted-color"
+                        />
+                        <Box class="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                        <span
+                          class="truncate flex-1"
+                          @click.stop="selectLogTarget(ns.name, pod.name)"
+                          v-html="highlightMatch(pod.name, searchQuery)"
+                        >
+                        </span>
+                      </div>
+
+                      <!-- Pod Containers -->
+                      <div
+                        v-if="isNodeExpanded(`pod:${ns.name}/${pod.name}`) || searchQuery"
+                        class="flex flex-col pl-4"
+                      >
+                        <div
+                          v-for="c in pod.containers"
+                          :key="`container:${ns.name}/${pod.name}/${c.name}`"
+                          :class="[
+                            isCurrentLogActive(ns.name, pod.name, c.name)
+                              ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
+                              : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
+                            'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
+                          ]"
+                          @click="selectLogTarget(ns.name, pod.name, c.name)"
+                        >
+                          <Layers class="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                          <span
+                            class="truncate"
+                            v-html="highlightMatch(c.name, searchQuery)"
+                          ></span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -262,52 +282,67 @@ import { highlightMatch } from '@/utils/text'
         </AccordionPanel>
 
         <!-- Recent Accordion -->
-        <AccordionPanel value="1" class="border-none">
+        <AccordionPanel
+          value="1"
+          class="!border-none !rounded-none flex flex-col min-h-0 border-t border-(--border)"
+          :class="[
+            !activeAccordion.includes('0') && activeAccordion.includes('1')
+              ? 'flex-1'
+              : activeAccordion.includes('1')
+                ? 'shrink-0 max-h-48'
+                : 'shrink-0'
+          ]"
+        >
           <AccordionHeader
-            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color flex justify-between items-center"
+            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color flex justify-between items-center shrink-0 !rounded-none !border-none"
           >
             <span>Recent</span>
           </AccordionHeader>
-          <AccordionContent class="p-0">
-            <div class="py-0.5">
-              <div
-                v-if="logsStore.recentLogs.length === 0"
-                class="text-sm text-muted-color px-3 py-1"
-              >
-                No recent logs
-              </div>
-
-              <div
-                v-for="log in logsStore.recentLogs"
-                :key="`recent:${log.namespace}/${log.pod}/${log.container}`"
-                :class="[
-                  isCurrentLogActive(log.namespace, log.pod, log.container)
-                    ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                    : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
-                  'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group'
-                ]"
-                @click="selectRecentLog(log)"
-              >
-                <Clock class="w-3.5 h-3.5 shrink-0 text-muted-color" />
-                <div class="flex flex-col truncate flex-1 min-w-0">
-                  <span class="truncate font-medium">{{ log.pod }}</span>
-                  <span class="text-xs text-muted-color truncate">
-                    {{ log.namespace }} &bull; {{ log.container }}
-                  </span>
-                </div>
-              </div>
-
-              <div v-if="logsStore.recentLogs.length > 0" class="p-1.5 flex justify-end">
-                <Button
-                  severity="secondary"
-                  variant="text"
-                  size="small"
-                  class="text-xs h-6"
-                  @click="logsStore.clearRecentLogs()"
+          <AccordionContent
+            class="p-0 flex-1 flex flex-col min-h-0"
+            :pt="{ content: 'p-0 flex flex-col h-full min-h-0' }"
+          >
+            <div class="py-0.5 overflow-x-auto overflow-y-auto flex-1 min-h-0">
+              <div class="w-max min-w-full">
+                <div
+                  v-if="logsStore.recentLogs.length === 0"
+                  class="text-sm text-muted-color px-3 py-1"
                 >
-                  <Trash2 class="w-3 h-3 mr-1" />
-                  Clear Recent
-                </Button>
+                  No recent logs
+                </div>
+
+                <div
+                  v-for="log in logsStore.recentLogs"
+                  :key="`recent:${log.namespace}/${log.pod}/${log.container}`"
+                  :class="[
+                    isCurrentLogActive(log.namespace, log.pod, log.container)
+                      ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
+                      : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
+                    'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group'
+                  ]"
+                  @click="selectRecentLog(log)"
+                >
+                  <Clock class="w-3.5 h-3.5 shrink-0 text-muted-color" />
+                  <div class="flex flex-col truncate flex-1 min-w-0">
+                    <span class="truncate font-medium">{{ log.pod }}</span>
+                    <span class="text-xs text-muted-color truncate">
+                      {{ log.namespace }} &bull; {{ log.container }}
+                    </span>
+                  </div>
+                </div>
+
+                <div v-if="logsStore.recentLogs.length > 0" class="p-1.5 flex justify-end">
+                  <Button
+                    severity="secondary"
+                    variant="text"
+                    size="small"
+                    class="text-xs h-6"
+                    @click="logsStore.clearRecentLogs()"
+                  >
+                    <Trash2 class="w-3 h-3 mr-1" />
+                    Clear Recent
+                  </Button>
+                </div>
               </div>
             </div>
           </AccordionContent>
