@@ -29,7 +29,7 @@ const isLinkActive = (linkPath: string) => {
 </script>
 
 <template>
-  <nav class="flex-1 overflow-y-auto">
+  <nav class="flex-1 overflow-y-auto overflow-x-hidden">
     <div v-if="k8sStore.activeClusterId !== null" class="flex flex-col py-1">
       <router-link
         v-for="item in flatItems"
