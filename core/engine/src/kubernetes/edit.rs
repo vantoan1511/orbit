@@ -5,7 +5,7 @@ use kube::{
 use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
-use k8s_openapi::api::networking::v1::NetworkPolicy;
+use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
 use serde_json::Value;
 
 fn to_json_val<T: serde::Serialize>(val: &T, kind: &str) -> Result<Value, kube::Error> {
@@ -86,6 +86,11 @@ pub async fn get_resource_raw(
             let resource = api.get(name).await?;
             to_json_val(&resource, kind)
         }
+        "Ingress" => {
+            let api: Api<Ingress> = Api::namespaced(client.clone(), namespace);
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
         _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported get resource kind: {}", kind),
@@ -132,6 +137,7 @@ pub async fn apply_resource(
         "Secret" => replace_resource!(Secret),
         "PersistentVolumeClaim" => replace_resource!(PersistentVolumeClaim),
         "NetworkPolicy" => replace_resource!(NetworkPolicy),
+        "Ingress" => replace_resource!(Ingress),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported apply resource kind: {}", kind),
