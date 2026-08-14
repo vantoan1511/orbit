@@ -10,13 +10,21 @@ const statusColor = computed(() => {
     case 'Running':
     case 'Completed':
     case 'Active':
+    case 'Ready':
+    case 'Bound':
+    case 'Available':
+    case 'Succeeded':
       return 'emerald'
     case 'Pending':
     case 'Progressing':
+    case 'Released':
+    case 'ContainerCreating':
+    case 'Warning':
       return 'amber'
     case 'Failed':
     case 'CrashLoopBackOff':
     case 'Terminating':
+    case 'Error':
       return 'rose'
     default:
       return 'gray'

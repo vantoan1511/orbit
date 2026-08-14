@@ -10,6 +10,7 @@ import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
@@ -92,7 +93,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     >
       <template #body="{ data }">
         <span
-          class="font-semibold hover:text-violet-400 transition-colors font-mono truncate max-w-48 block"
+          class="font-semibold font-mono truncate max-w-48 block"
           :title="data.name"
         >
           {{ data.name }}
@@ -156,33 +157,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-violet-400 font-semibold">{{ data.storageClass }}</span>
+        <span class="font-mono text-muted-color font-semibold">{{ data.storageClass }}</span>
       </template>
     </Column>
 
     <!-- Status Column -->
     <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-1.5">
-          <span
-            class="w-1.5 h-1.5 rounded-full"
-            :class="{
-              'bg-emerald-500': data.status === 'Bound',
-              'bg-amber-500': data.status === 'Pending',
-              'bg-rose-500': data.status === 'Lost'
-            }"
-          ></span>
-          <span
-            class="font-medium"
-            :class="{
-              'text-emerald-500': data.status === 'Bound',
-              'text-amber-500': data.status === 'Pending',
-              'text-rose-500': data.status === 'Lost'
-            }"
-          >
-            {{ data.status }}
-          </span>
-        </div>
+        <StatusBadge :status="data.status" />
       </template>
     </Column>
 

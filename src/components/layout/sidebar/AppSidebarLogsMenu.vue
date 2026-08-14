@@ -199,7 +199,7 @@ import { highlightMatch } from '@/utils/text'
                 <div v-for="ns in treeData" :key="`ns:${ns.name}`" class="flex flex-col">
                   <!-- Namespace Row -->
                   <div
-                    class="flex items-center gap-1.5 px-3 py-0.5 hover:bg-surface-100 dark:hover:bg-surface-800 cursor-pointer text-sm font-medium text-surface-700 dark:text-surface-300"
+                    class="flex items-center gap-1.5 px-3 py-0.5 hover:bg-(--bg-hover) cursor-pointer text-sm font-medium text-primary"
                     @click="toggleNode(`ns:${ns.name}`)"
                   >
                     <component
@@ -228,7 +228,7 @@ import { highlightMatch } from '@/utils/text'
                         :class="[
                           isCurrentLogActive(ns.name, pod.name)
                             ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                            : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
+                            : 'text-muted-color hover:bg-(--bg-hover)',
                           'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
                         ]"
                         @click="toggleNode(`pod:${ns.name}/${pod.name}`)"
@@ -261,7 +261,7 @@ import { highlightMatch } from '@/utils/text'
                           :class="[
                             isCurrentLogActive(ns.name, pod.name, c.name)
                               ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                              : 'text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
+                              : 'text-muted-color hover:bg-(--bg-hover)',
                             'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
                           ]"
                           @click="selectLogTarget(ns.name, pod.name, c.name)"
@@ -317,7 +317,7 @@ import { highlightMatch } from '@/utils/text'
                   :class="[
                     isCurrentLogActive(log.namespace, log.pod, log.container)
                       ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                      : 'text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800',
+                      : 'text-muted-color hover:bg-(--bg-hover)',
                     'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group'
                   ]"
                   @click="selectRecentLog(log)"

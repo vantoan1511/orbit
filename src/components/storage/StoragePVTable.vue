@@ -11,6 +11,7 @@ import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
 import type { PersistentVolumeInfo } from '@/types/kubernetes'
 
 const k8sStore = useKubernetesStore()
@@ -107,7 +108,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <template #body="{ data }">
         <div class="flex items-center gap-1.5">
           <span
-            class="font-semibold hover:text-violet-400 transition-colors font-mono truncate max-w-56"
+            class="font-semibold font-mono truncate max-w-56"
             :title="data.name"
           >
             {{ data.name }}
@@ -160,35 +161,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       class="p-3"
     >
       <template #body="{ data }">
-        <span class="font-mono text-violet-400 font-semibold">{{ data.storageClass }}</span>
+        <span class="font-mono text-muted-color font-semibold">{{ data.storageClass }}</span>
       </template>
     </Column>
 
     <!-- Status Column -->
     <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-1.5">
-          <span
-            class="w-1.5 h-1.5 rounded-full"
-            :class="{
-              'bg-emerald-500': data.status === 'Bound',
-              'bg-blue-500': data.status === 'Available',
-              'bg-amber-500': data.status === 'Released',
-              'bg-rose-500': data.status === 'Failed'
-            }"
-          ></span>
-          <span
-            class="font-medium"
-            :class="{
-              'text-emerald-500': data.status === 'Bound',
-              'text-blue-500': data.status === 'Available',
-              'text-amber-500': data.status === 'Released',
-              'text-rose-500': data.status === 'Failed'
-            }"
-          >
-            {{ data.status }}
-          </span>
-        </div>
+        <StatusBadge :status="data.status" />
       </template>
     </Column>
 

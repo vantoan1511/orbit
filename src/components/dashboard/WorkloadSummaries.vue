@@ -11,7 +11,7 @@ const items = computed(() => {
       title: 'Deployments',
       count: store.deployments.length,
       icon: Layers,
-      iconColor: 'text-[var(--deployment)] bg-[var(--deployment)]/10',
+      iconColor: 'text-deployment bg-(--deployment)/10',
       statusLabel: 'Available',
       statusVal: store.deployments.reduce((acc, d) => acc + d.available, 0),
       statusColor: 'text-emerald-500 bg-emerald-500/10'
@@ -20,7 +20,7 @@ const items = computed(() => {
       title: 'StatefulSets',
       count: store.statefulSets.length,
       icon: Database,
-      iconColor: 'text-[var(--statefulset)] bg-[var(--statefulset)]/10',
+      iconColor: 'text-statefulset bg-(--statefulset)/10',
       statusLabel: 'Current',
       statusVal: store.statefulSets.reduce((acc, s) => acc + s.replicas.current, 0),
       statusColor: 'text-emerald-500 bg-emerald-500/10'
@@ -29,7 +29,7 @@ const items = computed(() => {
       title: 'DaemonSets',
       count: store.daemonSets.length,
       icon: Box,
-      iconColor: 'text-[var(--daemonset)] bg-[var(--daemonset)]/10',
+      iconColor: 'text-daemonset bg-(--daemonset)/10',
       statusLabel: 'Ready',
       statusVal: store.daemonSets.reduce((acc, d) => acc + d.replicas.ready, 0),
       statusColor: 'text-emerald-500 bg-emerald-500/10'
@@ -38,7 +38,7 @@ const items = computed(() => {
       title: 'Jobs',
       count: store.jobs.length,
       icon: ClipboardList,
-      iconColor: 'text-[var(--job)] bg-[var(--job)]/10',
+      iconColor: 'text-job bg-(--job)/10',
       statusLabel: 'Completed',
       statusVal: store.jobs.filter((j) => j.status === 'Complete' || j.status === 'Completed')
         .length,
@@ -48,7 +48,7 @@ const items = computed(() => {
       title: 'Persistent Volumes',
       count: store.persistentVolumes.length,
       icon: HardDrive,
-      iconColor: 'text-[var(--text-muted)] bg-[var(--text-muted)]/10',
+      iconColor: 'text-muted-color bg-(--bg-hover)',
       statusLabel: 'Bound',
       statusVal: store.persistentVolumes.filter((pv) => pv.status === 'Bound').length,
       statusColor: 'text-emerald-500 bg-emerald-500/10'

@@ -78,7 +78,7 @@ const getAuthTypeColorClass = (authType: string) => {
       <!-- Active Identity Card -->
       <div class="p-4 rounded-xl bg-(--bg-sidebar)/60 border border-(--border) space-y-4">
         <div class="flex items-center gap-3">
-          <div class="p-2.5 rounded-lg bg-(--bg-card) border border-(--border) text-(--primary)">
+          <div class="p-2.5 rounded-lg bg-(--bg-card) border border-(--border) text-primary">
             <UserCheck :size="20" />
           </div>
           <div class="flex-1 min-w-0">

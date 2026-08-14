@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { NamespaceInfo } from '@/types/kubernetes'
 import { BarChart2, Clock, FileCode, Layers, Tag } from '@lucide/vue'
+import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
@@ -382,12 +383,16 @@ const annotationsExpanded = ref(false)
 
               <!-- View YAML link -->
               <div class="pt-2 border-t border-(--border)">
-                <button
-                  class="text-xs text-muted-color hover:text-muted-color transition-colors flex items-center gap-1.5"
+                <Button
+                  variant="text"
+                  severity="secondary"
+                  size="small"
+                  class="text-xs! flex! items-center! gap-1.5! p-0! h-auto!"
+                  @click="activeTab = 'yaml'"
                 >
                   <FileCode class="w-3.5 h-3.5" />
                   <span>View YAML</span>
-                </button>
+                </Button>
               </div>
             </TabPanel>
 
@@ -404,26 +409,21 @@ const annotationsExpanded = ref(false)
                     <span class="text-muted-color font-semibold">CPU</span>
                     <span class="font-mono text-muted-color">{{
                       props.namespace.resourceQuota.cpuUsed
-                    }}</span>
+                    }} / {{ props.namespace.resourceQuota.cpuLimit }}</span>
                   </div>
-                  <div class="w-full h-2 rounded-full bg-(--bg-hover) overflow-hidden">
+                  <div class="h-2 bg-(--bg-card) rounded-full overflow-hidden border border-(--border)">
                     <div
-                      class="h-full rounded-full bg-blue-500 transition-all duration-500"
-                      :style="{ width: props.namespace.resourceQuota.cpuPercent + '%' }"
+                      class="h-full bg-violet-500 rounded-full transition-all duration-500"
+                      :style="{
+                        width: `${Math.min(100, props.namespace.resourceQuota.cpuPercent)}%`
+                      }"
                     ></div>
                   </div>
-                  <div class="flex justify-between text-[10px] text-muted-color font-mono">
-                    <span>{{ props.namespace.resourceQuota.cpuRequest }} request</span>
-                    <span
-                      :class="
-                        props.namespace.resourceQuota.cpuPercent >= 80
-                          ? 'text-rose-400'
-                          : 'text-blue-400'
-                      "
-                    >
-                      {{ props.namespace.resourceQuota.cpuPercent }}%
-                    </span>
-                    <span>{{ props.namespace.resourceQuota.cpuLimit }} limit</span>
+                  <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
+                    <span>Usage</span>
+                    <span class="font-bold text-primary">{{
+                      props.namespace.resourceQuota.cpuPercent
+                    }}%</span>
                   </div>
                 </div>
 
@@ -433,40 +433,26 @@ const annotationsExpanded = ref(false)
                     <span class="text-muted-color font-semibold">Memory</span>
                     <span class="font-mono text-muted-color">{{
                       props.namespace.resourceQuota.memoryUsed
-                    }}</span>
+                    }} / {{ props.namespace.resourceQuota.memoryLimit }}</span>
                   </div>
-                  <div class="w-full h-2 rounded-full bg-(--bg-hover) overflow-hidden">
+                  <div class="h-2 bg-(--bg-card) rounded-full overflow-hidden border border-(--border)">
                     <div
-                      class="h-full rounded-full bg-violet-500 transition-all duration-500"
-                      :style="{ width: props.namespace.resourceQuota.memoryPercent + '%' }"
+                      class="h-full bg-blue-500 rounded-full transition-all duration-500"
+                      :style="{
+                        width: `${Math.min(100, props.namespace.resourceQuota.memoryPercent)}%`
+                      }"
                     ></div>
                   </div>
-                  <div class="flex justify-between text-[10px] text-muted-color font-mono">
-                    <span>{{ props.namespace.resourceQuota.memoryRequest }} request</span>
-                    <span
-                      :class="
-                        props.namespace.resourceQuota.memoryPercent >= 80
-                          ? 'text-rose-400'
-                          : 'text-violet-400'
-                      "
-                    >
-                      {{ props.namespace.resourceQuota.memoryPercent }}%
-                    </span>
-                    <span>{{ props.namespace.resourceQuota.memoryLimit }} limit</span>
+                  <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
+                    <span>Usage</span>
+                    <span class="font-bold text-primary">{{
+                      props.namespace.resourceQuota.memoryPercent
+                    }}%</span>
                   </div>
                 </div>
               </div>
-
-              <!-- No quota state -->
-              <div
-                v-else
-                class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-8 text-center flex flex-col items-center gap-3"
-              >
-                <BarChart2 class="w-8 h-8 text-muted-color/40" />
-                <div class="text-sm font-semibold text-muted-color">No Resource Quotas</div>
-                <div class="text-xs text-muted-color max-w-xs">
-                  This namespace has no resource quotas configured.
-                </div>
+              <div v-else class="text-xs text-muted-color italic py-4">
+                No ResourceQuotas defined for this namespace.
               </div>
             </TabPanel>
 
@@ -484,7 +470,7 @@ const annotationsExpanded = ref(false)
                   <div class="flex items-center justify-between mb-3">
                     <span class="text-xs font-semibold text-primary font-mono">{{ lr.type }}</span>
                     <span
-                      class="text-[9px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono"
+                      class="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono"
                     >
                       {{ lr.resource }}
                     </span>

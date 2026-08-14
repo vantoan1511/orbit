@@ -12,6 +12,7 @@ import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDet
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { useTableColumns } from '@/composables/useTableColumns'
@@ -238,10 +239,10 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     >
       <template #body="{ data }">
         <div class="flex items-center gap-2">
-          <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
+          <span class="font-semibold">{{ data.name }}</span>
           <span
             v-if="data.isSystem"
-            class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20"
+            class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20"
           >
             System
           </span>
@@ -252,15 +253,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Status Column -->
     <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-1.5">
-          <span
-            class="w-1.5 h-1.5 rounded-full"
-            :class="getStatusColor(data.status).split(' ')[0]"
-          ></span>
-          <span class="font-medium" :class="getStatusColor(data.status).split(' ')[1]">
-            {{ data.status }}
-          </span>
-        </div>
+        <StatusBadge :status="data.status" />
       </template>
     </Column>
 

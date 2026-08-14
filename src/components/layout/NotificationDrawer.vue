@@ -9,6 +9,7 @@ import {
   CircleCheck,
   Info,
   Trash2,
+  X,
   XCircle
 } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -158,7 +159,7 @@ const formatRelativeTime = (timestamp: number): string => {
                 :class="[
                   item.read
                     ? 'bg-(--bg-card) border-(--border) opacity-80 hover:opacity-100 hover:bg-(--bg-hover)/60'
-                    : 'bg-(--bg-hover) border-(--primary)/30 shadow-sm'
+                    : 'bg-(--bg-hover) border-(--border-strong) shadow-sm'
                 ]"
                 @click="notificationStore.markAsRead(item.id)"
               >
@@ -189,13 +190,14 @@ const formatRelativeTime = (timestamp: number): string => {
                         {{ formatRelativeTime(item.timestamp) }}
                       </span>
                       <Button
-                        icon="pi pi-times"
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5 h-5 p-0 text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        class="w-5! h-5! p-0! text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
                         @click.stop="notificationStore.removeNotification(item.id)"
-                      />
+                      >
+                        <X class="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
 
@@ -223,7 +225,7 @@ const formatRelativeTime = (timestamp: number): string => {
               <div
                 v-for="item in filteredNotifications"
                 :key="item.id"
-                class="group relative flex items-start gap-3 p-3.5 rounded-xl border bg-(--bg-hover) border-(--border)/30 transition-all duration-200 cursor-pointer select-none"
+                class="group relative flex items-start gap-3 p-3.5 rounded-xl border bg-(--bg-hover) border-(--border-strong) transition-all duration-200 cursor-pointer select-none"
                 @click="notificationStore.markAsRead(item.id)"
               >
                 <!-- Severity Icon Badge -->
@@ -249,13 +251,14 @@ const formatRelativeTime = (timestamp: number): string => {
                         {{ formatRelativeTime(item.timestamp) }}
                       </span>
                       <Button
-                        icon="pi pi-times"
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5 h-5 p-0 text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                        class="w-5! h-5! p-0! text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
                         @click.stop="notificationStore.removeNotification(item.id)"
-                      />
+                      >
+                        <X class="w-3 h-3" />
+                      </Button>
                     </div>
                   </div>
 

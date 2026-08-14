@@ -3,9 +3,10 @@ import { useTheme } from '@/composables/useTheme'
 import { os } from '@/services/nativeService'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
-import { Settings } from '@lucide/vue'
+import { Bell, Moon, Settings, Sun, User } from '@lucide/vue'
 import { Button } from 'primevue'
 import { useRoute, useRouter } from 'vue-router'
+import { GitHubIcon } from 'vue3-simple-icons'
 import { categories, type CategoryId, type SidebarCategory } from './navigation'
 
 defineProps<{
@@ -25,7 +26,7 @@ const { isDark, toggleTheme } = useTheme()
 
 <template>
   <div
-    class="w-14 flex flex-col items-center py-3 border-r border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-950 shrink-0 select-none"
+    class="w-14 flex flex-col items-center py-3 border-r border-(--border) bg-(--bg-sidebar) shrink-0 select-none"
   >
     <!-- Orbit Brand Logo -->
     <div class="mb-4 flex items-center justify-center p-1">
@@ -80,10 +81,12 @@ const { isDark, toggleTheme } = useTheme()
         v-tooltip.right="isDark ? 'Light Mode' : 'Dark Mode'"
         rounded
         variant="text"
-        class="w-10 h-10 text-muted-color"
-        :icon="isDark ? 'pi pi-sun' : 'pi pi-moon'"
+        class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
         @click="toggleTheme"
-      />
+      >
+        <Sun v-if="isDark" class="w-5 h-5" />
+        <Moon v-else class="w-5 h-5" />
+      </Button>
 
       <!-- Notifications -->
       <div class="relative inline-flex">
@@ -91,14 +94,15 @@ const { isDark, toggleTheme } = useTheme()
           v-tooltip.right="'Notifications'"
           rounded
           variant="text"
-          class="w-10 h-10 text-muted-color"
-          icon="pi pi-bell"
+          class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
           badge-severity="danger"
           :badge="
             notificationStore.unreadCount > 0 ? notificationStore.unreadCount.toString() : undefined
           "
           @click="notificationStore.toggleDrawer()"
-        />
+        >
+          <Bell class="w-5 h-5" />
+        </Button>
       </div>
 
       <!-- User Profile -->
@@ -106,20 +110,22 @@ const { isDark, toggleTheme } = useTheme()
         v-tooltip.right="'User Profile'"
         rounded
         variant="text"
-        class="w-10 h-10 text-muted-color"
-        icon="pi pi-user"
+        class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
         @click="profileStore.toggleDrawer()"
-      />
+      >
+        <User class="w-5 h-5" />
+      </Button>
 
       <!-- GitHub Docs -->
       <Button
         v-tooltip.right="'GitHub Repository'"
         rounded
         variant="text"
-        class="w-10 h-10 text-muted-color"
-        icon="pi pi-github"
+        class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
         @click="os.open('https://github.com/vantoan1511/orbit')"
-      />
+      >
+        <GitHubIcon :size="20" />
+      </Button>
     </div>
   </div>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
+import { Download, Gift, Loader2, X } from '@lucide/vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import { computed } from 'vue'
@@ -24,12 +25,12 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       return {
         text: trimmed.replace(/^#+\s*/, ''),
         class:
-          'font-bold text-slate-900 dark:text-slate-100 text-base mt-3 first:mt-0 pb-1 border-b border-slate-200 dark:border-zinc-800'
+          'font-bold text-primary text-base mt-3 first:mt-0 pb-1 border-b border-(--border)'
       }
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       return {
         text: '• ' + trimmed.substring(2),
-        class: 'pl-2 text-slate-700 dark:text-slate-300 leading-snug'
+        class: 'pl-2 text-secondary leading-snug'
       }
     } else if (trimmed.length === 0) {
       return {
@@ -39,7 +40,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     } else {
       return {
         text: trimmed,
-        class: 'text-slate-700 dark:text-slate-300 leading-normal'
+        class: 'text-secondary leading-normal'
       }
     }
   })
@@ -55,15 +56,15 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
   >
     <div class="flex flex-col gap-4">
       <!-- Header / Version Info -->
-      <div class="flex items-start gap-4 pb-4 border-b border-slate-200 dark:border-zinc-800">
+      <div class="flex items-start gap-4 pb-4 border-b border-(--border)">
         <div
           class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0"
         >
-          <i class="pi pi-gift text-2xl text-blue-500"></i>
+          <Gift class="w-6 h-6 text-blue-500" />
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">
+            <h3 class="text-lg font-bold text-primary">
               Orbit v{{ updaterStore.manifest?.version || '' }}
             </h3>
             <span
@@ -72,7 +73,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
               New Release
             </span>
           </div>
-          <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+          <p class="text-xs text-muted-color mt-0.5">
             A new version of Orbit is available. Review the release notes below to install or
             dismiss.
           </p>
@@ -82,19 +83,19 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       <!-- Release Notes Section -->
       <div>
         <h4
-          class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2"
+          class="text-xs font-semibold uppercase tracking-wider text-muted-color mb-2"
         >
           Release Notes
         </h4>
         <div
-          class="bg-slate-100/70 dark:bg-zinc-900/60 border border-slate-200 dark:border-zinc-800 rounded-xl p-4 max-h-64 overflow-y-auto text-sm flex flex-col gap-1.5"
+          class="bg-(--bg-hover)/40 border border-(--border) rounded-xl p-4 max-h-64 overflow-y-auto text-sm flex flex-col gap-1.5"
         >
           <template v-if="parsedNotes.length > 0">
             <div v-for="(block, index) in parsedNotes" :key="index" :class="block.class">
               {{ block.text }}
             </div>
           </template>
-          <div v-else class="text-slate-500 dark:text-slate-400 italic text-xs py-2">
+          <div v-else class="text-muted-color italic text-xs py-2">
             No release notes provided for this version.
           </div>
         </div>
@@ -103,14 +104,14 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       <!-- Download Progress Bar -->
       <div
         v-if="updaterStore.isDownloading"
-        class="pt-2 border-t border-slate-200 dark:border-zinc-800"
+        class="pt-2 border-t border-(--border)"
       >
         <div class="flex justify-between items-center text-xs mb-1.5">
-          <span class="font-medium text-slate-500 dark:text-slate-400">Downloading update...</span>
+          <span class="font-medium text-muted-color">Downloading update...</span>
           <span class="font-bold text-blue-500">{{ updaterStore.downloadProgress }}%</span>
         </div>
         <div
-          class="w-full bg-slate-200 dark:bg-zinc-800 rounded-full h-2 border border-slate-300 dark:border-zinc-700 overflow-hidden"
+          class="w-full bg-(--bg-hover) rounded-full h-2 border border-(--border-strong) overflow-hidden"
         >
           <div
             class="bg-blue-500 h-full rounded-full transition-all duration-300"
@@ -124,26 +125,31 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     <template #footer>
       <div class="flex justify-between items-center w-full pt-2">
         <Button
-          label="Dismiss"
-          icon="pi pi-times"
           severity="secondary"
           variant="text"
           size="small"
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.showUpdateDialog = false"
-        />
+        >
+          <X class="w-3.5 h-3.5 mr-1" />
+          <span>Dismiss</span>
+        </Button>
         <Button
-          :label="
-            updaterStore.isDownloading
-              ? `Downloading... ${updaterStore.downloadProgress}%`
-              : 'Install'
-          "
-          :icon="updaterStore.isDownloading ? 'pi pi-spinner pi-spin' : 'pi pi-download'"
           severity="primary"
           size="small"
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.applyUpdate()"
-        />
+        >
+          <Loader2 v-if="updaterStore.isDownloading" class="w-3.5 h-3.5 mr-1 animate-spin" />
+          <Download v-else class="w-3.5 h-3.5 mr-1" />
+          <span>
+            {{
+              updaterStore.isDownloading
+                ? `Downloading... ${updaterStore.downloadProgress}%`
+                : 'Install'
+            }}
+          </span>
+        </Button>
       </div>
     </template>
   </Dialog>

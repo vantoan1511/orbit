@@ -2,6 +2,7 @@
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import { Clock, Eye, EyeOff, FileCode, Server, Shield, Tag } from '@lucide/vue'
+import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -312,15 +313,18 @@ ${Object.entries(res.data)
                   >
                     <span class="text-xs font-bold font-mono text-violet-400">{{ key }}</span>
 
-                    <button
+                    <Button
                       v-if="isSecret(props.resource)"
-                      @click="toggleRevealKey(key)"
-                      class="p-1 rounded text-muted-color hover:text-primary hover:bg-(--bg-hover) transition-all duration-200"
+                      severity="secondary"
+                      variant="text"
+                      size="small"
+                      class="p-1! h-auto!"
                       title="Toggle visibility"
+                      @click="toggleRevealKey(key)"
                     >
                       <EyeOff v-if="revealedKeys[key]" class="w-3.5 h-3.5" />
                       <Eye v-else class="w-3.5 h-3.5" />
-                    </button>
+                    </Button>
                   </div>
 
                   <pre

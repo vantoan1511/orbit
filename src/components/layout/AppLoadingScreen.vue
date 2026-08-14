@@ -133,7 +133,7 @@ onUnmounted(() => {
     <!-- Progress bar -->
     <div class="w-full max-w-md h-2 rounded-full overflow-hidden my-2">
       <div
-        class="h-full bg-linear-to-r from-primary-500 to-surface-400 rounded-full transition-all duration-300 ease-out"
+        class="h-full bg-primary rounded-full transition-all duration-300 ease-out"
         :style="{ width: `${progress}%` }"
       ></div>
     </div>

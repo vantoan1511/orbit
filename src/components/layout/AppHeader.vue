@@ -109,7 +109,7 @@ const items = computed(() => {
 
 <template>
   <header
-    class="flex items-center select-none bg-surface-100 dark:bg-surface-900 border-b border-surface-200/60 dark:border-surface-800/60 px-3 py-2 text-xs shrink-0 z-20"
+    class="flex items-center select-none bg-(--bg-sidebar) border-b border-(--border) px-3 py-2 text-xs shrink-0 z-20"
   >
     <Breadcrumb :home="home" :model="items" class="p-0! bg-transparent! border-none! text-xs">
       <template #item="{ item, props }">

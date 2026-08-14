@@ -52,11 +52,11 @@ const startResize = (e: MouseEvent) => {
     v-if="activeTab"
     ref="panelRef"
     :style="{ width: `${panelWidth}px` }"
-    class="relative flex flex-col h-full overflow-hidden border-r border-surface-200 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 select-none shrink-0"
+    class="relative flex flex-col h-full overflow-hidden border-r border-(--border) bg-(--bg-sidebar) select-none shrink-0"
   >
     <!-- Panel Header -->
     <div
-      class="h-10 px-4 flex items-center justify-between border-b border-surface-100 dark:border-surface-800 shrink-0"
+      class="h-10 px-4 flex items-center justify-between border-b border-(--border) shrink-0"
     >
       <span class="text-sm font-medium tracking-tighter uppercase text-primary font-ui truncate">
         {{ activeTab === 'clusters' ? 'Clusters' : currentCategoryTitle }}

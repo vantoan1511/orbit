@@ -113,7 +113,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Name Column -->
     <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
       <template #body="{ data }">
-        <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
+        <span class="font-semibold">{{ data.name }}</span>
       </template>
     </Column>
 

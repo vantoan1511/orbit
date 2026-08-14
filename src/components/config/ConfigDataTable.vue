@@ -167,9 +167,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
       <template #body="{ data }">
         <div class="flex items-center gap-2">
-          <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-sky-400" />
-          <Lock v-else class="w-4 h-4 text-rose-400" />
-          <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
+          <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-configmap" />
+          <Lock v-else class="w-4 h-4 text-secret" />
+          <span class="font-semibold">{{ data.name }}</span>
         </div>
       </template>
     </Column>
@@ -194,7 +194,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="(val, key) in data.labels"
             :key="key"
-            class="font-mono text-[9px] bg-(--bg-hover) text-muted-color border border-(--border) px-1.5 py-0.5 rounded"
+            class="font-mono text-[10px] bg-(--bg-hover) text-muted-color border border-(--border) px-1.5 py-0.5 rounded"
           >
             {{ key }}: {{ val }}
           </span>
