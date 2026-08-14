@@ -25,7 +25,7 @@ pub use batch::{list_jobs, list_cronjobs};
 pub use nodes::list_nodes;
 pub use namespaces::list_namespaces;
 pub use services::list_services;
-pub use ingresses::list_ingresses;
+pub use ingresses::{list_ingresses, clone_ingress};
 pub use events::list_events;
 pub use policies::*;
 pub use logs::{stream_pod_logs, get_workload_pods};

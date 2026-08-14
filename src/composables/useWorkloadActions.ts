@@ -6,6 +6,7 @@ import { computed, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
 import { kubernetesService } from '@/services/kubernetesService'
 import ScaleDialog from '@/components/shared/ScaleDialog.vue'
+import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 
 export interface WorkloadActionOptions<T> {
   kind?: MaybeRefOrGetter<string>
@@ -84,6 +85,63 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     items.push({ separator: true })
+
+    // Clone (Ingress only)
+    if (resourceKind === 'Ingress') {
+      items.push({
+        label: 'Clone',
+        icon: 'pi pi-copy',
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+
+          const ingressRow = row as T & { hosts?: string }
+          const sourceHosts = ingressRow.hosts
+            ? ingressRow.hosts
+                .split(',')
+                .map((h: string) => h.trim())
+                .filter(Boolean)
+            : []
+
+          dialog.open(CloneIngressDialog, {
+            props: {
+              header: 'Clone Ingress',
+              style: {
+                width: '380px'
+              },
+              modal: true
+            },
+            data: {
+              sourceName: row.name,
+              sourceNamespace: row.namespace || 'default',
+              sourceHosts
+            },
+            onClose: async (options) => {
+              const result = options?.data as
+                { newName: string; newNamespace: string; newHosts: string[] } | undefined
+              if (result?.newName) {
+                try {
+                  await kubernetesService.cloneIngress({
+                    sourceNamespace: row.namespace || 'default',
+                    sourceName: row.name,
+                    newName: result.newName,
+                    newNamespace: result.newNamespace,
+                    newHosts: result.newHosts
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to clone Ingress',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      })
+    }
 
     // Redeploy
     if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(resourceKind)) {
