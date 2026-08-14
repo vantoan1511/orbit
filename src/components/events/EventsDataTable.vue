@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import Column from 'primevue/column'
-import Select from 'primevue/select'
-import Button from 'primevue/button'
-import { MoreVertical } from '@lucide/vue'
-import type { EventInfo } from '@/types/kubernetes'
-import EventDetailsDrawer from './EventDetailsDrawer.vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { storeToRefs } from 'pinia'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { EventInfo } from '@/types/kubernetes'
+import { MoreVertical } from '@lucide/vue'
+import { storeToRefs } from 'pinia'
+import Button from 'primevue/button'
+import Column from 'primevue/column'
+import Select from 'primevue/select'
+import { computed, onMounted, ref } from 'vue'
+import EventDetailsDrawer from './EventDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
 const { events } = storeToRefs(k8sStore)
@@ -83,25 +83,20 @@ const getTypeBadgeClass = (type: string) => {
   }
 }
 
-const actionMenuRef = useResourceActionMenu<EventInfo & { name: string }>()
-const actionMenu = actionMenuRef.actionMenu
-const selectedActionRow = actionMenuRef.selectedActionRow
-
-const toggleActionMenu = (event: Event, data: EventInfo) => {
-  event.stopPropagation()
-  selectedActionRow.value = { ...data, name: data.objectName }
-  actionMenu.value?.toggle(event)
-}
-
-const onRowContextMenu = (event: { originalEvent: Event; data: EventInfo }) => {
-  event.originalEvent?.stopPropagation()
-  event.originalEvent?.preventDefault()
-  selectedActionRow.value = { ...event.data, name: event.data.objectName }
-  actionMenu.value?.show(event.originalEvent)
-}
+const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } = useResourceActionMenu<
+  EventInfo,
+  EventInfo & { name: string }
+>((event) => ({
+  ...event,
+  name: event.objectName
+}))
 
 const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'Event'
+  kind: 'Event',
+  onViewDetails: (row) => {
+    selectedEvent.value = row
+    drawerVisible.value = true
+  }
 })
 </script>
 

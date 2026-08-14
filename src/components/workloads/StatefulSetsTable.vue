@@ -8,6 +8,7 @@ import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns } from '@/composables/useTableColumns'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { StatefulSetInfo } from '@/types/kubernetes'
@@ -89,8 +90,6 @@ const onRowClick = (event: { data: StatefulSetInfo }) => {
   selectedWorkload.value = event.data
   drawerVisible.value = true
 }
-
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
   useResourceActionMenu<StatefulSetInfo>()
