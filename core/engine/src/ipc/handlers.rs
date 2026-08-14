@@ -1252,6 +1252,65 @@ pub fn dispatch(
                 }
             });
         }
+        "cloneIngress" => {
+            tokio::spawn(async move {
+                let source_namespace = get_string(&data, "sourceNamespace")
+                    .unwrap_or_else(|| "default".to_string());
+                let source_name = get_string(&data, "sourceName").unwrap_or_default();
+                let new_name = get_string(&data, "newName").unwrap_or_default();
+                let new_namespace = get_string(&data, "newNamespace")
+                    .unwrap_or_else(|| source_namespace.clone());
+                let new_hosts: Vec<String> = data.as_ref()
+                    .and_then(|d| d.get("newHosts"))
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+
+                if let Some(ref client) = client {
+                    match crate::kubernetes::clone_ingress(
+                        client,
+                        &source_namespace,
+                        &source_name,
+                        &new_name,
+                        &new_namespace,
+                        new_hosts,
+                    )
+                    .await
+                    {
+                        Ok(()) => {
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::CommandSucceeded {
+                                    message: format!("Cloned Ingress {} as {}", source_name, new_name),
+                                },
+                            )
+                            .await;
+                        }
+                        Err(e) => {
+                            log::error!("Error cloning Ingress {}: {:?}", source_name, e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to clone Ingress: {}", e),
+                                },
+                            )
+                            .await;
+                        }
+                    }
+                }
+            });
+        }
         _ => {}
     }
 }
