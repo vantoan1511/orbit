@@ -186,15 +186,18 @@ const handleDeleteCachedContexts = () => {
                 <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
                 <InputText
                   v-model="kubeconfigPath"
-                  class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                  class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg"
                 />
               </div>
               <Button
+                size="small"
+                severity="secondary"
+                variant="outlined"
+                class="text-xs font-semibold flex items-center gap-1.5"
                 @click="handleReloadKubeconfig"
-                class="flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-[var(--bg-active)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-all"
               >
                 <RefreshCw class="w-3.5 h-3.5" />
-                Reload
+                <span>Reload</span>
               </Button>
             </div>
             <span class="text-[11px] text-muted-color"
@@ -225,9 +228,9 @@ const handleDeleteCachedContexts = () => {
     </div>
 
     <!-- Danger Zone Card -->
-    <div class="bg-red-500/5 border border-red-500/20 rounded-xl p-6 shadow-sm flex flex-col gap-6">
+    <div class="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 shadow-sm flex flex-col gap-6">
       <div>
-        <div class="flex items-center gap-2 text-red-500">
+        <div class="flex items-center gap-2 text-rose-500">
           <AlertTriangle class="w-4 h-4" />
           <h3 class="text-base font-semibold">Danger Zone</h3>
         </div>
@@ -238,20 +241,29 @@ const handleDeleteCachedContexts = () => {
 
       <div class="flex flex-wrap gap-3">
         <Button
+          size="small"
+          severity="danger"
+          variant="outlined"
+          class="text-xs font-semibold"
           @click="handleResetCache"
-          class="px-4 py-2 text-xs font-semibold border border-red-500/30 rounded-lg text-red-500 hover:bg-red-500/10 transition-all bg-transparent cursor-pointer"
         >
           Reset Application Cache
         </Button>
         <Button
+          size="small"
+          severity="danger"
+          variant="outlined"
+          class="text-xs font-semibold"
           @click="handleDeleteCachedContexts"
-          class="px-4 py-2 text-xs font-semibold border border-red-500/30 rounded-lg text-red-500 hover:bg-red-500/10 transition-all bg-transparent cursor-pointer"
         >
           Delete Cached Contexts
         </Button>
         <Button
+          size="small"
+          severity="danger"
+          variant="outlined"
+          class="text-xs font-semibold"
           @click="handleResetAllSettings"
-          class="px-4 py-2 text-xs font-semibold border border-red-500/30 rounded-lg text-red-500 hover:bg-red-500/10 transition-all bg-transparent cursor-pointer"
         >
           Reset All Settings
         </Button>

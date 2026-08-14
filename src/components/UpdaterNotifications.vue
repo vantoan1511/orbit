@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
+import { Download, RefreshCw } from '@lucide/vue'
 import { app } from '@neutralinojs/lib'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
@@ -56,7 +57,7 @@ watch(
     <template #message="slotProps">
       <div class="flex flex-col items-start w-full">
         <div class="flex items-center gap-2">
-          <i class="pi pi-download"></i>
+          <Download class="w-4 h-4" />
           <span class="font-bold">{{ slotProps.message.summary }}</span>
         </div>
         <div class="font-medium text-sm my-2">{{ slotProps.message.detail }}</div>
@@ -84,7 +85,7 @@ watch(
     :style="{ width: '25rem' }"
   >
     <div class="flex items-center gap-4 mb-4">
-      <i class="pi pi-sync text-4xl text-primary"></i>
+      <RefreshCw class="w-10 h-10 text-primary shrink-0 animate-spin" />
       <span class="m-0"
         >Orbit has been successfully updated. Restarting in {{ countdown }} seconds...</span
       >

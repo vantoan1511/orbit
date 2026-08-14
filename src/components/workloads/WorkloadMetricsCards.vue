@@ -231,7 +231,7 @@ const cardItems = computed(() => [
               <span>{{ card.percentValue }}% {{ card.footerText }}</span>
             </div>
             <div
-              class="w-full h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden"
+              class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden"
             >
               <div
                 :class="['h-full rounded-full', card.progressClass]"

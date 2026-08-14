@@ -66,7 +66,7 @@ const cloudProvider = computed(() => {
 
 <template>
   <footer
-    class="flex items-center justify-between gap-4 select-none bg-surface-100 dark:bg-surface-900 border-t border-surface-200/60 dark:border-surface-800/60 px-3 py-1 text-[11px] shrink-0 z-20"
+    class="flex items-center justify-between gap-4 select-none bg-(--bg-sidebar) border-t border-(--border) px-3 py-1 text-[11px] shrink-0 z-20"
   >
     <!-- Left side: Cluster info & inline metadata -->
     <div class="flex items-center gap-4 min-w-0">
@@ -84,7 +84,7 @@ const cloudProvider = computed(() => {
         v-if="activeCluster !== null && activeCluster.status === 'healthy'"
         class="flex items-center gap-3 text-[11px] font-medium tracking-wider text-muted-color shrink-0"
       >
-        <div class="h-3 w-px bg-surface-300 dark:bg-surface-700"></div>
+        <div class="h-3 w-px bg-(--border)"></div>
 
         <!-- Kubernetes Version -->
         <div class="flex items-center gap-1">

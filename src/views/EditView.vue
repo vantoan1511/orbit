@@ -9,6 +9,7 @@ import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
+import { Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
@@ -206,7 +207,7 @@ watch(
       <!-- Mode Toggle & Action Buttons -->
       <div class="flex items-center gap-4">
         <div
-          class="flex items-center gap-2 px-3 py-1 bg-(--bg-primary) border border-(--border) rounded-md"
+          class="flex items-center gap-2 px-3 py-1 bg-(--bg-card) border border-(--border) rounded-md"
         >
           <span
             class="text-xs font-medium"
@@ -238,7 +239,7 @@ watch(
 
     <!-- Content -->
     <div v-if="isLoading" class="flex-1 flex items-center justify-center">
-      <i class="pi pi-spin pi-spinner text-3xl text-muted-color"></i>
+      <Loader2 class="w-8 h-8 text-muted-color animate-spin" />
     </div>
     <div v-else class="flex-1 flex overflow-hidden">
       <!-- Form Mode -->
@@ -259,7 +260,7 @@ watch(
                 <InputText
                   disabled
                   v-model="formValues.name"
-                  class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-muted-color opacity-70"
+                  class="px-3 py-2 bg-(--bg-hover)/30 border border-(--border) rounded-md text-sm text-muted-color opacity-70"
                 />
               </div>
 
@@ -268,7 +269,7 @@ watch(
                 <InputText
                   disabled
                   v-model="formValues.namespace"
-                  class="px-3 py-2 bg-(--bg-primary) border border-(--border) rounded-md text-sm text-muted-color opacity-70"
+                  class="px-3 py-2 bg-(--bg-hover)/30 border border-(--border) rounded-md text-sm text-muted-color opacity-70"
                 />
               </div>
 

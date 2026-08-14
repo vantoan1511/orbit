@@ -221,7 +221,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
           <span
             v-for="img in data.images"
             :key="img"
-            class="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-700 text-muted-color text-xs font-mono truncate max-w-full"
+            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-xs font-mono truncate max-w-full"
             :title="img"
           >
             {{ img.split('/').pop() }}

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import Column from 'primevue/column'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useResourceFilters } from '@/composables/useResourceFilters'
@@ -59,10 +60,7 @@ const handleRefresh = async () => {
     <!-- Status Column -->
     <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
       <template #body="{ data }">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span class="font-semibold">{{ data.status }}</span>
-        </div>
+        <StatusBadge :status="data.status" />
       </template>
     </Column>
 
@@ -74,7 +72,7 @@ const handleRefresh = async () => {
           :class="
             data.role === 'control-plane'
               ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-              : 'bg-zinc-500/10 text-muted-color border-surface-200 dark:border-surface-700'
+              : 'bg-zinc-500/10 text-muted-color border-(--border)'
           "
         >
           {{ data.role }}
@@ -100,7 +98,7 @@ const handleRefresh = async () => {
               >{{ data.cpuUsed }} / {{ data.cpuTotal }}C</span
             >
           </div>
-          <div class="w-full h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+          <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
               class="h-full bg-blue-500 rounded-full"
               :style="{ width: data.cpuPct + '%' }"
@@ -126,7 +124,7 @@ const handleRefresh = async () => {
               >{{ data.memUsed }} / {{ data.memTotal }}G</span
             >
           </div>
-          <div class="w-full h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+          <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
               class="h-full bg-indigo-500 rounded-full"
               :style="{ width: data.memPct + '%' }"
@@ -152,7 +150,7 @@ const handleRefresh = async () => {
               >{{ data.podsCount }} / {{ data.podsLimit }}</span
             >
           </div>
-          <div class="w-full h-1.5 rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
+          <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
               class="h-full bg-sky-500 rounded-full"
               :style="{ width: (data.podsCount / data.podsLimit) * 100 + '%' }"
@@ -179,7 +177,7 @@ const handleRefresh = async () => {
           <span
             v-for="label in data.labels"
             :key="label"
-            class="px-1.5 py-0.5 rounded bg-surface-200 dark:bg-surface-700 text-muted-color text-xs font-mono truncate"
+            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-xs font-mono truncate"
             :title="label"
           >
             {{ label }}

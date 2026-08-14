@@ -179,18 +179,26 @@ const handleClearAllData = () => {
 
         <div class="flex flex-col gap-2 pt-2 border-t border-(--border)">
           <Button
+            size="small"
+            severity="secondary"
+            variant="outlined"
+            fluid
+            class="text-xs font-semibold"
             @click="handleClearCache"
-            class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold bg-[var(--bg-hover)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] hover:bg-[var(--bg-active)] transition-all cursor-pointer"
           >
-            <Trash2 class="w-3.5 h-3.5 text-rose-500" />
-            Clear Local Cache
+            <Trash2 class="w-3.5 h-3.5 text-rose-500 mr-1" />
+            <span>Clear Local Cache</span>
           </Button>
 
           <Button
+            size="small"
+            severity="danger"
+            variant="outlined"
+            fluid
+            class="text-xs font-semibold"
             @click="handleClearAllData"
-            class="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold bg-rose-500/10 border border-rose-500/20 rounded-lg text-rose-400 hover:bg-rose-500/20 transition-all cursor-pointer"
           >
-            Clear All Data
+            <span>Clear All Data</span>
           </Button>
         </div>
       </div>

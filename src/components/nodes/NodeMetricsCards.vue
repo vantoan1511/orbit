@@ -93,59 +93,61 @@ const cards = computed(() => {
 
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
-    <Card v-for="card in cards" :key="card.title">
-      <template #content>
-        <div class="flex items-center gap-5">
+    <div
+      v-for="card in cards"
+      :key="card.title"
+      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
+    >
+      <div class="flex items-center gap-5">
+        <div
+          class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          :class="card.iconColor"
+        >
+          <component :is="card.icon" class="w-6 h-6" />
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-xs font-bold text-muted-color uppercase tracking-wider">
+            {{ card.title }}
+          </div>
           <div
-            class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-            :class="card.iconColor"
+            class="text-2xl font-bold mt-1"
+            :class="card.title === 'Node Pressures' ? 'text-emerald-500 text-lg' : 'text-primary'"
           >
-            <component :is="card.icon" class="w-6 h-6" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-bold text-muted-color uppercase tracking-wider">
-              {{ card.title }}
-            </div>
-            <div
-              class="text-2xl font-bold mt-1"
-              :class="card.title === 'Node Pressures' ? 'text-emerald-500 text-lg' : 'text-primary'"
-            >
-              {{ card.value }}
-              <span v-if="card.subvalue" class="text-sm text-muted-color font-normal">
-                {{ card.subvalue }}
-              </span>
-            </div>
+            {{ card.value }}
+            <span v-if="card.subvalue" class="text-sm text-muted-color font-normal">
+              {{ card.subvalue }}
+            </span>
           </div>
         </div>
+      </div>
 
-        <!-- Bottom Section: Progress or Detail -->
-        <div class="mt-4">
-          <template v-if="card.progress !== undefined">
-            <div class="flex justify-between text-xs text-muted-color mb-1 font-mono">
-              <span>{{ card.detail }}</span>
-            </div>
+      <!-- Bottom Section: Progress or Detail -->
+      <div class="mt-4">
+        <template v-if="card.progress !== undefined">
+          <div class="flex justify-between text-xs text-muted-color mb-1 font-mono">
+            <span>{{ card.detail }}</span>
+          </div>
+          <div
+            class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden"
+          >
             <div
-              class="w-full h-1.5 rounded-full bg-surface-300 dark:bg-surface-600 overflow-hidden"
-            >
-              <div
-                class="h-full rounded-full"
-                :class="card.progressColor"
-                :style="{ width: card.progress + '%' }"
-              ></div>
-            </div>
-          </template>
-          <template v-else-if="card.isPressure">
-            <div class="text-xs text-muted-color flex gap-2">
-              <span v-for="p in card.pressures" :key="p.name" class="flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{{ p.name }}
-              </span>
-            </div>
-          </template>
-          <template v-else>
-            <div class="text-xs text-emerald-500 font-medium">{{ card.detail }}</div>
-          </template>
-        </div>
-      </template>
-    </Card>
+              class="h-full rounded-full"
+              :class="card.progressColor"
+              :style="{ width: card.progress + '%' }"
+            ></div>
+          </div>
+        </template>
+        <template v-else-if="card.isPressure">
+          <div class="text-xs text-muted-color flex gap-2">
+            <span v-for="p in card.pressures" :key="p.name" class="flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{{ p.name }}
+            </span>
+          </div>
+        </template>
+        <template v-else>
+          <div class="text-xs text-emerald-500 font-medium">{{ card.detail }}</div>
+        </template>
+      </div>
+    </div>
   </div>
 </template>

@@ -157,7 +157,7 @@ const getStatusBadgeClass = (status: string) => {
                     <span class="text-muted-color font-semibold">Violations (7d)</span>
                     <span
                       class="col-span-2 font-mono font-bold"
-                      :class="props.policy.violations > 0 ? 'text-red-400' : 'text-primary'"
+                      :class="props.policy.violations > 0 ? 'text-rose-400' : 'text-primary'"
                     >
                       {{ props.policy.violations }}
                     </span>
