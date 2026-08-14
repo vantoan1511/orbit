@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
+import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
+import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
+import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
+import { useTableColumns } from '@/composables/useTableColumns'
+import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import { kubernetesService } from '@/services/kubernetesService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { NamespaceInfo } from '@/types/kubernetes'
+import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Column from 'primevue/column'
 import Select from 'primevue/select'
-import { MoreVertical } from '@lucide/vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { kubernetesService } from '@/services/kubernetesService'
-import type { NamespaceInfo } from '@/types/kubernetes'
+import { computed, onMounted, ref } from 'vue'
 import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import StatusBadge from '@/components/shared/StatusBadge.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
-import { useTableColumns } from '@/composables/useTableColumns'
 
 interface MappedNamespaceInfo extends NamespaceInfo {
   pods: number
@@ -141,17 +141,6 @@ const handleRefresh = async () => {
 const onRowClick = (event: { data: MappedNamespaceInfo }) => {
   selectedNamespace.value = event.data
   drawerVisible.value = true
-}
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Active':
-      return 'bg-emerald-500 text-emerald-500'
-    case 'Terminating':
-      return 'bg-amber-500 text-amber-500'
-    default:
-      return 'bg-gray-400 text-gray-400'
-  }
 }
 
 // Sparkline chart options - minimal, no axes, no tooltips

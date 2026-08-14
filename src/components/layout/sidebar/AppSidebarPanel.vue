@@ -55,9 +55,7 @@ const startResize = (e: MouseEvent) => {
     class="relative flex flex-col h-full overflow-hidden border-r border-(--border) bg-(--bg-sidebar) select-none shrink-0"
   >
     <!-- Panel Header -->
-    <div
-      class="h-10 px-4 flex items-center justify-between border-b border-(--border) shrink-0"
-    >
+    <div class="h-10 px-4 flex items-center justify-between border-b border-(--border) shrink-0">
       <span class="text-sm font-medium tracking-tighter uppercase text-primary font-ui truncate">
         {{ activeTab === 'clusters' ? 'Clusters' : currentCategoryTitle }}
       </span>

@@ -228,7 +228,9 @@ const handleDeleteCachedContexts = () => {
     </div>
 
     <!-- Danger Zone Card -->
-    <div class="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 shadow-sm flex flex-col gap-6">
+    <div
+      class="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 shadow-sm flex flex-col gap-6"
+    >
       <div>
         <div class="flex items-center gap-2 text-rose-500">
           <AlertTriangle class="w-4 h-4" />

@@ -407,11 +407,14 @@ const annotationsExpanded = ref(false)
                 <div class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-3">
                   <div class="flex justify-between items-center text-xs">
                     <span class="text-muted-color font-semibold">CPU</span>
-                    <span class="font-mono text-muted-color">{{
-                      props.namespace.resourceQuota.cpuUsed
-                    }} / {{ props.namespace.resourceQuota.cpuLimit }}</span>
+                    <span class="font-mono text-muted-color"
+                      >{{ props.namespace.resourceQuota.cpuUsed }} /
+                      {{ props.namespace.resourceQuota.cpuLimit }}</span
+                    >
                   </div>
-                  <div class="h-2 bg-(--bg-card) rounded-full overflow-hidden border border-(--border)">
+                  <div
+                    class="h-2 bg-(--bg-card) rounded-full overflow-hidden border border-(--border)"
+                  >
                     <div
                       class="h-full bg-violet-500 rounded-full transition-all duration-500"
                       :style="{
@@ -419,11 +422,13 @@ const annotationsExpanded = ref(false)
                       }"
                     ></div>
                   </div>
-                  <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
+                  <div
+                    class="flex justify-between items-center text-[10px] text-muted-color font-mono"
+                  >
                     <span>Usage</span>
-                    <span class="font-bold text-primary">{{
-                      props.namespace.resourceQuota.cpuPercent
-                    }}%</span>
+                    <span class="font-bold text-primary"
+                      >{{ props.namespace.resourceQuota.cpuPercent }}%</span
+                    >
                   </div>
                 </div>
 
@@ -431,11 +436,14 @@ const annotationsExpanded = ref(false)
                 <div class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 space-y-3">
                   <div class="flex justify-between items-center text-xs">
                     <span class="text-muted-color font-semibold">Memory</span>
-                    <span class="font-mono text-muted-color">{{
-                      props.namespace.resourceQuota.memoryUsed
-                    }} / {{ props.namespace.resourceQuota.memoryLimit }}</span>
+                    <span class="font-mono text-muted-color"
+                      >{{ props.namespace.resourceQuota.memoryUsed }} /
+                      {{ props.namespace.resourceQuota.memoryLimit }}</span
+                    >
                   </div>
-                  <div class="h-2 bg-(--bg-card) rounded-full overflow-hidden border border-(--border)">
+                  <div
+                    class="h-2 bg-(--bg-card) rounded-full overflow-hidden border border-(--border)"
+                  >
                     <div
                       class="h-full bg-blue-500 rounded-full transition-all duration-500"
                       :style="{
@@ -443,11 +451,13 @@ const annotationsExpanded = ref(false)
                       }"
                     ></div>
                   </div>
-                  <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
+                  <div
+                    class="flex justify-between items-center text-[10px] text-muted-color font-mono"
+                  >
                     <span>Usage</span>
-                    <span class="font-bold text-primary">{{
-                      props.namespace.resourceQuota.memoryPercent
-                    }}%</span>
+                    <span class="font-bold text-primary"
+                      >{{ props.namespace.resourceQuota.memoryPercent }}%</span
+                    >
                   </div>
                 </div>
               </div>

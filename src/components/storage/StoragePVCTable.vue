@@ -92,10 +92,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       bodyClass="font-medium text-primary"
     >
       <template #body="{ data }">
-        <span
-          class="font-semibold font-mono truncate max-w-48 block"
-          :title="data.name"
-        >
+        <span class="font-semibold font-mono truncate max-w-48 block" :title="data.name">
           {{ data.name }}
         </span>
       </template>

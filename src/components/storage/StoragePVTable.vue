@@ -107,10 +107,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     >
       <template #body="{ data }">
         <div class="flex items-center gap-1.5">
-          <span
-            class="font-semibold font-mono truncate max-w-56"
-            :title="data.name"
-          >
+          <span class="font-semibold font-mono truncate max-w-56" :title="data.name">
             {{ data.name }}
           </span>
           <AlertCircle

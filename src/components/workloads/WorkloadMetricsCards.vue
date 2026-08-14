@@ -230,9 +230,7 @@ const cardItems = computed(() => [
             <div class="flex justify-between text-xs text-muted-color mb-1 font-mono">
               <span>{{ card.percentValue }}% {{ card.footerText }}</span>
             </div>
-            <div
-              class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden"
-            >
+            <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
                 :class="['h-full rounded-full', card.progressClass]"
                 :style="{ width: card.percentValue + '%' }"
