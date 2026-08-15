@@ -1,71 +1,115 @@
 # Orbit 🛰️
 
-**Navigate Kubernetes with confidence.**
+<p align="center">
+  <strong>Lightweight, high-performance native desktop Kubernetes dashboard.</strong>
+</p>
 
-Orbit is a fast, lightweight, and native desktop dashboard designed to explore, monitor, and manage your Kubernetes clusters. Built to feel native and stay resource-efficient, Orbit gives you a powerful visual overview of your clusters without the heavy memory footprint and sluggish startup times of traditional Electron-based tools.
+<p align="center">
+  <a href="https://github.com/vantoan1511/orbit/releases"><img src="https://img.shields.io/github/v/release/vantoan1511/orbit?style=flat-square&color=4f8cff" alt="Latest Release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-emerald?style=flat-square" alt="License"></a>
+  <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Backend-Rust-orange?style=flat-square&logo=rust" alt="Rust"></a>
+  <a href="https://neutralino.js.org/"><img src="https://img.shields.io/badge/Runtime-Neutralinojs-8b5cf6?style=flat-square" alt="Neutralinojs"></a>
+  <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Frontend-Vue%203-emerald?style=flat-square&logo=vue.js" alt="Vue 3"></a>
+  <a href="https://primevue.org/"><img src="https://img.shields.io/badge/UI-PrimeVue%20v4-blue?style=flat-square" alt="PrimeVue v4"></a>
+</p>
+
+---
+   
+Orbit is a fast, native-feeling desktop dashboard crafted for exploring, monitoring, and managing Kubernetes clusters. Built on top of a compiled **Rust engine** and the lightweight **Neutralinojs** desktop runtime, Orbit delivers instant startup, low memory footprint, and low-latency cluster API communication — without the bloat of traditional Electron applications.
 
 ---
 
 ## ⚡ Why Orbit?
 
-- **Native Performance**: Leverages a compiled Rust engine for low-latency cluster API communication and high-speed data processing.
-- **Minimal Resource Footprint**: Built on [Neutralinojs](https://neutralino.js.org/), bypassing the heavy Chromium runtime package. It runs on a fraction of the RAM used by typical desktop dashboards.
-- **Production-Ready Security**: Sensitive credentials, tokens, and certificates are handled strictly by the local Rust backend and never exposed to the frontend presentation layer.
+- **Native Rust Engine**: Low-latency communication with Kubernetes APIs, stream parsing, and credentials management handled by compiled native Rust binaries.
+- **Zero Electron Overhead**: Powered by [Neutralinojs](https://neutralino.js.org/), utilizing native operating system webview capabilities rather than bundling a duplicate Chromium browser.
+- **Security-First Architecture**: Sensitive kubeconfigs, tokens, and certificates are isolated inside the local Rust backend and never directly exposed to the frontend presentation layer.
+- **Compact & Technical Design**: Inspired by modern developer IDEs and the PrimeVue Nora theme — dense, monochrome/noir, and designed for efficient daily cluster operations.
 
 ---
 
 ## ✨ Features
 
-- **Multi-Cluster Context Switching**: Easily toggle between different Kubernetes clusters and contexts.
-- **Resource Explorer**: Inspect and manage pods, deployments, services, config maps, namespaces, and custom resource definitions (CRDs).
-- **Real-Time Logs & Events**: Instantly stream logs and view cluster events directly in a clean, filterable interface.
-- **Global Namespace Filtering**: Filter resource views globally or drill down into specific namespaces.
-- **Automatic Updates**: Always run the latest version with built-in, secure background updates managed by a dedicated rust updater.
-- **Modern UI/UX**: Responsive interface built using PrimeVue v4 and Tailwind CSS v4, supporting rich animations and transitions.
+### ☸️ Cluster & Context Management
 
----
+- **Instant Context Switching**: Seamlessly toggle between local (k3s, Minikube, Kind) and remote cloud Kubernetes clusters.
+- **Namespace Filtering**: Global namespace scope switcher with immediate resource updates across all views.
+- **Offline Cluster Awareness**: Graceful handling and clear diagnostics when clusters or nodes are unreachable.
 
-## 💾 Installation
+### 📦 Complete Resource Explorer
 
-Orbit is currently available for Windows.
+- **Workloads**: Inspect Deployments, Pods, StatefulSets, DaemonSets, Jobs, CronJobs, and ReplicaSets with live status indicators.
+- **Configuration & Storage**: Inspect ConfigMaps, Secrets, HPAs, PersistentVolumes, PersistentVolumeClaims, and StorageClasses.
+- **Network & Security**: Explore Services, Ingresses, NetworkPolicies, ResourceQuotas, and LimitRanges.
+- **Cluster Infrastructure**: Deep-dive into Nodes, Namespaces, and system-level events.
 
-### Download the Installer
+### 📝 Live YAML & In-App Apply
 
-1. Go to the [Releases](https://github.com/vantoan1511/orbit/releases) page.
-2. Download the latest `Orbit-Setup-x.y.z.exe` installer.
-3. Run the installer to install Orbit on your system.
+- **Integrated Monaco Editor**: Syntax-highlighted YAML editor with real-time Kubernetes schema awareness.
+- **Direct Apply & Diff**: Edit and apply manifests directly to the cluster with structured error feedback.
 
-_Support for macOS and Linux builds is coming soon._
+### 📊 Real-Time Logs & Events
+
+- **Pod Log Streaming**: Follow live container logs, switch between multi-container pods, and filter log output.
+- **Cluster Events**: Filter and monitor recent cluster warnings, errors, and lifecycle events.
+
+### 🔄 Seamless Background Updates
+
+- **Automatic Version Checks**: Integrated lightweight Rust updater keeps your installation secure and up to date.
 
 ---
 
 ## 🏗️ Architecture
 
-Orbit is structured to maintain a clean separation of concerns:
+Orbit enforces a strict single-responsibility boundary between the frontend and backend:
 
 ```
-┌──────────────────────────────────────┐
-│            Vue 3 Frontend            │  <-- Rendering, View State, UI Animations
-└──────────────────┬───────────────────┘
-                   │ Neutralino IPC
-┌──────────────────▼───────────────────┐
-│             Rust Backend             │  <-- K8s API, Credentials, File System, Updater
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                    Vue 3 Frontend                       │
+│  - Composition API + TypeScript                         │
+│  - PrimeVue v4 (Nora Theme) + Tailwind CSS v4           │
+│  - View State, Monaco YAML Editor, UI Interactions      │
+└────────────────────────────┬────────────────────────────┘
+                             │ Neutralino IPC
+┌────────────────────────────▼────────────────────────────┐
+│                     Rust Backend                        │
+│  - `core/engine`: Kubernetes API, kubeconfig, Cache     │
+│  - `core/updater`: Dedicated auto-update mechanism      │
+│  - Privileged OS, Network & Filesystem operations       │
+└─────────────────────────────────────────────────────────┘
 ```
 
-- **Rust Backend (`core/engine` & `core/updater`)**: Handles all privileged operations including Kubernetes API communication, config parsing, file system writes, and background update tasks.
-- **Vue Frontend (`src/`)**: Built using Vue 3 (Composition API), Tailwind CSS v4, and PrimeVue v4. It manages the presentation layer and user interactions.
-- **Neutralinojs IPC**: The frontend wrapper and the Rust engine communicate securely via Neutralino's lightweight IPC bridge.
+- **Frontend (`src/`)**: Pure presentation layer communicating only through structured IPC calls.
+- **Backend (`core/engine`, `core/updater`)**: Handles all Kubernetes client logic, kubeconfig discovery, and system interactions.
+- **IPC Boundary**: Strongly typed request/response contracts ensuring stability and strict separation of concerns.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Desktop Runtime**: [Neutralinojs](https://neutralino.js.org/)
-- **Backend Engine**: [Rust](https://www.rust-lang.org/)
-- **Frontend Framework**: [Vue 3](https://vuejs.org/) (Composition API, TypeScript)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/) & [PrimeVue v4](https://primevue.org/)
-- **Build System**: [Vite](https://vite.dev/)
+| Layer                     | Technology                                                                                  |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| **Desktop Runtime**       | [Neutralinojs](https://neutralino.js.org/)                                                  |
+| **Backend**               | [Rust](https://www.rust-lang.org/) (`kube-rs`, `tokio`)                                     |
+| **Frontend Framework**    | [Vue 3](https://vuejs.org/) (Composition API, TypeScript)                                   |
+| **UI Components & Theme** | [PrimeVue v4](https://primevue.org/) (Nora Preset)                                          |
+| **Styling**               | [Tailwind CSS v4](https://tailwindcss.com/)                                                 |
+| **State Management**      | [Pinia](https://pinia.vuejs.org/)                                                           |
+| **Editor**                | [Monaco Editor](https://microsoft.github.io/monaco-editor/) via `@guolao/vue-monaco-editor` |
+| **Icons**                 | [Lucide Vue](https://lucide.dev/)                                                           |
+| **Build Tool**            | [Vite](https://vite.dev/)                                                                   |
+
+---
+
+## 💾 Installation
+
+### Windows
+
+1. Navigate to the [Releases](https://github.com/vantoan1511/orbit/releases) page.
+2. Download the latest `Orbit-Setup-x.y.z.exe` installer.
+3. Run the installer to complete the setup.
+
+> _Note: macOS and Linux support is planned for upcoming releases._
 
 ---
 
@@ -73,39 +117,62 @@ Orbit is structured to maintain a clean separation of concerns:
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v20 or newer)
-- [Rust](https://www.rust-lang.org/) (stable)
+- [Node.js](https://nodejs.org/) (`>= 20.19.0` or `>= 22.12.0`)
+- [Rust](https://www.rust-lang.org/) (Stable toolchain)
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php) (Only required for building the Windows installer package)
 
-### Setup & Run
+### Getting Started
 
-1. Clone the repository and install npm packages:
+1. **Clone the repository:**
 
    ```bash
    git clone https://github.com/vantoan1511/orbit.git
    cd orbit
+   ```
+
+2. **Install dependencies:**
+
+   ```bash
    npm install
    ```
 
-2. Download Neutralino client binaries:
+3. **Update Neutralino binaries:**
 
    ```bash
-   npx neu update
+   npm run neu:update
    ```
 
-3. Run the app in development mode:
+4. **Run in development mode:**
    ```bash
-   npx neu run
+   npm run neu:run
    ```
 
-### Building & Packaging
+### Available Scripts
 
-To build both the frontend assets and compile the Rust binaries locally:
+| Command              | Description                                                                     |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `npm run dev`        | Starts the Vite development server                                              |
+| `npm run neu:run`    | Launches the Neutralino desktop application in dev mode                         |
+| `npm run build`      | Runs type checks and bundles the frontend production assets                     |
+| `npm run package`    | Builds backend binaries, compiles resources, and packages the Windows installer |
+| `npm run type-check` | Runs `vue-tsc` to validate TypeScript types across Vue components               |
+| `npm run lint`       | Lints and fixes source code using ESLint                                        |
+| `npm run format`     | Formats the codebase using Prettier                                             |
 
-- **Build assets**: `npm run build`
-- **Compile installer**: `npm run package` (compiles backend binaries and packages the Windows installer using Inno Setup under the `dist/` directory)
+---
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/vantoan1511/orbit/issues).
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feat/amazing-feature`)
+3. Commit your Changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the Branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
 ## ⚖️ License
 
-Orbit is licensed under the [MIT License](LICENSE).
+Distributed under the [MIT License](LICENSE). Copyright &copy; 2026 Toan Nguyen.
