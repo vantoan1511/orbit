@@ -15,7 +15,7 @@ import type { StatefulSetInfo } from '@/types/kubernetes'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
@@ -122,13 +122,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Status Select -->
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedStatus" :options="statuses" />
     </template>
 
     <!-- Actions Left -->

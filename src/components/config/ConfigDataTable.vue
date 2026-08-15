@@ -10,7 +10,7 @@ import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import { FileText, Lock, MoreVertical } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, ref, watch } from 'vue'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
@@ -150,13 +150,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Label Select -->
-      <Select
-        v-model="selectedLabel"
-        :options="labels"
-        size="small"
-        variant="filled"
-        class="min-w-44"
-      />
+      <TableFilterSelect v-model="selectedLabel" :options="labels" class="min-w-44" />
     </template>
 
     <!-- Actions Left -->

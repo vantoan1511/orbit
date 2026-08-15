@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import Button from 'primevue/button'
 import { MoreVertical } from '@lucide/vue'
 import type { PolicyInfo } from '@/types/kubernetes'
@@ -112,13 +112,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Filters -->
     <template #filters>
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
-      <Select
-        v-model="selectedType"
-        :options="types"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedType" :options="types" />
     </template>
 
     <!-- Name Column -->

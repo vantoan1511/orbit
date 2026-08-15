@@ -11,7 +11,7 @@ import type { ServiceInfo } from '@/types/kubernetes'
 import { ExternalLink, MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from '@/components/services/ServiceDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
@@ -107,13 +107,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <NamespaceFilter v-model="selectedNamespace" :namespaces="k8sStore.namespaces" />
 
       <!-- Type Select -->
-      <Select
-        v-model="selectedType"
-        :options="types"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedType" :options="types" />
     </template>
 
     <!-- Actions Left -->

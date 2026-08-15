@@ -9,7 +9,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { CronJobInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
@@ -123,13 +123,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Suspend Select -->
-      <Select
-        v-model="selectedSuspend"
-        :options="suspendOptions"
-        size="small"
-        variant="filled"
-        class="min-w-44"
-      />
+      <TableFilterSelect v-model="selectedSuspend" :options="suspendOptions" class="min-w-44" />
     </template>
 
     <!-- Actions Left -->

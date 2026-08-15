@@ -13,7 +13,7 @@ import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onMounted, ref } from 'vue'
 import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
 
@@ -208,20 +208,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   >
     <!-- Filters -->
     <template #filters>
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
-      <Select
-        v-model="selectedLabel"
-        :options="labelOptions"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedStatus" :options="statuses" />
+      <TableFilterSelect v-model="selectedLabel" :options="labelOptions" />
     </template>
 
     <!-- Actions Left -->

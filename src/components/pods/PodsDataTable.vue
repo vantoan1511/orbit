@@ -13,7 +13,7 @@ import type { PodInfo } from '@/types/kubernetes'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, ref } from 'vue'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
 import { useWorkloadActions } from '@/composables/useWorkloadActions'
@@ -97,13 +97,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
 
       <!-- Status Select -->
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedStatus" :options="statuses" />
     </template>
 
     <!-- Actions Left -->

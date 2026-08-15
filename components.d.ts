@@ -95,6 +95,7 @@ declare module 'vue' {
     StringListEditor: typeof import('./src/components/shared/StringListEditor.vue')['default']
     SystemNamespaceToggle: typeof import('./src/components/shared/SystemNamespaceToggle.vue')['default']
     Tab: typeof import('primevue/tab')['default']
+    TableFilterSelect: typeof import('./src/components/shared/TableFilterSelect.vue')['default']
     TabList: typeof import('primevue/tablist')['default']
     TabPanel: typeof import('primevue/tabpanel')['default']
     TabPanels: typeof import('primevue/tabpanels')['default']

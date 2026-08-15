@@ -13,7 +13,7 @@ import { MoreVertical } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onMounted, ref } from 'vue'
 import EventDetailsDrawer from './EventDetailsDrawer.vue'
 
@@ -116,13 +116,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Filters -->
     <template #filters>
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
-      <Select
-        v-model="selectedType"
-        :options="types"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedType" :options="types" />
     </template>
 
     <!-- Actions Left -->

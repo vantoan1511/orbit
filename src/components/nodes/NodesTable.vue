@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -67,13 +67,7 @@ const handleRefresh = async () => {
   >
     <!-- Filters -->
     <template #filters>
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        variant="filled"
-        size="small"
-        class="min-w-40"
-      />
+      <TableFilterSelect v-model="selectedStatus" :options="statuses" />
     </template>
 
     <!-- Name Column -->

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import Button from 'primevue/button'
 import { AlertCircle, MoreVertical } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -92,20 +92,8 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   >
     <!-- Filters -->
     <template #filters>
-      <Select
-        v-model="selectedStorageClass"
-        :options="storageClasses"
-        size="small"
-        variant="filled"
-        class="min-w-40"
-      />
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        size="small"
-        variant="filled"
-        class="min-w-36"
-      />
+      <TableFilterSelect v-model="selectedStorageClass" :options="storageClasses" />
+      <TableFilterSelect v-model="selectedStatus" :options="statuses" class="min-w-36" />
     </template>
 
     <!-- Name Column -->

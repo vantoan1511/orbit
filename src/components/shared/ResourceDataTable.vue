@@ -5,7 +5,7 @@ import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
-import Select from 'primevue/select'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
@@ -132,13 +132,7 @@ const isIndeterminate = computed(() => {
 
         <div v-if="!hideRowsPerPage" class="flex items-center gap-2">
           <span class="text-xs font-medium text-muted-color">Rows:</span>
-          <Select
-            v-model="rowsPerPage"
-            :options="rowsPerPageOptions"
-            variant="filled"
-            size="small"
-            class="min-w-20"
-          />
+          <TableFilterSelect v-model="rowsPerPage" :options="rowsPerPageOptions" class="min-w-20" />
         </div>
 
         <div class="flex items-center gap-1">
