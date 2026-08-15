@@ -82,10 +82,10 @@ watch(
     modal
     header="Update Ready"
     :closable="false"
-    :style="{ width: '24rem', maxWidth: '90vw' }"
+    :style="{ width: '380px', maxWidth: '92vw' }"
   >
-    <div class="flex items-center gap-3 py-2">
-      <RefreshCw class="w-5 h-5 text-primary shrink-0 animate-spin" />
+    <div class="flex items-center gap-3">
+      <RefreshCw class="w-4 h-4 text-primary shrink-0 animate-spin" />
       <span class="text-xs text-secondary leading-relaxed"
         >Orbit has been successfully updated. Restarting in {{ countdown }} seconds...</span
       >

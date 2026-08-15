@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useLogHighlighting } from '@/composables/useLogHighlighting'
+import { Plus, Save, Trash2 } from '@lucide/vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
@@ -22,16 +23,20 @@ const newPresetName = props.highlighting.newPresetName
     v-model:visible="visible"
     modal
     header="Highlight Rules"
-    :style="{ width: '900px', maxWidth: '90vw' }"
+    :style="{ width: '820px', maxWidth: '92vw' }"
   >
     <div class="flex flex-col gap-4">
-      <p class="text-sm text-muted-color">
+      <p class="text-xs text-muted-color">
         Define search patterns to style log lines dynamically. Presets are read-only; custom rules
-        can be edited/deleted.
+        can be edited and deleted.
       </p>
-      <div class="flex flex-wrap items-center justify-between gap-4 p-3">
+
+      <!-- Preset Bar (borderless well) -->
+      <div
+        class="bg-(--bg-hover)/40 rounded-lg p-3 flex flex-wrap items-center justify-between gap-4"
+      >
         <div class="flex items-center gap-3">
-          <label class="text-sm font-semibold text-muted-color">Rule Preset:</label>
+          <label class="text-xs font-semibold text-muted-color">Rule Preset:</label>
           <Select
             v-model="selectedPreset"
             :options="highlighting.presetOptions.value"
@@ -39,42 +44,59 @@ const newPresetName = props.highlighting.newPresetName
             optionValue="value"
             optionGroupLabel="label"
             optionGroupChildren="items"
-            class="text-sm min-w-48"
+            size="small"
+            class="text-xs min-w-48"
             @change="highlighting.saveRules"
           />
           <Button
             v-if="highlighting.isCustomPresetActive.value"
-            icon="pi pi-trash"
             severity="danger"
             variant="text"
             size="small"
             v-tooltip="'Delete this custom preset'"
             @click="highlighting.deleteCustomPreset"
-          />
+          >
+            <template #icon>
+              <Trash2 class="w-3.5 h-3.5" />
+            </template>
+          </Button>
         </div>
+
         <div class="flex items-center gap-2">
-          <InputText v-model="newPresetName" placeholder="Preset name..." class="text-sm w-40" />
+          <InputText
+            v-model="newPresetName"
+            placeholder="Preset name..."
+            size="small"
+            class="text-xs w-40"
+          />
           <Button
-            label="Save"
-            icon="pi pi-save"
+            size="small"
             severity="secondary"
             :disabled="
               !highlighting.customRules.value.length || !highlighting.newPresetName.value.trim()
             "
             @click="highlighting.saveCustomPreset"
-          />
+          >
+            <template #icon>
+              <Save class="w-3.5 h-3.5 mr-1" />
+            </template>
+            <span>Save</span>
+          </Button>
         </div>
       </div>
+
+      <!-- Rules List -->
       <div class="flex flex-col gap-2 max-h-80 overflow-y-auto pr-1">
         <div
           v-for="rule in highlighting.activeRules.value"
           :key="rule.id"
-          class="flex items-center gap-2 p-2"
+          class="flex items-center gap-2 p-1.5 rounded bg-(--bg-hover)/20"
         >
           <InputText
             v-model="rule.pattern"
             placeholder="Pattern..."
-            class="text-sm flex-1 cursor-not-allowed"
+            size="small"
+            class="text-xs flex-1"
             :disabled="rule.isPreset"
             @change="highlighting.saveRules"
           />
@@ -83,7 +105,8 @@ const newPresetName = props.highlighting.newPresetName
             :options="highlighting.colorOptions"
             optionLabel="label"
             optionValue="value"
-            class="text-sm min-w-30 cursor-not-allowed"
+            size="small"
+            class="text-xs min-w-32"
             :disabled="rule.isPreset"
             @change="highlighting.saveRules"
           />
@@ -97,7 +120,7 @@ const newPresetName = props.highlighting.newPresetName
             />
             <label
               :for="'bold-' + rule.id"
-              class="text-sm uppercase font-bold text-muted-color cursor-pointer select-none"
+              class="text-xs uppercase font-bold text-muted-color cursor-pointer select-none"
               >Bold</label
             >
           </div>
@@ -111,7 +134,7 @@ const newPresetName = props.highlighting.newPresetName
             />
             <label
               :for="'cs-' + rule.id"
-              class="text-sm uppercase font-bold text-muted-color cursor-pointer select-none"
+              class="text-xs uppercase font-bold text-muted-color cursor-pointer select-none"
               >CS</label
             >
           </div>
@@ -125,30 +148,37 @@ const newPresetName = props.highlighting.newPresetName
             />
             <label
               :for="'rx-' + rule.id"
-              class="text-sm uppercase font-bold text-muted-color cursor-pointer select-none"
+              class="text-xs uppercase font-bold text-muted-color cursor-pointer select-none"
               >Regex</label
             >
           </div>
           <Button
             v-if="!rule.isPreset"
-            icon="pi pi-trash"
             severity="danger"
             variant="text"
+            size="small"
+            class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
             @click="highlighting.deleteCustomRule(rule.id)"
-          />
+          >
+            <template #icon>
+              <Trash2 class="w-3.5 h-3.5" />
+            </template>
+          </Button>
         </div>
       </div>
-      <div class="flex justify-between items-center mt-2">
-        <Button
-          label="Add Rule"
-          icon="pi pi-plus"
-          size="small"
-          severity="secondary"
-          variant="text"
-          @click="highlighting.addRule"
-        />
-        <Button label="Close" size="small" variant="text" @click="visible = false" />
-      </div>
     </div>
+
+    <!-- Dialog Footer -->
+    <template #footer>
+      <div class="flex justify-between items-center w-full">
+        <Button size="small" severity="secondary" variant="text" @click="highlighting.addRule">
+          <template #icon>
+            <Plus class="w-3.5 h-3.5 mr-1" />
+          </template>
+          <span>Add Rule</span>
+        </Button>
+        <Button label="Close" size="small" severity="secondary" @click="visible = false" />
+      </div>
+    </template>
   </Dialog>
 </template>

@@ -36,13 +36,13 @@ const handleScale = () => {
 </script>
 
 <template>
-  <form @submit.prevent="handleScale" class="flex flex-col gap-4 p-1">
+  <form @submit.prevent="handleScale" class="flex flex-col gap-3.5">
     <p class="text-xs text-muted-color">
       Scale <span class="font-semibold text-primary">{{ resourceName }}</span> ({{ resourceKind }})
       to the desired number of replicas:
     </p>
 
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-1.5">
       <label for="replicas" class="text-xs font-semibold text-muted-color">Replicas</label>
       <InputNumber
         v-model="replicas"
@@ -51,15 +51,17 @@ const handleScale = () => {
         :max="100"
         showButtons
         class="w-full"
-        inputClass="text-sm bg-(--bg-card) border-(--border) text-center"
+        size="small"
+        inputClass="text-center font-mono font-medium"
       />
     </div>
 
-    <div class="flex justify-end gap-2 mt-4">
+    <div class="flex justify-end gap-2 pt-2">
       <Button
         type="button"
         label="Cancel"
         severity="secondary"
+        variant="text"
         size="small"
         @click="handleCancel"
       />

@@ -60,7 +60,7 @@ const handleClone = () => {
 </script>
 
 <template>
-  <form @submit.prevent="handleClone" class="flex flex-col gap-4 p-1">
+  <form @submit.prevent="handleClone" class="flex flex-col gap-3.5">
     <p class="text-xs text-muted-color">
       Cloning
       <span class="font-semibold text-primary">{{ sourceName }}</span>
@@ -75,8 +75,9 @@ const handleClone = () => {
         id="clone-ingress-name"
         v-model="newName"
         fluid
+        size="small"
         :invalid="!newName.trim()"
-        class="text-sm"
+        class="text-xs"
       />
     </div>
 
@@ -89,7 +90,8 @@ const handleClone = () => {
         v-model="newNamespace"
         :options="namespaceOptions"
         fluid
-        class="text-sm"
+        size="small"
+        class="text-xs"
       />
     </div>
 
@@ -100,11 +102,12 @@ const handleClone = () => {
       placeholder="e.g. example.com"
     />
 
-    <div class="flex justify-end gap-2 mt-2">
+    <div class="flex justify-end gap-2 pt-2">
       <Button
         type="button"
         label="Cancel"
         severity="secondary"
+        variant="text"
         size="small"
         @click="handleCancel"
       />

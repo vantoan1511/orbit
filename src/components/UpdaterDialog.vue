@@ -51,41 +51,40 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     v-model:visible="updaterStore.showUpdateDialog"
     modal
     header="Software Update"
-    :style="{ width: '540px', maxWidth: '90vw' }"
+    :style="{ width: '520px', maxWidth: '92vw' }"
   >
-    <div class="flex flex-col gap-5">
-      <!-- Header / Version Info -->
-      <div class="flex items-start gap-4 pb-4 border-b border-(--border)">
+    <div class="flex flex-col gap-4">
+      <!-- Version Info Banner -->
+      <div class="flex items-center gap-3.5 bg-(--bg-hover)/40 rounded-lg p-3">
         <div
-          class="w-12 h-12 bg-(--bg-hover)/60 rounded-xl flex items-center justify-center border border-(--border) shrink-0"
+          class="w-10 h-10 bg-(--bg-card) rounded-lg flex items-center justify-center border border-(--border) shrink-0"
         >
-          <Gift class="w-6 h-6 text-primary" />
+          <Gift class="w-5 h-5 text-primary" />
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <h3 class="text-base font-bold text-primary">
+            <h3 class="text-sm font-bold text-primary">
               Orbit v{{ updaterStore.manifest?.version || '' }}
             </h3>
             <span
-              class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-(--accent-soft) text-(--accent) border border-(--accent-soft)"
+              class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-(--accent-soft) text-(--accent)"
             >
               New Release
             </span>
           </div>
           <p class="text-xs text-muted-color mt-0.5">
-            A new version of Orbit is available. Review the release notes below to install or
-            dismiss.
+            A new version of Orbit is available. Review release notes below to install.
           </p>
         </div>
       </div>
 
       <!-- Release Notes Section -->
       <div>
-        <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-color mb-2">
+        <h4 class="text-xs font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           Release Notes
         </h4>
         <div
-          class="bg-(--bg-hover)/40 border border-(--border) rounded-lg p-3.5 max-h-60 overflow-y-auto text-xs flex flex-col gap-1.5"
+          class="bg-(--bg-hover)/40 rounded-lg p-3 max-h-56 overflow-y-auto text-xs flex flex-col gap-1.5"
         >
           <template v-if="parsedNotes.length > 0">
             <div v-for="(block, index) in parsedNotes" :key="index" :class="block.class">
@@ -99,10 +98,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       </div>
 
       <!-- Download Progress Bar -->
-      <div
-        v-if="updaterStore.isDownloading"
-        class="pt-2 border-t border-(--border) flex flex-col gap-1.5"
-      >
+      <div v-if="updaterStore.isDownloading" class="flex flex-col gap-1.5 pt-1">
         <div class="flex justify-between items-center text-xs">
           <span class="font-medium text-muted-color">Downloading update...</span>
           <span class="text-primary font-mono font-medium"
@@ -120,7 +116,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
 
     <!-- Footer Action Buttons -->
     <template #footer>
-      <div class="flex justify-between items-center w-full pt-2">
+      <div class="flex justify-between items-center w-full">
         <Button
           severity="secondary"
           variant="text"
@@ -128,7 +124,9 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.showUpdateDialog = false"
         >
-          <X class="w-3.5 h-3.5 mr-1" />
+          <template #icon>
+            <X class="w-3.5 h-3.5 mr-1" />
+          </template>
           <span>Dismiss</span>
         </Button>
         <Button
@@ -137,8 +135,10 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.applyUpdate()"
         >
-          <Loader2 v-if="updaterStore.isDownloading" class="w-3.5 h-3.5 mr-1 animate-spin" />
-          <Download v-else class="w-3.5 h-3.5 mr-1" />
+          <template #icon>
+            <Loader2 v-if="updaterStore.isDownloading" class="w-3.5 h-3.5 mr-1 animate-spin" />
+            <Download v-else class="w-3.5 h-3.5 mr-1" />
+          </template>
           <span>
             {{
               updaterStore.isDownloading
