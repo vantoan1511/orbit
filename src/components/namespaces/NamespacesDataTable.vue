@@ -1,21 +1,13 @@
 <script setup lang="ts">
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import StatusBadge from '@/components/shared/StatusBadge.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import { useTableColumns } from '@/composables/useTableColumns'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
+import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { NamespaceInfo } from '@/types/kubernetes'
-import { MoreVertical } from '@lucide/vue'
-import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Column from 'primevue/column'
-import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onMounted, ref } from 'vue'
-import NamespaceDetailsDrawer, { type DrawerNamespaceInfo } from './NamespaceDetailsDrawer.vue'
+import NamespaceDetailsDrawer from './NamespaceDetailsDrawer.vue'
 
 interface MappedNamespaceInfo extends NamespaceInfo {
   pods: number
@@ -27,12 +19,9 @@ interface MappedNamespaceInfo extends NamespaceInfo {
 }
 
 const store = useKubernetesStore()
-const searchQuery = ref('')
-const selectedStatus = ref('All Statuses')
 const selectedLabel = ref('All Labels')
-const showSystemNamespaces = ref(false)
 
-const { tableColumns, visibleCols } = useTableColumns([
+const columns = [
   { field: 'name', header: 'Name', visible: true },
   { field: 'status', header: 'Status', visible: true },
   { field: 'pods', header: 'Pods', visible: true },
@@ -42,11 +31,7 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'secrets', header: 'Secrets', visible: true },
   { field: 'age', header: 'Age', visible: true },
   { field: 'labels', header: 'Labels', visible: true }
-])
-
-// Drawer state
-const drawerVisible = ref(false)
-const selectedNamespace = ref<DrawerNamespaceInfo | null>(null)
+]
 
 const statuses = ['All Statuses', 'Active', 'Terminating']
 
@@ -107,25 +92,9 @@ const mappedNamespaces = computed(() => {
 
 const filteredNamespaces = computed(() => {
   return mappedNamespaces.value.filter((ns) => {
-    // System namespace toggle
-    if (!showSystemNamespaces.value && ns.isSystem) return false
-
-    // Search filter
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase()
-      if (!ns.name.toLowerCase().includes(q)) return false
-    }
-
-    // Status filter
-    if (selectedStatus.value !== 'All Statuses' && ns.status !== selectedStatus.value) {
-      return false
-    }
-
-    // Label filter
     if (selectedLabel.value !== 'All Labels') {
       if (!(selectedLabel.value in ns.labels)) return false
     }
-
     return true
   })
 })
@@ -136,11 +105,6 @@ const handleRefresh = async () => {
   } catch (error) {
     console.error('Error fetching namespaces:', error)
   }
-}
-
-const onRowClick = (event: { data: MappedNamespaceInfo }) => {
-  selectedNamespace.value = event.data
-  drawerVisible.value = true
 }
 
 // Sparkline chart options - minimal, no axes, no tooltips
@@ -178,201 +142,146 @@ const getSparklineData = (ns: MappedNamespaceInfo) => ({
   ]
 })
 
-// Max visible labels before showing "+N" overflow
 const MAX_VISIBLE_LABELS = 2
-
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<MappedNamespaceInfo>()
-
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'Namespace',
-  onViewDetails: (row) => {
-    selectedNamespace.value = row
-    drawerVisible.value = true
-  }
-})
 </script>
 
 <template>
-  <ResourceDataTable
+  <GenericResourceTable
     :data="filteredNamespaces"
-    v-model:searchQuery="searchQuery"
-    v-model:columns="tableColumns"
+    :initialColumns="columns"
+    :statuses="statuses"
+    :hideNamespaceFilter="true"
+    :hideNamespaceColumn="true"
+    kind="Namespace"
     searchPlaceholder="Search namespaces..."
     emptyMessage="No namespaces found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} namespaces"
     :loading="store.namespacesLoading"
     @refresh="handleRefresh"
-    @row-click="onRowClick"
-    @row-contextmenu="onRowContextMenu"
   >
-    <!-- Filters -->
+    <!-- Extra Filter -->
     <template #filters>
-      <TableFilterSelect v-model="selectedStatus" :options="statuses" />
       <TableFilterSelect v-model="selectedLabel" :options="labelOptions" />
     </template>
 
-    <!-- Actions Left -->
-    <template #actions-left>
-      <SystemNamespaceToggle v-model="showSystemNamespaces" />
+    <!-- Custom Name -->
+    <template #name="{ data }">
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">{{ data.name }}</span>
+        <span
+          v-if="data.isSystem"
+          class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20"
+        >
+          System
+        </span>
+      </div>
     </template>
 
-    <!-- Name Column -->
-    <Column
-      v-if="visibleCols['name']"
-      field="name"
-      header="Name"
-      sortable
-      class="p-3"
-      bodyClass="font-medium text-primary"
-    >
-      <template #body="{ data }">
-        <div class="flex items-center gap-2">
-          <span class="font-semibold">{{ data.name }}</span>
-          <span
-            v-if="data.isSystem"
-            class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20"
-          >
-            System
-          </span>
-        </div>
-      </template>
-    </Column>
-
-    <!-- Status Column -->
-    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
-      <template #body="{ data }">
-        <StatusBadge :status="data.status" />
-      </template>
-    </Column>
-
-    <!-- Pods Column with sparkline -->
-    <Column v-if="visibleCols['pods']" field="pods" header="Pods" sortable class="p-3">
-      <template #body="{ data }">
-        <div class="flex items-center gap-3">
-          <span class="font-mono text-primary min-w-6">{{ data.pods }}</span>
-          <div class="w-16 h-6 shrink-0" v-if="sparklineOptions">
-            <Chart
-              type="line"
-              :data="getSparklineData(data)"
-              :options="sparklineOptions"
-              class="w-full h-full"
-            />
+    <template #default="{ visibleCols }">
+      <!-- Pods Column with sparkline -->
+      <Column v-if="visibleCols['pods']" field="pods" header="Pods" sortable class="p-3">
+        <template #body="{ data }">
+          <div class="flex items-center gap-3">
+            <span class="font-mono text-primary min-w-6">{{ data.pods }}</span>
+            <div class="w-16 h-6 shrink-0" v-if="sparklineOptions">
+              <Chart
+                type="line"
+                :data="getSparklineData(data)"
+                :options="sparklineOptions"
+                class="w-full h-full"
+              />
+            </div>
           </div>
-        </div>
-      </template>
-    </Column>
+        </template>
+      </Column>
 
-    <!-- Workloads Column -->
-    <Column
-      v-if="visibleCols['workloads']"
-      field="workloads"
-      header="Workloads"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color"
-    >
-      <template #body="{ data }">
-        <span class="font-mono">{{ data.workloads }}</span>
-      </template>
-    </Column>
+      <!-- Workloads Column -->
+      <Column
+        v-if="visibleCols['workloads']"
+        field="workloads"
+        header="Workloads"
+        sortable
+        class="p-3"
+        bodyClass="text-muted-color"
+      >
+        <template #body="{ data }">
+          <span class="font-mono">{{ data.workloads }}</span>
+        </template>
+      </Column>
 
-    <!-- Services Column -->
-    <Column
-      v-if="visibleCols['services']"
-      field="services"
-      header="Services"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color"
-    >
-      <template #body="{ data }">
-        <span class="font-mono">{{ data.services }}</span>
-      </template>
-    </Column>
+      <!-- Services Column -->
+      <Column
+        v-if="visibleCols['services']"
+        field="services"
+        header="Services"
+        sortable
+        class="p-3"
+        bodyClass="text-muted-color"
+      >
+        <template #body="{ data }">
+          <span class="font-mono">{{ data.services }}</span>
+        </template>
+      </Column>
 
-    <!-- ConfigMaps Column -->
-    <Column
-      v-if="visibleCols['configMaps']"
-      field="configMaps"
-      header="ConfigMaps"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color"
-    >
-      <template #body="{ data }">
-        <span class="font-mono">{{ data.configMaps }}</span>
-      </template>
-    </Column>
+      <!-- ConfigMaps Column -->
+      <Column
+        v-if="visibleCols['configMaps']"
+        field="configMaps"
+        header="ConfigMaps"
+        sortable
+        class="p-3"
+        bodyClass="text-muted-color"
+      >
+        <template #body="{ data }">
+          <span class="font-mono">{{ data.configMaps }}</span>
+        </template>
+      </Column>
 
-    <!-- Secrets Column -->
-    <Column
-      v-if="visibleCols['secrets']"
-      field="secrets"
-      header="Secrets"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color"
-    >
-      <template #body="{ data }">
-        <span class="font-mono">{{ data.secrets }}</span>
-      </template>
-    </Column>
+      <!-- Secrets Column -->
+      <Column
+        v-if="visibleCols['secrets']"
+        field="secrets"
+        header="Secrets"
+        sortable
+        class="p-3"
+        bodyClass="text-muted-color"
+      >
+        <template #body="{ data }">
+          <span class="font-mono">{{ data.secrets }}</span>
+        </template>
+      </Column>
 
-    <!-- Age Column -->
-    <Column
-      v-if="visibleCols['age']"
-      field="age"
-      header="Age"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    >
-    </Column>
-
-    <!-- Labels Column -->
-    <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
-      <template #body="{ data }">
-        <div class="flex items-center gap-1 flex-wrap">
-          <span
-            v-for="(val, key) in Object.fromEntries(
-              Object.entries(data.labels).slice(0, MAX_VISIBLE_LABELS)
-            )"
-            :key="key"
-            class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
-          >
-            {{ key }}: {{ val }}
-          </span>
-          <span
-            v-if="Object.keys(data.labels).length > MAX_VISIBLE_LABELS"
-            class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20"
-          >
-            +{{ Object.keys(data.labels).length - MAX_VISIBLE_LABELS }}
-          </span>
-        </div>
-      </template>
-    </Column>
-
-    <!-- Actions Column -->
-    <Column class="p-3 text-center w-12 shrink-0">
-      <template #body="{ data }">
-        <Button
-          severity="secondary"
-          variant="text"
-          size="small"
-          class="p-1"
-          title="Actions"
-          @click="toggleActionMenu($event, data)"
-        >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
-        </Button>
-      </template>
-    </Column>
+      <!-- Labels Column -->
+      <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
+        <template #body="{ data }">
+          <div class="flex items-center gap-1 flex-wrap">
+            <span
+              v-for="(val, key) in Object.fromEntries(
+                Object.entries(data.labels).slice(0, MAX_VISIBLE_LABELS)
+              )"
+              :key="key"
+              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
+            >
+              {{ key }}: {{ val }}
+            </span>
+            <span
+              v-if="Object.keys(data.labels).length > MAX_VISIBLE_LABELS"
+              class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20"
+            >
+              +{{ Object.keys(data.labels).length - MAX_VISIBLE_LABELS }}
+            </span>
+          </div>
+        </template>
+      </Column>
+    </template>
 
     <!-- Drawer -->
-    <template #drawer>
-      <NamespaceDetailsDrawer v-model:visible="drawerVisible" :namespace="selectedNamespace" />
-      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    <template #drawer="{ selectedItem, visible, close }">
+      <NamespaceDetailsDrawer
+        :visible="visible"
+        :namespace="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
-  </ResourceDataTable>
+  </GenericResourceTable>
 </template>

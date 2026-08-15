@@ -1,58 +1,28 @@
 <script setup lang="ts">
-import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
-import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import StatusBadge from '@/components/shared/StatusBadge.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useResourceFilters } from '@/composables/useResourceFilters'
-import { useTableColumns } from '@/composables/useTableColumns'
+import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { ReplicaSetInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
-import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
-import { MoreVertical } from '@lucide/vue'
-import Button from 'primevue/button'
 
 const k8sStore = useKubernetesStore()
+const loading = ref(false)
 
-const { tableColumns, visibleCols } = useTableColumns([
+const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'status', header: 'Status', visible: true },
   { field: 'replicas', header: 'Replicas', visible: true },
   { field: 'age', header: 'Age', visible: true },
   { field: 'images', header: 'Images', visible: true }
-])
-
-const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(
-    computed(() => k8sStore.replicaSets),
-    ['name', 'images']
-  )
-
-const selectedStatus = ref('All Statuses')
-const loading = ref(false)
-
-// Drawer state
-const drawerVisible = ref(false)
-const selectedWorkload = ref<ReplicaSetInfo | null>(null)
-
-const namespaces = computed(() => {
-  return k8sStore.namespaces
-})
+]
 
 const statuses = ['All Statuses', 'Running', 'Progressing']
 
-const fetchReplicaSets = async () => {
+const fetchReplicaSets = async (namespace?: string) => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
-    await kubernetesService.getReplicaSets(ns)
+    await kubernetesService.getReplicaSets(namespace)
   } catch (e) {
     console.error('Error fetching replicasets', e)
   } finally {
@@ -66,155 +36,64 @@ onMounted(() => {
   }
 })
 
-watch(selectedNamespace, () => {
-  fetchReplicaSets()
-})
-
 watch(
   () => k8sStore.activeClusterId,
   () => {
     fetchReplicaSets()
   }
 )
-
-const filteredReplicaSets = computed(() => {
-  return filteredResources.value.filter((r) => {
-    if (selectedStatus.value !== 'All Statuses' && r.status !== selectedStatus.value) {
-      return false
-    }
-    return true
-  })
-})
-
-const onRowClick = (event: { data: ReplicaSetInfo }) => {
-  selectedWorkload.value = event.data
-  drawerVisible.value = true
-}
-
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<ReplicaSetInfo>()
-
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'ReplicaSet',
-  onViewDetails: (row) => {
-    selectedWorkload.value = row
-    drawerVisible.value = true
-  }
-})
 </script>
 
 <template>
-  <ResourceDataTable
-    :data="filteredReplicaSets"
-    v-model:searchQuery="searchQuery"
-    v-model:columns="tableColumns"
+  <GenericResourceTable
+    :data="k8sStore.replicaSets"
+    :initialColumns="columns"
+    :statuses="statuses"
+    :searchFields="['name', 'images']"
+    kind="ReplicaSet"
     searchPlaceholder="Search replicasets or images..."
     emptyMessage="No replicasets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} replicasets"
     :loading="loading || k8sStore.replicaSetsLoading"
     @refresh="fetchReplicaSets"
-    @row-click="onRowClick"
-    @row-contextmenu="onRowContextMenu"
+    @namespace-change="fetchReplicaSets"
   >
-    <!-- Filters -->
-    <template #filters>
-      <!-- Namespace Select -->
-      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
+    <template #default="{ visibleCols }">
+      <!-- Replicas Column -->
+      <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
+        <template #body="{ data }">
+          <div class="flex items-center gap-2 font-mono text-muted-color">
+            <span class="font-bold">{{ data.replicas.current }}</span>
+            <span class="text-muted-color">/</span>
+            <span>{{ data.replicas.desired }}</span>
+          </div>
+        </template>
+      </Column>
 
-      <!-- Status Select -->
-      <TableFilterSelect v-model="selectedStatus" :options="statuses" />
+      <!-- Images Column -->
+      <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
+        <template #body="{ data }">
+          <div class="flex flex-wrap gap-1">
+            <span
+              v-for="img in data.images"
+              :key="img"
+              class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
+              :title="img"
+            >
+              {{ img.split('/').pop() }}
+            </span>
+          </div>
+        </template>
+      </Column>
     </template>
-
-    <!-- Actions Left -->
-    <template #actions-left>
-      <SystemNamespaceToggle v-model="showSystemNamespaces" />
-    </template>
-
-    <!-- Columns -->
-    <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
-      <template #body="{ data }">
-        <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
-      </template>
-    </Column>
-
-    <!-- Namespace Column -->
-    <Column
-      v-if="visibleCols['namespace']"
-      field="namespace"
-      header="Namespace"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <NamespaceBadge :namespace="data.namespace" />
-      </template>
-    </Column>
-
-    <!-- Status Column -->
-    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
-      <template #body="{ data }">
-        <StatusBadge :status="data.status" />
-      </template>
-    </Column>
-
-    <!-- Replicas Column -->
-    <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
-      <template #body="{ data }">
-        <div class="flex items-center gap-2 font-mono text-muted-color">
-          <span class="font-bold">{{ data.replicas.current }}</span>
-          <span class="text-muted-color">/</span>
-          <span>{{ data.replicas.desired }}</span>
-        </div>
-      </template>
-    </Column>
-
-    <!-- Age Column -->
-    <Column
-      v-if="visibleCols['age']"
-      field="age"
-      header="Age"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    ></Column>
-
-    <!-- Images Column -->
-    <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
-      <template #body="{ data }">
-        <div class="flex flex-wrap gap-1">
-          <span
-            v-for="img in data.images"
-            :key="img"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
-            :title="img"
-          >
-            {{ img.split('/').pop() }}
-          </span>
-        </div>
-      </template>
-    </Column>
-
-    <!-- Actions Column -->
-    <Column class="p-3 text-center w-12 shrink-0">
-      <template #body="{ data }">
-        <Button
-          severity="secondary"
-          variant="text"
-          size="small"
-          class="p-1"
-          title="Actions"
-          @click="toggleActionMenu($event, data)"
-        >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
-        </Button>
-      </template>
-    </Column>
 
     <!-- Drawer -->
-    <template #drawer>
-      <WorkloadDetailsDrawer v-model:visible="drawerVisible" :workload="selectedWorkload" />
-      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    <template #drawer="{ selectedItem, visible, close }">
+      <WorkloadDetailsDrawer
+        :visible="visible"
+        :workload="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
-  </ResourceDataTable>
+  </GenericResourceTable>
 </template>

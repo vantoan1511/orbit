@@ -1,24 +1,12 @@
 <script setup lang="ts">
-import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
-import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useResourceFilters } from '@/composables/useResourceFilters'
-import { useTableColumns } from '@/composables/useTableColumns'
+import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
-import { FileText, Lock, MoreVertical } from '@lucide/vue'
+import { FileText, Lock } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
-import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, ref, watch } from 'vue'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
-import Button from 'primevue/button'
-
-// Removed toast import/usage
 
 const props = defineProps<{
   activeTab: 'configmaps' | 'secrets'
@@ -27,7 +15,7 @@ const props = defineProps<{
 const k8sStore = useKubernetesStore()
 const { configMaps, secrets } = storeToRefs(k8sStore)
 
-const { tableColumns, visibleCols } = useTableColumns([
+const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'labels', header: 'Labels', visible: true },
   { field: 'type', header: 'Type', visible: true },
@@ -35,50 +23,24 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'size', header: 'Size', visible: true },
   { field: 'mountedPods', header: 'Mounted In', visible: true },
   { field: 'age', header: 'Age', visible: true }
-])
+]
 
-// Filter out 'Type' column from configuration checkboxes when in configmaps tab
 const columnsForConfig = computed(() => {
   if (props.activeTab === 'configmaps') {
-    return tableColumns.value.filter((col) => col.field !== 'type')
+    return columns.filter((col) => col.field !== 'type')
   }
-  return tableColumns.value
+  return columns
 })
-
-const handleRefresh = async () => {
-  if (props.activeTab === 'configmaps') {
-    await k8sStore.fetchConfigMaps()
-  } else {
-    await k8sStore.fetchSecrets()
-  }
-}
-
-const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(
-    computed(() => (props.activeTab === 'configmaps' ? configMaps.value : secrets.value))
-  )
 
 const selectedLabel = ref('All Labels')
 
-// Drawer state
-const drawerVisible = ref(false)
-const selectedResource = ref<ConfigMapInfo | SecretInfo | null>(null)
-
-// Reset filters on tab switch
+// Reset filter on tab switch
 watch(
   () => props.activeTab,
   () => {
-    searchQuery.value = ''
-    selectedNamespace.value = []
     selectedLabel.value = 'All Labels'
   }
 )
-
-const namespaces = computed(() => {
-  const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
-  const list = new Set(currentList.map((item) => item.namespace))
-  return ['All Namespaces', ...Array.from(list)]
-})
 
 const labels = computed(() => {
   const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
@@ -90,43 +52,34 @@ const labels = computed(() => {
 })
 
 const filteredItems = computed(() => {
-  return filteredResources.value.filter((item) => {
-    // Label filter
+  const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
+  return currentList.filter((item) => {
     if (selectedLabel.value !== 'All Labels') {
       const hasLabelKey = Object.keys(item.labels).includes(selectedLabel.value)
       if (!hasLabelKey) return false
     }
-
     return true
   })
 })
 
-const onRowClick = (event: { data: ConfigMapInfo | SecretInfo }) => {
-  selectedResource.value = event.data
-  drawerVisible.value = true
-}
-
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } = useResourceActionMenu<
-  ConfigMapInfo | SecretInfo
->()
-
 const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
 
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: activeKind,
-  onViewDetails: (row) => {
-    selectedResource.value = row
-    drawerVisible.value = true
+const handleRefresh = async () => {
+  if (props.activeTab === 'configmaps') {
+    await k8sStore.fetchConfigMaps()
+  } else {
+    await k8sStore.fetchSecrets()
   }
-})
+}
 </script>
 
 <template>
-  <ResourceDataTable
+  <GenericResourceTable
     :data="filteredItems"
-    v-model:searchQuery="searchQuery"
-    :columns="columnsForConfig"
-    @update:columns="tableColumns = $event"
+    :initialColumns="columnsForConfig"
+    :hideStatusFilter="true"
+    :hideStatusColumn="true"
+    :kind="activeKind"
     :searchPlaceholder="
       props.activeTab === 'configmaps' ? 'Search configmaps...' : 'Search secrets...'
     "
@@ -136,152 +89,103 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
         ? 'Showing {first} to {last} of {totalRecords} configmaps'
         : 'Showing {first} to {last} of {totalRecords} secrets'
     "
-    :rows="12"
     :loading="
       props.activeTab === 'configmaps' ? k8sStore.configMapsLoading : k8sStore.secretsLoading
     "
     @refresh="handleRefresh"
-    @row-click="onRowClick"
-    @row-contextmenu="onRowContextMenu"
   >
-    <!-- Filters -->
+    <!-- Filter -->
     <template #filters>
-      <!-- Namespace Select -->
-      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
-
-      <!-- Label Select -->
       <TableFilterSelect v-model="selectedLabel" :options="labels" class="min-w-44" />
     </template>
 
-    <!-- Actions Left -->
-    <template #actions-left>
-      <SystemNamespaceToggle v-model="showSystemNamespaces" />
+    <!-- Custom Name -->
+    <template #name="{ data }">
+      <div class="flex items-center gap-2">
+        <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-configmap" />
+        <Lock v-else class="w-4 h-4 text-secret" />
+        <span class="font-semibold">{{ data.name }}</span>
+      </div>
     </template>
 
-    <!-- Columns -->
-    <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
-      <template #body="{ data }">
-        <div class="flex items-center gap-2">
-          <FileText v-if="props.activeTab === 'configmaps'" class="w-4 h-4 text-configmap" />
-          <Lock v-else class="w-4 h-4 text-secret" />
-          <span class="font-semibold">{{ data.name }}</span>
-        </div>
-      </template>
-    </Column>
+    <template #default="{ visibleCols }">
+      <!-- Labels Column -->
+      <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
+        <template #body="{ data }">
+          <div class="flex flex-wrap gap-1 max-w-72">
+            <span
+              v-for="(val, key) in data.labels"
+              :key="key"
+              class="font-mono text-[10px] bg-(--bg-hover) text-muted-color border border-(--border) px-1.5 py-0.5 rounded"
+            >
+              {{ key }}: {{ val }}
+            </span>
+          </div>
+        </template>
+      </Column>
 
-    <!-- Namespace Column -->
-    <Column
-      v-if="visibleCols['namespace']"
-      field="namespace"
-      header="Namespace"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <NamespaceBadge :namespace="data.namespace" />
-      </template>
-    </Column>
+      <!-- Secret Type Column (Only for Secrets) -->
+      <Column
+        v-if="props.activeTab === 'secrets' && visibleCols['type']"
+        field="type"
+        header="Type"
+        sortable
+        class="p-3"
+      >
+        <template #body="{ data }">
+          <span class="font-mono text-muted-color">{{ data.type }}</span>
+        </template>
+      </Column>
 
-    <!-- Labels Column -->
-    <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
-      <template #body="{ data }">
-        <div class="flex flex-wrap gap-1 max-w-72">
+      <!-- Data Keys Column -->
+      <Column
+        v-if="visibleCols['keysCount']"
+        field="keysCount"
+        header="Data Keys"
+        sortable
+        class="p-3 text-center"
+      >
+        <template #body="{ data }">
+          <span class="font-mono text-primary">{{ data.keysCount }}</span>
+        </template>
+      </Column>
+
+      <!-- Size Column -->
+      <Column
+        v-if="visibleCols['size']"
+        field="size"
+        header="Size"
+        sortable
+        class="p-3"
+        bodyClass="text-muted-color font-mono"
+      ></Column>
+
+      <!-- Mounted In Column -->
+      <Column
+        v-if="visibleCols['mountedPods']"
+        field="mountedPods"
+        header="Mounted In"
+        sortable
+        class="p-3 text-center"
+      >
+        <template #body="{ data }">
           <span
-            v-for="(val, key) in data.labels"
-            :key="key"
-            class="font-mono text-[10px] bg-(--bg-hover) text-muted-color border border-(--border) px-1.5 py-0.5 rounded"
+            class="font-mono font-semibold"
+            :class="data.mountedPods > 0 ? 'text-emerald-400' : 'text-muted-color'"
           >
-            {{ key }}: {{ val }}
+            {{ data.mountedPods }} {{ data.mountedPods === 1 ? 'pod' : 'pods' }}
           </span>
-        </div>
-      </template>
-    </Column>
-
-    <!-- Secret Type Column (Only for Secrets) -->
-    <Column
-      v-if="props.activeTab === 'secrets' && visibleCols['type']"
-      field="type"
-      header="Type"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <span class="font-mono text-muted-color">{{ data.type }}</span>
-      </template>
-    </Column>
-
-    <!-- Data Keys Column -->
-    <Column
-      v-if="visibleCols['keysCount']"
-      field="keysCount"
-      header="Data Keys"
-      sortable
-      class="p-3 text-center"
-    >
-      <template #body="{ data }">
-        <span class="font-mono text-primary">{{ data.keysCount }}</span>
-      </template>
-    </Column>
-
-    <!-- Size Column -->
-    <Column
-      v-if="visibleCols['size']"
-      field="size"
-      header="Size"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    ></Column>
-
-    <!-- Mounted In Column -->
-    <Column
-      v-if="visibleCols['mountedPods']"
-      field="mountedPods"
-      header="Mounted In"
-      sortable
-      class="p-3 text-center"
-    >
-      <template #body="{ data }">
-        <span
-          class="font-mono font-semibold"
-          :class="data.mountedPods > 0 ? 'text-emerald-400' : 'text-muted-color'"
-        >
-          {{ data.mountedPods }} {{ data.mountedPods === 1 ? 'pod' : 'pods' }}
-        </span>
-      </template>
-    </Column>
-
-    <!-- Age Column -->
-    <Column
-      v-if="visibleCols['age']"
-      field="age"
-      header="Age"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    ></Column>
-
-    <!-- Actions Column -->
-    <Column class="p-3 text-center w-12 shrink-0">
-      <template #body="{ data }">
-        <Button
-          severity="secondary"
-          variant="text"
-          size="small"
-          class="p-1"
-          title="Actions"
-          @click="toggleActionMenu($event, data)"
-        >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
-        </Button>
-      </template>
-    </Column>
+        </template>
+      </Column>
+    </template>
 
     <!-- Drawer -->
-    <template #drawer>
-      <ConfigDetailsDrawer v-model:visible="drawerVisible" :resource="selectedResource" />
-      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    <template #drawer="{ selectedItem, visible, close }">
+      <ConfigDetailsDrawer
+        :visible="visible"
+        :resource="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
-  </ResourceDataTable>
+  </GenericResourceTable>
 </template>
