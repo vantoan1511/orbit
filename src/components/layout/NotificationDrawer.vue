@@ -48,14 +48,14 @@ const getSeverityIcon = (severity: NotificationSeverity) => {
 const getSeverityColorClass = (severity: NotificationSeverity) => {
   switch (severity) {
     case 'success':
-      return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20'
+      return 'text-emerald-500 bg-emerald-500/10'
     case 'error':
-      return 'text-rose-500 bg-rose-500/10 border-rose-500/20'
+      return 'text-rose-500 bg-rose-500/10'
     case 'warn':
-      return 'text-amber-500 bg-amber-500/10 border-amber-500/20'
+      return 'text-amber-500 bg-amber-500/10'
     case 'info':
     default:
-      return 'text-sky-400 bg-sky-500/10 border-sky-500/20'
+      return 'text-sky-400 bg-sky-500/10'
   }
 }
 
@@ -85,53 +85,48 @@ const formatRelativeTime = (timestamp: number): string => {
           <span class="font-bold text-lg text-primary font-ui">Notifications</span>
           <span
             v-if="notificationStore.unreadCount > 0"
-            class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20"
+            class="text-[11px] font-semibold px-2 py-0.5 rounded bg-rose-500/10 text-rose-500"
           >
             {{ notificationStore.unreadCount }} new
           </span>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <Button
+            size="small"
+            variant="text"
+            severity="secondary"
+            class="text-xs font-medium h-7! px-2!"
+            :disabled="notificationStore.unreadCount === 0"
+            @click="notificationStore.markAllAsRead"
+          >
+            <CheckCheck class="w-3.5 h-3.5 mr-1 text-muted-color" />
+            <span>Mark read</span>
+          </Button>
+
+          <Button
+            size="small"
+            variant="text"
+            severity="danger"
+            class="text-xs font-medium h-7! px-2!"
+            :disabled="notificationStore.notifications.length === 0"
+            @click="notificationStore.clearAll"
+          >
+            <Trash2 class="w-3.5 h-3.5 mr-1" />
+            <span>Clear</span>
+          </Button>
         </div>
       </div>
     </template>
 
     <div class="flex flex-col h-full">
-      <!-- Toolbar Header Actions -->
-      <div
-        class="px-6 py-2 border-b border-(--border) flex items-center justify-between bg-(--bg-sidebar)/50"
-      >
-        <div class="flex items-center gap-2">
-          <Button
-            size="small"
-            variant="text"
-            severity="secondary"
-            class="text-xs font-medium"
-            :disabled="notificationStore.unreadCount === 0"
-            @click="notificationStore.markAllAsRead"
-          >
-            <CheckCheck class="w-3.5 h-3.5 mr-1 text-muted-color" />
-            <span>Mark all read</span>
-          </Button>
-        </div>
-
-        <Button
-          size="small"
-          variant="text"
-          severity="danger"
-          class="text-xs font-medium"
-          :disabled="notificationStore.notifications.length === 0"
-          @click="notificationStore.clearAll"
-        >
-          <Trash2 class="w-3.5 h-3.5 mr-1" />
-          <span>Clear all</span>
-        </Button>
-      </div>
-
       <!-- Filter Tabs -->
       <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
-        <TabList class="px-6 border-b border-(--border)">
-          <Tab value="all" class="px-4 py-2 text-xs font-semibold">
+        <TabList class="px-4">
+          <Tab value="all" class="px-3 py-2 text-xs font-semibold">
             All ({{ notificationStore.notifications.length }})
           </Tab>
-          <Tab value="unread" class="px-4 py-2 text-xs font-semibold">
+          <Tab value="unread" class="px-3 py-2 text-xs font-semibold">
             Unread ({{ notificationStore.unreadCount }})
           </Tab>
         </TabList>
@@ -151,21 +146,19 @@ const formatRelativeTime = (timestamp: number): string => {
             </div>
 
             <!-- List -->
-            <div v-else class="flex flex-col gap-2.5">
+            <div v-else class="flex flex-col gap-1.5">
               <div
                 v-for="item in filteredNotifications"
                 :key="item.id"
-                class="group relative flex items-start gap-3 p-3.5 rounded-xl border transition-all duration-200 cursor-pointer select-none"
+                class="group relative flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer select-none"
                 :class="[
-                  item.read
-                    ? 'bg-(--bg-card) border-(--border) opacity-80 hover:opacity-100 hover:bg-(--bg-hover)/60'
-                    : 'bg-(--bg-hover) border-(--border-strong) shadow-sm'
+                  item.read ? 'hover:bg-(--bg-hover)' : 'bg-(--bg-hover)/60 hover:bg-(--bg-hover)'
                 ]"
                 @click="notificationStore.markAsRead(item.id)"
               >
                 <!-- Severity Icon Badge -->
                 <div
-                  class="p-2 rounded-lg border shrink-0 flex items-center justify-center mt-0.5"
+                  class="p-2 rounded shrink-0 flex items-center justify-center mt-0.5"
                   :class="getSeverityColorClass(item.severity)"
                 >
                   <component :is="getSeverityIcon(item.severity)" class="w-4 h-4" />
@@ -177,7 +170,7 @@ const formatRelativeTime = (timestamp: number): string => {
                     <div class="flex items-center gap-1.5 min-w-0">
                       <span
                         v-if="!item.read"
-                        class="w-2 h-2 rounded-full bg-rose-500 shrink-0"
+                        class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
                         title="Unread"
                       ></span>
                       <span class="text-xs font-bold text-primary truncate">
@@ -221,16 +214,16 @@ const formatRelativeTime = (timestamp: number): string => {
             </div>
 
             <!-- Unread List -->
-            <div v-else class="flex flex-col gap-2.5">
+            <div v-else class="flex flex-col gap-1.5">
               <div
                 v-for="item in filteredNotifications"
                 :key="item.id"
-                class="group relative flex items-start gap-3 p-3.5 rounded-xl border bg-(--bg-hover) border-(--border-strong) transition-all duration-200 cursor-pointer select-none"
+                class="group relative flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer select-none bg-(--bg-hover)/60 hover:bg-(--bg-hover)"
                 @click="notificationStore.markAsRead(item.id)"
               >
                 <!-- Severity Icon Badge -->
                 <div
-                  class="p-2 rounded-lg border shrink-0 flex items-center justify-center mt-0.5"
+                  class="p-2 rounded shrink-0 flex items-center justify-center mt-0.5"
                   :class="getSeverityColorClass(item.severity)"
                 >
                   <component :is="getSeverityIcon(item.severity)" class="w-4 h-4" />
@@ -240,7 +233,10 @@ const formatRelativeTime = (timestamp: number): string => {
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-1.5 min-w-0">
-                      <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0" title="Unread"></span>
+                      <span
+                        class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
+                        title="Unread"
+                      ></span>
                       <span class="text-xs font-bold text-primary truncate">
                         {{ item.title }}
                       </span>
