@@ -24,7 +24,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
       return {
         text: trimmed.replace(/^#+\s*/, ''),
-        class: 'font-bold text-primary text-base mt-3 first:mt-0 pb-1 border-b border-(--border)'
+        class: 'font-bold text-primary text-xs mt-3 first:mt-0 pb-1 border-b border-(--border)'
       }
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       return {
@@ -51,23 +51,23 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
     v-model:visible="updaterStore.showUpdateDialog"
     modal
     header="Software Update"
-    :style="{ width: '560px', maxWidth: '90vw' }"
+    :style="{ width: '540px', maxWidth: '90vw' }"
   >
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-5">
       <!-- Header / Version Info -->
       <div class="flex items-start gap-4 pb-4 border-b border-(--border)">
         <div
-          class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0"
+          class="w-12 h-12 bg-(--bg-hover)/60 rounded-xl flex items-center justify-center border border-(--border) shrink-0"
         >
-          <Gift class="w-6 h-6 text-blue-500" />
+          <Gift class="w-6 h-6 text-primary" />
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <h3 class="text-lg font-bold text-primary">
+            <h3 class="text-base font-bold text-primary">
               Orbit v{{ updaterStore.manifest?.version || '' }}
             </h3>
             <span
-              class="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-500/15 text-blue-500 border border-blue-500/20"
+              class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-(--accent-soft) text-(--accent) border border-(--accent-soft)"
             >
               New Release
             </span>
@@ -85,7 +85,7 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
           Release Notes
         </h4>
         <div
-          class="bg-(--bg-hover)/40 border border-(--border) rounded-xl p-4 max-h-64 overflow-y-auto text-sm flex flex-col gap-1.5"
+          class="bg-(--bg-hover)/40 border border-(--border) rounded-lg p-3.5 max-h-60 overflow-y-auto text-xs flex flex-col gap-1.5"
         >
           <template v-if="parsedNotes.length > 0">
             <div v-for="(block, index) in parsedNotes" :key="index" :class="block.class">
@@ -99,16 +99,19 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
       </div>
 
       <!-- Download Progress Bar -->
-      <div v-if="updaterStore.isDownloading" class="pt-2 border-t border-(--border)">
-        <div class="flex justify-between items-center text-xs mb-1.5">
+      <div
+        v-if="updaterStore.isDownloading"
+        class="pt-2 border-t border-(--border) flex flex-col gap-1.5"
+      >
+        <div class="flex justify-between items-center text-xs">
           <span class="font-medium text-muted-color">Downloading update...</span>
-          <span class="font-bold text-blue-500">{{ updaterStore.downloadProgress }}%</span>
+          <span class="text-primary font-mono font-medium"
+            >{{ updaterStore.downloadProgress }}%</span
+          >
         </div>
-        <div
-          class="w-full bg-(--bg-hover) rounded-full h-2 border border-(--border-strong) overflow-hidden"
-        >
+        <div class="w-full bg-(--bg-hover) rounded-full h-1.5 overflow-hidden">
           <div
-            class="bg-blue-500 h-full rounded-full transition-all duration-300"
+            class="bg-primary h-1.5 rounded-full transition-all duration-300"
             :style="{ width: `${updaterStore.downloadProgress}%` }"
           ></div>
         </div>
