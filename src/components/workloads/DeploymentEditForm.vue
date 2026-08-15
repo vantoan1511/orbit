@@ -11,6 +11,9 @@ import Tabs from 'primevue/tabs'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, ref, toRaw, watch } from 'vue'
 
+import ContainerEnvEditor, {
+  type ContainerEnvItem
+} from '@/components/shared/ContainerEnvEditor.vue'
 import ContainerPortsEditor from '@/components/shared/ContainerPortsEditor.vue'
 import ContainerResourcesEditor from '@/components/shared/ContainerResourcesEditor.vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
@@ -46,6 +49,10 @@ const serviceAccountName = ref<string>('')
 const restartPolicy = ref<string>('Always')
 const terminationGracePeriodSeconds = ref<number>(30)
 const nodeSelector = ref<{ key: string; value: string }[]>([])
+const deploymentNamespace = computed(() => {
+  const meta = (props.rawData?.metadata as Record<string, unknown>) || {}
+  return typeof meta.namespace === 'string' ? meta.namespace : ''
+})
 
 interface ContainerFormState {
   name: string
@@ -54,8 +61,7 @@ interface ContainerFormState {
   workingDir: string
   command: string[]
   args: string[]
-  env: { key: string; value: string }[]
-  preservedValueFromEnv: unknown[]
+  environments: ContainerEnvItem[]
   ports: { name: string; containerPort: number; protocol: string }[]
   cpuRequest: string
   memoryRequest: string
@@ -137,16 +143,66 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
     ? (podSpec.containers as Record<string, unknown>[])
     : []
   containers.value = rawContainers.map((c) => {
-    const envList = Array.isArray(c.env) ? (c.env as Record<string, unknown>[]) : []
-    const simpleEnvs: { key: string; value: string }[] = []
-    const preservedEnvs: unknown[] = []
+    const environments: ContainerEnvItem[] = []
 
+    const envList = Array.isArray(c.env) ? (c.env as Record<string, unknown>[]) : []
     for (const e of envList) {
-      if (e && typeof e === 'object' && 'name' in e) {
-        if ('valueFrom' in e || !('value' in e)) {
-          preservedEnvs.push(e)
-        } else {
-          simpleEnvs.push({ key: String(e.name), value: String(e.value ?? '') })
+      if (e && typeof e === 'object' && typeof e.name === 'string') {
+        if ('value' in e) {
+          environments.push({
+            type: 'Literal',
+            name: e.name,
+            value: String(e.value ?? '')
+          })
+        } else if (e.valueFrom && typeof e.valueFrom === 'object') {
+          const vf = e.valueFrom as Record<string, Record<string, unknown>>
+          if (vf.configMapKeyRef) {
+            environments.push({
+              type: 'ConfigMapKey',
+              name: e.name,
+              refName: String(vf.configMapKeyRef.name || ''),
+              refKey: String(vf.configMapKeyRef.key || '')
+            })
+          } else if (vf.secretKeyRef) {
+            environments.push({
+              type: 'SecretKey',
+              name: e.name,
+              refName: String(vf.secretKeyRef.name || ''),
+              refKey: String(vf.secretKeyRef.key || '')
+            })
+          } else if (vf.fieldRef) {
+            environments.push({
+              type: 'FieldRef',
+              name: e.name,
+              fieldPath: String(vf.fieldRef.fieldPath || '')
+            })
+          } else if (vf.resourceFieldRef) {
+            environments.push({
+              type: 'ResourceFieldRef',
+              name: e.name,
+              fieldPath: String(vf.resourceFieldRef.resource || '')
+            })
+          }
+        }
+      }
+    }
+
+    const envFromList = Array.isArray(c.envFrom) ? (c.envFrom as Record<string, unknown>[]) : []
+    for (const ef of envFromList) {
+      if (ef && typeof ef === 'object') {
+        const prefix = typeof ef.prefix === 'string' ? ef.prefix : ''
+        if (ef.configMapRef && typeof ef.configMapRef === 'object') {
+          environments.push({
+            type: 'ConfigMapEnvFrom',
+            prefix,
+            refName: String((ef.configMapRef as Record<string, unknown>).name || '')
+          })
+        } else if (ef.secretRef && typeof ef.secretRef === 'object') {
+          environments.push({
+            type: 'SecretEnvFrom',
+            prefix,
+            refName: String((ef.secretRef as Record<string, unknown>).name || '')
+          })
         }
       }
     }
@@ -169,8 +225,7 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
       workingDir: typeof c.workingDir === 'string' ? c.workingDir : '',
       command: Array.isArray(c.command) ? (c.command as string[]) : [],
       args: Array.isArray(c.args) ? (c.args as string[]) : [],
-      env: simpleEnvs,
-      preservedValueFromEnv: preservedEnvs,
+      environments,
       ports: parsedPorts,
       cpuRequest: reqs.cpu ? String(reqs.cpu) : '',
       memoryRequest: reqs.memory ? String(reqs.memory) : '',
@@ -295,15 +350,51 @@ const emitUpdate = () => {
     }
 
     // Env vars
-    const simpleEnvsMapped = c.env
-      .filter((e) => e.key.trim() !== '')
-      .map((e) => ({ name: e.key.trim(), value: e.value }))
+    const envObjList: Record<string, unknown>[] = []
+    const envFromObjList: Record<string, unknown>[] = []
 
-    const combinedEnv = [...c.preservedValueFromEnv, ...simpleEnvsMapped]
-    if (combinedEnv.length > 0) {
-      containerObj.env = combinedEnv
+    for (const e of c.environments) {
+      if (e.type === 'ConfigMapEnvFrom' || e.type === 'SecretEnvFrom') {
+        if (!e.refName?.trim()) continue
+        const item: Record<string, unknown> = {}
+        if (e.prefix?.trim()) item.prefix = e.prefix.trim()
+        if (e.type === 'ConfigMapEnvFrom') {
+          item.configMapRef = { name: e.refName.trim() }
+        } else {
+          item.secretRef = { name: e.refName.trim() }
+        }
+        envFromObjList.push(item)
+      } else {
+        if (!e.name?.trim()) continue
+        const item: Record<string, unknown> = { name: e.name.trim() }
+        if (e.type === 'Literal') {
+          item.value = e.value || ''
+        } else if (e.type === 'ConfigMapKey' && e.refName?.trim() && e.refKey?.trim()) {
+          item.valueFrom = { configMapKeyRef: { name: e.refName.trim(), key: e.refKey.trim() } }
+        } else if (e.type === 'SecretKey' && e.refName?.trim() && e.refKey?.trim()) {
+          item.valueFrom = { secretKeyRef: { name: e.refName.trim(), key: e.refKey.trim() } }
+        } else if (e.type === 'FieldRef' && e.fieldPath?.trim()) {
+          item.valueFrom = { fieldRef: { fieldPath: e.fieldPath.trim() } }
+        } else if (e.type === 'ResourceFieldRef' && e.fieldPath?.trim()) {
+          item.valueFrom = { resourceFieldRef: { resource: e.fieldPath.trim() } }
+        } else {
+          // Incomplete complex ref, skip or just save as literal
+          continue
+        }
+        envObjList.push(item)
+      }
+    }
+
+    if (envObjList.length > 0) {
+      containerObj.env = envObjList
     } else {
       delete containerObj.env
+    }
+
+    if (envFromObjList.length > 0) {
+      containerObj.envFrom = envFromObjList
+    } else {
+      delete containerObj.envFrom
     }
 
     // Ports
@@ -374,7 +465,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 
       <TabPanels class="flex-1 overflow-y-auto pt-6 px-0">
         <!-- GENERAL & SCALING TAB -->
-        <TabPanel value="general" class="flex flex-col gap-10 max-w-5xl">
+        <TabPanel value="general" class="flex flex-col gap-10 max-w-7xl">
           <!-- Section 1: Deployment Scaling -->
           <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div class="md:col-span-4 flex flex-col gap-1">
@@ -536,7 +627,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
         </TabPanel>
 
         <!-- METADATA TAB -->
-        <TabPanel value="metadata" class="flex flex-col gap-10 max-w-5xl">
+        <TabPanel value="metadata" class="flex flex-col gap-10 max-w-7xl">
           <!-- Deployment Level -->
           <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div class="md:col-span-4 flex flex-col gap-1">
@@ -599,7 +690,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
         </TabPanel>
 
         <!-- POD SPEC TAB -->
-        <TabPanel value="pod" class="flex flex-col gap-10 max-w-5xl">
+        <TabPanel value="pod" class="flex flex-col gap-10 max-w-7xl">
           <!-- Execution Settings -->
           <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
             <div class="md:col-span-4 flex flex-col gap-1">
@@ -674,7 +765,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
         </TabPanel>
 
         <!-- CONTAINERS TAB -->
-        <TabPanel value="containers" class="flex flex-col gap-10 max-w-5xl">
+        <TabPanel value="containers" class="flex flex-col gap-10 max-w-7xl">
           <!-- Container selector if multiple -->
           <div v-if="containers.length > 1" class="flex items-center gap-2">
             <span class="text-xs font-medium text-muted-color">Container:</span>
@@ -818,19 +909,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
                 <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
-                  <p
-                    v-if="currentContainer.preservedValueFromEnv.length > 0"
-                    class="text-xs text-muted-color mb-1"
-                  >
-                    ({{ currentContainer.preservedValueFromEnv.length }} valueFrom env var(s)
-                    preserved)
-                  </p>
-                  <KeyValueEditor
-                    v-model="currentContainer.env"
-                    title="Environment Variables"
-                    key-placeholder="NAME"
-                    value-placeholder="VALUE"
-                    add-label="Add Env"
+                  <ContainerEnvEditor
+                    v-model="currentContainer.environments"
+                    :namespace="deploymentNamespace"
                     @update:model-value="handleFieldChange"
                   />
                 </div>
