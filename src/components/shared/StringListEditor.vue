@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus, X } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 
@@ -49,10 +50,14 @@ const updateItem = (index: number, val: string) => {
         v-if="!disabled"
         size="small"
         variant="text"
-        icon="pi pi-plus"
         :label="addLabel"
+        class="text-xs"
         @click="addItem"
-      />
+      >
+        <template #icon>
+          <Plus class="w-3.5 h-3.5 mr-1" />
+        </template>
+      </Button>
     </div>
 
     <div v-if="modelValue.length === 0" class="text-xs text-muted-color italic py-1">
@@ -64,18 +69,22 @@ const updateItem = (index: number, val: string) => {
         :model-value="item"
         :placeholder="placeholder"
         :disabled="disabled"
-        class="flex-1 px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
+        size="small"
+        class="flex-1"
         @update:model-value="(val) => updateItem(idx, val ?? '')"
       />
       <Button
         v-if="!disabled"
-        icon="pi pi-times"
         variant="text"
         severity="danger"
         size="small"
-        class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
+        class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
         @click="removeItem(idx)"
-      />
+      >
+        <template #icon>
+          <X class="w-4 h-4" />
+        </template>
+      </Button>
     </div>
   </div>
 </template>
