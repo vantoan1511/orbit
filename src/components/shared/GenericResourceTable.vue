@@ -22,11 +22,14 @@ import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns, type TableColumn } from '@/composables/useTableColumns'
 import { useWorkloadActions, type WorkloadActionOptions } from '@/composables/useWorkloadActions'
+import { useWorkloadBulkActions } from '@/composables/useWorkloadBulkActions'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import { computed, ref, toRef, watch } from 'vue'
+
+const selection = defineModel<T[]>('selection', { default: () => [] })
 
 const props = withDefaults(
   defineProps<{
@@ -39,6 +42,7 @@ const props = withDefaults(
     emptyMessage?: string
     reportTemplate?: string
     loading?: boolean
+    selectable?: boolean
     hideNamespaceFilter?: boolean
     hideStatusFilter?: boolean
     hideSystemNamespaceToggle?: boolean
@@ -62,6 +66,7 @@ const props = withDefaults(
     emptyMessage: 'No records found matching the filter criteria.',
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
+    selectable: true,
     hideNamespaceFilter: false,
     hideStatusFilter: false,
     hideSystemNamespaceToggle: false,
@@ -136,11 +141,20 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     props.actionOptions?.onViewDetails?.(row)
   }
 })
+
+// Bulk actions wiring
+const { bulkActions } = useWorkloadBulkActions(selection, {
+  kind: props.kind,
+  clearSelection: () => {
+    selection.value = []
+  }
+})
 </script>
 
 <template>
   <ResourceDataTable
     :data="filteredData"
+    v-model:selection="selection"
     v-model:searchQuery="searchQuery"
     v-model:columns="tableColumns"
     :searchPlaceholder="searchPlaceholder"
@@ -151,6 +165,23 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     @row-click="onRowClick"
     @row-contextmenu="onRowContextMenu"
   >
+    <!-- Bulk Actions -->
+    <template #bulk-actions="{ selection: currentSelection, clearSelection }">
+      <slot name="bulk-actions" :selection="currentSelection" :clearSelection="clearSelection">
+        <Button
+          v-for="action in bulkActions"
+          :key="action.label"
+          :label="action.label"
+          :icon="action.icon"
+          :severity="action.severity"
+          :variant="action.variant"
+          :class="action.class"
+          size="small"
+          @click="action.command"
+        />
+      </slot>
+    </template>
+
     <!-- Filters -->
     <template #filters>
       <!-- Namespace Filter -->
@@ -175,6 +206,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <SystemNamespaceToggle v-if="!hideSystemNamespaceToggle" v-model="showSystemNamespaces" />
       <slot name="actions-left"></slot>
     </template>
+
+    <!-- Selection Column -->
+    <Column
+      v-if="selectable"
+      selectionMode="multiple"
+      class="p-3 w-12 text-center"
+      headerClass="w-12 text-center"
+    />
 
     <!-- Name Column -->
     <Column

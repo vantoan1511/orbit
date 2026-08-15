@@ -26,7 +26,8 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     message: string,
     header: string,
     acceptLabel: string,
-    acceptCallback: () => Promise<void>
+    acceptCallback: () => Promise<void>,
+    severity: 'primary' | 'danger' = 'danger'
   ) => {
     confirm.require({
       message,
@@ -35,11 +36,13 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       rejectProps: {
         label: 'Cancel',
         severity: 'secondary',
-        outlined: true
+        variant: 'text',
+        size: 'small'
       },
       acceptProps: {
         label: acceptLabel,
-        severity: 'danger'
+        severity,
+        size: 'small'
       },
       accept: acceptCallback
     })
@@ -170,7 +173,8 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                   life: 5000
                 })
               }
-            }
+            },
+            'primary'
           )
         }
       })

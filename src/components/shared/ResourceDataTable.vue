@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Info, RefreshCw, Settings2 } from '@lucide/vue'
+import { Info, RefreshCw, Settings2, X } from '@lucide/vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
@@ -12,6 +12,8 @@ import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue
 import { type TableColumn } from '@/composables/useTableColumns'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+const selection = defineModel<any[]>('selection')
+
 const props = withDefaults(
   defineProps<{
     data: any[]
@@ -105,8 +107,36 @@ const isIndeterminate = computed(() => {
 
 <template>
   <div class="flex flex-col gap-4">
+    <!-- Bulk Actions Toolbar -->
+    <div
+      v-if="selection && selection.length > 0"
+      class="flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-lg px-3 py-2 min-h-[42px]"
+    >
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-semibold text-primary"> {{ selection.length }} selected </span>
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          class="p-1 h-6 w-6"
+          title="Clear Selection"
+          @click="selection = []"
+        >
+          <X class="w-3.5 h-3.5 text-muted-color" />
+        </Button>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <slot
+          name="bulk-actions"
+          :selection="selection"
+          :clearSelection="() => (selection = [])"
+        ></slot>
+      </div>
+    </div>
+
     <!-- Filter Toolbar -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div v-else class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64" v-if="!hideSearch">
@@ -216,6 +246,8 @@ const isIndeterminate = computed(() => {
       <DataTable
         v-else
         :value="data"
+        v-model:selection="selection"
+        dataKey="name"
         paginator
         :rowHover="true"
         v-model:rows="rowsPerPage"
