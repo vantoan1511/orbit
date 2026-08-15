@@ -94,14 +94,14 @@ const { isDark, toggleTheme } = useTheme()
           v-tooltip.right="'Notifications'"
           rounded
           variant="text"
-          class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
-          badge-severity="danger"
-          :badge="
-            notificationStore.unreadCount > 0 ? notificationStore.unreadCount.toString() : undefined
-          "
+          class="w-10 h-10 text-muted-color flex! items-center! justify-center! relative"
           @click="notificationStore.toggleDrawer()"
         >
           <Bell class="w-5 h-5" />
+          <span
+            v-if="notificationStore.unreadCount > 0"
+            class="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 pointer-events-none"
+          />
         </Button>
       </div>
 
