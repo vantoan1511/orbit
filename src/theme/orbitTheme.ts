@@ -66,6 +66,70 @@ const NoirPreset: Preset = {
       item: {
         focusBackground: 'transparent'
       }
+    },
+    datatable: {
+      header: {
+        background: 'transparent',
+        borderColor: 'transparent'
+      },
+      headerCell: {
+        borderColor: '{surface.200}',
+        color: '{text.muted.color}'
+      },
+      bodyCell: {
+        borderColor: '{surface.100}'
+      },
+      row: {
+        hoverBackground: '{surface.100}'
+      },
+      paginatorBottom: {
+        borderColor: '{surface.200}',
+        borderWidth: '1px 0 0 0'
+      },
+      colorScheme: {
+        light: {
+          root: {
+            borderColor: '{surface.200}'
+          },
+          headerCell: {
+            background: '{surface.100}',
+            hoverBackground: '{surface.200}',
+            borderColor: '{surface.200}',
+            color: '{surface.600}'
+          },
+          bodyCell: {
+            borderColor: '{surface.100}'
+          },
+          row: {
+            hoverBackground: '{surface.100}'
+          },
+          paginatorBottom: {
+            borderColor: '{surface.200}',
+            borderWidth: '1px 0 0 0'
+          }
+        },
+        dark: {
+          root: {
+            borderColor: '{surface.800}'
+          },
+          headerCell: {
+            background: '{surface.900}',
+            hoverBackground: '{surface.800}',
+            borderColor: '{surface.800}',
+            color: '{surface.400}'
+          },
+          bodyCell: {
+            borderColor: '{surface.900}'
+          },
+          row: {
+            hoverBackground: '{surface.800}'
+          },
+          paginatorBottom: {
+            borderColor: '{surface.800}',
+            borderWidth: '1px 0 0 0'
+          }
+        }
+      }
     }
   }
 }

@@ -614,14 +614,13 @@ Use these tokens consistently — never assign an arbitrary color to a resource 
  ---
  
  ## Borders and Radius
- 
- - Orbit's UI is inspired by the **PrimeVue Nora theme**, emphasizing flatness, minimalism, and simplicity.
- - Do NOT use borders, card wrappers, or `<hr>` lines to group in-page content or divide form sections. Use the borderless grouping techniques above instead.
- - Structural borders use `border-(--border)` or `border-surface-200/60` (via PrimeVue surface tokens), used sparingly for primary structural containers (e.g. data table outer frames, sidebar separators).
- - Table containers use `border border-surface rounded-lg overflow-hidden`.
- - Drawer title sections use `border-b border-(--border)`.
- - Input controls use the PrimeVue Nora default radius (small, consistent).
- - Do not apply large or pill-shaped radii to data containers.
+
+- Orbit's UI is inspired by the **PrimeVue Nora theme**, emphasizing flatness, minimalism, and simplicity.
+- Do NOT use borders, card wrappers, or `<hr>` lines to group in-page content or divide form sections. Use the borderless grouping techniques above instead.
+- Data tables use a flat, single-container design (`border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)`) without elevated `<Card>` wrappers. Header rows use subtle zonal tone shifts (`bg-surface-100` light / `bg-surface-900` dark) with a crisp bottom separator, while data rows use subtle separators and responsive hover states (`hover:bg-(--bg-hover)`).
+- Input controls use `variant="filled"` or the PrimeVue Nora default radius (small, consistent) without heavy border chrome.
+- Drawer title sections use `border-b border-(--border)`.
+- Do not apply large or pill-shaped radii to data containers.
 
 ---
 

@@ -45,7 +45,7 @@ const cards = computed(() => {
       subvalue: `/ ${totalNodes}`,
       detail: `${readyNodes} Online (${onlinePct}%)`,
       icon: Server,
-      iconColor: 'text-violet-400 bg-violet-500/10'
+      iconColor: 'text-node bg-node/10'
     },
     {
       title: 'CPU Allocation',

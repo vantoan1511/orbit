@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Column from 'primevue/column'
+import Select from 'primevue/select'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -17,6 +18,20 @@ const { searchQuery, filteredResources } = useResourceFilters(nodesWithNamespace
   'role',
   'version'
 ])
+
+const selectedStatus = ref('All Statuses')
+const statuses = ['All Statuses', 'Ready', 'NotReady']
+
+const filteredNodes = computed(() => {
+  return filteredResources.value.filter((n) => {
+    if (selectedStatus.value !== 'All Statuses' && n.status !== selectedStatus.value) {
+      return false
+    }
+    return true
+  })
+})
+
+const MAX_VISIBLE_LABELS = 2
 
 const { tableColumns, visibleCols } = useTableColumns([
   { field: 'name', header: 'Name', visible: true },
@@ -41,7 +56,7 @@ const handleRefresh = async () => {
 
 <template>
   <ResourceDataTable
-    :data="filteredResources"
+    :data="filteredNodes"
     v-model:searchQuery="searchQuery"
     v-model:columns="tableColumns"
     searchPlaceholder="Search nodes..."
@@ -50,10 +65,27 @@ const handleRefresh = async () => {
     :loading="k8sStore.nodesLoading"
     @refresh="handleRefresh"
   >
+    <!-- Filters -->
+    <template #filters>
+      <Select
+        v-model="selectedStatus"
+        :options="statuses"
+        variant="filled"
+        class="text-sm min-w-40"
+      />
+    </template>
+
     <!-- Name Column -->
-    <Column v-if="visibleCols['name']" field="name" header="Name" sortable class="font-medium p-3">
+    <Column
+      v-if="visibleCols['name']"
+      field="name"
+      header="Name"
+      sortable
+      class="p-3"
+      bodyClass="font-medium text-primary"
+    >
       <template #body="{ data }">
-        <span class="font-semibold">{{ data.name }}</span>
+        <span class="font-semibold transition-colors">{{ data.name }}</span>
       </template>
     </Column>
 
@@ -71,8 +103,8 @@ const handleRefresh = async () => {
           class="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border"
           :class="
             data.role === 'control-plane'
-              ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
-              : 'bg-zinc-500/10 text-muted-color border-(--border)'
+              ? 'bg-node/10 text-node border-node/20'
+              : 'bg-(--bg-hover) text-muted-color border-(--border)'
           "
         >
           {{ data.role }}
@@ -89,7 +121,15 @@ const handleRefresh = async () => {
     ></Column>
 
     <!-- CPU Column -->
-    <Column v-if="visibleCols['cpuPct']" field="cpuPct" header="CPU" sortable class="p-3 min-w-35">
+    <Column
+      v-if="visibleCols['cpuPct']"
+      field="cpuPct"
+      header="CPU"
+      sortable
+      class="p-3 min-w-35"
+      headerClass="text-right justify-end"
+      bodyClass="text-right"
+    >
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-full">
           <div class="flex justify-between font-mono text-muted-color">
@@ -115,6 +155,8 @@ const handleRefresh = async () => {
       header="Memory"
       sortable
       class="p-3 min-w-35"
+      headerClass="text-right justify-end"
+      bodyClass="text-right"
     >
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-full">
@@ -141,6 +183,8 @@ const handleRefresh = async () => {
       header="Pods"
       sortable
       class="p-3 min-w-30"
+      headerClass="text-right justify-end"
+      bodyClass="text-right"
     >
       <template #body="{ data }">
         <div class="flex flex-col gap-1 w-full">
@@ -171,16 +215,23 @@ const handleRefresh = async () => {
     ></Column>
 
     <!-- Labels Column -->
-    <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3 max-w-50">
+    <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
       <template #body="{ data }">
-        <div class="flex flex-wrap gap-1">
+        <div class="flex items-center gap-1 flex-wrap">
           <span
-            v-for="label in data.labels"
+            v-for="label in (data.labels || []).slice(0, MAX_VISIBLE_LABELS)"
             :key="label"
-            class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-xs font-mono truncate"
+            class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
             :title="label"
           >
             {{ label }}
+          </span>
+          <span
+            v-if="(data.labels || []).length > MAX_VISIBLE_LABELS"
+            class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-(--bg-hover) text-muted-color border border-(--border)"
+            :title="(data.labels || []).slice(MAX_VISIBLE_LABELS).join('\n')"
+          >
+            +{{ (data.labels || []).length - MAX_VISIBLE_LABELS }}
           </span>
         </div>
       </template>

@@ -104,107 +104,113 @@ const isIndeterminate = computed(() => {
 </script>
 
 <template>
-  <Card>
-    <template #title>
-      <!-- Filter Toolbar -->
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-center gap-3 flex-wrap">
-          <!-- Search -->
-          <div class="relative min-w-64" v-if="!hideSearch">
-            <IconField>
-              <InputIcon class="pi pi-search" />
-              <InputText
-                :model-value="searchQuery"
-                :placeholder="searchPlaceholder"
-                @update:model-value="onSearchUpdate"
-                fluid
-              />
-            </IconField>
-          </div>
-
-          <slot name="filters"></slot>
+  <div class="flex flex-col gap-4">
+    <!-- Filter Toolbar -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3 flex-wrap">
+        <!-- Search -->
+        <div class="relative min-w-64" v-if="!hideSearch">
+          <IconField>
+            <InputIcon class="pi pi-search" />
+            <InputText
+              :model-value="searchQuery"
+              :placeholder="searchPlaceholder"
+              @update:model-value="onSearchUpdate"
+              variant="filled"
+              fluid
+            />
+          </IconField>
         </div>
 
-        <!-- Toggles and Actions -->
-        <div class="flex items-center gap-4 self-end md:self-auto" v-if="!hideActions">
-          <slot name="actions-left"></slot>
+        <slot name="filters"></slot>
+      </div>
 
-          <div v-if="!hideRowsPerPage" class="flex items-center gap-2">
-            <span class="text-sm font-medium text-muted-color">Rows:</span>
-            <Select v-model="rowsPerPage" :options="rowsPerPageOptions" class="text-xs min-w-20" />
-          </div>
+      <!-- Toggles and Actions -->
+      <div class="flex items-center gap-4 self-end md:self-auto" v-if="!hideActions">
+        <slot name="actions-left"></slot>
 
-          <div class="flex items-center gap-1">
-            <Button
-              v-if="!hideRefresh"
-              severity="secondary"
-              variant="text"
-              size="small"
-              class="p-1"
-              @click="emit('refresh')"
-              :loading="loading"
-            >
-              <RefreshCw class="w-4 h-4 text-muted-color" />
-            </Button>
-            <Button
-              v-if="!hideConfig"
-              severity="secondary"
-              variant="text"
-              size="small"
-              class="p-1"
-              @click="toggleConfig"
-            >
-              <Settings2 class="w-4 h-4 text-muted-color" />
-            </Button>
-            <Popover ref="configPopover">
-              <div class="flex flex-col gap-2 p-3 min-w-48 text-primary">
-                <div class="font-semibold text-sm border-b border-surface pb-1.5 text-muted-color">
-                  Configure Columns
-                </div>
-                <div class="flex flex-col gap-1.5 pt-1">
-                  <div class="flex items-center gap-2 py-0.5 hover:bg-surface-200/20 rounded px-1">
-                    <Checkbox
-                      inputId="col-all"
-                      :modelValue="allSelected"
-                      @update:modelValue="allSelected = $event"
-                      :binary="true"
-                      :indeterminate="isIndeterminate"
-                      size="small"
-                    />
-                    <label
-                      for="col-all"
-                      class="text-sm cursor-pointer select-none font-semibold text-primary w-full"
-                    >
-                      All
-                    </label>
-                  </div>
-                  <div
-                    v-for="col in columns"
-                    :key="col.field"
-                    class="flex items-center gap-2 py-0.5 rounded px-1"
+        <div v-if="!hideRowsPerPage" class="flex items-center gap-2">
+          <span class="text-xs font-medium text-muted-color">Rows:</span>
+          <Select
+            v-model="rowsPerPage"
+            :options="rowsPerPageOptions"
+            variant="filled"
+            class="text-xs min-w-20"
+          />
+        </div>
+
+        <div class="flex items-center gap-1">
+          <Button
+            v-if="!hideRefresh"
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="emit('refresh')"
+            :loading="loading"
+          >
+            <RefreshCw class="w-4 h-4 text-muted-color" />
+          </Button>
+          <Button
+            v-if="!hideConfig"
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1"
+            @click="toggleConfig"
+          >
+            <Settings2 class="w-4 h-4 text-muted-color" />
+          </Button>
+          <Popover ref="configPopover">
+            <div class="flex flex-col gap-2 p-3 min-w-48 text-primary">
+              <div class="font-semibold text-sm border-b border-surface pb-1.5 text-muted-color">
+                Configure Columns
+              </div>
+              <div class="flex flex-col gap-1.5 pt-1">
+                <div class="flex items-center gap-2 py-0.5 hover:bg-surface-200/20 rounded px-1">
+                  <Checkbox
+                    inputId="col-all"
+                    :modelValue="allSelected"
+                    @update:modelValue="allSelected = $event"
+                    :binary="true"
+                    :indeterminate="isIndeterminate"
+                    size="small"
+                  />
+                  <label
+                    for="col-all"
+                    class="text-sm cursor-pointer select-none font-semibold text-primary w-full"
                   >
-                    <Checkbox
-                      :inputId="`col-${col.field}`"
-                      :modelValue="col.visible"
-                      @update:modelValue="onToggleColumn(col.field, $event)"
-                      :binary="true"
-                      size="small"
-                    />
-                    <label
-                      :for="`col-${col.field}`"
-                      class="text-sm cursor-pointer select-none font-medium text-muted-color w-full"
-                    >
-                      {{ col.header }}
-                    </label>
-                  </div>
+                    All
+                  </label>
+                </div>
+                <div
+                  v-for="col in columns"
+                  :key="col.field"
+                  class="flex items-center gap-2 py-0.5 rounded px-1"
+                >
+                  <Checkbox
+                    :inputId="`col-${col.field}`"
+                    :modelValue="col.visible"
+                    @update:modelValue="onToggleColumn(col.field, $event)"
+                    :binary="true"
+                    size="small"
+                  />
+                  <label
+                    :for="`col-${col.field}`"
+                    class="text-sm cursor-pointer select-none font-medium text-muted-color w-full"
+                  >
+                    {{ col.header }}
+                  </label>
                 </div>
               </div>
-            </Popover>
-          </div>
+            </div>
+          </Popover>
         </div>
       </div>
-    </template>
-    <template #content>
+    </div>
+
+    <!-- Table Container -->
+    <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
       <!-- Loading Skeleton or Data Table -->
       <slot name="loading" v-if="loading">
         <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
@@ -215,9 +221,10 @@ const isIndeterminate = computed(() => {
         v-else
         :value="data"
         paginator
+        :rowHover="true"
         v-model:rows="rowsPerPage"
         :rowsPerPageOptions="rowsPerPageOptions"
-        class="p-datatable-sm border border-surface rounded-lg overflow-hidden cursor-pointer"
+        class="p-datatable-sm cursor-pointer"
         tableClass="w-full text-left text-xs border-collapse"
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
         :currentPageReportTemplate="reportTemplate"
@@ -236,9 +243,9 @@ const isIndeterminate = computed(() => {
         <!-- Pass columns down -->
         <slot></slot>
       </DataTable>
+    </div>
 
-      <!-- Details slideout drawer -->
-      <slot name="drawer"></slot>
-    </template>
-  </Card>
+    <!-- Details slideout drawer -->
+    <slot name="drawer"></slot>
+  </div>
 </template>
