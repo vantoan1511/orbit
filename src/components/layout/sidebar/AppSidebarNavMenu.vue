@@ -41,10 +41,10 @@ const isLinkActive = (linkPath: string) => {
         <a
           :href="href"
           :class="[
+            'flex items-center gap-2.5 px-3 py-1.5 transition-colors text-sm cursor-pointer no-underline select-none my-0.5 mx-2 rounded-md',
             isLinkActive(item.route as string)
-              ? 'border-l-3 rounded-none!'
-              : 'text-muted-color font-medium!',
-            'flex items-center gap-2.5 px-3 py-1.5 transition-colors text-sm cursor-pointer no-underline select-none my-0.5'
+              ? 'bg-(--bg-active) text-(--text-primary) font-semibold'
+              : 'text-muted-color font-medium hover:bg-(--bg-hover)'
           ]"
           @click="navigate"
         >
