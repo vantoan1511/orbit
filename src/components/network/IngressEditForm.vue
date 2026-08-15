@@ -8,9 +8,18 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
-import { ref, toRaw, watch } from 'vue'
+import { computed, ref, toRaw, watch } from 'vue'
 
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import {
+  isValidHost,
+  isValidK8sLabel,
+  isValidK8sName,
+  isValidPath,
+  isValidPort,
+  parseRuleSummary
+} from '@/utils/validators'
 
 const props = defineProps<{
   rawData: Record<string, unknown> | null
@@ -18,6 +27,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:rawData', value: Record<string, unknown>): void
+  (e: 'update:isValid', value: boolean): void
 }>()
 
 const activeTab = ref('general')
@@ -52,6 +62,125 @@ const labels = ref<{ key: string; value: string }[]>([])
 const annotations = ref<{ key: string; value: string }[]>([])
 
 let isEmitting = false
+
+const k8sStore = useKubernetesStore()
+
+const currentIngressName = computed(() => {
+  const meta = (props.rawData?.metadata as Record<string, unknown>) || {}
+  return typeof meta.name === 'string' ? meta.name : ''
+})
+
+const currentIngressNamespace = computed(() => {
+  const meta = (props.rawData?.metadata as Record<string, unknown>) || {}
+  return typeof meta.namespace === 'string' ? meta.namespace : ''
+})
+
+const otherIngressRulesMap = computed(() => {
+  const map = new Map<string, { ingressName: string; namespace: string }>()
+  const curName = currentIngressName.value.toLowerCase()
+  const curNs = currentIngressNamespace.value
+
+  for (const ing of k8sStore.ingresses) {
+    if (ing.namespace === curNs && ing.name.toLowerCase() !== curName) {
+      if (ing.rulesSummary) {
+        for (const ruleStr of ing.rulesSummary) {
+          const parsed = parseRuleSummary(ruleStr)
+          if (parsed) {
+            const key = `${parsed.host}:::${parsed.path}`
+            if (!map.has(key)) {
+              map.set(key, { ingressName: ing.name, namespace: ing.namespace })
+            }
+          }
+        }
+      }
+    }
+  }
+  return map
+})
+
+const getHostError = (host: string, path: string, index: number): string | null => {
+  const trimmedHost = host.trim()
+  if (!trimmedHost) return null
+  if (!isValidHost(trimmedHost)) {
+    return 'Must be a valid hostname (e.g. example.com or *.example.com).'
+  }
+  const lowerHost = trimmedHost.toLowerCase()
+  const lowerPath = (path.trim() || '/').toLowerCase()
+
+  // Check duplicate in current rules list with same host AND same path
+  const firstIndex = rules.value.findIndex(
+    (r) =>
+      r.host.trim().toLowerCase() === lowerHost &&
+      (r.path.trim() || '/').toLowerCase() === lowerPath
+  )
+  if (firstIndex !== -1 && firstIndex !== index) {
+    return `Duplicate rule for host "${trimmedHost}" and path "${lowerPath}".`
+  }
+
+  // Check if (host + path) is already in use by another Ingress in this namespace
+  const key = `${lowerHost}:::${lowerPath}`
+  const existing = otherIngressRulesMap.value.get(key)
+  if (existing) {
+    return `Host "${trimmedHost}" and path "${lowerPath}" is already used by Ingress "${existing.ingressName}".`
+  }
+  return null
+}
+
+const getPathError = (path: string): string | null => {
+  const trimmed = path.trim()
+  if (!trimmed) return null
+  if (!isValidPath(trimmed)) {
+    return 'Path must start with "/" (e.g. / or /api).'
+  }
+  return null
+}
+
+const getServiceNameError = (name: string): string | null => {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+  if (!isValidK8sName(trimmed)) {
+    return 'Service name must be a valid DNS-1123 subdomain.'
+  }
+  return null
+}
+
+const getServicePortError = (port: string): string | null => {
+  const trimmed = port.trim()
+  if (!trimmed) return null
+  if (!isValidPort(trimmed) && !isValidK8sLabel(trimmed)) {
+    return 'Port must be a number (1-65535) or a valid port name.'
+  }
+  return null
+}
+
+const isFormValid = computed(() => {
+  if (ingressClassName.value && !isValidK8sLabel(ingressClassName.value)) return false
+  if (getServiceNameError(defaultBackendServiceName.value)) return false
+  if (getServicePortError(defaultBackendServicePort.value)) return false
+
+  for (let idx = 0; idx < rules.value.length; idx++) {
+    const r = rules.value[idx]
+    if (!r) continue
+    if (getHostError(r.host, r.path, idx)) return false
+    if (getPathError(r.path)) return false
+    if (getServiceNameError(r.serviceName)) return false
+    if (getServicePortError(r.servicePort)) return false
+  }
+
+  for (const tls of tlsConfigs.value) {
+    if (tls.secretName && !isValidK8sName(tls.secretName)) return false
+  }
+
+  return true
+})
+
+watch(
+  isFormValid,
+  (val) => {
+    emit('update:isValid', val)
+  },
+  { immediate: true }
+)
 
 const kvObjectToArray = (
   obj: Record<string, unknown> | undefined
@@ -370,8 +499,9 @@ const removeTlsRow = (index: number) => {
                 <InputText
                   v-model="ingressClassName"
                   placeholder="e.g. nginx"
+                  :invalid="Boolean(ingressClassName && !isValidK8sLabel(ingressClassName))"
                   size="small"
-                  class="w-full md:w-80"
+                  class="w-full md:w-80 text-xs"
                   @input="handleFieldChange"
                 />
               </div>
@@ -395,20 +525,36 @@ const removeTlsRow = (index: number) => {
                   <InputText
                     v-model="defaultBackendServiceName"
                     placeholder="e.g. default-backend-svc"
+                    :invalid="Boolean(getServiceNameError(defaultBackendServiceName))"
                     size="small"
                     fluid
+                    class="text-xs"
                     @input="handleFieldChange"
                   />
+                  <small
+                    v-if="getServiceNameError(defaultBackendServiceName)"
+                    class="text-(--danger) text-[11px] leading-tight"
+                  >
+                    {{ getServiceNameError(defaultBackendServiceName) }}
+                  </small>
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label class="text-xs font-medium text-muted-color">Service Port</label>
                   <InputText
                     v-model="defaultBackendServicePort"
                     placeholder="e.g. 80 or http"
+                    :invalid="Boolean(getServicePortError(defaultBackendServicePort))"
                     size="small"
                     fluid
+                    class="text-xs"
                     @input="handleFieldChange"
                   />
+                  <small
+                    v-if="getServicePortError(defaultBackendServicePort)"
+                    class="text-(--danger) text-[11px] leading-tight"
+                  >
+                    {{ getServicePortError(defaultBackendServicePort) }}
+                  </small>
                 </div>
               </div>
             </div>
@@ -481,20 +627,36 @@ const removeTlsRow = (index: number) => {
                     <InputText
                       v-model="rule.host"
                       placeholder="e.g. app.example.com"
+                      :invalid="Boolean(getHostError(rule.host, rule.path, idx))"
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
+                    <small
+                      v-if="getHostError(rule.host, rule.path, idx)"
+                      class="text-(--danger) text-[11px] leading-tight"
+                    >
+                      {{ getHostError(rule.host, rule.path, idx) }}
+                    </small>
                   </div>
                   <div class="flex flex-col gap-1">
                     <label class="text-[11px] font-medium text-muted-color">Path</label>
                     <InputText
                       v-model="rule.path"
                       placeholder="e.g. / or /api"
+                      :invalid="Boolean(getPathError(rule.path))"
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
+                    <small
+                      v-if="getPathError(rule.path)"
+                      class="text-(--danger) text-[11px] leading-tight"
+                    >
+                      {{ getPathError(rule.path) }}
+                    </small>
                   </div>
                 </div>
 
@@ -506,6 +668,7 @@ const removeTlsRow = (index: number) => {
                       :options="pathTypeOptions"
                       size="small"
                       fluid
+                      class="text-xs"
                       @change="handleFieldChange"
                     />
                   </div>
@@ -514,20 +677,36 @@ const removeTlsRow = (index: number) => {
                     <InputText
                       v-model="rule.serviceName"
                       placeholder="e.g. my-service"
+                      :invalid="Boolean(getServiceNameError(rule.serviceName))"
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
+                    <small
+                      v-if="getServiceNameError(rule.serviceName)"
+                      class="text-(--danger) text-[11px] leading-tight"
+                    >
+                      {{ getServiceNameError(rule.serviceName) }}
+                    </small>
                   </div>
                   <div class="flex flex-col gap-1">
                     <label class="text-[11px] font-medium text-muted-color">Port</label>
                     <InputText
                       v-model="rule.servicePort"
                       placeholder="e.g. 80 or http"
+                      :invalid="Boolean(getServicePortError(rule.servicePort))"
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
+                    <small
+                      v-if="getServicePortError(rule.servicePort)"
+                      class="text-(--danger) text-[11px] leading-tight"
+                    >
+                      {{ getServicePortError(rule.servicePort) }}
+                    </small>
                   </div>
                 </div>
               </div>
@@ -550,12 +729,14 @@ const removeTlsRow = (index: number) => {
             <div class="md:col-span-8 flex flex-col gap-4">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-medium text-muted-color"
-                  >{{ tlsConfigs.length }} Certificate{{ tlsConfigs.length === 1 ? '' : 's' }}</span
+                  >{{ tlsConfigs.length }} Configuration{{
+                    tlsConfigs.length === 1 ? '' : 's'
+                  }}</span
                 >
                 <Button
                   size="small"
                   variant="text"
-                  label="Add TLS Certificate"
+                  label="Add TLS Config"
                   class="text-xs"
                   @click="addTlsRow"
                 >
@@ -572,12 +753,10 @@ const removeTlsRow = (index: number) => {
               <div
                 v-for="(tls, idx) in tlsConfigs"
                 :key="'tls-' + idx"
-                class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3"
+                class="flex flex-col gap-3 p-3.5 rounded bg-(--bg-hover)/40"
               >
-                <div class="flex items-center justify-between border-b border-(--border) pb-2">
-                  <span class="text-xs font-semibold text-primary font-mono"
-                    >TLS Cert #{{ idx + 1 }}</span
-                  >
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-primary">Certificate #{{ idx + 1 }}</span>
                   <Button
                     variant="text"
                     severity="danger"
@@ -598,8 +777,10 @@ const removeTlsRow = (index: number) => {
                     <InputText
                       v-model="tls.secretName"
                       placeholder="e.g. tls-secret"
+                      :invalid="Boolean(tls.secretName && !isValidK8sName(tls.secretName))"
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
                   </div>
@@ -612,6 +793,7 @@ const removeTlsRow = (index: number) => {
                       placeholder="e.g. example.com, api.example.com"
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
                   </div>

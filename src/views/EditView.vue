@@ -7,7 +7,7 @@ import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
@@ -32,6 +32,21 @@ const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
 const isYamlMode = ref(false)
+const isChildFormValid = ref(true)
+
+const isYamlValid = computed(() => {
+  if (!yamlContent.value.trim()) return false
+  try {
+    yaml.parse(yamlContent.value)
+    return true
+  } catch {
+    return false
+  }
+})
+
+const isFormValid = computed(() => {
+  return isYamlMode.value ? isYamlValid.value : isChildFormValid.value
+})
 
 // Simple form fields
 const formValues = ref({
@@ -72,8 +87,8 @@ onMounted(() => {
     }
   }
 
-  errorHandler = (data: { message: string }) => {
-    toast.add({ severity: 'error', summary: 'Error', detail: data.message, life: 5000 })
+  errorHandler = () => {
+    // Error toast is handled globally by App.vue
     isSaving.value = false
   }
 
@@ -130,6 +145,7 @@ const handleModeToggle = () => {
 }
 
 const saveChanges = () => {
+  if (isSaving.value || isLoading.value) return
   isSaving.value = true
   try {
     let updatedData: Record<string, unknown>
@@ -241,7 +257,7 @@ watch(
           <Button
             size="small"
             :loading="isSaving"
-            :disabled="isSaving || isLoading"
+            :disabled="isSaving || isLoading || !isFormValid"
             :label="isSaving ? 'Saving...' : 'Save Changes'"
             @click="saveChanges"
           />
@@ -257,14 +273,22 @@ watch(
       <!-- Form Mode -->
       <template v-if="!isYamlMode">
         <div v-if="props.kind === 'Deployment'" class="w-full h-full overflow-hidden flex flex-col">
-          <DeploymentEditForm :raw-data="rawData" @update:raw-data="handleCustomFormUpdate" />
+          <DeploymentEditForm
+            :raw-data="rawData"
+            @update:raw-data="handleCustomFormUpdate"
+            @update:is-valid="(val) => (isChildFormValid = val)"
+          />
         </div>
 
         <div
           v-else-if="props.kind === 'Ingress'"
           class="w-full h-full overflow-hidden flex flex-col"
         >
-          <IngressEditForm :raw-data="rawData" @update:raw-data="handleCustomFormUpdate" />
+          <IngressEditForm
+            :raw-data="rawData"
+            @update:raw-data="handleCustomFormUpdate"
+            @update:is-valid="(val) => (isChildFormValid = val)"
+          />
         </div>
 
         <!-- Non-Deployment Fallback Form with Asymmetric 2-Column Section Layout -->
