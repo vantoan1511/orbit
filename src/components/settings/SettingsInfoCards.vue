@@ -63,17 +63,15 @@ const handleClearAllData = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- Card 1: Current Context -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-4"
-    >
-      <div class="flex items-center gap-2 pb-3 border-b border-(--border)">
+  <div class="flex flex-col gap-4">
+    <!-- Section 1: Current Context -->
+    <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
         <Hexagon class="w-4 h-4 text-violet-500" />
-        <h4 class="text-xs font-bold text-primary uppercase tracking-wider">Current Context</h4>
+        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Current Context</h4>
       </div>
 
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-2.5">
         <div class="flex items-center justify-between">
           <span class="text-xs text-muted-color">Context Name</span>
           <span class="text-xs font-semibold text-primary truncate max-w-44">{{
@@ -84,7 +82,7 @@ const handleClearAllData = () => {
         <div class="flex items-center justify-between">
           <span class="text-xs text-muted-color">Active Namespace</span>
           <span
-            class="text-xs font-mono font-semibold bg-violet-500/10 text-violet-400 border border-violet-500/20 px-2 py-0.5 rounded text-[10px]"
+            class="text-xs font-mono font-medium bg-violet-500/10 text-violet-400 px-2 py-0.5 rounded text-[11px]"
           >
             {{ currentContext.namespace }}
           </span>
@@ -93,7 +91,7 @@ const handleClearAllData = () => {
         <div class="flex flex-col gap-1">
           <span class="text-xs text-muted-color">Server Address</span>
           <span
-            class="text-[10px] font-mono text-muted-color bg-(--bg-hover)/20 p-2 rounded border border-(--border) truncate"
+            class="text-[11px] font-mono text-muted-color bg-(--bg-hover)/40 p-1.5 rounded truncate select-all"
           >
             {{ currentContext.server }}
           </span>
@@ -106,9 +104,9 @@ const handleClearAllData = () => {
           }}</span>
         </div>
 
-        <div class="flex items-center justify-between pt-2 border-t border-(--border)">
+        <div class="flex items-center justify-between pt-1">
           <span class="text-xs text-muted-color">Status</span>
-          <span class="flex items-center gap-1.5 text-emerald-500 font-semibold text-xs">
+          <span class="flex items-center gap-1.5 text-emerald-500 font-medium text-xs">
             <CheckCircle2 class="w-3.5 h-3.5" />
             Connected
           </span>
@@ -116,16 +114,16 @@ const handleClearAllData = () => {
       </div>
     </div>
 
-    <!-- Card 2: Kubeconfig Details -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-4"
-    >
-      <div class="flex items-center gap-2 pb-3 border-b border-(--border)">
+    <!-- Section 2: Kubeconfig Details -->
+    <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
         <FileText class="w-4 h-4 text-sky-500" />
-        <h4 class="text-xs font-bold text-primary uppercase tracking-wider">Kubeconfig Details</h4>
+        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">
+          Kubeconfig Details
+        </h4>
       </div>
 
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-2.5">
         <div class="flex items-center justify-between">
           <span class="text-xs text-muted-color">Total Contexts</span>
           <span class="text-xs font-semibold text-primary">{{ kubeconfigInfo.contextsCount }}</span>
@@ -148,16 +146,14 @@ const handleClearAllData = () => {
       </div>
     </div>
 
-    <!-- Card 3: Data Management -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm flex flex-col gap-4"
-    >
-      <div class="flex items-center gap-2 pb-3 border-b border-(--border)">
+    <!-- Section 3: Data Management -->
+    <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
         <Database class="w-4 h-4 text-emerald-500" />
-        <h4 class="text-xs font-bold text-primary uppercase tracking-wider">Data Management</h4>
+        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Data Management</h4>
       </div>
 
-      <div class="flex flex-col gap-3">
+      <div class="flex flex-col gap-2.5">
         <div class="flex items-center justify-between">
           <span class="text-xs text-muted-color">Cached Objects</span>
           <span class="text-xs font-semibold text-primary">{{
@@ -177,13 +173,13 @@ const handleClearAllData = () => {
           }}</span>
         </div>
 
-        <div class="flex flex-col gap-2 pt-2 border-t border-(--border)">
+        <div class="flex flex-col gap-2 pt-2">
           <Button
             size="small"
             severity="secondary"
             variant="outlined"
             fluid
-            class="text-xs font-semibold"
+            class="text-xs font-medium"
             @click="handleClearCache"
           >
             <Trash2 class="w-3.5 h-3.5 text-rose-500 mr-1" />
@@ -195,7 +191,7 @@ const handleClearAllData = () => {
             severity="danger"
             variant="outlined"
             fluid
-            class="text-xs font-semibold"
+            class="text-xs font-medium"
             @click="handleClearAllData"
           >
             <span>Clear All Data</span>
