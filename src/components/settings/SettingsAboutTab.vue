@@ -3,10 +3,16 @@ import { app } from '@/services/nativeService'
 import { useUpdaterStore } from '@/stores/updater'
 import { Check, CheckCircle2, Compass, Info, RefreshCw } from '@lucide/vue'
 import Button from 'primevue/button'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const updaterStore = useUpdaterStore()
 const appVersion = ref('')
+const appArch = computed(() => {
+  if (typeof window !== 'undefined' && 'NL_ARCH' in window) {
+    return (window as unknown as { NL_ARCH: string }).NL_ARCH
+  }
+  return 'x64'
+})
 
 onMounted(async () => {
   try {
@@ -48,7 +54,7 @@ onMounted(async () => {
           </div>
           <div class="flex justify-between items-center py-1.5 text-xs">
             <span class="font-medium text-muted-color">Architecture</span>
-            <span class="text-primary font-mono">x64</span>
+            <span class="text-primary font-mono">{{ appArch }}</span>
           </div>
           <div class="flex justify-between items-center py-1.5 text-xs">
             <span class="font-medium text-muted-color">Author</span>

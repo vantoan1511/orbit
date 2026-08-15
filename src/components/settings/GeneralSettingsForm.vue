@@ -1,84 +1,66 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import Checkbox from 'primevue/checkbox'
-import Select from 'primevue/select'
-import InputText from 'primevue/inputtext'
-import ToggleSwitch from 'primevue/toggleswitch'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useProfileStore } from '@/stores/profileStore'
+import { AlertTriangle, Folder, RefreshCw } from '@lucide/vue'
 import Button from 'primevue/button'
-import { RefreshCw, Folder, AlertTriangle } from '@lucide/vue'
+import Checkbox from 'primevue/checkbox'
+import InputText from 'primevue/inputtext'
+import Select from 'primevue/select'
+import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
-import { useConfirm } from 'primevue/useconfirm'
+import { computed, ref } from 'vue'
 
+const profileStore = useProfileStore()
+const k8sStore = useKubernetesStore()
 const toast = useToast()
-const confirm = useConfirm()
 
-// Startup settings state
-const launchOnStartup = ref(true)
+// Startup settings state (placeholders)
+const launchOnStartup = ref(false)
 const startMinimized = ref(false)
 
-// Updates settings state
+// Updates settings state (placeholders)
 const autoCheckUpdates = ref(true)
 const updateChannel = ref('Stable')
 const channels = ref(['Stable', 'Beta', 'Nightly'])
 
 // Kubeconfig settings state
-const kubeconfigPath = ref('~/.kube/config')
+const kubeconfigPath = computed(() => {
+  if (profileStore.profile?.kubeconfigPaths && profileStore.profile.kubeconfigPaths.length > 0) {
+    return profileStore.profile.kubeconfigPaths.join(', ')
+  }
+  return 'Auto-detected'
+})
 
-// Telemetry settings state
+const isReloading = ref(false)
+
+// Telemetry settings state (placeholder)
 const shareTelemetry = ref(false)
 
-const handleReloadKubeconfig = () => {
-  toast.add({
-    severity: 'success',
-    summary: 'Kubeconfig Reloaded',
-    detail: 'Kubeconfig reloaded successfully!',
-    life: 3000
-  })
-}
-
-const handleResetCache = () => {
-  confirm.require({
-    message: 'Are you sure you want to reset the application cache?',
-    header: 'Reset Cache',
-    accept: () => {
-      toast.add({
-        severity: 'success',
-        summary: 'Cache Cleared',
-        detail: 'Application cache cleared.',
-        life: 3000
-      })
-    }
-  })
-}
-
-const handleResetAllSettings = () => {
-  confirm.require({
-    message: 'Are you sure you want to reset all settings to defaults?',
-    header: 'Reset Settings',
-    accept: () => {
-      toast.add({
-        severity: 'success',
-        summary: 'Settings Reset',
-        detail: 'Settings reset to defaults.',
-        life: 3000
-      })
-    }
-  })
-}
-
-const handleDeleteCachedContexts = () => {
-  confirm.require({
-    message: 'Are you sure you want to delete all cached context metadata?',
-    header: 'Delete Contexts',
-    accept: () => {
-      toast.add({
-        severity: 'success',
-        summary: 'Contexts Deleted',
-        detail: 'Cached contexts deleted.',
-        life: 3000
-      })
-    }
-  })
+const handleReloadKubeconfig = async () => {
+  if (isReloading.value) return
+  isReloading.value = true
+  try {
+    await Promise.all([
+      profileStore.fetchProfile(),
+      k8sStore.loadInitialData()
+    ])
+    toast.add({
+      severity: 'success',
+      summary: 'Kubeconfig Reloaded',
+      detail: 'Kubeconfig and cluster contexts reloaded.',
+      life: 3000
+    })
+  } catch (error) {
+    console.error('Failed to reload kubeconfig:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Failed to reload kubeconfig.',
+      life: 3000
+    })
+  } finally {
+    isReloading.value = false
+  }
 }
 </script>
 
@@ -203,7 +185,8 @@ const handleDeleteCachedContexts = () => {
             <div class="relative flex-1">
               <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
               <InputText
-                v-model="kubeconfigPath"
+                :modelValue="kubeconfigPath"
+                readonly
                 disabled
                 class="pl-9 pr-4 py-1.5 w-full text-xs"
               />
@@ -212,11 +195,12 @@ const handleDeleteCachedContexts = () => {
               size="small"
               severity="secondary"
               variant="outlined"
-              disabled
+              :loading="isReloading"
+              :disabled="isReloading"
               class="text-xs font-semibold flex items-center gap-1.5"
               @click="handleReloadKubeconfig"
             >
-              <RefreshCw class="w-3.5 h-3.5" />
+              <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isReloading }" />
               <span>Reload</span>
             </Button>
           </div>
@@ -277,7 +261,6 @@ const handleDeleteCachedContexts = () => {
               variant="outlined"
               disabled
               class="text-xs font-medium"
-              @click="handleResetCache"
             >
               Reset Cache
             </Button>
@@ -287,7 +270,6 @@ const handleDeleteCachedContexts = () => {
               variant="outlined"
               disabled
               class="text-xs font-medium"
-              @click="handleDeleteCachedContexts"
             >
               Delete Cached Contexts
             </Button>
@@ -297,7 +279,6 @@ const handleDeleteCachedContexts = () => {
               variant="outlined"
               disabled
               class="text-xs font-medium"
-              @click="handleResetAllSettings"
             >
               Reset All Settings
             </Button>

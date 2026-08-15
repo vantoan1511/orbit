@@ -82,7 +82,6 @@ declare module 'vue' {
     ServicesTable: typeof import('./src/components/network/ServicesTable.vue')['default']
     SettingsAboutTab: typeof import('./src/components/settings/SettingsAboutTab.vue')['default']
     SettingsGeneralTab: typeof import('./src/components/settings/SettingsGeneralTab.vue')['default']
-    SettingsInfoCards: typeof import('./src/components/settings/SettingsInfoCards.vue')['default']
     StatefulSetsTable: typeof import('./src/components/workloads/StatefulSetsTable.vue')['default']
     StatusBadge: typeof import('./src/components/shared/StatusBadge.vue')['default']
     StatusCard: typeof import('./src/components/dashboard/StatusCard.vue')['default']
