@@ -58,6 +58,7 @@ watch(
     emptyMessage="No deployments found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} deployments"
     :loading="loading || k8sStore.deploymentsLoading"
+    :selectable="true"
     @refresh="fetchDeployments"
     @namespace-change="fetchDeployments"
   >
