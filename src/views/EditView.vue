@@ -262,7 +262,7 @@ watch(
         <!-- Non-Deployment Fallback Form with Asymmetric 2-Column Section Layout -->
         <div v-else class="w-full h-full overflow-y-auto pt-2 px-0 flex flex-col gap-10">
           <!-- Section 1: Resource Identity -->
-          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-5xl">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl">
             <div class="md:col-span-4 flex flex-col gap-1">
               <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
                 Resource Identity
@@ -284,7 +284,7 @@ watch(
           </div>
 
           <!-- Section 2: Labels & Annotations -->
-          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-5xl">
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl">
             <div class="md:col-span-4 flex flex-col gap-1">
               <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
                 Metadata & Tags

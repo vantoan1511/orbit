@@ -28,6 +28,7 @@ declare module 'vue' {
     ConfigDataTable: typeof import('./src/components/config/ConfigDataTable.vue')['default']
     ConfigDetailsDrawer: typeof import('./src/components/config/ConfigDetailsDrawer.vue')['default']
     ConfigMetricsCards: typeof import('./src/components/config/ConfigMetricsCards.vue')['default']
+    ContainerEnvEditor: typeof import('./src/components/shared/ContainerEnvEditor.vue')['default']
     ContainerPortsEditor: typeof import('./src/components/shared/ContainerPortsEditor.vue')['default']
     ContainerResourcesEditor: typeof import('./src/components/shared/ContainerResourcesEditor.vue')['default']
     CronJobsTable: typeof import('./src/components/workloads/CronJobsTable.vue')['default']
