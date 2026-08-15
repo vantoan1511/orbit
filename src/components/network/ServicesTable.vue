@@ -1,26 +1,16 @@
 <script setup lang="ts">
-import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
-import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useResourceFilters } from '@/composables/useResourceFilters'
-import { useTableColumns } from '@/composables/useTableColumns'
+import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { ServiceInfo } from '@/types/kubernetes'
-import { ExternalLink, MoreVertical } from '@lucide/vue'
-import Button from 'primevue/button'
+import { ExternalLink } from '@lucide/vue'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
 import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from '@/components/services/ServiceDetailsDrawer.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const k8sStore = useKubernetesStore()
 
-const { tableColumns, visibleCols } = useTableColumns([
+const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'type', header: 'Type', visible: true },
   { field: 'clusterIP', header: 'Cluster IP', visible: true },
@@ -28,37 +18,22 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'ports', header: 'Ports', visible: true },
   { field: 'endpoints', header: 'Endpoints', visible: true },
   { field: 'age', header: 'Age', visible: true }
-])
-
-const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(computed(() => k8sStore.services))
+]
 
 const selectedType = ref('All Types')
-
-// Drawer state
-const drawerVisible = ref(false)
-const selectedService = ref<ServiceInfo | null>(null)
-
-const handleRefresh = async () => {
-  await kubernetesService.getServices()
-}
-
 const types = ['All Types', 'ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName']
 
 const filteredServices = computed(() => {
-  return filteredResources.value.filter((s) => {
-    // Type filter
+  return k8sStore.services.filter((s) => {
     if (selectedType.value !== 'All Types' && s.type !== selectedType.value) {
       return false
     }
-
     return true
   })
 })
 
-const onRowClick = (event: { data: ServiceInfo }) => {
-  selectedService.value = event.data
-  drawerVisible.value = true
+const handleRefresh = async () => {
+  await kubernetesService.getServices()
 }
 
 const getTypeBadgeClass = (type: string) => {
@@ -75,165 +50,100 @@ const getTypeBadgeClass = (type: string) => {
       return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
   }
 }
-
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<ServiceInfo>()
-
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'Service',
-  onViewDetails: (row) => {
-    selectedService.value = row
-    drawerVisible.value = true
-  }
-})
 </script>
 
 <template>
-  <ResourceDataTable
+  <GenericResourceTable
     :data="filteredServices"
-    v-model:searchQuery="searchQuery"
-    v-model:columns="tableColumns"
+    :initialColumns="columns"
+    :hideStatusFilter="true"
+    :hideStatusColumn="true"
+    :searchFields="['name', 'clusterIP', 'externalIP']"
+    kind="Service"
     searchPlaceholder="Search services..."
     emptyMessage="No services found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} services"
     :loading="k8sStore.servicesLoading"
     @refresh="handleRefresh"
-    @row-click="onRowClick"
-    @row-contextmenu="onRowContextMenu"
   >
-    <!-- Filters -->
+    <!-- Filter -->
     <template #filters>
-      <!-- Namespace Select -->
-      <NamespaceFilter v-model="selectedNamespace" :namespaces="k8sStore.namespaces" />
-
-      <!-- Type Select -->
-      <Select
-        v-model="selectedType"
-        :options="types"
-        class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <TableFilterSelect v-model="selectedType" :options="types" />
     </template>
 
-    <!-- Actions Left -->
-    <template #actions-left>
-      <SystemNamespaceToggle v-model="showSystemNamespaces" />
+    <template #default="{ visibleCols }">
+      <!-- Type Column -->
+      <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3">
+        <template #body="{ data }">
+          <span
+            class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
+            :class="getTypeBadgeClass(data.type)"
+          >
+            {{ data.type }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- Cluster IP Column -->
+      <Column
+        v-if="visibleCols['clusterIP']"
+        field="clusterIP"
+        header="Cluster IP"
+        sortable
+        class="p-3"
+      >
+        <template #body="{ data }">
+          <span class="font-mono text-muted-color">{{ data.clusterIP }}</span>
+        </template>
+      </Column>
+
+      <!-- External IP Column -->
+      <Column
+        v-if="visibleCols['externalIP']"
+        field="externalIP"
+        header="External IP"
+        sortable
+        class="p-3"
+      >
+        <template #body="{ data }">
+          <div class="flex items-center gap-1">
+            <span class="font-mono text-muted-color">{{ data.externalIP }}</span>
+            <ExternalLink
+              v-if="data.externalIP !== '-'"
+              class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
+            />
+          </div>
+        </template>
+      </Column>
+
+      <!-- Ports Column -->
+      <Column v-if="visibleCols['ports']" field="ports" header="Ports" sortable class="p-3">
+        <template #body="{ data }">
+          <span class="font-mono text-muted-color whitespace-pre-line">{{ data.ports }}</span>
+        </template>
+      </Column>
+
+      <!-- Endpoints Column -->
+      <Column
+        v-if="visibleCols['endpoints']"
+        field="endpoints"
+        header="Endpoints"
+        sortable
+        class="p-3"
+      >
+        <template #body="{ data }">
+          <span class="font-mono font-medium text-emerald-400">{{ data.endpoints }}</span>
+        </template>
+      </Column>
     </template>
-
-    <!-- Columns -->
-    <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
-      <template #body="{ data }">
-        <span class="font-semibold">{{ data.name }}</span>
-      </template>
-    </Column>
-
-    <!-- Namespace Column -->
-    <Column
-      v-if="visibleCols['namespace']"
-      field="namespace"
-      header="Namespace"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <NamespaceBadge :namespace="data.namespace" />
-      </template>
-    </Column>
-
-    <!-- Type Column -->
-    <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3">
-      <template #body="{ data }">
-        <span
-          class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
-          :class="getTypeBadgeClass(data.type)"
-        >
-          {{ data.type }}
-        </span>
-      </template>
-    </Column>
-
-    <!-- Cluster IP Column -->
-    <Column
-      v-if="visibleCols['clusterIP']"
-      field="clusterIP"
-      header="Cluster IP"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <span class="font-mono text-muted-color">{{ data.clusterIP }}</span>
-      </template>
-    </Column>
-
-    <!-- External IP Column -->
-    <Column
-      v-if="visibleCols['externalIP']"
-      field="externalIP"
-      header="External IP"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <div class="flex items-center gap-1">
-          <span class="font-mono text-muted-color">{{ data.externalIP }}</span>
-          <ExternalLink
-            v-if="data.externalIP !== '-'"
-            class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
-          />
-        </div>
-      </template>
-    </Column>
-
-    <!-- Ports Column -->
-    <Column v-if="visibleCols['ports']" field="ports" header="Ports" sortable class="p-3">
-      <template #body="{ data }">
-        <span class="font-mono text-muted-color whitespace-pre-line">{{ data.ports }}</span>
-      </template>
-    </Column>
-
-    <!-- Endpoints Column -->
-    <Column
-      v-if="visibleCols['endpoints']"
-      field="endpoints"
-      header="Endpoints"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <span class="font-mono font-medium text-emerald-400">{{ data.endpoints }}</span>
-      </template>
-    </Column>
-
-    <!-- Age Column -->
-    <Column
-      v-if="visibleCols['age']"
-      field="age"
-      header="Age"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    ></Column>
-
-    <!-- Actions Column -->
-    <Column class="p-3 text-center w-12 shrink-0">
-      <template #body="{ data }">
-        <Button
-          severity="secondary"
-          variant="text"
-          size="small"
-          class="p-1"
-          title="Actions"
-          @click="toggleActionMenu($event, data)"
-        >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
-        </Button>
-      </template>
-    </Column>
 
     <!-- Drawer -->
-    <template #drawer>
-      <ServiceDetailsDrawer v-model:visible="drawerVisible" :service="selectedService" />
-      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    <template #drawer="{ selectedItem, visible, close }">
+      <ServiceDetailsDrawer
+        :visible="visible"
+        :service="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
-  </ResourceDataTable>
+  </GenericResourceTable>
 </template>

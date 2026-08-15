@@ -1,58 +1,41 @@
 <script setup lang="ts">
-import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
-import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import { useResourceFilters } from '@/composables/useResourceFilters'
-import { useTableColumns } from '@/composables/useTableColumns'
+import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { CronJobInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
 import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
-import { MoreVertical } from '@lucide/vue'
-import Button from 'primevue/button'
 
 const k8sStore = useKubernetesStore()
+const loading = ref(false)
 
-const { tableColumns, visibleCols } = useTableColumns([
+const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'schedule', header: 'Schedule', visible: true },
   { field: 'suspend', header: 'Suspend', visible: true },
   { field: 'active', header: 'Active Jobs', visible: true },
   { field: 'lastSchedule', header: 'Last Schedule', visible: true },
   { field: 'age', header: 'Age', visible: true }
-])
-
-const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(
-    computed(() => k8sStore.cronJobs),
-    ['name', 'images']
-  )
+]
 
 const selectedSuspend = ref('All Suspend States')
-const loading = ref(false)
-
-// Drawer state
-const drawerVisible = ref(false)
-const selectedWorkload = ref<CronJobInfo | null>(null)
-
-const namespaces = computed(() => {
-  return k8sStore.namespaces
-})
-
 const suspendOptions = ['All Suspend States', 'Suspended', 'Active']
 
-const fetchCronJobs = async () => {
+const filteredCronJobs = computed(() => {
+  return k8sStore.cronJobs.filter((cj) => {
+    if (selectedSuspend.value !== 'All Suspend States') {
+      const isSuspended = selectedSuspend.value === 'Suspended'
+      if (cj.suspend !== isSuspended) return false
+    }
+    return true
+  })
+})
+
+const fetchCronJobs = async (namespace?: string) => {
   loading.value = true
   try {
-    const ns = selectedNamespace.value.length === 1 ? selectedNamespace.value[0] : undefined
-    await kubernetesService.getCronJobs(ns)
+    await kubernetesService.getCronJobs(namespace)
   } catch (e) {
     console.error('Error fetching cronjobs', e)
   } finally {
@@ -66,179 +49,96 @@ onMounted(() => {
   }
 })
 
-watch(selectedNamespace, () => {
-  fetchCronJobs()
-})
-
 watch(
   () => k8sStore.activeClusterId,
   () => {
     fetchCronJobs()
   }
 )
-
-const filteredCronJobs = computed(() => {
-  return filteredResources.value.filter((cj) => {
-    if (selectedSuspend.value !== 'All Suspend States') {
-      const isSuspended = selectedSuspend.value === 'Suspended'
-      if (cj.suspend !== isSuspended) return false
-    }
-    return true
-  })
-})
-
-const onRowClick = (event: { data: CronJobInfo }) => {
-  selectedWorkload.value = event.data
-  drawerVisible.value = true
-}
-
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<CronJobInfo>()
-
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'CronJob',
-  onViewDetails: (row) => {
-    selectedWorkload.value = row
-    drawerVisible.value = true
-  }
-})
 </script>
 
 <template>
-  <ResourceDataTable
+  <GenericResourceTable
     :data="filteredCronJobs"
-    v-model:searchQuery="searchQuery"
-    v-model:columns="tableColumns"
+    :initialColumns="columns"
+    :hideStatusFilter="true"
+    :hideStatusColumn="true"
+    :searchFields="['name', 'images']"
+    kind="CronJob"
     searchPlaceholder="Search cronjobs or images..."
     emptyMessage="No cronjobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} cronjobs"
     :loading="loading || k8sStore.cronJobsLoading"
     @refresh="fetchCronJobs"
-    @row-click="onRowClick"
-    @row-contextmenu="onRowContextMenu"
+    @namespace-change="fetchCronJobs"
   >
-    <!-- Filters -->
+    <!-- Custom Filter -->
     <template #filters>
-      <!-- Namespace Select -->
-      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
-
-      <!-- Suspend Select -->
-      <Select
-        v-model="selectedSuspend"
-        :options="suspendOptions"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
-      />
+      <TableFilterSelect v-model="selectedSuspend" :options="suspendOptions" class="min-w-44" />
     </template>
 
-    <!-- Actions Left -->
-    <template #actions-left>
-      <SystemNamespaceToggle v-model="showSystemNamespaces" />
+    <template #default="{ visibleCols }">
+      <!-- Schedule Column -->
+      <Column
+        v-if="visibleCols['schedule']"
+        field="schedule"
+        header="Schedule"
+        sortable
+        class="p-3"
+        bodyClass="font-mono text-primary"
+      ></Column>
+
+      <!-- Suspend Column -->
+      <Column v-if="visibleCols['suspend']" field="suspend" header="Suspend" sortable class="p-3">
+        <template #body="{ data }">
+          <span
+            class="font-medium px-2 py-0.5 rounded text-[10px] uppercase tracking-wider"
+            :class="
+              data.suspend
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+            "
+          >
+            {{ data.suspend ? 'True' : 'False' }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- Active Column -->
+      <Column
+        v-if="visibleCols['active']"
+        field="active"
+        header="Active Jobs"
+        sortable
+        class="p-3 text-center"
+      >
+        <template #body="{ data }">
+          <span class="font-mono text-muted-color">{{ data.active }}</span>
+        </template>
+      </Column>
+
+      <!-- Last Schedule Column -->
+      <Column
+        v-if="visibleCols['lastSchedule']"
+        field="lastSchedule"
+        header="Last Schedule"
+        sortable
+        class="p-3"
+        bodyClass="font-mono text-muted-color"
+      >
+        <template #body="{ data }">
+          <span>{{ data.lastSchedule || '-' }}</span>
+        </template>
+      </Column>
     </template>
-
-    <!-- Columns -->
-    <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
-      <template #body="{ data }">
-        <span class="font-semibold hover:text-violet-400 transition-colors">{{ data.name }}</span>
-      </template>
-    </Column>
-
-    <!-- Namespace Column -->
-    <Column
-      v-if="visibleCols['namespace']"
-      field="namespace"
-      header="Namespace"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <NamespaceBadge :namespace="data.namespace" />
-      </template>
-    </Column>
-
-    <!-- Schedule Column -->
-    <Column
-      v-if="visibleCols['schedule']"
-      field="schedule"
-      header="Schedule"
-      sortable
-      class="p-3"
-      bodyClass="font-mono text-primary"
-    ></Column>
-
-    <!-- Suspend Column -->
-    <Column v-if="visibleCols['suspend']" field="suspend" header="Suspend" sortable class="p-3">
-      <template #body="{ data }">
-        <span
-          class="font-medium px-2 py-0.5 rounded text-[10px] uppercase tracking-wider"
-          :class="
-            data.suspend
-              ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-          "
-        >
-          {{ data.suspend ? 'True' : 'False' }}
-        </span>
-      </template>
-    </Column>
-
-    <!-- Active Column -->
-    <Column
-      v-if="visibleCols['active']"
-      field="active"
-      header="Active Jobs"
-      sortable
-      class="p-3 text-center"
-    >
-      <template #body="{ data }">
-        <span class="font-mono text-muted-color">{{ data.active }}</span>
-      </template>
-    </Column>
-
-    <!-- Last Schedule Column -->
-    <Column
-      v-if="visibleCols['lastSchedule']"
-      field="lastSchedule"
-      header="Last Schedule"
-      sortable
-      class="p-3"
-      bodyClass="font-mono text-muted-color"
-    >
-      <template #body="{ data }">
-        <span>{{ data.lastSchedule || '-' }}</span>
-      </template>
-    </Column>
-
-    <!-- Age Column -->
-    <Column
-      v-if="visibleCols['age']"
-      field="age"
-      header="Age"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    ></Column>
-
-    <!-- Actions Column -->
-    <Column class="p-3 text-center w-12 shrink-0">
-      <template #body="{ data }">
-        <Button
-          severity="secondary"
-          variant="text"
-          size="small"
-          class="p-1"
-          title="Actions"
-          @click="toggleActionMenu($event, data)"
-        >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
-        </Button>
-      </template>
-    </Column>
 
     <!-- Drawer -->
-    <template #drawer>
-      <WorkloadDetailsDrawer v-model:visible="drawerVisible" :workload="selectedWorkload" />
-      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    <template #drawer="{ selectedItem, visible, close }">
+      <WorkloadDetailsDrawer
+        :visible="visible"
+        :workload="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
-  </ResourceDataTable>
+  </GenericResourceTable>
 </template>

@@ -2,7 +2,7 @@ import { computed, ref, type Ref } from 'vue'
 
 export interface ResourceItem {
   name: string
-  namespace: string
+  namespace?: string
   [key: string]: unknown
 }
 
@@ -32,12 +32,16 @@ export function useResourceFilters<T extends ResourceItem>(
       }
 
       // 2. Namespace filter
-      if (selectedNamespace.value.length > 0 && !selectedNamespace.value.includes(item.namespace)) {
+      if (
+        selectedNamespace.value.length > 0 &&
+        (!item.namespace || !selectedNamespace.value.includes(item.namespace))
+      ) {
         return false
       }
 
       // 3. System Namespaces filter
-      const isSystem = ['kube-system', 'monitoring', 'logging'].includes(item.namespace)
+      const isSystem =
+        item.namespace && ['kube-system', 'monitoring', 'logging'].includes(item.namespace)
       if (!showSystemNamespaces.value && isSystem && selectedNamespace.value.length === 0) {
         return false
       }

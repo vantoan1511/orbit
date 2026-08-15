@@ -13,6 +13,8 @@ const props = defineProps<{
     :options="props.namespaces.filter((n) => n !== 'All Namespaces')"
     placeholder="All Namespaces"
     :maxSelectedLabels="3"
-    class="min-w-44 text-sm"
+    size="small"
+    variant="filled"
+    class="min-w-44"
   />
 </template>

@@ -1,26 +1,12 @@
 <script setup lang="ts">
-import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
-import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
-import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
-import StatusBadge from '@/components/shared/StatusBadge.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
-import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
-import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
-import { useResourceFilters } from '@/composables/useResourceFilters'
-import { useTableColumns } from '@/composables/useTableColumns'
+import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { PodInfo } from '@/types/kubernetes'
-import { MoreVertical } from '@lucide/vue'
-import Button from 'primevue/button'
 import Column from 'primevue/column'
-import Select from 'primevue/select'
-import { computed, ref } from 'vue'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
-import { useWorkloadActions } from '@/composables/useWorkloadActions'
 
 const k8sStore = useKubernetesStore()
 
-const { tableColumns, visibleCols } = useTableColumns([
+const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'status', header: 'Status', visible: true },
   { field: 'node', header: 'Node', visible: true },
@@ -28,20 +14,7 @@ const { tableColumns, visibleCols } = useTableColumns([
   { field: 'cpu', header: 'CPU', visible: true },
   { field: 'memory', header: 'Memory', visible: true },
   { field: 'age', header: 'Age', visible: true }
-])
-
-const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(computed(() => k8sStore.pods))
-
-const selectedStatus = ref('All Statuses')
-
-// Drawer state
-const drawerVisible = ref(false)
-const selectedPod = ref<PodInfo | null>(null)
-
-const namespaces = computed(() => {
-  return k8sStore.namespaces
-})
+]
 
 const statuses = [
   'All Statuses',
@@ -52,201 +25,109 @@ const statuses = [
   'Completed',
   'Unknown'
 ]
-
-const filteredPods = computed(() => {
-  return filteredResources.value.filter((p) => {
-    if (selectedStatus.value !== 'All Statuses' && p.status !== selectedStatus.value) {
-      return false
-    }
-    return true
-  })
-})
-
-const onRowClick = (event: { data: PodInfo }) => {
-  selectedPod.value = event.data
-  drawerVisible.value = true
-}
-
-const { actionMenu, selectedActionRow, toggleActionMenu, onRowContextMenu } =
-  useResourceActionMenu<PodInfo>()
-
-const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
-  kind: 'Pod',
-  onViewDetails: (row) => {
-    selectedPod.value = row
-    drawerVisible.value = true
-  }
-})
 </script>
 
 <template>
-  <ResourceDataTable
-    :data="filteredPods"
-    v-model:searchQuery="searchQuery"
-    v-model:columns="tableColumns"
+  <GenericResourceTable
+    :data="k8sStore.pods"
+    :initialColumns="columns"
+    :statuses="statuses"
+    :searchFields="['name', 'node']"
+    kind="Pod"
     searchPlaceholder="Search pods, images or nodes..."
     emptyMessage="No pods found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} pods"
     :loading="k8sStore.podsLoading"
-    @row-click="onRowClick"
-    @row-contextmenu="onRowContextMenu"
   >
-    <!-- Filters -->
-    <template #filters>
-      <!-- Namespace Select -->
-      <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
-
-      <!-- Status Select -->
-      <Select
-        v-model="selectedStatus"
-        :options="statuses"
-        class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
-      />
-    </template>
-
-    <!-- Actions Left -->
-    <template #actions-left>
-      <SystemNamespaceToggle v-model="showSystemNamespaces" />
-    </template>
-
-    <!-- Columns -->
-    <!-- Name Column -->
-    <Column field="name" header="Name" sortable class="p-3" bodyClass="font-medium text-primary">
-      <template #body="{ data }">
-        <span class="font-semibold">{{ data.name }}</span>
-      </template>
-    </Column>
-
-    <!-- Namespace Column -->
-    <Column
-      v-if="visibleCols['namespace']"
-      field="namespace"
-      header="Namespace"
-      sortable
-      class="p-3"
-    >
-      <template #body="{ data }">
-        <NamespaceBadge :namespace="data.namespace" />
-      </template>
-    </Column>
-
-    <!-- Status Column -->
-    <Column v-if="visibleCols['status']" field="status" header="Status" sortable class="p-3">
-      <template #body="{ data }">
-        <StatusBadge :status="data.status" />
-      </template>
-    </Column>
-
-    <!-- Node Column -->
-    <Column v-if="visibleCols['node']" field="node" header="Node" sortable class="p-3">
-      <template #body="{ data }">
-        <span
-          class="text-muted-color font-mono truncate block max-w-44"
-          :title="data.node || 'N/A'"
-        >
-          {{ data.node ? data.node.split('.')[0] : 'N/A' }}
-        </span>
-      </template>
-    </Column>
-
-    <!-- Restarts Column -->
-    <Column
-      v-if="visibleCols['restarts']"
-      field="restarts"
-      header="Restarts"
-      sortable
-      class="p-3 text-center"
-    >
-      <template #body="{ data }">
-        <span
-          class="font-mono px-1.5 py-0.5 rounded text-[10px]"
-          :class="
-            (data.restarts || 0) > 0
-              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-              : 'text-muted-color'
-          "
-        >
-          {{ data.restarts || 0 }}
-        </span>
-      </template>
-    </Column>
-
-    <!-- CPU Column -->
-    <Column v-if="visibleCols['cpu']" field="cpu" header="CPU" sortable class="p-3">
-      <template #body="{ data }">
-        <div class="flex flex-col gap-1 w-24">
-          <div class="flex justify-between font-mono text-[10px]">
-            <span class="text-muted-color">{{ data.cpu || '-' }}</span>
-            <span class="text-muted-color" v-if="data.cpu && data.cpu !== '-'"
-              >{{ data.cpuPct || 0 }}%</span
-            >
-          </div>
-          <div
-            class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-            v-if="data.cpu && data.cpu !== '-'"
+    <template #default="{ visibleCols }">
+      <!-- Node Column -->
+      <Column v-if="visibleCols['node']" field="node" header="Node" sortable class="p-3">
+        <template #body="{ data }">
+          <span
+            class="text-muted-color font-mono truncate block max-w-44"
+            :title="data.node || 'N/A'"
           >
-            <div
-              class="h-full rounded-full bg-violet-500"
-              :style="{ width: (data.cpuPct || 0) + '%' }"
-            ></div>
-          </div>
-        </div>
-      </template>
-    </Column>
+            {{ data.node ? data.node.split('.')[0] : 'N/A' }}
+          </span>
+        </template>
+      </Column>
 
-    <!-- Memory Column -->
-    <Column v-if="visibleCols['memory']" field="memory" header="Memory" sortable class="p-3">
-      <template #body="{ data }">
-        <div class="flex flex-col gap-1 w-24">
-          <div class="flex justify-between font-mono text-[10px]">
-            <span class="text-muted-color">{{ data.memory || '-' }}</span>
-            <span class="text-muted-color" v-if="data.memory && data.memory !== '-'"
-              >{{ data.memoryPct || 0 }}%</span
-            >
-          </div>
-          <div
-            class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-            v-if="data.memory && data.memory !== '-'"
+      <!-- Restarts Column -->
+      <Column
+        v-if="visibleCols['restarts']"
+        field="restarts"
+        header="Restarts"
+        sortable
+        class="p-3 text-center"
+      >
+        <template #body="{ data }">
+          <span
+            class="font-mono px-1.5 py-0.5 rounded text-[10px]"
+            :class="
+              (data.restarts || 0) > 0
+                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                : 'text-muted-color'
+            "
           >
+            {{ data.restarts || 0 }}
+          </span>
+        </template>
+      </Column>
+
+      <!-- CPU Column -->
+      <Column v-if="visibleCols['cpu']" field="cpu" header="CPU" sortable class="p-3">
+        <template #body="{ data }">
+          <div class="flex flex-col gap-1 w-24">
+            <div class="flex justify-between font-mono text-[10px]">
+              <span class="text-muted-color">{{ data.cpu || '-' }}</span>
+              <span class="text-muted-color" v-if="data.cpu && data.cpu !== '-'"
+                >{{ data.cpuPct || 0 }}%</span
+              >
+            </div>
             <div
-              class="h-full rounded-full bg-blue-500"
-              :style="{ width: (data.memoryPct || 0) + '%' }"
-            ></div>
+              class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
+              v-if="data.cpu && data.cpu !== '-'"
+            >
+              <div
+                class="h-full rounded-full bg-violet-500"
+                :style="{ width: (data.cpuPct || 0) + '%' }"
+              ></div>
+            </div>
           </div>
-        </div>
-      </template>
-    </Column>
+        </template>
+      </Column>
 
-    <!-- Age Column -->
-    <Column
-      v-if="visibleCols['age']"
-      field="age"
-      header="Age"
-      sortable
-      class="p-3"
-      bodyClass="text-muted-color font-mono"
-    ></Column>
-
-    <!-- Actions Column -->
-    <Column class="p-3 text-center w-12 shrink-0">
-      <template #body="{ data }">
-        <Button
-          severity="secondary"
-          variant="text"
-          size="small"
-          class="p-1"
-          title="Actions"
-          @click="toggleActionMenu($event, data)"
-        >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
-        </Button>
-      </template>
-    </Column>
+      <!-- Memory Column -->
+      <Column v-if="visibleCols['memory']" field="memory" header="Memory" sortable class="p-3">
+        <template #body="{ data }">
+          <div class="flex flex-col gap-1 w-24">
+            <div class="flex justify-between font-mono text-[10px]">
+              <span class="text-muted-color">{{ data.memory || '-' }}</span>
+              <span class="text-muted-color" v-if="data.memory && data.memory !== '-'"
+                >{{ data.memoryPct || 0 }}%</span
+              >
+            </div>
+            <div
+              class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
+              v-if="data.memory && data.memory !== '-'"
+            >
+              <div
+                class="h-full rounded-full bg-blue-500"
+                :style="{ width: (data.memoryPct || 0) + '%' }"
+              ></div>
+            </div>
+          </div>
+        </template>
+      </Column>
+    </template>
 
     <!-- Drawer -->
-    <template #drawer>
-      <PodDetailsDrawer v-model:visible="drawerVisible" :pod="selectedPod" />
-      <ResourceActionMenu ref="actionMenu" :items="actionMenuItems" />
+    <template #drawer="{ selectedItem, visible, close }">
+      <PodDetailsDrawer
+        :visible="visible"
+        :pod="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
-  </ResourceDataTable>
+  </GenericResourceTable>
 </template>
