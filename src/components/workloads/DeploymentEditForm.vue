@@ -365,31 +365,34 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
 <template>
   <div class="flex flex-col h-full w-full">
     <Tabs v-model:value="activeTab" class="w-full flex flex-col h-full">
-      <TabList class="border-b border-(--border)">
-        <Tab value="general" class="text-xs font-medium px-3 py-2">General & Scaling</Tab>
-        <Tab value="metadata" class="text-xs font-medium px-3 py-2">Metadata</Tab>
-        <Tab value="pod" class="text-xs font-medium px-3 py-2">Pod Spec</Tab>
-        <Tab value="containers" class="text-xs font-medium px-3 py-2">Containers</Tab>
+      <TabList>
+        <Tab value="general" class="text-xs font-medium">General & Scaling</Tab>
+        <Tab value="metadata" class="text-xs font-medium">Metadata</Tab>
+        <Tab value="pod" class="text-xs font-medium">Pod Spec</Tab>
+        <Tab value="containers" class="text-xs font-medium">Containers</Tab>
       </TabList>
 
-      <TabPanels class="flex-1 overflow-y-auto p-4">
+      <TabPanels class="flex-1 overflow-y-auto pt-6 px-0">
         <!-- GENERAL & SCALING TAB -->
-        <TabPanel value="general" class="flex flex-col gap-5">
-          <div class="flex flex-col gap-3">
-            <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
-              Deployment Scaling
-            </h3>
-
-            <div class="flex gap-4">
+        <TabPanel value="general" class="flex flex-col gap-10 max-w-5xl">
+          <!-- Section 1: Deployment Scaling -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Deployment Scaling
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Desired pod replica count and execution status.
+              </p>
+            </div>
+            <div class="md:col-span-8 flex items-center gap-8">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-muted-color">Replicas</label>
                 <InputNumber
                   v-model="replicas"
                   showButtons
                   buttonLayout="horizontal"
-                  inputClass="bg-(--bg-primary) border border-(--border) text-xs text-primary text-center"
-                  increment-button-class="bg-(--bg-primary) border border-(--border)"
-                  decrement-button-class="bg-(--bg-primary) border border-(--border)"
+                  size="small"
                   :min="0"
                   :max="1000"
                   @update:model-value="handleFieldChange"
@@ -397,8 +400,8 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 />
               </div>
 
-              <div class="flex flex-col gap-1.5 justify-center">
-                <label class="text-xs font-medium text-muted-color">Paused</label>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-medium text-muted-color">Execution State</label>
                 <div class="flex items-center gap-2 mt-1">
                   <ToggleSwitch v-model="paused" @change="handleFieldChange" />
                   <span class="text-xs text-muted-color">
@@ -409,59 +412,72 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             </div>
           </div>
 
-          <div class="flex flex-col gap-3 mt-3">
-            <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
-              Deployment Strategy
-            </h3>
-
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-medium text-muted-color">Strategy Type</label>
-              <Select
-                v-model="strategyType"
-                :options="['RollingUpdate', 'Recreate']"
-                class="bg-(--bg-primary) border border-(--border)"
-                @change="handleFieldChange"
-              />
+          <!-- Section 2: Deployment Strategy -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Deployment Strategy
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Strategy used to replace old pods with new pods during rollout.
+              </p>
             </div>
-
-            <div v-if="strategyType === 'RollingUpdate'" class="grid grid-cols-2 gap-4 mt-1">
+            <div class="md:col-span-8 flex flex-col gap-4">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color">Max Surge</label>
-                <InputText
-                  v-model="maxSurge"
-                  placeholder="e.g. 25% or 1"
-                  class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
-                  @input="handleFieldChange"
+                <label class="text-xs font-medium text-muted-color">Strategy Type</label>
+                <Select
+                  v-model="strategyType"
+                  :options="['RollingUpdate', 'Recreate']"
+                  size="small"
+                  class="w-full md:w-64"
+                  @change="handleFieldChange"
                 />
               </div>
 
-              <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color">Max Unavailable</label>
-                <InputText
-                  v-model="maxUnavailable"
-                  placeholder="e.g. 25% or 0"
-                  class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
-                  @input="handleFieldChange"
-                />
+              <div v-if="strategyType === 'RollingUpdate'" class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium text-muted-color">Max Surge</label>
+                  <InputText
+                    v-model="maxSurge"
+                    placeholder="e.g. 25% or 1"
+                    size="small"
+                    fluid
+                    @input="handleFieldChange"
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium text-muted-color">Max Unavailable</label>
+                  <InputText
+                    v-model="maxUnavailable"
+                    placeholder="e.g. 25% or 0"
+                    size="small"
+                    fluid
+                    @input="handleFieldChange"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <hr class="border-(--border)" />
-
-          <div class="flex flex-col gap-3">
-            <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
-              Timing & Limits
-            </h3>
-
-            <div class="grid grid-cols-3 gap-3">
+          <!-- Section 3: Timing & Limits -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Timing & Limits
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Deadlines, minimal ready time, and revision history retention.
+              </p>
+            </div>
+            <div class="md:col-span-8 grid grid-cols-3 gap-4">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-muted-color">Min Ready Secs</label>
                 <InputNumber
                   v-model="minReadySeconds"
                   :min="0"
-                  class="w-full"
-                  inputClass="w-full px-2 py-1.5 bg-(--bg-primary) border border-(--border) text-xs text-primary"
+                  size="small"
+                  fluid
                   @change="handleFieldChange"
                 />
               </div>
@@ -471,8 +487,8 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <InputNumber
                   v-model="revisionHistoryLimit"
                   :min="0"
-                  class="w-full"
-                  inputClass="w-full px-2 py-1.5 bg-(--bg-primary) border border-(--border) text-xs text-primary"
+                  size="small"
+                  fluid
                   @change="handleFieldChange"
                 />
               </div>
@@ -482,141 +498,185 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <InputNumber
                   v-model="progressDeadlineSeconds"
                   :min="0"
-                  class="w-full"
-                  inputClass="w-full px-2 py-1.5 bg-(--bg-primary) border border-(--border) text-xs text-primary"
+                  size="small"
+                  fluid
                   @change="handleFieldChange"
                 />
               </div>
             </div>
           </div>
 
-          <hr class="border-(--border)" />
-
-          <!-- Read-only Selector -->
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between">
-              <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
-                Selector Labels
-              </h3>
-              <span class="text-[11px] text-muted-color italic">(Immutable in apps/v1)</span>
+          <!-- Section 4: Read-only Selector -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                  Selector Labels
+                </span>
+              </div>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Pod selector labels. Immutable after deployment creation.
+              </p>
             </div>
-            <div v-if="selectorLabels.length === 0" class="text-xs text-muted-color">
-              None defined
-            </div>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="(s, idx) in selectorLabels"
-                :key="'sel-' + idx"
-                class="px-2 py-1 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-muted-color font-mono"
-              >
-                {{ s.key }}={{ s.value }}
-              </span>
+            <div class="md:col-span-8 flex flex-col gap-2">
+              <div v-if="selectorLabels.length === 0" class="text-xs text-muted-color">
+                None defined
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="(s, idx) in selectorLabels"
+                  :key="'sel-' + idx"
+                  class="px-2.5 py-1 bg-(--bg-hover)/60 rounded text-xs text-muted-color font-mono"
+                >
+                  {{ s.key }}={{ s.value }}
+                </span>
+              </div>
             </div>
           </div>
         </TabPanel>
 
         <!-- METADATA TAB -->
-        <TabPanel value="metadata" class="flex flex-col gap-5">
-          <!-- Deployment Labels -->
-          <KeyValueEditor
-            v-model="deploymentLabels"
-            title="Deployment Labels"
-            add-label="Add Label"
-            @update:model-value="handleFieldChange"
-          />
-
-          <hr class="border-(--border)" />
-
-          <!-- Deployment Annotations -->
-          <KeyValueEditor
-            v-model="deploymentAnnotations"
-            title="Deployment Annotations"
-            add-label="Add Annotation"
-            @update:model-value="handleFieldChange"
-          />
-
-          <hr class="border-(--border)" />
-
-          <!-- Pod Labels -->
-          <KeyValueEditor
-            v-model="podLabels"
-            title="Pod Template Labels"
-            add-label="Add Label"
-            @update:model-value="handleFieldChange"
-          />
-
-          <hr class="border-(--border)" />
-
-          <!-- Pod Annotations -->
-          <KeyValueEditor
-            v-model="podAnnotations"
-            title="Pod Template Annotations"
-            add-label="Add Annotation"
-            @update:model-value="handleFieldChange"
-          />
-        </TabPanel>
-
-        <!-- POD SPEC TAB -->
-        <TabPanel value="pod" class="flex flex-col gap-5">
-          <div class="flex flex-col gap-3">
-            <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
-              Pod Execution Settings
-            </h3>
-
-            <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-medium text-muted-color">Service Account Name</label>
-              <InputText
-                v-model="serviceAccountName"
-                placeholder="e.g. default"
-                class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
-                @input="handleFieldChange"
-              />
+        <TabPanel value="metadata" class="flex flex-col gap-10 max-w-5xl">
+          <!-- Deployment Level -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Deployment Metadata
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Labels and annotations attached to the Deployment resource itself.
+              </p>
             </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color">Restart Policy</label>
-                <Select
-                  v-model="restartPolicy"
-                  :options="['Always', 'OnFailure', 'Never']"
-                  class="bg-(--bg-primary) border border-(--border) text-xs"
-                  @change="handleFieldChange"
+            <div class="md:col-span-8 flex flex-col gap-6">
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <KeyValueEditor
+                  v-model="deploymentLabels"
+                  title="Deployment Labels"
+                  add-label="Add Label"
+                  @update:model-value="handleFieldChange"
                 />
               </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color"
-                  >Termination Grace Period (s)</label
-                >
-                <InputNumber
-                  v-model="terminationGracePeriodSeconds"
-                  :min="0"
-                  class="w-full"
-                  inputClass="w-full px-2 py-1.5 bg-(--bg-primary) border border-(--border) text-xs text-primary"
-                  @change="handleFieldChange"
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <KeyValueEditor
+                  v-model="deploymentAnnotations"
+                  title="Deployment Annotations"
+                  add-label="Add Annotation"
+                  @update:model-value="handleFieldChange"
                 />
               </div>
             </div>
           </div>
 
-          <hr class="border-(--border)" />
+          <!-- Pod Template Level -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Pod Template Metadata
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Labels and annotations propagated to created Pod instances.
+              </p>
+            </div>
+            <div class="md:col-span-8 flex flex-col gap-6">
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <KeyValueEditor
+                  v-model="podLabels"
+                  title="Pod Template Labels"
+                  add-label="Add Label"
+                  @update:model-value="handleFieldChange"
+                />
+              </div>
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <KeyValueEditor
+                  v-model="podAnnotations"
+                  title="Pod Template Annotations"
+                  add-label="Add Annotation"
+                  @update:model-value="handleFieldChange"
+                />
+              </div>
+            </div>
+          </div>
+        </TabPanel>
 
-          <!-- Node Selector -->
-          <KeyValueEditor
-            v-model="nodeSelector"
-            title="Node Selector"
-            add-label="Add Constraint"
-            @update:model-value="handleFieldChange"
-          />
+        <!-- POD SPEC TAB -->
+        <TabPanel value="pod" class="flex flex-col gap-10 max-w-5xl">
+          <!-- Execution Settings -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Execution Settings
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Service account authorization, restart policies, and grace periods.
+              </p>
+            </div>
+            <div class="md:col-span-8 flex flex-col gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-xs font-medium text-muted-color">Service Account Name</label>
+                <InputText
+                  v-model="serviceAccountName"
+                  placeholder="e.g. default"
+                  size="small"
+                  fluid
+                  @input="handleFieldChange"
+                />
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium text-muted-color">Restart Policy</label>
+                  <Select
+                    v-model="restartPolicy"
+                    :options="['Always', 'OnFailure', 'Never']"
+                    size="small"
+                    fluid
+                    @change="handleFieldChange"
+                  />
+                </div>
+
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-xs font-medium text-muted-color"
+                    >Termination Grace Period (s)</label
+                  >
+                  <InputNumber
+                    v-model="terminationGracePeriodSeconds"
+                    :min="0"
+                    size="small"
+                    fluid
+                    @change="handleFieldChange"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scheduling Constraints -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Scheduling Constraints
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Key-value selector constraints for targeting specific Kubernetes nodes.
+              </p>
+            </div>
+            <div class="md:col-span-8 flex flex-col gap-3">
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+                <KeyValueEditor
+                  v-model="nodeSelector"
+                  title="Node Selector"
+                  add-label="Add Constraint"
+                  @update:model-value="handleFieldChange"
+                />
+              </div>
+            </div>
+          </div>
         </TabPanel>
 
         <!-- CONTAINERS TAB -->
-        <TabPanel value="containers" class="flex flex-col gap-5">
+        <TabPanel value="containers" class="flex flex-col gap-10 max-w-5xl">
           <!-- Container selector if multiple -->
-          <div
-            v-if="containers.length > 1"
-            class="flex items-center gap-2 border-b border-(--border) pb-2"
-          >
+          <div v-if="containers.length > 1" class="flex items-center gap-2">
             <span class="text-xs font-medium text-muted-color">Container:</span>
             <Button
               v-for="(c, idx) in containers"
@@ -625,122 +685,177 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
-              class="px-2.5! py-1! text-xs cursor-pointer"
+              class="text-xs cursor-pointer"
               @click="activeContainerIndex = idx"
             />
           </div>
 
-          <div v-if="currentContainer" class="flex flex-col gap-5">
+          <div v-if="currentContainer" class="flex flex-col gap-10">
             <!-- Basic Info -->
-            <div class="flex flex-col gap-3">
-              <h3 class="text-xs font-semibold text-primary uppercase tracking-wider">
-                Basic Info ({{ currentContainer.name || 'Container' }})
-              </h3>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div class="md:col-span-4 flex flex-col gap-1">
+                <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                  Container Image
+                </span>
+                <p class="text-xs text-muted-color leading-relaxed">
+                  Basic container identifier, image reference, and image pull policy.
+                </p>
+              </div>
+              <div class="md:col-span-8 flex flex-col gap-4">
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-muted-color">Container Name</label>
+                    <InputText
+                      v-model="currentContainer.name"
+                      size="small"
+                      fluid
+                      @input="handleFieldChange"
+                    />
+                  </div>
 
-              <div class="grid grid-cols-2 gap-4">
+                  <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-muted-color">Image Pull Policy</label>
+                    <Select
+                      v-model="currentContainer.imagePullPolicy"
+                      :options="['Always', 'IfNotPresent', 'Never']"
+                      size="small"
+                      fluid
+                      @change="handleFieldChange"
+                    />
+                  </div>
+                </div>
+
                 <div class="flex flex-col gap-1.5">
-                  <label class="text-xs font-medium text-muted-color">Container Name</label>
+                  <label class="text-xs font-medium text-muted-color">Image</label>
                   <InputText
-                    v-model="currentContainer.name"
-                    class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
+                    v-model="currentContainer.image"
+                    placeholder="e.g. nginx:latest"
+                    size="small"
+                    fluid
                     @input="handleFieldChange"
                   />
                 </div>
 
                 <div class="flex flex-col gap-1.5">
-                  <label class="text-xs font-medium text-muted-color">Image Pull Policy</label>
-                  <Select
-                    v-model="currentContainer.imagePullPolicy"
-                    :options="['Always', 'IfNotPresent', 'Never']"
-                    class="bg-(--bg-primary) border border-(--border)"
-                    @change="handleFieldChange"
+                  <label class="text-xs font-medium text-muted-color">Working Directory</label>
+                  <InputText
+                    v-model="currentContainer.workingDir"
+                    placeholder="e.g. /app"
+                    size="small"
+                    fluid
+                    @input="handleFieldChange"
                   />
                 </div>
               </div>
+            </div>
 
-              <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color">Image</label>
-                <InputText
-                  v-model="currentContainer.image"
-                  placeholder="e.g. nginx:latest"
-                  class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
-                  @input="handleFieldChange"
-                />
+            <!-- Resource Allocation -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div class="md:col-span-4 flex flex-col gap-1">
+                <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                  Resource Allocation
+                </span>
+                <p class="text-xs text-muted-color leading-relaxed">
+                  Compute requests (guaranteed) and limits (maximum cap) for CPU and Memory.
+                </p>
               </div>
-
-              <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color">Working Directory</label>
-                <InputText
-                  v-model="currentContainer.workingDir"
-                  placeholder="e.g. /app"
-                  class="px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
-                  @input="handleFieldChange"
+              <div class="md:col-span-8 flex flex-col gap-3">
+                <ContainerResourcesEditor
+                  v-model:cpu-request="currentContainer.cpuRequest"
+                  v-model:memory-request="currentContainer.memoryRequest"
+                  v-model:cpu-limit="currentContainer.cpuLimit"
+                  v-model:memory-limit="currentContainer.memoryLimit"
+                  @update:cpu-request="handleFieldChange"
+                  @update:memory-request="handleFieldChange"
+                  @update:cpu-limit="handleFieldChange"
+                  @update:memory-limit="handleFieldChange"
                 />
               </div>
             </div>
 
-            <hr class="border-(--border)" />
+            <!-- Execution Commands -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div class="md:col-span-4 flex flex-col gap-1">
+                <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                  Execution Commands
+                </span>
+                <p class="text-xs text-muted-color leading-relaxed">
+                  Entrypoint commands and arguments executed by the container runtime.
+                </p>
+              </div>
+              <div class="md:col-span-8 flex flex-col gap-4">
+                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                  <StringListEditor
+                    v-model="currentContainer.command"
+                    title="Command"
+                    placeholder="/bin/sh"
+                    add-label="Add Cmd"
+                    @update:model-value="handleFieldChange"
+                  />
+                </div>
 
-            <!-- Resource Limits & Requests -->
-            <ContainerResourcesEditor
-              v-model:cpu-request="currentContainer.cpuRequest"
-              v-model:memory-request="currentContainer.memoryRequest"
-              v-model:cpu-limit="currentContainer.cpuLimit"
-              v-model:memory-limit="currentContainer.memoryLimit"
-              @update:cpu-request="handleFieldChange"
-              @update:memory-request="handleFieldChange"
-              @update:cpu-limit="handleFieldChange"
-              @update:memory-limit="handleFieldChange"
-            />
-
-            <hr class="border-(--border)" />
-
-            <!-- Command & Args -->
-            <div class="flex flex-col gap-4">
-              <StringListEditor
-                v-model="currentContainer.command"
-                title="Command"
-                placeholder="/bin/sh"
-                add-label="Add Cmd"
-                @update:model-value="handleFieldChange"
-              />
-
-              <StringListEditor
-                v-model="currentContainer.args"
-                title="Args"
-                placeholder="-c"
-                add-label="Add Arg"
-                @update:model-value="handleFieldChange"
-              />
+                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                  <StringListEditor
+                    v-model="currentContainer.args"
+                    title="Args"
+                    placeholder="-c"
+                    add-label="Add Arg"
+                    @update:model-value="handleFieldChange"
+                  />
+                </div>
+              </div>
             </div>
-
-            <hr class="border-(--border)" />
 
             <!-- Environment Variables -->
-            <div>
-              <p
-                v-if="currentContainer.preservedValueFromEnv.length > 0"
-                class="text-[11px] text-muted-color mb-1"
-              >
-                ({{ currentContainer.preservedValueFromEnv.length }} valueFrom env var(s) preserved)
-              </p>
-              <KeyValueEditor
-                v-model="currentContainer.env"
-                title="Environment Variables"
-                key-placeholder="NAME"
-                value-placeholder="VALUE"
-                add-label="Add Env"
-                @update:model-value="handleFieldChange"
-              />
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div class="md:col-span-4 flex flex-col gap-1">
+                <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                  Environment
+                </span>
+                <p class="text-xs text-muted-color leading-relaxed">
+                  Environment variables passed directly into the container process.
+                </p>
+              </div>
+              <div class="md:col-span-8 flex flex-col gap-3">
+                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                  <p
+                    v-if="currentContainer.preservedValueFromEnv.length > 0"
+                    class="text-xs text-muted-color mb-1"
+                  >
+                    ({{ currentContainer.preservedValueFromEnv.length }} valueFrom env var(s)
+                    preserved)
+                  </p>
+                  <KeyValueEditor
+                    v-model="currentContainer.env"
+                    title="Environment Variables"
+                    key-placeholder="NAME"
+                    value-placeholder="VALUE"
+                    add-label="Add Env"
+                    @update:model-value="handleFieldChange"
+                  />
+                </div>
+              </div>
             </div>
 
-            <hr class="border-(--border)" />
-
             <!-- Container Ports -->
-            <ContainerPortsEditor
-              v-model="currentContainer.ports"
-              @update:model-value="handleFieldChange"
-            />
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div class="md:col-span-4 flex flex-col gap-1">
+                <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                  Networking & Ports
+                </span>
+                <p class="text-xs text-muted-color leading-relaxed">
+                  Network ports exposed by container processes for incoming cluster traffic.
+                </p>
+              </div>
+              <div class="md:col-span-8 flex flex-col gap-3">
+                <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+                  <ContainerPortsEditor
+                    v-model="currentContainer.ports"
+                    @update:model-value="handleFieldChange"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </TabPanel>
       </TabPanels>

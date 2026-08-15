@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Plus, X } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -59,11 +60,14 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         v-if="!disabled"
         size="small"
         variant="text"
-        icon="pi pi-plus"
         label="Add Port"
         class="text-xs"
         @click="addPort"
-      />
+      >
+        <template #icon>
+          <Plus class="w-3.5 h-3.5 mr-1" />
+        </template>
+      </Button>
     </div>
 
     <div v-if="modelValue.length === 0" class="text-xs text-muted-color italic py-1">
@@ -75,7 +79,8 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :model-value="port.name"
         placeholder="Port Name (e.g. http)"
         :disabled="disabled"
-        class="w-1/3 px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
+        size="small"
+        class="w-1/3"
         @update:model-value="(val) => updatePortField(idx, 'name', val ?? '')"
       />
       <InputNumber
@@ -84,26 +89,31 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :disabled="disabled"
         :min="1"
         :max="65535"
-        class="w-1/3 text-xs"
-        input-class="w-full px-2.5 py-1.5 bg-(--bg-primary) border border-(--border) rounded-md text-xs text-primary"
+        size="small"
+        class="w-1/3"
+        fluid
         @update:model-value="(val) => updatePortField(idx, 'containerPort', Number(val ?? 80))"
       />
       <Select
         :model-value="port.protocol"
         :options="protocolOptions"
         :disabled="disabled"
-        class="w-1/4 bg-(--bg-primary) border border-(--border) text-xs"
+        size="small"
+        class="w-1/4"
         @update:model-value="(val) => updatePortField(idx, 'protocol', val ?? 'TCP')"
       />
       <Button
         v-if="!disabled"
-        icon="pi pi-times"
         variant="text"
         severity="danger"
         size="small"
-        class="p-1! text-red-400 hover:text-red-300 cursor-pointer"
+        class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
         @click="removePort(idx)"
-      />
+      >
+        <template #icon>
+          <X class="w-4 h-4" />
+        </template>
+      </Button>
     </div>
   </div>
 </template>

@@ -3,13 +3,15 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
 import VueMonacoEditor from '@guolao/vue-monaco-editor'
+import Button from 'primevue/button'
+import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
-import { Loader2 } from '@lucide/vue'
+import { ArrowLeft, Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
@@ -187,38 +189,47 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col h-full bg-(--bg-card)">
-    <!-- Header -->
-    <div class="flex items-center justify-between p-4 border-b border-(--border)">
+  <div class="flex flex-col h-[calc(100vh-8rem)]">
+    <!-- Control Bar (Tone Shift) -->
+    <div
+      class="flex items-center justify-between px-4 py-3 rounded-lg bg-(--bg-hover)/40 shrink-0 mb-6"
+    >
       <div class="flex items-center gap-3">
         <Button
           rounded
-          icon="pi pi-arrow-left"
           variant="text"
           severity="secondary"
+          size="small"
+          aria-label="Back"
           @click="goBack"
-        />
-        <div>
-          <h1 class="text-lg font-semibold text-primary">Edit {{ props.kind }}</h1>
-          <p class="text-sm text-muted-color">{{ props.namespace }} / {{ props.name }}</p>
+        >
+          <template #icon>
+            <ArrowLeft class="w-4 h-4" />
+          </template>
+        </Button>
+        <div class="flex flex-col">
+          <h1 class="text-lg font-bold tracking-tight text-primary leading-tight">
+            Edit {{ props.kind }}
+          </h1>
+          <span class="text-xs font-medium text-muted-color font-mono">
+            {{ props.namespace }} / {{ props.name }}
+          </span>
         </div>
       </div>
 
       <!-- Mode Toggle & Action Buttons -->
-      <div class="flex items-center gap-4">
-        <div
-          class="flex items-center gap-2 px-3 py-1 bg-(--bg-card) border border-(--border) rounded-md"
-        >
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2.5">
           <span
-            class="text-xs font-medium"
-            :class="!isYamlMode ? 'text-primary' : 'text-muted-color'"
+            class="text-xs font-medium transition-colors"
+            :class="!isYamlMode ? 'text-primary font-semibold' : 'text-muted-color'"
           >
             Form
           </span>
           <ToggleSwitch v-model="isYamlMode" @change="handleModeToggle" />
           <span
-            class="text-xs font-medium"
-            :class="isYamlMode ? 'text-primary' : 'text-muted-color'"
+            class="text-xs font-medium transition-colors"
+            :class="isYamlMode ? 'text-primary font-semibold' : 'text-muted-color'"
           >
             YAML
           </span>
@@ -237,64 +248,77 @@ watch(
       </div>
     </div>
 
-    <!-- Content -->
+    <!-- Content Area -->
     <div v-if="isLoading" class="flex-1 flex items-center justify-center">
       <Loader2 class="w-8 h-8 text-muted-color animate-spin" />
     </div>
-    <div v-else class="flex-1 flex overflow-hidden">
+    <div v-else class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <!-- Form Mode -->
       <template v-if="!isYamlMode">
-        <div v-if="props.kind === 'Deployment'" class="w-full h-full overflow-y-auto flex flex-col">
+        <div v-if="props.kind === 'Deployment'" class="w-full h-full overflow-hidden flex flex-col">
           <DeploymentEditForm :raw-data="rawData" @update:raw-data="handleDeploymentFormUpdate" />
         </div>
 
-        <div v-else class="w-full h-full overflow-y-auto p-4 flex flex-col gap-6">
-          <div>
-            <h2 class="text-sm font-semibold text-primary mb-3 uppercase tracking-wider">
-              Metadata
-            </h2>
-
-            <div class="flex flex-col gap-4 max-w-xl">
+        <!-- Non-Deployment Fallback Form with Asymmetric 2-Column Section Layout -->
+        <div v-else class="w-full h-full overflow-y-auto pt-2 px-0 flex flex-col gap-10">
+          <!-- Section 1: Resource Identity -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-5xl">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Resource Identity
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Core identity parameters defined in metadata. These fields are immutable.
+              </p>
+            </div>
+            <div class="md:col-span-8 flex flex-col gap-3">
               <div class="flex flex-col gap-1.5">
-                <label class="text-xs font-medium text-muted-color">Name</label>
-                <InputText
-                  disabled
-                  v-model="formValues.name"
-                  class="px-3 py-2 bg-(--bg-hover)/30 border border-(--border) rounded-md text-sm text-muted-color opacity-70"
-                />
+                <label class="text-xs font-medium text-muted-color">Resource Name</label>
+                <InputText disabled v-model="formValues.name" size="small" fluid />
               </div>
-
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-muted-color">Namespace</label>
-                <InputText
-                  disabled
-                  v-model="formValues.namespace"
-                  class="px-3 py-2 bg-(--bg-hover)/30 border border-(--border) rounded-md text-sm text-muted-color opacity-70"
+                <InputText disabled v-model="formValues.namespace" size="small" fluid />
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Labels & Annotations -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-5xl">
+            <div class="md:col-span-4 flex flex-col gap-1">
+              <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+                Metadata & Tags
+              </span>
+              <p class="text-xs text-muted-color leading-relaxed">
+                Key-value pairs for organizational indexing, selectors, and Kubernetes annotations.
+              </p>
+            </div>
+            <div class="md:col-span-8 flex flex-col gap-6">
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <KeyValueEditor v-model="formValues.labels" title="Labels" add-label="Add Label" />
+              </div>
+              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <KeyValueEditor
+                  v-model="formValues.annotations"
+                  title="Annotations"
+                  add-label="Add Annotation"
                 />
               </div>
-
-              <!-- Labels -->
-              <KeyValueEditor v-model="formValues.labels" title="Labels" add-label="Add Label" />
-
-              <!-- Annotations -->
-              <KeyValueEditor
-                v-model="formValues.annotations"
-                title="Annotations"
-                add-label="Add Annotation"
-                class="mt-2"
-              />
             </div>
           </div>
         </div>
       </template>
 
       <!-- YAML Mode -->
-      <div v-else class="w-full h-full bg-[#1e1e1e]">
+      <div v-else class="w-full h-full flex-1 min-h-0 pt-2">
         <vue-monaco-editor
           v-model:value="yamlContent"
-          :theme="isDark ? 'vs-dark' : 'vs-light'"
+          :theme="isDark ? 'vs-dark' : 'vs'"
           language="yaml"
+          height="100%"
+          width="100%"
           :options="{
+            automaticLayout: true,
             minimap: { enabled: true },
             fontSize: 13,
             lineHeight: 22,

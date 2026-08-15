@@ -513,94 +513,115 @@ Use these tokens consistently — never assign an arbitrary color to a resource 
 ---
 
 ## Spacing
-
-Orbit uses Tailwind's default spacing scale. The following values are standard across components:
-
-| Context                        | Value             |
-|--------------------------------|-------------------|
-| Main content area padding      | `p-8`             |
-| Card/panel inner padding       | controlled by PrimeVue Card |
-| Table toolbar gap              | `gap-4`           |
-| Control group gap              | `gap-2` / `gap-3` |
-| Inline icon + label gap        | `gap-1.5`         |
-| Section vertical gap           | `gap-6`           |
-| Footer / header horizontal pad | `px-3`            |
-| Footer / header vertical pad   | `py-1` (footer) / `py-2` (header) |
-| Drawer inner header margin     | `mb-2`            |
-
-Do not use arbitrary spacing values (`min-w-[140px]`, `gap-[18px]`). Prefer the nearest Tailwind scale step or an existing pattern.
-
----
-
-## Shadows
-
-Shadows are used sparingly. They communicate layering — not decoration.
-
-| Token         | Usage                                |
-|---------------|--------------------------------------|
-| `--shadow-sm` | Subtle lift for inputs, small cards  |
-| `--shadow`    | Dropdowns, overlays, popovers        |
-
-Do not add `box-shadow` outside of these two tokens. Hierarchy is established through borders and background color contrast, not shadow depth.
-
----
-
-## Z-Index Scale
-
-| Token          | Value | Layer                          |
-|----------------|-------|--------------------------------|
-| `--z-sticky`   | 100   | Sticky headers, toolbars       |
-| `--z-dropdown` | 1000  | Select/dropdown menus          |
-| `--z-overlay`  | 1030  | Sidebars, panels               |
-| `--z-modal`    | 1050  | Dialogs                        |
-| `--z-popover`  | 1060  | Popovers, column configurators |
-| `--z-tooltip`  | 1070  | Tooltips                       |
-| `--z-toast`    | 1080  | Toast notifications            |
-
-Always use a token. Never use a hard-coded z-index value.
-
----
-
-## Layout
-
-### Application Shell
-
-```
-┌────────────────────────────────────────────────────┐
-│  [Activity Bar] [Sidebar Panel] │ [Header]          │  ← shrink-0
-│                                 │ ─────────         │
-│                                 │ [Main Content]    │  ← flex-1 overflow-y-auto
-│                                 │                   │
-│                                 │ p-8 container     │
-├────────────────────────────────────────────────────┤
-│  [Footer — status bar]                              │  ← shrink-0
-└────────────────────────────────────────────────────┘
-```
-
-- The root is `flex flex-col h-screen w-screen overflow-hidden`.
-- Sidebar is an `<aside>` composed of a narrow activity bar and a contextual panel.
-- Header and footer use `shrink-0` to remain fixed height.
-- Main content uses `flex-1 overflow-y-auto`.
-
-### View Layout
-
-Every page view uses `ViewLayout` which provides:
-
-- A `text-xl font-bold tracking-tight` `<h2>` for the page title.
-- A `flex flex-col gap-6` content wrapper.
-- An optional `actions` slot aligned to the title row.
-
-Do not replicate this pattern inline in a view. Always use `ViewLayout`.
-
----
-
-## Borders and Radius
-
-- Structural borders use `border-(--border)` or `border-surface-200/60` (via PrimeVue surface tokens).
-- Table containers use `border border-surface rounded-lg overflow-hidden`.
-- Drawer title sections use `border-b border-(--border)`.
-- Input controls use the PrimeVue Nora default radius (small, consistent).
-- Do not apply large or pill-shaped radii to data containers.
+ 
+ Orbit uses Tailwind's default spacing scale. The following values are standard across components:
+ 
+ | Context                        | Value             |
+ |--------------------------------|-------------------|
+ | Main content area padding      | `p-8`             |
+ | Card/panel inner padding       | controlled by PrimeVue Card |
+ | Table toolbar gap              | `gap-4`           |
+ | Control group gap              | `gap-2` / `gap-3` |
+ | Inline icon + label gap        | `gap-1.5`         |
+ | Section vertical gap           | `gap-8` / `gap-10` |
+ | Footer / header horizontal pad | `px-3`            |
+ | Footer / header vertical pad   | `py-1` (footer) / `py-2` (header) |
+ | Drawer inner header margin     | `mb-2`            |
+ 
+ Do not use arbitrary spacing values (`min-w-[140px]`, `gap-[18px]`). Prefer the nearest Tailwind scale step or an existing pattern.
+ 
+ ---
+ 
+ ## Component Grouping Without Borders
+ 
+ When spacing alone is insufficient to distinguish complex component groups, use the following **borderless grouping techniques** inspired by the PrimeVue Nora theme:
+ 
+ 1. **Proportional Ratio Spacing (1:3 Rhythm)**:
+    - Intra-item gap (between label and input): **tight** (`gap-1.5` / `gap-2`).
+    - Inter-item gap (between controls in the same sub-group): **medium** (`gap-3` / `gap-4`).
+    - Inter-group gap (between major sections): **wide** (`gap-8` / `gap-10`).
+ 2. **Subtle Surface Tone Shifts (Zonal Backgrounds)**:
+    - Use flat, borderless background fills (`bg-(--bg-hover)/40`, `bg-surface-50`, `bg-surface-900`) with soft radii to visually group related sub-widgets or complex inputs without any stroke lines.
+ 3. **Two-Column / Asymmetric Layout**:
+    - Pair an informative left sidebar/header column (~25–30% width: title, micro-description, icon) with interactive controls on the right column (~70–75% width) to break reading flow and create natural section landmarks.
+ 4. **Typographic Rhythm & Eyebrow Headers**:
+    - Use small, uppercase tracked overlines (`text-xs font-semibold tracking-wider text-muted-color`) paired with contextual micro-descriptions to demarcate section boundaries clearly.
+ 5. **Grouped Inset Wells**:
+    - Group repeatable items (e.g. Key-Value pairs, Port lists, Environment variables) in borderless inset wells with unified inner padding.
+ 
+ ---
+ 
+ ## Shadows
+ 
+ Shadows are used sparingly. They communicate layering — not decoration.
+ 
+ | Token         | Usage                                |
+ |---------------|--------------------------------------|
+ | `--shadow-sm` | Subtle lift for inputs, small cards  |
+ | `--shadow`    | Dropdowns, overlays, popovers        |
+ 
+ Do not add `box-shadow` outside of these two tokens. Hierarchy is established through borders and background color contrast, not shadow depth.
+ 
+ ---
+ 
+ ## Z-Index Scale
+ 
+ | Token          | Value | Layer                          |
+ |----------------|-------|--------------------------------|
+ | `--z-sticky`   | 100   | Sticky headers, toolbars       |
+ | `--z-dropdown` | 1000  | Select/dropdown menus          |
+ | `--z-overlay`  | 1030  | Sidebars, panels               |
+ | `--z-modal`    | 1050  | Dialogs                        |
+ | `--z-popover`  | 1060  | Popovers, column configurators |
+ | `--z-tooltip`  | 1070  | Tooltips                       |
+ | `--z-toast`    | 1080  | Toast notifications            |
+ 
+ Always use a token. Never use a hard-coded z-index value.
+ 
+ ---
+ 
+ ## Layout
+ 
+ ### Application Shell
+ 
+ ```
+ ┌────────────────────────────────────────────────────┐
+ │  [Activity Bar] [Sidebar Panel] │ [Header]          │  ← shrink-0
+ │                                 │ ─────────         │
+ │                                 │ [Main Content]    │  ← flex-1 overflow-y-auto
+ │                                 │                   │
+ │                                 │ p-8 container     │
+ ├────────────────────────────────────────────────────┤
+ │  [Footer — status bar]                              │  ← shrink-0
+ └────────────────────────────────────────────────────┘
+ ```
+ 
+ - The root is `flex flex-col h-screen w-screen overflow-hidden`.
+ - Sidebar is an `<aside>` composed of a narrow activity bar and a contextual panel.
+ - Header and footer use `shrink-0` to remain fixed height.
+ - Main content uses `flex-1 overflow-y-auto`.
+ 
+ ### View Layout
+ 
+ Every page view uses `ViewLayout` which provides:
+ 
+ - A `text-xl font-bold tracking-tight` `<h2>` for the page title.
+ - A `flex flex-col gap-6` content wrapper.
+ - An optional `actions` slot aligned to the title row.
+ 
+ Do not replicate this pattern inline in a view. Always use `ViewLayout`.
+ 
+ ---
+ 
+ ## Borders and Radius
+ 
+ - Orbit's UI is inspired by the **PrimeVue Nora theme**, emphasizing flatness, minimalism, and simplicity.
+ - Do NOT use borders, card wrappers, or `<hr>` lines to group in-page content or divide form sections. Use the borderless grouping techniques above instead.
+ - Structural borders use `border-(--border)` or `border-surface-200/60` (via PrimeVue surface tokens), used sparingly for primary structural containers (e.g. data table outer frames, sidebar separators).
+ - Table containers use `border border-surface rounded-lg overflow-hidden`.
+ - Drawer title sections use `border-b border-(--border)`.
+ - Input controls use the PrimeVue Nora default radius (small, consistent).
+ - Do not apply large or pill-shaped radii to data containers.
 
 ---
 
@@ -711,6 +732,7 @@ Never use any of the following:
 - `min-w-[140px]` instead of `min-w-35`.
 - Multiple local overrides of the same PrimeVue component selector.
 - Shadow or border purely for decoration.
+- Borders, card wrappers, or `<hr>` lines used to group content or divide form sections instead of using natural vertical spacing (`gap-6`, `gap-8`).
 - Gradients for backgrounds or text.
 - Color accents on UI elements that carry no semantic meaning.
 - Rounded pill shapes on data containers or table rows.
