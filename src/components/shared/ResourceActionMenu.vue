@@ -39,7 +39,7 @@ const MenuItemButton = (props: { item: MenuItem; menuProps: any }) => {
     {
       ...props.menuProps?.action,
       class: [
-        'flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-muted-color hover:text-primary hover:bg-(--bg-hover)/20 rounded-md transition-colors cursor-pointer select-none',
+        'flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-muted-color hover:text-primary hover:bg-(--bg-hover) rounded-md transition-colors cursor-pointer select-none',
         props.item.class
       ]
     },
