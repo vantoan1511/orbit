@@ -130,6 +130,176 @@ const NoirPreset: Preset = {
           }
         }
       }
+    },
+    toast: {
+      root: {
+        borderWidth: '1px',
+        borderRadius: '{content.border.radius}'
+      },
+      icon: {
+        size: '1rem'
+      },
+      content: {
+        padding: '0.75rem 1rem',
+        gap: '0.75rem'
+      },
+      text: {
+        gap: '0.25rem'
+      },
+      summary: {
+        fontWeight: '600',
+        fontSize: '0.875rem'
+      },
+      detail: {
+        fontWeight: '400',
+        fontSize: '0.75rem'
+      },
+      closeButton: {
+        width: '1.5rem',
+        height: '1.5rem',
+        borderRadius: '{content.border.radius}'
+      },
+      closeIcon: {
+        size: '0.875rem'
+      },
+      colorScheme: {
+        light: {
+          info: {
+            background: '{surface.0}',
+            borderColor: '{surface.200}',
+            color: '{blue.600}',
+            detailColor: '{surface.600}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.100}',
+              focusRing: { color: '{surface.600}', shadow: 'none' }
+            }
+          },
+          success: {
+            background: '{surface.0}',
+            borderColor: '{surface.200}',
+            color: '{green.600}',
+            detailColor: '{surface.600}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.100}',
+              focusRing: { color: '{surface.600}', shadow: 'none' }
+            }
+          },
+          warn: {
+            background: '{surface.0}',
+            borderColor: '{surface.200}',
+            color: '{yellow.600}',
+            detailColor: '{surface.600}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.100}',
+              focusRing: { color: '{surface.600}', shadow: 'none' }
+            }
+          },
+          error: {
+            background: '{surface.0}',
+            borderColor: '{surface.200}',
+            color: '{red.600}',
+            detailColor: '{surface.600}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.100}',
+              focusRing: { color: '{surface.600}', shadow: 'none' }
+            }
+          },
+          secondary: {
+            background: '{surface.0}',
+            borderColor: '{surface.200}',
+            color: '{surface.600}',
+            detailColor: '{surface.500}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.100}',
+              focusRing: { color: '{surface.600}', shadow: 'none' }
+            }
+          },
+          contrast: {
+            background: '{surface.900}',
+            borderColor: '{surface.900}',
+            color: '{surface.50}',
+            detailColor: '{surface.300}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.800}',
+              focusRing: { color: '{surface.50}', shadow: 'none' }
+            }
+          }
+        },
+        dark: {
+          info: {
+            background: '{surface.900}',
+            borderColor: '{surface.800}',
+            color: '{blue.400}',
+            detailColor: '{surface.400}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.800}',
+              focusRing: { color: '{surface.400}', shadow: 'none' }
+            }
+          },
+          success: {
+            background: '{surface.900}',
+            borderColor: '{surface.800}',
+            color: '{green.400}',
+            detailColor: '{surface.400}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.800}',
+              focusRing: { color: '{surface.400}', shadow: 'none' }
+            }
+          },
+          warn: {
+            background: '{surface.900}',
+            borderColor: '{surface.800}',
+            color: '{yellow.400}',
+            detailColor: '{surface.400}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.800}',
+              focusRing: { color: '{surface.400}', shadow: 'none' }
+            }
+          },
+          error: {
+            background: '{surface.900}',
+            borderColor: '{surface.800}',
+            color: '{red.400}',
+            detailColor: '{surface.400}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.800}',
+              focusRing: { color: '{surface.400}', shadow: 'none' }
+            }
+          },
+          secondary: {
+            background: '{surface.900}',
+            borderColor: '{surface.800}',
+            color: '{surface.400}',
+            detailColor: '{surface.500}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.800}',
+              focusRing: { color: '{surface.400}', shadow: 'none' }
+            }
+          },
+          contrast: {
+            background: '{surface.0}',
+            borderColor: '{surface.0}',
+            color: '{surface.950}',
+            detailColor: '{surface.600}',
+            shadow: '{overlay.popover.shadow}',
+            closeButton: {
+              hoverBackground: '{surface.100}',
+              focusRing: { color: '{surface.950}', shadow: 'none' }
+            }
+          }
+        }
+      }
     }
   }
 }

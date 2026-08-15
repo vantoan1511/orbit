@@ -7,4 +7,3 @@ import GeneralSettingsForm from './GeneralSettingsForm.vue'
     <GeneralSettingsForm />
   </div>
 </template>
-

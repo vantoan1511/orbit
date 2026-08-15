@@ -40,10 +40,7 @@ const handleReloadKubeconfig = async () => {
   if (isReloading.value) return
   isReloading.value = true
   try {
-    await Promise.all([
-      profileStore.fetchProfile(),
-      k8sStore.loadInitialData()
-    ])
+    await Promise.all([profileStore.fetchProfile(), k8sStore.loadInitialData()])
     toast.add({
       severity: 'success',
       summary: 'Kubeconfig Reloaded',
