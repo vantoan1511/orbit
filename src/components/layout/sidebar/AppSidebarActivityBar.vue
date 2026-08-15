@@ -38,15 +38,15 @@ const { isDark, toggleTheme } = useTheme()
       <Button
         v-for="cat in categories"
         :key="cat.id"
-        :severity="activeTab === cat.id ? 'primary' : 'secondary'"
-        :class="[
-          activeTab === cat.id
-            ? 'border-l-3! border-l-primary-900 dark:border-l-primary-50 rounded-none!'
-            : 'text-muted-color'
-        ]"
         v-tooltip.right="cat.name"
         variant="text"
-        class="w-full!"
+        severity="secondary"
+        :class="[
+          'w-10 h-10',
+          activeTab === cat.id
+            ? 'bg-(--bg-active) text-(--text-primary)'
+            : 'text-muted-color hover:bg-(--bg-hover)'
+        ]"
         @click="emit('toggleCategory', cat)"
       >
         <template #icon>
@@ -63,68 +63,78 @@ const { isDark, toggleTheme } = useTheme()
       <!-- Settings Link -->
       <Button
         v-tooltip.right="'Settings'"
-        rounded
         variant="text"
+        severity="secondary"
         :class="[
-          'w-10 h-10 flex! items-center! justify-center!',
+          'w-10 h-10',
           route.path === '/settings'
-            ? 'bg-primary-100! dark:bg-primary-900/40! text-primary-600! dark:text-primary-400!'
-            : 'text-muted-color'
+            ? 'bg-(--bg-active) text-(--text-primary)'
+            : 'text-muted-color hover:bg-(--bg-hover)'
         ]"
         @click="router.push('/settings')"
       >
-        <Settings class="w-5 h-5" />
+        <template #icon>
+          <Settings class="w-5 h-5" />
+        </template>
       </Button>
 
       <!-- Theme Toggle -->
       <Button
         v-tooltip.right="isDark ? 'Light Mode' : 'Dark Mode'"
-        rounded
         variant="text"
-        class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
+        severity="secondary"
+        class="w-10 h-10 text-muted-color hover:bg-(--bg-hover)"
         @click="toggleTheme"
       >
-        <Sun v-if="isDark" class="w-5 h-5" />
-        <Moon v-else class="w-5 h-5" />
+        <template #icon>
+          <Sun v-if="isDark" class="w-5 h-5" />
+          <Moon v-else class="w-5 h-5" />
+        </template>
       </Button>
 
       <!-- Notifications -->
       <div class="relative inline-flex">
         <Button
           v-tooltip.right="'Notifications'"
-          rounded
           variant="text"
-          class="w-10 h-10 text-muted-color flex! items-center! justify-center! relative"
+          severity="secondary"
+          class="w-10 h-10 text-muted-color hover:bg-(--bg-hover)"
           @click="notificationStore.toggleDrawer()"
         >
-          <Bell class="w-5 h-5" />
-          <span
-            v-if="notificationStore.unreadCount > 0"
-            class="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 pointer-events-none"
-          />
+          <template #icon>
+            <Bell class="w-5 h-5" />
+          </template>
         </Button>
+        <span
+          v-if="notificationStore.unreadCount > 0"
+          class="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 pointer-events-none"
+        />
       </div>
 
       <!-- User Profile -->
       <Button
         v-tooltip.right="'User Profile'"
-        rounded
         variant="text"
-        class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
+        severity="secondary"
+        class="w-10 h-10 text-muted-color hover:bg-(--bg-hover)"
         @click="profileStore.toggleDrawer()"
       >
-        <User class="w-5 h-5" />
+        <template #icon>
+          <User class="w-5 h-5" />
+        </template>
       </Button>
 
       <!-- GitHub Docs -->
       <Button
         v-tooltip.right="'GitHub Repository'"
-        rounded
         variant="text"
-        class="w-10 h-10 text-muted-color flex! items-center! justify-center!"
+        severity="secondary"
+        class="w-10 h-10 text-muted-color hover:bg-(--bg-hover)"
         @click="os.open('https://github.com/vantoan1511/orbit')"
       >
-        <GitHubIcon :size="20" />
+        <template #icon>
+          <GitHubIcon :size="20" />
+        </template>
       </Button>
     </div>
   </div>
