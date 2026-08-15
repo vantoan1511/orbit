@@ -107,12 +107,12 @@ onMounted(async () => {
         <!-- Show apply actions if ready but not applied -->
         <div
           v-if="!updaterStore.isDownloading && updaterStore.hasUpdate"
-          class="p-4 bg-sky-500/10 rounded-lg flex items-start gap-3"
+          class="p-4 bg-(--info-soft) rounded-lg flex items-start gap-3 border border-(--info-soft)"
         >
-          <Info class="w-4 h-4 text-sky-400 mt-0.5 shrink-0" />
+          <Info class="w-4 h-4 text-(--info) mt-0.5 shrink-0" />
           <div class="flex flex-col gap-2">
             <div>
-              <h4 class="text-xs font-semibold text-sky-400">Update Available</h4>
+              <h4 class="text-xs font-semibold text-(--info)">Update Available</h4>
               <p class="text-[11px] text-muted-color mt-0.5">
                 Version {{ updaterStore.manifest?.version }} is ready to install. Restart required.
               </p>
@@ -128,7 +128,7 @@ onMounted(async () => {
               />
               <Button
                 size="small"
-                severity="info"
+                severity="primary"
                 label="Update & Restart"
                 class="text-xs font-medium"
                 @click="updaterStore.applyUpdate()"
