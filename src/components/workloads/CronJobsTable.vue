@@ -126,7 +126,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Select
         v-model="selectedSuspend"
         :options="suspendOptions"
-        class="text-xs min-w-44 bg-(--bg-hover)/30 border-(--border)"
+        size="small"
+        variant="filled"
+        class="min-w-44"
       />
     </template>
 

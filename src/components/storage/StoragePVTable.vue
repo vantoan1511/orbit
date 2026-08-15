@@ -92,8 +92,20 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   >
     <!-- Filters -->
     <template #filters>
-      <Select v-model="selectedStorageClass" :options="storageClasses" class="text-xs min-w-40" />
-      <Select v-model="selectedStatus" :options="statuses" class="text-xs min-w-36" />
+      <Select
+        v-model="selectedStorageClass"
+        :options="storageClasses"
+        size="small"
+        variant="filled"
+        class="min-w-40"
+      />
+      <Select
+        v-model="selectedStatus"
+        :options="statuses"
+        size="small"
+        variant="filled"
+        class="min-w-36"
+      />
     </template>
 
     <!-- Name Column -->

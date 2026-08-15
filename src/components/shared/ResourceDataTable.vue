@@ -117,6 +117,7 @@ const isIndeterminate = computed(() => {
               :placeholder="searchPlaceholder"
               @update:model-value="onSearchUpdate"
               variant="filled"
+              size="small"
               fluid
             />
           </IconField>
@@ -135,7 +136,8 @@ const isIndeterminate = computed(() => {
             v-model="rowsPerPage"
             :options="rowsPerPageOptions"
             variant="filled"
-            class="text-xs min-w-20"
+            size="small"
+            class="min-w-20"
           />
         </div>
 
@@ -228,6 +230,15 @@ const isIndeterminate = computed(() => {
         tableClass="w-full text-left text-xs border-collapse"
         paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
         :currentPageReportTemplate="reportTemplate"
+        :pt="{
+          pcPaginator: {
+            pcRowPerPageDropdown: {
+              root: {
+                class: 'p-variant-filled p-select-sm min-w-20'
+              }
+            }
+          }
+        }"
         @row-click="emit('row-click', $event)"
         @row-contextmenu="emit('row-contextmenu', $event)"
       >

@@ -71,7 +71,8 @@ const handleRefresh = async () => {
         v-model="selectedStatus"
         :options="statuses"
         variant="filled"
-        class="text-sm min-w-40"
+        size="small"
+        class="min-w-40"
       />
     </template>
 

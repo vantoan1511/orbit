@@ -116,7 +116,13 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
     <!-- Filters -->
     <template #filters>
       <NamespaceFilter v-model="selectedNamespace" :namespaces="namespaces" />
-      <Select v-model="selectedType" :options="types" class="text-xs min-w-40" />
+      <Select
+        v-model="selectedType"
+        :options="types"
+        size="small"
+        variant="filled"
+        class="min-w-40"
+      />
     </template>
 
     <!-- Actions Left -->

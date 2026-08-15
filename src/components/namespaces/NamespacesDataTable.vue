@@ -208,8 +208,20 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   >
     <!-- Filters -->
     <template #filters>
-      <Select v-model="selectedStatus" :options="statuses" class="text-xs min-w-40" />
-      <Select v-model="selectedLabel" :options="labelOptions" class="text-xs min-w-40" />
+      <Select
+        v-model="selectedStatus"
+        :options="statuses"
+        size="small"
+        variant="filled"
+        class="min-w-40"
+      />
+      <Select
+        v-model="selectedLabel"
+        :options="labelOptions"
+        size="small"
+        variant="filled"
+        class="min-w-40"
+      />
     </template>
 
     <!-- Actions Left -->

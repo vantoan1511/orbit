@@ -100,7 +100,9 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
       <Select
         v-model="selectedStatus"
         :options="statuses"
-        class="text-xs min-w-40 bg-(--bg-hover)/30 border-(--border)"
+        size="small"
+        variant="filled"
+        class="min-w-40"
       />
     </template>
 
