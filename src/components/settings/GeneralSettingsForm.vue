@@ -83,192 +83,226 @@ const handleDeleteCachedContexts = () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <!-- General Settings Form Card -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-6 shadow-sm flex flex-col gap-6"
-    >
-      <div class="border-b border-(--border) pb-4">
-        <h3 class="text-base font-semibold text-primary">General Settings</h3>
-        <p class="text-xs text-muted-color mt-1">
-          Configure startup, updates, and core application behaviors.
-        </p>
-      </div>
+  <div class="flex flex-col gap-10">
+    <!-- Header info -->
+    <div>
+      <h3 class="text-base font-semibold text-primary">General Settings</h3>
+      <p class="text-xs text-muted-color mt-1">
+        Configure startup, updates, and core application behaviors.
+      </p>
+    </div>
 
-      <!-- Startup Section -->
-      <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-primary">Startup</h4>
-        <div class="flex flex-col gap-3">
-          <div class="flex items-start gap-3">
-            <Checkbox
-              v-model="launchOnStartup"
-              :binary="true"
-              inputId="launch-startup"
-              class="mt-0.5"
-            />
-            <div class="flex flex-col">
-              <label
-                for="launch-startup"
-                class="text-xs font-semibold text-muted-color cursor-pointer select-none"
-              >
-                Launch Orbit on system startup
-              </label>
-              <span class="text-[11px] text-muted-color"
-                >Automatically start the application when you log in.</span
-              >
-            </div>
-          </div>
-
-          <div class="flex items-start gap-3">
-            <Checkbox
-              v-model="startMinimized"
-              :binary="true"
-              inputId="start-minimized"
-              class="mt-0.5"
-            />
-            <div class="flex flex-col">
-              <label
-                for="start-minimized"
-                class="text-xs font-semibold text-muted-color cursor-pointer select-none"
-              >
-                Start minimized to system tray
-              </label>
-              <span class="text-[11px] text-muted-color"
-                >Keep Orbit running in the background when launched.</span
-              >
-            </div>
-          </div>
+    <!-- Startup Section -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10 opacity-60">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <div class="flex items-center gap-2">
+          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Startup</h4>
+          <span
+            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
+            >Coming soon</span
+          >
         </div>
+        <p class="text-[11px] text-muted-color">Configure how Orbit behaves when launched.</p>
       </div>
-
-      <hr class="border-(--border)" />
-
-      <!-- Updates Section -->
-      <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-primary">Updates</h4>
-        <div class="flex flex-col gap-4">
-          <div class="flex items-center justify-between gap-4">
-            <div class="flex flex-col">
-              <span class="text-xs font-semibold text-muted-color"
-                >Automatically check for updates</span
-              >
-              <span class="text-[11px] text-muted-color"
-                >Get notified when a new version of Orbit is available.</span
-              >
-            </div>
-            <ToggleSwitch v-model="autoCheckUpdates" />
-          </div>
-
-          <div class="flex flex-col gap-2 max-w-sm">
-            <label class="text-xs font-semibold text-muted-color">Update Channel</label>
-            <Select
-              v-model="updateChannel"
-              :options="channels"
-              class="text-xs w-full bg-(--bg-hover)/30 border-(--border)"
-            />
-            <span class="text-[11px] text-muted-color"
-              >Choose Beta or Nightly to test experimental features early.</span
-            >
-          </div>
-        </div>
-      </div>
-
-      <hr class="border-(--border)" />
-
-      <!-- Kubeconfig Section -->
-      <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-primary">Kubeconfig</h4>
-        <div class="flex flex-col gap-3">
-          <div class="flex flex-col gap-2">
-            <label class="text-xs font-semibold text-muted-color">Default Path</label>
-            <div class="flex gap-2">
-              <div class="relative flex-1">
-                <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
-                <InputText
-                  v-model="kubeconfigPath"
-                  class="pl-9 pr-4 py-2 w-full text-xs bg-(--bg-hover)/30 border-(--border) text-primary rounded-lg"
-                />
-              </div>
-              <Button
-                size="small"
-                severity="secondary"
-                variant="outlined"
-                class="text-xs font-semibold flex items-center gap-1.5"
-                @click="handleReloadKubeconfig"
-              >
-                <RefreshCw class="w-3.5 h-3.5" />
-                <span>Reload</span>
-              </Button>
-            </div>
-            <span class="text-[11px] text-muted-color"
-              >Orbit will monitor this path for Kubernetes config changes.</span
-            >
-          </div>
-        </div>
-      </div>
-
-      <hr class="border-(--border)" />
-
-      <!-- Telemetry Section -->
-      <div class="flex flex-col gap-4">
-        <h4 class="text-sm font-semibold text-primary">Telemetry</h4>
-        <div class="flex items-center justify-between gap-4">
+      <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-3">
+        <div class="flex items-start gap-3">
+          <Checkbox
+            v-model="launchOnStartup"
+            :binary="true"
+            inputId="launch-startup"
+            disabled
+            class="mt-0.5"
+          />
           <div class="flex flex-col">
-            <span class="text-xs font-semibold text-muted-color"
-              >Share anonymous usage statistics</span
+            <label
+              for="launch-startup"
+              class="text-xs font-semibold text-muted-color cursor-not-allowed select-none"
             >
+              Launch Orbit on system startup
+            </label>
             <span class="text-[11px] text-muted-color"
-              >Help us improve Orbit by sending telemetry data. No secrets or PII are
-              collected.</span
+              >Automatically start the application when you log in.</span
             >
           </div>
-          <ToggleSwitch v-model="shareTelemetry" />
+        </div>
+
+        <div class="flex items-start gap-3">
+          <Checkbox
+            v-model="startMinimized"
+            :binary="true"
+            inputId="start-minimized"
+            disabled
+            class="mt-0.5"
+          />
+          <div class="flex flex-col">
+            <label
+              for="start-minimized"
+              class="text-xs font-semibold text-muted-color cursor-not-allowed select-none"
+            >
+              Start minimized to system tray
+            </label>
+            <span class="text-[11px] text-muted-color"
+              >Keep Orbit running in the background when launched.</span
+            >
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Danger Zone Card -->
-    <div
-      class="bg-rose-500/5 border border-rose-500/20 rounded-xl p-6 shadow-sm flex flex-col gap-6"
-    >
-      <div>
-        <div class="flex items-center gap-2 text-rose-500">
-          <AlertTriangle class="w-4 h-4" />
-          <h3 class="text-base font-semibold">Danger Zone</h3>
-        </div>
-        <p class="text-xs text-muted-color mt-1">
-          Actions here can result in data loss or configuration resetting.
+    <!-- Updates Section -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Updates</h4>
+        <p class="text-[11px] text-muted-color">
+          Manage release channel and automated update checks.
         </p>
       </div>
+      <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-4">
+        <div class="flex items-center justify-between gap-4 max-w-lg">
+          <div class="flex flex-col">
+            <span class="text-xs font-semibold text-primary">Automatically check for updates</span>
+            <span class="text-[11px] text-muted-color"
+              >Get notified when a new version of Orbit is available.</span
+            >
+          </div>
+          <ToggleSwitch v-model="autoCheckUpdates" disabled />
+        </div>
 
-      <div class="flex flex-wrap gap-3">
-        <Button
-          size="small"
-          severity="danger"
-          variant="outlined"
-          class="text-xs font-semibold"
-          @click="handleResetCache"
-        >
-          Reset Application Cache
-        </Button>
-        <Button
-          size="small"
-          severity="danger"
-          variant="outlined"
-          class="text-xs font-semibold"
-          @click="handleDeleteCachedContexts"
-        >
-          Delete Cached Contexts
-        </Button>
-        <Button
-          size="small"
-          severity="danger"
-          variant="outlined"
-          class="text-xs font-semibold"
-          @click="handleResetAllSettings"
-        >
-          Reset All Settings
-        </Button>
+        <div class="flex flex-col gap-1.5 max-w-xs opacity-60">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-semibold text-muted-color">Update Channel</label>
+            <span
+              class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
+              >Stable only</span
+            >
+          </div>
+          <Select v-model="updateChannel" :options="channels" disabled class="text-xs w-full" />
+          <span class="text-[11px] text-muted-color"
+            >Beta and Nightly channels will be available in future releases.</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Kubeconfig Section -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10 opacity-60">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <div class="flex items-center gap-2">
+          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Kubeconfig</h4>
+          <span
+            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
+            >Auto-detected</span
+          >
+        </div>
+        <p class="text-[11px] text-muted-color">File path location used for cluster contexts.</p>
+      </div>
+      <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-3 max-w-lg">
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-muted-color">Default Path</label>
+          <div class="flex gap-2">
+            <div class="relative flex-1">
+              <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
+              <InputText
+                v-model="kubeconfigPath"
+                disabled
+                class="pl-9 pr-4 py-1.5 w-full text-xs"
+              />
+            </div>
+            <Button
+              size="small"
+              severity="secondary"
+              variant="outlined"
+              disabled
+              class="text-xs font-semibold flex items-center gap-1.5"
+              @click="handleReloadKubeconfig"
+            >
+              <RefreshCw class="w-3.5 h-3.5" />
+              <span>Reload</span>
+            </Button>
+          </div>
+          <span class="text-[11px] text-muted-color"
+            >Orbit currently monitors standard system kubeconfig locations.</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Telemetry Section -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10 opacity-60">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <div class="flex items-center gap-2">
+          <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Telemetry</h4>
+          <span
+            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
+            >Disabled</span
+          >
+        </div>
+        <p class="text-[11px] text-muted-color">Help improve Orbit performance and stability.</p>
+      </div>
+      <div class="w-full md:w-2/3 xl:w-3/4 flex items-center justify-between gap-4 max-w-lg">
+        <div class="flex flex-col">
+          <span class="text-xs font-semibold text-muted-color"
+            >Share anonymous usage statistics</span
+          >
+          <span class="text-[11px] text-muted-color"
+            >Telemetry collection is currently disabled in this build.</span
+          >
+        </div>
+        <ToggleSwitch v-model="shareTelemetry" disabled />
+      </div>
+    </div>
+
+    <!-- Danger Zone Section -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10 pt-2 opacity-60">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <div class="flex items-center gap-1.5 text-muted-color">
+          <AlertTriangle class="w-3.5 h-3.5" />
+          <h4 class="text-xs font-semibold uppercase tracking-wider">Danger Zone</h4>
+          <span
+            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
+            >Coming soon</span
+          >
+        </div>
+        <p class="text-[11px] text-muted-color">Irreversible actions and configuration resets.</p>
+      </div>
+      <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-3">
+        <div class="bg-rose-500/5 p-4 rounded-lg flex flex-col gap-3 max-w-lg">
+          <span class="text-xs text-muted-color">
+            These operations immediately wipe local caches and restore application defaults.
+          </span>
+          <div class="flex flex-wrap gap-2">
+            <Button
+              size="small"
+              severity="danger"
+              variant="outlined"
+              disabled
+              class="text-xs font-medium"
+              @click="handleResetCache"
+            >
+              Reset Cache
+            </Button>
+            <Button
+              size="small"
+              severity="danger"
+              variant="outlined"
+              disabled
+              class="text-xs font-medium"
+              @click="handleDeleteCachedContexts"
+            >
+              Delete Cached Contexts
+            </Button>
+            <Button
+              size="small"
+              severity="danger"
+              variant="outlined"
+              disabled
+              class="text-xs font-medium"
+              @click="handleResetAllSettings"
+            >
+              Reset All Settings
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   </div>

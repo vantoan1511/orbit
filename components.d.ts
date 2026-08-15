@@ -94,6 +94,8 @@ declare module 'vue' {
     StoragePVTable: typeof import('./src/components/storage/StoragePVTable.vue')['default']
     StringListEditor: typeof import('./src/components/shared/StringListEditor.vue')['default']
     SystemNamespaceToggle: typeof import('./src/components/shared/SystemNamespaceToggle.vue')['default']
+    Tab: typeof import('primevue/tab')['default']
+    TabList: typeof import('primevue/tablist')['default']
     TabPanel: typeof import('primevue/tabpanel')['default']
     TabPanels: typeof import('primevue/tabpanels')['default']
     Tabs: typeof import('primevue/tabs')['default']
