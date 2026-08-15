@@ -153,7 +153,7 @@ const consumers = computed<ConsumerItem[]>(() => {
     </template>
     <template #footer>
       <router-link
-        to="/pods"
+        to="/workloads?tab=pods"
         class="text-xs text-muted-color hover:underline flex justify-between font-semibold w-full mt-5"
       >
         <span>View all resource usage</span>

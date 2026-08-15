@@ -2,13 +2,15 @@
 import ViewLayout from '@/components/shared/ViewLayout.vue'
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import CronJobsTable from '../components/workloads/CronJobsTable.vue'
-import DaemonSetsTable from '../components/workloads/DaemonSetsTable.vue'
-import DeploymentsTable from '../components/workloads/DeploymentsTable.vue'
-import JobsTable from '../components/workloads/JobsTable.vue'
-import ReplicaSetsTable from '../components/workloads/ReplicaSetsTable.vue'
-import StatefulSetsTable from '../components/workloads/StatefulSetsTable.vue'
-import WorkloadMetricsCards from '../components/workloads/WorkloadMetricsCards.vue'
+import CronJobsTable from '@/components/workloads/CronJobsTable.vue'
+import DaemonSetsTable from '@/components/workloads/DaemonSetsTable.vue'
+import DeploymentsTable from '@/components/workloads/DeploymentsTable.vue'
+import JobsTable from '@/components/workloads/JobsTable.vue'
+import PodMetricsCards from '@/components/pods/PodMetricsCards.vue'
+import PodsDataTable from '@/components/pods/PodsDataTable.vue'
+import ReplicaSetsTable from '@/components/workloads/ReplicaSetsTable.vue'
+import StatefulSetsTable from '@/components/workloads/StatefulSetsTable.vue'
+import WorkloadMetricsCards from '@/components/workloads/WorkloadMetricsCards.vue'
 
 const route = useRoute()
 const activeTab = ref((route.query.tab as string) || 'deployments')
@@ -37,6 +39,14 @@ watch(activeTab, (newTab) => {
         <!-- Overview Tab -->
         <TabPanel value="overview">
           <WorkloadMetricsCards v-if="visitedTabs.has('overview')" />
+        </TabPanel>
+
+        <!-- Pods Tab -->
+        <TabPanel value="pods">
+          <div v-if="visitedTabs.has('pods')" class="flex flex-col gap-6">
+            <PodMetricsCards />
+            <PodsDataTable />
+          </div>
         </TabPanel>
 
         <!-- Deployments Tab -->
