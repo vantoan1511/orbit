@@ -300,6 +300,52 @@ const NoirPreset: Preset = {
           }
         }
       }
+    },
+    dialog: {
+      root: {
+        borderRadius: '{content.border.radius}'
+      },
+      header: {
+        padding: '1rem 1.25rem 0.75rem 1.25rem',
+        gap: '0.5rem'
+      },
+      title: {
+        fontSize: '1rem',
+        fontWeight: '700'
+      },
+      content: {
+        padding: '0 1.25rem 1rem 1.25rem'
+      },
+      footer: {
+        padding: '0.75rem 1.25rem 1.25rem 1.25rem',
+        gap: '0.5rem'
+      },
+      colorScheme: {
+        light: {
+          root: {
+            background: '{surface.0}',
+            borderColor: '{surface.200}',
+            color: '{surface.900}',
+            shadow: '{overlay.popover.shadow}'
+          }
+        },
+        dark: {
+          root: {
+            background: '{surface.900}',
+            borderColor: '{surface.800}',
+            color: '{surface.50}',
+            shadow: '{overlay.popover.shadow}'
+          }
+        }
+      }
+    },
+    confirmdialog: {
+      icon: {
+        size: '1.25rem'
+      },
+      content: {
+        gap: '0.75rem'
+      }
     }
   }
 }
