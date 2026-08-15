@@ -5,7 +5,6 @@ import EventsView from '@/views/EventsView.vue'
 import LogsView from '@/views/LogsView.vue'
 import NamespacesView from '@/views/NamespacesView.vue'
 import NodesView from '@/views/NodesView.vue'
-import PodsView from '@/views/PodsView.vue'
 import PoliciesView from '@/views/PoliciesView.vue'
 import NetworkView from '@/views/NetworkView.vue'
 import SettingsView from '@/views/SettingsView.vue'
@@ -45,8 +44,7 @@ const router = createRouter({
     },
     {
       path: '/pods',
-      name: 'pods',
-      component: PodsView
+      redirect: '/workloads?tab=pods'
     },
     {
       path: '/network',

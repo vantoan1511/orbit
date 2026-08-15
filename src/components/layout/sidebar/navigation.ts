@@ -82,7 +82,7 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
       customIcon: Boxes,
       route: '/workloads?tab=overview'
     },
-    { key: 'workloads-pods', label: 'Pods', customIcon: Box, route: '/pods' },
+    { key: 'workloads-pods', label: 'Pods', customIcon: Box, route: '/workloads?tab=pods' },
     {
       key: 'workloads-deployments',
       label: 'Deployments',
