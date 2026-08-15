@@ -14,6 +14,7 @@ import * as yaml from 'yaml'
 import { ArrowLeft, Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
+import IngressEditForm from '@/components/network/IngressEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 
 const props = defineProps<{
@@ -149,16 +150,16 @@ const saveChanges = () => {
   }
 }
 
-const handleDeploymentFormUpdate = (updatedData: Record<string, unknown>) => {
+const handleCustomFormUpdate = (updatedData: Record<string, unknown>) => {
   rawData.value = updatedData
   yamlContent.value = yaml.stringify(updatedData)
 }
 
-// Watch form fields to sync to YAML for non-Deployment resources
+// Watch form fields to sync to YAML for fallback non-custom resources
 watch(
   () => formValues.value,
   (newVal) => {
-    if (!rawData.value || props.kind === 'Deployment') return
+    if (!rawData.value || props.kind === 'Deployment' || props.kind === 'Ingress') return
     try {
       const currentData = yaml.parse(yamlContent.value) || {}
       if (!currentData.metadata) currentData.metadata = {}
@@ -256,7 +257,14 @@ watch(
       <!-- Form Mode -->
       <template v-if="!isYamlMode">
         <div v-if="props.kind === 'Deployment'" class="w-full h-full overflow-hidden flex flex-col">
-          <DeploymentEditForm :raw-data="rawData" @update:raw-data="handleDeploymentFormUpdate" />
+          <DeploymentEditForm :raw-data="rawData" @update:raw-data="handleCustomFormUpdate" />
+        </div>
+
+        <div
+          v-else-if="props.kind === 'Ingress'"
+          class="w-full h-full overflow-hidden flex flex-col"
+        >
+          <IngressEditForm :raw-data="rawData" @update:raw-data="handleCustomFormUpdate" />
         </div>
 
         <!-- Non-Deployment Fallback Form with Asymmetric 2-Column Section Layout -->

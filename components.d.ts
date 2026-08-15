@@ -45,6 +45,7 @@ declare module 'vue' {
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
     IconField: typeof import('primevue/iconfield')['default']
     IngressDetailsDrawer: typeof import('./src/components/network/IngressDetailsDrawer.vue')['default']
+    IngressEditForm: typeof import('./src/components/network/IngressEditForm.vue')['default']
     IngressesTable: typeof import('./src/components/network/IngressesTable.vue')['default']
     InputIcon: typeof import('primevue/inputicon')['default']
     JobsTable: typeof import('./src/components/workloads/JobsTable.vue')['default']
