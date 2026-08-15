@@ -41,6 +41,7 @@ declare module 'vue' {
     EventMetricsCards: typeof import('./src/components/events/EventMetricsCards.vue')['default']
     EventsDataTable: typeof import('./src/components/events/EventsDataTable.vue')['default']
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
+    GenericResourceTable: typeof import('./src/components/shared/GenericResourceTable.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
     IconField: typeof import('primevue/iconfield')['default']
     IngressDetailsDrawer: typeof import('./src/components/network/IngressDetailsDrawer.vue')['default']
