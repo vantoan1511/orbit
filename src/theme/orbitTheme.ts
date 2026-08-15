@@ -54,6 +54,19 @@ const NoirPreset: Preset = {
         }
       }
     }
+  },
+  components: {
+    contextmenu: {
+      item: {
+        focusBackground: 'transparent',
+        activeBackground: 'transparent'
+      }
+    },
+    menu: {
+      item: {
+        focusBackground: 'transparent'
+      }
+    }
   }
 }
 
