@@ -350,7 +350,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list namespaces: {}", e),
+                                    message: format!("Failed to list namespaces: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -377,7 +377,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list pods: {}", e),
+                                    message: format!("Failed to list pods: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -404,7 +404,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list deployments: {}", e),
+                                    message: format!("Failed to list deployments: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -431,7 +431,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list statefulsets: {}", e),
+                                    message: format!("Failed to list statefulsets: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -458,7 +458,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list daemonsets: {}", e),
+                                    message: format!("Failed to list daemonsets: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -485,7 +485,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list replicasets: {}", e),
+                                    message: format!("Failed to list replicasets: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -512,7 +512,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list jobs: {}", e),
+                                    message: format!("Failed to list jobs: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -539,7 +539,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list cronjobs: {}", e),
+                                    message: format!("Failed to list cronjobs: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -566,7 +566,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list services: {}", e),
+                                    message: format!("Failed to list services: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -593,7 +593,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list ingresses: {}", e),
+                                    message: format!("Failed to list ingresses: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -620,7 +620,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list configmaps: {}", e),
+                                    message: format!("Failed to list configmaps: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -647,7 +647,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list events: {}", e),
+                                    message: format!("Failed to list events: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -674,7 +674,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list secrets: {}", e),
+                                    message: format!("Failed to list secrets: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -699,7 +699,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list persistent volumes: {}", e),
+                                    message: format!("Failed to list persistent volumes: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -726,7 +726,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list persistent volume claims: {}", e),
+                                    message: format!("Failed to list persistent volume claims: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -751,7 +751,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list storage classes: {}", e),
+                                    message: format!("Failed to list storage classes: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -776,7 +776,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list nodes: {}", e),
+                                    message: format!("Failed to list nodes: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -803,7 +803,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to list policies: {}", e),
+                                    message: format!("Failed to list policies: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -970,7 +970,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to find pods for workload: {}", e),
+                                    message: format!("Failed to find pods for workload: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                             return;
@@ -1040,7 +1040,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to scale: {}", e),
+                                    message: format!("Failed to scale: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -1076,7 +1076,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to redeploy: {}", e),
+                                    message: format!("Failed to redeploy: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -1123,7 +1123,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to delete: {}", e),
+                                    message: format!("Failed to delete: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -1166,7 +1166,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to restart pod: {}", e),
+                                    message: format!("Failed to restart pod: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -1204,7 +1204,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to get raw resource: {}", e),
+                                    message: format!("Failed to get raw resource: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -1244,7 +1244,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to apply resource: {}", e),
+                                    message: format!("Failed to apply resource: {}", crate::kubernetes::format_error(&e)),
                                 },
                             ).await;
                         }
@@ -1302,7 +1302,7 @@ pub fn dispatch(
                                 &writer,
                                 &token,
                                 &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to clone Ingress: {}", e),
+                                    message: format!("Failed to clone Ingress: {}", crate::kubernetes::format_error(&e)),
                                 },
                             )
                             .await;

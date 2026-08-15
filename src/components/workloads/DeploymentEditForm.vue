@@ -18,6 +18,7 @@ import ContainerPortsEditor from '@/components/shared/ContainerPortsEditor.vue'
 import ContainerResourcesEditor from '@/components/shared/ContainerResourcesEditor.vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import StringListEditor from '@/components/shared/StringListEditor.vue'
+import { isValidK8sLabel, isValidK8sName, isValidPath } from '@/utils/validators'
 
 const props = defineProps<{
   rawData: Record<string, unknown> | null
@@ -25,6 +26,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:rawData', value: Record<string, unknown>): void
+  (e: 'update:isValid', value: boolean): void
 }>()
 
 const activeTab = ref('general')
@@ -72,6 +74,30 @@ interface ContainerFormState {
 
 const containers = ref<ContainerFormState[]>([])
 const activeContainerIndex = ref<number>(0)
+
+const isFormValid = computed(() => {
+  if (serviceAccountName.value && !isValidK8sName(serviceAccountName.value)) return false
+
+  for (const c of containers.value) {
+    if (c.name && !isValidK8sLabel(c.name)) return false
+    if (c.workingDir && !isValidPath(c.workingDir)) return false
+    if (c.ports) {
+      for (const p of c.ports) {
+        if (p.name && !isValidK8sLabel(p.name)) return false
+      }
+    }
+  }
+
+  return true
+})
+
+watch(
+  isFormValid,
+  (val) => {
+    emit('update:isValid', val)
+  },
+  { immediate: true }
+)
 
 let isEmitting = false
 
@@ -707,8 +733,10 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <InputText
                   v-model="serviceAccountName"
                   placeholder="e.g. default"
+                  :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
                   size="small"
                   fluid
+                  class="text-xs"
                   @input="handleFieldChange"
                 />
               </div>
@@ -798,8 +826,12 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     <label class="text-xs font-medium text-muted-color">Container Name</label>
                     <InputText
                       v-model="currentContainer.name"
+                      :invalid="
+                        Boolean(currentContainer.name && !isValidK8sLabel(currentContainer.name))
+                      "
                       size="small"
                       fluid
+                      class="text-xs"
                       @input="handleFieldChange"
                     />
                   </div>
@@ -811,6 +843,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                       :options="['Always', 'IfNotPresent', 'Never']"
                       size="small"
                       fluid
+                      class="text-xs"
                       @change="handleFieldChange"
                     />
                   </div>
@@ -823,6 +856,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     placeholder="e.g. nginx:latest"
                     size="small"
                     fluid
+                    class="text-xs"
                     @input="handleFieldChange"
                   />
                 </div>
@@ -832,8 +866,14 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputText
                     v-model="currentContainer.workingDir"
                     placeholder="e.g. /app"
+                    :invalid="
+                      Boolean(
+                        currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
+                      )
+                    "
                     size="small"
                     fluid
+                    class="text-xs"
                     @input="handleFieldChange"
                   />
                 </div>

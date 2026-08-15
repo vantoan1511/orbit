@@ -16,6 +16,7 @@ export default [
       '**/coverage/**',
       'bin/**',
       'build/**',
+      'core/**',
       'components.d.ts'
     ]
   },

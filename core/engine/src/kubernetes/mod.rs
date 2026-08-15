@@ -64,3 +64,39 @@ pub(crate) fn format_size(bytes: usize) -> String {
         format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
     }
 }
+
+/// Formats a Kubernetes API or client error into a user-friendly message,
+/// extracting clean messages from Api error responses.
+pub(crate) fn format_error(e: &kube::Error) -> String {
+    match e {
+        kube::Error::Api(api_err) => api_err.message.clone(),
+        other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_error_api_error() {
+        let err = kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: "admission webhook \"validate.nginx.ingress.kubernetes.io\" denied the request: host \"app.example.com\" already defined".to_string(),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        });
+
+        assert_eq!(
+            format_error(&err),
+            "admission webhook \"validate.nginx.ingress.kubernetes.io\" denied the request: host \"app.example.com\" already defined"
+        );
+    }
+
+    #[test]
+    fn test_format_error_other_error() {
+        let err = kube::Error::Discovery(kube::error::DiscoveryError::MissingKind("Foo".into()));
+        assert!(format_error(&err).contains("Foo"));
+    }
+}
+

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { isValidK8sLabel } from '@/utils/validators'
 import { Plus, X } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -79,8 +80,9 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :model-value="port.name"
         placeholder="Port Name (e.g. http)"
         :disabled="disabled"
+        :invalid="Boolean(port.name && !isValidK8sLabel(port.name))"
         size="small"
-        class="w-1/3"
+        class="w-1/3 text-xs"
         @update:model-value="(val) => updatePortField(idx, 'name', val ?? '')"
       />
       <InputNumber

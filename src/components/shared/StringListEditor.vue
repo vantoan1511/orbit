@@ -10,18 +10,29 @@ const props = withDefaults(
     placeholder?: string
     addLabel?: string
     disabled?: boolean
+    itemValidator?: (val: string, index: number, allItems: string[]) => boolean | string
+    errorMessage?: string
   }>(),
   {
     title: '',
     placeholder: 'Value',
     addLabel: 'Add',
-    disabled: false
+    disabled: false,
+    errorMessage: 'Invalid value'
   }
 )
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string[]): void
 }>()
+
+const getItemError = (item: string, idx: number): string | null => {
+  if (!item || !props.itemValidator) return null
+  const res = props.itemValidator(item, idx, props.modelValue)
+  if (res === false) return props.errorMessage
+  if (typeof res === 'string') return res
+  return null
+}
 
 const addItem = () => {
   if (props.disabled) return
@@ -64,27 +75,33 @@ const updateItem = (index: number, val: string) => {
       No items defined.
     </div>
 
-    <div v-for="(item, idx) in modelValue" :key="'str-' + idx" class="flex items-center gap-2">
-      <InputText
-        :model-value="item"
-        :placeholder="placeholder"
-        :disabled="disabled"
-        size="small"
-        class="flex-1"
-        @update:model-value="(val) => updateItem(idx, val ?? '')"
-      />
-      <Button
-        v-if="!disabled"
-        variant="text"
-        severity="danger"
-        size="small"
-        class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
-        @click="removeItem(idx)"
-      >
-        <template #icon>
-          <X class="w-4 h-4" />
-        </template>
-      </Button>
+    <div v-for="(item, idx) in modelValue" :key="'str-' + idx" class="flex flex-col gap-1">
+      <div class="flex items-center gap-2">
+        <InputText
+          :model-value="item"
+          :placeholder="placeholder"
+          :disabled="disabled"
+          :invalid="Boolean(getItemError(item, idx))"
+          size="small"
+          class="flex-1 text-xs"
+          @update:model-value="(val) => updateItem(idx, val ?? '')"
+        />
+        <Button
+          v-if="!disabled"
+          variant="text"
+          severity="danger"
+          size="small"
+          class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
+          @click="removeItem(idx)"
+        >
+          <template #icon>
+            <X class="w-4 h-4" />
+          </template>
+        </Button>
+      </div>
+      <small v-if="getItemError(item, idx)" class="text-(--danger) text-[11px] leading-tight">
+        {{ getItemError(item, idx) }}
+      </small>
     </div>
   </div>
 </template>
