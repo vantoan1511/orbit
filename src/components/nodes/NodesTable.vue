@@ -33,6 +33,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    kind="Node"
     :data="k8sStore.nodes"
     :initialColumns="columns"
     :statuses="statuses"
@@ -53,7 +54,7 @@ const handleRefresh = async () => {
       <Column v-if="visibleCols['role']" field="role" header="Role" sortable class="p-3">
         <template #body="{ data }">
           <span
-            class="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border"
+            class="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border whitespace-nowrap"
             :class="
               data.role === 'control-plane'
                 ? 'bg-node/10 text-node border-node/20'

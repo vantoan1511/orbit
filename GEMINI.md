@@ -26,8 +26,8 @@ Agents must follow this workflow for every task.
 
 Before modifying code:
 
-1. Inspect the relevant existing implementation.
-2. Inspect neighboring components and established patterns.
+1. Use `codegraph` (`codegraph_explore`) as the primary tool to explore architecture, survey components, and locate relevant symbols/flows.
+2. Inspect the relevant existing implementation and neighboring components for established patterns.
 3. Search for reusable components, composables, services, utilities, types, and IPC commands.
 4. Inspect relevant design-system files for UI work.
 5. Identify the smallest set of files that should change.
@@ -96,13 +96,13 @@ Never claim that work was completed if required verification has not been perfor
 
 The repository is the source of truth.
 
-Before referring to an existing component, composable, service, utility, IPC command, Rust module, type, route, store, or design token, locate it in the repository.
+Before referring to an existing component, composable, service, utility, IPC command, Rust module, type, route, store, or design token, locate and verify it in the repository using `codegraph` (`codegraph_explore`) or targeted searches.
 
 Never assume an implementation exists because it would be conventional.
 
 If an API or abstraction cannot be found:
 
-1. Search again using related terminology.
+1. Explore using `codegraph_explore` or search again using related terminology.
 2. Confirm that it does not exist.
 3. Propose the smallest required addition rather than assuming it exists.
 
