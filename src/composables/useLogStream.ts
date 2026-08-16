@@ -127,12 +127,28 @@ export function useLogStream(options: {
     }
   }
 
+  const isAtBottom = ref<boolean>(true)
+
   const scrollToBottom = () => {
+    isAtBottom.value = true
+    isFollowing.value = true
     nextTick(() => {
       if (virtualScrollerRef.value && filteredLogLines.value.length > 0) {
         virtualScrollerRef.value.scrollToIndex(filteredLogLines.value.length - 1)
       }
     })
+  }
+
+  const onScroll = (event: Event) => {
+    const target = event.target as HTMLElement
+    if (!target) return
+    const tolerance = 20
+    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= tolerance
+    isAtBottom.value = atBottom
+
+    if (!atBottom && isFollowing.value) {
+      isFollowing.value = false
+    }
   }
 
   const filteredLogLines = computed(() => {
@@ -212,6 +228,9 @@ export function useLogStream(options: {
     isFullscreen,
     isFollowing,
     filteredLogLines,
+    isAtBottom,
+    onScroll,
+    scrollToBottom,
     clearLogs,
     downloadLogs
   }
