@@ -2,6 +2,7 @@
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { NamespaceInfo } from '@/types/kubernetes'
 import { CheckCircle2, FolderOpen, Loader2, Shield, XCircle } from '@lucide/vue'
+import { Card } from 'primevue'
 import Chart from 'primevue/chart'
 import { computed, onMounted, ref, watch } from 'vue'
 
@@ -82,151 +83,167 @@ onMounted(() => {
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
     <!-- Card 1: Total Namespaces -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-3">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
-        >
-          <FolderOpen class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-            Total Namespaces
+    <Card>
+      <template #content>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
+            >
+              <FolderOpen class="w-5 h-5" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                Total Namespaces
+              </div>
+              <div class="text-2xl font-bold mt-1 text-primary">
+                {{ totalNamespaces }}
+              </div>
+            </div>
           </div>
-          <div class="text-2xl font-bold mt-1 text-primary">
-            {{ totalNamespaces }}
-          </div>
+          <div class="text-[10px] text-muted-color font-medium truncate">Across the cluster</div>
         </div>
-      </div>
-      <div class="text-[10px] text-muted-color font-medium">Across the cluster</div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 2: Active -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
-          >
-            <CheckCircle2 class="w-5 h-5" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Active
+    <Card>
+      <template #content>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
+              >
+                <CheckCircle2 class="w-5 h-5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Active
+                </div>
+                <div class="text-2xl font-bold mt-1 text-emerald-500 truncate">
+                  {{ activeCount }}
+                </div>
+              </div>
             </div>
-            <div class="text-2xl font-bold mt-1 text-emerald-500">{{ activeCount }}</div>
+            <div class="w-14 h-14 shrink-0 relative" v-if="activeChartData">
+              <Chart
+                type="doughnut"
+                :data="activeChartData"
+                :options="donutOptions"
+                class="w-full h-full"
+              />
+            </div>
+          </div>
+          <div class="text-[10px] text-muted-color font-medium truncate">
+            {{ totalNamespaces ? Math.round((activeCount / totalNamespaces) * 1000) / 10 : 0 }}%
           </div>
         </div>
-        <div class="w-14 h-14 shrink-0 relative" v-if="activeChartData">
-          <Chart
-            type="doughnut"
-            :data="activeChartData"
-            :options="donutOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="text-[10px] text-muted-color font-medium">
-        {{ totalNamespaces ? Math.round((activeCount / totalNamespaces) * 1000) / 10 : 0 }}%
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 3: Terminating -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
-          >
-            <Loader2 class="w-5 h-5 animate-spin" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Terminating
+    <Card>
+      <template #content>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
+              >
+                <Loader2 class="w-5 h-5 animate-spin" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Terminating
+                </div>
+                <div class="text-2xl font-bold mt-1 text-amber-500 truncate">
+                  {{ terminatingCount }}
+                </div>
+              </div>
             </div>
-            <div class="text-2xl font-bold mt-1 text-amber-500">{{ terminatingCount }}</div>
+            <div class="w-14 h-14 shrink-0 relative" v-if="terminatingChartData">
+              <Chart
+                type="doughnut"
+                :data="terminatingChartData"
+                :options="donutOptions"
+                class="w-full h-full"
+              />
+            </div>
+          </div>
+          <div class="text-[10px] text-muted-color font-medium truncate">
+            {{
+              totalNamespaces ? Math.round((terminatingCount / totalNamespaces) * 1000) / 10 : 0
+            }}%
           </div>
         </div>
-        <div class="w-14 h-14 shrink-0 relative" v-if="terminatingChartData">
-          <Chart
-            type="doughnut"
-            :data="terminatingChartData"
-            :options="donutOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="text-[10px] text-muted-color font-medium">
-        {{ totalNamespaces ? Math.round((terminatingCount / totalNamespaces) * 1000) / 10 : 0 }}%
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 4: Failed -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
-          >
-            <XCircle class="w-5 h-5" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Failed
+    <Card>
+      <template #content>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
+              >
+                <XCircle class="w-5 h-5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Failed
+                </div>
+                <div class="text-2xl font-bold mt-1 text-rose-500 truncate">{{ failedCount }}</div>
+              </div>
             </div>
-            <div class="text-2xl font-bold mt-1 text-rose-500">{{ failedCount }}</div>
+            <div class="w-14 h-14 shrink-0 relative" v-if="failedChartData">
+              <Chart
+                type="doughnut"
+                :data="failedChartData"
+                :options="donutOptions"
+                class="w-full h-full"
+              />
+            </div>
           </div>
+          <div class="text-[10px] text-muted-color font-medium truncate">0%</div>
         </div>
-        <div class="w-14 h-14 shrink-0 relative" v-if="failedChartData">
-          <Chart
-            type="doughnut"
-            :data="failedChartData"
-            :options="donutOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="text-[10px] text-muted-color font-medium">0%</div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 5: System -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col gap-3 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-blue-400 bg-blue-500/10"
-          >
-            <Shield class="w-5 h-5" />
-          </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              System
+    <Card>
+      <template #content>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-blue-400 bg-blue-500/10"
+              >
+                <Shield class="w-5 h-5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  System
+                </div>
+                <div class="text-2xl font-bold mt-1 text-blue-400 truncate">{{ systemCount }}</div>
+              </div>
             </div>
-            <div class="text-2xl font-bold mt-1 text-blue-400">{{ systemCount }}</div>
+            <div class="w-14 h-14 shrink-0 relative" v-if="systemChartData">
+              <Chart
+                type="doughnut"
+                :data="systemChartData"
+                :options="donutOptions"
+                class="w-full h-full"
+              />
+            </div>
+          </div>
+          <div class="text-[10px] text-muted-color font-medium truncate">
+            {{ totalNamespaces ? Math.round((systemCount / totalNamespaces) * 1000) / 10 : 0 }}%
           </div>
         </div>
-        <div class="w-14 h-14 shrink-0 relative" v-if="systemChartData">
-          <Chart
-            type="doughnut"
-            :data="systemChartData"
-            :options="donutOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="text-[10px] text-muted-color font-medium">
-        {{ totalNamespaces ? Math.round((systemCount / totalNamespaces) * 1000) / 10 : 0 }}%
-      </div>
-    </div>
+      </template>
+    </Card>
   </div>
 </template>
