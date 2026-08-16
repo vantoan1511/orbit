@@ -121,17 +121,18 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
           severity="secondary"
           variant="text"
           size="small"
+          label="Dismiss"
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.showUpdateDialog = false"
         >
           <template #icon>
             <X class="w-3.5 h-3.5 mr-1" />
           </template>
-          <span>Dismiss</span>
         </Button>
         <Button
           severity="primary"
           size="small"
+          :label="updaterStore.isDownloading ? `Downloading... ${updaterStore.downloadProgress}%` : 'Install'"
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.applyUpdate()"
         >
@@ -139,13 +140,6 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
             <Loader2 v-if="updaterStore.isDownloading" class="w-3.5 h-3.5 mr-1 animate-spin" />
             <Download v-else class="w-3.5 h-3.5 mr-1" />
           </template>
-          <span>
-            {{
-              updaterStore.isDownloading
-                ? `Downloading... ${updaterStore.downloadProgress}%`
-                : 'Install'
-            }}
-          </span>
         </Button>
       </div>
     </template>
