@@ -191,6 +191,9 @@ export const app = {
   },
   restartProcess() {
     return neuApp.restartProcess()
+  },
+  exit(code?: number) {
+    return neuApp.exit(code)
   }
 }
 

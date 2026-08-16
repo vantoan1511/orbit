@@ -295,13 +295,15 @@ Use:
 - composables
 - reusable components
 - PrimeVue v4 components (`Button`, `InputText`, `InputNumber`, `Select`, `ToggleSwitch`, etc.) over raw HTML elements or custom controls
+- centralized service wrappers (e.g., `@/services/nativeService`) for all native or system operations
 
 Avoid:
 
 - Options API
 - large components
 - business logic inside views
-- direct IPC calls scattered across components
+- direct IPC or Neutralino calls scattered across components
+- direct imports of `@neutralinojs/lib` in components, views, or composables (must use `@/services/nativeService` or domain services)
 - raw HTML inputs/buttons (`<button>`, `<input>`, `<select>`) or reinventions of controls already available in PrimeVue
 
 Components should remain focused on rendering.
@@ -322,11 +324,11 @@ Composable
 
 ↓
 
-Frontend Service
+Frontend Service (`@/services/*`, e.g., `@/services/nativeService`)
 
 ↓
 
-Neutralino IPC
+Neutralino IPC / Native API (`@neutralinojs/lib`)
 
 ↓
 
@@ -336,7 +338,7 @@ Rust Backend
 
 Kubernetes
 
-Components should never call IPC directly.
+Components must never call IPC or `@neutralinojs/lib` directly. All native/OS/filesystem/IPC capabilities must be accessed via frontend services.
 
 ---
 

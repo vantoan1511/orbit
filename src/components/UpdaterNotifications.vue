@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
 import { Download, RefreshCw } from '@lucide/vue'
-import { app } from '@neutralinojs/lib'
+import { app } from '@/services/nativeService'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import { useToast } from 'primevue/usetoast'
