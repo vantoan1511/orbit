@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { AlertTriangle, Box, CheckCircle2, HelpCircle, Loader2 } from '@lucide/vue'
+import { Card } from 'primevue'
 import Chart from 'primevue/chart'
 import { computed, onMounted, ref } from 'vue'
 
@@ -111,170 +112,182 @@ const unknownChartData = computed(() => {
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
     <!-- Card 1: Total Pods -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center gap-4">
-        <div
-          class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
-        >
-          <Box class="w-5 h-5" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-            Total Pods
+    <Card class="flex flex-col justify-between">
+      <template #content>
+        <div class="flex flex-col justify-between h-full">
+          <div class="flex items-center gap-4">
+            <div
+              class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
+            >
+              <Box class="w-5 h-5" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                Total Pods
+              </div>
+              <div class="text-2xl font-bold mt-1 text-primary">
+                {{ totalPods }}
+                <span class="text-sm font-normal text-muted-color">/ {{ maxPods }}</span>
+              </div>
+            </div>
           </div>
-          <div class="text-2xl font-bold mt-1 text-primary">
-            {{ totalPods }}
-            <span class="text-sm font-normal text-muted-color">/ {{ maxPods }} [■]</span>
+          <div class="mt-4">
+            <div class="flex justify-between text-[10px] text-muted-color mb-1 font-mono">
+              <span>{{ Math.round((totalPods / maxPods) * 100) }}% Limit</span>
+            </div>
+            <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
+              <div
+                class="h-full rounded-full bg-violet-500"
+                :style="{ width: (totalPods / maxPods) * 100 + '%' }"
+              ></div>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="mt-4">
-        <div class="flex justify-between text-[10px] text-muted-color mb-1 font-mono">
-          <span>{{ Math.round((totalPods / maxPods) * 100) }}% Limit</span>
-        </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div
-            class="h-full rounded-full bg-violet-500"
-            :style="{ width: (totalPods / maxPods) * 100 + '%' }"
-          ></div>
-        </div>
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 2: Running -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
-          >
-            <CheckCircle2 class="w-5 h-5" />
+    <Card class="flex flex-col justify-between">
+      <template #content>
+        <div class="flex flex-col justify-between h-full">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
+              >
+                <CheckCircle2 class="w-5 h-5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Running
+                </div>
+                <div class="text-2xl font-bold mt-1 text-emerald-500 truncate">
+                  {{ runningCount }}
+                </div>
+              </div>
+            </div>
+            <div class="w-16 h-8 shrink-0" v-if="runningChartData">
+              <Chart
+                type="line"
+                :data="runningChartData"
+                :options="sparklineOptions"
+                class="w-full h-full"
+              />
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Running
-            </div>
-            <div class="text-2xl font-bold mt-1 text-emerald-500">
-              {{ runningCount }}
-            </div>
+          <div class="mt-4 text-[10px] text-muted-color font-medium truncate">
+            {{ Math.round((runningCount / totalPods) * 1000) / 10 }}% of total workloads active
           </div>
         </div>
-        <div class="w-16 h-8 shrink-0" v-if="runningChartData">
-          <Chart
-            type="line"
-            :data="runningChartData"
-            :options="sparklineOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-muted-color font-medium">
-        {{ Math.round((runningCount / totalPods) * 1000) / 10 }}% of total workloads active
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 3: Pending -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
-          >
-            <Loader2 class="w-5 h-5 animate-spin" />
+    <Card class="flex flex-col justify-between">
+      <template #content>
+        <div class="flex flex-col justify-between h-full">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
+              >
+                <Loader2 class="w-5 h-5 animate-spin" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Pending
+                </div>
+                <div class="text-2xl font-bold mt-1 text-amber-500 truncate">
+                  {{ pendingCount }}
+                </div>
+              </div>
+            </div>
+            <div class="w-16 h-8 shrink-0" v-if="pendingChartData">
+              <Chart
+                type="line"
+                :data="pendingChartData"
+                :options="sparklineOptions"
+                class="w-full h-full"
+              />
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Pending
-            </div>
-            <div class="text-2xl font-bold mt-1 text-amber-500">
-              {{ pendingCount }}
-            </div>
+          <div class="mt-4 text-[10px] text-muted-color font-medium truncate">
+            {{ Math.round((pendingCount / totalPods) * 1000) / 10 }}% scheduler queues occupied
           </div>
         </div>
-        <div class="w-16 h-8 shrink-0" v-if="pendingChartData">
-          <Chart
-            type="line"
-            :data="pendingChartData"
-            :options="sparklineOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-muted-color font-medium">
-        {{ Math.round((pendingCount / totalPods) * 1000) / 10 }}% scheduler queues occupied
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 4: Failed -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
-          >
-            <AlertTriangle class="w-5 h-5" />
+    <Card class="flex flex-col justify-between">
+      <template #content>
+        <div class="flex flex-col justify-between h-full">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
+              >
+                <AlertTriangle class="w-5 h-5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Failed
+                </div>
+                <div class="text-2xl font-bold mt-1 text-rose-500 truncate">
+                  {{ failedCount }}
+                </div>
+              </div>
+            </div>
+            <div class="w-16 h-8 shrink-0" v-if="failedChartData">
+              <Chart
+                type="line"
+                :data="failedChartData"
+                :options="sparklineOptions"
+                class="w-full h-full"
+              />
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Failed
-            </div>
-            <div class="text-2xl font-bold mt-1 text-rose-500">
-              {{ failedCount }}
-            </div>
+          <div class="mt-4 text-[10px] text-rose-500 font-medium truncate">
+            Requires operator intervention
           </div>
         </div>
-        <div class="w-16 h-8 shrink-0" v-if="failedChartData">
-          <Chart
-            type="line"
-            :data="failedChartData"
-            :options="sparklineOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-rose-500 font-medium">Requires operator intervention</div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 5: Unknown -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex flex-col justify-between shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="flex items-center justify-between gap-4">
-        <div class="flex items-center gap-4">
-          <div
-            class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-gray-400 bg-gray-500/10"
-          >
-            <HelpCircle class="w-5 h-5" />
+    <Card class="flex flex-col justify-between">
+      <template #content>
+        <div class="flex flex-col justify-between h-full">
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              <div
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-gray-400 bg-gray-500/10"
+              >
+                <HelpCircle class="w-5 h-5" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+                  Unknown
+                </div>
+                <div class="text-2xl font-bold mt-1 text-gray-400 truncate">
+                  {{ unknownCount }}
+                </div>
+              </div>
+            </div>
+            <div class="w-16 h-8 shrink-0" v-if="unknownChartData">
+              <Chart
+                type="line"
+                :data="unknownChartData"
+                :options="sparklineOptions"
+                class="w-full h-full"
+              />
+            </div>
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-              Unknown
-            </div>
-            <div class="text-2xl font-bold mt-1 text-gray-400">
-              {{ unknownCount }}
-            </div>
+          <div class="mt-4 text-[10px] text-muted-color font-medium truncate">
+            Unreachable or lost nodes status
           </div>
         </div>
-        <div class="w-16 h-8 shrink-0" v-if="unknownChartData">
-          <Chart
-            type="line"
-            :data="unknownChartData"
-            :options="sparklineOptions"
-            class="w-full h-full"
-          />
-        </div>
-      </div>
-      <div class="mt-4 text-[10px] text-muted-color font-medium">
-        Unreachable or lost nodes status
-      </div>
-    </div>
+      </template>
+    </Card>
   </div>
 </template>

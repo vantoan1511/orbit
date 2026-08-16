@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { Card } from 'primevue'
 import { Bell, CheckCircle, AlertTriangle, XCircle, Info } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 
@@ -33,97 +34,117 @@ const otherPct = computed(() =>
 <template>
   <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
     <!-- Card 1: Total Events -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div
-        class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color"
-      >
-        <Bell class="w-5 h-5" />
-      </div>
-      <div>
-        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
-          Total Events
+    <Card>
+      <template #content>
+        <div class="flex items-center gap-4">
+          <div
+            class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color shrink-0"
+          >
+            <Bell class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
+              Total Events
+            </div>
+            <div class="text-2xl font-bold text-primary font-mono mt-0.5">
+              {{ totalCount }}
+            </div>
+            <div class="text-[10px] text-muted-color mt-0.5 truncate">Active cluster events</div>
+          </div>
         </div>
-        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
-          {{ totalCount }}
-        </div>
-        <div class="text-[10px] text-muted-color mt-0.5">Active cluster events</div>
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 2: Normal -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div
-        class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400"
-      >
-        <CheckCircle class="w-5 h-5" />
-      </div>
-      <div>
-        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
-          Normal
+    <Card>
+      <template #content>
+        <div class="flex items-center gap-4">
+          <div
+            class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0"
+          >
+            <CheckCircle class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
+              Normal
+            </div>
+            <div class="text-2xl font-bold text-primary font-mono mt-0.5">
+              {{ normalCount }}
+            </div>
+            <div class="text-[10px] text-emerald-400 font-medium mt-0.5 truncate">
+              {{ normalPct }}%
+            </div>
+          </div>
         </div>
-        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
-          {{ normalCount }}
-        </div>
-        <div class="text-[10px] text-emerald-400 font-medium mt-0.5">{{ normalPct }}%</div>
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 3: Warning -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div
-        class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400"
-      >
-        <AlertTriangle class="w-5 h-5" />
-      </div>
-      <div>
-        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
-          Warning
+    <Card>
+      <template #content>
+        <div class="flex items-center gap-4">
+          <div
+            class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0"
+          >
+            <AlertTriangle class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
+              Warning
+            </div>
+            <div class="text-2xl font-bold text-primary font-mono mt-0.5">
+              {{ warningCount }}
+            </div>
+            <div class="text-[10px] text-amber-400 font-medium mt-0.5 truncate">
+              {{ warningPct }}%
+            </div>
+          </div>
         </div>
-        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
-          {{ warningCount }}
-        </div>
-        <div class="text-[10px] text-amber-400 font-medium mt-0.5">{{ warningPct }}%</div>
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 4: Error -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400">
-        <XCircle class="w-5 h-5" />
-      </div>
-      <div>
-        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">Error</div>
-        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
-          {{ errorCount }}
+    <Card>
+      <template #content>
+        <div class="flex items-center gap-4">
+          <div
+            class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 shrink-0"
+          >
+            <XCircle class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
+              Error
+            </div>
+            <div class="text-2xl font-bold text-primary font-mono mt-0.5">
+              {{ errorCount }}
+            </div>
+            <div class="text-[10px] text-red-400 font-medium mt-0.5 truncate">{{ errorPct }}%</div>
+          </div>
         </div>
-        <div class="text-[10px] text-red-400 font-medium mt-0.5">{{ errorPct }}%</div>
-      </div>
-    </div>
+      </template>
+    </Card>
 
     <!-- Card 5: Other -->
-    <div
-      class="bg-(--bg-card) border border-(--border) rounded-xl p-5 flex items-center gap-4 shadow-sm transition-all duration-200 hover:border-(--border-strong)"
-    >
-      <div
-        class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400"
-      >
-        <Info class="w-5 h-5" />
-      </div>
-      <div>
-        <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">Other</div>
-        <div class="text-2xl font-bold text-primary font-mono mt-0.5">
-          {{ otherCount }}
+    <Card>
+      <template #content>
+        <div class="flex items-center gap-4">
+          <div
+            class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0"
+          >
+            <Info class="w-5 h-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-[11px] font-semibold text-muted-color uppercase tracking-wider">
+              Other
+            </div>
+            <div class="text-2xl font-bold text-primary font-mono mt-0.5">
+              {{ otherCount }}
+            </div>
+            <div class="text-[10px] text-blue-400 font-medium mt-0.5 truncate">{{ otherPct }}%</div>
+          </div>
         </div>
-        <div class="text-[10px] text-blue-400 font-medium mt-0.5">{{ otherPct }}%</div>
-      </div>
-    </div>
+      </template>
+    </Card>
   </div>
 </template>
