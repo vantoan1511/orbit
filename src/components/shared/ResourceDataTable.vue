@@ -115,14 +115,16 @@ const isIndeterminate = computed(() => {
       <div class="flex items-center gap-3">
         <span class="text-xs font-semibold text-primary"> {{ selection.length }} selected </span>
         <Button
+          v-tooltip.top="'Clear Selection'"
           severity="secondary"
           variant="text"
           size="small"
-          class="p-1 h-6 w-6"
-          title="Clear Selection"
+          class="p-1! h-6! w-6!"
           @click="selection = []"
         >
-          <X class="w-3.5 h-3.5 text-muted-color" />
+          <template #icon>
+            <X class="w-3.5 h-3.5 text-muted-color" />
+          </template>
         </Button>
       </div>
 
@@ -168,24 +170,30 @@ const isIndeterminate = computed(() => {
         <div class="flex items-center gap-1">
           <Button
             v-if="!hideRefresh"
+            v-tooltip.top="'Refresh'"
             severity="secondary"
             variant="text"
             size="small"
-            class="p-1"
+            class="p-1! w-7! h-7!"
             @click="emit('refresh')"
             :loading="loading"
           >
-            <RefreshCw class="w-4 h-4 text-muted-color" />
+            <template #icon>
+              <RefreshCw class="w-4 h-4 text-muted-color" />
+            </template>
           </Button>
           <Button
             v-if="!hideConfig"
+            v-tooltip.top="'Configure Columns'"
             severity="secondary"
             variant="text"
             size="small"
-            class="p-1"
+            class="p-1! w-7! h-7!"
             @click="toggleConfig"
           >
-            <Settings2 class="w-4 h-4 text-muted-color" />
+            <template #icon>
+              <Settings2 class="w-4 h-4 text-muted-color" />
+            </template>
           </Button>
           <Popover ref="configPopover">
             <div class="flex flex-col gap-2 p-3 min-w-48 text-primary">
