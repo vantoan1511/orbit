@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCluster } from '@/composables/useCluster'
-import { Cog, Compass, FolderOpen, Layers, Lock } from '@lucide/vue'
+import { Cog, Compass, FolderOpen, Layers, Lock, Plus } from '@lucide/vue'
 
 const { handleAddCluster } = useCluster()
 
@@ -13,102 +13,100 @@ const quickStartSteps = [
   {
     icon: Layers,
     step: '2. Select a Cluster',
-    description: 'Choose a cluster from the list to make it active.'
+    description: 'Choose a cluster from the sidebar to activate and monitor it.'
   },
   {
     icon: Compass,
     step: '3. Explore Resources',
-    description: 'Browse and monitor workloads, services, pods, and more.'
+    description: 'Browse workloads, pods, services, network policies, and storage.'
   },
   {
     icon: Cog,
-    step: '4. Manage with Ease',
-    description: 'Edit configurations, view logs, and manage your cluster.'
+    step: '4. Inspect & Manage',
+    description: 'View real-time logs, edit configurations, scale replicas, and track events.'
   }
 ]
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-y-auto">
-    <!-- Hero section -->
-    <div
-      class="flex flex-col items-center justify-center flex-1 gap-8 text-center px-8 py-12 select-none min-h-130"
-    >
-      <!-- Animated orbit logo -->
-      <div class="relative w-28 h-28 flex items-center justify-center">
-        <img src="/logo.png" alt="Orbit" class="w-14 h-14 object-contain relative z-10" />
-      </div>
-
-      <!-- Headline -->
-      <div class="flex flex-col gap-2 max-w-md">
-        <h1 class="text-3xl font-bold tracking-tight text-primary font-ui">Welcome to Orbit</h1>
-        <p class="text-sm text-muted-color leading-relaxed">
-          Orbit helps you explore, monitor, and manage<br />
-          your Kubernetes clusters from a single, intuitive interface.
-        </p>
-      </div>
-
-      <!-- Tip card -->
+  <div class="max-w-4xl mx-auto flex flex-col gap-8 select-none py-6">
+    <!-- Header / Branding -->
+    <div class="flex items-center gap-3.5">
       <div
-        class="flex items-start gap-3 px-6 py-4 rounded-xl border border-(--border) bg-(--bg-card) max-w-md w-full text-left"
+        class="w-9 h-9 rounded-lg bg-(--bg-card) border border-(--border) flex items-center justify-center shrink-0"
       >
-        <span class="text-xl leading-none mt-0.5">👈</span>
-        <div class="flex flex-col gap-1">
-          <span class="text-sm font-semibold text-primary"
-            >Click on a cluster to start browsing</span
-          >
-          <span class="text-xs text-muted-color">
-            Select a cluster from the list on the left to view its overview and start managing your
-            resources.
+        <img src="/logo.png" alt="Orbit" class="w-5 h-5 object-contain" />
+      </div>
+      <div class="flex flex-col">
+        <h1 class="text-xl font-bold tracking-tight text-primary font-ui">Orbit</h1>
+        <p class="text-xs text-muted-color">Lightweight, native desktop Kubernetes dashboard</p>
+      </div>
+    </div>
+
+    <!-- Main Content: 2-column asymmetric layout (IDE / VS Code style) -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+      <!-- Left Column: Start Actions (col-span-5) -->
+      <div class="md:col-span-5 flex flex-col gap-6">
+        <div class="flex flex-col gap-3">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-color">Start</h2>
+          <div class="flex flex-col gap-2">
+            <Button
+              id="welcome-add-cluster-btn"
+              severity="secondary"
+              size="small"
+              class="justify-start text-xs font-medium py-2 px-3 gap-2"
+              @click="handleAddCluster"
+            >
+              <Plus class="w-4 h-4 text-primary" />
+              <span>Add Cluster</span>
+            </Button>
+          </div>
+          <p class="text-xs text-muted-color leading-relaxed">
+            Connect using your local kubeconfig or specify a cluster endpoint.
+          </p>
+        </div>
+
+        <!-- Tip / Note -->
+        <div
+          class="p-3.5 rounded-lg bg-(--bg-hover)/30 text-xs text-muted-color flex flex-col gap-1.5"
+        >
+          <span class="font-medium text-primary">Already configured?</span>
+          <span class="leading-relaxed">
+            Select an existing cluster from the sidebar on the left to start inspecting resources.
           </span>
         </div>
       </div>
 
-      <!-- Or divider -->
-      <div class="flex items-center gap-4 text-muted-color text-xs w-72">
-        <div class="flex-1 h-px bg-(--border)"></div>
-        <span>or</span>
-        <div class="flex-1 h-px bg-(--border)"></div>
-      </div>
-
-      <!-- Add Cluster CTA -->
-      <div class="flex flex-col items-center gap-3">
-        <Button
-          fluid
-          id="welcome-add-cluster-btn"
-          icon="pi pi-plus"
-          label="Add Cluster"
-          @click="handleAddCluster"
-        />
-        <p class="text-sm font-semibold text-muted-color">
-          No clusters yet? Add one to get started.
-        </p>
-        <p class="text-xs text-muted-color max-w-xs">
-          You can add a cluster using your kubeconfig file or connect to a remote cluster.
-        </p>
-      </div>
-    </div>
-
-    <!-- Quick start section -->
-    <div class="border-t border-(--border) bg-(--bg-card) px-8 py-6 select-none">
-      <h2 class="text-sm font-semibold text-primary mb-5">Quick start</h2>
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-6">
-        <div v-for="item in quickStartSteps" :key="item.step" class="flex flex-col gap-2">
-          <component :is="item.icon" class="w-5 h-5 text-primary" />
-          <span class="text-sm font-semibold text-primary">{{ item.step }}</span>
-          <p class="text-xs text-muted-color leading-relaxed">{{ item.description }}</p>
+      <!-- Right Column: Walkthrough / Quick Start (col-span-7) -->
+      <div class="md:col-span-7 flex flex-col gap-3">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-muted-color">Walkthrough</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div
+            v-for="item in quickStartSteps"
+            :key="item.step"
+            class="p-3.5 rounded-lg bg-(--bg-hover)/20 hover:bg-(--bg-hover)/40 transition-colors flex flex-col gap-2"
+          >
+            <div class="flex items-center gap-2">
+              <component :is="item.icon" class="w-4 h-4 shrink-0 text-primary" />
+              <span class="text-xs font-semibold text-primary">{{ item.step }}</span>
+            </div>
+            <p class="text-xs text-muted-color leading-relaxed">
+              {{ item.description }}
+            </p>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Privacy footer -->
+    <!-- Security / Local-first note footer -->
     <div
-      class="border-t border-(--border) px-8 py-3 flex items-center justify-center gap-2 text-xs text-muted-color select-none"
+      class="pt-6 border-t border-(--border) flex items-center justify-between text-xs text-muted-color"
     >
-      <Lock class="w-3.5 h-3.5" />
-      <span>
-        Your data stays local. Orbit doesn't collect or share any of your cluster information.
-      </span>
+      <div class="flex items-center gap-2">
+        <Lock class="w-3.5 h-3.5" />
+        <span>Local-first architecture. Orbit operates entirely on your machine.</span>
+      </div>
+      <span class="font-mono text-[11px] opacity-75">Orbit Desktop</span>
     </div>
   </div>
 </template>
