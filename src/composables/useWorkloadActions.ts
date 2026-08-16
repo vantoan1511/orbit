@@ -75,7 +75,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // View Details
-    if (!['PersistentVolume', 'PersistentVolumeClaim'].includes(resourceKind)) {
+    if (!['PersistentVolume', 'PersistentVolumeClaim', 'Node'].includes(resourceKind)) {
       items.push({
         label: 'View Details',
         icon: 'pi pi-info',
@@ -323,7 +323,14 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       })
     }
 
-    return items
+    return items.filter((item, index, arr) => {
+      if (item.separator) {
+        if (index === 0 || index === arr.length - 1 || arr[index - 1]?.separator) {
+          return false
+        }
+      }
+      return true
+    })
   })
 
   return { actionMenuItems }
