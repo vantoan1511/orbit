@@ -53,11 +53,12 @@ const newPresetName = props.highlighting.newPresetName
             severity="danger"
             variant="text"
             size="small"
+            class="w-8! h-8! p-0! shrink-0"
             v-tooltip="'Delete this custom preset'"
             @click="highlighting.deleteCustomPreset"
           >
             <template #icon>
-              <Trash2 class="w-3.5 h-3.5" />
+              <Trash2 class="w-4 h-4" />
             </template>
           </Button>
         </div>
@@ -70,6 +71,7 @@ const newPresetName = props.highlighting.newPresetName
             class="text-xs w-40"
           />
           <Button
+            label="Save"
             size="small"
             severity="secondary"
             :disabled="
@@ -80,7 +82,6 @@ const newPresetName = props.highlighting.newPresetName
             <template #icon>
               <Save class="w-3.5 h-3.5 mr-1" />
             </template>
-            <span>Save</span>
           </Button>
         </div>
       </div>
@@ -161,7 +162,7 @@ const newPresetName = props.highlighting.newPresetName
             @click="highlighting.deleteCustomRule(rule.id)"
           >
             <template #icon>
-              <Trash2 class="w-3.5 h-3.5" />
+              <Trash2 class="w-4 h-4" />
             </template>
           </Button>
         </div>
@@ -171,11 +172,16 @@ const newPresetName = props.highlighting.newPresetName
     <!-- Dialog Footer -->
     <template #footer>
       <div class="flex justify-between items-center w-full">
-        <Button size="small" severity="secondary" variant="text" @click="highlighting.addRule">
+        <Button
+          label="Add Rule"
+          size="small"
+          severity="secondary"
+          variant="text"
+          @click="highlighting.addRule"
+        >
           <template #icon>
             <Plus class="w-3.5 h-3.5 mr-1" />
           </template>
-          <span>Add Rule</span>
         </Button>
         <Button label="Close" size="small" severity="secondary" @click="visible = false" />
       </div>
