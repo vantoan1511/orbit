@@ -1,49 +1,126 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
 import { Download, Gift, Loader2, X } from '@lucide/vue'
+import { os } from '@/services/nativeService'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import { computed } from 'vue'
 
 const updaterStore = useUpdaterStore()
 
-interface ParsedNoteBlock {
+type NoteSegmentType = 'text' | 'bold' | 'author' | 'pr' | 'link'
+
+interface NoteSegment {
+  type: NoteSegmentType
   text: string
+  url?: string
+}
+
+interface ParsedNoteBlock {
+  type: 'header' | 'list-item' | 'empty' | 'paragraph'
+  segments: NoteSegment[]
   class: string
+}
+
+function parseSegments(text: string): NoteSegment[] {
+  const segments: NoteSegment[] = []
+  // Matches:
+  // 1,2: Bold (**text**)
+  // 3,4: PR URL (https://github.com/.../pull/123)
+  // 5,6: Compare URL (https://github.com/.../compare/v0.5.1...v0.6.0)
+  // 7,8,9: Markdown Link ([label](url))
+  // 10: Author (@username)
+  // 11: General URL
+  const regex =
+    /(\*\*([^*]+)\*\*)|(https:\/\/github\.com\/[\w-]+\/[\w-]+\/pull\/(\d+))|(https:\/\/github\.com\/[\w-]+\/[\w-]+\/compare\/([^\s)]+))|(\[([^\]]+)\]\(([^)]+)\))|(@[\w-]+)|(https?:\/\/[^\s)]+)/g
+
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: 'text', text: text.substring(lastIndex, match.index) })
+    }
+
+    if (match[1] && match[2]) {
+      segments.push({ type: 'bold', text: match[2] })
+    } else if (match[3] && match[4]) {
+      segments.push({ type: 'pr', text: '#' + match[4], url: match[3] })
+    } else if (match[5] && match[6]) {
+      segments.push({ type: 'link', text: match[6], url: match[5] })
+    } else if (match[7] && match[8]) {
+      segments.push({ type: 'link', text: match[8], url: match[9] })
+    } else if (match[10]) {
+      segments.push({ type: 'author', text: match[10] })
+    } else if (match[11]) {
+      segments.push({ type: 'link', text: match[11], url: match[11] })
+    }
+
+    lastIndex = regex.lastIndex
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ type: 'text', text: text.substring(lastIndex) })
+  }
+
+  return segments
 }
 
 const parsedNotes = computed<ParsedNoteBlock[]>(() => {
   const notes = updaterStore.manifest?.release_notes
   if (!notes) return []
 
-  return notes.split('\n').map((line) => {
-    let trimmed = line.trim()
-    // Strip standard markdown links [label](url) -> label
-    trimmed = trimmed.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+  const cleanedNotes = notes.replace(/<!--[\s\S]*?-->/g, '')
 
-    if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
-      return {
-        text: trimmed.replace(/^#+\s*/, ''),
-        class: 'font-bold text-primary text-xs mt-3 first:mt-0 pb-1 border-b border-(--border)'
+  return cleanedNotes
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim()
+
+      if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+        return {
+          type: 'header' as const,
+          segments: [{ type: 'text' as const, text: trimmed.replace(/^#+\s*/, '') }],
+          class: 'font-bold text-primary text-xs mt-3 first:mt-0 pb-1 border-b border-(--border)'
+        }
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const content = trimmed.substring(2).trim()
+        return {
+          type: 'list-item' as const,
+          segments: parseSegments(content),
+          class: 'pl-2 text-secondary leading-snug'
+        }
+      } else if (trimmed.length === 0) {
+        return {
+          type: 'empty' as const,
+          segments: [],
+          class: 'h-1.5'
+        }
+      } else {
+        return {
+          type: 'paragraph' as const,
+          segments: parseSegments(trimmed),
+          class: 'text-secondary leading-normal'
+        }
       }
-    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      return {
-        text: '• ' + trimmed.substring(2),
-        class: 'pl-2 text-secondary leading-snug'
+    })
+    .filter((block, idx, arr) => {
+      if (block.type === 'empty') {
+        return idx > 0 && arr[idx - 1]?.type !== 'empty' && idx < arr.length - 1
       }
-    } else if (trimmed.length === 0) {
-      return {
-        text: '',
-        class: 'h-1.5'
-      }
-    } else {
-      return {
-        text: trimmed,
-        class: 'text-secondary leading-normal'
-      }
-    }
-  })
+      return true
+    })
 })
+
+const openUrl = async (url?: string) => {
+  if (url) {
+    try {
+      await os.open(url)
+    } catch (e) {
+      console.error('Failed to open URL', e)
+    }
+  }
+}
 </script>
 
 <template>
@@ -88,7 +165,58 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
         >
           <template v-if="parsedNotes.length > 0">
             <div v-for="(block, index) in parsedNotes" :key="index" :class="block.class">
-              {{ block.text }}
+              <template v-if="block.type === 'header'">
+                {{ block.segments[0]?.text }}
+              </template>
+              <template v-else-if="block.type === 'list-item'">
+                <div class="flex items-start">
+                  <span class="mr-1.5 shrink-0 select-none">•</span>
+                  <div class="leading-relaxed">
+                    <template v-for="(segment, sIndex) in block.segments" :key="sIndex">
+                      <span v-if="segment.type === 'text'">{{ segment.text }}</span>
+                      <span v-else-if="segment.type === 'bold'" class="font-semibold text-primary">
+                        {{ segment.text }}
+                      </span>
+                      <span
+                        v-else-if="segment.type === 'author'"
+                        class="inline-block px-1 rounded border border-(--warning)/20 bg-(--warning-soft) text-(--warning) text-[10px] font-mono leading-tight whitespace-nowrap mx-0.5"
+                      >
+                        {{ segment.text }}
+                      </span>
+                      <a
+                        v-else-if="segment.type === 'pr' || segment.type === 'link'"
+                        href="#"
+                        class="inline-block px-1 rounded border border-(--accent)/20 bg-(--accent-soft) text-(--accent) text-[10px] font-mono leading-tight whitespace-nowrap mx-0.5 cursor-pointer hover:bg-(--accent)/20 transition-colors"
+                        @click.prevent="openUrl(segment.url)"
+                      >
+                        {{ segment.text }}
+                      </a>
+                    </template>
+                  </div>
+                </div>
+              </template>
+              <template v-else-if="block.type === 'paragraph'">
+                <template v-for="(segment, sIndex) in block.segments" :key="sIndex">
+                  <span v-if="segment.type === 'text'">{{ segment.text }}</span>
+                  <span v-else-if="segment.type === 'bold'" class="font-semibold text-primary">
+                    {{ segment.text }}
+                  </span>
+                  <span
+                    v-else-if="segment.type === 'author'"
+                    class="inline-block px-1 rounded border border-(--warning)/20 bg-(--warning-soft) text-(--warning) text-[10px] font-mono leading-tight whitespace-nowrap mx-0.5"
+                  >
+                    {{ segment.text }}
+                  </span>
+                  <a
+                    v-else-if="segment.type === 'pr' || segment.type === 'link'"
+                    href="#"
+                    class="inline-block px-1 rounded border border-(--accent)/20 bg-(--accent-soft) text-(--accent) text-[10px] font-mono leading-tight whitespace-nowrap mx-0.5 cursor-pointer hover:bg-(--accent)/20 transition-colors"
+                    @click.prevent="openUrl(segment.url)"
+                  >
+                    {{ segment.text }}
+                  </a>
+                </template>
+              </template>
             </div>
           </template>
           <div v-else class="text-muted-color italic text-xs py-2">
@@ -132,7 +260,11 @@ const parsedNotes = computed<ParsedNoteBlock[]>(() => {
         <Button
           severity="primary"
           size="small"
-          :label="updaterStore.isDownloading ? `Downloading... ${updaterStore.downloadProgress}%` : 'Install'"
+          :label="
+            updaterStore.isDownloading
+              ? `Downloading... ${updaterStore.downloadProgress}%`
+              : 'Install'
+          "
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.applyUpdate()"
         >
