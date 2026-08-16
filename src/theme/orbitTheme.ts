@@ -346,6 +346,11 @@ const NoirPreset: Preset = {
       content: {
         gap: '0.75rem'
       }
+    },
+    tooltip: {
+      root: {
+        padding: '0.25rem 0.5rem'
+      }
     }
   }
 }
