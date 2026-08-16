@@ -57,6 +57,9 @@ const {
   isFollowing,
   filteredLogLines,
   virtualScrollerRef,
+  isAtBottom,
+  onScroll,
+  scrollToBottom,
   clearLogs,
   downloadLogs
 } = useLogStream({
@@ -182,7 +185,7 @@ const LOG_ITEM_HEIGHT = 28
 
     <!-- Console Viewer -->
     <div
-      class="flex-1 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed min-h-0 selection:bg-surface-200 dark:selection:bg-primary-700 h-full overflow-hidden"
+      class="flex-1 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed min-h-0 selection:bg-surface-200 dark:selection:bg-primary-700 h-full overflow-hidden relative"
     >
       <div
         v-if="filteredLogLines.length === 0"
@@ -196,6 +199,7 @@ const LOG_ITEM_HEIGHT = 28
         :items="filteredLogLines"
         :itemSize="LOG_ITEM_HEIGHT"
         class="h-full w-full"
+        @scroll="onScroll"
       >
         <template #item="{ item: line, options }">
           <div
@@ -222,6 +226,27 @@ const LOG_ITEM_HEIGHT = 28
           </div>
         </template>
       </VirtualScroller>
+
+      <!-- Scroll to Bottom Button -->
+      <Transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-2"
+      >
+        <Button
+          v-if="!isAtBottom && filteredLogLines.length > 0"
+          icon="pi pi-arrow-down"
+          rounded
+          class="absolute bottom-6 left-1/2 -translate-x-1/2 shadow-lg z-10"
+          size="small"
+          severity="secondary"
+          title="Scroll to bottom"
+          @click="scrollToBottom"
+        />
+      </Transition>
     </div>
 
     <!-- Highlight Rules Config Dialog -->
