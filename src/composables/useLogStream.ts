@@ -171,6 +171,24 @@ export function useLogStream(options: {
     logLines.value = []
   }
 
+  const isCopied = ref<boolean>(false)
+
+  const copyLogs = async () => {
+    const content = filteredLogLines.value
+      .map((l) => `${l.timestamp ? l.timestamp + ' ' : ''}[${l.pod}/${l.container}] ${l.text}`)
+      .join('\n')
+
+    try {
+      await navigator.clipboard.writeText(content)
+      isCopied.value = true
+      setTimeout(() => {
+        isCopied.value = false
+      }, 1500)
+    } catch (err) {
+      console.error('Failed to copy logs to clipboard:', err)
+    }
+  }
+
   const downloadLogs = () => {
     const content = filteredLogLines.value
       .map((l) => `${l.timestamp ? l.timestamp + ' ' : ''}[${l.pod}/${l.container}] ${l.text}`)
@@ -232,6 +250,8 @@ export function useLogStream(options: {
     onScroll,
     scrollToBottom,
     clearLogs,
-    downloadLogs
+    downloadLogs,
+    copyLogs,
+    isCopied
   }
 }
