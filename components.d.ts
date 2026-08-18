@@ -25,6 +25,7 @@ declare module 'vue' {
     Button: typeof import('primevue/button')['default']
     Card: typeof import('primevue/card')['default']
     CloneIngressDialog: typeof import('./src/components/shared/CloneIngressDialog.vue')['default']
+    Column: typeof import('primevue/column')['default']
     ConfigDataTable: typeof import('./src/components/config/ConfigDataTable.vue')['default']
     ConfigDetailsDrawer: typeof import('./src/components/config/ConfigDetailsDrawer.vue')['default']
     ConfigMetricsCards: typeof import('./src/components/config/ConfigMetricsCards.vue')['default']

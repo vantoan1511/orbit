@@ -61,7 +61,9 @@ const {
   onScroll,
   scrollToBottom,
   clearLogs,
-  downloadLogs
+  downloadLogs,
+  copyLogs,
+  isCopied
 } = useLogStream({
   selectedNamespace,
   selectedWorkloadName,
@@ -161,6 +163,14 @@ const LOG_ITEM_HEIGHT = 28
               variant="text"
               @click="showRulesDialog = true"
               title="Highlight Rules"
+            />
+            <Button
+              :icon="isCopied ? 'pi pi-check' : 'pi pi-copy'"
+              size="small"
+              variant="text"
+              :disabled="logLines.length <= 0"
+              @click="copyLogs"
+              title="Copy Logs"
             />
             <Button
               icon="pi pi-download"
