@@ -147,17 +147,36 @@ const handleActiveClusterChanged = (payload: { active_cluster_id: string | null 
   k8sStore.setActiveClusterId(payload.active_cluster_id)
 }
 
+let lastConnectionErrorTime = 0
+
 const handleErrorOccurred = (payload: { message: string }) => {
   k8sStore.resetAllLoading()
+
+  const isConnectionError =
+    payload.message.includes('client error (Connect)') ||
+    payload.message.includes('error trying to connect') ||
+    payload.message.toLowerCase().includes('connection refused')
+
+  let displayMessage = payload.message
+
+  if (isConnectionError) {
+    const now = Date.now()
+    if (now - lastConnectionErrorTime < 5000) {
+      return // Ignore duplicate connection error within 5 seconds
+    }
+    lastConnectionErrorTime = now
+    displayMessage = 'Connection not ready. Please verify your cluster status.'
+  }
+
   toast.add({
     severity: 'error',
     summary: 'Error',
-    detail: payload.message,
+    detail: displayMessage,
     life: 5000
   })
   notificationStore.addNotification({
     title: 'Error',
-    message: payload.message,
+    message: displayMessage,
     severity: 'error',
     category: 'system'
   })
