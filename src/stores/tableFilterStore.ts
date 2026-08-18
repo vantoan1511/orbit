@@ -61,7 +61,6 @@ export const useTableFilterStore = defineStore('tableFilter', () => {
   }
 
   return {
-    filters,
     getFilters,
     setFilter,
     setExtraFilter,

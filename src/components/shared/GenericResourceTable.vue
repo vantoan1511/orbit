@@ -103,9 +103,7 @@ const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources 
 const storedStatus = filterStore.getFilters(resolvedStoreKey).selectedStatus
 const defaultStatus: string =
   props.statuses.length > 0 ? (props.statuses[0] ?? 'All Statuses') : 'All Statuses'
-const selectedStatus = ref<string>(
-  storedStatus && storedStatus !== 'All Statuses' ? storedStatus : defaultStatus
-)
+const selectedStatus = ref<string>(storedStatus || defaultStatus)
 
 watch(selectedStatus, (val) => {
   filterStore.setFilter(resolvedStoreKey, 'selectedStatus', val)
@@ -192,7 +190,7 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 
 // Rows per page persistence
 const storedRows = filterStore.getFilters(resolvedStoreKey).rows
-const rowsPerPage = ref<number>(storedRows || 25)
+const rowsPerPage = ref<number>(storedRows ?? 25)
 
 watch(rowsPerPage, (val) => {
   filterStore.setFilter(resolvedStoreKey, 'rows', val)

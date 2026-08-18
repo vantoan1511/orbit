@@ -268,11 +268,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     if (activeClusterId.value === id) return
     activeClusterId.value = id
     // Clear filters when switching clusters
-    try {
-      useTableFilterStore().resetAll()
-    } catch {
-      // Ignored if Pinia not active yet
-    }
+    useTableFilterStore().resetAll()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
     deployments.value = []
