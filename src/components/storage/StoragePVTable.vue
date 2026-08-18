@@ -2,11 +2,14 @@
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { AlertCircle } from '@lucide/vue'
 import Column from 'primevue/column'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const filterStore = useTableFilterStore()
+const STORE_KEY = 'persistentvolume'
 
 const columns = [
   { field: 'name', header: 'Name', visible: true },
@@ -18,7 +21,10 @@ const columns = [
   { field: 'age', header: 'Age', visible: true }
 ]
 
-const selectedStorageClass = ref('All Storage Classes')
+const selectedStorageClass = computed({
+  get: () => filterStore.getExtraFilter(STORE_KEY, 'storageClass', 'All Storage Classes'),
+  set: (val: string) => filterStore.setExtraFilter(STORE_KEY, 'storageClass', val)
+})
 const statuses = ['All Statuses', 'Bound', 'Available', 'Released', 'Failed']
 
 const storageClasses = computed(() => {

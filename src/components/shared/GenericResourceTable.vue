@@ -27,6 +27,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { computed, ref, toRef, watch } from 'vue'
 
 const selection = defineModel<T[]>('selection', { default: () => [] })
@@ -38,6 +39,7 @@ const props = withDefaults(
     searchFields?: string[]
     statuses?: string[]
     kind?: string
+    storeKey?: string
     searchPlaceholder?: string
     emptyMessage?: string
     reportTemplate?: string
@@ -85,17 +87,61 @@ const emit = defineEmits<{
 }>()
 
 const k8sStore = useKubernetesStore()
-
-// Column visibility
-const { tableColumns, visibleCols } = useTableColumns(props.initialColumns)
+const filterStore = useTableFilterStore()
 
 // Resource filtering (search, namespace, system namespaces)
+const resolvedStoreKey = (props.storeKey ?? props.kind ?? 'deployment').toLowerCase()
+
+// Column visibility
+const { tableColumns, visibleCols } = useTableColumns(props.initialColumns, resolvedStoreKey)
+
 const dataRef = toRef(props, 'data')
 const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(dataRef, props.searchFields as (keyof T)[])
+  useResourceFilters(dataRef, props.searchFields as (keyof T)[], resolvedStoreKey)
 
 // Status filtering
-const selectedStatus = ref(props.statuses.length > 0 ? props.statuses[0] : 'All Statuses')
+const storedStatus = filterStore.getFilters(resolvedStoreKey).selectedStatus
+const defaultStatus: string =
+  props.statuses.length > 0 ? (props.statuses[0] ?? 'All Statuses') : 'All Statuses'
+const selectedStatus = ref<string>(storedStatus || defaultStatus)
+
+watch(selectedStatus, (val) => {
+  filterStore.setFilter(resolvedStoreKey, 'selectedStatus', val)
+})
+
+// Row selection persistence
+const storedRowKeys = filterStore.getFilters(resolvedStoreKey).selectedRowKeys
+if (storedRowKeys.length > 0) {
+  const matched = props.data.filter((item) => storedRowKeys.includes(item.name))
+  if (matched.length > 0) {
+    selection.value = matched
+  }
+}
+
+watch(
+  () => props.data,
+  (newData) => {
+    const keys = filterStore.getFilters(resolvedStoreKey).selectedRowKeys
+    if (keys.length > 0 && selection.value.length === 0) {
+      const matched = newData.filter((item) => keys.includes(item.name))
+      if (matched.length > 0) {
+        selection.value = matched
+      }
+    }
+  }
+)
+
+watch(
+  selection,
+  (val) => {
+    filterStore.setFilter(
+      resolvedStoreKey,
+      'selectedRowKeys',
+      val.map((item) => item.name)
+    )
+  },
+  { deep: true }
+)
 
 watch(selectedNamespace, (newNs) => {
   const ns = newNs.length === 1 ? newNs[0] : undefined
@@ -142,6 +188,14 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
   }
 })
 
+// Rows per page persistence
+const storedRows = filterStore.getFilters(resolvedStoreKey).rows
+const rowsPerPage = ref<number>(storedRows ?? 25)
+
+watch(rowsPerPage, (val) => {
+  filterStore.setFilter(resolvedStoreKey, 'rows', val)
+})
+
 // Bulk actions wiring
 const { bulkActions } = useWorkloadBulkActions(selection, {
   kind: props.kind,
@@ -157,6 +211,7 @@ const { bulkActions } = useWorkloadBulkActions(selection, {
     v-model:selection="selection"
     v-model:searchQuery="searchQuery"
     v-model:columns="tableColumns"
+    v-model:rows="rowsPerPage"
     :searchPlaceholder="searchPlaceholder"
     :emptyMessage="emptyMessage"
     :reportTemplate="reportTemplate"

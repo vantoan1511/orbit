@@ -22,6 +22,7 @@ import type {
   StatefulSetInfo,
   StorageClassInfo
 } from '@/types/kubernetes'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { defineStore } from 'pinia'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 
@@ -266,6 +267,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   function setActiveClusterId(id: string | null) {
     if (activeClusterId.value === id) return
     activeClusterId.value = id
+    // Clear filters when switching clusters
+    useTableFilterStore().resetAll()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
     deployments.value = []
