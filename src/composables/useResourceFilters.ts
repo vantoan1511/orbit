@@ -1,4 +1,5 @@
-import { computed, ref, type Ref } from 'vue'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { computed, ref, watch, type Ref } from 'vue'
 
 export interface ResourceItem {
   name: string
@@ -8,11 +9,31 @@ export interface ResourceItem {
 
 export function useResourceFilters<T extends ResourceItem>(
   resources: Ref<T[]>,
-  searchFields: (keyof T)[] = ['name']
+  searchFields: (keyof T)[] = ['name'],
+  storeKey?: string
 ) {
-  const searchQuery = ref('')
-  const selectedNamespace = ref<string[]>([])
-  const showSystemNamespaces = ref(false)
+  const filterStore = storeKey ? useTableFilterStore() : null
+  const stored = storeKey && filterStore ? filterStore.getFilters(storeKey) : null
+
+  const searchQuery = ref(stored?.searchQuery ?? '')
+  const selectedNamespace = ref<string[]>(stored ? [...stored.selectedNamespace] : [])
+  const showSystemNamespaces = ref(stored?.showSystemNamespaces ?? false)
+
+  if (storeKey && filterStore) {
+    watch(searchQuery, (val) => {
+      filterStore.setFilter(storeKey, 'searchQuery', val)
+    })
+    watch(
+      selectedNamespace,
+      (val) => {
+        filterStore.setFilter(storeKey, 'selectedNamespace', [...val])
+      },
+      { deep: true }
+    )
+    watch(showSystemNamespaces, (val) => {
+      filterStore.setFilter(storeKey, 'showSystemNamespaces', val)
+    })
+  }
 
   const filteredResources = computed(() => {
     return resources.value.filter((item) => {

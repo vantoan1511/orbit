@@ -4,8 +4,8 @@ import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { FileText, Lock } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
-import Column from 'primevue/column'
-import { computed, ref, watch } from 'vue'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { computed } from 'vue'
 import ConfigDetailsDrawer from './ConfigDetailsDrawer.vue'
 
 const props = defineProps<{
@@ -13,6 +13,7 @@ const props = defineProps<{
 }>()
 
 const k8sStore = useKubernetesStore()
+const filterStore = useTableFilterStore()
 const { configMaps, secrets } = storeToRefs(k8sStore)
 
 const columns = [
@@ -32,15 +33,12 @@ const columnsForConfig = computed(() => {
   return columns
 })
 
-const selectedLabel = ref('All Labels')
+const filterKey = computed(() => (props.activeTab === 'configmaps' ? 'configmap' : 'secret'))
 
-// Reset filter on tab switch
-watch(
-  () => props.activeTab,
-  () => {
-    selectedLabel.value = 'All Labels'
-  }
-)
+const selectedLabel = computed({
+  get: () => filterStore.getExtraFilter(filterKey.value, 'label', 'All Labels'),
+  set: (val: string) => filterStore.setExtraFilter(filterKey.value, 'label', val)
+})
 
 const labels = computed(() => {
   const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
