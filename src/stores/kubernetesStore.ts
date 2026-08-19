@@ -26,6 +26,22 @@ import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { defineStore } from 'pinia'
 import { computed, onScopeDispose, ref, watch } from 'vue'
 
+// Helpers for Kubernetes quantity strings emitted by the Metrics Server.
+function parseCpuToCores(q: string): number {
+  if (q.endsWith('m')) return parseFloat(q) / 1000
+  if (q.endsWith('n')) return parseFloat(q) / 1_000_000_000
+  if (q.endsWith('u')) return parseFloat(q) / 1_000_000
+  return parseFloat(q) || 0
+}
+
+function parseMemToGiB(q: string): number {
+  if (q.endsWith('Ki')) return parseFloat(q) / (1024 * 1024)
+  if (q.endsWith('Mi')) return parseFloat(q) / 1024
+  if (q.endsWith('Gi')) return parseFloat(q)
+  if (q.endsWith('Ti')) return parseFloat(q) * 1024
+  return 0
+}
+
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
   const isAppLoading = ref(true)
@@ -80,10 +96,15 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   const cpuHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
   const memHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
+  const hasReceivedMetrics = ref(false)
 
+  // Provides history snapshots from node request-based data when the Metrics Server is
+  // absent. When the Metrics Server is active, onPodMetricsUpdated is the primary driver.
   watch(
     nodes,
     (newNodes: NodeInfo[]) => {
+      if (hasReceivedMetrics.value) return
+
       let totalCpu = 0
       let usedCpu = 0
       let totalMem = 0
@@ -307,6 +328,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     namespacesLoading.value = true
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
+    hasReceivedMetrics.value = false
 
     // Load data for the newly selected cluster
     if (id !== null) {
@@ -538,6 +560,50 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
+  function onNodeMetricsUpdated(payload: {
+    metrics: Array<{ name: string; cpu: string; memory: string }>
+  }) {
+    hasReceivedMetrics.value = true
+
+    for (const m of payload.metrics) {
+      const node = nodes.value.find((n) => n.name === m.name)
+      if (node) {
+        node.cpuUsed = m.cpu
+        node.memUsed = m.memory
+
+        const totalCpu = parseFloat(node.cpuTotal || '0')
+        const totalMem = parseFloat(node.memTotal || '0')
+        const usedCpu = parseFloat(m.cpu || '0')
+        const usedMem = parseFloat(m.memory || '0')
+
+        node.cpuPct = totalCpu > 0 ? (usedCpu / totalCpu) * 100 : 0
+        node.memPct = totalMem > 0 ? (usedMem / totalMem) * 100 : 0
+      }
+    }
+
+    // Aggregate cluster-wide CPU and memory usage from real node metrics
+    let totalCpuCores = 0
+    let totalUsedCpuCores = 0
+    let totalMemGiB = 0
+    let totalUsedMemGiB = 0
+
+    for (const node of nodes.value) {
+      totalCpuCores += parseFloat(node.cpuTotal || '0')
+      totalUsedCpuCores += parseFloat(node.cpuUsed || '0')
+      totalMemGiB += parseFloat(node.memTotal || '0')
+      totalUsedMemGiB += parseFloat(node.memUsed || '0')
+    }
+
+    const cpuPct = totalCpuCores > 0 ? Math.min((totalUsedCpuCores / totalCpuCores) * 100, 100) : 0
+    const memPct = totalMemGiB > 0 ? Math.min((totalUsedMemGiB / totalMemGiB) * 100, 100) : 0
+
+    // Push new data points into the sliding-window history for the dashboard charts.
+    cpuHistory.value.shift()
+    cpuHistory.value.push(cpuPct)
+    memHistory.value.shift()
+    memHistory.value.push(memPct)
+  }
+
   function onPodMetricsUpdated(payload: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
   }) {
@@ -548,14 +614,45 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         pod.memory = m.memory
       }
     }
+
+    // If node metrics are not available on this cluster, use pod metrics as fallback for history.
+    if (!hasReceivedMetrics.value) {
+      let totalUsedCpuCores = 0
+      let totalUsedMemGiB = 0
+
+      for (const m of payload.metrics) {
+        totalUsedCpuCores += parseCpuToCores(m.cpu)
+        totalUsedMemGiB += parseMemToGiB(m.memory)
+      }
+
+      const totalCpuCores = nodes.value.reduce(
+        (acc, node) => acc + parseFloat(node.cpuTotal || '0'),
+        0
+      )
+      const totalMemGiB = nodes.value.reduce(
+        (acc, node) => acc + parseFloat(node.memTotal || '0'),
+        0
+      )
+
+      const cpuPct =
+        totalCpuCores > 0 ? Math.min((totalUsedCpuCores / totalCpuCores) * 100, 100) : 0
+      const memPct = totalMemGiB > 0 ? Math.min((totalUsedMemGiB / totalMemGiB) * 100, 100) : 0
+
+      cpuHistory.value.shift()
+      cpuHistory.value.push(cpuPct)
+      memHistory.value.shift()
+      memHistory.value.push(memPct)
+    }
   }
 
   nativeEvents.on(OrbitEvents.ResourceUpdated, onResourceUpdated)
   nativeEvents.on(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
+  nativeEvents.on(OrbitEvents.NodeMetricsUpdated, onNodeMetricsUpdated)
 
   onScopeDispose(() => {
     nativeEvents.off(OrbitEvents.ResourceUpdated, onResourceUpdated)
     nativeEvents.off(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
+    nativeEvents.off(OrbitEvents.NodeMetricsUpdated, onNodeMetricsUpdated)
   })
 
   return {
