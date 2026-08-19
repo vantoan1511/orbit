@@ -294,9 +294,26 @@ import { highlightMatch } from '@/utils/text'
           ]"
         >
           <AccordionHeader
+            as="div"
             class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color flex justify-between items-center shrink-0 !rounded-none !border-none"
           >
-            <span>Recent</span>
+            <div class="flex items-center justify-between flex-1 mr-2">
+              <span>Recent</span>
+              <Button
+                v-if="logsStore.recentLogs.length > 0"
+                severity="secondary"
+                variant="text"
+                size="small"
+                class="w-6! h-6! p-0! shrink-0 text-muted-color hover:text-primary"
+                title="Clear recent logs"
+                aria-label="Clear recent logs"
+                @click.stop="logsStore.clearRecentLogs()"
+              >
+                <template #icon>
+                  <Trash2 class="w-3.5 h-3.5" />
+                </template>
+              </Button>
+            </div>
           </AccordionHeader>
           <AccordionContent
             class="p-0 flex-1 flex flex-col min-h-0"
@@ -329,19 +346,6 @@ import { highlightMatch } from '@/utils/text'
                       {{ log.namespace }} &bull; {{ log.container }}
                     </span>
                   </div>
-                </div>
-
-                <div v-if="logsStore.recentLogs.length > 0" class="p-1.5 flex justify-end">
-                  <Button
-                    severity="secondary"
-                    variant="text"
-                    size="small"
-                    class="text-xs h-6"
-                    @click="logsStore.clearRecentLogs()"
-                  >
-                    <Trash2 class="w-3 h-3 mr-1" />
-                    Clear Recent
-                  </Button>
                 </div>
               </div>
             </div>
