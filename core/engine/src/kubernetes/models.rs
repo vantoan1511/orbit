@@ -372,3 +372,11 @@ pub struct PodMetricItem {
     pub cpu: String,
     pub memory: String,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeMetricItem {
+    pub name: String,
+    pub cpu: String,
+    pub memory: String,
+}

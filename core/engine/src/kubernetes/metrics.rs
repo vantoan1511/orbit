@@ -10,8 +10,8 @@ use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::models::PodMetricItem;
 use crate::kubernetes::nodes::{parse_cpu_quantity, parse_memory_quantity};
 
-/// Polls PodMetrics from the Metrics Server every 15 seconds and broadcasts
-/// the aggregated CPU/memory usage per pod via the `podMetricsUpdated` event.
+/// Polls NodeMetrics and PodMetrics from the Metrics Server every 15 seconds
+/// and broadcasts them via `nodeMetricsUpdated` and `podMetricsUpdated` events.
 /// Uses kube's dynamic API — no extra crate needed, and handles missing Metrics
 /// Server gracefully.
 /// The loop exits cleanly when `cancel_rx` receives `true`.
@@ -21,13 +21,53 @@ pub async fn poll_pod_metrics(
     token: String,
     mut cancel_rx: tokio::sync::watch::Receiver<bool>,
 ) {
-    let gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "PodMetrics");
-    let ar = ApiResource::from_gvk(&gvk);
-    let api: Api<DynamicObject> = Api::all_with(client, &ar);
+    let node_gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "NodeMetrics");
+    let node_ar = ApiResource::from_gvk(&node_gvk);
+    let node_api: Api<DynamicObject> = Api::all_with(client.clone(), &node_ar);
+
+    let pod_gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "PodMetrics");
+    let pod_ar = ApiResource::from_gvk(&pod_gvk);
+    let pod_api: Api<DynamicObject> = Api::all_with(client.clone(), &pod_ar);
 
     loop {
-        // Poll immediately on first iteration, then wait 15 seconds before each subsequent poll.
-        match api.list(&ListParams::default()).await {
+        // 1. Poll NodeMetrics (actual total usage of each node)
+        match node_api.list(&ListParams::default()).await {
+            Ok(metric_list) => {
+                let metrics: Vec<crate::kubernetes::models::NodeMetricItem> = metric_list
+                    .items
+                    .into_iter()
+                    .filter_map(|obj| {
+                        let name = obj.metadata.name.clone()?;
+                        let usage = obj.data.get("usage")?;
+                        let cpu_str = usage.get("cpu").and_then(|v| v.as_str()).unwrap_or("0");
+                        let mem_str = usage.get("memory").and_then(|v| v.as_str()).unwrap_or("0");
+
+                        let cpu_cores = parse_cpu_quantity(cpu_str);
+                        let mem_gib = parse_memory_quantity(mem_str);
+
+                        Some(crate::kubernetes::models::NodeMetricItem {
+                            name,
+                            cpu: format!("{:.2}", cpu_cores),
+                            memory: format!("{:.2}", mem_gib),
+                        })
+                    })
+                    .collect();
+
+                if !metrics.is_empty() {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::NodeMetricsUpdated { metrics },
+                    ).await;
+                }
+            }
+            Err(e) => {
+                log::debug!("Node metrics unavailable: {:?}", e);
+            }
+        }
+
+        // 2. Poll PodMetrics (per-pod resource usage)
+        match pod_api.list(&ListParams::default()).await {
             Ok(metric_list) => {
                 let metrics: Vec<PodMetricItem> = metric_list
                     .items
@@ -70,15 +110,14 @@ pub async fn poll_pod_metrics(
                 }
             }
             Err(e) => {
-                // Metrics Server may not be installed — log at debug level and keep polling.
-                log::debug!("Pod metrics unavailable (Metrics Server not installed?): {:?}", e);
+                log::debug!("Pod metrics unavailable: {:?}", e);
             }
         }
 
         tokio::select! {
             _ = cancel_rx.changed() => {
                 if *cancel_rx.borrow() {
-                    log::debug!("Pod metrics poller cancelled.");
+                    log::debug!("Metrics poller cancelled.");
                     break;
                 }
             }

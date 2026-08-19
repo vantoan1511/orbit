@@ -132,6 +132,10 @@ pub(crate) fn parse_cpu_quantity(q: &str) -> f64 {
     let q = q.trim();
     if let Some(stripped) = q.strip_suffix('m') {
         stripped.parse::<f64>().unwrap_or(0.0) / 1000.0
+    } else if let Some(stripped) = q.strip_suffix('n') {
+        stripped.parse::<f64>().unwrap_or(0.0) / 1_000_000_000.0
+    } else if let Some(stripped) = q.strip_suffix('u') {
+        stripped.parse::<f64>().unwrap_or(0.0) / 1_000_000.0
     } else {
         q.parse::<f64>().unwrap_or(0.0)
     }

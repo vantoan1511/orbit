@@ -116,6 +116,9 @@ export interface OrbitEventMap {
   podMetricsUpdated: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
   }
+  nodeMetricsUpdated: {
+    metrics: Array<{ name: string; cpu: string; memory: string }>
+  }
   errorOccurred: {
     message: string
   }
@@ -181,6 +184,7 @@ export const OrbitEvents = {
   PoliciesUpdated: 'policiesUpdated',
   ResourceUpdated: 'resourceUpdated',
   PodMetricsUpdated: 'podMetricsUpdated',
+  NodeMetricsUpdated: 'nodeMetricsUpdated',
   ErrorOccurred: 'errorOccurred',
   LogLineReceived: 'logLineReceived',
   LogLinesChunkReceived: 'logLinesChunkReceived',
