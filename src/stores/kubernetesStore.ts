@@ -81,6 +81,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const cpuHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
   const memHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
 
+  // Provides history snapshots from node request-based data when the Metrics Server is
+  // absent. When the Metrics Server is active, onPodMetricsUpdated is the primary driver.
   watch(
     nodes,
     (newNodes: NodeInfo[]) => {
@@ -541,6 +543,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   function onPodMetricsUpdated(payload: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
   }) {
+    // Update per-pod metric fields for the Pods table and TopConsumers widget.
     for (const m of payload.metrics) {
       const pod = pods.value.find((p) => p.name === m.name && p.namespace === m.namespace)
       if (pod) {
@@ -548,6 +551,45 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         pod.memory = m.memory
       }
     }
+
+    // Inline helpers for Kubernetes quantity strings emitted by the Metrics Server.
+    // CPU is always in millicores ("250m") or whole cores ("2").
+    const parseCpuToCores = (q: string): number => {
+      if (q.endsWith('m')) return parseFloat(q) / 1000
+      return parseFloat(q) || 0
+    }
+    // Memory is always in MiB ("512Mi") from the Metrics Server, but handle GiB too.
+    const parseMemToGiB = (q: string): number => {
+      if (q.endsWith('Mi')) return parseFloat(q) / 1024
+      if (q.endsWith('Gi')) return parseFloat(q)
+      return 0
+    }
+
+    // Aggregate real CPU and memory usage from the metrics payload.
+    let totalUsedCpuCores = 0
+    let totalUsedMemGiB = 0
+    for (const m of payload.metrics) {
+      totalUsedCpuCores += parseCpuToCores(m.cpu)
+      totalUsedMemGiB += parseMemToGiB(m.memory)
+    }
+
+    // Derive cluster capacity from node data already in the store.
+    // node.cpuTotal is stored as a plain float string (cores) by nodes.rs.
+    // node.memTotal is stored as a plain float string (GiB) by nodes.rs.
+    const totalCpuCores = nodes.value.reduce(
+      (acc, node) => acc + parseFloat(node.cpuTotal || '0'),
+      0
+    )
+    const totalMemGiB = nodes.value.reduce((acc, node) => acc + parseFloat(node.memTotal || '0'), 0)
+
+    const cpuPct = totalCpuCores > 0 ? Math.min((totalUsedCpuCores / totalCpuCores) * 100, 100) : 0
+    const memPct = totalMemGiB > 0 ? Math.min((totalUsedMemGiB / totalMemGiB) * 100, 100) : 0
+
+    // Push new data points into the sliding-window history for the dashboard charts.
+    cpuHistory.value.shift()
+    cpuHistory.value.push(cpuPct)
+    memHistory.value.shift()
+    memHistory.value.push(memPct)
   }
 
   nativeEvents.on(OrbitEvents.ResourceUpdated, onResourceUpdated)

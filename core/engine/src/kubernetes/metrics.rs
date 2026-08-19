@@ -10,7 +10,7 @@ use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::models::PodMetricItem;
 use crate::kubernetes::nodes::{parse_cpu_quantity, parse_memory_quantity};
 
-/// Polls PodMetrics from the Metrics Server every 15 seconds and broadcasts
+/// Polls PodMetrics from the Metrics Server every 1 second and broadcasts
 /// the aggregated CPU/memory usage per pod via the `podMetricsUpdated` event.
 /// Uses kube's dynamic API — no extra crate needed, and handles missing Metrics
 /// Server gracefully.
@@ -26,7 +26,7 @@ pub async fn poll_pod_metrics(
     let api: Api<DynamicObject> = Api::all_with(client, &ar);
 
     loop {
-        // Poll immediately on first iteration, then wait 15 seconds before each subsequent poll.
+        // Poll immediately on first iteration, then wait 1 second before each subsequent poll.
         match api.list(&ListParams::default()).await {
             Ok(metric_list) => {
                 let metrics: Vec<PodMetricItem> = metric_list
@@ -82,7 +82,7 @@ pub async fn poll_pod_metrics(
                     break;
                 }
             }
-            _ = tokio::time::sleep(tokio::time::Duration::from_secs(15)) => {}
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {}
         }
     }
 }
