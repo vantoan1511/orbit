@@ -159,7 +159,11 @@ import { highlightMatch } from '@/utils/text'
           header: {
             border: { width: '0', color: 'transparent' },
             borderRadius: '0',
-            padding: '0.375rem 0.75rem'
+            padding: '0',
+            background: 'transparent',
+            hoverBackground: 'transparent',
+            activeBackground: 'transparent',
+            activeHoverBackground: 'transparent'
           },
           content: { border: { width: '0', color: 'transparent' }, borderRadius: '0', padding: '0' }
         }"
@@ -167,13 +171,13 @@ import { highlightMatch } from '@/utils/text'
         <!-- Explorer Accordion -->
         <AccordionPanel
           value="0"
-          class="!border-none !rounded-none flex flex-col min-h-0"
+          class="!border-none !rounded-none flex flex-col min-h-0 transition-[flex]"
           :class="[activeAccordion.includes('0') ? 'flex-1' : 'shrink-0']"
         >
           <AccordionHeader
-            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color shrink-0 !rounded-none !border-none"
+            class="h-8 py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color hover:text-primary flex items-center justify-between shrink-0 !rounded-none border border-transparent hover:border-(--border) cursor-pointer !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent"
           >
-            Explorer
+            <span>Explorer</span>
           </AccordionHeader>
           <AccordionContent
             class="p-0 flex-1 flex flex-col min-h-0"
@@ -199,7 +203,7 @@ import { highlightMatch } from '@/utils/text'
                 <div v-for="ns in treeData" :key="`ns:${ns.name}`" class="flex flex-col">
                   <!-- Namespace Row -->
                   <div
-                    class="flex items-center gap-1.5 px-3 py-0.5 hover:bg-(--bg-hover) cursor-pointer text-sm font-medium text-primary"
+                    class="flex items-center gap-1.5 px-3 py-0.5 border border-transparent hover:border-(--border) cursor-pointer text-sm font-medium text-primary rounded-sm"
                     @click="toggleNode(`ns:${ns.name}`)"
                   >
                     <component
@@ -227,9 +231,9 @@ import { highlightMatch } from '@/utils/text'
                       <div
                         :class="[
                           isCurrentLogActive(ns.name, pod.name)
-                            ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                            : 'text-muted-color hover:bg-(--bg-hover)',
-                          'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
+                            ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
+                            : 'text-muted-color hover:text-primary hover:border-(--border)',
+                          'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-sm'
                         ]"
                         @click="toggleNode(`pod:${ns.name}/${pod.name}`)"
                       >
@@ -260,9 +264,9 @@ import { highlightMatch } from '@/utils/text'
                           :key="`container:${ns.name}/${pod.name}/${c.name}`"
                           :class="[
                             isCurrentLogActive(ns.name, pod.name, c.name)
-                              ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                              : 'text-muted-color hover:bg-(--bg-hover)',
-                            'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm'
+                              ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
+                              : 'text-muted-color hover:text-primary hover:border-(--border)',
+                            'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-sm'
                           ]"
                           @click="selectLogTarget(ns.name, pod.name, c.name)"
                         >
@@ -284,18 +288,12 @@ import { highlightMatch } from '@/utils/text'
         <!-- Recent Accordion -->
         <AccordionPanel
           value="1"
-          class="!border-none !rounded-none flex flex-col min-h-0 border-t border-(--border)"
-          :class="[
-            !activeAccordion.includes('0') && activeAccordion.includes('1')
-              ? 'flex-1'
-              : activeAccordion.includes('1')
-                ? 'shrink-0 max-h-48'
-                : 'shrink-0'
-          ]"
+          class="!border-none !rounded-none flex flex-col min-h-0 border-t border-(--border) transition-[flex]"
+          :class="[activeAccordion.includes('1') ? 'flex-1' : 'shrink-0']"
         >
           <AccordionHeader
             as="div"
-            class="py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color flex justify-between items-center shrink-0 !rounded-none !border-none"
+            class="h-8 py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color hover:text-primary flex justify-between items-center shrink-0 !rounded-none border border-transparent hover:border-(--border) cursor-pointer !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent"
           >
             <div class="flex items-center justify-between flex-1 mr-2">
               <span>Recent</span>
@@ -304,7 +302,7 @@ import { highlightMatch } from '@/utils/text'
                 severity="secondary"
                 variant="text"
                 size="small"
-                class="w-6! h-6! p-0! shrink-0 text-muted-color hover:text-primary"
+                class="w-5! h-5! p-0! shrink-0 text-muted-color hover:text-primary"
                 title="Clear recent logs"
                 aria-label="Clear recent logs"
                 @click.stop="logsStore.clearRecentLogs()"
@@ -333,9 +331,9 @@ import { highlightMatch } from '@/utils/text'
                   :key="`recent:${log.namespace}/${log.pod}/${log.container}`"
                   :class="[
                     isCurrentLogActive(log.namespace, log.pod, log.container)
-                      ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold'
-                      : 'text-muted-color hover:bg-(--bg-hover)',
-                    'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group'
+                      ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
+                      : 'text-muted-color hover:text-primary hover:border-(--border)',
+                    'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group border border-transparent rounded-sm'
                   ]"
                   @click="selectRecentLog(log)"
                 >
