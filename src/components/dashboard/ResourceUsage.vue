@@ -29,7 +29,7 @@ const memPct = computed(() => {
   return totalMem.value > 0 ? ((usedMem.value / totalMem.value) * 100).toFixed(0) : '0'
 })
 
-const labels = ['-6s', '-5s', '-4s', '-3s', '-2s', '-1s', 'Now']
+const labels = ['-90s', '-75s', '-60s', '-45s', '-30s', '-15s', 'Now']
 
 const chartOptions = ref()
 const cpuGradient = ref<CanvasGradient | null>(null)
