@@ -3,7 +3,7 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { onMounted, ref, watch } from 'vue'
+import { ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
@@ -20,29 +20,16 @@ const columns = [
 
 const statuses = ['All Statuses', 'Active', 'Succeeded', 'Failed', 'Unknown']
 
-const fetchJobs = async (namespace?: string) => {
+const fetchJobs = async () => {
   loading.value = true
   try {
-    await kubernetesService.getJobs(namespace)
+    await kubernetesService.getJobs()
   } catch (e) {
     console.error('Error fetching jobs', e)
   } finally {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  if (k8sStore.jobs.length === 0 && !k8sStore.jobsLoading) {
-    fetchJobs()
-  }
-})
-
-watch(
-  () => k8sStore.activeClusterId,
-  () => {
-    fetchJobs()
-  }
-)
 </script>
 
 <template>
@@ -57,7 +44,6 @@ watch(
     reportTemplate="Showing {first} to {last} of {totalRecords} jobs"
     :loading="loading || k8sStore.jobsLoading"
     @refresh="fetchJobs"
-    @namespace-change="fetchJobs"
   >
     <template #default="{ visibleCols }">
       <!-- Completions Column -->

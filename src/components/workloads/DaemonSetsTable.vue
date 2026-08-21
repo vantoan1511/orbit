@@ -3,7 +3,7 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { onMounted, ref, watch } from 'vue'
+import { ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
@@ -21,29 +21,16 @@ const columns = [
 
 const statuses = ['All Statuses', 'Running', 'Progressing']
 
-const fetchDaemonSets = async (namespace?: string) => {
+const fetchDaemonSets = async () => {
   loading.value = true
   try {
-    await kubernetesService.getDaemonSets(namespace)
+    await kubernetesService.getDaemonSets()
   } catch (e) {
     console.error('Error fetching daemonsets', e)
   } finally {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  if (k8sStore.daemonSets.length === 0 && !k8sStore.daemonSetsLoading) {
-    fetchDaemonSets()
-  }
-})
-
-watch(
-  () => k8sStore.activeClusterId,
-  () => {
-    fetchDaemonSets()
-  }
-)
 </script>
 
 <template>
@@ -58,7 +45,6 @@ watch(
     reportTemplate="Showing {first} to {last} of {totalRecords} daemonsets"
     :loading="loading || k8sStore.daemonSetsLoading"
     @refresh="fetchDaemonSets"
-    @namespace-change="fetchDaemonSets"
   >
     <template #default="{ visibleCols }">
       <!-- Desired/Current Column -->

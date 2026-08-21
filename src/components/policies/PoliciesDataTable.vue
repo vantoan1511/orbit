@@ -38,9 +38,9 @@ const filteredPolicies = computed(() => {
   })
 })
 
-const handleRefresh = async (namespace?: string) => {
+const handleRefresh = async () => {
   try {
-    await k8sStore.fetchPolicies(namespace)
+    await k8sStore.fetchPolicies()
   } catch (error) {
     console.error('Error fetching policies:', error)
   }
@@ -73,7 +73,6 @@ const getStatusBadgeClass = (status: string) => {
     reportTemplate="Showing {first} to {last} of {totalRecords} policies"
     :loading="k8sStore.policiesLoading"
     @refresh="handleRefresh"
-    @namespace-change="handleRefresh"
   >
     <!-- Custom Filter -->
     <template #filters>

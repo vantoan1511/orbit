@@ -3,7 +3,7 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { onMounted, ref, watch } from 'vue'
+import { ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
@@ -19,29 +19,16 @@ const columns = [
 
 const statuses = ['All Statuses', 'Running', 'Progressing']
 
-const fetchReplicaSets = async (namespace?: string) => {
+const fetchReplicaSets = async () => {
   loading.value = true
   try {
-    await kubernetesService.getReplicaSets(namespace)
+    await kubernetesService.getReplicaSets()
   } catch (e) {
     console.error('Error fetching replicasets', e)
   } finally {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  if (k8sStore.replicaSets.length === 0 && !k8sStore.replicaSetsLoading) {
-    fetchReplicaSets()
-  }
-})
-
-watch(
-  () => k8sStore.activeClusterId,
-  () => {
-    fetchReplicaSets()
-  }
-)
 </script>
 
 <template>
@@ -56,7 +43,6 @@ watch(
     reportTemplate="Showing {first} to {last} of {totalRecords} replicasets"
     :loading="loading || k8sStore.replicaSetsLoading"
     @refresh="fetchReplicaSets"
-    @namespace-change="fetchReplicaSets"
   >
     <template #default="{ visibleCols }">
       <!-- Replicas Column -->

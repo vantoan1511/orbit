@@ -18,9 +18,9 @@ const columns = [
 
 const statuses = ['All Statuses', 'Bound', 'Pending', 'Lost']
 
-const handleRefresh = async (namespace?: string) => {
+const handleRefresh = async () => {
   try {
-    await k8sStore.fetchPersistentVolumeClaims(namespace)
+    await k8sStore.fetchPersistentVolumeClaims()
   } catch (error) {
     console.error('Error fetching PVCs:', error)
   }
@@ -39,7 +39,6 @@ const handleRefresh = async (namespace?: string) => {
     reportTemplate="Showing {first} to {last} of {totalRecords} claims"
     :loading="k8sStore.persistentVolumeClaimsLoading"
     @refresh="handleRefresh"
-    @namespace-change="handleRefresh"
   >
     <template #default="{ visibleCols }">
       <!-- Volume Column -->

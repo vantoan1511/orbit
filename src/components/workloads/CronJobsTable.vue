@@ -4,7 +4,7 @@ import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
@@ -32,29 +32,16 @@ const filteredCronJobs = computed(() => {
   })
 })
 
-const fetchCronJobs = async (namespace?: string) => {
+const fetchCronJobs = async () => {
   loading.value = true
   try {
-    await kubernetesService.getCronJobs(namespace)
+    await kubernetesService.getCronJobs()
   } catch (e) {
     console.error('Error fetching cronjobs', e)
   } finally {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  if (k8sStore.cronJobs.length === 0 && !k8sStore.cronJobsLoading) {
-    fetchCronJobs()
-  }
-})
-
-watch(
-  () => k8sStore.activeClusterId,
-  () => {
-    fetchCronJobs()
-  }
-)
 </script>
 
 <template>
@@ -70,7 +57,6 @@ watch(
     reportTemplate="Showing {first} to {last} of {totalRecords} cronjobs"
     :loading="loading || k8sStore.cronJobsLoading"
     @refresh="fetchCronJobs"
-    @namespace-change="fetchCronJobs"
   >
     <!-- Custom Filter -->
     <template #filters>
