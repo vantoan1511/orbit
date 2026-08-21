@@ -2,12 +2,30 @@
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { DeploymentInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
 const loading = ref(false)
+
+const getRestarts = (deployment: DeploymentInfo) => {
+  const deploymentPods = k8sStore.pods.filter((p) => {
+    return (
+      p.namespace === deployment.namespace &&
+      p.controlledBy?.startsWith(`ReplicaSet/${deployment.name}-`)
+    )
+  })
+  return deploymentPods.reduce((sum, pod) => sum + (pod.restarts ?? 0), 0)
+}
+
+const deployments = computed(() => {
+  return k8sStore.deployments.map((d) => ({
+    ...d,
+    restarts: getRestarts(d)
+  }))
+})
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
@@ -15,6 +33,7 @@ const columns = [
   { field: 'replicas', header: 'Replicas', visible: true },
   { field: 'available', header: 'Available', visible: true },
   { field: 'upToDate', header: 'Up-To-Date', visible: true },
+  { field: 'restarts', header: 'Restarts', visible: true },
   { field: 'age', header: 'Age', visible: true },
   { field: 'images', header: 'Images', visible: true }
 ]
@@ -49,7 +68,7 @@ watch(
 
 <template>
   <GenericResourceTable
-    :data="k8sStore.deployments"
+    :data="deployments"
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
@@ -104,6 +123,19 @@ watch(
       >
         <template #body="{ data }">
           <span class="font-mono text-muted-color">{{ data.upToDate }}</span>
+        </template>
+      </Column>
+
+      <!-- Restarts Column -->
+      <Column
+        v-if="visibleCols['restarts']"
+        field="restarts"
+        header="Restarts"
+        sortable
+        class="p-3"
+      >
+        <template #body="{ data }">
+          <span class="font-mono text-muted-color">{{ data.restarts ?? 0 }}</span>
         </template>
       </Column>
 
