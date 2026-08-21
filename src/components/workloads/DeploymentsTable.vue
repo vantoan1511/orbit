@@ -4,7 +4,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { DeploymentInfo } from '@/types/kubernetes'
 import Column from 'primevue/column'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
@@ -40,30 +40,16 @@ const columns = [
 
 const statuses = ['All Statuses', 'Running', 'Progressing', 'Failed']
 
-const fetchDeployments = async (namespace?: string) => {
+const fetchDeployments = async () => {
   loading.value = true
   try {
-    await kubernetesService.getDeployments(namespace)
+    await kubernetesService.getDeployments()
   } catch (e) {
     console.error('Error fetching deployments', e)
   } finally {
     loading.value = false
   }
 }
-
-onMounted(() => {
-  if (k8sStore.deployments.length === 0 && !k8sStore.deploymentsLoading) {
-    fetchDeployments()
-  }
-})
-
-// Refetch on cluster change
-watch(
-  () => k8sStore.activeClusterId,
-  () => {
-    fetchDeployments()
-  }
-)
 </script>
 
 <template>
@@ -79,7 +65,6 @@ watch(
     :loading="loading || k8sStore.deploymentsLoading"
     :selectable="true"
     @refresh="fetchDeployments"
-    @namespace-change="fetchDeployments"
   >
     <template #default="{ visibleCols }">
       <!-- Replicas Column -->

@@ -4,7 +4,7 @@ import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import EventDetailsDrawer from './EventDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
@@ -43,10 +43,6 @@ const handleRefresh = async () => {
     console.error('Error fetching events:', error)
   }
 }
-
-onMounted(() => {
-  k8sStore.fetchEvents()
-})
 
 const getTypeBadgeClass = (type: string) => {
   switch (type) {
