@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useLogsStore, type RecentLogInfo } from '@/stores/logsStore'
-import { Box, ChevronDown, ChevronRight, Clock, Folder, Layers, Trash2 } from '@lucide/vue'
+import { highlightMatch } from '@/utils/text'
+import { Box, ChevronDown, ChevronRight, Clock, Folder, Trash2 } from '@lucide/vue'
 import Accordion from 'primevue/accordion'
 import AccordionContent from 'primevue/accordioncontent'
 import AccordionHeader from 'primevue/accordionheader'
@@ -23,7 +24,7 @@ onMounted(() => {
   logsStore.loadRecentLogs()
 })
 
-// Expanded state for tree nodes: keys like `ns:default`, `pod:default/my-pod`
+// Expanded state for namespace tree nodes: keys like `ns:default`
 const expandedNodes = ref<Record<string, boolean>>({})
 
 const toggleNode = (key: string) => {
@@ -34,19 +35,15 @@ const isNodeExpanded = (key: string) => {
   return !!expandedNodes.value[key]
 }
 
-interface TreeContainer {
+interface TreeWorkload {
   name: string
-}
-
-interface TreePod {
-  name: string
+  kind: string
   namespace: string
-  containers: TreeContainer[]
 }
 
 interface TreeNamespace {
   name: string
-  pods: TreePod[]
+  workloads: TreeWorkload[]
 }
 
 const treeData = computed<TreeNamespace[]>(() => {
@@ -56,42 +53,84 @@ const treeData = computed<TreeNamespace[]>(() => {
   const result: TreeNamespace[] = []
 
   for (const ns of namespaces) {
-    const nsPods = k8sStore.pods.filter((p) => p.namespace === ns)
-    const matchingPods: TreePod[] = []
+    const allWorkloads: TreeWorkload[] = []
 
-    for (const pod of nsPods) {
-      const containers = (pod.containers || []).map((c) => ({ name: c.name }))
-
-      // Filter check
-      if (query) {
-        const podMatches = pod.name.toLowerCase().includes(query)
-        const nsMatches = ns.toLowerCase().includes(query)
-        const containerMatches = containers.some((c) => c.name.toLowerCase().includes(query))
-
-        if (podMatches || nsMatches || containerMatches) {
-          const filteredContainers =
-            containerMatches && !podMatches && !nsMatches
-              ? containers.filter((c) => c.name.toLowerCase().includes(query))
-              : containers
-          matchingPods.push({
-            name: pod.name,
-            namespace: ns,
-            containers: filteredContainers
-          })
-        }
-      } else {
-        matchingPods.push({
-          name: pod.name,
-          namespace: ns,
-          containers
-        })
+    // Deployments
+    for (const d of k8sStore.deployments) {
+      if (d.namespace === ns) {
+        allWorkloads.push({ name: d.name, kind: 'Deployment', namespace: ns })
       }
     }
 
-    if (!query || matchingPods.length > 0 || ns.toLowerCase().includes(query)) {
+    // StatefulSets
+    for (const s of k8sStore.statefulSets) {
+      if (s.namespace === ns) {
+        allWorkloads.push({ name: s.name, kind: 'StatefulSet', namespace: ns })
+      }
+    }
+
+    // DaemonSets
+    for (const d of k8sStore.daemonSets) {
+      if (d.namespace === ns) {
+        allWorkloads.push({ name: d.name, kind: 'DaemonSet', namespace: ns })
+      }
+    }
+
+    // ReplicaSets (standalone only)
+    const deploymentNames = new Set(
+      k8sStore.deployments.filter((d) => d.namespace === ns).map((d) => d.name)
+    )
+    for (const r of k8sStore.replicaSets) {
+      if (
+        r.namespace === ns &&
+        !Array.from(deploymentNames).some((depName) => r.name.startsWith(depName + '-'))
+      ) {
+        allWorkloads.push({ name: r.name, kind: 'ReplicaSet', namespace: ns })
+      }
+    }
+
+    // Jobs
+    for (const j of k8sStore.jobs) {
+      if (j.namespace === ns) {
+        allWorkloads.push({ name: j.name, kind: 'Job', namespace: ns })
+      }
+    }
+
+    // CronJobs
+    for (const c of k8sStore.cronJobs) {
+      if (c.namespace === ns) {
+        allWorkloads.push({ name: c.name, kind: 'CronJob', namespace: ns })
+      }
+    }
+
+    // Standalone Pods (pods without controlledBy)
+    for (const p of k8sStore.pods) {
+      if (p.namespace === ns && (!p.controlledBy || p.controlledBy === '')) {
+        allWorkloads.push({ name: p.name, kind: 'Pod', namespace: ns })
+      }
+    }
+
+    // Sort workloads alphabetically by name
+    allWorkloads.sort((a, b) => a.name.localeCompare(b.name))
+
+    const matchingWorkloads: TreeWorkload[] = []
+
+    for (const w of allWorkloads) {
+      if (query) {
+        const workloadMatches = w.name.toLowerCase().includes(query)
+        const nsMatches = ns.toLowerCase().includes(query)
+        if (workloadMatches || nsMatches) {
+          matchingWorkloads.push(w)
+        }
+      } else {
+        matchingWorkloads.push(w)
+      }
+    }
+
+    if (!query || matchingWorkloads.length > 0 || ns.toLowerCase().includes(query)) {
       result.push({
         name: ns,
-        pods: matchingPods
+        workloads: matchingWorkloads
       })
     }
   }
@@ -99,52 +138,63 @@ const treeData = computed<TreeNamespace[]>(() => {
   return result
 })
 
-const isCurrentLogActive = (ns: string, pod: string, container?: string) => {
+const getWorkloadColorClass = (kind: string) => {
+  switch (kind) {
+    case 'Deployment':
+      return 'text-deployment'
+    case 'DaemonSet':
+      return 'text-daemonset'
+    case 'StatefulSet':
+      return 'text-statefulset'
+    case 'Job':
+    case 'CronJob':
+      return 'text-job'
+    case 'ReplicaSet':
+      return 'text-replicaset'
+    case 'Pod':
+      return 'text-pod'
+    default:
+      return 'text-primary'
+  }
+}
+
+const isCurrentLogActive = (ns: string, workload: string, kind?: string) => {
   if (route.path !== '/logs') return false
   const qNs = route.query.namespace as string
-  const qPod = route.query.pod as string
-  const qContainer = route.query.container as string
+  const qWorkload = route.query.workload as string
+  const qKind = route.query.kind as string
 
   if (qNs !== ns) return false
-  if (qPod !== pod) return false
-  if (container && qContainer && qContainer !== 'All') {
-    return qContainer === container
-  }
+  if (qWorkload !== workload) return false
+  if (kind && qKind && qKind !== kind) return false
   return true
 }
 
-const selectLogTarget = (ns: string, pod: string, container: string = 'All') => {
-  const podObj = k8sStore.pods.find((p) => p.name === pod && p.namespace === ns)
-  let kind = 'Pod'
-  let workload = pod
-
-  if (podObj && podObj.controlledBy) {
-    const parts = podObj.controlledBy.split('/')
-    if (parts.length === 2 && parts[0] && parts[1]) {
-      kind = parts[0]
-      workload = parts[1]
-    } else if (podObj.controlledBy) {
-      workload = podObj.controlledBy
-    }
-  }
-
+const selectLogTarget = (ns: string, workload: string, kind: string) => {
   router.push({
     path: '/logs',
     query: {
       namespace: ns,
       kind,
       workload,
-      pod,
-      container
+      pod: 'All',
+      container: 'All'
     }
   })
 }
 
 const selectRecentLog = (log: RecentLogInfo) => {
-  selectLogTarget(log.namespace, log.pod, log.container)
+  router.push({
+    path: '/logs',
+    query: {
+      namespace: log.namespace,
+      kind: log.workloadKind,
+      workload: log.workloadName,
+      pod: log.pod || 'All',
+      container: log.container || 'All'
+    }
+  })
 }
-
-import { highlightMatch } from '@/utils/text'
 </script>
 
 <template>
@@ -214,69 +264,36 @@ import { highlightMatch } from '@/utils/text'
                     />
                     <Folder class="w-3.5 h-3.5 shrink-0 text-amber-500" />
                     <span class="truncate" v-html="highlightMatch(ns.name, searchQuery)"></span>
-                    <span class="ml-auto text-xs text-muted-color">({{ ns.pods.length }})</span>
+                    <span class="ml-auto text-xs text-muted-color"
+                      >({{ ns.workloads.length }})</span
+                    >
                   </div>
 
-                  <!-- Namespace Pods -->
+                  <!-- Namespace Workloads -->
                   <div
                     v-if="isNodeExpanded(`ns:${ns.name}`) || searchQuery"
                     class="flex flex-col pl-4"
                   >
                     <div
-                      v-for="pod in ns.pods"
-                      :key="`pod:${ns.name}/${pod.name}`"
-                      class="flex flex-col"
+                      v-for="workload in ns.workloads"
+                      :key="`workload:${ns.name}/${workload.kind}/${workload.name}`"
+                      :class="[
+                        isCurrentLogActive(ns.name, workload.name, workload.kind)
+                          ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
+                          : 'text-muted-color hover:text-primary hover:border-(--border)',
+                        'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-sm'
+                      ]"
+                      @click="selectLogTarget(ns.name, workload.name, workload.kind)"
                     >
-                      <!-- Pod Row -->
-                      <div
-                        :class="[
-                          isCurrentLogActive(ns.name, pod.name)
-                            ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
-                            : 'text-muted-color hover:text-primary hover:border-(--border)',
-                          'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-sm'
-                        ]"
-                        @click="toggleNode(`pod:${ns.name}/${pod.name}`)"
+                      <Box
+                        class="w-3.5 h-3.5 shrink-0"
+                        :class="getWorkloadColorClass(workload.kind)"
+                      />
+                      <span
+                        class="truncate flex-1"
+                        v-html="highlightMatch(workload.name, searchQuery)"
                       >
-                        <component
-                          :is="
-                            isNodeExpanded(`pod:${ns.name}/${pod.name}`) || searchQuery
-                              ? ChevronDown
-                              : ChevronRight
-                          "
-                          class="w-3.5 h-3.5 shrink-0 text-muted-color"
-                        />
-                        <Box class="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                        <span
-                          class="truncate flex-1"
-                          @click.stop="selectLogTarget(ns.name, pod.name)"
-                          v-html="highlightMatch(pod.name, searchQuery)"
-                        >
-                        </span>
-                      </div>
-
-                      <!-- Pod Containers -->
-                      <div
-                        v-if="isNodeExpanded(`pod:${ns.name}/${pod.name}`) || searchQuery"
-                        class="flex flex-col pl-4"
-                      >
-                        <div
-                          v-for="c in pod.containers"
-                          :key="`container:${ns.name}/${pod.name}/${c.name}`"
-                          :class="[
-                            isCurrentLogActive(ns.name, pod.name, c.name)
-                              ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
-                              : 'text-muted-color hover:text-primary hover:border-(--border)',
-                            'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-sm'
-                          ]"
-                          @click="selectLogTarget(ns.name, pod.name, c.name)"
-                        >
-                          <Layers class="w-3.5 h-3.5 shrink-0 text-emerald-500" />
-                          <span
-                            class="truncate"
-                            v-html="highlightMatch(c.name, searchQuery)"
-                          ></span>
-                        </div>
-                      </div>
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -328,9 +345,9 @@ import { highlightMatch } from '@/utils/text'
 
                 <div
                   v-for="log in logsStore.recentLogs"
-                  :key="`recent:${log.namespace}/${log.pod}/${log.container}`"
+                  :key="`recent:${log.namespace}/${log.workloadKind}/${log.workloadName}`"
                   :class="[
-                    isCurrentLogActive(log.namespace, log.pod, log.container)
+                    isCurrentLogActive(log.namespace, log.workloadName, log.workloadKind)
                       ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
                       : 'text-muted-color hover:text-primary hover:border-(--border)',
                     'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group border border-transparent rounded-sm'
@@ -339,9 +356,9 @@ import { highlightMatch } from '@/utils/text'
                 >
                   <Clock class="w-3.5 h-3.5 shrink-0 text-muted-color" />
                   <div class="flex flex-col truncate flex-1 min-w-0">
-                    <span class="truncate font-medium">{{ log.pod }}</span>
+                    <span class="truncate font-medium">{{ log.workloadName }}</span>
                     <span class="text-xs text-muted-color truncate">
-                      {{ log.namespace }} &bull; {{ log.container }}
+                      {{ log.namespace }} &bull; {{ log.workloadKind }}
                     </span>
                   </div>
                 </div>
