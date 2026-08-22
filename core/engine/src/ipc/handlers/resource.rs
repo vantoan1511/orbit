@@ -111,6 +111,17 @@ pub fn create_resource(
             .cloned()
             .unwrap_or(serde_json::Value::Null);
 
+        if kind.is_empty() || name.is_empty() {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "Failed to create: kind and name must not be empty".to_string(),
+                },
+            ).await;
+            return;
+        }
+
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
@@ -138,6 +149,14 @@ pub fn create_resource(
                     ).await;
                 }
             }
+        } else {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "Failed to create: no active Kubernetes client".to_string(),
+                },
+            ).await;
         }
     });
 }

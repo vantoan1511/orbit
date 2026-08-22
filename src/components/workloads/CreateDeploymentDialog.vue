@@ -14,16 +14,10 @@ interface CreateDeploymentDialogData {
   initialNamespace?: string
 }
 
-export interface CreateDeploymentResult {
-  name: string
-  namespace: string
-  manifest: Record<string, unknown>
-}
-
 const dialogRef = inject<
   | Ref<{
       data?: CreateDeploymentDialogData
-      close: (data?: CreateDeploymentResult) => void
+      close: () => void
     }>
   | undefined
 >('dialogRef')
@@ -41,10 +35,12 @@ const image = ref('')
 const replicas = ref<number>(1)
 const port = ref<number | null>(null)
 const isCreating = ref(false)
+const submittedName = ref('')
 
-const handleCommandSucceeded = () => {
-  if (isCreating.value) {
+const handleCommandSucceeded = (payload: { message: string }) => {
+  if (isCreating.value && submittedName.value && payload.message.includes(submittedName.value)) {
     isCreating.value = false
+    submittedName.value = ''
     dialogRef?.value?.close()
   }
 }
@@ -52,6 +48,7 @@ const handleCommandSucceeded = () => {
 const handleErrorOccurred = () => {
   if (isCreating.value) {
     isCreating.value = false
+    submittedName.value = ''
   }
 }
 
@@ -163,6 +160,7 @@ const handleCreate = async () => {
   }
 
   isCreating.value = true
+  submittedName.value = trimmedName
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
@@ -172,6 +170,7 @@ const handleCreate = async () => {
     })
   } catch {
     isCreating.value = false
+    submittedName.value = ''
   }
 }
 </script>
@@ -243,7 +242,7 @@ const handleCreate = async () => {
         <InputNumber
           id="create-deployment-replicas"
           v-model="replicas"
-          :min="0"
+          :min="1"
           :max="1000"
           showButtons
           fluid
