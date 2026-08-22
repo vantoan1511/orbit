@@ -138,6 +138,47 @@ export interface CronJobInfo {
 export type WorkloadInfo =
   DeploymentInfo | StatefulSetInfo | DaemonSetInfo | ReplicaSetInfo | JobInfo | CronJobInfo
 
+export interface NodeSystemInfo {
+  machineId: string
+  systemUuid: string
+  bootId: string
+  kernelVersion: string
+  osImage: string
+  containerRuntimeVersion: string
+  kubeletVersion: string
+  kubeProxyVersion: string
+  operatingSystem: string
+  architecture: string
+}
+
+export interface NodeAddress {
+  type: string
+  address: string
+}
+
+export interface NodeCondition {
+  type: string
+  status: string
+  reason?: string
+  message?: string
+  lastTransitionTime?: string
+  lastHeartbeatTime?: string
+}
+
+export interface NodeTaint {
+  key: string
+  value?: string
+  effect: string
+  timeAdded?: string
+}
+
+export interface NodeResources {
+  cpu: string
+  memory: string
+  pods: string
+  ephemeralStorage?: string
+}
+
 export interface NodeInfo {
   name: string
   status: string
@@ -152,8 +193,18 @@ export interface NodeInfo {
   podsCount: number
   podsLimit: number
   uptime: string
+  createdAt?: string
   labels: string[]
+  labelsMap?: Record<string, string>
+  annotations?: Record<string, string>
   isCordoned: boolean
+  nodeInfo?: NodeSystemInfo
+  addresses?: NodeAddress[]
+  conditions?: NodeCondition[]
+  taints?: NodeTaint[]
+  capacity?: NodeResources
+  allocatable?: NodeResources
+  imagesCount?: number
 }
 
 export interface ServicePort {

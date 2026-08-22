@@ -167,6 +167,57 @@ pub struct CronJobInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct NodeSystemInfo {
+    pub machine_id: String,
+    pub system_uuid: String,
+    pub boot_id: String,
+    pub kernel_version: String,
+    pub os_image: String,
+    pub container_runtime_version: String,
+    pub kubelet_version: String,
+    pub kube_proxy_version: String,
+    pub operating_system: String,
+    pub architecture: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeAddress {
+    pub r#type: String,
+    pub address: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeCondition {
+    pub r#type: String,
+    pub status: String,
+    pub reason: Option<String>,
+    pub message: Option<String>,
+    pub last_transition_time: Option<String>,
+    pub last_heartbeat_time: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeTaint {
+    pub key: String,
+    pub value: Option<String>,
+    pub effect: String,
+    pub time_added: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeResources {
+    pub cpu: String,
+    pub memory: String,
+    pub pods: String,
+    pub ephemeral_storage: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct NodeInfo {
     pub name: String,
     pub status: String,
@@ -181,8 +232,18 @@ pub struct NodeInfo {
     pub pods_count: i32,
     pub pods_limit: i32,
     pub uptime: String,
+    pub created_at: Option<String>,
     pub labels: Vec<String>,
+    pub labels_map: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
     pub is_cordoned: bool,
+    pub node_info: Option<NodeSystemInfo>,
+    pub addresses: Vec<NodeAddress>,
+    pub conditions: Vec<NodeCondition>,
+    pub taints: Vec<NodeTaint>,
+    pub capacity: Option<NodeResources>,
+    pub allocatable: Option<NodeResources>,
+    pub images_count: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

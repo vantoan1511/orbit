@@ -1,6 +1,6 @@
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, ref, unref, watch, type MaybeRef, type Ref } from 'vue'
 
 export interface ResourceItem {
   name: string
@@ -13,7 +13,8 @@ const SYSTEM_NAMESPACES = ['kube-system', 'kube-public', 'kube-node-lease', 'mon
 export function useResourceFilters<T extends ResourceItem>(
   resources: Ref<T[]>,
   searchFields: (keyof T)[] = ['name'],
-  storeKey?: string
+  storeKey?: string,
+  hideNamespaceFilter: MaybeRef<boolean> = false
 ) {
   const filterStore = storeKey ? useTableFilterStore() : null
   const stored = storeKey && filterStore ? filterStore.getFilters(storeKey) : null
@@ -21,6 +22,8 @@ export function useResourceFilters<T extends ResourceItem>(
 
   const searchQuery = ref(stored?.searchQuery ?? '')
   const selectedNamespace = ref<string[]>(stored ? [...stored.selectedNamespace] : [])
+
+  const shouldHideNamespace = computed(() => unref(hideNamespaceFilter))
 
   if (storeKey && filterStore) {
     watch(searchQuery, (val) => {
@@ -37,6 +40,7 @@ export function useResourceFilters<T extends ResourceItem>(
     watch(
       () => k8sStore.namespaceList,
       (newList) => {
+        if (shouldHideNamespace.value) return
         const state = filterStore.getFilters(storeKey)
         if (!state.isNamespaceInitialized && newList.length > 0) {
           const userNamespaces = newList
@@ -68,10 +72,20 @@ export function useResourceFilters<T extends ResourceItem>(
         if (!matches) return false
       }
 
-      // 2. Namespace filter
+      // 2. Namespace filter: only filter resources that belong to a specific namespace
+      const isNamespaced =
+        typeof item.namespace === 'string' &&
+        item.namespace.trim().length > 0 &&
+        item.namespace !== '-' &&
+        item.namespace !== 'Cluster' &&
+        item.namespace !== 'All' &&
+        item.scope !== 'Cluster'
+
       if (
+        !shouldHideNamespace.value &&
         selectedNamespace.value.length > 0 &&
-        (!item.namespace || !selectedNamespace.value.includes(item.namespace))
+        isNamespaced &&
+        !selectedNamespace.value.includes(item.namespace as string)
       ) {
         return false
       }
