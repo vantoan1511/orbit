@@ -5,6 +5,7 @@ import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
@@ -178,7 +179,7 @@ const annotationsExpanded = ref(false)
         </h2>
         <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
-          <span>Age: {{ props.namespace.age }}</span>
+          <span>Age: <ReactiveAge :age="props.namespace.age" /></span>
         </div>
       </div>
 
@@ -246,7 +247,9 @@ const annotationsExpanded = ref(false)
                   </div>
                   <div class="flex justify-between items-center">
                     <span class="text-muted-color">Age</span>
-                    <span class="font-mono text-muted-color">{{ props.namespace.age }}</span>
+                    <span class="font-mono text-muted-color"
+                      ><ReactiveAge :age="props.namespace.age"
+                    /></span>
                   </div>
                   <div class="flex justify-between items-start gap-4">
                     <span class="text-muted-color shrink-0">UID</span>

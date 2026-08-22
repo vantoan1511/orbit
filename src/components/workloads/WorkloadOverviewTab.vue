@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import ReplicasProgressBar from '@/components/shared/ReplicasProgressBar.vue'
 import type { DaemonSetReplicas, WorkloadInfo } from '@/types/kubernetes'
 
@@ -100,7 +101,7 @@ defineProps<{
         </div>
         <div>
           <span class="text-muted-color block mb-0.5">Age</span>
-          <span class="font-semibold text-muted-color">{{ workloadAge }}</span>
+          <span class="font-semibold text-muted-color"><ReactiveAge :age="workloadAge" /></span>
         </div>
         <div>
           <span class="text-muted-color block mb-0.5">Status</span>

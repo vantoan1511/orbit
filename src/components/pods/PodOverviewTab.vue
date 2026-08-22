@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { PodInfo } from '@/types/kubernetes'
 
 defineProps<{
@@ -90,7 +91,7 @@ defineProps<{
         </div>
         <div>
           <span class="text-muted-color">Age: </span>
-          <span class="font-semibold text-primary font-mono">{{ pod.age }}</span>
+          <span class="font-semibold text-primary font-mono"><ReactiveAge :age="pod.age" /></span>
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import WorkloadEventsTab from '@/components/workloads/WorkloadEventsTab.vue'
 import WorkloadYamlTab from '@/components/workloads/WorkloadYamlTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
@@ -230,7 +231,7 @@ const copyYaml = async () => {
         </h2>
         <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
-          <span>Age: {{ props.ingress.age }}</span>
+          <span>Age: <ReactiveAge :age="props.ingress.age" /></span>
         </div>
       </div>
 
@@ -311,7 +312,9 @@ const copyYaml = async () => {
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-muted-color font-semibold">Age</span>
-                    <span class="col-span-2 text-primary">{{ props.ingress.age }}</span>
+                    <span class="col-span-2 text-primary"
+                      ><ReactiveAge :age="props.ingress.age"
+                    /></span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-muted-color font-semibold">UID</span>

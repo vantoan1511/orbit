@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ServiceInfo } from '@/types/kubernetes'
 import { Activity, Clock, ExternalLink, FileCode, Server, Shield, Tag } from '@lucide/vue'
 import Drawer from 'primevue/drawer'
@@ -111,7 +112,7 @@ const getTypeBadgeClass = (type: string) => {
         </h2>
         <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
-          <span>Age: {{ props.service.age }}</span>
+          <span>Age: <ReactiveAge :age="props.service.age" /></span>
         </div>
       </div>
 
@@ -200,7 +201,9 @@ const getTypeBadgeClass = (type: string) => {
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-muted-color font-semibold">Age</span>
-                    <span class="col-span-2 text-primary">{{ props.service.age }}</span>
+                    <span class="col-span-2 text-primary"
+                      ><ReactiveAge :age="props.service.age"
+                    /></span>
                   </div>
                   <div class="grid grid-cols-3 p-3">
                     <span class="text-muted-color font-semibold">UID</span>
