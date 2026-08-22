@@ -195,46 +195,44 @@ const isIndeterminate = computed(() => {
               <Settings2 class="w-4 h-4 text-muted-color" />
             </template>
           </Button>
-          <Popover ref="configPopover">
-            <div class="flex flex-col gap-2 p-3 min-w-48 text-primary">
-              <div class="font-semibold text-sm border-b border-surface pb-1.5 text-muted-color">
-                Configure Columns
+          <Popover ref="configPopover" :pt="{ content: 'p-0!' }">
+            <div class="flex flex-col min-w-52 text-primary">
+              <div
+                class="flex items-center gap-2 px-3 py-2 border-b border-(--border) hover:bg-(--bg-hover) cursor-pointer"
+                @click="allSelected = !allSelected"
+              >
+                <Checkbox
+                  :modelValue="allSelected"
+                  :binary="true"
+                  :indeterminate="isIndeterminate"
+                  size="small"
+                  class="pointer-events-none"
+                />
+                <span
+                  class="text-sm select-none font-semibold text-primary w-full pointer-events-none"
+                >
+                  All Columns
+                </span>
               </div>
-              <div class="flex flex-col gap-1.5 pt-1">
-                <div class="flex items-center gap-2 py-0.5 hover:bg-surface-200/20 rounded px-1">
-                  <Checkbox
-                    inputId="col-all"
-                    :modelValue="allSelected"
-                    @update:modelValue="allSelected = $event"
-                    :binary="true"
-                    :indeterminate="isIndeterminate"
-                    size="small"
-                  />
-                  <label
-                    for="col-all"
-                    class="text-sm cursor-pointer select-none font-semibold text-primary w-full"
-                  >
-                    All
-                  </label>
-                </div>
+              <div class="flex flex-col p-1.5 gap-0.5 max-h-[50vh] overflow-y-auto">
                 <div
                   v-for="col in columns"
                   :key="col.field"
-                  class="flex items-center gap-2 py-0.5 rounded px-1"
+                  class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-(--bg-hover) cursor-pointer"
+                  @click="onToggleColumn(col.field, !col.visible)"
                 >
                   <Checkbox
                     :inputId="`col-${col.field}`"
                     :modelValue="col.visible"
-                    @update:modelValue="onToggleColumn(col.field, $event)"
                     :binary="true"
                     size="small"
+                    class="pointer-events-none"
                   />
-                  <label
-                    :for="`col-${col.field}`"
-                    class="text-sm cursor-pointer select-none font-medium text-muted-color w-full"
+                  <span
+                    class="text-sm select-none font-medium text-primary w-full pointer-events-none"
                   >
                     {{ col.header }}
-                  </label>
+                  </span>
                 </div>
               </div>
             </div>
