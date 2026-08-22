@@ -32,6 +32,7 @@ declare module 'vue' {
     ContainerEnvEditor: typeof import('./src/components/shared/ContainerEnvEditor.vue')['default']
     ContainerPortsEditor: typeof import('./src/components/shared/ContainerPortsEditor.vue')['default']
     ContainerResourcesEditor: typeof import('./src/components/shared/ContainerResourcesEditor.vue')['default']
+    CreateDeploymentDialog: typeof import('./src/components/workloads/CreateDeploymentDialog.vue')['default']
     CronJobsTable: typeof import('./src/components/workloads/CronJobsTable.vue')['default']
     DaemonSetsTable: typeof import('./src/components/workloads/DaemonSetsTable.vue')['default']
     DeploymentEditForm: typeof import('./src/components/workloads/DeploymentEditForm.vue')['default']

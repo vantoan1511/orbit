@@ -148,6 +148,53 @@ pub async fn apply_resource(
     Ok(())
 }
 
+pub async fn create_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    raw_json: Value,
+) -> Result<(), kube::Error> {
+    let post_params = PostParams::default();
+
+    macro_rules! create_resource {
+        ($api_type:ty) => {{
+            let api: Api<$api_type> = Api::namespaced(client.clone(), namespace);
+            let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
+                kube::Error::Api(kube::error::ErrorResponse {
+                    status: "Failure".to_string(),
+                    message: format!("Failed to parse {}: {}", kind, e),
+                    reason: "BadRequest".to_string(),
+                    code: 400,
+                })
+            })?;
+            api.create(&post_params, &parsed).await?;
+        }};
+    }
+
+    match kind {
+        "Pod" => create_resource!(Pod),
+        "Deployment" => create_resource!(Deployment),
+        "StatefulSet" => create_resource!(StatefulSet),
+        "DaemonSet" => create_resource!(DaemonSet),
+        "ReplicaSet" => create_resource!(ReplicaSet),
+        "Job" => create_resource!(Job),
+        "CronJob" => create_resource!(CronJob),
+        "Service" => create_resource!(Service),
+        "ConfigMap" => create_resource!(ConfigMap),
+        "Secret" => create_resource!(Secret),
+        "PersistentVolumeClaim" => create_resource!(PersistentVolumeClaim),
+        "NetworkPolicy" => create_resource!(NetworkPolicy),
+        "Ingress" => create_resource!(Ingress),
+        _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported create resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        })),
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
