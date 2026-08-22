@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LogHighlightRulesDialog from '@/components/logs/LogHighlightRulesDialog.vue'
+import HighlightedText from '@/components/shared/HighlightedText.vue'
 import { useLogHighlighting } from '@/composables/useLogHighlighting'
 import { useLogSelection } from '@/composables/useLogSelection'
 import { useLogStream } from '@/composables/useLogStream'
@@ -231,7 +232,7 @@ const LOG_ITEM_HEIGHT = 28
 
             <!-- Log Content -->
             <span class="flex-1" :class="getLogLevelColor(line.text)">
-              {{ line.text }}
+              <HighlightedText :text="line.text" :query="searchQuery" :is-regex="isRegex" />
             </span>
           </div>
         </template>
