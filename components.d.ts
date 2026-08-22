@@ -46,6 +46,7 @@ declare module 'vue' {
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
     GenericResourceTable: typeof import('./src/components/shared/GenericResourceTable.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
+    HighlightedText: typeof import('./src/components/shared/HighlightedText.vue')['default']
     IconField: typeof import('primevue/iconfield')['default']
     IngressDetailsDrawer: typeof import('./src/components/network/IngressDetailsDrawer.vue')['default']
     IngressEditForm: typeof import('./src/components/network/IngressEditForm.vue')['default']
