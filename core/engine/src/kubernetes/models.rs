@@ -73,6 +73,13 @@ pub struct DaemonSetReplicas {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ContainerImageInfo {
+    pub name: String,
+    pub image: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DeploymentInfo {
     pub name: String,
     pub namespace: String,
@@ -82,6 +89,7 @@ pub struct DeploymentInfo {
     pub up_to_date: i32,
     pub age: String,
     pub images: Vec<String>,
+    pub containers: Vec<ContainerImageInfo>,
     pub strategy: Option<String>,
     pub min_ready_seconds: i32,
     pub revision_history: Option<i32>,

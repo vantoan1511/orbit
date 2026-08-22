@@ -185,6 +185,15 @@ export const kubernetesService = {
     await coreEngine.dispatch('scaleResource', params)
   },
 
+  async updateResourceImages(params: {
+    namespace: string
+    kind: string
+    name: string
+    containers: { name: string; image: string }[]
+  }): Promise<void> {
+    await coreEngine.dispatch('updateResourceImages', params)
+  },
+
   async redeployResource(params: { namespace: string; kind: string; name: string }): Promise<void> {
     await coreEngine.dispatch('redeployResource', params)
   },
