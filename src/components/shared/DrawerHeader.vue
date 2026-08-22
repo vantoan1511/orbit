@@ -14,12 +14,7 @@ defineProps<{
   <div class="flex flex-col">
     <!-- Header bar inside drawer -->
     <div class="flex items-center gap-2 mb-2">
-      <span
-        v-if="kind"
-        class="text-xs font-semibold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20"
-      >
-        {{ kind }}
-      </span>
+      <Tag v-if="kind" severity="info" :value="kind" />
       <NamespaceBadge v-if="namespace" :namespace="namespace" />
     </div>
 

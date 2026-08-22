@@ -142,16 +142,11 @@ watch(scCapacityData, updateChart, { immediate: true })
           </div>
           <div class="flex flex-col items-end shrink-0">
             <span class="text-[10px] font-mono text-muted-color">{{ sc.reclaimPolicy }}</span>
-            <span
-              class="text-[10px] px-1.5 py-0.5 rounded mt-1 font-semibold"
-              :class="
-                sc.allowVolumeExpansion
-                  ? 'bg-emerald-500/10 text-emerald-500'
-                  : 'bg-(--bg-hover) text-muted-color'
-              "
-            >
-              {{ sc.allowVolumeExpansion ? 'Resizable' : 'Static' }}
-            </span>
+            <Tag
+              class="mt-1"
+              :severity="sc.allowVolumeExpansion ? 'success' : 'secondary'"
+              :value="sc.allowVolumeExpansion ? 'Resizable' : 'Static'"
+            />
           </div>
         </div>
       </div>

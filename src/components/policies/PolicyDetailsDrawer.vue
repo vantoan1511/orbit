@@ -20,16 +20,16 @@ const emit = defineEmits<{
 
 const activeTab = ref('overview')
 
-const getStatusBadgeClass = (status: string) => {
+const getStatusSeverity = (status: string) => {
   switch (status) {
     case 'Audit':
-      return 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+      return 'info'
     case 'Enforced':
-      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+      return 'success'
     case 'Disabled':
-      return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+      return 'secondary'
     default:
-      return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+      return 'secondary'
   }
 }
 </script>
@@ -60,24 +60,14 @@ const getStatusBadgeClass = (status: string) => {
             {{ props.policy.type }}
           </span>
         </div>
-        <div
+        <Tag
           v-if="props.policy.namespace !== '-'"
-          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
-        >
-          ns/{{ props.policy.namespace }}
-        </div>
-        <div
-          v-else
-          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
-        >
-          Cluster Scope
-        </div>
-        <div
-          class="text-[10px] font-semibold uppercase tracking-wider font-ui border px-2 py-0.5 rounded"
-          :class="getStatusBadgeClass(props.policy.status)"
-        >
-          {{ props.policy.status }}
-        </div>
+          severity="secondary"
+          class="font-mono"
+          :value="`ns/${props.policy.namespace}`"
+        />
+        <Tag v-else severity="secondary" class="font-mono" value="Cluster Scope" />
+        <Tag :severity="getStatusSeverity(props.policy.status)" :value="props.policy.status" />
       </div>
     </template>
 

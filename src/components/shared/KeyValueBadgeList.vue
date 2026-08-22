@@ -23,14 +23,17 @@ withDefaults(
 
     <!-- Tag Variant (used for Labels) -->
     <div v-if="variant === 'tag'" class="flex flex-wrap gap-2">
-      <div
+      <Tag
         v-for="(val, key) in items"
         :key="key"
-        class="flex items-center gap-1 bg-violet-500/5 border border-violet-500/10 rounded-md text-[10px] px-2 py-0.5 text-violet-400 font-mono"
+        severity="secondary"
+        class="font-mono"
+        :value="`${key}=${val}`"
       >
-        <TagIcon class="w-3 h-3" />
-        <span>{{ key }}={{ val }}</span>
-      </div>
+        <template #icon>
+          <TagIcon class="w-3 h-3" />
+        </template>
+      </Tag>
     </div>
 
     <!-- List Variant (used for Annotations) -->

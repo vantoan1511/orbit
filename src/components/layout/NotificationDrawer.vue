@@ -83,12 +83,11 @@ const formatRelativeTime = (timestamp: number): string => {
       <div class="flex items-center justify-between w-full pr-2">
         <div class="flex items-center gap-2">
           <span class="font-bold text-lg text-primary font-ui">Notifications</span>
-          <span
+          <Tag
             v-if="notificationStore.unreadCount > 0"
-            class="text-[11px] font-semibold px-2 py-0.5 rounded bg-rose-500/10 text-rose-500"
-          >
-            {{ notificationStore.unreadCount }} new
-          </span>
+            severity="danger"
+            :value="`${notificationStore.unreadCount} new`"
+          />
         </div>
 
         <div class="flex items-center gap-1">

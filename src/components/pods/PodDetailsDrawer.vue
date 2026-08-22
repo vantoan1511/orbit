@@ -179,11 +179,7 @@ const viewPodLogs = (containerName?: string) => {
               >
                 {{ pod.name }}
               </h3>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full font-mono border bg-purple-500/10 text-purple-400 border-purple-500/20"
-              >
-                Pod
-              </span>
+              <Tag rounded severity="info" class="font-mono" value="Pod" />
             </div>
             <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
               <span>ns: {{ pod.namespace }}</span>

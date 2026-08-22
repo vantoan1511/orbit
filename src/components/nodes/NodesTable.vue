@@ -53,16 +53,11 @@ const handleRefresh = async () => {
       <!-- Role Column -->
       <Column v-if="visibleCols['role']" field="role" header="Role" sortable class="p-3">
         <template #body="{ data }">
-          <span
-            class="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border whitespace-nowrap"
-            :class="
-              data.role === 'control-plane'
-                ? 'bg-node/10 text-node border-node/20'
-                : 'bg-(--bg-hover) text-muted-color border-(--border)'
-            "
-          >
-            {{ data.role }}
-          </span>
+          <Tag
+            rounded
+            :severity="data.role === 'control-plane' ? 'info' : 'secondary'"
+            :value="data.role"
+          />
         </template>
       </Column>
 
@@ -172,21 +167,20 @@ const handleRefresh = async () => {
       <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
         <template #body="{ data }">
           <div class="flex items-center gap-1 flex-wrap">
-            <span
+            <Tag
               v-for="label in (data.labels || []).slice(0, MAX_VISIBLE_LABELS)"
               :key="label"
-              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
+              severity="secondary"
+              class="font-mono whitespace-nowrap"
               :title="label"
-            >
-              {{ label }}
-            </span>
-            <span
+              :value="label"
+            />
+            <Tag
               v-if="(data.labels || []).length > MAX_VISIBLE_LABELS"
-              class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-(--bg-hover) text-muted-color border border-(--border)"
+              severity="secondary"
               :title="(data.labels || []).slice(MAX_VISIBLE_LABELS).join('\n')"
-            >
-              +{{ (data.labels || []).length - MAX_VISIBLE_LABELS }}
-            </span>
+              :value="`+${(data.labels || []).length - MAX_VISIBLE_LABELS}`"
+            />
           </div>
         </template>
       </Column>

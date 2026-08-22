@@ -76,10 +76,7 @@ const handleReloadKubeconfig = async () => {
       <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
         <div class="flex items-center gap-2">
           <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Startup</h4>
-          <span
-            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
-            >Coming soon</span
-          >
+          <Tag severity="secondary" value="Coming soon" />
         </div>
         <p class="text-[11px] text-muted-color">Configure how Orbit behaves when launched.</p>
       </div>
@@ -150,10 +147,7 @@ const handleReloadKubeconfig = async () => {
         <div class="flex flex-col gap-1.5 max-w-xs opacity-60">
           <div class="flex items-center gap-2">
             <label class="text-xs font-semibold text-muted-color">Update Channel</label>
-            <span
-              class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
-              >Stable only</span
-            >
+            <Tag severity="secondary" value="Stable only" />
           </div>
           <Select v-model="updateChannel" :options="channels" disabled class="text-xs w-full" />
           <span class="text-[11px] text-muted-color"
@@ -168,10 +162,7 @@ const handleReloadKubeconfig = async () => {
       <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
         <div class="flex items-center gap-2">
           <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Kubeconfig</h4>
-          <span
-            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
-            >Auto-detected</span
-          >
+          <Tag severity="secondary" value="Auto-detected" />
         </div>
         <p class="text-[11px] text-muted-color">File path location used for cluster contexts.</p>
       </div>
@@ -202,7 +193,7 @@ const handleReloadKubeconfig = async () => {
             </Button>
           </div>
           <span class="text-[11px] text-muted-color"
-            >Orbit currently monitors standard system kubeconfig locations.</span
+            >Orbit automatically resolves standard ~/.kube/config environments.</span
           >
         </div>
       </div>
@@ -213,10 +204,7 @@ const handleReloadKubeconfig = async () => {
       <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
         <div class="flex items-center gap-2">
           <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Telemetry</h4>
-          <span
-            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
-            >Disabled</span
-          >
+          <Tag severity="secondary" value="Disabled" />
         </div>
         <p class="text-[11px] text-muted-color">Help improve Orbit performance and stability.</p>
       </div>
@@ -239,10 +227,7 @@ const handleReloadKubeconfig = async () => {
         <div class="flex items-center gap-1.5 text-muted-color">
           <AlertTriangle class="w-3.5 h-3.5" />
           <h4 class="text-xs font-semibold uppercase tracking-wider">Danger Zone</h4>
-          <span
-            class="text-[10px] px-1.5 py-0.2 rounded bg-surface-200 dark:bg-surface-800 text-muted-color"
-            >Coming soon</span
-          >
+          <Tag severity="secondary" value="Coming soon" />
         </div>
         <p class="text-[11px] text-muted-color">Irreversible actions and configuration resets.</p>
       </div>

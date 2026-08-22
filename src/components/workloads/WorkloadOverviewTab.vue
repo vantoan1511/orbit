@@ -124,14 +124,14 @@ defineProps<{
         <div class="col-span-2" v-if="workloadImages && workloadImages.length">
           <span class="text-muted-color block mb-0.5">Container Images</span>
           <div class="flex flex-wrap gap-1.5 mt-1">
-            <span
+            <Tag
               v-for="img in workloadImages"
               :key="img"
-              class="bg-(--bg-hover) text-muted-color font-mono text-[10px] px-2 py-0.5 rounded border border-(--border) truncate max-w-full"
+              severity="secondary"
+              class="font-mono truncate max-w-full"
               :title="img"
-            >
-              {{ img }}
-            </span>
+              :value="img"
+            />
           </div>
         </div>
       </div>

@@ -74,14 +74,14 @@ const fetchJobs = async () => {
       <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
         <template #body="{ data }">
           <div class="flex flex-wrap gap-1">
-            <span
+            <Tag
               v-for="img in data.images"
               :key="img"
-              class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color text-[10px] border border-(--border) font-mono truncate max-w-full"
+              severity="secondary"
+              class="font-mono truncate max-w-full"
               :title="img"
-            >
-              {{ img.split('/').pop() }}
-            </span>
+              :value="img.split('/').pop()"
+            />
           </div>
         </template>
       </Column>

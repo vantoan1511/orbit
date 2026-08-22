@@ -2,7 +2,15 @@
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ServiceInfo } from '@/types/kubernetes'
-import { Activity, Clock, ExternalLink, FileCode, Server, Shield, Tag } from '@lucide/vue'
+import {
+  Activity,
+  Clock,
+  ExternalLink,
+  FileCode,
+  Server,
+  Shield,
+  Tag as TagIcon
+} from '@lucide/vue'
 import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
@@ -56,18 +64,18 @@ status:
 `
 }
 
-const getTypeBadgeClass = (type: string) => {
+const getTypeSeverity = (type: string) => {
   switch (type) {
     case 'LoadBalancer':
-      return 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
+      return 'info'
     case 'ClusterIP':
-      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+      return 'success'
     case 'NodePort':
-      return 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+      return 'warn'
     case 'ExternalName':
-      return 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+      return 'contrast'
     default:
-      return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+      return 'secondary'
   }
 }
 </script>
@@ -87,17 +95,8 @@ const getTypeBadgeClass = (type: string) => {
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
           <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
         </div>
-        <div
-          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
-        >
-          ns/{{ props.service.namespace }}
-        </div>
-        <div
-          class="text-[10px] font-semibold uppercase tracking-wider font-ui border px-2 py-0.5 rounded"
-          :class="getTypeBadgeClass(props.service.type)"
-        >
-          {{ props.service.type }}
-        </div>
+        <Tag severity="secondary" class="font-mono" :value="`ns/${props.service.namespace}`" />
+        <Tag :severity="getTypeSeverity(props.service.type)" :value="props.service.type" />
       </div>
     </template>
 
@@ -219,7 +218,7 @@ const getTypeBadgeClass = (type: string) => {
                 <h3
                   class="text-xs font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
                 >
-                  <Tag class="w-3.5 h-3.5" />
+                  <TagIcon class="w-3.5 h-3.5" />
                   <span>Selector</span>
                 </h3>
                 <div class="flex flex-wrap gap-2">

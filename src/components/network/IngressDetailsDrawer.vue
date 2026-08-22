@@ -206,17 +206,8 @@ const copyYaml = async () => {
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
           <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
         </div>
-        <div
-          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
-        >
-          ns/{{ props.ingress.namespace }}
-        </div>
-        <div
-          v-if="props.ingress.className"
-          class="text-[10px] font-semibold uppercase tracking-wider font-ui border border-purple-500/20 bg-purple-500/10 text-purple-400 px-2 py-0.5 rounded"
-        >
-          {{ props.ingress.className }}
-        </div>
+        <Tag severity="secondary" class="font-mono" :value="`ns/${props.ingress.namespace}`" />
+        <Tag v-if="props.ingress.className" severity="info" :value="props.ingress.className" />
       </div>
     </template>
 

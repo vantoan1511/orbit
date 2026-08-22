@@ -53,17 +53,20 @@ const workloadKind = computed(() => {
   return props.workload ? getWorkloadKind(props.workload) : 'Workload'
 })
 
-const TYPE_BADGE_CLASSES: Record<string, string> = {
-  Deployment: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  StatefulSet: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  DaemonSet: 'bg-teal-500/10 text-teal-400 border-teal-500/20',
-  ReplicaSet: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  Job: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  CronJob: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
+const getWorkloadSeverity = (kind: string) => {
+  switch (kind) {
+    case 'Deployment':
+    case 'StatefulSet':
+    case 'DaemonSet':
+    case 'ReplicaSet':
+      return 'info'
+    case 'Job':
+    case 'CronJob':
+      return 'warn'
+    default:
+      return 'secondary'
+  }
 }
-
-const getTypeBadgeClass = (kind: string) =>
-  TYPE_BADGE_CLASSES[kind] ?? 'bg-gray-500/10 text-gray-400 border-gray-500/20'
 
 const workloadStatus = computed(() => {
   if (!props.workload) return 'Active'
@@ -338,12 +341,12 @@ const copyYaml = async () => {
               >
                 {{ workloadName }}
               </h3>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full font-mono border"
-                :class="getTypeBadgeClass(workloadKind)"
-              >
-                {{ workloadKind }}
-              </span>
+              <Tag
+                rounded
+                class="font-mono"
+                :severity="getWorkloadSeverity(workloadKind)"
+                :value="workloadKind"
+              />
             </div>
             <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
               <span>ns: {{ workloadNamespace }}</span>

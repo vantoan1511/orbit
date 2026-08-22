@@ -168,12 +168,7 @@ const MAX_VISIBLE_LABELS = 2
     <template #name="{ data }">
       <div class="flex items-center gap-2">
         <span class="font-semibold">{{ data.name }}</span>
-        <span
-          v-if="data.isSystem"
-          class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20"
-        >
-          System
-        </span>
+        <Tag v-if="data.isSystem" severity="info" value="System" />
       </div>
     </template>
 
@@ -255,21 +250,20 @@ const MAX_VISIBLE_LABELS = 2
       <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
         <template #body="{ data }">
           <div class="flex items-center gap-1 flex-wrap">
-            <span
+            <Tag
               v-for="(val, key) in Object.fromEntries(
                 Object.entries(data.labels).slice(0, MAX_VISIBLE_LABELS)
               )"
               :key="key"
-              class="px-1.5 py-0.5 rounded text-[9px] font-mono bg-(--bg-hover) text-muted-color border border-(--border) whitespace-nowrap"
-            >
-              {{ key }}: {{ val }}
-            </span>
-            <span
+              severity="secondary"
+              class="font-mono whitespace-nowrap"
+              :value="`${key}: ${val}`"
+            />
+            <Tag
               v-if="Object.keys(data.labels).length > MAX_VISIBLE_LABELS"
-              class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-violet-500/10 text-violet-400 border border-violet-500/20"
-            >
-              +{{ Object.keys(data.labels).length - MAX_VISIBLE_LABELS }}
-            </span>
+              severity="secondary"
+              :value="`+${Object.keys(data.labels).length - MAX_VISIBLE_LABELS}`"
+            />
           </div>
         </template>
       </Column>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NamespaceInfo } from '@/types/kubernetes'
-import { BarChart2, Clock, FileCode, Layers, Tag } from '@lucide/vue'
+import { BarChart2, Clock, FileCode, Layers, Tag as TagIcon } from '@lucide/vue'
 import Button from 'primevue/button'
 import Chart from 'primevue/chart'
 import Drawer from 'primevue/drawer'
@@ -266,14 +266,17 @@ const annotationsExpanded = ref(false)
                   Labels
                 </h3>
                 <div class="flex flex-wrap gap-2">
-                  <div
+                  <Tag
                     v-for="(val, key) in props.namespace.labels"
                     :key="key"
-                    class="flex items-center gap-1 bg-violet-500/5 border border-violet-500/10 rounded-md text-[10px] px-2 py-0.5 text-violet-400 font-mono"
+                    severity="secondary"
+                    class="font-mono"
+                    :value="`${key}=${val}`"
                   >
-                    <Tag class="w-3 h-3" />
-                    <span>{{ key }}={{ val }}</span>
-                  </div>
+                    <template #icon>
+                      <TagIcon class="w-3 h-3" />
+                    </template>
+                  </Tag>
                   <div
                     v-if="Object.keys(props.namespace.labels).length === 0"
                     class="text-xs text-muted-color"
@@ -482,11 +485,7 @@ const annotationsExpanded = ref(false)
                 >
                   <div class="flex items-center justify-between mb-3">
                     <span class="text-xs font-semibold text-primary font-mono">{{ lr.type }}</span>
-                    <span
-                      class="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20 font-mono"
-                    >
-                      {{ lr.resource }}
-                    </span>
+                    <Tag severity="secondary" class="font-mono" :value="lr.resource" />
                   </div>
                   <div class="grid grid-cols-2 gap-2 text-[10px]">
                     <div>

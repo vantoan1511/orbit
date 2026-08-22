@@ -44,16 +44,16 @@ const handleRefresh = async () => {
   }
 }
 
-const getTypeBadgeClass = (type: string) => {
+const getTypeSeverity = (type: string) => {
   switch (type) {
     case 'Warning':
-      return 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+      return 'warn'
     case 'Error':
-      return 'bg-red-500/10 text-red-400 border border-red-500/20'
+      return 'danger'
     case 'Normal':
-      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+      return 'success'
     default:
-      return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+      return 'secondary'
   }
 }
 </script>
@@ -98,12 +98,7 @@ const getTypeBadgeClass = (type: string) => {
       <!-- Type Column -->
       <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3 min-w-24">
         <template #body="{ data }">
-          <span
-            class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
-            :class="getTypeBadgeClass(data.type)"
-          >
-            {{ data.type }}
-          </span>
+          <Tag :severity="getTypeSeverity(data.type)" :value="data.type" />
         </template>
       </Column>
 
