@@ -31,7 +31,6 @@ const handleRefresh = async () => {
     :hideNamespaceColumn="true"
     :hideStatusFilter="true"
     :hideStatusColumn="true"
-    :hideSystemNamespaceToggle="true"
     :searchFields="['name', 'provisioner']"
     kind="StorageClass"
     searchPlaceholder="Search Storage Classes..."

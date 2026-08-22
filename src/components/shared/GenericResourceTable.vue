@@ -16,7 +16,6 @@ import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
-import SystemNamespaceToggle from '@/components/shared/SystemNamespaceToggle.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
@@ -47,7 +46,6 @@ const props = withDefaults(
     selectable?: boolean
     hideNamespaceFilter?: boolean
     hideStatusFilter?: boolean
-    hideSystemNamespaceToggle?: boolean
     hideNameColumn?: boolean
     hideNamespaceColumn?: boolean
     hideStatusColumn?: boolean
@@ -71,7 +69,6 @@ const props = withDefaults(
     selectable: true,
     hideNamespaceFilter: false,
     hideStatusFilter: false,
-    hideSystemNamespaceToggle: false,
     hideNameColumn: false,
     hideNamespaceColumn: false,
     hideStatusColumn: false,
@@ -89,15 +86,18 @@ const emit = defineEmits<{
 const k8sStore = useKubernetesStore()
 const filterStore = useTableFilterStore()
 
-// Resource filtering (search, namespace, system namespaces)
+// Resource filtering (search, namespace)
 const resolvedStoreKey = (props.storeKey ?? props.kind ?? 'deployment').toLowerCase()
 
 // Column visibility
 const { tableColumns, visibleCols } = useTableColumns(props.initialColumns, resolvedStoreKey)
 
 const dataRef = toRef(props, 'data')
-const { searchQuery, selectedNamespace, showSystemNamespaces, filteredResources } =
-  useResourceFilters(dataRef, props.searchFields as (keyof T)[], resolvedStoreKey)
+const { searchQuery, selectedNamespace, filteredResources } = useResourceFilters(
+  dataRef,
+  props.searchFields as (keyof T)[],
+  resolvedStoreKey
+)
 
 // Status filtering
 const storedStatus = filterStore.getFilters(resolvedStoreKey).selectedStatus
@@ -258,7 +258,6 @@ const { bulkActions } = useWorkloadBulkActions(selection, {
 
     <!-- Actions Left -->
     <template #actions-left>
-      <SystemNamespaceToggle v-if="!hideSystemNamespaceToggle" v-model="showSystemNamespaces" />
       <slot name="actions-left"></slot>
     </template>
 

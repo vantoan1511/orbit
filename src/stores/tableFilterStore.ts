@@ -5,7 +5,7 @@ import { ref } from 'vue'
 export interface TableFilterState {
   searchQuery: string
   selectedNamespace: string[]
-  showSystemNamespaces: boolean
+  isNamespaceInitialized: boolean
   selectedStatus: string
   rows: number
   columns: TableColumn[]
@@ -17,7 +17,7 @@ function defaultState(): TableFilterState {
   return {
     searchQuery: '',
     selectedNamespace: [],
-    showSystemNamespaces: false,
+    isNamespaceInitialized: false,
     selectedStatus: 'All Statuses',
     rows: 25,
     columns: [],
