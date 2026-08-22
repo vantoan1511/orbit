@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import NodeDetailsDrawer from '@/components/nodes/NodeDetailsDrawer.vue'
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -189,6 +190,15 @@ const handleRefresh = async () => {
           </div>
         </template>
       </Column>
+    </template>
+
+    <!-- Drawer -->
+    <template #drawer="{ selectedItem, visible, close }">
+      <NodeDetailsDrawer
+        :visible="visible"
+        :node="selectedItem"
+        @update:visible="!$event && close()"
+      />
     </template>
   </GenericResourceTable>
 </template>

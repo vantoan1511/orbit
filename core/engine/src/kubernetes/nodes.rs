@@ -51,6 +51,7 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
             .unwrap_or_else(|| "Unknown".to_string());
 
         let uptime = format_age(&node.metadata.creation_timestamp);
+        let created_at = node.metadata.creation_timestamp.as_ref().map(|t| t.0.to_rfc3339());
 
         let mut labels = Vec::new();
         if let Some(map) = &node.metadata.labels {
@@ -59,6 +60,8 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
             }
         }
         labels.sort();
+        let labels_map = node.metadata.labels.clone().unwrap_or_default();
+        let annotations = node.metadata.annotations.clone().unwrap_or_default();
 
         let node_pods = pods_by_node.get(&name).cloned().unwrap_or_default();
         let pods_count = node_pods.len() as i32;
@@ -106,6 +109,80 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
 
         let is_cordoned = node.spec.as_ref().and_then(|s| s.unschedulable).unwrap_or(false);
 
+        let system_info = node.status.as_ref()
+            .and_then(|s| s.node_info.as_ref())
+            .map(|ni| models::NodeSystemInfo {
+                machine_id: ni.machine_id.clone(),
+                system_uuid: ni.system_uuid.clone(),
+                boot_id: ni.boot_id.clone(),
+                kernel_version: ni.kernel_version.clone(),
+                os_image: ni.os_image.clone(),
+                container_runtime_version: ni.container_runtime_version.clone(),
+                kubelet_version: ni.kubelet_version.clone(),
+                kube_proxy_version: ni.kube_proxy_version.clone(),
+                operating_system: ni.operating_system.clone(),
+                architecture: ni.architecture.clone(),
+            });
+
+        let addresses = node.status.as_ref()
+            .and_then(|s| s.addresses.as_ref())
+            .map(|addrs| {
+                addrs.iter().map(|a| models::NodeAddress {
+                    r#type: a.type_.clone(),
+                    address: a.address.clone(),
+                }).collect()
+            })
+            .unwrap_or_default();
+
+        let conditions = node.status.as_ref()
+            .and_then(|s| s.conditions.as_ref())
+            .map(|conds| {
+                conds.iter().map(|c| models::NodeCondition {
+                    r#type: c.type_.clone(),
+                    status: c.status.clone(),
+                    reason: c.reason.clone(),
+                    message: c.message.clone(),
+                    last_transition_time: c.last_transition_time.as_ref().map(|t| t.0.to_rfc3339()),
+                    last_heartbeat_time: c.last_heartbeat_time.as_ref().map(|t| t.0.to_rfc3339()),
+                }).collect()
+            })
+            .unwrap_or_default();
+
+        let taints = node.spec.as_ref()
+            .and_then(|s| s.taints.as_ref())
+            .map(|ts| {
+                ts.iter().map(|t| models::NodeTaint {
+                    key: t.key.clone(),
+                    value: t.value.clone(),
+                    effect: t.effect.clone(),
+                    time_added: t.time_added.as_ref().map(|time| time.0.to_rfc3339()),
+                }).collect()
+            })
+            .unwrap_or_default();
+
+        let capacity = node.status.as_ref()
+            .and_then(|s| s.capacity.as_ref())
+            .map(|m| models::NodeResources {
+                cpu: m.get("cpu").map(|q| q.0.clone()).unwrap_or_else(|| "-".to_string()),
+                memory: m.get("memory").map(|q| q.0.clone()).unwrap_or_else(|| "-".to_string()),
+                pods: m.get("pods").map(|q| q.0.clone()).unwrap_or_else(|| "-".to_string()),
+                ephemeral_storage: m.get("ephemeral-storage").map(|q| q.0.clone()),
+            });
+
+        let allocatable = node.status.as_ref()
+            .and_then(|s| s.allocatable.as_ref())
+            .map(|m| models::NodeResources {
+                cpu: m.get("cpu").map(|q| q.0.clone()).unwrap_or_else(|| "-".to_string()),
+                memory: m.get("memory").map(|q| q.0.clone()).unwrap_or_else(|| "-".to_string()),
+                pods: m.get("pods").map(|q| q.0.clone()).unwrap_or_else(|| "-".to_string()),
+                ephemeral_storage: m.get("ephemeral-storage").map(|q| q.0.clone()),
+            });
+
+        let images_count = node.status.as_ref()
+            .and_then(|s| s.images.as_ref())
+            .map(|imgs| imgs.len())
+            .unwrap_or(0);
+
         list.push(models::NodeInfo {
             name,
             status,
@@ -120,8 +197,18 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
             pods_count,
             pods_limit,
             uptime,
+            created_at,
             labels,
+            labels_map,
+            annotations,
             is_cordoned,
+            node_info: system_info,
+            addresses,
+            conditions,
+            taints,
+            capacity,
+            allocatable,
+            images_count,
         });
     }
 

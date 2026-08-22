@@ -94,10 +94,12 @@ const resolvedStoreKey = (props.storeKey ?? props.kind ?? 'deployment').toLowerC
 const { tableColumns, visibleCols } = useTableColumns(props.initialColumns, resolvedStoreKey)
 
 const dataRef = toRef(props, 'data')
+const hideNamespaceFilterRef = toRef(props, 'hideNamespaceFilter')
 const { searchQuery, selectedNamespace, filteredResources } = useResourceFilters(
   dataRef,
   props.searchFields as (keyof T)[],
-  resolvedStoreKey
+  resolvedStoreKey,
+  hideNamespaceFilterRef
 )
 
 // Status filtering
