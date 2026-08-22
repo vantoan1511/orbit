@@ -170,6 +170,7 @@ Before generating code:
 6. Never perform self-initiated or unrequested refactoring; touch existing code only when explicitly asked or strictly required for the requested change.
 7. Explain trade-offs when multiple implementations are reasonable.
 8. Always check-out to another branch for features implementing or bugs fixing, never work on main/master.
+9. Keep code small and well-organized by business logic boundaries.
 
 Never invent APIs that do not exist.
 
