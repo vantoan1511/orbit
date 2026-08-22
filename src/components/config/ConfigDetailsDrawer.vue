@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import { Clock, Eye, EyeOff, FileCode, Server, Shield, Tag } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -128,7 +129,7 @@ ${Object.entries(res.data)
         </h2>
         <div class="text-xs text-muted-color flex items-center gap-2">
           <Clock class="w-3.5 h-3.5" />
-          <span>Age: {{ props.resource.age }}</span>
+          <span>Age: <ReactiveAge :age="props.resource.age" /></span>
         </div>
       </div>
 
@@ -205,7 +206,7 @@ ${Object.entries(res.data)
                     <div class="grid grid-cols-3 border-b border-(--border) p-3">
                       <div class="text-xs text-muted-color font-medium">Age</div>
                       <div class="col-span-2 text-xs text-primary">
-                        {{ props.resource.age }}
+                        <ReactiveAge :age="props.resource.age" />
                       </div>
                     </div>
                     <div class="grid grid-cols-3 p-3">

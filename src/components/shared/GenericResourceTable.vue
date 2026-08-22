@@ -13,6 +13,7 @@
 >
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
@@ -329,7 +330,7 @@ const { bulkActions } = useWorkloadBulkActions(selection, {
     >
       <template #body="{ data }">
         <slot name="age" :data="data">
-          <span>{{ data.age }}</span>
+          <ReactiveAge :age="data.age" />
         </slot>
       </template>
     </Column>

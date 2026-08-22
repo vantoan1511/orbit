@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PodInfo } from '@/types/kubernetes'
+import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import { Info, Terminal } from '@lucide/vue'
 import Button from 'primevue/button'
 
@@ -41,7 +42,7 @@ const emit = defineEmits<{
                 <span>IP: {{ pod.ip || 'N/A' }}</span>
                 <span>Node: {{ pod.node || 'N/A' }}</span>
                 <span v-if="pod.restarts !== undefined">Restarts: {{ pod.restarts }}</span>
-                <span>Age: {{ pod.age }}</span>
+                <span>Age: <ReactiveAge :age="pod.age" /></span>
               </div>
             </div>
           </div>
