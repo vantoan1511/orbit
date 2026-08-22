@@ -10,7 +10,13 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
     let pods_api: Api<Pod> = Api::all(client.clone());
 
     let nodes = nodes_api.list(&ListParams::default()).await?;
-    let pods = pods_api.list(&ListParams::default()).await?;
+    let pods = match pods_api.list(&ListParams::default()).await {
+        Ok(list) => list.items,
+        Err(e) => {
+            log::warn!("Could not list pods for node metrics calculation (RBAC?): {}", e);
+            Vec::new()
+        }
+    };
 
     let mut pods_by_node: std::collections::HashMap<String, Vec<Pod>> = std::collections::HashMap::new();
     for pod in pods {

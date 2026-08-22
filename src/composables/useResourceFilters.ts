@@ -72,16 +72,20 @@ export function useResourceFilters<T extends ResourceItem>(
         if (!matches) return false
       }
 
-      // 2. Namespace filter
-      if (
-        !shouldHideNamespace.value &&
-        selectedNamespace.value.length > 0 &&
-        item.namespace &&
+      // 2. Namespace filter: only filter resources that belong to a specific namespace
+      const isNamespaced =
+        typeof item.namespace === 'string' &&
+        item.namespace.trim().length > 0 &&
         item.namespace !== '-' &&
         item.namespace !== 'Cluster' &&
         item.namespace !== 'All' &&
-        item.scope !== 'Cluster' &&
-        !selectedNamespace.value.includes(item.namespace)
+        item.scope !== 'Cluster'
+
+      if (
+        !shouldHideNamespace.value &&
+        selectedNamespace.value.length > 0 &&
+        isNamespaced &&
+        !selectedNamespace.value.includes(item.namespace as string)
       ) {
         return false
       }

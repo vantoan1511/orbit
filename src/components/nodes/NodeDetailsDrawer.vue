@@ -71,10 +71,16 @@ const fetchRawYaml = async () => {
   }
 }
 
-const handleRawData = (payload: { name?: string; namespace?: string; data?: unknown }) => {
+const handleRawData = (payload: {
+  kind?: string
+  name?: string
+  namespace?: string
+  data?: unknown
+}) => {
   if (!props.visible || !props.node) return
+  const matchesKind = !payload?.kind || payload.kind.toLowerCase() === 'node'
   const matchesName = payload?.name === props.node.name
-  if (matchesName) {
+  if (matchesKind && matchesName) {
     if (payload.data) {
       rawYamlData.value =
         typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data)
@@ -93,11 +99,13 @@ onUnmounted(() => {
 
 watch(
   () => [props.visible, props.node?.name],
-  ([newVisible]) => {
+  ([newVisible, newName], [oldVisible, oldName]) => {
     if (newVisible && props.node) {
-      rawYamlData.value = null
-      if (activeTab.value === 'yaml') {
-        fetchRawYaml()
+      if (newName !== oldName || !oldVisible) {
+        rawYamlData.value = null
+        if (activeTab.value === 'yaml') {
+          fetchRawYaml()
+        }
       }
     }
   }
