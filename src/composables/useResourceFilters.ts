@@ -1,3 +1,4 @@
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { computed, ref, watch, type Ref } from 'vue'
 
@@ -7,6 +8,8 @@ export interface ResourceItem {
   [key: string]: unknown
 }
 
+const SYSTEM_NAMESPACES = ['kube-system', 'kube-public', 'kube-node-lease', 'monitoring', 'logging']
+
 export function useResourceFilters<T extends ResourceItem>(
   resources: Ref<T[]>,
   searchFields: (keyof T)[] = ['name'],
@@ -14,10 +17,10 @@ export function useResourceFilters<T extends ResourceItem>(
 ) {
   const filterStore = storeKey ? useTableFilterStore() : null
   const stored = storeKey && filterStore ? filterStore.getFilters(storeKey) : null
+  const k8sStore = useKubernetesStore()
 
   const searchQuery = ref(stored?.searchQuery ?? '')
   const selectedNamespace = ref<string[]>(stored ? [...stored.selectedNamespace] : [])
-  const showSystemNamespaces = ref(stored?.showSystemNamespaces ?? false)
 
   if (storeKey && filterStore) {
     watch(searchQuery, (val) => {
@@ -30,9 +33,22 @@ export function useResourceFilters<T extends ResourceItem>(
       },
       { deep: true }
     )
-    watch(showSystemNamespaces, (val) => {
-      filterStore.setFilter(storeKey, 'showSystemNamespaces', val)
-    })
+
+    watch(
+      () => k8sStore.namespaceList,
+      (newList) => {
+        const state = filterStore.getFilters(storeKey)
+        if (!state.isNamespaceInitialized && newList.length > 0) {
+          const userNamespaces = newList
+            .map((n) => n.name)
+            .filter((n) => !SYSTEM_NAMESPACES.includes(n))
+
+          selectedNamespace.value = userNamespaces
+          filterStore.setFilter(storeKey, 'isNamespaceInitialized', true)
+        }
+      },
+      { immediate: true }
+    )
   }
 
   const filteredResources = computed(() => {
@@ -60,13 +76,6 @@ export function useResourceFilters<T extends ResourceItem>(
         return false
       }
 
-      // 3. System Namespaces filter
-      const isSystem =
-        item.namespace && ['kube-system', 'monitoring', 'logging'].includes(item.namespace)
-      if (!showSystemNamespaces.value && isSystem && selectedNamespace.value.length === 0) {
-        return false
-      }
-
       return true
     })
   })
@@ -74,7 +83,6 @@ export function useResourceFilters<T extends ResourceItem>(
   return {
     searchQuery,
     selectedNamespace,
-    showSystemNamespaces,
     filteredResources
   }
 }

@@ -40,7 +40,6 @@ const handleRefresh = async () => {
     :searchFields="['name', 'role', 'version']"
     :hideNamespaceFilter="true"
     :hideNamespaceColumn="true"
-    :hideSystemNamespaceToggle="true"
     :hideAgeColumn="true"
     :hideActionsColumn="true"
     searchPlaceholder="Search nodes..."

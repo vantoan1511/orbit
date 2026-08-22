@@ -61,7 +61,6 @@ const handleRefresh = async () => {
     :searchFields="['name', 'storageClass']"
     :hideNamespaceFilter="true"
     :hideNamespaceColumn="true"
-    :hideSystemNamespaceToggle="true"
     kind="PersistentVolume"
     searchPlaceholder="Search PVs..."
     emptyMessage="No Persistent Volumes found matching the filter criteria."
