@@ -33,12 +33,12 @@ const getTaintEffectSeverity = (effect: string) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="flex flex-col gap-8">
     <!-- Resource Metrics Grid -->
     <div class="grid grid-cols-3 gap-3">
       <!-- CPU -->
-      <div class="p-3.5 rounded-xl border border-(--border) bg-(--bg-card)">
-        <div class="text-[10px] font-bold uppercase tracking-wider text-muted-color mb-1">
+      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           CPU Requests
         </div>
         <div class="text-base font-bold font-mono text-primary flex items-baseline justify-between">
@@ -47,7 +47,7 @@ const getTaintEffectSeverity = (effect: string) => {
             {{ node.cpuUsed }} / {{ node.cpuTotal }} Cores
           </span>
         </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden mt-2">
+        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden mt-2.5">
           <div
             class="h-full bg-blue-500 rounded-full"
             :style="{ width: Math.min(node.cpuPct, 100) + '%' }"
@@ -56,8 +56,8 @@ const getTaintEffectSeverity = (effect: string) => {
       </div>
 
       <!-- Memory -->
-      <div class="p-3.5 rounded-xl border border-(--border) bg-(--bg-card)">
-        <div class="text-[10px] font-bold uppercase tracking-wider text-muted-color mb-1">
+      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           Memory Requests
         </div>
         <div class="text-base font-bold font-mono text-primary flex items-baseline justify-between">
@@ -66,7 +66,7 @@ const getTaintEffectSeverity = (effect: string) => {
             {{ node.memUsed }} / {{ node.memTotal }} GiB
           </span>
         </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden mt-2">
+        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden mt-2.5">
           <div
             class="h-full bg-indigo-500 rounded-full"
             :style="{ width: Math.min(node.memPct, 100) + '%' }"
@@ -75,8 +75,8 @@ const getTaintEffectSeverity = (effect: string) => {
       </div>
 
       <!-- Pods -->
-      <div class="p-3.5 rounded-xl border border-(--border) bg-(--bg-card)">
-        <div class="text-[10px] font-bold uppercase tracking-wider text-muted-color mb-1">
+      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           Allocated Pods
         </div>
         <div class="text-base font-bold font-mono text-primary flex items-baseline justify-between">
@@ -85,7 +85,7 @@ const getTaintEffectSeverity = (effect: string) => {
             {{ node.podsCount }} / {{ node.podsLimit }}
           </span>
         </div>
-        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden mt-2">
+        <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden mt-2.5">
           <div
             class="h-full bg-sky-500 rounded-full"
             :style="{ width: Math.min(podsPct, 100) + '%' }"
@@ -96,12 +96,10 @@ const getTaintEffectSeverity = (effect: string) => {
 
     <!-- Node Attributes & Addresses -->
     <div>
-      <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2.5">
+      <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Node Attributes
       </div>
-      <div
-        class="grid grid-cols-2 gap-3 p-4 rounded-xl border border-(--border) bg-(--bg-card) text-xs"
-      >
+      <div class="grid grid-cols-2 gap-4 p-4 rounded-xl bg-(--bg-hover)/40 text-xs">
         <div>
           <span class="text-muted-color">Role: </span>
           <span class="font-semibold text-primary uppercase font-mono">{{ node.role }}</span>
@@ -142,16 +140,16 @@ const getTaintEffectSeverity = (effect: string) => {
         <!-- Node Addresses -->
         <div
           v-if="node.addresses && node.addresses.length > 0"
-          class="col-span-2 pt-2 border-t border-(--border)/50 mt-1"
+          class="col-span-2 pt-3 border-t border-(--border)/30 mt-1"
         >
-          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2">
+          <div class="text-[10px] font-semibold text-muted-color uppercase tracking-wider mb-2">
             Addresses
           </div>
-          <div class="flex flex-wrap gap-3">
+          <div class="flex flex-wrap gap-2.5">
             <div
               v-for="addr in node.addresses"
               :key="addr.type + addr.address"
-              class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-(--bg-hover)/60 border border-(--border)"
+              class="flex items-center gap-1.5 px-2.5 py-1 rounded bg-(--bg-hover)/80"
             >
               <span class="text-muted-color text-[11px]">{{ addr.type }}:</span>
               <span class="font-mono font-medium text-primary text-[11px]">{{ addr.address }}</span>
@@ -163,12 +161,10 @@ const getTaintEffectSeverity = (effect: string) => {
 
     <!-- System Information -->
     <div v-if="node.nodeInfo">
-      <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2.5">
+      <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         System Information
       </div>
-      <div
-        class="grid grid-cols-2 gap-3 p-4 rounded-xl border border-(--border) bg-(--bg-card) text-xs"
-      >
+      <div class="grid grid-cols-2 gap-4 p-4 rounded-xl bg-(--bg-hover)/40 text-xs">
         <div>
           <span class="text-muted-color">OS Image: </span>
           <span class="font-medium text-primary font-mono">{{ node.nodeInfo.osImage || '-' }}</span>
@@ -226,21 +222,21 @@ const getTaintEffectSeverity = (effect: string) => {
 
     <!-- Capacity & Allocatable -->
     <div v-if="node.capacity || node.allocatable">
-      <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2.5">
+      <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Capacity & Allocatable
       </div>
-      <div class="rounded-xl border border-(--border) bg-(--bg-card) overflow-hidden text-xs">
+      <div class="rounded-xl bg-(--bg-hover)/40 overflow-hidden text-xs">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
-              class="border-b border-(--border) bg-(--bg-hover)/40 text-[10px] text-muted-color uppercase tracking-wider font-semibold"
+              class="bg-(--bg-hover)/60 text-[10px] text-muted-color uppercase tracking-wider font-semibold"
             >
               <th class="p-2.5 pl-4">Resource</th>
               <th class="p-2.5">Capacity</th>
               <th class="p-2.5 pr-4">Allocatable</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-(--border)/50 font-mono">
+          <tbody class="divide-y divide-(--border)/30 font-mono">
             <tr>
               <td class="p-2.5 pl-4 text-muted-color font-sans font-medium">CPU</td>
               <td class="p-2.5 text-primary">{{ node.capacity?.cpu || '-' }}</td>
@@ -270,14 +266,14 @@ const getTaintEffectSeverity = (effect: string) => {
 
     <!-- Node Conditions -->
     <div v-if="node.conditions && node.conditions.length > 0">
-      <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2.5">
+      <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Conditions ({{ node.conditions.length }})
       </div>
-      <div class="rounded-xl border border-(--border) bg-(--bg-card) overflow-hidden text-xs">
+      <div class="rounded-xl bg-(--bg-hover)/40 overflow-hidden text-xs">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
-              class="border-b border-(--border) bg-(--bg-hover)/40 text-[10px] text-muted-color uppercase tracking-wider font-semibold"
+              class="bg-(--bg-hover)/60 text-[10px] text-muted-color uppercase tracking-wider font-semibold"
             >
               <th class="p-2.5 pl-4">Type</th>
               <th class="p-2.5">Status</th>
@@ -285,7 +281,7 @@ const getTaintEffectSeverity = (effect: string) => {
               <th class="p-2.5 pr-4">Message</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-(--border)/50">
+          <tbody class="divide-y divide-(--border)/30">
             <tr v-for="cond in node.conditions" :key="cond.type">
               <td class="p-2.5 pl-4 font-semibold text-primary font-mono">{{ cond.type }}</td>
               <td class="p-2.5">
@@ -311,14 +307,14 @@ const getTaintEffectSeverity = (effect: string) => {
 
     <!-- Node Taints -->
     <div v-if="node.taints && node.taints.length > 0">
-      <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2.5">
+      <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Taints ({{ node.taints.length }})
       </div>
-      <div class="space-y-2">
+      <div class="bg-(--bg-hover)/40 rounded-xl p-3 flex flex-col gap-2">
         <div
           v-for="(taint, idx) in node.taints"
           :key="idx"
-          class="flex items-center justify-between p-2.5 rounded-lg border border-(--border) bg-(--bg-card) text-xs font-mono"
+          class="flex items-center justify-between p-2.5 rounded-lg bg-(--bg-hover)/60 text-xs font-mono"
         >
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-primary font-semibold">{{ taint.key }}</span>
