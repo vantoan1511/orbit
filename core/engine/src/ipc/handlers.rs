@@ -1048,6 +1048,58 @@ pub fn dispatch(
                 }
             });
         }
+        "updateResourceImages" => {
+            tokio::spawn(async move {
+                let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+                let kind = get_string(&data, "kind").unwrap_or_default();
+                let name = get_string(&data, "name").unwrap_or_default();
+                let containers: Vec<crate::kubernetes::models::ContainerImageInfo> = data
+                    .as_ref()
+                    .and_then(|d| d.get("containers"))
+                    .and_then(|c| serde_json::from_value(c.clone()).ok())
+                    .unwrap_or_default();
+
+                if containers.is_empty() {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: "No containers provided for image update".to_string(),
+                        },
+                    ).await;
+                    return;
+                }
+
+                let client = {
+                    let r_manager = manager.read().await;
+                    r_manager.active_client.clone()
+                };
+
+                if let Some(ref client) = client {
+                    match crate::kubernetes::workloads::update_images_resource(client, &namespace, &kind, &name, containers).await {
+                        Ok(()) => {
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::CommandSucceeded {
+                                    message: format!("Updated images for {} {}", kind, name),
+                                },
+                            ).await;
+                        }
+                        Err(e) => {
+                            log::error!("Error updating images for {}: {:?}", kind, e);
+                            let _ = Bridge::send_event(
+                                &writer,
+                                &token,
+                                &OrbitEvent::ErrorOccurred {
+                                    message: format!("Failed to update images: {}", crate::kubernetes::format_error(&e)),
+                                },
+                            ).await;
+                        }
+                    }
+                }
+            });
+        }
         "redeployResource" => {
             tokio::spawn(async move {
                 let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());

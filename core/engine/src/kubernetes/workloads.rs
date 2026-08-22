@@ -147,11 +147,16 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
     }
 
     let mut images = Vec::new();
+    let mut containers = Vec::new();
     if let Some(spec) = d.spec.as_ref() {
         for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
             if let Some(img) = &c.image {
                 images.push(img.clone());
             }
+            containers.push(models::ContainerImageInfo {
+                name: c.name.clone(),
+                image: c.image.clone().unwrap_or_default(),
+            });
         }
     }
 
@@ -174,6 +179,7 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
         up_to_date,
         age,
         images,
+        containers,
         strategy,
         min_ready_seconds,
         revision_history,
@@ -461,3 +467,57 @@ pub async fn delete_pod(
     api.delete(name, &DeleteParams::default()).await?;
     Ok(())
 }
+
+pub async fn update_images_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+    containers: Vec<models::ContainerImageInfo>,
+) -> Result<(), kube::Error> {
+    let containers_patch: Vec<serde_json::Value> = containers
+        .into_iter()
+        .map(|c| {
+            serde_json::json!({
+                "name": c.name,
+                "image": c.image
+            })
+        })
+        .collect();
+
+    let patch = serde_json::json!({
+        "spec": {
+            "template": {
+                "spec": {
+                    "containers": containers_patch
+                }
+            }
+        }
+    });
+    let patch_params = PatchParams::default();
+
+    match kind {
+        "Deployment" => {
+            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+        }
+        "StatefulSet" => {
+            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+        }
+        "DaemonSet" => {
+            let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+        }
+        _ => {
+            return Err(kube::Error::Api(kube::error::ErrorResponse {
+                status: "Failure".to_string(),
+                message: format!("Unsupported update images resource kind: {}", kind),
+                reason: "BadRequest".to_string(),
+                code: 400,
+            }))
+        }
+    }
+    Ok(())
+}
+

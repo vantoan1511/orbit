@@ -55,6 +55,11 @@ export interface DaemonSetReplicas {
   available: number
 }
 
+export interface ContainerImageInfo {
+  name: string
+  image: string
+}
+
 export interface DeploymentInfo {
   name: string
   namespace: string
@@ -64,6 +69,7 @@ export interface DeploymentInfo {
   upToDate: number
   age: string
   images: string[]
+  containers?: ContainerImageInfo[]
   strategy?: string
   minReadySeconds: number
   revisionHistory?: number
