@@ -7,6 +7,7 @@ import { useRouter } from 'vue-router'
 import { kubernetesService } from '@/services/kubernetesService'
 import ScaleDialog from '@/components/shared/ScaleDialog.vue'
 import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
+import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
 
 export interface WorkloadActionOptions<T> {
   kind?: MaybeRefOrGetter<string>
@@ -136,6 +137,52 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                     severity: 'error',
                     summary: 'Error',
                     detail: e instanceof Error ? e.message : 'Failed to clone Ingress',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      })
+    }
+
+    // Clone (Deployment only)
+    if (resourceKind === 'Deployment') {
+      items.push({
+        label: 'Clone',
+        icon: 'pi pi-copy',
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+
+          dialog.open(CloneDeploymentDialog, {
+            props: {
+              header: 'Clone Deployment',
+              style: {
+                width: '380px'
+              },
+              modal: true
+            },
+            data: {
+              sourceName: row.name,
+              sourceNamespace: row.namespace || 'default'
+            },
+            onClose: async (options) => {
+              const result = options?.data as { newName: string; newNamespace: string } | undefined
+              if (result?.newName) {
+                try {
+                  await kubernetesService.cloneDeployment({
+                    sourceNamespace: row.namespace || 'default',
+                    sourceName: row.name,
+                    newName: result.newName,
+                    newNamespace: result.newNamespace
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to clone Deployment',
                     life: 5000
                   })
                 }

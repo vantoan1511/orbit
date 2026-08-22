@@ -1,5 +1,5 @@
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, DeleteParams},
+    api::{Api, ListParams, Patch, PatchParams, DeleteParams, PostParams},
     Client,
 };
 use k8s_openapi::api::core::v1::Pod;
@@ -519,5 +519,147 @@ pub async fn update_images_resource(
         }
     }
     Ok(())
+}
+
+pub async fn clone_deployment(
+    client: &Client,
+    source_namespace: &str,
+    source_name: &str,
+    new_name: &str,
+    new_namespace: &str,
+) -> Result<(), kube::Error> {
+    let source_api: Api<Deployment> = Api::namespaced(client.clone(), source_namespace);
+    let mut cloned = source_api.get(source_name).await?;
+
+    // Strip server-managed metadata
+    cloned.metadata.uid = None;
+    cloned.metadata.resource_version = None;
+    cloned.metadata.creation_timestamp = None;
+    cloned.metadata.generation = None;
+    cloned.metadata.managed_fields = None;
+    cloned.metadata.owner_references = None;
+    cloned.metadata.finalizers = None;
+    cloned.status = None;
+
+    cloned.metadata.name = Some(new_name.to_string());
+    cloned.metadata.namespace = Some(new_namespace.to_string());
+
+    // Update metadata labels if any match source_name
+    if let Some(labels) = cloned.metadata.labels.as_mut() {
+        for (_, val) in labels.iter_mut() {
+            if val == source_name {
+                *val = new_name.to_string();
+            }
+        }
+    }
+
+    // Update spec.selector.match_labels and spec.template.metadata.labels
+    if let Some(spec) = cloned.spec.as_mut() {
+        if let Some(match_labels) = spec.selector.match_labels.as_mut() {
+            for (_, val) in match_labels.iter_mut() {
+                if val == source_name {
+                    *val = new_name.to_string();
+                }
+            }
+        }
+
+        if let Some(template_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
+            for (_, val) in template_labels.iter_mut() {
+                if val == source_name {
+                    *val = new_name.to_string();
+                }
+            }
+        }
+    }
+
+    let target_api: Api<Deployment> = Api::namespaced(client.clone(), new_namespace);
+    target_api.create(&PostParams::default(), &cloned).await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
+    use k8s_openapi::api::core::v1::PodTemplateSpec;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_clone_deployment_label_patching() {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "my-service".to_string());
+        labels.insert("tier".to_string(), "backend".to_string());
+
+        let mut template_labels = BTreeMap::new();
+        template_labels.insert("app".to_string(), "my-service".to_string());
+        template_labels.insert("tier".to_string(), "backend".to_string());
+
+        let mut dep = Deployment {
+            metadata: ObjectMeta {
+                name: Some("my-service".to_string()),
+                namespace: Some("default".to_string()),
+                labels: Some(labels.clone()),
+                ..Default::default()
+            },
+            spec: Some(DeploymentSpec {
+                selector: LabelSelector {
+                    match_labels: Some(labels.clone()),
+                    ..Default::default()
+                },
+                template: PodTemplateSpec {
+                    metadata: Some(ObjectMeta {
+                        labels: Some(template_labels),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            status: None,
+        };
+
+        let source_name = "my-service";
+        let new_name = "my-service-copy";
+
+        // Apply metadata updates as in clone_deployment
+        dep.metadata.name = Some(new_name.to_string());
+        if let Some(meta_labels) = dep.metadata.labels.as_mut() {
+            for (_, val) in meta_labels.iter_mut() {
+                if val == source_name {
+                    *val = new_name.to_string();
+                }
+            }
+        }
+
+        if let Some(spec) = dep.spec.as_mut() {
+            if let Some(match_labels) = spec.selector.match_labels.as_mut() {
+                for (_, val) in match_labels.iter_mut() {
+                    if val == source_name {
+                        *val = new_name.to_string();
+                    }
+                }
+            }
+
+            if let Some(t_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
+                for (_, val) in t_labels.iter_mut() {
+                    if val == source_name {
+                        *val = new_name.to_string();
+                    }
+                }
+            }
+        }
+
+        assert_eq!(dep.metadata.name.as_deref(), Some("my-service-copy"));
+        assert_eq!(dep.metadata.labels.as_ref().unwrap().get("app").unwrap(), "my-service-copy");
+        assert_eq!(dep.metadata.labels.as_ref().unwrap().get("tier").unwrap(), "backend");
+        assert_eq!(
+            dep.spec.as_ref().unwrap().selector.match_labels.as_ref().unwrap().get("app").unwrap(),
+            "my-service-copy"
+        );
+        assert_eq!(
+            dep.spec.as_ref().unwrap().template.metadata.as_ref().unwrap().labels.as_ref().unwrap().get("app").unwrap(),
+            "my-service-copy"
+        );
+    }
 }
 

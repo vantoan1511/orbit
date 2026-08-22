@@ -63,6 +63,7 @@ pub fn dispatch(
         "applyResource" => resource::apply_resource(data, writer, token, manager),
         "createResource" => resource::create_resource(data, writer, token, manager),
         "cloneIngress" => network::clone_ingress(data, writer, token, manager),
+        "cloneDeployment" => workloads::clone_deployment(data, writer, token, manager),
         _ => {}
     }
 }

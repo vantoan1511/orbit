@@ -24,6 +24,7 @@ declare module 'vue' {
     AppSidebarPanel: typeof import('./src/components/layout/sidebar/AppSidebarPanel.vue')['default']
     Button: typeof import('primevue/button')['default']
     Card: typeof import('primevue/card')['default']
+    CloneDeploymentDialog: typeof import('./src/components/shared/CloneDeploymentDialog.vue')['default']
     CloneIngressDialog: typeof import('./src/components/shared/CloneIngressDialog.vue')['default']
     Column: typeof import('primevue/column')['default']
     ConfigDataTable: typeof import('./src/components/config/ConfigDataTable.vue')['default']

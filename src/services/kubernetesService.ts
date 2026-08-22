@@ -236,5 +236,14 @@ export const kubernetesService = {
     newHosts: string[]
   }): Promise<void> {
     await coreEngine.dispatch('cloneIngress', params)
+  },
+
+  async cloneDeployment(params: {
+    sourceNamespace: string
+    sourceName: string
+    newName: string
+    newNamespace: string
+  }): Promise<void> {
+    await coreEngine.dispatch('cloneDeployment', params)
   }
 }
