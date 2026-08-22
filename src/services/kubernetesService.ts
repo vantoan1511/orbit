@@ -219,6 +219,15 @@ export const kubernetesService = {
     await coreEngine.dispatch('applyResource', params)
   },
 
+  async createResource(params: {
+    namespace: string
+    kind: string
+    name: string
+    data: Record<string, unknown>
+  }): Promise<void> {
+    await coreEngine.dispatch('createResource', params)
+  },
+
   async cloneIngress(params: {
     sourceNamespace: string
     sourceName: string

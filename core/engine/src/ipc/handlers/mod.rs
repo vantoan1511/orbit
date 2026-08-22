@@ -61,6 +61,7 @@ pub fn dispatch(
         "restartPod" => workloads::restart_pod(data, writer, token, manager),
         "getResourceRaw" => resource::get_resource_raw(data, writer, token, manager),
         "applyResource" => resource::apply_resource(data, writer, token, manager),
+        "createResource" => resource::create_resource(data, writer, token, manager),
         "cloneIngress" => network::clone_ingress(data, writer, token, manager),
         _ => {}
     }

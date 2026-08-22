@@ -2,6 +2,9 @@
 import ViewLayout from '@/components/shared/ViewLayout.vue'
 import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import Button from 'primevue/button'
+import { useDialog } from 'primevue/usedialog'
+import CreateDeploymentDialog from '@/components/workloads/CreateDeploymentDialog.vue'
 import CronJobsTable from '@/components/workloads/CronJobsTable.vue'
 import DaemonSetsTable from '@/components/workloads/DaemonSetsTable.vue'
 import DeploymentsTable from '@/components/workloads/DeploymentsTable.vue'
@@ -13,6 +16,7 @@ import StatefulSetsTable from '@/components/workloads/StatefulSetsTable.vue'
 import WorkloadMetricsCards from '@/components/workloads/WorkloadMetricsCards.vue'
 
 const route = useRoute()
+const dialog = useDialog()
 const activeTab = ref((route.query.tab as string) || 'deployments')
 const visitedTabs = ref(new Set([activeTab.value]))
 
@@ -30,10 +34,31 @@ watch(
 watch(activeTab, (newTab) => {
   visitedTabs.value.add(newTab)
 })
+
+const openCreateDeploymentDialog = () => {
+  dialog.open(CreateDeploymentDialog, {
+    props: {
+      header: 'Create Deployment',
+      style: {
+        width: '420px'
+      },
+      modal: true
+    }
+  })
+}
 </script>
 
 <template>
   <ViewLayout title="Workloads">
+    <template #actions>
+      <Button
+        v-if="activeTab === 'deployments'"
+        label="Create"
+        icon="pi pi-plus"
+        size="small"
+        @click="openCreateDeploymentDialog"
+      />
+    </template>
     <Tabs v-model:value="activeTab">
       <TabPanels>
         <!-- Overview Tab -->

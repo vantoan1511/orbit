@@ -30,7 +30,7 @@ pub use events::list_events;
 pub use policies::*;
 pub use logs::{stream_pod_logs, get_workload_pods};
 pub use delete::delete_resource;
-pub use edit::{get_resource_raw, apply_resource};
+pub use edit::{get_resource_raw, apply_resource, create_resource};
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
 pub(crate) fn format_age(creation_timestamp: &Option<k8s_openapi::apimachinery::pkg::apis::meta::v1::Time>) -> String {

@@ -96,6 +96,52 @@ pub fn apply_resource(
     });
 }
 
+pub fn create_resource(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+        let kind = get_string(&data, "kind").unwrap_or_default();
+        let name = get_string(&data, "name").unwrap_or_default();
+        let raw_json = data.as_ref()
+            .and_then(|d| d.get("data"))
+            .cloned()
+            .unwrap_or(serde_json::Value::Null);
+
+        let client = {
+            let r_manager = manager.read().await;
+            r_manager.active_client.clone()
+        };
+
+        if let Some(ref client) = client {
+            match crate::kubernetes::create_resource(client, &namespace, &kind, raw_json).await {
+                Ok(()) => {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::CommandSucceeded {
+                            message: format!("Created {} {}", kind, name),
+                        },
+                    ).await;
+                }
+                Err(e) => {
+                    log::error!("Error creating resource {}: {:?}", name, e);
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: format!("Failed to create resource: {}", crate::kubernetes::format_error(&e)),
+                        },
+                    ).await;
+                }
+            }
+        }
+    });
+}
+
 pub fn delete_resource(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
