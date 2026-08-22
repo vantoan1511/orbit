@@ -98,11 +98,33 @@ export function useLogSelection() {
   ]
 
   watch(selectedWorkloadKind, () => {
-    selectedWorkloadName.value = workloads.value[0] || ''
+    if (
+      selectedWorkloadKind.value !== 'Pod' &&
+      !workloads.value.includes(selectedWorkloadName.value)
+    ) {
+      selectedWorkloadName.value = workloads.value[0] || ''
+    }
   })
 
   watch(selectedNamespace, () => {
-    selectedWorkloadName.value = workloads.value[0] || ''
+    if (
+      selectedWorkloadKind.value !== 'Pod' &&
+      !workloads.value.includes(selectedWorkloadName.value)
+    ) {
+      selectedWorkloadName.value = workloads.value[0] || ''
+    }
+  })
+
+  watch(podOptions, () => {
+    if (!podOptions.value.includes(selectedPodName.value)) {
+      selectedPodName.value = 'All'
+    }
+  })
+
+  watch(containerOptions, () => {
+    if (!containerOptions.value.includes(selectedContainerName.value)) {
+      selectedContainerName.value = 'All'
+    }
   })
 
   return {

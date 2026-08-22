@@ -4,10 +4,10 @@ import { ref } from 'vue'
 
 export interface RecentLogInfo {
   namespace: string
-  workloadKind?: string
-  workloadName?: string
-  pod: string
-  container: string
+  workloadKind: string
+  workloadName: string
+  pod?: string
+  container?: string
   timestamp: number
 }
 
@@ -33,13 +33,13 @@ export const useLogsStore = defineStore('logs', () => {
   }
 
   async function addRecentLog(log: Omit<RecentLogInfo, 'timestamp'>) {
-    // Filter out existing duplicate entry for pod + container + namespace
+    // Filter out existing duplicate entry for namespace + workloadKind + workloadName
     const filtered = recentLogs.value.filter(
       (item) =>
         !(
           item.namespace === log.namespace &&
-          item.pod === log.pod &&
-          item.container === log.container
+          item.workloadKind === log.workloadKind &&
+          item.workloadName === log.workloadName
         )
     )
 

@@ -26,18 +26,26 @@ const {
   selectedPodName,
   selectedContainerName,
   tailLines,
-  tailLinesOptions
+  tailLinesOptions,
+  podOptions,
+  containerOptions
 } = useLogSelection()
 
 watch(
-  [selectedNamespace, selectedPodName, selectedContainerName],
-  ([ns, pod, container]) => {
-    if (ns && pod && pod !== 'All') {
+  [
+    selectedNamespace,
+    selectedWorkloadKind,
+    selectedWorkloadName,
+    selectedPodName,
+    selectedContainerName
+  ],
+  ([ns, kind, workload, pod, container]) => {
+    if (ns && workload) {
       logsStore.addRecentLog({
         namespace: ns,
-        workloadKind: selectedWorkloadKind.value,
-        workloadName: selectedWorkloadName.value,
-        pod,
+        workloadKind: kind,
+        workloadName: workload,
+        pod: pod || 'All',
         container: container || 'All'
       })
     }
@@ -101,20 +109,20 @@ const LOG_ITEM_HEIGHT = 28
     <Card :dt="{ body: { padding: '0' } }">
       <template #content>
         <div class="flex items-center justify-between gap-3 p-1.5 px-3">
-          <div class="flex items-center gap-3.5 flex-1">
+          <div class="flex items-center gap-3.5 flex-1 overflow-x-auto">
             <InputText
               v-model="searchQuery"
               placeholder="Search logs..."
               size="small"
-              class="text-xs w-full max-w-xs"
+              class="text-xs w-full max-w-xs shrink-0"
             />
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
               <Checkbox v-model="isRegex" inputId="is-regex" binary class="border-surface" />
               <label for="is-regex" class="text-xs text-muted-color cursor-pointer select-none"
                 >Regex</label
               >
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
               <Checkbox v-model="showTimestamps" inputId="show-timestamps" binary />
               <label
                 for="show-timestamps"
@@ -122,7 +130,7 @@ const LOG_ITEM_HEIGHT = 28
                 >Timestamps</label
               >
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
               <ToggleSwitch
                 v-model="isFollowing"
                 inputId="is-following"
@@ -134,7 +142,25 @@ const LOG_ITEM_HEIGHT = 28
                 >Follow</label
               >
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-xs text-muted-color select-none">Pod</span>
+              <Select
+                v-model="selectedPodName"
+                :options="podOptions"
+                size="small"
+                class="text-xs min-w-28 max-w-44"
+              />
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-xs text-muted-color select-none">Container</span>
+              <Select
+                v-model="selectedContainerName"
+                :options="containerOptions"
+                size="small"
+                class="text-xs min-w-28 max-w-44"
+              />
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
               <span class="text-xs text-muted-color select-none">Lines</span>
               <Select
                 v-model="tailLines"
