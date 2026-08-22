@@ -102,14 +102,14 @@ defineProps<{
         Container Images ({{ pod.images.length }})
       </div>
       <div class="flex flex-wrap gap-2">
-        <span
+        <Tag
           v-for="img in pod.images"
           :key="img"
-          class="px-2.5 py-1 bg-(--bg-hover) border border-(--border) rounded-lg text-xs font-mono text-primary truncate max-w-full"
+          severity="secondary"
+          class="font-mono truncate max-w-full"
           :title="img"
-        >
-          {{ img }}
-        </span>
+          :value="img"
+        />
       </div>
     </div>
 

@@ -77,16 +77,10 @@ const fetchCronJobs = async () => {
       <!-- Suspend Column -->
       <Column v-if="visibleCols['suspend']" field="suspend" header="Suspend" sortable class="p-3">
         <template #body="{ data }">
-          <span
-            class="font-medium px-2 py-0.5 rounded text-[10px] uppercase tracking-wider"
-            :class="
-              data.suspend
-                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-            "
-          >
-            {{ data.suspend ? 'True' : 'False' }}
-          </span>
+          <Tag
+            :severity="data.suspend ? 'warn' : 'success'"
+            :value="data.suspend ? 'True' : 'False'"
+          />
         </template>
       </Column>
 

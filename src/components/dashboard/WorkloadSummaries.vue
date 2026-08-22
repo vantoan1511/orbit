@@ -14,7 +14,7 @@ const items = computed(() => {
       iconColor: 'text-deployment bg-(--deployment)/10',
       statusLabel: 'Available',
       statusVal: store.deployments.reduce((acc, d) => acc + d.available, 0),
-      statusColor: 'text-emerald-500 bg-emerald-500/10'
+      statusSeverity: 'success'
     },
     {
       title: 'StatefulSets',
@@ -23,7 +23,7 @@ const items = computed(() => {
       iconColor: 'text-statefulset bg-(--statefulset)/10',
       statusLabel: 'Current',
       statusVal: store.statefulSets.reduce((acc, s) => acc + s.replicas.current, 0),
-      statusColor: 'text-emerald-500 bg-emerald-500/10'
+      statusSeverity: 'success'
     },
     {
       title: 'DaemonSets',
@@ -32,7 +32,7 @@ const items = computed(() => {
       iconColor: 'text-daemonset bg-(--daemonset)/10',
       statusLabel: 'Ready',
       statusVal: store.daemonSets.reduce((acc, d) => acc + d.replicas.ready, 0),
-      statusColor: 'text-emerald-500 bg-emerald-500/10'
+      statusSeverity: 'success'
     },
     {
       title: 'Jobs',
@@ -42,7 +42,7 @@ const items = computed(() => {
       statusLabel: 'Completed',
       statusVal: store.jobs.filter((j) => j.status === 'Complete' || j.status === 'Completed')
         .length,
-      statusColor: 'text-emerald-500 bg-emerald-500/10'
+      statusSeverity: 'success'
     },
     {
       title: 'Persistent Volumes',
@@ -51,7 +51,7 @@ const items = computed(() => {
       iconColor: 'text-muted-color bg-(--bg-hover)',
       statusLabel: 'Bound',
       statusVal: store.persistentVolumes.filter((pv) => pv.status === 'Bound').length,
-      statusColor: 'text-emerald-500 bg-emerald-500/10'
+      statusSeverity: 'success'
     },
     {
       title: 'CronJobs',
@@ -60,7 +60,7 @@ const items = computed(() => {
       iconColor: 'text-rose-500 bg-rose-500/10',
       statusLabel: 'Active',
       statusVal: store.cronJobs.reduce((acc, c) => acc + c.active, 0),
-      statusColor: 'text-amber-500 bg-amber-500/10'
+      statusSeverity: 'warn'
     }
   ]
 })
@@ -89,9 +89,7 @@ const items = computed(() => {
       <template #footer>
         <div class="mt-4 flex items-center justify-between text-xs border-t border-surface pt-3">
           <span class="text-muted-color font-medium">{{ item.statusLabel }}</span>
-          <span class="px-2 py-0.5 rounded text-xs font-bold" :class="item.statusColor">
-            {{ item.statusVal }}
-          </span>
+          <Tag :severity="item.statusSeverity" :value="item.statusVal" />
         </div>
       </template>
     </Card>

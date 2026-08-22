@@ -351,6 +351,69 @@ const NoirPreset: Preset = {
       root: {
         padding: '0.25rem 0.5rem'
       }
+    },
+    tag: {
+      root: {
+        fontSize: '0.625rem',
+        fontWeight: '600',
+        padding: '0.125rem 0.375rem',
+        borderRadius: '{content.border.radius}',
+        gap: '0.25rem'
+      },
+      colorScheme: {
+        light: {
+          secondary: {
+            background: '{surface.100}',
+            color: '{surface.700}'
+          },
+          info: {
+            background: 'rgba(79, 140, 255, 0.12)',
+            color: '#2563eb'
+          },
+          success: {
+            background: 'rgba(40, 167, 69, 0.12)',
+            color: '#16a34a'
+          },
+          warn: {
+            background: 'rgba(244, 161, 0, 0.12)',
+            color: '#d97706'
+          },
+          danger: {
+            background: 'rgba(214, 69, 69, 0.12)',
+            color: '#dc2626'
+          },
+          contrast: {
+            background: '{surface.950}',
+            color: '{surface.0}'
+          }
+        },
+        dark: {
+          secondary: {
+            background: '{surface.800}',
+            color: '{surface.300}'
+          },
+          info: {
+            background: 'rgba(106, 168, 255, 0.14)',
+            color: '#60a5fa'
+          },
+          success: {
+            background: 'rgba(16, 185, 129, 0.14)',
+            color: '#34d399'
+          },
+          warn: {
+            background: 'rgba(245, 158, 11, 0.14)',
+            color: '#fbbf24'
+          },
+          danger: {
+            background: 'rgba(244, 63, 94, 0.14)',
+            color: '#f87171'
+          },
+          contrast: {
+            background: '{surface.0}',
+            color: '{surface.950}'
+          }
+        }
+      }
     }
   }
 }

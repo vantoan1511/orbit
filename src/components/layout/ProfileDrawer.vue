@@ -32,44 +32,41 @@ const handleOpenSettings = () => {
   router.push('/settings')
 }
 
-const getAuthTypeColorClass = (authType: string) => {
+const getAuthTypeSeverity = (authType: string) => {
   switch (authType) {
     case 'Certificate':
-      return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+      return 'success'
     case 'Token':
-      return 'text-sky-400 bg-sky-500/10 border-sky-500/20'
+      return 'info'
     case 'Exec Plugin':
-      return 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+      return 'warn'
     case 'OIDC':
-      return 'text-purple-400 bg-purple-500/10 border-purple-500/20'
+      return 'contrast'
     default:
-      return 'text-muted-color bg-(--bg-hover) border-(--border)'
+      return 'secondary'
   }
 }
 </script>
 
 <template>
   <Drawer
-    v-model:visible="profileStore.isDrawerOpen"
+    :visible="profileStore.isDrawerOpen"
+    @update:visible="profileStore.closeDrawer"
     position="right"
     class="w-full sm:max-w-md border-l border-(--border) bg-(--bg-card) p-0"
+    :header="'User Profile'"
     :style="{ width: '28rem' }"
   >
     <template #header>
       <div class="flex items-center justify-between w-full pr-2">
         <div class="flex items-center gap-2">
           <span class="font-bold text-lg text-primary font-ui">User Profile</span>
-          <span
+          <Tag
             v-if="profileStore.profile?.k8sVersion"
-            class="text-xs font-semibold px-2 py-0.5 rounded-full border"
-            :class="
-              activeCluster?.status === 'healthy'
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-            "
-          >
-            {{ profileStore.profile.k8sVersion }}
-          </span>
+            rounded
+            :severity="activeCluster?.status === 'healthy' ? 'success' : 'warn'"
+            :value="profileStore.profile.k8sVersion"
+          />
         </div>
       </div>
     </template>
@@ -89,13 +86,12 @@ const getAuthTypeColorClass = (authType: string) => {
               {{ profileStore.profile?.userName || 'Default Identity' }}
             </div>
           </div>
-          <span
+          <Tag
             v-if="profileStore.profile?.authType"
-            class="text-xs px-2.5 py-1 rounded-md border font-mono font-medium"
-            :class="getAuthTypeColorClass(profileStore.profile.authType)"
-          >
-            {{ profileStore.profile.authType }}
-          </span>
+            :severity="getAuthTypeSeverity(profileStore.profile.authType)"
+            class="font-mono font-medium"
+            :value="profileStore.profile.authType"
+          />
         </div>
 
         <div class="space-y-2.5 pt-2 border-t border-(--border)/60 text-xs">

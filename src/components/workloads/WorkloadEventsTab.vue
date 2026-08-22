@@ -20,16 +20,11 @@ defineProps<{
         ></span>
         <div class="flex items-center gap-2">
           <span class="text-xs font-semibold text-primary">{{ ev.reason }}</span>
-          <span
-            class="text-[9px] px-1.5 py-0.2 rounded font-mono border"
-            :class="
-              ev.type === 'Warning'
-                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-            "
-          >
-            {{ ev.type }}
-          </span>
+          <Tag
+            class="font-mono"
+            :severity="ev.type === 'Warning' ? 'danger' : 'success'"
+            :value="ev.type"
+          />
           <span v-if="ev.count > 1" class="text-[9px] text-muted-color font-mono">
             (x{{ ev.count }})
           </span>

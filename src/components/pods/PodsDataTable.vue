@@ -61,16 +61,13 @@ const statuses = [
         class="p-3 text-center"
       >
         <template #body="{ data }">
-          <span
-            class="font-mono px-1.5 py-0.5 rounded text-[10px]"
-            :class="
-              (data.restarts || 0) > 0
-                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                : 'text-muted-color'
-            "
-          >
-            {{ data.restarts || 0 }}
-          </span>
+          <Tag
+            v-if="(data.restarts || 0) > 0"
+            severity="danger"
+            class="font-mono"
+            :value="data.restarts"
+          />
+          <span v-else class="font-mono text-muted-color"> 0 </span>
         </template>
       </Column>
 

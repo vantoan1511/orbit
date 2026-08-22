@@ -41,16 +41,11 @@ const isRunning = (status: string) => {
             <span class="text-xs font-bold text-primary font-mono truncate" :title="c.name">
               {{ c.name }}
             </span>
-            <span
-              class="text-[9px] px-1.5 py-0.2 rounded font-mono border"
-              :class="
-                c.ready === 'true'
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-              "
-            >
-              Ready: {{ c.ready }}
-            </span>
+            <Tag
+              class="font-mono"
+              :severity="c.ready === 'true' ? 'success' : 'warn'"
+              :value="c.ready === 'true' ? 'Ready' : 'Not Ready'"
+            />
           </div>
 
           <Button

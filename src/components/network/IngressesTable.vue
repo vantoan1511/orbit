@@ -39,11 +39,7 @@ const handleRefresh = async () => {
       <!-- Class Column -->
       <Column v-if="visibleCols['className']" field="className" header="Class" sortable class="p-3">
         <template #body="{ data }">
-          <span
-            class="font-mono text-xs px-2 py-0.5 rounded bg-surface-800 text-surface-200 border border-surface-700"
-          >
-            {{ data.className || '-' }}
-          </span>
+          <Tag severity="secondary" class="font-mono" :value="data.className || '-'" />
         </template>
       </Column>
 

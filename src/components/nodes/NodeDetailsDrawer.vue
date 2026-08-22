@@ -164,11 +164,7 @@ const copyYaml = async () => {
               >
                 {{ node.name }}
               </h3>
-              <span
-                class="text-[10px] px-2 py-0.5 rounded-full font-mono border bg-node/10 text-node border-node/20"
-              >
-                Node
-              </span>
+              <Tag rounded severity="info" class="font-mono" value="Node" />
             </div>
             <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
               <span>role: {{ node.role }}</span>

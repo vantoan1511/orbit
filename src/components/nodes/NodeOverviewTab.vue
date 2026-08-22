@@ -13,22 +13,18 @@ const podsPct = computed(() => {
   return Math.round((props.node.podsCount / props.node.podsLimit) * 100)
 })
 
-const getConditionBadgeClass = (type: string, status: string) => {
+const getConditionSeverity = (type: string, status: string) => {
   if (type === 'Ready') {
-    return status === 'True'
-      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-      : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+    return status === 'True' ? 'success' : 'danger'
   }
   // For Pressure conditions (MemoryPressure, DiskPressure, PIDPressure), True is bad
-  return status === 'True'
-    ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+  return status === 'True' ? 'danger' : 'success'
 }
 
 const getTaintEffectSeverity = (effect: string) => {
-  if (effect === 'NoExecute') return 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-  if (effect === 'NoSchedule') return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-  return 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+  if (effect === 'NoExecute') return 'danger'
+  if (effect === 'NoSchedule') return 'warn'
+  return 'info'
 }
 </script>
 
@@ -285,12 +281,12 @@ const getTaintEffectSeverity = (effect: string) => {
             <tr v-for="cond in node.conditions" :key="cond.type">
               <td class="p-2.5 pl-4 font-semibold text-primary font-mono">{{ cond.type }}</td>
               <td class="p-2.5">
-                <span
-                  class="px-2 py-0.5 rounded-full text-[10px] font-mono border font-semibold whitespace-nowrap"
-                  :class="getConditionBadgeClass(cond.type, cond.status)"
-                >
-                  {{ cond.status }}
-                </span>
+                <Tag
+                  rounded
+                  class="font-mono whitespace-nowrap"
+                  :severity="getConditionSeverity(cond.type, cond.status)"
+                  :value="cond.status"
+                />
               </td>
               <td class="p-2.5 text-muted-color font-mono text-[11px]">{{ cond.reason || '-' }}</td>
               <td
@@ -320,12 +316,12 @@ const getTaintEffectSeverity = (effect: string) => {
             <span class="text-primary font-semibold">{{ taint.key }}</span>
             <span v-if="taint.value" class="text-muted-color">= {{ taint.value }}</span>
           </div>
-          <span
-            class="px-2 py-0.5 rounded-full text-[10px] border font-bold uppercase tracking-wider whitespace-nowrap"
-            :class="getTaintEffectSeverity(taint.effect)"
-          >
-            {{ taint.effect }}
-          </span>
+          <Tag
+            rounded
+            class="whitespace-nowrap"
+            :severity="getTaintEffectSeverity(taint.effect)"
+            :value="taint.effect"
+          />
         </div>
       </div>
     </div>

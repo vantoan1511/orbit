@@ -79,16 +79,10 @@ const handleRefresh = async () => {
         class="p-3"
       >
         <template #body="{ data }">
-          <span
-            class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"
-            :class="
-              data.allowVolumeExpansion
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-            "
-          >
-            {{ data.allowVolumeExpansion ? 'True' : 'False' }}
-          </span>
+          <Tag
+            :severity="data.allowVolumeExpansion ? 'success' : 'secondary'"
+            :value="data.allowVolumeExpansion ? 'True' : 'False'"
+          />
         </template>
       </Column>
     </template>

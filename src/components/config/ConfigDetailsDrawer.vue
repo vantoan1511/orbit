@@ -2,7 +2,7 @@
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
-import { Clock, Eye, EyeOff, FileCode, Server, Shield, Tag } from '@lucide/vue'
+import { Clock, Eye, EyeOff, FileCode, Server, Shield, Tag as TagIcon } from '@lucide/vue'
 import Button from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
@@ -98,23 +98,9 @@ ${Object.entries(res.data)
           <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
           <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
         </div>
-        <div
-          class="text-xs text-muted-color font-mono bg-(--bg-hover) px-2 py-0.5 rounded border border-(--border)"
-        >
-          ns/{{ props.resource.namespace }}
-        </div>
-        <div
-          v-if="isSecret(props.resource)"
-          class="text-[10px] font-semibold uppercase tracking-wider font-ui border px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border-rose-500/20"
-        >
-          Secret
-        </div>
-        <div
-          v-else
-          class="text-[10px] font-semibold uppercase tracking-wider font-ui border px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border-sky-500/20"
-        >
-          ConfigMap
-        </div>
+        <Tag severity="secondary" class="font-mono" :value="`ns/${props.resource.namespace}`" />
+        <Tag v-if="isSecret(props.resource)" severity="danger" value="Secret" />
+        <Tag v-else severity="info" value="ConfigMap" />
       </div>
     </template>
 
@@ -274,21 +260,16 @@ ${Object.entries(res.data)
                       class="flex items-center justify-between p-3"
                     >
                       <div class="flex items-center gap-2">
-                        <Tag class="w-3.5 h-3.5 text-violet-400" />
+                        <TagIcon class="w-3.5 h-3.5 text-violet-400" />
                         <span class="text-xs font-mono text-primary truncate max-w-72">
                           {{ pod.name }}
                         </span>
                       </div>
-                      <span
-                        class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                        :class="[
-                          pod.status === 'Running'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-zinc-500/10 text-zinc-400 border border-zinc-500/20'
-                        ]"
-                      >
-                        {{ pod.status }}
-                      </span>
+                      <Tag
+                        rounded
+                        :severity="pod.status === 'Running' ? 'success' : 'secondary'"
+                        :value="pod.status"
+                      />
                     </div>
                     <div
                       v-if="props.resource.usedBy.length === 0"

@@ -211,14 +211,14 @@ const saveImages = async () => {
             @click.stop="openImagesEdit($event, data)"
           >
             <div class="flex flex-wrap gap-1 max-w-full min-w-0">
-              <span
+              <Tag
                 v-for="img in data.images"
                 :key="img"
-                class="px-1.5 py-0.5 rounded bg-(--bg-hover) text-muted-color group-hover:text-primary text-xs font-mono truncate max-w-full transition-colors inline-block"
+                severity="secondary"
+                class="group-hover:text-primary font-mono truncate max-w-full transition-colors inline-block"
                 :title="img"
-              >
-                {{ img.split('/').pop() }}
-              </span>
+                :value="img.split('/').pop()"
+              />
             </div>
             <Pencil
               class="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-muted-color ml-0.5"

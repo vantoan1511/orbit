@@ -46,16 +46,16 @@ const handleRefresh = async () => {
   }
 }
 
-const getStatusBadgeClass = (status: string) => {
+const getStatusSeverity = (status: string) => {
   switch (status) {
     case 'Audit':
-      return 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+      return 'info'
     case 'Enforced':
-      return 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+      return 'success'
     case 'Disabled':
-      return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+      return 'secondary'
     default:
-      return 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+      return 'secondary'
   }
 }
 </script>
@@ -91,12 +91,7 @@ const getStatusBadgeClass = (status: string) => {
 
     <!-- Custom Status -->
     <template #status="{ data }">
-      <span
-        class="px-2 py-0.5 rounded text-[10px] font-semibold tracking-wider font-ui border"
-        :class="getStatusBadgeClass(data.status)"
-      >
-        {{ data.status }}
-      </span>
+      <Tag :severity="getStatusSeverity(data.status)" :value="data.status" />
     </template>
 
     <template #default="{ visibleCols }">

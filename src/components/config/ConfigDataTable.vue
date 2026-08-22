@@ -111,13 +111,13 @@ const handleRefresh = async () => {
       <Column v-if="visibleCols['labels']" field="labels" header="Labels" class="p-3">
         <template #body="{ data }">
           <div class="flex flex-wrap gap-1 max-w-72">
-            <span
+            <Tag
               v-for="(val, key) in data.labels"
               :key="key"
-              class="font-mono text-[10px] bg-(--bg-hover) text-muted-color border border-(--border) px-1.5 py-0.5 rounded"
-            >
-              {{ key }}: {{ val }}
-            </span>
+              severity="secondary"
+              class="font-mono"
+              :value="`${key}: ${val}`"
+            />
           </div>
         </template>
       </Column>

@@ -143,11 +143,7 @@ const openUrl = async (url?: string) => {
             <h3 class="text-sm font-bold text-primary">
               Orbit v{{ updaterStore.manifest?.version || '' }}
             </h3>
-            <span
-              class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-(--accent-soft) text-(--accent)"
-            >
-              New Release
-            </span>
+            <Tag rounded severity="info" value="New Release" />
           </div>
           <p class="text-xs text-muted-color mt-0.5">
             A new version of Orbit is available. Review release notes below to install.
