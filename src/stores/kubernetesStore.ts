@@ -77,6 +77,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const namespaceList = ref<NamespaceInfo[]>([])
   const clusters = ref<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
+  const lastUpdatedAt = ref<Date | null>(null)
 
   const cpuHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
   const memHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
@@ -311,6 +312,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     // Load data for the newly selected cluster
     if (id !== null) {
       loadInitialData()
+    } else {
+      lastUpdatedAt.value = null
     }
   }
 
@@ -428,6 +431,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         fetchEvents(),
         fetchPolicies()
       ])
+      lastUpdatedAt.value = new Date()
     }
   }
 
@@ -639,6 +643,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     fetchPersistentVolumeClaims,
     fetchStorageClasses,
     loadInitialData,
+    lastUpdatedAt,
     cpuHistory,
     memHistory
   }

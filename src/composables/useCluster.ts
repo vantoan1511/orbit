@@ -31,14 +31,13 @@ export function useCluster() {
     return k8sStore.clusters.find((c) => c.id === k8sStore.activeClusterId) || null
   })
 
-  const lastUpdatedAt = ref<Date | null>(null)
+  const lastUpdatedAt = computed(() => k8sStore.lastUpdatedAt)
 
   const refreshCluster = async () => {
     if (isRefreshing.value) return
     isRefreshing.value = true
     try {
       await k8sStore.loadInitialData()
-      lastUpdatedAt.value = new Date()
     } catch (error) {
       console.error('Failed to refresh cluster data:', error)
     } finally {
