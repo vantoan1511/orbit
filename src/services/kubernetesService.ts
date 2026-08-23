@@ -245,5 +245,13 @@ export const kubernetesService = {
     newNamespace: string
   }): Promise<void> {
     await coreEngine.dispatch('cloneDeployment', params)
+  },
+
+  async rollbackDeployment(params: {
+    namespace: string
+    name: string
+    revision?: number
+  }): Promise<void> {
+    await coreEngine.dispatch('rollbackDeployment', params)
   }
 }

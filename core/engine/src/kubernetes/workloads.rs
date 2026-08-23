@@ -577,11 +577,132 @@ pub async fn clone_deployment(
     Ok(())
 }
 
+pub const REVISION_ANNOTATION: &str = "deployment.kubernetes.io/revision";
+
+pub fn find_rollback_replicaset<'a>(
+    deployment: &Deployment,
+    replicasets: &'a [ReplicaSet],
+    target_revision: Option<i64>,
+) -> Result<&'a ReplicaSet, String> {
+    let deploy_name = deployment.metadata.name.as_deref().unwrap_or_default();
+    let deploy_uid = deployment.metadata.uid.as_deref().unwrap_or_default();
+
+    let mut matching_rs: Vec<(&'a ReplicaSet, i64)> = replicasets
+        .iter()
+        .filter(|rs| {
+            rs.metadata.owner_references.as_ref().map_or(false, |owners| {
+                owners.iter().any(|owner| {
+                    owner.kind == "Deployment"
+                        && (owner.name == deploy_name || (!deploy_uid.is_empty() && owner.uid == deploy_uid))
+                })
+            })
+        })
+        .filter_map(|rs| {
+            let rev = rs
+                .metadata
+                .annotations
+                .as_ref()
+                .and_then(|a| a.get(REVISION_ANNOTATION))
+                .and_then(|r| r.parse::<i64>().ok())?;
+            Some((rs, rev))
+        })
+        .collect();
+
+    if matching_rs.is_empty() {
+        return Err("No matching ReplicaSets with revision annotations found".to_string());
+    }
+
+    matching_rs.sort_by(|a, b| b.1.cmp(&a.1));
+
+    if let Some(target) = target_revision {
+        if target > 0 {
+            return matching_rs
+                .into_iter()
+                .find(|(_, rev)| *rev == target)
+                .map(|(rs, _)| rs)
+                .ok_or_else(|| format!("ReplicaSet with revision {} not found", target));
+        }
+    }
+
+    let current_revision = deployment
+        .metadata
+        .annotations
+        .as_ref()
+        .and_then(|a| a.get(REVISION_ANNOTATION))
+        .and_then(|r| r.parse::<i64>().ok());
+
+    if let Some(curr) = current_revision {
+        if let Some((rs, _)) = matching_rs.iter().find(|(_, rev)| *rev < curr) {
+            return Ok(rs);
+        }
+    }
+
+    if matching_rs.len() > 1 {
+        return Ok(matching_rs[1].0);
+    }
+
+    Err("No previous revision available to rollback to".to_string())
+}
+
+pub fn clean_template_for_rollback(template: &mut k8s_openapi::api::core::v1::PodTemplateSpec) {
+    if let Some(labels) = template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
+        labels.remove("pod-template-hash");
+    }
+}
+
+pub async fn rollback_deployment(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+    target_revision: Option<i64>,
+) -> Result<(), kube::Error> {
+    let deploy_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+    let deployment = deploy_api.get(name).await?;
+
+    let rs_api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
+    let rs_list = rs_api.list(&ListParams::default()).await?;
+
+    let target_rs = find_rollback_replicaset(&deployment, &rs_list.items, target_revision).map_err(|msg| {
+        kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: msg,
+            reason: "BadRequest".to_string(),
+            code: 400,
+        })
+    })?;
+
+    let mut template = match target_rs.spec.as_ref().and_then(|s| s.template.clone()) {
+        Some(t) => t,
+        None => {
+            return Err(kube::Error::Api(kube::error::ErrorResponse {
+                status: "Failure".to_string(),
+                message: "Target ReplicaSet has no pod template".to_string(),
+                reason: "InternalError".to_string(),
+                code: 500,
+            }))
+        }
+    };
+
+    clean_template_for_rollback(&mut template);
+
+    let patch = serde_json::json!({
+        "spec": {
+            "template": template
+        }
+    });
+
+    let patch_params = PatchParams::default();
+    deploy_api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
-    use k8s_openapi::api::core::v1::PodTemplateSpec;
-    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+    use super::*;
+    use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec, ReplicaSet, ReplicaSetSpec};
+    use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta, OwnerReference};
     use std::collections::BTreeMap;
 
     #[test]
@@ -660,6 +781,106 @@ mod tests {
             dep.spec.as_ref().unwrap().template.metadata.as_ref().unwrap().labels.as_ref().unwrap().get("app").unwrap(),
             "my-service-copy"
         );
+    }
+
+    fn make_replicaset(name: &str, deploy_name: &str, revision: &str, image: &str) -> ReplicaSet {
+        let mut annotations = BTreeMap::new();
+        annotations.insert(REVISION_ANNOTATION.to_string(), revision.to_string());
+
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), deploy_name.to_string());
+        labels.insert("pod-template-hash".to_string(), "hash123".to_string());
+
+        ReplicaSet {
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                namespace: Some("default".to_string()),
+                annotations: Some(annotations),
+                owner_references: Some(vec![OwnerReference {
+                    api_version: "apps/v1".to_string(),
+                    kind: "Deployment".to_string(),
+                    name: deploy_name.to_string(),
+                    uid: "deploy-uid-1".to_string(),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            },
+            spec: Some(ReplicaSetSpec {
+                template: Some(PodTemplateSpec {
+                    metadata: Some(ObjectMeta {
+                        labels: Some(labels),
+                        ..Default::default()
+                    }),
+                    spec: Some(PodSpec {
+                        containers: vec![Container {
+                            name: "app".to_string(),
+                            image: Some(image.to_string()),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }),
+                }),
+                ..Default::default()
+            }),
+            status: None,
+        }
+    }
+
+    #[test]
+    fn test_find_rollback_replicaset_previous() {
+        let mut dep_annotations = BTreeMap::new();
+        dep_annotations.insert(REVISION_ANNOTATION.to_string(), "3".to_string());
+
+        let dep = Deployment {
+            metadata: ObjectMeta {
+                name: Some("web".to_string()),
+                uid: Some("deploy-uid-1".to_string()),
+                namespace: Some("default".to_string()),
+                annotations: Some(dep_annotations),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let rs1 = make_replicaset("web-rs-1", "web", "1", "nginx:1.18");
+        let rs2 = make_replicaset("web-rs-2", "web", "2", "nginx:1.19");
+        let rs3 = make_replicaset("web-rs-3", "web", "3", "nginx:1.20");
+        let rs_other = make_replicaset("other-rs-1", "other", "2", "redis:6");
+
+        let replicasets = vec![rs1, rs2, rs3, rs_other];
+
+        // Should find revision 2 when target_revision is None
+        let target = find_rollback_replicaset(&dep, &replicasets, None).expect("Should find target RS");
+        assert_eq!(target.metadata.name.as_deref(), Some("web-rs-2"));
+
+        // Should find revision 1 when target_revision is Some(1)
+        let target_rev1 = find_rollback_replicaset(&dep, &replicasets, Some(1)).expect("Should find target RS rev 1");
+        assert_eq!(target_rev1.metadata.name.as_deref(), Some("web-rs-1"));
+
+        // Should fail when target_revision does not exist
+        let err = find_rollback_replicaset(&dep, &replicasets, Some(99)).unwrap_err();
+        assert!(err.contains("revision 99 not found"));
+    }
+
+    #[test]
+    fn test_clean_template_for_rollback() {
+        let mut labels = BTreeMap::new();
+        labels.insert("app".to_string(), "web".to_string());
+        labels.insert("pod-template-hash".to_string(), "abcxyz".to_string());
+
+        let mut template = PodTemplateSpec {
+            metadata: Some(ObjectMeta {
+                labels: Some(labels),
+                ..Default::default()
+            }),
+            spec: None,
+        };
+
+        clean_template_for_rollback(&mut template);
+
+        let labels = template.metadata.unwrap().labels.unwrap();
+        assert_eq!(labels.get("app").map(|s| s.as_str()), Some("web"));
+        assert!(!labels.contains_key("pod-template-hash"));
     }
 }
 
