@@ -63,18 +63,42 @@ const conditions = computed<ConditionItem[]>(() => {
 })
 
 const getConditionSeverity = (status: string, type: string) => {
-  if (type === 'ReplicaFailure' && status === 'True') return 'danger'
+  // Failure / Pressure / Degraded conditions where "True" indicates a problem
+  if (
+    type === 'ReplicaFailure' ||
+    type.endsWith('Pressure') ||
+    type.endsWith('Failure') ||
+    type.endsWith('Degraded')
+  ) {
+    if (status === 'True') return 'danger'
+    if (status === 'False') return 'secondary'
+    return 'warn'
+  }
+
+  // Standard health/progress conditions (Available, Progressing, Ready, etc.)
   if (status === 'True') return 'success'
-  if (status === 'False') return 'secondary'
+  if (status === 'False') return 'danger'
   return 'warn'
 }
 
+// Helper to extract pod spec from standard workloads or CronJobs
+const podSpec = computed<Record<string, unknown> | undefined>(() => {
+  if (!props.rawResourceData) return undefined
+  const spec = props.rawResourceData.spec as Record<string, unknown> | undefined
+  if (!spec) return undefined
+  const jobTemplate = spec.jobTemplate as Record<string, unknown> | undefined
+  const jobSpec = jobTemplate?.spec as Record<string, unknown> | undefined
+  const cronTemplate = jobSpec?.template as Record<string, unknown> | undefined
+  if (cronTemplate?.spec) {
+    return cronTemplate.spec as Record<string, unknown>
+  }
+  const template = spec.template as Record<string, unknown> | undefined
+  return template?.spec as Record<string, unknown> | undefined
+})
+
 // 4. Scheduling Constraints
 const nodeSelector = computed<Record<string, string>>(() => {
-  const spec = props.rawResourceData?.spec as Record<string, unknown> | undefined
-  const template = spec?.template as Record<string, unknown> | undefined
-  const podSpec = template?.spec as Record<string, unknown> | undefined
-  return (podSpec?.nodeSelector as Record<string, string>) || {}
+  return (podSpec.value?.nodeSelector as Record<string, string>) || {}
 })
 
 interface TolerationItem {
@@ -86,10 +110,9 @@ interface TolerationItem {
 }
 
 const tolerations = computed<TolerationItem[]>(() => {
-  const spec = props.rawResourceData?.spec as Record<string, unknown> | undefined
-  const template = spec?.template as Record<string, unknown> | undefined
-  const podSpec = template?.spec as Record<string, unknown> | undefined
-  return Array.isArray(podSpec?.tolerations) ? (podSpec.tolerations as TolerationItem[]) : []
+  return Array.isArray(podSpec.value?.tolerations)
+    ? (podSpec.value.tolerations as TolerationItem[])
+    : []
 })
 
 const formatToleration = (t: TolerationItem): string => {
@@ -111,15 +134,12 @@ const formatToleration = (t: TolerationItem): string => {
 }
 
 const affinityYaml = computed<string | null>(() => {
-  const spec = props.rawResourceData?.spec as Record<string, unknown> | undefined
-  const template = spec?.template as Record<string, unknown> | undefined
-  const podSpec = template?.spec as Record<string, unknown> | undefined
   if (
-    podSpec?.affinity &&
-    typeof podSpec.affinity === 'object' &&
-    Object.keys(podSpec.affinity).length > 0
+    podSpec.value?.affinity &&
+    typeof podSpec.value.affinity === 'object' &&
+    Object.keys(podSpec.value.affinity).length > 0
   ) {
-    return yaml.stringify(podSpec.affinity)
+    return yaml.stringify(podSpec.value.affinity)
   }
   return null
 })
@@ -149,10 +169,9 @@ interface ContainerSpecItem {
 }
 
 const templateContainers = computed<ContainerSpecItem[]>(() => {
-  const spec = props.rawResourceData?.spec as Record<string, unknown> | undefined
-  const template = spec?.template as Record<string, unknown> | undefined
-  const podSpec = template?.spec as Record<string, unknown> | undefined
-  return Array.isArray(podSpec?.containers) ? (podSpec.containers as ContainerSpecItem[]) : []
+  return Array.isArray(podSpec.value?.containers)
+    ? (podSpec.value.containers as ContainerSpecItem[])
+    : []
 })
 
 const formatEnvValue = (e: ContainerEnvItem): string => {
@@ -275,8 +294,8 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
           <span class="text-muted-color block mb-0.5">Container Images</span>
           <div class="flex flex-wrap gap-1.5 mt-1">
             <Tag
-              v-for="img in workloadImages"
-              :key="img"
+              v-for="(img, idx) in workloadImages"
+              :key="idx"
               severity="secondary"
               class="font-mono truncate max-w-full"
               :title="img"
@@ -437,9 +456,9 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
             <span class="text-muted-color block mb-1.5 text-[11px]">Environment</span>
             <div class="space-y-1 max-h-40 overflow-y-auto pr-1">
               <div
-                v-for="ef in c.envFrom || []"
-                :key="ef.configMapRef?.name || ef.secretRef?.name"
-                class="flex items-center justify-between p-1.5 bg-(--bg-hover)/50 border border-(--border)/60 rounded text-[11px] font-mono"
+                v-for="(ef, efIdx) in c.envFrom || []"
+                :key="efIdx"
+                class="flex items-center justify-between p-1.5 bg-(--bg-hover)/50 rounded text-[11px] font-mono"
               >
                 <span class="text-muted-color">envFrom</span>
                 <span class="text-primary">
@@ -451,9 +470,9 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
                 </span>
               </div>
               <div
-                v-for="e in c.env || []"
-                :key="e.name"
-                class="flex items-center justify-between p-1.5 bg-(--bg-hover)/50 border border-(--border)/60 rounded text-[11px] font-mono"
+                v-for="(e, eIdx) in c.env || []"
+                :key="e.name || eIdx"
+                class="flex items-center justify-between p-1.5 bg-(--bg-hover)/50 rounded text-[11px] font-mono"
               >
                 <span class="text-muted-color shrink-0 mr-2">{{ e.name }}</span>
                 <span class="text-primary truncate text-right" :title="formatEnvValue(e)">
