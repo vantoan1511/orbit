@@ -189,12 +189,13 @@ const editYaml = () => {
   })
 }
 
-// Live Raw YAML Fetching
+// Live Raw YAML & JSON Fetching
+const rawResourceData = ref<Record<string, unknown> | null>(null)
 const rawYamlData = ref<string | null>(null)
 const isYamlLoading = ref<boolean>(false)
 const copied = ref<boolean>(false)
 
-const fetchRawYaml = async () => {
+const fetchRawData = async () => {
   if (!props.workload || !props.visible) return
   isYamlLoading.value = true
   try {
@@ -204,14 +205,15 @@ const fetchRawYaml = async () => {
       name: workloadName.value
     })
   } catch (e) {
-    console.error('Failed to fetch raw YAML:', e)
+    console.error('Failed to fetch raw resource data:', e)
     isYamlLoading.value = false
   }
 }
 
 const handleRawData = (data: { kind?: string; name?: string; data?: unknown }) => {
   if (data && data.kind === workloadKind.value && data.name === workloadName.value) {
-    if (data.data) {
+    if (data.data && typeof data.data === 'object') {
+      rawResourceData.value = data.data as Record<string, unknown>
       rawYamlData.value = yaml.stringify(data.data)
     }
     isYamlLoading.value = false
@@ -227,17 +229,19 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [props.visible, props.workload, activeTab.value],
-  ([visible]) => {
-    if (visible && props.workload) {
-      if (activeTab.value === 'yaml' && !rawYamlData.value) {
-        fetchRawYaml()
-      }
+  () => [props.visible, props.workload],
+  ([visible, workload]) => {
+    if (visible && workload) {
+      rawResourceData.value = null
+      rawYamlData.value = null
+      fetchRawData()
     } else if (!visible) {
+      rawResourceData.value = null
       rawYamlData.value = null
       copied.value = false
     }
-  }
+  },
+  { immediate: true }
 )
 
 const generateYaml = (w: WorkloadInfo) => {
@@ -438,6 +442,7 @@ const copyYaml = async () => {
               :workload-images="workloadImages"
               :workload-labels="workloadLabels"
               :workload-annotations="workloadAnnotations"
+              :raw-resource-data="rawResourceData"
             />
           </TabPanel>
 
