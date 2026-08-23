@@ -171,6 +171,7 @@ Before generating code:
 7. Explain trade-offs when multiple implementations are reasonable.
 8. Always check-out to another branch for features implementing or bugs fixing, never work on main/master.
 9. Keep code small and well-organized by business logic boundaries.
+10. Design for extensibility from the start: if a pattern or logic could be extended (such as rule evaluations, parsers, or handler registries), make it extensible upfront (e.g. table-driven or strategy patterns) instead of keeping it overly simplistic (e.g. long if-else chains).
 
 Never invent APIs that do not exist.
 
