@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useCluster } from '@/composables/useCluster'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { detectCloudProvider } from '@/utils/cloudProvider'
 import { Clock, Cloud, RefreshCwIcon } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { KubernetesIcon } from 'vue3-simple-icons'
@@ -45,43 +46,7 @@ const clusterUptime = computed(() => {
 })
 
 const cloudProvider = computed(() => {
-  const node = kubernetesStore.nodes[0]
-  if (!node || !node.labels) {
-    return { provider: 'Local', platform: 'Custom' }
-  }
-  const labels = node.labels
-  let provider = 'Local'
-  let platform = 'Custom'
-
-  for (const label of labels) {
-    const l = label.toLowerCase()
-    if (l.includes('eks.amazonaws.com') || l.includes('aws')) {
-      provider = 'AWS'
-      platform = 'EKS'
-      break
-    } else if (l.includes('google.com') || l.includes('gke')) {
-      provider = 'GCP'
-      platform = 'GKE'
-      break
-    } else if (l.includes('azure') || l.includes('aks')) {
-      provider = 'Azure'
-      platform = 'AKS'
-      break
-    } else if (l.includes('minikube')) {
-      provider = 'Minikube'
-      platform = 'Local'
-      break
-    } else if (l.includes('k3s')) {
-      provider = 'K3s'
-      platform = 'Local'
-      break
-    } else if (l.includes('microk8s')) {
-      provider = 'MicroK8s'
-      platform = 'Local'
-      break
-    }
-  }
-  return { provider, platform }
+  return detectCloudProvider(kubernetesStore.nodes[0]?.labels)
 })
 </script>
 
