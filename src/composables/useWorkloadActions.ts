@@ -227,6 +227,39 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
       })
     }
 
+    // Rollback
+    if (resourceKind === 'Deployment') {
+      items.push({
+        label: 'Rollback',
+        icon: 'pi pi-history',
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+          confirmAction(
+            `Are you sure you want to rollback Deployment "${row.name}" to the previous revision?`,
+            'Confirm Rollback',
+            'Rollback',
+            async () => {
+              try {
+                await kubernetesService.rollbackDeployment({
+                  namespace: row.namespace || 'default',
+                  name: row.name
+                })
+              } catch (e) {
+                toast.add({
+                  severity: 'error',
+                  summary: 'Error',
+                  detail: e instanceof Error ? e.message : 'Failed to rollback deployment',
+                  life: 5000
+                })
+              }
+            },
+            'primary'
+          )
+        }
+      })
+    }
+
     // Restart
     if (resourceKind === 'Pod') {
       items.push({

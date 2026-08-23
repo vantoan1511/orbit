@@ -381,6 +381,48 @@ pub fn redeploy_resource(
     });
 }
 
+pub fn rollback_deployment(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+        let name = get_string(&data, "name").unwrap_or_default();
+        let revision = get_i64(&data, "revision");
+
+        let client = {
+            let r_manager = manager.read().await;
+            r_manager.active_client.clone()
+        };
+
+        if let Some(ref client) = client {
+            match crate::kubernetes::workloads::rollback_deployment(client, &namespace, &name, revision).await {
+                Ok(()) => {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::CommandSucceeded {
+                            message: format!("Rolled back Deployment {}", name),
+                        },
+                    ).await;
+                }
+                Err(e) => {
+                    log::error!("Error rolling back deployment {}: {:?}", name, e);
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: format!("Failed to rollback: {}", crate::kubernetes::format_error(&e)),
+                        },
+                    ).await;
+                }
+            }
+        }
+    });
+}
+
 pub fn restart_pod(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
