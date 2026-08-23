@@ -106,119 +106,158 @@ const LOG_ITEM_HEIGHT = 28
     </div>
 
     <!-- Controls Bar -->
-    <Card :dt="{ body: { padding: '0' } }">
-      <template #content>
-        <div class="flex items-center justify-between gap-3 p-1.5 px-3">
-          <div class="flex items-center gap-3.5 flex-1 overflow-x-auto">
+    <div class="flex flex-col gap-2.5">
+      <!-- Row 1: Context Selection & Actions -->
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex items-center gap-2 shrink-0">
+            <span
+              class="text-[10px] font-semibold tracking-wider text-muted-color uppercase select-none"
+              >Pod</span
+            >
+            <Select
+              v-model="selectedPodName"
+              :options="podOptions"
+              variant="filled"
+              size="small"
+              class="text-xs min-w-32 max-w-56"
+            />
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span
+              class="text-[10px] font-semibold tracking-wider text-muted-color uppercase select-none"
+              >Container</span
+            >
+            <Select
+              v-model="selectedContainerName"
+              :options="containerOptions"
+              variant="filled"
+              size="small"
+              class="text-xs min-w-32 max-w-56"
+            />
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span
+              class="text-[10px] font-semibold tracking-wider text-muted-color uppercase select-none"
+              >Lines</span
+            >
+            <Select
+              v-model="tailLines"
+              :options="tailLinesOptions"
+              optionLabel="label"
+              optionValue="value"
+              variant="filled"
+              size="small"
+              class="text-xs min-w-28"
+            />
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1">
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1! w-7! h-7!"
+            :icon="isPaused ? 'pi pi-play' : 'pi pi-pause'"
+            :title="isPaused ? 'Resume Stream' : 'Pause Stream'"
+            @click="isPaused = !isPaused"
+          />
+          <Button
+            severity="secondary"
+            icon="pi pi-trash"
+            size="small"
+            variant="text"
+            class="p-1! w-7! h-7!"
+            title="Clear Logs"
+            @click="clearLogs"
+          />
+          <div class="w-px h-3.5 bg-(--border) mx-1"></div>
+          <Button
+            severity="secondary"
+            icon="pi pi-palette"
+            size="small"
+            variant="text"
+            class="p-1! w-7! h-7!"
+            title="Highlight Rules"
+            @click="showRulesDialog = true"
+          />
+          <Button
+            severity="secondary"
+            :icon="isCopied ? 'pi pi-check' : 'pi pi-copy'"
+            size="small"
+            variant="text"
+            class="p-1! w-7! h-7!"
+            :disabled="logLines.length <= 0"
+            title="Copy Logs"
+            @click="copyLogs"
+          />
+          <Button
+            severity="secondary"
+            icon="pi pi-download"
+            size="small"
+            variant="text"
+            class="p-1! w-7! h-7!"
+            :disabled="logLines.length <= 0"
+            title="Download Logs"
+            @click="downloadLogs"
+          />
+          <Button
+            severity="secondary"
+            size="small"
+            variant="text"
+            class="p-1! w-7! h-7!"
+            :icon="isFullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
+            :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+            @click="isFullscreen = !isFullscreen"
+          />
+        </div>
+      </div>
+
+      <!-- Row 2: Search & Display Toggles -->
+      <div class="flex items-center justify-between gap-4 flex-wrap">
+        <div class="flex items-center gap-3 flex-1 min-w-64 max-w-xl">
+          <IconField class="flex-1">
+            <InputIcon class="pi pi-search" />
             <InputText
               v-model="searchQuery"
               placeholder="Search logs..."
+              variant="filled"
               size="small"
-              class="text-xs w-full max-w-xs shrink-0"
+              fluid
+              class="text-xs"
             />
-            <div class="flex items-center gap-1.5 shrink-0">
-              <Checkbox v-model="isRegex" inputId="is-regex" binary class="border-surface" />
-              <label for="is-regex" class="text-xs text-muted-color cursor-pointer select-none"
-                >Regex</label
-              >
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <Checkbox v-model="showTimestamps" inputId="show-timestamps" binary />
-              <label
-                for="show-timestamps"
-                class="text-xs text-muted-color cursor-pointer select-none"
-                >Timestamps</label
-              >
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <ToggleSwitch
-                v-model="isFollowing"
-                inputId="is-following"
-                class="scale-75 origin-left"
-              />
-              <label
-                for="is-following"
-                class="text-xs text-muted-color cursor-pointer select-none -ml-1"
-                >Follow</label
-              >
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <span class="text-xs text-muted-color select-none">Pod</span>
-              <Select
-                v-model="selectedPodName"
-                :options="podOptions"
-                size="small"
-                class="text-xs min-w-28 max-w-44"
-              />
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <span class="text-xs text-muted-color select-none">Container</span>
-              <Select
-                v-model="selectedContainerName"
-                :options="containerOptions"
-                size="small"
-                class="text-xs min-w-28 max-w-44"
-              />
-            </div>
-            <div class="flex items-center gap-1.5 shrink-0">
-              <span class="text-xs text-muted-color select-none">Lines</span>
-              <Select
-                v-model="tailLines"
-                :options="tailLinesOptions"
-                optionLabel="label"
-                optionValue="value"
-                size="small"
-                class="text-xs min-w-28"
-              />
-            </div>
-          </div>
-
-          <div class="flex items-center gap-1.5">
-            <Button
-              variant="text"
-              size="small"
-              :icon="isPaused ? 'pi pi-play' : 'pi pi-pause'"
-              @click="isPaused = !isPaused"
-            />
-            <Button icon="pi pi-trash" size="small" variant="text" @click="clearLogs" />
-          </div>
-
-          <div class="flex justify-center items-center gap-1.5">
-            <Button
-              icon="pi pi-palette"
-              size="small"
-              variant="text"
-              @click="showRulesDialog = true"
-              title="Highlight Rules"
-            />
-            <Button
-              :icon="isCopied ? 'pi pi-check' : 'pi pi-copy'"
-              size="small"
-              variant="text"
-              :disabled="logLines.length <= 0"
-              @click="copyLogs"
-              title="Copy Logs"
-            />
-            <Button
-              icon="pi pi-download"
-              size="small"
-              variant="text"
-              :disabled="logLines.length <= 0"
-              @click="downloadLogs"
-              title="Download Logs"
-            ></Button>
-            <Button
-              size="small"
-              variant="text"
-              :icon="isFullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
-              @click="isFullscreen = !isFullscreen"
-              title="Fullscreen"
+          </IconField>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <Checkbox v-model="isRegex" inputId="is-regex" binary class="border-surface" />
+            <label for="is-regex" class="text-xs text-muted-color cursor-pointer select-none"
+              >Regex</label
             >
-            </Button>
           </div>
         </div>
-      </template>
-    </Card>
+
+        <div class="flex items-center gap-4 shrink-0">
+          <div class="flex items-center gap-1.5 shrink-0">
+            <Checkbox v-model="showTimestamps" inputId="show-timestamps" binary />
+            <label for="show-timestamps" class="text-xs text-muted-color cursor-pointer select-none"
+              >Timestamps</label
+            >
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <ToggleSwitch
+              v-model="isFollowing"
+              inputId="is-following"
+              class="scale-75 origin-left"
+            />
+            <label
+              for="is-following"
+              class="text-xs text-muted-color cursor-pointer select-none -ml-1"
+              >Follow</label
+            >
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Console Viewer -->
     <div
