@@ -14,10 +14,10 @@ pub fn check_for_updates(
         let url = get_string(&data, "manifestUrl")
             .unwrap_or_else(|| "https://raw.githubusercontent.com/vantoan1511/orbit/main/update-manifest.json".to_string());
         
-        match crate::updater::UpdateManifest::fetch(&url).await {
+        let current_engine = env!("CARGO_PKG_VERSION");
+
+        match crate::updater::UpdateManifest::fetch(&url, current_engine).await {
             Ok(manifest) => {
-                let current_engine = env!("CARGO_PKG_VERSION");
-                
                 let has_update = manifest.has_update(current_engine).unwrap_or(false);
 
                 let _ = Bridge::send_event(
