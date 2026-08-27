@@ -6,6 +6,9 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// How often the engine sends a WebSocket-level Ping to keep the TCP connection alive.
+pub const PING_INTERVAL_SECS: u64 = 30;
+
 /// Auth info received from Neutralino via stdin or CLI flags.
 #[derive(Debug, Default, Deserialize)]
 pub struct AuthInfo {
@@ -86,7 +89,7 @@ impl Bridge {
             urlencoding::encode(&auth.nl_connect_token)
         );
 
-        log::info!("Connecting to WebSocket: {}", url);
+        tracing::info!("Connecting to Neutralino WebSocket server at port {}", auth.nl_port);
         let (ws, _) = connect_async(&url).await?;
         let (writer, reader) = ws.split();
 
@@ -114,7 +117,19 @@ impl Bridge {
         };
 
         let text = serde_json::to_string(&msg)?;
-        log::info!("Sending typed event");
+        let ev_name = event.event_name();
+        match event {
+            super::events::OrbitEvent::ErrorOccurred { message } => {
+                tracing::error!(event = ev_name, error = %message, "Response to UI (Error)");
+            }
+            super::events::OrbitEvent::CommandSucceeded { message } => {
+                tracing::info!(event = ev_name, message = %message, "Response to UI (Command Succeeded)");
+            }
+            _ => {
+                tracing::debug!(event = ev_name, "Response to UI (Event Broadcast)");
+            }
+        }
+
         let mut w = writer.lock().await;
         w.send(Message::Text(text.into())).await?;
         Ok(())
@@ -125,6 +140,11 @@ impl Bridge {
             match reader.next().await {
                 Some(Ok(Message::Text(text))) => {
                     let msg: WsMessage = serde_json::from_str(&text)?;
+                    if let Some(ref ev) = msg.event {
+                        tracing::info!(event = %ev, id = ?msg.id, "Received request/event from UI");
+                    } else if let Some(ref method) = msg.method {
+                        tracing::info!(method = %method, id = ?msg.id, "Received method from UI");
+                    }
                     return Ok(msg);
                 }
                 Some(Ok(Message::Ping(data))) => {
@@ -132,8 +152,14 @@ impl Bridge {
                     w.send(Message::Pong(data)).await?;
                 }
                 Some(Ok(_)) => continue,
-                Some(Err(e)) => return Err(Box::new(e)),
-                None => return Err("WebSocket closed".into()),
+                Some(Err(e)) => {
+                    tracing::error!("WebSocket error reading message: {:?}", e);
+                    return Err(Box::new(e));
+                }
+                None => {
+                    tracing::warn!("WebSocket connection closed by server");
+                    return Err("WebSocket closed".into());
+                }
             }
         }
     }

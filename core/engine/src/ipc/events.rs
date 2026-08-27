@@ -151,3 +151,44 @@ pub enum OrbitEvent {
         data: serde_json::Value,
     },
 }
+
+impl OrbitEvent {
+    pub fn event_name(&self) -> &'static str {
+        match self {
+            OrbitEvent::EngineConnected { .. } => "engineConnected",
+            OrbitEvent::Ping { .. } => "ping",
+            OrbitEvent::Pong { .. } => "pong",
+            OrbitEvent::NamespacesUpdated { .. } => "namespacesUpdated",
+            OrbitEvent::PodsUpdated { .. } => "podsUpdated",
+            OrbitEvent::DeploymentsUpdated { .. } => "deploymentsUpdated",
+            OrbitEvent::StatefulSetsUpdated { .. } => "statefulSetsUpdated",
+            OrbitEvent::DaemonSetsUpdated { .. } => "daemonSetsUpdated",
+            OrbitEvent::ReplicaSetsUpdated { .. } => "replicaSetsUpdated",
+            OrbitEvent::JobsUpdated { .. } => "jobsUpdated",
+            OrbitEvent::CronJobsUpdated { .. } => "cronJobsUpdated",
+            OrbitEvent::ClustersUpdated { .. } => "clustersUpdated",
+            OrbitEvent::ActiveClusterChanged { .. } => "activeClusterChanged",
+            OrbitEvent::UserProfileUpdated { .. } => "userProfileUpdated",
+            OrbitEvent::NodesUpdated { .. } => "nodesUpdated",
+            OrbitEvent::ServicesUpdated { .. } => "servicesUpdated",
+            OrbitEvent::IngressesUpdated { .. } => "ingressesUpdated",
+            OrbitEvent::ConfigMapsUpdated { .. } => "configMapsUpdated",
+            OrbitEvent::SecretsUpdated { .. } => "secretsUpdated",
+            OrbitEvent::EventsUpdated { .. } => "eventsUpdated",
+            OrbitEvent::PersistentVolumesUpdated { .. } => "persistentVolumesUpdated",
+            OrbitEvent::PersistentVolumeClaimsUpdated { .. } => "persistentVolumeClaimsUpdated",
+            OrbitEvent::StorageClassesUpdated { .. } => "storageClassesUpdated",
+            OrbitEvent::PoliciesUpdated { .. } => "policiesUpdated",
+            OrbitEvent::ResourceUpdated { .. } => "resourceUpdated",
+            OrbitEvent::PodMetricsUpdated { .. } => "podMetricsUpdated",
+            OrbitEvent::ErrorOccurred { .. } => "errorOccurred",
+            OrbitEvent::LogLineReceived { .. } => "logLineReceived",
+            OrbitEvent::LogLinesChunkReceived { .. } => "logLinesChunkReceived",
+            OrbitEvent::UpdateCheckFinished { .. } => "updateCheckFinished",
+            OrbitEvent::CommandSucceeded { .. } => "commandSucceeded",
+            OrbitEvent::UpdateDownloadProgress { .. } => "updateDownloadProgress",
+            OrbitEvent::UpdateReady { .. } => "updateReady",
+            OrbitEvent::ResourceRawData { .. } => "resourceRawData",
+        }
+    }
+}

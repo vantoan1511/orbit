@@ -27,6 +27,7 @@ pub fn dispatch(
     token: String,
     manager: Arc<RwLock<KubeManager>>,
 ) {
+    tracing::info!(event = %event_name, "Dispatching UI request");
     match event_name {
         "getClusters" => cluster::get_clusters(writer, token, manager),
         "getUserProfile" => cluster::get_user_profile(writer, token, manager),
@@ -65,6 +66,8 @@ pub fn dispatch(
         "cloneIngress" => network::clone_ingress(data, writer, token, manager),
         "cloneDeployment" => workloads::clone_deployment(data, writer, token, manager),
         "rollbackDeployment" => workloads::rollback_deployment(data, writer, token, manager),
-        _ => {}
+        other => {
+            tracing::debug!(event = %other, "Unhandled UI event in dispatcher");
+        }
     }
 }
