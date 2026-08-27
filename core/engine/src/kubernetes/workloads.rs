@@ -385,6 +385,7 @@ pub async fn scale_resource(
     name: &str,
     replicas: i32,
 ) -> Result<(), kube::Error> {
+    tracing::info!(kind = %kind, namespace = %namespace, name = %name, replicas = replicas, "Sending request to Kubernetes: scale resource");
     let patch = serde_json::json!({
         "spec": {
             "replicas": replicas
@@ -412,6 +413,7 @@ pub async fn scale_resource(
             code: 400,
         })),
     }
+    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Kubernetes request completed: scale resource");
     Ok(())
 }
 
@@ -421,6 +423,7 @@ pub async fn redeploy_resource(
     kind: &str,
     name: &str,
 ) -> Result<(), kube::Error> {
+    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Sending request to Kubernetes: redeploy/restart resource");
     let now = chrono::Utc::now().to_rfc3339();
     let patch = serde_json::json!({
         "spec": {
@@ -455,6 +458,7 @@ pub async fn redeploy_resource(
             code: 400,
         })),
     }
+    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Kubernetes request completed: redeploy resource");
     Ok(())
 }
 
@@ -463,8 +467,10 @@ pub async fn delete_pod(
     namespace: &str,
     name: &str,
 ) -> Result<(), kube::Error> {
+    tracing::info!(namespace = %namespace, name = %name, "Sending request to Kubernetes: delete pod");
     let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
     api.delete(name, &DeleteParams::default()).await?;
+    tracing::info!(namespace = %namespace, name = %name, "Kubernetes request completed: delete pod");
     Ok(())
 }
 
@@ -475,6 +481,7 @@ pub async fn update_images_resource(
     name: &str,
     containers: Vec<models::ContainerImageInfo>,
 ) -> Result<(), kube::Error> {
+    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Sending request to Kubernetes: update container images");
     let containers_patch: Vec<serde_json::Value> = containers
         .into_iter()
         .map(|c| {
@@ -518,6 +525,7 @@ pub async fn update_images_resource(
             }))
         }
     }
+    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Kubernetes request completed: update container images");
     Ok(())
 }
 
@@ -528,6 +536,7 @@ pub async fn clone_deployment(
     new_name: &str,
     new_namespace: &str,
 ) -> Result<(), kube::Error> {
+    tracing::info!(source_namespace = %source_namespace, source_name = %source_name, new_namespace = %new_namespace, new_name = %new_name, "Sending request to Kubernetes: clone deployment");
     let source_api: Api<Deployment> = Api::namespaced(client.clone(), source_namespace);
     let mut cloned = source_api.get(source_name).await?;
 
@@ -574,6 +583,7 @@ pub async fn clone_deployment(
 
     let target_api: Api<Deployment> = Api::namespaced(client.clone(), new_namespace);
     target_api.create(&PostParams::default(), &cloned).await?;
+    tracing::info!(new_namespace = %new_namespace, new_name = %new_name, "Kubernetes request completed: clone deployment");
     Ok(())
 }
 
@@ -656,6 +666,7 @@ pub async fn rollback_deployment(
     name: &str,
     target_revision: Option<i64>,
 ) -> Result<(), kube::Error> {
+    tracing::info!(namespace = %namespace, name = %name, target_revision = ?target_revision, "Sending request to Kubernetes: rollback deployment");
     let deploy_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
     let deployment = deploy_api.get(name).await?;
 
@@ -693,7 +704,7 @@ pub async fn rollback_deployment(
 
     let patch_params = PatchParams::default();
     deploy_api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-
+    tracing::info!(namespace = %namespace, name = %name, "Kubernetes request completed: rollback deployment");
     Ok(())
 }
 
