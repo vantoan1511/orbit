@@ -8,10 +8,11 @@ pub struct UpdateManifest {
     pub release_notes: Option<String>,
 }
 
+const GITHUB_REPO: &str = "vantoan1511/orbit";
+
 #[derive(Deserialize)]
 struct GithubReleaseItem {
-    #[serde(default)]
-    tag_name: String,
+    tag_name: Option<String>,
     body: Option<String>,
 }
 
@@ -41,40 +42,51 @@ impl UpdateManifest {
             .build()
             .ok()?;
 
-        let list_api_url = "https://api.github.com/repos/vantoan1511/orbit/releases?per_page=30";
-        if let Ok(resp) = client.get(list_api_url).send().await {
-            if resp.status().is_success() {
-                if let Ok(releases) = resp.json::<Vec<GithubReleaseItem>>().await {
-                    if let Some(notes) = Self::aggregate_release_notes(&releases, target_version, current_version) {
-                        return Some(notes);
-                    }
-                }
-            }
+        if let Some(notes) = Self::fetch_aggregated_release_notes(&client, target_version, current_version).await {
+            return Some(notes);
         }
 
-        // Fallback: try tag endpoint if list fails or is empty
+        Self::fetch_single_release_notes(&client, target_version).await
+    }
+
+    async fn fetch_aggregated_release_notes(
+        client: &reqwest::Client,
+        target_version: &str,
+        current_version: &str,
+    ) -> Option<String> {
+        let list_api_url = format!("https://api.github.com/repos/{}/releases?per_page=100", GITHUB_REPO);
+        let resp = client.get(&list_api_url).send().await.ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+
+        let releases = resp.json::<Vec<GithubReleaseItem>>().await.ok()?;
+        Self::aggregate_release_notes(&releases, target_version, current_version)
+    }
+
+    async fn fetch_release_by_url(client: &reqwest::Client, url: &str) -> Option<String> {
+        let resp = client.get(url).send().await.ok()?;
+        if !resp.status().is_success() {
+            return None;
+        }
+        let release = resp.json::<GithubReleaseItem>().await.ok()?;
+        release.body
+    }
+
+    async fn fetch_single_release_notes(client: &reqwest::Client, target_version: &str) -> Option<String> {
         let tag = if target_version.starts_with('v') {
             target_version.to_string()
         } else {
             format!("v{}", target_version)
         };
-        let api_url = format!("https://api.github.com/repos/vantoan1511/orbit/releases/tags/{}", tag);
-
-        let resp = client.get(&api_url).send().await.ok()?;
-        if resp.status().is_success() {
-            let release = resp.json::<GithubReleaseItem>().await.ok()?;
-            release.body
-        } else {
-            // Fallback: try latest release endpoint if specific tag lookup fails
-            let fallback_url = "https://api.github.com/repos/vantoan1511/orbit/releases/latest";
-            let resp = client.get(fallback_url).send().await.ok()?;
-            if resp.status().is_success() {
-                let release = resp.json::<GithubReleaseItem>().await.ok()?;
-                release.body
-            } else {
-                None
-            }
+        let tag_url = format!("https://api.github.com/repos/{}/releases/tags/{}", GITHUB_REPO, tag);
+        if let Some(body) = Self::fetch_release_by_url(client, &tag_url).await {
+            return Some(body);
         }
+
+        // Fallback: try latest release endpoint if specific tag lookup fails
+        let fallback_url = format!("https://api.github.com/repos/{}/releases/latest", GITHUB_REPO);
+        Self::fetch_release_by_url(client, &fallback_url).await
     }
 
     /// Check if an update is available.
@@ -126,29 +138,42 @@ impl UpdateManifest {
         let target_sem = semver::Version::parse(target_version.trim_start_matches('v')).ok()?;
         let current_sem = semver::Version::parse(current_version.trim_start_matches('v')).ok()?;
 
+        let mut matching_releases: Vec<(semver::Version, &str, &Option<String>)> = releases
+            .iter()
+            .filter_map(|release| {
+                let tag = release.tag_name.as_deref()?;
+                let release_sem = semver::Version::parse(tag.trim_start_matches('v')).ok()?;
+                if release_sem > current_sem && release_sem <= target_sem {
+                    Some((release_sem, tag, &release.body))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        if matching_releases.is_empty() {
+            return None;
+        }
+
+        // Sort descending (newest first)
+        matching_releases.sort_by(|a, b| b.0.cmp(&a.0));
+
         let mut combined_notes = String::new();
 
-        for release in releases {
-            if let Ok(release_sem) = semver::Version::parse(release.tag_name.trim_start_matches('v')) {
-                if release_sem > current_sem && release_sem <= target_sem {
-                    if let Some(body) = &release.body {
-                        let trimmed_body = body.trim();
-                        if !trimmed_body.is_empty() {
-                            if !combined_notes.is_empty() {
-                                combined_notes.push_str("\n\n");
-                            }
-                            combined_notes.push_str(&format!("## Release {}\n\n{}", release.tag_name, trimmed_body));
-                        }
-                    }
-                }
+        for (_, tag, body) in matching_releases {
+            let body_text = body
+                .as_deref()
+                .map(str::trim)
+                .filter(|b| !b.is_empty())
+                .unwrap_or("_No release notes provided._");
+
+            if !combined_notes.is_empty() {
+                combined_notes.push_str("\n\n");
             }
+            combined_notes.push_str(&format!("## Release {}\n\n{}", tag, body_text));
         }
 
-        if !combined_notes.is_empty() {
-            Some(combined_notes)
-        } else {
-            None
-        }
+        Some(combined_notes)
     }
 }
 
@@ -158,17 +183,18 @@ mod tests {
 
     #[test]
     fn test_aggregate_release_notes_multiple_intermediate_versions() {
+        // Provided in arbitrary/reverse order to verify that sorting guarantees descending order
         let releases = vec![
             GithubReleaseItem {
-                tag_name: "v0.7.1".to_string(),
-                body: Some("### Features\n- Fix bug A".to_string()),
-            },
-            GithubReleaseItem {
-                tag_name: "v0.7.0".to_string(),
+                tag_name: Some("v0.7.0".to_string()),
                 body: Some("### Features\n- Add feature B".to_string()),
             },
             GithubReleaseItem {
-                tag_name: "v0.6.0".to_string(),
+                tag_name: Some("v0.7.1".to_string()),
+                body: Some("### Features\n- Fix bug A".to_string()),
+            },
+            GithubReleaseItem {
+                tag_name: Some("v0.6.0".to_string()),
                 body: Some("### Features\n- Old feature".to_string()),
             },
         ];
@@ -179,17 +205,22 @@ mod tests {
         assert!(notes.contains("## Release v0.7.1\n\n### Features\n- Fix bug A"));
         assert!(notes.contains("## Release v0.7.0\n\n### Features\n- Add feature B"));
         assert!(!notes.contains("v0.6.0"));
+
+        // Verify descending order (newest first)
+        let pos_v071 = notes.find("## Release v0.7.1").unwrap();
+        let pos_v070 = notes.find("## Release v0.7.0").unwrap();
+        assert!(pos_v071 < pos_v070, "v0.7.1 should appear before v0.7.0 in descending order");
     }
 
     #[test]
     fn test_aggregate_release_notes_single_version() {
         let releases = vec![
             GithubReleaseItem {
-                tag_name: "v0.7.1".to_string(),
+                tag_name: Some("v0.7.1".to_string()),
                 body: Some("### Features\n- Fix bug A".to_string()),
             },
             GithubReleaseItem {
-                tag_name: "v0.7.0".to_string(),
+                tag_name: Some("v0.7.0".to_string()),
                 body: Some("### Features\n- Add feature B".to_string()),
             },
         ];
@@ -205,13 +236,33 @@ mod tests {
     fn test_aggregate_release_notes_no_matching_versions() {
         let releases = vec![
             GithubReleaseItem {
-                tag_name: "v0.6.0".to_string(),
+                tag_name: Some("v0.6.0".to_string()),
                 body: Some("### Features\n- Old feature".to_string()),
             },
         ];
 
         let result = UpdateManifest::aggregate_release_notes(&releases, "0.7.1", "0.7.0");
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_aggregate_release_notes_empty_body_fallback() {
+        let releases = vec![
+            GithubReleaseItem {
+                tag_name: Some("v0.7.1".to_string()),
+                body: None,
+            },
+            GithubReleaseItem {
+                tag_name: Some("v0.7.0".to_string()),
+                body: Some("   ".to_string()),
+            },
+        ];
+
+        let result = UpdateManifest::aggregate_release_notes(&releases, "v0.7.1", "v0.6.0");
+        assert!(result.is_some());
+        let notes = result.unwrap();
+        assert!(notes.contains("## Release v0.7.1\n\n_No release notes provided._"));
+        assert!(notes.contains("## Release v0.7.0\n\n_No release notes provided._"));
     }
 }
 
