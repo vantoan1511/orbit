@@ -19,15 +19,16 @@ impl Inner {
 
         // If orbit.log already exists, check if it was last modified on a previous day
         if log_path.exists() {
-            if let Ok(metadata) = std::fs::metadata(&log_path) {
-                if let Ok(modified) = metadata.modified() {
-                    let mod_datetime: DateTime<Local> = modified.into();
-                    let mod_date = mod_datetime.format("%Y-%m-%d").to_string();
-                    if mod_date != today {
-                        // Rename existing orbit.log to orbit.log.<mod_date>
-                        let archive_path = dir.join(format!("orbit.log.{}", mod_date));
-                        let _ = std::fs::rename(&log_path, &archive_path);
-                    }
+            let modified = std::fs::metadata(&log_path)
+                .ok()
+                .and_then(|m| m.modified().ok());
+            if let Some(modified) = modified {
+                let mod_datetime: DateTime<Local> = modified.into();
+                let mod_date = mod_datetime.format("%Y-%m-%d").to_string();
+                if mod_date != today {
+                    // Rename existing orbit.log to orbit.log.<mod_date>
+                    let archive_path = dir.join(format!("orbit.log.{}", mod_date));
+                    let _ = std::fs::rename(&log_path, &archive_path);
                 }
             }
         }
@@ -95,7 +96,7 @@ impl Write for RotatingFileAppender {
         let mut inner = self
             .inner
             .lock()
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Lock poisoned"))?;
+            .map_err(|_| io::Error::other("Lock poisoned"))?;
         inner.write_all(buf)?;
         Ok(buf.len())
     }
@@ -104,7 +105,7 @@ impl Write for RotatingFileAppender {
         let mut inner = self
             .inner
             .lock()
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "Lock poisoned"))?;
+            .map_err(|_| io::Error::other("Lock poisoned"))?;
         if let Some(ref mut f) = inner.file {
             f.flush()?;
         }
@@ -123,7 +124,7 @@ impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for RotatingFileAppender {
 /// Initialize tracing with file logging in `~/.orbit/orbit.log` and stdout.
 pub fn init() -> Result<(), Box<dyn std::error::Error>> {
     let config_dir = crate::config::OrbitConfig::config_dir()
-        .ok_or_else(|| "Could not determine Orbit config directory for logs")?;
+        .ok_or("Could not determine Orbit config directory for logs")?;
     std::fs::create_dir_all(&config_dir)?;
 
     let appender = RotatingFileAppender::new(config_dir.clone());

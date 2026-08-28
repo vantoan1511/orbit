@@ -367,3 +367,12 @@ export interface PolicyInfo {
   description: string
   rules: string
 }
+
+export interface ActivePortForward {
+  id: string
+  namespace: string
+  kind: string
+  name: string
+  localPort: number
+  remotePort: number
+}

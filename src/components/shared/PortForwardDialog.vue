@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import Button from 'primevue/button'
-import InputNumber from 'primevue/inputnumber'
 import { computed, inject, onMounted, ref, type Ref } from 'vue'
 
 interface PortForwardDialogData {

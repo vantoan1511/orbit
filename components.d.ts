@@ -52,6 +52,7 @@ declare module 'vue' {
     IngressEditForm: typeof import('./src/components/network/IngressEditForm.vue')['default']
     IngressesTable: typeof import('./src/components/network/IngressesTable.vue')['default']
     InputIcon: typeof import('primevue/inputicon')['default']
+    InputNumber: typeof import('primevue/inputnumber')['default']
     JobsTable: typeof import('./src/components/workloads/JobsTable.vue')['default']
     KeyValueBadgeList: typeof import('./src/components/shared/KeyValueBadgeList.vue')['default']
     KeyValueEditor: typeof import('./src/components/shared/KeyValueEditor.vue')['default']

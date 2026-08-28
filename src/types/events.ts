@@ -150,8 +150,11 @@ export interface OrbitEventMap {
   }
   portForwardStarted: {
     id: string
-    local_port: number
-    remote_port: number
+    namespace: string
+    kind: string
+    name: string
+    localPort: number
+    remotePort: number
   }
   portForwardStopped: {
     id: string

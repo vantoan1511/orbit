@@ -20,7 +20,8 @@ import type {
   SecretInfo,
   ServiceInfo,
   StatefulSetInfo,
-  StorageClassInfo
+  StorageClassInfo,
+  ActivePortForward
 } from '@/types/kubernetes'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { defineStore } from 'pinia'
@@ -306,6 +307,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     eventsLoading.value = true
     policiesLoading.value = true
     namespacesLoading.value = true
+    kubernetesService.stopPortForward().catch((err) => {
+      console.error('Failed to stop port forwards on cluster switch:', err)
+    })
     activePortForwards.value = []
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
@@ -543,7 +547,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  const activePortForwards = ref<string[]>([])
+  const activePortForwards = ref<ActivePortForward[]>([])
 
   function onPodMetricsUpdated(payload: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
@@ -557,14 +561,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  function onPortForwardStarted(payload: { id: string; local_port: number; remote_port: number }) {
-    if (!activePortForwards.value.includes(payload.id)) {
-      activePortForwards.value = [...activePortForwards.value, payload.id]
+  function onPortForwardStarted(payload: ActivePortForward) {
+    if (!activePortForwards.value.some((f) => f.id === payload.id)) {
+      activePortForwards.value = [...activePortForwards.value, payload]
     }
   }
 
   function onPortForwardStopped(payload: { id: string }) {
-    activePortForwards.value = activePortForwards.value.filter((id) => id !== payload.id)
+    activePortForwards.value = activePortForwards.value.filter((f) => f.id !== payload.id)
   }
 
   nativeEvents.on(OrbitEvents.ResourceUpdated, onResourceUpdated)

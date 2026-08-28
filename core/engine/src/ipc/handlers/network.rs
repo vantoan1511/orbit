@@ -221,14 +221,22 @@ pub fn start_port_forward(
         let stderr_reader = child.stderr.take();
         let stdout_reader = child.stdout.take();
 
-        // Spawn background task to consume stdout so pipe buffer does not fill up
-        if let Some(mut stdout) = stdout_reader {
+        let (started_tx, mut started_rx) = tokio::sync::oneshot::channel::<bool>();
+        let started_tx = Arc::new(tokio::sync::Mutex::new(Some(started_tx)));
+
+        // Spawn background task to consume stdout and detect when port forwarding is listening
+        if let Some(stdout) = stdout_reader {
+            let started_tx_clone = started_tx.clone();
             tokio::spawn(async move {
-                use tokio::io::AsyncReadExt;
-                let mut buf = [0u8; 1024];
-                while let Ok(n) = stdout.read(&mut buf).await {
-                    if n == 0 {
-                        break;
+                use tokio::io::{AsyncBufReadExt, BufReader};
+                let mut reader = BufReader::new(stdout).lines();
+                while let Ok(Some(line)) = reader.next_line().await {
+                    log::debug!("kubectl port-forward stdout: {}", line);
+                    if line.contains("Forwarding from") {
+                        let mut lock = started_tx_clone.lock().await;
+                        if let Some(tx) = lock.take() {
+                            let _ = tx.send(true);
+                        }
                     }
                 }
             });
@@ -253,72 +261,60 @@ pub fn start_port_forward(
             });
         }
 
-        // Notify UI that port forwarding has started
-        let _ = Bridge::send_event(
-            &writer,
-            &token,
-            &OrbitEvent::PortForwardStarted {
-                id: forward_id.clone(),
-                local_port,
-                remote_port,
-            },
-        )
-        .await;
-
-        let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+        let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel();
         let writer_clone = writer.clone();
         let token_clone = token.clone();
         let forward_id_clone = forward_id.clone();
         let manager_clone = manager.clone();
+        let namespace_clone = namespace.clone();
+        let kind_clone = kind.clone();
+        let name_clone = name.clone();
 
         {
             let mut w_manager = manager.write().await;
 
             let join_handle = tokio::spawn(async move {
+                let mut has_started = false;
+
                 tokio::select! {
-                    res = child.wait() => {
-                        match res {
-                            Ok(status) => {
-                                if !status.success() {
-                                    let err_msg = {
-                                        let lock = stderr_output.lock().await;
-                                        lock.trim().to_string()
-                                    };
-                                    let message = if !err_msg.is_empty() {
-                                        format!("Port forwarding failed for {}: {}", forward_id_clone, err_msg)
-                                    } else {
-                                        format!("kubectl port-forward for {} exited with status {:?}", forward_id_clone, status)
-                                    };
-                                    log::error!("{}", message);
-                                    let _ = Bridge::send_event(
-                                        &writer_clone,
-                                        &token_clone,
-                                        &OrbitEvent::ErrorOccurred { message },
-                                    ).await;
-                                } else {
-                                    log::info!("kubectl port-forward for {} exited cleanly", forward_id_clone);
-                                }
-                            }
-                            Err(e) => {
-                                log::error!("kubectl port-forward for {} wait error: {:?}", forward_id_clone, e);
-                            }
+                    ready = &mut started_rx => {
+                        if ready.unwrap_or(false) {
+                            has_started = true;
+                            let _ = Bridge::send_event(
+                                &writer_clone,
+                                &token_clone,
+                                &OrbitEvent::PortForwardStarted {
+                                    id: forward_id_clone.clone(),
+                                    namespace: namespace_clone,
+                                    kind: kind_clone,
+                                    name: name_clone,
+                                    local_port,
+                                    remote_port,
+                                },
+                            )
+                            .await;
                         }
                     }
-                    _ = cancel_rx => {
-                        log::info!("Killing kubectl port-forward for {}", forward_id_clone);
+                    res = child.wait() => {
+                        handle_port_forward_exit(res, &stderr_output, &forward_id_clone, &writer_clone, &token_clone).await;
+                        let mut w_manager = manager_clone.write().await;
+                        w_manager.port_forward_cancel.remove(&forward_id_clone);
+                        return;
+                    }
+                    _ = &mut cancel_rx => {
+                        kill_port_forward_child(&mut child, &forward_id_clone).await;
+                        let mut w_manager = manager_clone.write().await;
+                        w_manager.port_forward_cancel.remove(&forward_id_clone);
+                        return;
+                    }
+                }
 
-                        #[cfg(windows)]
-                        {
-                            if let Some(pid) = child.id() {
-                                let _ = tokio::process::Command::new("taskkill")
-                                    .args(["/F", "/T", "/PID", &pid.to_string()])
-                                    .output()
-                                    .await;
-                            }
-                        }
-
-                        let _ = child.kill().await;
-                        let _ = child.wait().await;
+                tokio::select! {
+                    res = child.wait() => {
+                        handle_port_forward_exit(res, &stderr_output, &forward_id_clone, &writer_clone, &token_clone).await;
+                    }
+                    _ = &mut cancel_rx => {
+                        kill_port_forward_child(&mut child, &forward_id_clone).await;
                     }
                 }
 
@@ -328,20 +324,74 @@ pub fn start_port_forward(
                     w_manager.port_forward_cancel.remove(&forward_id_clone);
                 }
 
-                // Notify UI that port forwarding has stopped
-                let _ = Bridge::send_event(
-                    &writer_clone,
-                    &token_clone,
-                    &OrbitEvent::PortForwardStopped {
-                        id: forward_id_clone,
-                    },
-                )
-                .await;
+                if has_started {
+                    // Notify UI that port forwarding has stopped
+                    let _ = Bridge::send_event(
+                        &writer_clone,
+                        &token_clone,
+                        &OrbitEvent::PortForwardStopped {
+                            id: forward_id_clone,
+                        },
+                    )
+                    .await;
+                }
             });
 
             w_manager.port_forward_cancel.insert(forward_id.clone(), (cancel_tx, join_handle));
         }
     });
+}
+
+async fn handle_port_forward_exit(
+    res: Result<std::process::ExitStatus, std::io::Error>,
+    stderr_output: &Arc<tokio::sync::Mutex<String>>,
+    forward_id: &str,
+    writer: &Arc<Mutex<WsWriter>>,
+    token: &str,
+) {
+    match res {
+        Ok(status) => {
+            if !status.success() {
+                let err_msg = {
+                    let lock = stderr_output.lock().await;
+                    lock.trim().to_string()
+                };
+                let message = if !err_msg.is_empty() {
+                    format!("Port forwarding failed for {}: {}", forward_id, err_msg)
+                } else {
+                    format!("kubectl port-forward for {} exited with status {:?}", forward_id, status)
+                };
+                log::error!("{}", message);
+                let _ = Bridge::send_event(
+                    writer,
+                    token,
+                    &OrbitEvent::ErrorOccurred { message },
+                ).await;
+            } else {
+                log::info!("kubectl port-forward for {} exited cleanly", forward_id);
+            }
+        }
+        Err(e) => {
+            log::error!("kubectl port-forward for {} wait error: {:?}", forward_id, e);
+        }
+    }
+}
+
+async fn kill_port_forward_child(child: &mut tokio::process::Child, forward_id: &str) {
+    log::info!("Killing kubectl port-forward for {}", forward_id);
+
+    #[cfg(windows)]
+    {
+        if let Some(pid) = child.id() {
+            let _ = tokio::process::Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .output()
+                .await;
+        }
+    }
+
+    let _ = child.kill().await;
+    let _ = child.wait().await;
 }
 
 pub fn stop_port_forward(

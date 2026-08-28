@@ -371,7 +371,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     if (['Deployment', 'Pod', 'Service', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
       items.push({
         label: 'Port Forwarding',
-        icon: 'pi pi-external-link',
+        icon: 'pi pi-arrow-right-arrow-left',
         command: () => {
           const row = selectedActionRow.value
           if (!row) return
@@ -426,35 +426,29 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         const targetKind = resourceKind.toLowerCase()
         const targetName = row.name.toLowerCase()
 
-        const activeIds = k8sStore.activePortForwards.filter((id) => {
-          const parts = id.split('/')
-          if (parts.length < 3) return false
-          const ns = parts[0]
-          const k = parts[1]
-          const rest = parts[2]
-          if (!ns || !k || !rest) return false
-          const namePart = rest.split(':')[0]
-          if (!namePart) return false
-          return (
-            ns.toLowerCase() === targetNamespace &&
-            k.toLowerCase() === targetKind &&
-            namePart.toLowerCase() === targetName
-          )
-        })
+        const activeForwards = k8sStore.activePortForwards.filter(
+          (f) =>
+            f.namespace.toLowerCase() === targetNamespace &&
+            f.kind.toLowerCase() === targetKind &&
+            f.name.toLowerCase() === targetName
+        )
 
-        if (activeIds.length > 0) {
+        if (activeForwards.length > 0) {
           items.push({
             label: 'Stop Port Forwarding',
             icon: 'pi pi-stop-circle',
-            class: 'text-amber-500 hover:text-amber-400',
+            class: 'text-warning hover:opacity-80',
             command: async () => {
-              for (const id of activeIds) {
+              const currentRow = selectedActionRow.value
+              if (!currentRow) return
+
+              for (const f of activeForwards) {
                 try {
-                  await kubernetesService.stopPortForward({ id })
+                  await kubernetesService.stopPortForward({ id: f.id })
                   toast.add({
                     severity: 'info',
                     summary: 'Port Forward Stopped',
-                    detail: `Stopped port forward for ${row.name}`,
+                    detail: `Stopped port forward for ${currentRow.name}`,
                     life: 3000
                   })
                 } catch (e) {

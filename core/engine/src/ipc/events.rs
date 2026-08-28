@@ -151,12 +151,17 @@ pub enum OrbitEvent {
         data: serde_json::Value,
     },
     #[serde(rename = "portForwardStarted")]
+    #[serde(rename_all = "camelCase")]
     PortForwardStarted {
         id: String,
+        namespace: String,
+        kind: String,
+        name: String,
         local_port: u16,
         remote_port: u16,
     },
     #[serde(rename = "portForwardStopped")]
+    #[serde(rename_all = "camelCase")]
     PortForwardStopped {
         id: String,
     },
