@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use kube::{Client, config::{Kubeconfig, KubeConfigOptions, Config}};
 use crate::kubernetes::models::{ClusterInfo, UserProfileInfo};
 use crate::config::OrbitConfig;
@@ -10,6 +11,7 @@ pub struct KubeManager {
     pub watch_cancel: Option<tokio::sync::watch::Sender<bool>>,
     pub active_context_healthy: bool,
     pub log_cancel: Vec<tokio::sync::oneshot::Sender<()>>,
+    pub port_forward_cancel: HashMap<String, (tokio::sync::oneshot::Sender<()>, tokio::task::JoinHandle<()>)>,
     pub config: OrbitConfig,
 }
 
@@ -24,6 +26,7 @@ impl KubeManager {
             watch_cancel: None,
             active_context_healthy: false,
             log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
             config,
         };
         
@@ -261,6 +264,7 @@ mod tests {
             watch_cancel: None,
             active_context_healthy: false,
             log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
             config: OrbitConfig::default(),
         };
 
@@ -278,6 +282,7 @@ mod tests {
             watch_cancel: None,
             active_context_healthy: false,
             log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
             config: OrbitConfig::default(),
         };
 
@@ -322,6 +327,7 @@ users:
             watch_cancel: None,
             active_context_healthy: false,
             log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
             config: OrbitConfig::default(),
         };
 

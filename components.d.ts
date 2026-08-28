@@ -74,6 +74,7 @@ declare module 'vue' {
     PoliciesDataTable: typeof import('./src/components/policies/PoliciesDataTable.vue')['default']
     PoliciesMetricsCards: typeof import('./src/components/policies/PoliciesMetricsCards.vue')['default']
     PolicyDetailsDrawer: typeof import('./src/components/policies/PolicyDetailsDrawer.vue')['default']
+    PortForwardDialog: typeof import('./src/components/shared/PortForwardDialog.vue')['default']
     ProfileDrawer: typeof import('./src/components/layout/ProfileDrawer.vue')['default']
     ReactiveAge: typeof import('./src/components/shared/ReactiveAge.vue')['default']
     ReplicaSetsTable: typeof import('./src/components/workloads/ReplicaSetsTable.vue')['default']

@@ -5,9 +5,11 @@ import { useDialog } from 'primevue/usedialog'
 import { computed, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
 import { kubernetesService } from '@/services/kubernetesService'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import ScaleDialog from '@/components/shared/ScaleDialog.vue'
 import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
+import PortForwardDialog from '@/components/shared/PortForwardDialog.vue'
 
 export interface WorkloadActionOptions<T> {
   kind?: MaybeRefOrGetter<string>
@@ -22,6 +24,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
   const confirm = useConfirm()
   const dialog = useDialog()
   const router = useRouter()
+  const k8sStore = useKubernetesStore()
 
   const confirmAction = (
     message: string,
@@ -362,6 +365,111 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
           })
         }
       })
+    }
+
+    // Port Forwarding
+    if (['Deployment', 'Pod', 'Service', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
+      items.push({
+        label: 'Port Forwarding',
+        icon: 'pi pi-external-link',
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+
+          dialog.open(PortForwardDialog, {
+            props: {
+              header: 'Port Forwarding',
+              style: {
+                width: '380px'
+              },
+              modal: true
+            },
+            data: {
+              sourceName: row.name,
+              sourceNamespace: row.namespace || 'default',
+              kind: resourceKind
+            },
+            onClose: async (options) => {
+              const result = options?.data as { localPort: number; remotePort: number } | undefined
+              if (result?.localPort && result?.remotePort) {
+                try {
+                  await kubernetesService.startPortForward({
+                    namespace: row.namespace || 'default',
+                    kind: resourceKind,
+                    name: row.name,
+                    localPort: result.localPort,
+                    remotePort: result.remotePort
+                  })
+                  toast.add({
+                    severity: 'success',
+                    summary: 'Port Forward Started',
+                    detail: `Forwarding ${result.localPort} -> ${result.remotePort} for ${row.name}`,
+                    life: 5000
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to start port forwarding',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      })
+
+      const row = selectedActionRow.value
+      if (row) {
+        const targetNamespace = (row.namespace || 'default').toLowerCase()
+        const targetKind = resourceKind.toLowerCase()
+        const targetName = row.name.toLowerCase()
+
+        const activeIds = k8sStore.activePortForwards.filter((id) => {
+          const parts = id.split('/')
+          if (parts.length < 3) return false
+          const ns = parts[0]
+          const k = parts[1]
+          const rest = parts[2]
+          if (!ns || !k || !rest) return false
+          const namePart = rest.split(':')[0]
+          if (!namePart) return false
+          return (
+            ns.toLowerCase() === targetNamespace &&
+            k.toLowerCase() === targetKind &&
+            namePart.toLowerCase() === targetName
+          )
+        })
+
+        if (activeIds.length > 0) {
+          items.push({
+            label: 'Stop Port Forwarding',
+            icon: 'pi pi-stop-circle',
+            class: 'text-amber-500 hover:text-amber-400',
+            command: async () => {
+              for (const id of activeIds) {
+                try {
+                  await kubernetesService.stopPortForward({ id })
+                  toast.add({
+                    severity: 'info',
+                    summary: 'Port Forward Stopped',
+                    detail: `Stopped port forward for ${row.name}`,
+                    life: 3000
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to stop port forwarding',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      }
     }
 
     items.push({ separator: true })

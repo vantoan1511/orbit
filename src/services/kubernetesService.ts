@@ -253,5 +253,19 @@ export const kubernetesService = {
     revision?: number
   }): Promise<void> {
     await coreEngine.dispatch('rollbackDeployment', params)
+  },
+
+  async startPortForward(params: {
+    namespace: string
+    kind: string
+    name: string
+    localPort: number
+    remotePort: number
+  }): Promise<void> {
+    await coreEngine.dispatch('startPortForward', params)
+  },
+
+  async stopPortForward(params?: { id?: string }): Promise<void> {
+    await coreEngine.dispatch('stopPortForward', params)
   }
 }

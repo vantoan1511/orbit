@@ -150,6 +150,16 @@ pub enum OrbitEvent {
         name: String,
         data: serde_json::Value,
     },
+    #[serde(rename = "portForwardStarted")]
+    PortForwardStarted {
+        id: String,
+        local_port: u16,
+        remote_port: u16,
+    },
+    #[serde(rename = "portForwardStopped")]
+    PortForwardStopped {
+        id: String,
+    },
 }
 
 impl OrbitEvent {
@@ -189,6 +199,8 @@ impl OrbitEvent {
             OrbitEvent::UpdateDownloadProgress { .. } => "updateDownloadProgress",
             OrbitEvent::UpdateReady { .. } => "updateReady",
             OrbitEvent::ResourceRawData { .. } => "resourceRawData",
+            OrbitEvent::PortForwardStarted { .. } => "portForwardStarted",
+            OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
         }
     }
 }
