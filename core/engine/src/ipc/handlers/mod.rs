@@ -66,6 +66,8 @@ pub fn dispatch(
         "cloneIngress" => network::clone_ingress(data, writer, token, manager),
         "cloneDeployment" => workloads::clone_deployment(data, writer, token, manager),
         "rollbackDeployment" => workloads::rollback_deployment(data, writer, token, manager),
+        "startPortForward" => network::start_port_forward(data, writer, token, manager),
+        "stopPortForward" => network::stop_port_forward(data, manager),
         other => {
             tracing::debug!(event = %other, "Unhandled UI event in dispatcher");
         }

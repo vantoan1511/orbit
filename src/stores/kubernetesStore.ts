@@ -20,7 +20,8 @@ import type {
   SecretInfo,
   ServiceInfo,
   StatefulSetInfo,
-  StorageClassInfo
+  StorageClassInfo,
+  ActivePortForward
 } from '@/types/kubernetes'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { defineStore } from 'pinia'
@@ -306,6 +307,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     eventsLoading.value = true
     policiesLoading.value = true
     namespacesLoading.value = true
+    kubernetesService.stopPortForward().catch((err) => {
+      console.error('Failed to stop port forwards on cluster switch:', err)
+    })
+    activePortForwards.value = []
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
 
@@ -542,6 +547,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
+  const activePortForwards = ref<ActivePortForward[]>([])
+
   function onPodMetricsUpdated(payload: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
   }) {
@@ -554,12 +561,26 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
+  function onPortForwardStarted(payload: ActivePortForward) {
+    if (!activePortForwards.value.some((f) => f.id === payload.id)) {
+      activePortForwards.value = [...activePortForwards.value, payload]
+    }
+  }
+
+  function onPortForwardStopped(payload: { id: string }) {
+    activePortForwards.value = activePortForwards.value.filter((f) => f.id !== payload.id)
+  }
+
   nativeEvents.on(OrbitEvents.ResourceUpdated, onResourceUpdated)
   nativeEvents.on(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
+  nativeEvents.on(OrbitEvents.PortForwardStarted, onPortForwardStarted)
+  nativeEvents.on(OrbitEvents.PortForwardStopped, onPortForwardStopped)
 
   onScopeDispose(() => {
     nativeEvents.off(OrbitEvents.ResourceUpdated, onResourceUpdated)
     nativeEvents.off(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
+    nativeEvents.off(OrbitEvents.PortForwardStarted, onPortForwardStarted)
+    nativeEvents.off(OrbitEvents.PortForwardStopped, onPortForwardStopped)
   })
 
   return {
@@ -645,6 +666,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     loadInitialData,
     lastUpdatedAt,
     cpuHistory,
-    memHistory
+    memHistory,
+    activePortForwards
   }
 })

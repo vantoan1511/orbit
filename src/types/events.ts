@@ -148,6 +148,17 @@ export interface OrbitEventMap {
     name: string
     data: Record<string, unknown>
   }
+  portForwardStarted: {
+    id: string
+    namespace: string
+    kind: string
+    name: string
+    localPort: number
+    remotePort: number
+  }
+  portForwardStopped: {
+    id: string
+  }
 }
 
 /** Sentinel value for the tailLines IPC field meaning "fetch all log lines". */
@@ -188,7 +199,9 @@ export const OrbitEvents = {
   UpdateDownloadProgress: 'updateDownloadProgress',
   UpdateReady: 'updateReady',
   CommandSucceeded: 'commandSucceeded',
-  ResourceRawData: 'resourceRawData'
+  ResourceRawData: 'resourceRawData',
+  PortForwardStarted: 'portForwardStarted',
+  PortForwardStopped: 'portForwardStopped'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

@@ -600,7 +600,7 @@ pub fn find_rollback_replicaset<'a>(
     let mut matching_rs: Vec<(&'a ReplicaSet, i64)> = replicasets
         .iter()
         .filter(|rs| {
-            rs.metadata.owner_references.as_ref().map_or(false, |owners| {
+            rs.metadata.owner_references.as_ref().is_some_and(|owners| {
                 owners.iter().any(|owner| {
                     owner.kind == "Deployment"
                         && (owner.name == deploy_name || (!deploy_uid.is_empty() && owner.uid == deploy_uid))
@@ -622,16 +622,14 @@ pub fn find_rollback_replicaset<'a>(
         return Err("No matching ReplicaSets with revision annotations found".to_string());
     }
 
-    matching_rs.sort_by(|a, b| b.1.cmp(&a.1));
+    matching_rs.sort_by_key(|b| std::cmp::Reverse(b.1));
 
-    if let Some(target) = target_revision {
-        if target > 0 {
-            return matching_rs
-                .into_iter()
-                .find(|(_, rev)| *rev == target)
-                .map(|(rs, _)| rs)
-                .ok_or_else(|| format!("ReplicaSet with revision {} not found", target));
-        }
+    if let Some(target) = target_revision.filter(|&t| t > 0) {
+        return matching_rs
+            .into_iter()
+            .find(|(_, rev)| *rev == target)
+            .map(|(rs, _)| rs)
+            .ok_or_else(|| format!("ReplicaSet with revision {} not found", target));
     }
 
     let current_revision = deployment
@@ -641,10 +639,8 @@ pub fn find_rollback_replicaset<'a>(
         .and_then(|a| a.get(REVISION_ANNOTATION))
         .and_then(|r| r.parse::<i64>().ok());
 
-    if let Some(curr) = current_revision {
-        if let Some((rs, _)) = matching_rs.iter().find(|(_, rev)| *rev < curr) {
-            return Ok(rs);
-        }
+    if let Some((rs, _)) = current_revision.and_then(|curr| matching_rs.iter().find(|(_, rev)| *rev < curr)) {
+        return Ok(rs);
     }
 
     if matching_rs.len() > 1 {
