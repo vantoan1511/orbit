@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import Select from 'primevue/select'
 import { computed, inject, onMounted, ref, type Ref } from 'vue'
 
 interface PortForwardDialogData {
   sourceName: string
   sourceNamespace: string
   kind: string
+  availablePorts?: number[]
 }
 
 export interface PortForwardDialogResult {
@@ -25,13 +27,34 @@ const sourceNamespace = ref('')
 const kind = ref('Deployment')
 
 const localPort = ref<number | null>(8080)
-const remotePort = ref<number | null>(8080)
+const availablePorts = ref<number[]>([])
+const remotePortInput = ref<string | number | null>(8080)
+
+const remotePort = computed<number | null>(() => {
+  if (remotePortInput.value === null || remotePortInput.value === '') return null
+  const parsed = Number(remotePortInput.value)
+  return isNaN(parsed) ? null : parsed
+})
+
+const remotePortNumber = computed({
+  get: () => remotePort.value,
+  set: (val: number | null) => {
+    remotePortInput.value = val
+  }
+})
 
 onMounted(() => {
   if (dialogRef?.value?.data) {
     sourceName.value = dialogRef.value.data.sourceName
     sourceNamespace.value = dialogRef.value.data.sourceNamespace || 'default'
     kind.value = dialogRef.value.data.kind || 'Deployment'
+
+    if (dialogRef.value.data.availablePorts && dialogRef.value.data.availablePorts.length > 0) {
+      availablePorts.value = dialogRef.value.data.availablePorts
+      const firstPort = availablePorts.value[0] ?? 8080
+      remotePortInput.value = firstPort
+      localPort.value = firstPort
+    }
   }
 })
 
@@ -94,9 +117,21 @@ const handleStart = () => {
         <label for="container-port" class="text-xs font-semibold text-muted-color">
           Container Port (Remote)
         </label>
-        <InputNumber
+        <Select
+          v-if="availablePorts.length > 0"
           id="container-port"
-          v-model="remotePort"
+          v-model="remotePortInput"
+          :options="availablePorts"
+          editable
+          placeholder="8080"
+          fluid
+          size="small"
+          class="text-xs font-mono"
+        />
+        <InputNumber
+          v-else
+          id="container-port"
+          v-model="remotePortNumber"
           :min="1"
           :max="65535"
           :useGrouping="false"
