@@ -449,6 +449,8 @@ Use:
 
 - PrimeVue v4 components (`Button`, `InputText`, `InputNumber`, `Select`, `ToggleSwitch`, etc.) over raw HTML elements or custom controls
 
+- PrimeVue `v-tooltip` directive for all tooltips and hover hints (e.g., `v-tooltip.top="'...'"` or `v-tooltip="'...'"`) over native HTML `title` attributes
+
 - centralized service wrappers (e.g., `@/services/nativeService`) for all native or system operations
 
 Avoid:
@@ -464,6 +466,8 @@ Avoid:
 - direct imports of `@neutralinojs/lib` in components, views, or composables (must use `@/services/nativeService` or domain services)
 
 - raw HTML inputs/buttons (`<button>`, `<input>`, `<select>`) or reinventions of controls already available in PrimeVue
+
+- native HTML `title` attributes for tooltips or descriptive hints (always use PrimeVue `v-tooltip`)
 
 Components should remain focused on rendering.
 

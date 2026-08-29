@@ -11,6 +11,7 @@
     }
   "
 >
+import ActivePortForwardBadge from '@/components/shared/ActivePortForwardBadge.vue'
 import NamespaceBadge from '@/components/shared/NamespaceBadge.vue'
 import NamespaceFilter from '@/components/shared/NamespaceFilter.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
@@ -206,6 +207,17 @@ const { bulkActions } = useWorkloadBulkActions(selection, {
     selection.value = []
   }
 })
+
+// Port forward helpers
+const getPortForwards = (data: T) => {
+  if (!props.kind) return []
+  return k8sStore.activePortForwards.filter(
+    (pf) =>
+      pf.kind.toLowerCase() === props.kind!.toLowerCase() &&
+      (!data.namespace || !pf.namespace || pf.namespace === data.namespace) &&
+      pf.name === data.name
+  )
+}
 </script>
 
 <template>
@@ -282,9 +294,12 @@ const { bulkActions } = useWorkloadBulkActions(selection, {
       bodyClass="font-medium text-primary"
     >
       <template #body="{ data }">
-        <slot name="name" :data="data">
-          <span class="font-semibold transition-colors">{{ data.name }}</span>
-        </slot>
+        <div class="flex items-center gap-2">
+          <slot name="name" :data="data">
+            <span class="font-semibold transition-colors">{{ data.name }}</span>
+          </slot>
+          <ActivePortForwardBadge :portForwards="getPortForwards(data)" />
+        </div>
       </template>
     </Column>
 
