@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActivePortForwardBadge: typeof import('./src/components/shared/ActivePortForwardBadge.vue')['default']
     AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
     AppFooter: typeof import('./src/components/layout/AppFooter.vue')['default']
     AppHeader: typeof import('./src/components/layout/AppHeader.vue')['default']
