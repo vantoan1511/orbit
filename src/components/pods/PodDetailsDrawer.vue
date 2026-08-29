@@ -2,7 +2,7 @@
 import PodContainersTab from '@/components/pods/PodContainersTab.vue'
 import PodOverviewTab from '@/components/pods/PodOverviewTab.vue'
 import WorkloadEventsTab from '@/components/workloads/WorkloadEventsTab.vue'
-import WorkloadYamlTab from '@/components/workloads/WorkloadYamlTab.vue'
+import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -236,7 +236,7 @@ const viewPodLogs = (containerName?: string) => {
           </TabPanel>
 
           <TabPanel value="yaml">
-            <WorkloadYamlTab
+            <ResourceYamlTab
               :displayed-yaml="displayedYaml"
               :is-yaml-loading="isYamlLoading"
               :copied="copied"

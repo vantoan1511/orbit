@@ -2,7 +2,7 @@
 import WorkloadEventsTab from '@/components/workloads/WorkloadEventsTab.vue'
 import WorkloadOverviewTab from '@/components/workloads/WorkloadOverviewTab.vue'
 import WorkloadPodsTab from '@/components/workloads/WorkloadPodsTab.vue'
-import WorkloadYamlTab from '@/components/workloads/WorkloadYamlTab.vue'
+import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -462,7 +462,7 @@ const copyYaml = async () => {
 
           <!-- YAML PANEL -->
           <TabPanel value="yaml" class="h-full">
-            <WorkloadYamlTab
+            <ResourceYamlTab
               :displayed-yaml="displayedYaml"
               :is-yaml-loading="isYamlLoading"
               :copied="copied"
