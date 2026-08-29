@@ -86,251 +86,229 @@ ${Object.entries(res.data)
 <template>
   <Drawer
     :visible="props.visible"
-    @update:visible="emit('update:visible', $event)"
     position="right"
-    class="w-full sm:max-w-lg border-l border-(--border) bg-(--bg-card) p-0"
-    :header="props.resource?.name || 'Resource Details'"
-    :style="{ width: '36rem' }"
+    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
+    :dismissable="true"
+    @update:visible="emit('update:visible', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-3 w-full" v-if="props.resource">
-        <div class="flex items-center gap-1.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
+      <div v-if="props.resource" class="flex items-center justify-between w-full pr-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="w-3 h-3 rounded-full shrink-0 animate-pulse bg-emerald-500"></span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h3
+                class="text-base font-bold text-primary font-mono truncate max-w-70"
+                :title="props.resource.name"
+              >
+                {{ props.resource.name }}
+              </h3>
+              <Tag
+                rounded
+                class="font-mono"
+                :severity="isSecret(props.resource) ? 'danger' : 'info'"
+                :value="isSecret(props.resource) ? 'Secret' : 'ConfigMap'"
+              />
+            </div>
+            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
+              <span>ns: {{ props.resource.namespace }}</span>
+              <span class="text-muted-color/60">•</span>
+              <span class="flex items-center gap-1">
+                <Clock class="w-3 h-3" />
+                <ReactiveAge :age="props.resource.age" />
+              </span>
+            </div>
+          </div>
         </div>
-        <Tag severity="secondary" class="font-mono" :value="`ns/${props.resource.namespace}`" />
-        <Tag v-if="isSecret(props.resource)" severity="danger" value="Secret" />
-        <Tag v-else severity="info" value="ConfigMap" />
       </div>
     </template>
 
-    <div v-if="props.resource" class="h-full flex flex-col">
-      <!-- Title Section -->
-      <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
-        <h2
-          class="text-lg font-bold text-primary font-ui truncate mb-1"
-          :title="props.resource.name"
-        >
-          {{ props.resource.name }}
-        </h2>
-        <div class="text-xs text-muted-color flex items-center gap-2">
-          <Clock class="w-3.5 h-3.5" />
-          <span>Age: <ReactiveAge :age="props.resource.age" /></span>
-        </div>
-      </div>
-
+    <div v-if="props.resource" class="flex flex-col h-full">
       <!-- Tab Layout -->
-      <div class="flex-1 flex flex-col min-h-0">
-        <Tabs v-model:value="activeTab" class="flex-1 flex flex-col">
-          <TabList class="border-b border-(--border) px-6 bg-(--bg-card)">
-            <Tab
-              value="overview"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
-            >
-              <Server class="w-3.5 h-3.5" />
-              <span>Overview</span>
-            </Tab>
-            <Tab
-              value="data"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
-            >
-              <Shield class="w-3.5 h-3.5" />
-              <span>Data</span>
-            </Tab>
-            <Tab
-              value="yaml"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5"
-            >
-              <FileCode class="w-3.5 h-3.5" />
-              <span>YAML</span>
-            </Tab>
-          </TabList>
+      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
+        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
+          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Server class="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </Tab>
+          <Tab value="data" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Shield class="w-3.5 h-3.5" />
+            <span>Data</span>
+          </Tab>
+          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <FileCode class="w-3.5 h-3.5" />
+            <span>YAML</span>
+          </Tab>
+        </TabList>
 
-          <TabPanels class="flex-1 overflow-y-auto p-6">
-            <!-- Overview Panel -->
-            <TabPanel value="overview">
-              <div class="flex flex-col gap-6">
-                <!-- General Section -->
-                <div>
-                  <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">
-                    General
-                  </h3>
-                  <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Namespace</div>
-                      <div class="col-span-2 text-xs text-primary font-mono">
-                        {{ props.resource.namespace }}
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Labels</div>
-                      <div class="col-span-2">
-                        <KeyValueBadgeList :items="props.resource.labels" variant="tag" />
-                        <span
-                          v-if="
-                            !props.resource.labels ||
-                            Object.keys(props.resource.labels).length === 0
-                          "
-                          class="text-xs text-muted-color"
-                        >
-                          None
-                        </span>
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Annotations</div>
-                      <div class="col-span-2 text-xs text-primary">
-                        {{ props.resource.annotations }}
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Created</div>
-                      <div class="col-span-2 text-xs text-primary">
-                        {{ props.resource.created }}
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Age</div>
-                      <div class="col-span-2 text-xs text-primary">
-                        <ReactiveAge :age="props.resource.age" />
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 p-3">
-                      <div class="text-xs text-muted-color font-medium">Resource Version</div>
-                      <div class="col-span-2 text-xs text-primary font-mono">
-                        {{ props.resource.resourceVersion }}
-                      </div>
+        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
+          <!-- Overview Panel -->
+          <TabPanel value="overview">
+            <div class="flex flex-col gap-6">
+              <!-- General Section -->
+              <div>
+                <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">
+                  General
+                </h3>
+                <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Namespace</div>
+                    <div class="col-span-2 text-xs text-primary font-mono">
+                      {{ props.resource.namespace }}
                     </div>
                   </div>
-                </div>
-
-                <!-- Details Section -->
-                <div>
-                  <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">
-                    Details
-                  </h3>
-                  <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Data Keys</div>
-                      <div class="col-span-2 text-xs text-primary">
-                        {{ props.resource.keysCount }}
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Size</div>
-                      <div class="col-span-2 text-xs text-primary font-mono">
-                        {{ props.resource.size }}
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 border-b border-(--border) p-3">
-                      <div class="text-xs text-muted-color font-medium">Mounted In</div>
-                      <div class="col-span-2 text-xs text-primary">
-                        {{ props.resource.mountedPods }} pods
-                      </div>
-                    </div>
-                    <div class="grid grid-cols-3 p-3">
-                      <div class="text-xs text-muted-color font-medium">Immutable</div>
-                      <div class="col-span-2 text-xs text-primary">
-                        {{ props.resource.immutable ? 'True' : 'False' }}
-                      </div>
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Annotations</div>
+                    <div class="col-span-2 text-xs text-primary">
+                      {{ props.resource.annotations }}
                     </div>
                   </div>
-                </div>
-
-                <!-- Used By Section -->
-                <div>
-                  <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider">
-                      Used By
-                    </h3>
-                    <a
-                      href="#"
-                      class="text-xs text-violet-400 hover:text-violet-300 font-semibold flex items-center gap-1"
-                    >
-                      <span>View all ({{ props.resource.mountedPods }})</span>
-                      <span class="text-[10px]">&rarr;</span>
-                    </a>
-                  </div>
-                  <div
-                    class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) divide-y divide-(--border)"
-                  >
-                    <div
-                      v-for="pod in props.resource.usedBy"
-                      :key="pod.name"
-                      class="flex items-center justify-between p-3"
-                    >
-                      <div class="flex items-center gap-2">
-                        <TagIcon class="w-3.5 h-3.5 text-violet-400" />
-                        <span class="text-xs font-mono text-primary truncate max-w-72">
-                          {{ pod.name }}
-                        </span>
-                      </div>
-                      <Tag
-                        rounded
-                        :severity="pod.status === 'Running' ? 'success' : 'secondary'"
-                        :value="pod.status"
-                      />
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Created</div>
+                    <div class="col-span-2 text-xs text-primary">
+                      {{ props.resource.created }}
                     </div>
-                    <div
-                      v-if="props.resource.usedBy.length === 0"
-                      class="p-6 text-center text-xs text-muted-color"
-                    >
-                      No pods currently referencing this configuration.
+                  </div>
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Age</div>
+                    <div class="col-span-2 text-xs text-primary">
+                      <ReactiveAge :age="props.resource.age" />
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Resource Version</div>
+                    <div class="col-span-2 text-xs text-primary font-mono">
+                      {{ props.resource.resourceVersion }}
                     </div>
                   </div>
                 </div>
               </div>
-            </TabPanel>
 
-            <!-- Data Panel -->
-            <TabPanel value="data">
-              <div class="flex flex-col gap-4">
-                <div
-                  v-for="(value, key) in props.resource.data"
-                  :key="key"
-                  class="border border-(--border) rounded-lg bg-(--bg-hover)/20 p-4"
-                >
-                  <div
-                    class="flex items-center justify-between border-b border-(--border)/50 pb-2 mb-2"
-                  >
-                    <span class="text-xs font-bold font-mono text-violet-400">{{ key }}</span>
+              <!-- Labels Section -->
+              <KeyValueBadgeList :items="props.resource.labels" title="Labels" variant="tag" />
 
-                    <Button
-                      v-if="isSecret(props.resource)"
-                      severity="secondary"
-                      variant="text"
-                      size="small"
-                      class="p-1! h-auto!"
-                      title="Toggle visibility"
-                      @click="toggleRevealKey(key)"
-                    >
-                      <EyeOff v-if="revealedKeys[key]" class="w-3.5 h-3.5" />
-                      <Eye v-else class="w-3.5 h-3.5" />
-                    </Button>
+              <!-- Details Section -->
+              <div>
+                <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">
+                  Details
+                </h3>
+                <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Data Keys</div>
+                    <div class="col-span-2 text-xs text-primary">
+                      {{ props.resource.keysCount }}
+                    </div>
                   </div>
-
-                  <pre
-                    class="text-xs font-mono p-2 rounded bg-(--bg-card) border border-(--border) overflow-x-auto whitespace-pre-wrap break-all select-all text-primary"
-                    >{{
-                      isSecret(props.resource)
-                        ? revealedKeys[key]
-                          ? decodeSecretValue(value)
-                          : '••••••••••••••••'
-                        : value
-                    }}</pre>
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Size</div>
+                    <div class="col-span-2 text-xs text-primary font-mono">
+                      {{ props.resource.size }}
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Mounted In</div>
+                    <div class="col-span-2 text-xs text-primary">
+                      {{ props.resource.mountedPods }} pods
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-3">
+                    <div class="text-xs text-muted-color font-medium">Immutable</div>
+                    <div class="col-span-2 text-xs text-primary">
+                      {{ props.resource.immutable ? 'True' : 'False' }}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </TabPanel>
 
-            <!-- YAML Panel -->
-            <TabPanel value="yaml">
-              <pre
-                class="text-xs font-mono p-4 rounded-lg bg-(--bg-card) border border-(--border) text-primary overflow-x-auto whitespace-pre select-all"
-                >{{ generateYaml(props.resource) }}</pre>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </div>
+              <!-- Used By Section -->
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider">
+                    Used By
+                  </h3>
+                  <a
+                    href="#"
+                    class="text-xs text-violet-400 hover:text-violet-300 font-semibold flex items-center gap-1"
+                  >
+                    <span>View all ({{ props.resource.mountedPods }})</span>
+                    <span class="text-[10px]">&rarr;</span>
+                  </a>
+                </div>
+                <div class="bg-(--bg-hover)/40 rounded-xl p-3 flex flex-col gap-2">
+                  <div
+                    v-for="pod in props.resource.usedBy"
+                    :key="pod.name"
+                    class="flex items-center justify-between p-2.5 rounded-lg bg-(--bg-card)"
+                  >
+                    <div class="flex items-center gap-2">
+                      <TagIcon class="w-3.5 h-3.5 text-violet-400" />
+                      <span class="text-xs font-mono text-primary truncate max-w-72">
+                        {{ pod.name }}
+                      </span>
+                    </div>
+                    <Tag
+                      rounded
+                      :severity="pod.status === 'Running' ? 'success' : 'secondary'"
+                      :value="pod.status"
+                    />
+                  </div>
+                  <div
+                    v-if="props.resource.usedBy.length === 0"
+                    class="p-4 text-center text-xs text-muted-color"
+                  >
+                    No pods currently referencing this configuration.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- Data Panel -->
+          <TabPanel value="data">
+            <div class="flex flex-col gap-4">
+              <div
+                v-for="(value, key) in props.resource.data"
+                :key="key"
+                class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2"
+              >
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold font-mono text-violet-400">{{ key }}</span>
+
+                  <Button
+                    v-if="isSecret(props.resource)"
+                    severity="secondary"
+                    variant="text"
+                    size="small"
+                    class="p-1! h-auto!"
+                    title="Toggle visibility"
+                    @click="toggleRevealKey(key)"
+                  >
+                    <EyeOff v-if="revealedKeys[key]" class="w-3.5 h-3.5" />
+                    <Eye v-else class="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+
+                <pre
+                  class="text-xs font-mono p-3 rounded-lg bg-(--bg-card) overflow-x-auto whitespace-pre-wrap break-all select-all text-primary"
+                  >{{
+                    isSecret(props.resource)
+                      ? revealedKeys[key]
+                        ? decodeSecretValue(value)
+                        : '••••••••••••••••'
+                      : value
+                  }}</pre>
+              </div>
+            </div>
+          </TabPanel>
+
+          <!-- YAML Panel -->
+          <TabPanel value="yaml">
+            <pre
+              class="text-xs font-mono p-4 rounded-xl bg-(--bg-card) text-primary overflow-x-auto whitespace-pre select-all"
+              >{{ generateYaml(props.resource) }}</pre>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
   </Drawer>
 </template>

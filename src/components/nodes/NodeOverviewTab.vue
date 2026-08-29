@@ -221,34 +221,37 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Capacity & Allocatable
       </div>
-      <div class="rounded-xl bg-(--bg-hover)/40 overflow-hidden text-xs">
+      <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) text-xs">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
-              class="bg-(--bg-hover)/60 text-[10px] text-muted-color uppercase tracking-wider font-semibold"
+              class="bg-(--bg-hover)/60 border-b border-(--border) text-[10px] text-muted-color uppercase tracking-wider font-semibold"
             >
               <th class="p-2.5 pl-4">Resource</th>
               <th class="p-2.5">Capacity</th>
               <th class="p-2.5 pr-4">Allocatable</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-(--border)/30 font-mono">
-            <tr>
+          <tbody class="divide-y divide-(--border) font-mono">
+            <tr class="hover:bg-(--bg-hover) transition-colors">
               <td class="p-2.5 pl-4 text-muted-color font-sans font-medium">CPU</td>
               <td class="p-2.5 text-primary">{{ node.capacity?.cpu || '-' }}</td>
               <td class="p-2.5 pr-4 text-primary">{{ node.allocatable?.cpu || '-' }}</td>
             </tr>
-            <tr>
+            <tr class="hover:bg-(--bg-hover) transition-colors">
               <td class="p-2.5 pl-4 text-muted-color font-sans font-medium">Memory</td>
               <td class="p-2.5 text-primary">{{ node.capacity?.memory || '-' }}</td>
               <td class="p-2.5 pr-4 text-primary">{{ node.allocatable?.memory || '-' }}</td>
             </tr>
-            <tr>
+            <tr class="hover:bg-(--bg-hover) transition-colors">
               <td class="p-2.5 pl-4 text-muted-color font-sans font-medium">Pods</td>
               <td class="p-2.5 text-primary">{{ node.capacity?.pods || '-' }}</td>
               <td class="p-2.5 pr-4 text-primary">{{ node.allocatable?.pods || '-' }}</td>
             </tr>
-            <tr v-if="node.capacity?.ephemeralStorage || node.allocatable?.ephemeralStorage">
+            <tr
+              v-if="node.capacity?.ephemeralStorage || node.allocatable?.ephemeralStorage"
+              class="hover:bg-(--bg-hover) transition-colors"
+            >
               <td class="p-2.5 pl-4 text-muted-color font-sans font-medium">Ephemeral Storage</td>
               <td class="p-2.5 text-primary">{{ node.capacity?.ephemeralStorage || '-' }}</td>
               <td class="p-2.5 pr-4 text-primary">
@@ -265,11 +268,11 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Conditions ({{ node.conditions.length }})
       </div>
-      <div class="rounded-xl bg-(--bg-hover)/40 overflow-hidden text-xs">
+      <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) text-xs">
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
-              class="bg-(--bg-hover)/60 text-[10px] text-muted-color uppercase tracking-wider font-semibold"
+              class="bg-(--bg-hover)/60 border-b border-(--border) text-[10px] text-muted-color uppercase tracking-wider font-semibold"
             >
               <th class="p-2.5 pl-4">Type</th>
               <th class="p-2.5">Status</th>
@@ -277,8 +280,12 @@ const getTaintEffectSeverity = (effect: string) => {
               <th class="p-2.5 pr-4">Message</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-(--border)/30">
-            <tr v-for="cond in node.conditions" :key="cond.type">
+          <tbody class="divide-y divide-(--border)">
+            <tr
+              v-for="cond in node.conditions"
+              :key="cond.type"
+              class="hover:bg-(--bg-hover) transition-colors"
+            >
               <td class="p-2.5 pl-4 font-semibold text-primary font-mono">{{ cond.type }}</td>
               <td class="p-2.5">
                 <Tag

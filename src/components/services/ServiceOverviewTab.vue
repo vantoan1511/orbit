@@ -3,7 +3,7 @@ import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.v
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ServiceInfo } from '@/types/kubernetes'
-import { ExternalLink, Tag as TagIcon } from '@lucide/vue'
+import { ExternalLink } from '@lucide/vue'
 import Tag from 'primevue/tag'
 
 defineProps<{
@@ -91,32 +91,13 @@ const getTypeSeverity = (type: string) => {
     <!-- Active Port Forwards -->
     <ActivePortForwardsList kind="Service" :namespace="service.namespace" :name="service.name" />
 
-    <!-- Selector Section -->
-    <div class="space-y-3">
-      <h3
-        class="text-[10px] font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
-      >
-        <TagIcon class="w-3.5 h-3.5" />
-        <span>Pod Selectors</span>
-      </h3>
-      <div v-if="Object.keys(service.selector).length > 0" class="flex flex-wrap gap-2">
-        <div
-          v-for="(val, key) in service.selector"
-          :key="key"
-          class="flex items-center text-xs bg-(--bg-hover)/60 text-primary rounded-lg overflow-hidden border border-(--border)/40"
-        >
-          <span
-            class="px-2.5 py-1 bg-(--bg-hover) font-medium text-muted-color border-r border-(--border)/40"
-          >
-            {{ key }}
-          </span>
-          <span class="px-2.5 py-1 font-mono text-primary">{{ val }}</span>
-        </div>
-      </div>
-      <div v-else class="text-xs text-muted-color italic bg-(--bg-hover)/20 rounded-lg p-3">
-        No pod selectors defined (headless, selectorless, or ExternalName service).
-      </div>
-    </div>
+    <!-- Pod Selectors -->
+    <KeyValueBadgeList
+      title="Pod Selectors"
+      :items="service.selector"
+      variant="tag"
+      empty-message="No pod selectors defined (headless, selectorless, or ExternalName service)."
+    />
 
     <!-- Labels Section -->
     <KeyValueBadgeList :items="service.labels" title="Labels" variant="tag" />

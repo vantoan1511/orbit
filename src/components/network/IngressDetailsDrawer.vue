@@ -194,221 +194,213 @@ const copyYaml = async () => {
 <template>
   <Drawer
     :visible="props.visible"
-    @update:visible="emit('update:visible', $event)"
     position="right"
-    class="w-full sm:max-w-lg border-l border-(--border) bg-(--bg-card) p-0"
-    :header="props.ingress?.name || 'Ingress Details'"
-    :style="{ width: '36rem' }"
+    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
+    :dismissable="true"
+    @update:visible="emit('update:visible', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-3 w-full" v-if="props.ingress">
-        <div class="flex items-center gap-1.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
+      <div v-if="props.ingress" class="flex items-center justify-between w-full pr-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="w-3 h-3 rounded-full shrink-0 animate-pulse bg-emerald-500"></span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h3
+                class="text-base font-bold text-primary font-mono truncate max-w-70"
+                :title="props.ingress.name"
+              >
+                {{ props.ingress.name }}
+              </h3>
+              <Tag rounded severity="info" class="font-mono" value="Ingress" />
+              <Tag
+                v-if="props.ingress.className"
+                rounded
+                severity="secondary"
+                class="font-mono"
+                :value="props.ingress.className"
+              />
+            </div>
+            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
+              <span>ns: {{ props.ingress.namespace }}</span>
+              <span class="text-muted-color/60">•</span>
+              <span class="flex items-center gap-1">
+                <Clock class="w-3 h-3" />
+                <ReactiveAge :age="props.ingress.age" />
+              </span>
+            </div>
+          </div>
         </div>
-        <Tag severity="secondary" class="font-mono" :value="`ns/${props.ingress.namespace}`" />
-        <Tag v-if="props.ingress.className" severity="info" :value="props.ingress.className" />
       </div>
     </template>
 
-    <div v-if="props.ingress" class="h-full flex flex-col">
-      <!-- Title Section -->
-      <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
-        <h2
-          class="text-lg font-bold text-primary font-ui truncate mb-1"
-          :title="props.ingress.name"
-        >
-          {{ props.ingress.name }}
-        </h2>
-        <div class="text-xs text-muted-color flex items-center gap-2">
-          <Clock class="w-3.5 h-3.5" />
-          <span>Age: <ReactiveAge :age="props.ingress.age" /></span>
-        </div>
-      </div>
-
+    <div v-if="props.ingress" class="flex flex-col h-full">
       <!-- Tab Layout -->
-      <div class="flex-1 flex flex-col min-h-0">
-        <Tabs v-model:value="activeTab" class="flex-1 flex flex-col">
-          <TabList class="border-b border-(--border) px-6 bg-(--bg-card)">
-            <Tab
-              value="overview"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <Server class="w-3.5 h-3.5" />
-              <span>Overview</span>
-            </Tab>
-            <Tab
-              value="rules"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <Network class="w-3.5 h-3.5" />
-              <span>Rules ({{ props.ingress.rulesSummary.length }})</span>
-            </Tab>
-            <Tab
-              value="events"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <Activity class="w-3.5 h-3.5" />
-              <span>Events ({{ ingressEvents.length }})</span>
-            </Tab>
-            <Tab
-              value="yaml"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <FileCode class="w-3.5 h-3.5" />
-              <span>YAML</span>
-            </Tab>
-          </TabList>
+      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
+        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
+          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Server class="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </Tab>
+          <Tab value="rules" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Network class="w-3.5 h-3.5" />
+            <span>Rules ({{ props.ingress.rulesSummary.length }})</span>
+          </Tab>
+          <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Activity class="w-3.5 h-3.5" />
+            <span>Events ({{ ingressEvents.length }})</span>
+          </Tab>
+          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <FileCode class="w-3.5 h-3.5" />
+            <span>YAML</span>
+          </Tab>
+        </TabList>
 
-          <TabPanels class="p-6 flex-1 overflow-y-auto min-h-0">
-            <!-- OVERVIEW PANEL -->
-            <TabPanel value="overview" class="space-y-6">
-              <!-- General Info Grid -->
-              <div class="space-y-4">
-                <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">General</h3>
-                <div
-                  class="border border-(--border) rounded-xl overflow-hidden divide-y divide-(--border) bg-(--bg-hover)/10 text-xs"
-                >
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Namespace</span>
-                    <span class="col-span-2 font-mono text-primary">{{
-                      props.ingress.namespace
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Class</span>
-                    <span class="col-span-2 font-mono text-primary">{{
-                      props.ingress.className || '-'
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Hosts</span>
-                    <span class="col-span-2 font-mono text-violet-400 whitespace-pre-line">{{
-                      props.ingress.hosts
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Address</span>
-                    <span class="col-span-2 font-mono text-primary">{{
-                      props.ingress.address
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Ports</span>
-                    <span class="col-span-2 font-mono text-primary">{{ props.ingress.ports }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Created</span>
-                    <span class="col-span-2 text-primary">{{ props.ingress.created }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Age</span>
-                    <span class="col-span-2 text-primary"
-                      ><ReactiveAge :age="props.ingress.age"
-                    /></span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">UID</span>
-                    <span class="col-span-2 font-mono text-[10px] text-primary">{{
-                      props.ingress.uid
-                    }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Rules Summary Section -->
-              <div class="space-y-3" v-if="parsedRules.length > 0">
-                <h3
-                  class="text-xs font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <Globe class="w-3.5 h-3.5" />
-                  <span>Routing Rules</span>
-                </h3>
-                <div class="space-y-2">
-                  <div
-                    v-for="(r, idx) in parsedRules"
-                    :key="idx"
-                    class="p-3 rounded-lg border border-(--border) bg-(--bg-hover)/30 text-xs font-mono flex items-center justify-between gap-2"
-                  >
-                    <div class="flex items-center gap-2 truncate">
-                      <span class="text-violet-400 font-semibold truncate">{{ r.host }}</span>
-                      <span class="text-muted-color">→</span>
-                      <span class="text-primary truncate">{{ r.path }}</span>
-                    </div>
-                    <div class="text-emerald-400 font-medium shrink-0">
-                      {{ r.backend }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Labels Section -->
-              <KeyValueBadgeList :items="props.ingress.labels" title="Labels" variant="tag" />
-
-              <!-- Annotations Section -->
-              <KeyValueBadgeList
-                :items="props.ingress.annotations"
-                title="Annotations"
-                variant="list"
-              />
-            </TabPanel>
-
-            <!-- RULES PANEL -->
-            <TabPanel value="rules" class="space-y-4">
-              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
-                Ingress Rules Breakdown
+        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
+          <!-- OVERVIEW PANEL -->
+          <TabPanel value="overview" class="space-y-6">
+            <!-- General Info Grid -->
+            <div>
+              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">
+                General
               </h3>
-              <div
-                v-if="parsedRules.length > 0"
-                class="border border-(--border) rounded-xl overflow-hidden bg-(--bg-hover)/10 text-xs"
+              <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Namespace</span>
+                  <span class="col-span-2 font-mono text-primary">{{
+                    props.ingress.namespace
+                  }}</span>
+                </div>
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Class</span>
+                  <span class="col-span-2 font-mono text-primary">{{
+                    props.ingress.className || '-'
+                  }}</span>
+                </div>
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Hosts</span>
+                  <span class="col-span-2 font-mono text-violet-400 whitespace-pre-line">{{
+                    props.ingress.hosts
+                  }}</span>
+                </div>
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Address</span>
+                  <span class="col-span-2 font-mono text-primary">{{ props.ingress.address }}</span>
+                </div>
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Ports</span>
+                  <span class="col-span-2 font-mono text-primary">{{ props.ingress.ports }}</span>
+                </div>
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Created</span>
+                  <span class="col-span-2 text-primary">{{ props.ingress.created }}</span>
+                </div>
+                <div class="grid grid-cols-3">
+                  <span class="text-muted-color font-semibold">Age</span>
+                  <span class="col-span-2 text-primary"
+                    ><ReactiveAge :age="props.ingress.age"
+                  /></span>
+                </div>
+                <div class="grid grid-cols-3 items-start gap-4">
+                  <span class="text-muted-color font-semibold shrink-0">UID</span>
+                  <span class="col-span-2 font-mono text-[10px] text-primary truncate">{{
+                    props.ingress.uid
+                  }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rules Summary Section -->
+            <div class="space-y-3" v-if="parsedRules.length > 0">
+              <h3
+                class="text-xs font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
               >
-                <table class="w-full text-left border-collapse">
-                  <thead>
-                    <tr
-                      class="bg-(--bg-hover)/40 border-b border-(--border) text-muted-color font-semibold"
-                    >
-                      <th class="p-3">Host</th>
-                      <th class="p-3">Path</th>
-                      <th class="p-3">Backend Target</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-(--border)">
-                    <tr
-                      v-for="(rule, idx) in parsedRules"
-                      :key="idx"
-                      class="text-muted-color hover:bg-(--bg-hover)/10"
-                    >
-                      <td class="p-3 font-mono text-violet-400 font-medium">{{ rule.host }}</td>
-                      <td class="p-3 font-mono text-primary">{{ rule.path }}</td>
-                      <td class="p-3 font-mono text-emerald-400 font-semibold">
-                        {{ rule.backend }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                <Globe class="w-3.5 h-3.5" />
+                <span>Routing Rules</span>
+              </h3>
+              <div class="space-y-2">
+                <div
+                  v-for="(r, idx) in parsedRules"
+                  :key="idx"
+                  class="p-3 rounded-xl bg-(--bg-hover)/40 text-xs font-mono flex items-center justify-between gap-2"
+                >
+                  <div class="flex items-center gap-2 truncate">
+                    <span class="text-violet-400 font-semibold truncate">{{ r.host }}</span>
+                    <span class="text-muted-color">→</span>
+                    <span class="text-primary truncate">{{ r.path }}</span>
+                  </div>
+                  <div class="text-emerald-400 font-medium shrink-0">
+                    {{ r.backend }}
+                  </div>
+                </div>
               </div>
-              <div v-else class="text-xs text-muted-color italic">
-                No routing rules configured for this ingress.
-              </div>
-            </TabPanel>
+            </div>
 
-            <!-- EVENTS PANEL -->
-            <TabPanel value="events">
-              <WorkloadEventsTab :events="ingressEvents" />
-            </TabPanel>
+            <!-- Labels Section -->
+            <KeyValueBadgeList :items="props.ingress.labels" title="Labels" variant="tag" />
 
-            <!-- YAML PANEL -->
-            <TabPanel value="yaml">
-              <ResourceYamlTab
-                :displayed-yaml="displayedYaml"
-                :is-yaml-loading="isYamlLoading"
-                :copied="copied"
-                @copy-yaml="copyYaml"
-              />
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </div>
+            <!-- Annotations Section -->
+            <KeyValueBadgeList
+              :items="props.ingress.annotations"
+              title="Annotations"
+              variant="list"
+            />
+          </TabPanel>
+
+          <!-- RULES PANEL -->
+          <TabPanel value="rules" class="space-y-4">
+            <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
+              Ingress Rules Breakdown
+            </h3>
+            <div
+              v-if="parsedRules.length > 0"
+              class="border border-(--border) rounded-xl overflow-hidden bg-(--bg-hover)/10 text-xs"
+            >
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr
+                    class="bg-(--bg-hover)/40 border-b border-(--border) text-muted-color font-semibold"
+                  >
+                    <th class="p-3">Host</th>
+                    <th class="p-3">Path</th>
+                    <th class="p-3">Backend Target</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-(--border)">
+                  <tr
+                    v-for="(rule, idx) in parsedRules"
+                    :key="idx"
+                    class="text-muted-color hover:bg-(--bg-hover)/10"
+                  >
+                    <td class="p-3 font-mono text-violet-400 font-medium">{{ rule.host }}</td>
+                    <td class="p-3 font-mono text-primary">{{ rule.path }}</td>
+                    <td class="p-3 font-mono text-emerald-400 font-semibold">
+                      {{ rule.backend }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-else class="text-xs text-muted-color italic">
+              No routing rules configured for this ingress.
+            </div>
+          </TabPanel>
+
+          <!-- EVENTS PANEL -->
+          <TabPanel value="events">
+            <WorkloadEventsTab :events="ingressEvents" />
+          </TabPanel>
+
+          <!-- YAML PANEL -->
+          <TabPanel value="yaml">
+            <ResourceYamlTab
+              :displayed-yaml="displayedYaml"
+              :is-yaml-loading="isYamlLoading"
+              :copied="copied"
+              @copy-yaml="copyYaml"
+            />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
   </Drawer>
 </template>
