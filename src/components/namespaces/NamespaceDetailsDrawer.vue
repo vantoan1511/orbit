@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { NamespaceInfo } from '@/types/kubernetes'
 import { BarChart2, Clock, FileCode, Layers } from '@lucide/vue'
-import Chart from 'primevue/chart'
-import Drawer from 'primevue/drawer'
-import Tab from 'primevue/tab'
+import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
+import Chart from 'primevue/chart'
+import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
@@ -144,45 +144,28 @@ const getStatusTextClass = (status: string) => {
 </script>
 
 <template>
-  <Drawer
+  <BaseResourceDrawer
     :visible="props.visible"
-    position="right"
-    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
-    :dismissable="true"
+    :has-resource="!!props.namespace"
+    :title="props.namespace?.name ?? ''"
+    kind="Namespace"
+    :kind-severity="props.namespace?.status === 'Active' ? 'success' : 'warn'"
+    :status-badge-class="
+      props.namespace ? getStatusBadgeClass(props.namespace.status) : 'bg-gray-400'
+    "
     @update:visible="emit('update:visible', $event)"
   >
-    <template #header>
-      <div v-if="props.namespace" class="flex items-center justify-between w-full pr-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <span
-            class="w-3 h-3 rounded-full shrink-0 animate-pulse"
-            :class="getStatusBadgeClass(props.namespace.status)"
-          ></span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h3
-                class="text-base font-bold text-primary font-mono truncate max-w-70"
-                :title="props.namespace.name"
-              >
-                {{ props.namespace.name }}
-              </h3>
-              <Tag
-                rounded
-                class="font-mono"
-                :severity="props.namespace.status === 'Active' ? 'success' : 'warn'"
-                value="Namespace"
-              />
-            </div>
-            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
-              <span>status: {{ props.namespace.status }}</span>
-              <span class="text-muted-color/60">•</span>
-              <span class="flex items-center gap-1">
-                <Clock class="w-3 h-3" />
-                <ReactiveAge :age="props.namespace.age" />
-              </span>
-            </div>
-          </div>
-        </div>
+    <template #metadata>
+      <div
+        v-if="props.namespace"
+        class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5"
+      >
+        <span>status: {{ props.namespace.status }}</span>
+        <span class="text-muted-color/60">•</span>
+        <span class="flex items-center gap-1">
+          <Clock class="w-3 h-3" />
+          <ReactiveAge :age="props.namespace.age" />
+        </span>
       </div>
     </template>
 
@@ -436,5 +419,5 @@ const getStatusTextClass = (status: string) => {
         </TabPanels>
       </Tabs>
     </div>
-  </Drawer>
+  </BaseResourceDrawer>
 </template>

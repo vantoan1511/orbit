@@ -2,9 +2,9 @@
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
-import { Clock, Eye, EyeOff, FileCode, Server, Shield, Tag as TagIcon } from '@lucide/vue'
+import { Eye, EyeOff, FileCode, Server, Shield, Tag as TagIcon } from '@lucide/vue'
+import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
-import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -84,45 +84,17 @@ ${Object.entries(res.data)
 </script>
 
 <template>
-  <Drawer
+  <BaseResourceDrawer
     :visible="props.visible"
-    position="right"
-    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
-    :dismissable="true"
+    :has-resource="!!props.resource"
+    :title="props.resource?.name ?? ''"
+    :kind="props.resource ? (isSecret(props.resource) ? 'Secret' : 'ConfigMap') : ''"
+    :kind-severity="props.resource ? (isSecret(props.resource) ? 'danger' : 'info') : 'info'"
+    status-badge-class="bg-emerald-500"
+    :namespace="props.resource?.namespace"
+    :age="props.resource?.age"
     @update:visible="emit('update:visible', $event)"
   >
-    <template #header>
-      <div v-if="props.resource" class="flex items-center justify-between w-full pr-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <span class="w-3 h-3 rounded-full shrink-0 animate-pulse bg-emerald-500"></span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h3
-                class="text-base font-bold text-primary font-mono truncate max-w-70"
-                :title="props.resource.name"
-              >
-                {{ props.resource.name }}
-              </h3>
-              <Tag
-                rounded
-                class="font-mono"
-                :severity="isSecret(props.resource) ? 'danger' : 'info'"
-                :value="isSecret(props.resource) ? 'Secret' : 'ConfigMap'"
-              />
-            </div>
-            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
-              <span>ns: {{ props.resource.namespace }}</span>
-              <span class="text-muted-color/60">•</span>
-              <span class="flex items-center gap-1">
-                <Clock class="w-3 h-3" />
-                <ReactiveAge :age="props.resource.age" />
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </template>
-
     <div v-if="props.resource" class="flex flex-col h-full">
       <!-- Tab Layout -->
       <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
@@ -310,5 +282,5 @@ ${Object.entries(res.data)
         </TabPanels>
       </Tabs>
     </div>
-  </Drawer>
+  </BaseResourceDrawer>
 </template>

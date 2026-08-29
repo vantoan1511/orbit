@@ -8,10 +8,10 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type { CronJobInfo, DaemonSetReplicas, JobInfo, WorkloadInfo } from '@/types/kubernetes'
-import { Activity, Clock, FileCode, Layers, Server, Terminal } from '@lucide/vue'
+import { Activity, FileCode, Layers, Server, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
+import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
-import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -323,72 +323,41 @@ const copyYaml = async () => {
 </script>
 
 <template>
-  <Drawer
+  <BaseResourceDrawer
     :visible="props.visible"
-    position="right"
-    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
-    :dismissable="true"
+    :has-resource="!!props.workload"
+    :title="workloadName"
+    :kind="workloadKind"
+    :kind-severity="getWorkloadSeverity(workloadKind)"
+    :status-badge-class="getStatusBadgeClass(workloadStatus)"
+    :namespace="workloadNamespace"
+    :age="workloadAge"
     @update:visible="emit('update:visible', $event)"
   >
-    <template #header>
-      <div v-if="props.workload" class="flex items-center justify-between w-full pr-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <span
-            class="w-3 h-3 rounded-full shrink-0 animate-pulse"
-            :class="getStatusBadgeClass(workloadStatus)"
-          ></span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h3
-                class="text-base font-bold text-primary font-mono truncate max-w-70"
-                :title="workloadName"
-              >
-                {{ workloadName }}
-              </h3>
-              <Tag
-                rounded
-                class="font-mono"
-                :severity="getWorkloadSeverity(workloadKind)"
-                :value="workloadKind"
-              />
-            </div>
-            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
-              <span>ns: {{ workloadNamespace }}</span>
-              <span v-if="workloadAge" class="text-muted-color/60">•</span>
-              <span v-if="workloadAge" class="flex items-center gap-1">
-                <Clock class="w-3 h-3" />
-                <span>{{ workloadAge }}</span>
-              </span>
-            </div>
-          </div>
-        </div>
+    <template #actions>
+      <Button
+        severity="secondary"
+        size="small"
+        variant="outlined"
+        class="text-xs flex items-center gap-1.5"
+        title="View Logs"
+        @click="viewLogs"
+      >
+        <Terminal class="w-3.5 h-3.5" />
+        <span>Logs</span>
+      </Button>
 
-        <div class="flex items-center gap-2 shrink-0">
-          <Button
-            severity="secondary"
-            size="small"
-            variant="outlined"
-            class="text-xs flex items-center gap-1.5"
-            title="View Logs"
-            @click="viewLogs"
-          >
-            <Terminal class="w-3.5 h-3.5" />
-            <span>Logs</span>
-          </Button>
-
-          <Button
-            severity="secondary"
-            size="small"
-            variant="outlined"
-            class="text-xs flex items-center gap-1.5"
-            title="Edit YAML"
-            @click="editYaml"
-          >
-            <FileCode class="w-3.5 h-3.5" />
-            <span>Edit</span>
-          </Button>
-        </div>
-      </div>
+      <Button
+        severity="secondary"
+        size="small"
+        variant="outlined"
+        class="text-xs flex items-center gap-1.5"
+        title="Edit YAML"
+        @click="editYaml"
+      >
+        <FileCode class="w-3.5 h-3.5" />
+        <span>Edit</span>
+      </Button>
     </template>
 
     <div v-if="props.workload" class="flex flex-col h-full">
@@ -472,5 +441,5 @@ const copyYaml = async () => {
         </TabPanels>
       </Tabs>
     </div>
-  </Drawer>
+  </BaseResourceDrawer>
 </template>
