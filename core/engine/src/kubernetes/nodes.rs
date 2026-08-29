@@ -107,17 +107,21 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
         let mut actual_mem_gib = 0.0;
         let mut has_metrics = false;
 
-        if let Some(metrics_list) = &node_metrics {
-            if let Some(metric) = metrics_list.iter().find(|m| m.metadata.name.as_deref() == Some(&name)) {
-                if let Some(usage) = metric.data.get("usage") {
-                    has_metrics = true;
-                    if let Some(cpu) = usage.get("cpu").and_then(|v| v.as_str()) {
-                        actual_cpu_cores = parse_cpu_quantity(cpu);
-                    }
-                    if let Some(mem) = usage.get("memory").and_then(|v| v.as_str()) {
-                        actual_mem_gib = parse_memory_quantity(mem);
-                    }
-                }
+        // Usage calculation precedence:
+        // 1. Real NodeMetrics from Metrics Server (metrics.k8s.io/v1beta1 schema: { "usage": { "cpu": "...", "memory": "..." } })
+        // 2. Sum of Pod resource requests (fallback when Metrics Server is not installed or returns an error)
+        // 3. 0.0 default when no metrics or pods exist for this node
+        if let Some(usage) = node_metrics.as_ref().and_then(|list| {
+            list.iter()
+                .find(|m| m.metadata.name.as_deref() == Some(&name))
+                .and_then(|metric| metric.data.get("usage"))
+        }) {
+            has_metrics = true;
+            if let Some(cpu) = usage.get("cpu").and_then(|v| v.as_str()) {
+                actual_cpu_cores = parse_cpu_quantity(cpu);
+            }
+            if let Some(mem) = usage.get("memory").and_then(|v| v.as_str()) {
+                actual_mem_gib = parse_memory_quantity(mem);
             }
         }
 
@@ -249,6 +253,8 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
     Ok(list)
 }
 
+/// Parses a Kubernetes CPU quantity string (e.g. "2", "250m", "500u", "3141592n") into fractional CPU cores.
+/// Returns `0.0` for empty, unrecognized, or invalid quantity formats.
 pub(crate) fn parse_cpu_quantity(q: &str) -> f64 {
     let q = q.trim();
     if let Some(stripped) = q.strip_suffix('n') {
