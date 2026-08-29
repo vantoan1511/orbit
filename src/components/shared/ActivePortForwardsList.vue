@@ -46,10 +46,10 @@ const stopPortForward = async (id: string) => {
       <div
         v-for="pf in portForwards"
         :key="pf.id"
-        class="flex items-center justify-between gap-3 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs"
+        class="flex items-center justify-between gap-3 p-3 rounded-lg bg-(--success-soft) text-xs"
       >
         <div class="flex items-center gap-2.5 font-mono">
-          <Cable class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+          <Cable class="w-4 h-4 text-(--success) shrink-0" />
           <div class="flex items-center gap-1.5">
             <span class="text-primary font-semibold">127.0.0.1:{{ pf.localPort }}</span>
             <span class="text-muted-color">→</span>

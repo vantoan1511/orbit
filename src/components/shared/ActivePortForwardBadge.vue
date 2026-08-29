@@ -33,7 +33,7 @@ const stopPortForward = async (id: string) => {
   <div v-if="props.portForwards.length > 0" class="inline-flex items-center">
     <div
       v-tooltip.right="'Active Port Forwards (Click to view/stop)'"
-      class="group inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 cursor-pointer transition-colors"
+      class="group inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-(--success-soft) text-(--success) hover:opacity-80 cursor-pointer transition-opacity"
       @click.stop="toggle"
     >
       <Cable class="w-3 h-3" />
@@ -58,7 +58,7 @@ const stopPortForward = async (id: string) => {
           <div
             v-for="pf in props.portForwards"
             :key="pf.id"
-            class="flex items-center justify-between gap-3 p-2 rounded bg-(--bg-hover) border border-(--border)"
+            class="flex items-center justify-between gap-3 p-2 rounded bg-(--bg-hover)"
           >
             <div class="flex items-center gap-2 font-mono text-xs">
               <span class="text-primary font-semibold">127.0.0.1:{{ pf.localPort }}</span>
