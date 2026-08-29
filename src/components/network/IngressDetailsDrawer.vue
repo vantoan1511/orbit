@@ -2,7 +2,7 @@
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import WorkloadEventsTab from '@/components/workloads/WorkloadEventsTab.vue'
-import WorkloadYamlTab from '@/components/workloads/WorkloadYamlTab.vue'
+import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -399,7 +399,7 @@ const copyYaml = async () => {
 
             <!-- YAML PANEL -->
             <TabPanel value="yaml">
-              <WorkloadYamlTab
+              <ResourceYamlTab
                 :displayed-yaml="displayedYaml"
                 :is-yaml-loading="isYamlLoading"
                 :copied="copied"

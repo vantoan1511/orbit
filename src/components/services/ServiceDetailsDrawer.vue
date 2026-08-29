@@ -1,24 +1,23 @@
 <script setup lang="ts">
-import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.vue'
-import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
+import ServiceEndpointsTab from '@/components/services/ServiceEndpointsTab.vue'
+import ServiceOverviewTab from '@/components/services/ServiceOverviewTab.vue'
+import ServicePortsTab from '@/components/services/ServicePortsTab.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
+import { kubernetesService } from '@/services/kubernetesService'
+import { events } from '@/services/nativeService'
+import { OrbitEvents } from '@/types/events'
 import type { ServiceInfo } from '@/types/kubernetes'
-import {
-  Activity,
-  Clock,
-  ExternalLink,
-  FileCode,
-  Server,
-  Shield,
-  Tag as TagIcon
-} from '@lucide/vue'
+import { Activity, Clock, FileCode, Server, Shield } from '@lucide/vue'
 import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
-import { ref } from 'vue'
+import Tag from 'primevue/tag'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import * as yaml from 'yaml'
 
 const props = defineProps<{
   visible: boolean
@@ -30,6 +29,74 @@ const emit = defineEmits<{
 }>()
 
 const activeTab = ref('overview')
+
+const getTypeSeverity = (type: string) => {
+  switch (type) {
+    case 'LoadBalancer':
+      return 'info'
+    case 'ClusterIP':
+      return 'success'
+    case 'NodePort':
+      return 'warn'
+    case 'ExternalName':
+      return 'contrast'
+    default:
+      return 'secondary'
+  }
+}
+
+// Live Raw YAML & JSON Fetching
+const rawYamlData = ref<string | null>(null)
+const isYamlLoading = ref<boolean>(false)
+const copied = ref<boolean>(false)
+
+const fetchRawData = async () => {
+  if (!props.service || !props.visible) return
+  isYamlLoading.value = true
+  try {
+    await kubernetesService.getResourceRaw({
+      namespace: props.service.namespace,
+      kind: 'Service',
+      name: props.service.name
+    })
+  } catch (e) {
+    console.error('Failed to fetch raw service YAML:', e)
+    isYamlLoading.value = false
+  }
+}
+
+const handleRawData = (data: { kind?: string; name?: string; data?: unknown }) => {
+  if (data && data.kind === 'Service' && data.name === props.service?.name) {
+    if (data.data && typeof data.data === 'object') {
+      rawYamlData.value = yaml.stringify(data.data)
+    } else if (typeof data.data === 'string') {
+      rawYamlData.value = data.data
+    }
+    isYamlLoading.value = false
+  }
+}
+
+onMounted(() => {
+  events.on(OrbitEvents.ResourceRawData, handleRawData)
+})
+
+onUnmounted(() => {
+  events.off(OrbitEvents.ResourceRawData, handleRawData)
+})
+
+watch(
+  () => [props.visible, props.service],
+  ([visible, service]) => {
+    if (visible && service) {
+      rawYamlData.value = null
+      fetchRawData()
+    } else if (!visible) {
+      rawYamlData.value = null
+      copied.value = false
+    }
+  },
+  { immediate: true }
+)
 
 const generateYaml = (s: ServiceInfo) => {
   return `apiVersion: v1
@@ -65,18 +132,21 @@ status:
 `
 }
 
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case 'LoadBalancer':
-      return 'info'
-    case 'ClusterIP':
-      return 'success'
-    case 'NodePort':
-      return 'warn'
-    case 'ExternalName':
-      return 'contrast'
-    default:
-      return 'secondary'
+const displayedYaml = computed(() => {
+  if (rawYamlData.value) return rawYamlData.value
+  return props.service ? generateYaml(props.service) : ''
+})
+
+const copyYaml = async () => {
+  if (!displayedYaml.value) return
+  try {
+    await navigator.clipboard.writeText(displayedYaml.value)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  } catch (e) {
+    console.error('Failed to copy YAML:', e)
   }
 }
 </script>
@@ -84,245 +154,92 @@ const getTypeSeverity = (type: string) => {
 <template>
   <Drawer
     :visible="props.visible"
-    @update:visible="emit('update:visible', $event)"
     position="right"
-    class="w-full sm:max-w-lg border-l border-(--border) bg-(--bg-card) p-0"
-    :header="props.service?.name || 'Service Details'"
-    :style="{ width: '36rem' }"
+    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
+    :dismissable="true"
+    @update:visible="emit('update:visible', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-3 w-full" v-if="props.service">
-        <div class="flex items-center gap-1.5">
-          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-          <span class="text-xs font-bold uppercase tracking-wider text-muted-color"> Active </span>
+      <div v-if="props.service" class="flex items-center justify-between w-full pr-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="w-3 h-3 rounded-full shrink-0 animate-pulse bg-emerald-500"></span>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h3
+                class="text-base font-bold text-primary font-mono truncate max-w-70"
+                :title="props.service.name"
+              >
+                {{ props.service.name }}
+              </h3>
+              <Tag
+                rounded
+                class="font-mono"
+                :severity="getTypeSeverity(props.service.type)"
+                :value="props.service.type"
+              />
+            </div>
+            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
+              <span>ns: {{ props.service.namespace }}</span>
+              <span class="text-muted-color/60">•</span>
+              <span class="flex items-center gap-1">
+                <Clock class="w-3 h-3" />
+                <ReactiveAge :age="props.service.age" />
+              </span>
+            </div>
+          </div>
         </div>
-        <Tag severity="secondary" class="font-mono" :value="`ns/${props.service.namespace}`" />
-        <Tag :severity="getTypeSeverity(props.service.type)" :value="props.service.type" />
       </div>
     </template>
 
-    <div v-if="props.service" class="h-full flex flex-col">
-      <!-- Title Section -->
-      <div class="p-6 border-b border-(--border) bg-(--bg-hover)/50">
-        <h2
-          class="text-lg font-bold text-primary font-ui truncate mb-1"
-          :title="props.service.name"
-        >
-          {{ props.service.name }}
-        </h2>
-        <div class="text-xs text-muted-color flex items-center gap-2">
-          <Clock class="w-3.5 h-3.5" />
-          <span>Age: <ReactiveAge :age="props.service.age" /></span>
-        </div>
-      </div>
-
+    <div v-if="props.service" class="flex flex-col h-full">
       <!-- Tab Layout -->
-      <div class="flex-1 flex flex-col min-h-0">
-        <Tabs v-model:value="activeTab" class="flex-1 flex flex-col">
-          <TabList class="border-b border-(--border) px-6 bg-(--bg-card)">
-            <Tab
-              value="overview"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <Server class="w-3.5 h-3.5" />
-              <span>Overview</span>
-            </Tab>
-            <Tab
-              value="endpoints"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <Shield class="w-3.5 h-3.5" />
-              <span>Endpoints</span>
-            </Tab>
-            <Tab
-              value="ports"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <Activity class="w-3.5 h-3.5" />
-              <span>Ports</span>
-            </Tab>
-            <Tab
-              value="yaml"
-              class="py-3 px-4 text-xs font-bold uppercase tracking-wider flex items-center gap-1"
-            >
-              <FileCode class="w-3.5 h-3.5" />
-              <span>YAML</span>
-            </Tab>
-          </TabList>
+      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
+        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
+          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Server class="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </Tab>
+          <Tab value="endpoints" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Shield class="w-3.5 h-3.5" />
+            <span>Endpoints ({{ props.service.endpointsList.length }})</span>
+          </Tab>
+          <Tab value="ports" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Activity class="w-3.5 h-3.5" />
+            <span>Ports ({{ props.service.portsList.length }})</span>
+          </Tab>
+          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <FileCode class="w-3.5 h-3.5" />
+            <span>YAML</span>
+          </Tab>
+        </TabList>
 
-          <TabPanels class="p-6 flex-1 overflow-y-auto min-h-0">
-            <!-- OVERVIEW PANEL -->
-            <TabPanel value="overview" class="space-y-6">
-              <!-- General Info Grid -->
-              <div class="space-y-4">
-                <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">General</h3>
-                <div
-                  class="border border-(--border) rounded-xl overflow-hidden divide-y divide-(--border) bg-(--bg-hover)/10 text-xs"
-                >
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Namespace</span>
-                    <span class="col-span-2 font-mono text-primary">{{
-                      props.service.namespace
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Cluster IP</span>
-                    <span class="col-span-2 font-mono text-primary">{{
-                      props.service.clusterIP
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">External IP</span>
-                    <span class="col-span-2 font-mono text-primary flex items-center gap-1.5">
-                      {{ props.service.externalIP }}
-                      <ExternalLink
-                        v-if="props.service.externalIP !== '-'"
-                        class="w-3 h-3 text-violet-400 cursor-pointer"
-                      />
-                    </span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Type</span>
-                    <span class="col-span-2 font-mono text-primary">{{ props.service.type }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Session Affinity</span>
-                    <span class="col-span-2 text-primary">{{ props.service.sessionAffinity }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Internal Traffic Policy</span>
-                    <span class="col-span-2 text-primary">{{
-                      props.service.internalTrafficPolicy
-                    }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Created</span>
-                    <span class="col-span-2 text-primary">{{ props.service.created }}</span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">Age</span>
-                    <span class="col-span-2 text-primary"
-                      ><ReactiveAge :age="props.service.age"
-                    /></span>
-                  </div>
-                  <div class="grid grid-cols-3 p-3">
-                    <span class="text-muted-color font-semibold">UID</span>
-                    <span class="col-span-2 font-mono text-[10px] text-primary">{{
-                      props.service.uid
-                    }}</span>
-                  </div>
-                </div>
-              </div>
+        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
+          <!-- OVERVIEW PANEL -->
+          <TabPanel value="overview">
+            <ServiceOverviewTab :service="props.service" />
+          </TabPanel>
 
-              <!-- Active Port Forwards -->
-              <ActivePortForwardsList
-                kind="Service"
-                :namespace="props.service.namespace"
-                :name="props.service.name"
-              />
+          <!-- ENDPOINTS PANEL -->
+          <TabPanel value="endpoints">
+            <ServiceEndpointsTab :service="props.service" />
+          </TabPanel>
 
-              <!-- Selector Section -->
-              <div class="space-y-3">
-                <h3
-                  class="text-xs font-bold text-muted-color uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <TagIcon class="w-3.5 h-3.5" />
-                  <span>Selector</span>
-                </h3>
-                <div class="flex flex-wrap gap-2">
-                  <div
-                    v-for="(val, key) in props.service.selector"
-                    :key="key"
-                    class="flex items-center text-xs border border-violet-500/20 bg-violet-500/5 text-violet-400 rounded-lg overflow-hidden"
-                  >
-                    <span
-                      class="px-2 py-1 bg-violet-500/10 border-r border-violet-500/20 font-medium"
-                      >{{ key }}</span
-                    >
-                    <span class="px-2 py-1 font-mono">{{ val }}</span>
-                  </div>
-                  <span
-                    v-if="Object.keys(props.service.selector).length === 0"
-                    class="text-xs text-muted-color italic"
-                    >None</span
-                  >
-                </div>
-              </div>
+          <!-- PORTS PANEL -->
+          <TabPanel value="ports">
+            <ServicePortsTab :service="props.service" />
+          </TabPanel>
 
-              <!-- Labels Section -->
-              <KeyValueBadgeList :items="props.service.labels" title="Labels" variant="tag" />
-            </TabPanel>
-
-            <!-- ENDPOINTS PANEL -->
-            <TabPanel value="endpoints" class="space-y-4">
-              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
-                Target Endpoints
-              </h3>
-              <div class="border border-(--border) rounded-xl p-4 bg-(--bg-hover)/10">
-                <ul class="space-y-2" v-if="props.service.endpointsList.length > 0">
-                  <li
-                    v-for="(ep, idx) in props.service.endpointsList"
-                    :key="idx"
-                    class="font-mono text-xs text-primary flex items-center gap-2"
-                  >
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    {{ ep }}
-                  </li>
-                </ul>
-                <div v-else class="text-xs text-muted-color italic">
-                  No active endpoints (ExternalName or selectorless service).
-                </div>
-              </div>
-            </TabPanel>
-
-            <!-- PORTS PANEL -->
-            <TabPanel value="ports" class="space-y-4">
-              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider">
-                Port Mappings
-              </h3>
-              <div
-                class="border border-(--border) rounded-xl overflow-hidden bg-(--bg-hover)/10 text-xs"
-              >
-                <table class="w-full text-left border-collapse">
-                  <thead>
-                    <tr
-                      class="bg-(--bg-hover)/40 border-b border-(--border) text-muted-color font-semibold"
-                    >
-                      <th class="p-3">Port</th>
-                      <th class="p-3">Target Port</th>
-                      <th class="p-3">Protocol</th>
-                      <th class="p-3">Node Port</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-(--border)">
-                    <tr
-                      v-for="(port, idx) in props.service.portsList"
-                      :key="idx"
-                      class="text-muted-color hover:bg-(--bg-hover)/10"
-                    >
-                      <td class="p-3 font-mono text-primary">{{ port.port }}</td>
-                      <td class="p-3 font-mono">{{ port.targetPort }}</td>
-                      <td class="p-3 font-semibold">{{ port.protocol }}</td>
-                      <td class="p-3 font-mono">{{ port.nodePort || '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </TabPanel>
-
-            <!-- YAML PANEL -->
-            <TabPanel value="yaml" class="h-full flex flex-col gap-2">
-              <div
-                class="flex-1 min-h-64 border border-(--border) rounded-xl bg-zinc-950 p-4 overflow-y-auto"
-              >
-                <pre class="font-mono text-[10px] text-zinc-300 leading-relaxed">{{
-                  generateYaml(props.service)
-                }}</pre>
-              </div>
-            </TabPanel>
-          </TabPanels>
-        </Tabs>
-      </div>
+          <!-- YAML PANEL -->
+          <TabPanel value="yaml" class="h-full">
+            <ResourceYamlTab
+              :displayed-yaml="displayedYaml"
+              :is-yaml-loading="isYamlLoading"
+              :copied="copied"
+              @copy-yaml="copyYaml"
+            />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
   </Drawer>
 </template>
