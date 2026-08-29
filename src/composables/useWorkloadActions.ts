@@ -93,6 +93,107 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
 
     items.push({ separator: true })
 
+    // Port Forwarding
+    if (['Deployment', 'Pod', 'Service', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
+      items.push({
+        label: 'Port Forwarding',
+        icon: 'pi pi-arrow-right-arrow-left',
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+
+          dialog.open(PortForwardDialog, {
+            props: {
+              header: 'Port Forwarding',
+              style: {
+                width: '380px'
+              },
+              modal: true
+            },
+            data: {
+              sourceName: row.name,
+              sourceNamespace: row.namespace || 'default',
+              kind: resourceKind
+            },
+            onClose: async (options) => {
+              const result = options?.data as { localPort: number; remotePort: number } | undefined
+              if (result?.localPort && result?.remotePort) {
+                try {
+                  await kubernetesService.startPortForward({
+                    namespace: row.namespace || 'default',
+                    kind: resourceKind,
+                    name: row.name,
+                    localPort: result.localPort,
+                    remotePort: result.remotePort
+                  })
+                  toast.add({
+                    severity: 'success',
+                    summary: 'Port Forward Started',
+                    detail: `Forwarding ${result.localPort} -> ${result.remotePort} for ${row.name}`,
+                    life: 5000
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to start port forwarding',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      })
+
+      const row = selectedActionRow.value
+      if (row) {
+        const targetNamespace = (row.namespace || 'default').toLowerCase()
+        const targetKind = resourceKind.toLowerCase()
+        const targetName = row.name.toLowerCase()
+
+        const activeForwards = k8sStore.activePortForwards.filter(
+          (f) =>
+            f.namespace.toLowerCase() === targetNamespace &&
+            f.kind.toLowerCase() === targetKind &&
+            f.name.toLowerCase() === targetName
+        )
+
+        if (activeForwards.length > 0) {
+          items.push({
+            label: 'Stop Port Forwarding',
+            icon: 'pi pi-stop-circle',
+            class: 'text-warning hover:opacity-80',
+            command: async () => {
+              const currentRow = selectedActionRow.value
+              if (!currentRow) return
+
+              for (const f of activeForwards) {
+                try {
+                  await kubernetesService.stopPortForward({ id: f.id })
+                  toast.add({
+                    severity: 'info',
+                    summary: 'Port Forward Stopped',
+                    detail: `Stopped port forward for ${currentRow.name}`,
+                    life: 3000
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to stop port forwarding',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      }
+    }
+
+    items.push({ separator: true })
+
     // Clone (Ingress only)
     if (resourceKind === 'Ingress') {
       items.push({
@@ -365,105 +466,6 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
           })
         }
       })
-    }
-
-    // Port Forwarding
-    if (['Deployment', 'Pod', 'Service', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
-      items.push({
-        label: 'Port Forwarding',
-        icon: 'pi pi-arrow-right-arrow-left',
-        command: () => {
-          const row = selectedActionRow.value
-          if (!row) return
-
-          dialog.open(PortForwardDialog, {
-            props: {
-              header: 'Port Forwarding',
-              style: {
-                width: '380px'
-              },
-              modal: true
-            },
-            data: {
-              sourceName: row.name,
-              sourceNamespace: row.namespace || 'default',
-              kind: resourceKind
-            },
-            onClose: async (options) => {
-              const result = options?.data as { localPort: number; remotePort: number } | undefined
-              if (result?.localPort && result?.remotePort) {
-                try {
-                  await kubernetesService.startPortForward({
-                    namespace: row.namespace || 'default',
-                    kind: resourceKind,
-                    name: row.name,
-                    localPort: result.localPort,
-                    remotePort: result.remotePort
-                  })
-                  toast.add({
-                    severity: 'success',
-                    summary: 'Port Forward Started',
-                    detail: `Forwarding ${result.localPort} -> ${result.remotePort} for ${row.name}`,
-                    life: 5000
-                  })
-                } catch (e) {
-                  toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: e instanceof Error ? e.message : 'Failed to start port forwarding',
-                    life: 5000
-                  })
-                }
-              }
-            }
-          })
-        }
-      })
-
-      const row = selectedActionRow.value
-      if (row) {
-        const targetNamespace = (row.namespace || 'default').toLowerCase()
-        const targetKind = resourceKind.toLowerCase()
-        const targetName = row.name.toLowerCase()
-
-        const activeForwards = k8sStore.activePortForwards.filter(
-          (f) =>
-            f.namespace.toLowerCase() === targetNamespace &&
-            f.kind.toLowerCase() === targetKind &&
-            f.name.toLowerCase() === targetName
-        )
-
-        if (activeForwards.length > 0) {
-          items.push({
-            label: 'Stop Port Forwarding',
-            icon: 'pi pi-stop-circle',
-            class: 'text-warning hover:opacity-80',
-            command: async () => {
-              const currentRow = selectedActionRow.value
-              if (!currentRow) return
-
-              for (const f of activeForwards) {
-                try {
-                  await kubernetesService.stopPortForward({ id: f.id })
-                  toast.add({
-                    severity: 'info',
-                    summary: 'Port Forward Stopped',
-                    detail: `Stopped port forward for ${currentRow.name}`,
-                    life: 3000
-                  })
-                } catch (e) {
-                  toast.add({
-                    severity: 'error',
-                    summary: 'Error',
-                    detail: e instanceof Error ? e.message : 'Failed to stop port forwarding',
-                    life: 5000
-                  })
-                }
-              }
-            }
-          })
-        }
-      }
     }
 
     items.push({ separator: true })
