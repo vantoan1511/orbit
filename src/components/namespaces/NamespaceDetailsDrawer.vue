@@ -6,10 +6,8 @@ import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import Chart from 'primevue/chart'
 import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
+import Tag from 'primevue/tag'
 import { ref, watch } from 'vue'
 
 interface ResourceQuotaInfo {
@@ -145,6 +143,7 @@ const getStatusTextClass = (status: string) => {
 
 <template>
   <BaseResourceDrawer
+    v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.namespace"
     :title="props.namespace?.name ?? ''"
@@ -153,6 +152,7 @@ const getStatusTextClass = (status: string) => {
     :status-badge-class="
       props.namespace ? getStatusBadgeClass(props.namespace.status) : 'bg-gray-400'
     "
+    :show-yaml-tab="false"
     @update:visible="emit('update:visible', $event)"
   >
     <template #metadata>
@@ -169,255 +169,242 @@ const getStatusTextClass = (status: string) => {
       </div>
     </template>
 
-    <div v-if="props.namespace" class="flex flex-col h-full">
-      <!-- Tab Layout -->
-      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
-          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Layers class="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </Tab>
-          <Tab value="quotas" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <BarChart2 class="w-3.5 h-3.5" />
-            <span>Resource Quotas</span>
-          </Tab>
-          <Tab value="limitranges" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <FileCode class="w-3.5 h-3.5" />
-            <span>Limit Ranges</span>
-          </Tab>
-        </TabList>
+    <!-- Extra Tabs -->
+    <template #extra-tabs>
+      <Tab value="quotas" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <BarChart2 class="w-3.5 h-3.5" />
+        <span>Resource Quotas</span>
+      </Tab>
+      <Tab value="limitranges" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <FileCode class="w-3.5 h-3.5" />
+        <span>Limit Ranges</span>
+      </Tab>
+    </template>
 
-        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
-          <!-- OVERVIEW PANEL -->
-          <TabPanel value="overview" class="space-y-6">
-            <!-- General Section -->
-            <div>
-              <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
-                General
-              </h3>
-              <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
-                <div class="flex justify-between items-center">
-                  <span class="text-muted-color">Name</span>
-                  <span class="font-semibold text-primary font-mono">{{
-                    props.namespace.name
-                  }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-muted-color">Status</span>
-                  <div class="flex items-center gap-1.5">
-                    <span
-                      class="w-1.5 h-1.5 rounded-full"
-                      :class="getStatusBadgeClass(props.namespace.status)"
-                    ></span>
-                    <span
-                      class="font-semibold"
-                      :class="getStatusTextClass(props.namespace.status)"
-                      >{{ props.namespace.status }}</span
-                    >
-                  </div>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-muted-color">Created</span>
-                  <span class="text-muted-color">{{ props.namespace.created }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-muted-color">Age</span>
-                  <span class="font-mono text-muted-color"
-                    ><ReactiveAge :age="props.namespace.age"
-                  /></span>
-                </div>
-                <div class="flex justify-between items-start gap-4">
-                  <span class="text-muted-color shrink-0">UID</span>
-                  <span class="font-mono text-muted-color text-[10px] truncate text-right">{{
-                    props.namespace.uid
-                  }}</span>
-                </div>
+    <!-- Overview Panel -->
+    <template #overview>
+      <div v-if="props.namespace" class="space-y-6">
+        <!-- General Section -->
+        <div>
+          <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
+            General
+          </h3>
+          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+            <div class="flex justify-between items-center">
+              <span class="text-muted-color">Name</span>
+              <span class="font-semibold text-primary font-mono">{{ props.namespace.name }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-muted-color">Status</span>
+              <div class="flex items-center gap-1.5">
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="getStatusBadgeClass(props.namespace.status)"
+                ></span>
+                <span class="font-semibold" :class="getStatusTextClass(props.namespace.status)">{{
+                  props.namespace.status
+                }}</span>
               </div>
             </div>
-
-            <!-- Labels Section -->
-            <KeyValueBadgeList title="Labels" :items="props.namespace.labels" variant="tag" />
-
-            <!-- Annotations Section -->
-            <KeyValueBadgeList
-              title="Annotations"
-              :items="props.namespace.annotations"
-              variant="list"
-            />
-
-            <!-- Resource Usage Section -->
-            <div>
-              <div class="flex items-center justify-between mb-3">
-                <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-                  Resource Usage
-                </h3>
-                <span v-if="props.namespace.cpuUsage" class="text-[10px] text-muted-color"
-                  >Last 1 hour</span
-                >
-              </div>
-              <div
-                v-if="!props.namespace.cpuUsage"
-                class="bg-(--bg-hover)/40 rounded-xl p-6 text-center text-xs text-muted-color"
-              >
-                Resource usage metrics are currently unavailable. Dynamic metric monitoring is
-                planned for a future update.
-              </div>
-              <div v-else class="space-y-4">
-                <!-- CPU Usage -->
-                <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2">
-                  <div class="flex justify-between items-center text-xs">
-                    <span class="text-muted-color font-semibold">CPU Usage</span>
-                    <span class="font-mono font-bold text-violet-400">
-                      {{ props.namespace.cpuUsage }} ({{ props.namespace.cpuPercent }}%)
-                    </span>
-                  </div>
-                  <div class="h-20 w-full" v-if="cpuChartData">
-                    <Chart
-                      type="line"
-                      :data="cpuChartData"
-                      :options="chartOptions"
-                      class="w-full h-full"
-                    />
-                  </div>
-                </div>
-
-                <!-- Memory Usage -->
-                <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2">
-                  <div class="flex justify-between items-center text-xs">
-                    <span class="text-muted-color font-semibold">Memory Usage</span>
-                    <span class="font-mono font-bold text-blue-400">
-                      {{ props.namespace.memoryUsage }} ({{ props.namespace.memoryPercent }}%)
-                    </span>
-                  </div>
-                  <div class="h-20 w-full" v-if="memoryChartData">
-                    <Chart
-                      type="line"
-                      :data="memoryChartData"
-                      :options="chartOptions"
-                      class="w-full h-full"
-                    />
-                  </div>
-                </div>
-              </div>
+            <div class="flex justify-between items-center">
+              <span class="text-muted-color">Created</span>
+              <span class="text-muted-color">{{ props.namespace.created }}</span>
             </div>
-          </TabPanel>
-
-          <!-- RESOURCE QUOTAS PANEL -->
-          <TabPanel value="quotas" class="space-y-6">
-            <div v-if="props.namespace.resourceQuota" class="space-y-5">
-              <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
-                Resource Quotas
-              </h3>
-
-              <!-- CPU Quota -->
-              <div class="bg-(--bg-hover)/40 rounded-xl p-4 space-y-3">
-                <div class="flex justify-between items-center text-xs">
-                  <span class="text-muted-color font-semibold">CPU</span>
-                  <span class="font-mono text-muted-color"
-                    >{{ props.namespace.resourceQuota.cpuUsed }} /
-                    {{ props.namespace.resourceQuota.cpuLimit }}</span
-                  >
-                </div>
-                <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-violet-500 rounded-full transition-all duration-500"
-                    :style="{
-                      width: `${Math.min(100, props.namespace.resourceQuota.cpuPercent)}%`
-                    }"
-                  ></div>
-                </div>
-                <div
-                  class="flex justify-between items-center text-[10px] text-muted-color font-mono"
-                >
-                  <span>Usage</span>
-                  <span class="font-bold text-primary"
-                    >{{ props.namespace.resourceQuota.cpuPercent }}%</span
-                  >
-                </div>
-              </div>
-
-              <!-- Memory Quota -->
-              <div class="bg-(--bg-hover)/40 rounded-xl p-4 space-y-3">
-                <div class="flex justify-between items-center text-xs">
-                  <span class="text-muted-color font-semibold">Memory</span>
-                  <span class="font-mono text-muted-color"
-                    >{{ props.namespace.resourceQuota.memoryUsed }} /
-                    {{ props.namespace.resourceQuota.memoryLimit }}</span
-                  >
-                </div>
-                <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-blue-500 rounded-full transition-all duration-500"
-                    :style="{
-                      width: `${Math.min(100, props.namespace.resourceQuota.memoryPercent)}%`
-                    }"
-                  ></div>
-                </div>
-                <div
-                  class="flex justify-between items-center text-[10px] text-muted-color font-mono"
-                >
-                  <span>Usage</span>
-                  <span class="font-bold text-primary"
-                    >{{ props.namespace.resourceQuota.memoryPercent }}%</span
-                  >
-                </div>
-              </div>
+            <div class="flex justify-between items-center">
+              <span class="text-muted-color">Age</span>
+              <span class="font-mono text-muted-color"
+                ><ReactiveAge :age="props.namespace.age"
+              /></span>
             </div>
-            <div v-else class="text-xs text-muted-color italic py-4">
-              No ResourceQuotas defined for this namespace.
+            <div class="flex justify-between items-start gap-4">
+              <span class="text-muted-color shrink-0">UID</span>
+              <span class="font-mono text-muted-color text-[10px] truncate text-right">{{
+                props.namespace.uid
+              }}</span>
             </div>
-          </TabPanel>
+          </div>
+        </div>
 
-          <!-- LIMIT RANGES PANEL -->
-          <TabPanel value="limitranges" class="space-y-4">
-            <div v-if="props.namespace.limitRanges && props.namespace.limitRanges.length > 0">
-              <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-4">
-                Limit Ranges
-              </h3>
-              <div
-                v-for="(lr, idx) in props.namespace.limitRanges"
-                :key="idx"
-                class="bg-(--bg-hover)/40 rounded-xl p-4 mb-3"
-              >
-                <div class="flex items-center justify-between mb-3">
-                  <span class="text-xs font-semibold text-primary font-mono">{{ lr.type }}</span>
-                  <Tag severity="secondary" class="font-mono" :value="lr.resource" />
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-[10px]">
-                  <div>
-                    <span class="text-muted-color block">Min</span>
-                    <span class="font-mono text-muted-color">{{ lr.min }}</span>
-                  </div>
-                  <div>
-                    <span class="text-muted-color block">Max</span>
-                    <span class="font-mono text-muted-color">{{ lr.max }}</span>
-                  </div>
-                  <div>
-                    <span class="text-muted-color block">Default</span>
-                    <span class="font-mono text-muted-color">{{ lr.default }}</span>
-                  </div>
-                  <div>
-                    <span class="text-muted-color block">Default Request</span>
-                    <span class="font-mono text-muted-color">{{ lr.defaultRequest }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+        <!-- Labels Section -->
+        <KeyValueBadgeList title="Labels" :items="props.namespace.labels" variant="tag" />
 
-            <!-- No limit ranges state -->
-            <div
-              v-else
-              class="bg-(--bg-hover)/40 rounded-xl p-8 text-center flex flex-col items-center gap-3"
+        <!-- Annotations Section -->
+        <KeyValueBadgeList
+          title="Annotations"
+          :items="props.namespace.annotations"
+          variant="list"
+        />
+
+        <!-- Resource Usage Section -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+              Resource Usage
+            </h3>
+            <span v-if="props.namespace.cpuUsage" class="text-[10px] text-muted-color"
+              >Last 1 hour</span
             >
-              <Layers class="w-8 h-8 text-muted-color/40" />
-              <div class="text-sm font-semibold text-muted-color">No Limit Ranges</div>
-              <div class="text-xs text-muted-color max-w-xs">
-                This namespace has no limit ranges configured.
+          </div>
+          <div
+            v-if="!props.namespace.cpuUsage"
+            class="bg-(--bg-hover)/40 rounded-xl p-6 text-center text-xs text-muted-color"
+          >
+            Resource usage metrics are currently unavailable. Dynamic metric monitoring is planned
+            for a future update.
+          </div>
+          <div v-else class="space-y-4">
+            <!-- CPU Usage -->
+            <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-muted-color font-semibold">CPU Usage</span>
+                <span class="font-mono font-bold text-violet-400">
+                  {{ props.namespace.cpuUsage }} ({{ props.namespace.cpuPercent }}%)
+                </span>
+              </div>
+              <div class="h-20 w-full" v-if="cpuChartData">
+                <Chart
+                  type="line"
+                  :data="cpuChartData"
+                  :options="chartOptions"
+                  class="w-full h-full"
+                />
               </div>
             </div>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </div>
+
+            <!-- Memory Usage -->
+            <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2">
+              <div class="flex justify-between items-center text-xs">
+                <span class="text-muted-color font-semibold">Memory Usage</span>
+                <span class="font-mono font-bold text-blue-400">
+                  {{ props.namespace.memoryUsage }} ({{ props.namespace.memoryPercent }}%)
+                </span>
+              </div>
+              <div class="h-20 w-full" v-if="memoryChartData">
+                <Chart
+                  type="line"
+                  :data="memoryChartData"
+                  :options="chartOptions"
+                  class="w-full h-full"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Extra Panels -->
+    <template #extra-panels>
+      <!-- RESOURCE QUOTAS PANEL -->
+      <TabPanel value="quotas" class="space-y-6">
+        <div v-if="props.namespace?.resourceQuota" class="space-y-5">
+          <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
+            Resource Quotas
+          </h3>
+
+          <!-- CPU Quota -->
+          <div class="bg-(--bg-hover)/40 rounded-xl p-4 space-y-3">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-muted-color font-semibold">CPU</span>
+              <span class="font-mono text-muted-color"
+                >{{ props.namespace.resourceQuota.cpuUsed }} /
+                {{ props.namespace.resourceQuota.cpuLimit }}</span
+              >
+            </div>
+            <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
+              <div
+                class="h-full bg-violet-500 rounded-full transition-all duration-500"
+                :style="{
+                  width: `${Math.min(100, props.namespace.resourceQuota.cpuPercent)}%`
+                }"
+              ></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
+              <span>Usage</span>
+              <span class="font-bold text-primary"
+                >{{ props.namespace.resourceQuota.cpuPercent }}%</span
+              >
+            </div>
+          </div>
+
+          <!-- Memory Quota -->
+          <div class="bg-(--bg-hover)/40 rounded-xl p-4 space-y-3">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-muted-color font-semibold">Memory</span>
+              <span class="font-mono text-muted-color"
+                >{{ props.namespace.resourceQuota.memoryUsed }} /
+                {{ props.namespace.resourceQuota.memoryLimit }}</span
+              >
+            </div>
+            <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
+              <div
+                class="h-full bg-blue-500 rounded-full transition-all duration-500"
+                :style="{
+                  width: `${Math.min(100, props.namespace.resourceQuota.memoryPercent)}%`
+                }"
+              ></div>
+            </div>
+            <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
+              <span>Usage</span>
+              <span class="font-bold text-primary"
+                >{{ props.namespace.resourceQuota.memoryPercent }}%</span
+              >
+            </div>
+          </div>
+        </div>
+        <div v-else class="text-xs text-muted-color italic py-4">
+          No ResourceQuotas defined for this namespace.
+        </div>
+      </TabPanel>
+
+      <!-- LIMIT RANGES PANEL -->
+      <TabPanel value="limitranges" class="space-y-4">
+        <div v-if="props.namespace?.limitRanges && props.namespace.limitRanges.length > 0">
+          <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-4">
+            Limit Ranges
+          </h3>
+          <div
+            v-for="(lr, idx) in props.namespace.limitRanges"
+            :key="idx"
+            class="bg-(--bg-hover)/40 rounded-xl p-4 mb-3"
+          >
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-primary font-mono">{{ lr.type }}</span>
+              <Tag severity="secondary" class="font-mono" :value="lr.resource" />
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-[10px]">
+              <div>
+                <span class="text-muted-color block">Min</span>
+                <span class="font-mono text-muted-color">{{ lr.min }}</span>
+              </div>
+              <div>
+                <span class="text-muted-color block">Max</span>
+                <span class="font-mono text-muted-color">{{ lr.max }}</span>
+              </div>
+              <div>
+                <span class="text-muted-color block">Default</span>
+                <span class="font-mono text-muted-color">{{ lr.default }}</span>
+              </div>
+              <div>
+                <span class="text-muted-color block">Default Request</span>
+                <span class="font-mono text-muted-color">{{ lr.defaultRequest }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- No limit ranges state -->
+        <div
+          v-else
+          class="bg-(--bg-hover)/40 rounded-xl p-8 text-center flex flex-col items-center gap-3"
+        >
+          <Layers class="w-8 h-8 text-muted-color/40" />
+          <div class="text-sm font-semibold text-muted-color">No Limit Ranges</div>
+          <div class="text-xs text-muted-color max-w-xs">
+            This namespace has no limit ranges configured.
+          </div>
+        </div>
+      </TabPanel>
+    </template>
   </BaseResourceDrawer>
 </template>

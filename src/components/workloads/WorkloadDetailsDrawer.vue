@@ -8,15 +8,12 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type { CronJobInfo, DaemonSetReplicas, JobInfo, WorkloadInfo } from '@/types/kubernetes'
-import { Activity, FileCode, Layers, Server, Terminal } from '@lucide/vue'
+import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
 import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
@@ -324,6 +321,7 @@ const copyYaml = async () => {
 
 <template>
   <BaseResourceDrawer
+    v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.workload"
     :title="workloadName"
@@ -360,86 +358,72 @@ const copyYaml = async () => {
       </Button>
     </template>
 
-    <div v-if="props.workload" class="flex flex-col h-full">
-      <!-- Tab Layout -->
-      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
-          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Server class="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </Tab>
+    <!-- Extra Tabs -->
+    <template #extra-tabs>
+      <Tab value="pods" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <Layers class="w-3.5 h-3.5" />
+        <span>Pods ({{ workloadPods.length }})</span>
+      </Tab>
 
-          <Tab value="pods" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Layers class="w-3.5 h-3.5" />
-            <span>Pods ({{ workloadPods.length }})</span>
-          </Tab>
+      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <Activity class="w-3.5 h-3.5" />
+        <span>Events ({{ workloadEvents.length }})</span>
+      </Tab>
+    </template>
 
-          <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Activity class="w-3.5 h-3.5" />
-            <span>Events ({{ workloadEvents.length }})</span>
-          </Tab>
+    <!-- Overview Panel -->
+    <template #overview>
+      <WorkloadOverviewTab
+        v-if="props.workload"
+        :workload="props.workload"
+        :workload-kind="workloadKind"
+        :workload-namespace="workloadNamespace"
+        :workload-age="workloadAge"
+        :workload-status="workloadStatus"
+        :replicas="replicas"
+        :desired-replicas="desiredReplicas"
+        :current-replicas="currentReplicas"
+        :ready-replicas="readyReplicas"
+        :available-replicas="availableReplicas"
+        :completions="completions"
+        :duration="duration"
+        :schedule="schedule"
+        :suspend="suspend"
+        :active="active"
+        :last-schedule="lastSchedule"
+        :strategy="strategy"
+        :min-ready-seconds="minReadySeconds"
+        :revision-history="revisionHistory"
+        :workload-images="workloadImages"
+        :workload-labels="workloadLabels"
+        :workload-annotations="workloadAnnotations"
+        :raw-resource-data="rawResourceData"
+      />
+    </template>
 
-          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <FileCode class="w-3.5 h-3.5" />
-            <span>YAML</span>
-          </Tab>
-        </TabList>
+    <!-- Extra Panels -->
+    <template #extra-panels>
+      <TabPanel value="pods">
+        <WorkloadPodsTab
+          :pods="workloadPods"
+          :get-status-badge-class="getStatusBadgeClass"
+          @view-pod-logs="viewPodLogs"
+        />
+      </TabPanel>
 
-        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
-          <!-- OVERVIEW PANEL -->
-          <TabPanel value="overview">
-            <WorkloadOverviewTab
-              :workload="props.workload"
-              :workload-kind="workloadKind"
-              :workload-namespace="workloadNamespace"
-              :workload-age="workloadAge"
-              :workload-status="workloadStatus"
-              :replicas="replicas"
-              :desired-replicas="desiredReplicas"
-              :current-replicas="currentReplicas"
-              :ready-replicas="readyReplicas"
-              :available-replicas="availableReplicas"
-              :completions="completions"
-              :duration="duration"
-              :schedule="schedule"
-              :suspend="suspend"
-              :active="active"
-              :last-schedule="lastSchedule"
-              :strategy="strategy"
-              :min-ready-seconds="minReadySeconds"
-              :revision-history="revisionHistory"
-              :workload-images="workloadImages"
-              :workload-labels="workloadLabels"
-              :workload-annotations="workloadAnnotations"
-              :raw-resource-data="rawResourceData"
-            />
-          </TabPanel>
+      <TabPanel value="events">
+        <WorkloadEventsTab :events="workloadEvents" />
+      </TabPanel>
+    </template>
 
-          <!-- PODS PANEL -->
-          <TabPanel value="pods">
-            <WorkloadPodsTab
-              :pods="workloadPods"
-              :get-status-badge-class="getStatusBadgeClass"
-              @view-pod-logs="viewPodLogs"
-            />
-          </TabPanel>
-
-          <!-- EVENTS PANEL -->
-          <TabPanel value="events">
-            <WorkloadEventsTab :events="workloadEvents" />
-          </TabPanel>
-
-          <!-- YAML PANEL -->
-          <TabPanel value="yaml" class="h-full">
-            <ResourceYamlTab
-              :displayed-yaml="displayedYaml"
-              :is-yaml-loading="isYamlLoading"
-              :copied="copied"
-              @copy-yaml="copyYaml"
-            />
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </div>
+    <!-- YAML Panel -->
+    <template #yaml>
+      <ResourceYamlTab
+        :displayed-yaml="displayedYaml"
+        :is-yaml-loading="isYamlLoading"
+        :copied="copied"
+        @copy-yaml="copyYaml"
+      />
+    </template>
   </BaseResourceDrawer>
 </template>

@@ -2,12 +2,7 @@
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import type { EventInfo } from '@/types/kubernetes'
-import { Clock, FileCode, Server } from '@lucide/vue'
-import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
-import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
+import { Clock } from '@lucide/vue'
 import { ref } from 'vue'
 
 const props = defineProps<{
@@ -70,6 +65,7 @@ const getEventBadgeClass = (type: string) => {
 
 <template>
   <BaseResourceDrawer
+    v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.event"
     :title="props.event?.reason ?? ''"
@@ -92,101 +88,86 @@ const getEventBadgeClass = (type: string) => {
       </div>
     </template>
 
-    <div v-if="props.event" class="flex flex-col h-full">
-      <!-- Tab Layout -->
-      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
-          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Server class="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </Tab>
-          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <FileCode class="w-3.5 h-3.5" />
-            <span>YAML</span>
-          </Tab>
-        </TabList>
+    <!-- Overview Panel -->
+    <template #overview>
+      <div v-if="props.event" class="space-y-6">
+        <!-- Event Message -->
+        <div v-if="props.event.message" class="bg-(--bg-hover)/40 rounded-xl p-4">
+          <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1.5">
+            Message
+          </div>
+          <div class="text-xs text-primary font-mono leading-relaxed break-words">
+            {{ props.event.message }}
+          </div>
+        </div>
 
-        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
-          <!-- OVERVIEW PANEL -->
-          <TabPanel value="overview" class="space-y-6">
-            <!-- Event Message -->
-            <div v-if="props.event.message" class="bg-(--bg-hover)/40 rounded-xl p-4">
-              <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1.5">
-                Message
-              </div>
-              <div class="text-xs text-primary font-mono leading-relaxed break-words">
-                {{ props.event.message }}
-              </div>
+        <!-- General Info Grid -->
+        <div>
+          <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">
+            Event Properties
+          </h3>
+          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Namespace</span>
+              <span class="col-span-2 font-mono text-primary">{{ props.event.namespace }}</span>
             </div>
-
-            <!-- General Info Grid -->
-            <div>
-              <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">
-                Event Properties
-              </h3>
-              <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Namespace</span>
-                  <span class="col-span-2 font-mono text-primary">{{ props.event.namespace }}</span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Involved Object</span>
-                  <span class="col-span-2 text-primary">
-                    <span class="font-semibold text-violet-400">{{ props.event.objectKind }}</span
-                    >/{{ props.event.objectName }}
-                  </span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Reason</span>
-                  <span class="col-span-2 text-primary font-mono">{{ props.event.reason }}</span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Source Component</span>
-                  <span class="col-span-2 text-primary">{{ props.event.source }}</span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">First Timestamp</span>
-                  <span class="col-span-2 text-primary">{{ props.event.firstSeen }}</span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Last Timestamp</span>
-                  <span class="col-span-2 text-primary">{{ props.event.lastSeen }}</span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Occurrence Count</span>
-                  <span class="col-span-2 text-primary font-mono font-bold">{{
-                    props.event.count
-                  }}</span>
-                </div>
-                <div class="grid grid-cols-3">
-                  <span class="text-muted-color font-semibold">Type</span>
-                  <span class="col-span-2 text-primary">{{ props.event.type }}</span>
-                </div>
-                <div class="grid grid-cols-3 items-start gap-4">
-                  <span class="text-muted-color font-semibold shrink-0">UID</span>
-                  <span class="col-span-2 font-mono text-[10px] text-primary truncate">{{
-                    props.event.uid
-                  }}</span>
-                </div>
-              </div>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Involved Object</span>
+              <span class="col-span-2 text-primary">
+                <span class="font-semibold text-violet-400">{{ props.event.objectKind }}</span
+                >/{{ props.event.objectName }}
+              </span>
             </div>
-
-            <!-- Labels Section -->
-            <KeyValueBadgeList title="Labels" :items="props.event.labels" variant="tag" />
-          </TabPanel>
-
-          <!-- YAML PANEL -->
-          <TabPanel value="yaml" class="h-full flex flex-col gap-2">
-            <div
-              class="flex-1 min-h-64 border border-(--border) rounded-xl bg-zinc-950 p-4 overflow-y-auto"
-            >
-              <pre class="font-mono text-[10px] text-zinc-300 leading-relaxed">{{
-                generateYaml(props.event)
-              }}</pre>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Reason</span>
+              <span class="col-span-2 text-primary font-mono">{{ props.event.reason }}</span>
             </div>
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </div>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Source Component</span>
+              <span class="col-span-2 text-primary">{{ props.event.source }}</span>
+            </div>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">First Timestamp</span>
+              <span class="col-span-2 text-primary">{{ props.event.firstSeen }}</span>
+            </div>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Last Timestamp</span>
+              <span class="col-span-2 text-primary">{{ props.event.lastSeen }}</span>
+            </div>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Occurrence Count</span>
+              <span class="col-span-2 text-primary font-mono font-bold">{{
+                props.event.count
+              }}</span>
+            </div>
+            <div class="grid grid-cols-3">
+              <span class="text-muted-color font-semibold">Type</span>
+              <span class="col-span-2 text-primary">{{ props.event.type }}</span>
+            </div>
+            <div class="grid grid-cols-3 items-start gap-4">
+              <span class="text-muted-color font-semibold shrink-0">UID</span>
+              <span class="col-span-2 font-mono text-[10px] text-primary truncate">{{
+                props.event.uid
+              }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Labels Section -->
+        <KeyValueBadgeList title="Labels" :items="props.event.labels" variant="tag" />
+      </div>
+    </template>
+
+    <!-- YAML Panel -->
+    <template #yaml>
+      <div
+        v-if="props.event"
+        class="flex-1 min-h-64 border border-(--border) rounded-xl bg-zinc-950 p-4 overflow-y-auto"
+      >
+        <pre class="font-mono text-[10px] text-zinc-300 leading-relaxed">{{
+          generateYaml(props.event)
+        }}</pre>
+      </div>
+    </template>
   </BaseResourceDrawer>
 </template>

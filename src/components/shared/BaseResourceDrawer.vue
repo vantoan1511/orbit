@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
-import { Clock } from '@lucide/vue'
+import { Clock, FileCode, Server } from '@lucide/vue'
 import Drawer from 'primevue/drawer'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
 import Tag from 'primevue/tag'
 
 const props = withDefaults(
@@ -14,6 +19,7 @@ const props = withDefaults(
     statusBadgeClass?: string
     namespace?: string
     age?: string
+    showYamlTab?: boolean
   }>(),
   {
     hasResource: true,
@@ -22,9 +28,12 @@ const props = withDefaults(
     kindSeverity: 'info',
     statusBadgeClass: 'bg-emerald-500',
     namespace: undefined,
-    age: undefined
+    age: undefined,
+    showYamlTab: true
   }
 )
+
+const activeTab = defineModel<string>('activeTab', { default: 'overview' })
 
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
@@ -97,7 +106,39 @@ const emit = defineEmits<{
 
     <!-- Main Content Body -->
     <div v-if="props.hasResource" class="flex flex-col h-full">
-      <slot></slot>
+      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
+        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
+          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+            <Server class="w-3.5 h-3.5" />
+            <span>Overview</span>
+          </Tab>
+
+          <slot name="extra-tabs"></slot>
+
+          <Tab
+            v-if="props.showYamlTab"
+            value="yaml"
+            class="text-xs! flex items-center gap-1.5 py-2.5 px-3"
+          >
+            <FileCode class="w-3.5 h-3.5" />
+            <span>YAML</span>
+          </Tab>
+        </TabList>
+
+        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
+          <TabPanel value="overview">
+            <slot name="overview">
+              <slot></slot>
+            </slot>
+          </TabPanel>
+
+          <slot name="extra-panels"></slot>
+
+          <TabPanel v-if="props.showYamlTab" value="yaml" class="h-full">
+            <slot name="yaml"></slot>
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
     </div>
   </Drawer>
 </template>

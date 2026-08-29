@@ -8,15 +8,12 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type { PodInfo } from '@/types/kubernetes'
-import { Activity, FileCode, Server, Shield, Terminal } from '@lucide/vue'
+import { Activity, Shield, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
 import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
@@ -158,6 +155,7 @@ const viewPodLogs = (containerName?: string) => {
 
 <template>
   <BaseResourceDrawer
+    v-model:active-tab="activeTab"
     :visible="visible"
     :has-resource="!!pod"
     :title="pod?.name ?? ''"
@@ -181,50 +179,42 @@ const viewPodLogs = (containerName?: string) => {
       </Button>
     </template>
 
-    <div v-if="pod" class="flex flex-col h-full">
-      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
-          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Server class="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </Tab>
-          <Tab value="containers" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Shield class="w-3.5 h-3.5" />
-            <span>Containers ({{ pod.containers?.length || 0 }})</span>
-          </Tab>
-          <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Activity class="w-3.5 h-3.5" />
-            <span>Events ({{ podEvents.length }})</span>
-          </Tab>
-          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <FileCode class="w-3.5 h-3.5" />
-            <span>YAML</span>
-          </Tab>
-        </TabList>
+    <!-- Extra Tabs -->
+    <template #extra-tabs>
+      <Tab value="containers" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <Shield class="w-3.5 h-3.5" />
+        <span>Containers ({{ pod?.containers?.length || 0 }})</span>
+      </Tab>
+      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <Activity class="w-3.5 h-3.5" />
+        <span>Events ({{ podEvents.length }})</span>
+      </Tab>
+    </template>
 
-        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
-          <TabPanel value="overview">
-            <PodOverviewTab :pod="pod" />
-          </TabPanel>
+    <!-- Overview Panel -->
+    <template #overview>
+      <PodOverviewTab v-if="pod" :pod="pod" />
+    </template>
 
-          <TabPanel value="containers">
-            <PodContainersTab :containers="pod.containers || []" @view-logs="viewPodLogs" />
-          </TabPanel>
+    <!-- Extra Panels -->
+    <template #extra-panels>
+      <TabPanel value="containers">
+        <PodContainersTab :containers="pod?.containers || []" @view-logs="viewPodLogs" />
+      </TabPanel>
 
-          <TabPanel value="events">
-            <WorkloadEventsTab :events="podEvents" />
-          </TabPanel>
+      <TabPanel value="events">
+        <WorkloadEventsTab :events="podEvents" />
+      </TabPanel>
+    </template>
 
-          <TabPanel value="yaml">
-            <ResourceYamlTab
-              :displayed-yaml="displayedYaml"
-              :is-yaml-loading="isYamlLoading"
-              :copied="copied"
-              @copy-yaml="copyYaml"
-            />
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </div>
+    <!-- YAML Panel -->
+    <template #yaml>
+      <ResourceYamlTab
+        :displayed-yaml="displayedYaml"
+        :is-yaml-loading="isYamlLoading"
+        :copied="copied"
+        @copy-yaml="copyYaml"
+      />
+    </template>
   </BaseResourceDrawer>
 </template>

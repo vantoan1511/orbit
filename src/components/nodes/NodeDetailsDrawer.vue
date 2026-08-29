@@ -7,14 +7,11 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type { NodeInfo } from '@/types/kubernetes'
-import { Activity, FileCode, Server } from '@lucide/vue'
+import { Activity } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Tab from 'primevue/tab'
-import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as yaml from 'yaml'
 
@@ -143,6 +140,7 @@ const copyYaml = async () => {
 
 <template>
   <BaseResourceDrawer
+    v-model:active-tab="activeTab"
     :visible="visible"
     :has-resource="!!node"
     :title="node?.name ?? ''"
@@ -159,42 +157,34 @@ const copyYaml = async () => {
       </div>
     </template>
 
-    <div v-if="node" class="flex flex-col h-full">
-      <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
-          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Server class="w-3.5 h-3.5" />
-            <span>Overview</span>
-          </Tab>
-          <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <Activity class="w-3.5 h-3.5" />
-            <span>Events ({{ nodeEvents.length }})</span>
-          </Tab>
-          <Tab value="yaml" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
-            <FileCode class="w-3.5 h-3.5" />
-            <span>YAML</span>
-          </Tab>
-        </TabList>
+    <!-- Extra Tabs -->
+    <template #extra-tabs>
+      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <Activity class="w-3.5 h-3.5" />
+        <span>Events ({{ nodeEvents.length }})</span>
+      </Tab>
+    </template>
 
-        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
-          <TabPanel value="overview">
-            <NodeOverviewTab :node="node" />
-          </TabPanel>
+    <!-- Overview Panel -->
+    <template #overview>
+      <NodeOverviewTab v-if="node" :node="node" />
+    </template>
 
-          <TabPanel value="events">
-            <WorkloadEventsTab :events="nodeEvents" />
-          </TabPanel>
+    <!-- Extra Panels -->
+    <template #extra-panels>
+      <TabPanel value="events">
+        <WorkloadEventsTab :events="nodeEvents" />
+      </TabPanel>
+    </template>
 
-          <TabPanel value="yaml">
-            <ResourceYamlTab
-              :displayed-yaml="displayedYaml"
-              :is-yaml-loading="isYamlLoading"
-              :copied="copied"
-              @copy-yaml="copyYaml"
-            />
-          </TabPanel>
-        </TabPanels>
-      </Tabs>
-    </div>
+    <!-- YAML Panel -->
+    <template #yaml>
+      <ResourceYamlTab
+        :displayed-yaml="displayedYaml"
+        :is-yaml-loading="isYamlLoading"
+        :copied="copied"
+        @copy-yaml="copyYaml"
+      />
+    </template>
   </BaseResourceDrawer>
 </template>
