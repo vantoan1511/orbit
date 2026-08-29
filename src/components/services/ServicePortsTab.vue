@@ -16,12 +16,12 @@ defineProps<{
 
     <div
       v-if="service.portsList.length > 0"
-      class="rounded-xl overflow-hidden bg-(--bg-hover)/30 text-xs"
+      class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) text-xs"
     >
       <table class="w-full text-left border-collapse">
         <thead>
           <tr
-            class="bg-(--bg-hover)/60 border-b border-(--border)/60 text-muted-color text-[11px] font-semibold tracking-wider uppercase"
+            class="bg-(--bg-hover)/60 border-b border-(--border) text-muted-color text-[11px] font-semibold tracking-wider uppercase"
           >
             <th class="py-2.5 px-3.5">Port</th>
             <th class="py-2.5 px-3.5">Target Port</th>
@@ -29,11 +29,11 @@ defineProps<{
             <th class="py-2.5 px-3.5">Node Port</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-(--border)/40">
+        <tbody class="divide-y divide-(--border)">
           <tr
             v-for="(port, idx) in service.portsList"
             :key="idx"
-            class="text-muted-color hover:bg-(--bg-hover)/50 transition-colors"
+            class="text-muted-color hover:bg-(--bg-hover) transition-colors"
           >
             <td class="py-2.5 px-3.5 font-mono font-medium text-primary">{{ port.port }}</td>
             <td class="py-2.5 px-3.5 font-mono text-primary">{{ port.targetPort }}</td>

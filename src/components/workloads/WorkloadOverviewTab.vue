@@ -212,7 +212,7 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
       <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         Job Status
       </h3>
-      <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3">
+      <div class="bg-(--bg-hover)/40 rounded-xl p-4 text-xs space-y-3">
         <div class="flex justify-between">
           <span class="text-muted-color font-medium">Completions</span>
           <span class="font-mono font-bold text-primary">{{ completions }}</span>
@@ -229,7 +229,7 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
       <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         CronJob Schedule
       </h3>
-      <div class="bg-(--bg-hover)/50 border border-(--border) rounded-xl p-4 text-xs space-y-3">
+      <div class="bg-(--bg-hover)/40 rounded-xl p-4 text-xs space-y-3">
         <div class="flex justify-between">
           <span class="text-muted-color font-medium">Schedule</span>
           <span class="font-mono font-bold text-primary">{{ schedule }}</span>
@@ -254,9 +254,7 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
       <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         Configuration
       </h3>
-      <div
-        class="grid grid-cols-2 gap-4 bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 text-xs"
-      >
+      <div class="grid grid-cols-2 gap-4 bg-(--bg-hover)/40 rounded-xl p-4 text-xs">
         <div>
           <span class="text-muted-color block mb-0.5">Kind</span>
           <span class="font-semibold text-muted-color">{{ workloadKind }}</span>
@@ -331,7 +329,7 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
         <div
           v-for="cond in conditions"
           :key="cond.type"
-          class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-3 text-xs flex flex-col gap-1.5"
+          class="bg-(--bg-hover)/40 rounded-xl p-3 text-xs flex flex-col gap-1.5"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
@@ -392,7 +390,7 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
       <div v-if="affinityYaml">
         <span class="text-xs font-semibold text-muted-color block mb-2">Affinity</span>
         <pre
-          class="bg-(--bg-hover)/40 border border-(--border) rounded-lg p-3 text-[11px] font-mono text-muted-color overflow-x-auto leading-relaxed"
+          class="bg-(--bg-hover)/40 rounded-lg p-3 text-[11px] font-mono text-muted-color overflow-x-auto leading-relaxed"
           >{{ affinityYaml }}</pre>
       </div>
     </div>
@@ -406,7 +404,7 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
         <div
           v-for="c in templateContainers"
           :key="c.name"
-          class="bg-(--bg-hover)/30 border border-(--border) rounded-xl p-4 text-xs space-y-3"
+          class="bg-(--bg-hover)/40 rounded-xl p-4 text-xs space-y-3"
         >
           <!-- Container Header -->
           <div class="flex items-center justify-between gap-2 border-b border-(--border)/60 pb-2">

@@ -24,7 +24,7 @@ const emit = defineEmits<{
         <div
           v-for="pod in pods"
           :key="pod.name"
-          class="flex items-center justify-between p-3.5 bg-(--bg-hover)/30 border border-(--border) rounded-xl hover:bg-(--bg-hover)/50 transition-colors"
+          class="flex items-center justify-between p-3.5 bg-(--bg-hover)/40 rounded-xl hover:bg-(--bg-hover)/60 transition-colors"
         >
           <div class="flex items-center gap-3 min-w-0">
             <span

@@ -13,7 +13,7 @@ defineProps<{
   <div class="space-y-6">
     <!-- Metrics Section -->
     <div class="grid grid-cols-2 gap-4">
-      <div class="p-4 rounded-xl border border-(--border) bg-(--bg-card)">
+      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
         <div class="text-[10px] font-bold uppercase tracking-wider text-muted-color mb-1">
           CPU Usage
         </div>
@@ -24,7 +24,7 @@ defineProps<{
           </span>
         </div>
       </div>
-      <div class="p-4 rounded-xl border border-(--border) bg-(--bg-card)">
+      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
         <div class="text-[10px] font-bold uppercase tracking-wider text-muted-color mb-1">
           Memory Usage
         </div>
@@ -45,9 +45,7 @@ defineProps<{
       <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-2.5">
         Pod Configuration
       </div>
-      <div
-        class="grid grid-cols-2 gap-3 p-4 rounded-xl border border-(--border) bg-(--bg-card) text-xs"
-      >
+      <div class="grid grid-cols-2 gap-3 p-4 rounded-xl bg-(--bg-hover)/40 text-xs">
         <div>
           <span class="text-muted-color">Namespace: </span>
           <span class="font-semibold text-primary font-mono">{{ pod.namespace }}</span>
