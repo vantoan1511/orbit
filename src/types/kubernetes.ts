@@ -60,10 +60,19 @@ export interface ContainerImageInfo {
   image: string
 }
 
+export interface ResourceCondition {
+  type: string
+  status: string
+  reason?: string
+  message?: string
+  lastTransitionTime?: string
+}
+
 export interface DeploymentInfo {
   name: string
   namespace: string
   status: string
+  conditions?: ResourceCondition[]
   replicas: Replicas
   available: number
   upToDate: number

@@ -80,10 +80,21 @@ pub struct ContainerImageInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ResourceCondition {
+    pub r#type: String,
+    pub status: String,
+    pub reason: Option<String>,
+    pub message: Option<String>,
+    pub last_transition_time: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct DeploymentInfo {
     pub name: String,
     pub namespace: String,
     pub status: String,
+    pub conditions: Vec<ResourceCondition>,
     pub replicas: Replicas,
     pub available: i32,
     pub up_to_date: i32,
