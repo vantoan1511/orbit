@@ -113,7 +113,13 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
             data: {
               sourceName: row.name,
               sourceNamespace: row.namespace || 'default',
-              kind: resourceKind
+              kind: resourceKind,
+              availablePorts:
+                resourceKind === 'Service' && 'portsList' in row
+                  ? (row as { portsList?: Array<{ port: number }> }).portsList?.map(
+                      (p) => p.port
+                    ) || []
+                  : []
             },
             onClose: async (options) => {
               const result = options?.data as { localPort: number; remotePort: number } | undefined
