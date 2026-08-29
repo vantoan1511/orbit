@@ -1,5 +1,5 @@
 use kube::{
-    api::{Api, ListParams},
+    api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams},
     Client,
 };
 use k8s_openapi::api::core::v1::{Node, Pod};
@@ -15,6 +15,17 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
         Err(e) => {
             log::warn!("Could not list pods for node metrics calculation (RBAC?): {}", e);
             Vec::new()
+        }
+    };
+
+    let gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "NodeMetrics");
+    let ar = ApiResource::from_gvk(&gvk);
+    let metrics_api: Api<DynamicObject> = Api::all_with(client.clone(), &ar);
+    let node_metrics = match metrics_api.list(&ListParams::default()).await {
+        Ok(list) => Some(list.items),
+        Err(e) => {
+            log::warn!("Could not fetch node metrics (Metrics Server installed?): {}", e);
+            None
         }
     };
 
@@ -92,26 +103,43 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
             .unwrap_or_else(|| "0".to_string());
         let mem_total_val = parse_memory_quantity(&mem_total_str);
 
-        let mut cpu_req = 0.0;
-        let mut mem_req = 0.0;
+        let mut actual_cpu_cores = 0.0;
+        let mut actual_mem_gib = 0.0;
+        let mut has_metrics = false;
 
-        for pod in &node_pods {
-            if let Some(spec) = &pod.spec {
-                for container in &spec.containers {
-                    if let Some(requests) = container.resources.as_ref().and_then(|r| r.requests.as_ref()) {
-                        if let Some(cpu) = requests.get("cpu") {
-                            cpu_req += parse_cpu_quantity(&cpu.0);
-                        }
-                        if let Some(mem) = requests.get("memory") {
-                            mem_req += parse_memory_quantity(&mem.0);
+        if let Some(metrics_list) = &node_metrics {
+            if let Some(metric) = metrics_list.iter().find(|m| m.metadata.name.as_deref() == Some(&name)) {
+                if let Some(usage) = metric.data.get("usage") {
+                    has_metrics = true;
+                    if let Some(cpu) = usage.get("cpu").and_then(|v| v.as_str()) {
+                        actual_cpu_cores = parse_cpu_quantity(cpu);
+                    }
+                    if let Some(mem) = usage.get("memory").and_then(|v| v.as_str()) {
+                        actual_mem_gib = parse_memory_quantity(mem);
+                    }
+                }
+            }
+        }
+
+        if !has_metrics {
+            for pod in &node_pods {
+                if let Some(spec) = &pod.spec {
+                    for container in &spec.containers {
+                        if let Some(requests) = container.resources.as_ref().and_then(|r| r.requests.as_ref()) {
+                            if let Some(cpu) = requests.get("cpu") {
+                                actual_cpu_cores += parse_cpu_quantity(&cpu.0);
+                            }
+                            if let Some(mem) = requests.get("memory") {
+                                actual_mem_gib += parse_memory_quantity(&mem.0);
+                            }
                         }
                     }
                 }
             }
         }
 
-        let cpu_pct = if cpu_total_val > 0.0 { ((cpu_req / cpu_total_val) * 1000.0).round() / 10.0 } else { 0.0 };
-        let mem_pct = if mem_total_val > 0.0 { ((mem_req / mem_total_val) * 1000.0).round() / 10.0 } else { 0.0 };
+        let cpu_pct = if cpu_total_val > 0.0 { ((actual_cpu_cores / cpu_total_val) * 1000.0).round() / 10.0 } else { 0.0 };
+        let mem_pct = if mem_total_val > 0.0 { ((actual_mem_gib / mem_total_val) * 1000.0).round() / 10.0 } else { 0.0 };
 
         let is_cordoned = node.spec.as_ref().and_then(|s| s.unschedulable).unwrap_or(false);
 
@@ -195,10 +223,10 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
             role,
             version,
             cpu_pct,
-            cpu_used: format!("{:.1}", cpu_req),
+            cpu_used: format!("{:.1}", actual_cpu_cores),
             cpu_total: format!("{:.0}", cpu_total_val),
             mem_pct,
-            mem_used: format!("{:.1}", mem_req),
+            mem_used: format!("{:.1}", actual_mem_gib),
             mem_total: format!("{:.0}", mem_total_val),
             pods_count,
             pods_limit,
@@ -223,7 +251,11 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
 
 pub(crate) fn parse_cpu_quantity(q: &str) -> f64 {
     let q = q.trim();
-    if let Some(stripped) = q.strip_suffix('m') {
+    if let Some(stripped) = q.strip_suffix('n') {
+        stripped.parse::<f64>().unwrap_or(0.0) / 1_000_000_000.0
+    } else if let Some(stripped) = q.strip_suffix('u') {
+        stripped.parse::<f64>().unwrap_or(0.0) / 1_000_000.0
+    } else if let Some(stripped) = q.strip_suffix('m') {
         stripped.parse::<f64>().unwrap_or(0.0) / 1000.0
     } else {
         q.parse::<f64>().unwrap_or(0.0)
@@ -277,5 +309,29 @@ pub(crate) fn parse_memory_quantity(q: &str) -> f64 {
             log::warn!("parse_memory_quantity: unrecognised suffix in {:?}, treating as bytes", q);
         }
         val / (1024.0 * 1024.0 * 1024.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_cpu_quantity() {
+        assert_eq!(parse_cpu_quantity("2"), 2.0);
+        assert_eq!(parse_cpu_quantity("250m"), 0.25);
+        assert_eq!(parse_cpu_quantity("500u"), 0.0005);
+        assert_eq!(parse_cpu_quantity("3141592n"), 0.003141592);
+        assert_eq!(parse_cpu_quantity("0"), 0.0);
+        assert_eq!(parse_cpu_quantity(""), 0.0);
+        assert_eq!(parse_cpu_quantity("invalid"), 0.0);
+    }
+
+    #[test]
+    fn test_parse_memory_quantity() {
+        assert_eq!(parse_memory_quantity("1Gi"), 1.0);
+        assert_eq!(parse_memory_quantity("1024Mi"), 1.0);
+        assert_eq!(parse_memory_quantity("1048576Ki"), 1.0);
+        assert_eq!(parse_memory_quantity(""), 0.0);
     }
 }
