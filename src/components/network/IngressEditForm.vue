@@ -38,19 +38,26 @@ const defaultBackendServiceName = ref<string>('')
 const defaultBackendServicePort = ref<string>('')
 
 // Rules
-interface IngressRuleRow {
-  host: string
+interface IngressPathRule {
+  id: string
   path: string
   pathType: 'Prefix' | 'Exact' | 'ImplementationSpecific'
   serviceName: string
   servicePort: string
 }
 
+interface IngressRuleGroup {
+  id: string
+  host: string
+  paths: IngressPathRule[]
+}
+
 const pathTypeOptions = ['Prefix', 'Exact', 'ImplementationSpecific']
-const rules = ref<IngressRuleRow[]>([])
+const ruleGroups = ref<IngressRuleGroup[]>([])
 
 // TLS
 interface IngressTlsRow {
+  id: string
   secretName: string
   hosts: string
 }
@@ -98,39 +105,51 @@ const otherIngressRulesMap = computed(() => {
   return map
 })
 
-const getHostError = (host: string, path: string, index: number): string | null => {
+const getHostError = (host: string, groupIndex: number): string | null => {
   const trimmedHost = host.trim()
-  if (!trimmedHost) return null
-  if (!isValidHost(trimmedHost)) {
+  if (trimmedHost && !isValidHost(trimmedHost)) {
     return 'Must be a valid hostname (e.g. example.com or *.example.com).'
   }
   const lowerHost = trimmedHost.toLowerCase()
-  const lowerPath = (path.trim() || '/').toLowerCase()
 
-  // Check duplicate in current rules list with same host AND same path
-  const firstIndex = rules.value.findIndex(
-    (r) =>
-      r.host.trim().toLowerCase() === lowerHost &&
-      (r.path.trim() || '/').toLowerCase() === lowerPath
-  )
-  if (firstIndex !== -1 && firstIndex !== index) {
-    return `Duplicate rule for host "${trimmedHost}" and path "${lowerPath}".`
+  // Check duplicate host across groups (including empty host / catch-all)
+  const firstIndex = ruleGroups.value.findIndex((g) => g.host.trim().toLowerCase() === lowerHost)
+  if (firstIndex !== -1 && firstIndex !== groupIndex) {
+    return trimmedHost
+      ? `Duplicate rule group for host "${trimmedHost}".`
+      : 'Duplicate rule group for catch-all (empty host).'
+  }
+  return null
+}
+
+const getPathError = (
+  host: string,
+  path: string,
+  groupIndex: number,
+  pathIndex: number
+): string | null => {
+  const trimmed = path.trim()
+  if (!trimmed) return null
+  if (!isValidPath(trimmed)) {
+    return 'Path must start with "/" (e.g. / or /api).'
+  }
+  const lowerPath = trimmed.toLowerCase()
+  const lowerHost = host.trim().toLowerCase()
+
+  // Check duplicate in current host group
+  const group = ruleGroups.value[groupIndex]
+  if (group) {
+    const firstIndex = group.paths.findIndex((p) => p.path.trim().toLowerCase() === lowerPath)
+    if (firstIndex !== -1 && firstIndex !== pathIndex) {
+      return `Duplicate path "${lowerPath}" for this host.`
+    }
   }
 
   // Check if (host + path) is already in use by another Ingress in this namespace
   const key = `${lowerHost}:::${lowerPath}`
   const existing = otherIngressRulesMap.value.get(key)
   if (existing) {
-    return `Host "${trimmedHost}" and path "${lowerPath}" is already used by Ingress "${existing.ingressName}".`
-  }
-  return null
-}
-
-const getPathError = (path: string): string | null => {
-  const trimmed = path.trim()
-  if (!trimmed) return null
-  if (!isValidPath(trimmed)) {
-    return 'Path must start with "/" (e.g. / or /api).'
+    return `Host "${host.trim() || '*'}" and path "${lowerPath}" is already used by Ingress "${existing.ingressName}".`
   }
   return null
 }
@@ -158,13 +177,18 @@ const isFormValid = computed(() => {
   if (getServiceNameError(defaultBackendServiceName.value)) return false
   if (getServicePortError(defaultBackendServicePort.value)) return false
 
-  for (let idx = 0; idx < rules.value.length; idx++) {
-    const r = rules.value[idx]
-    if (!r) continue
-    if (getHostError(r.host, r.path, idx)) return false
-    if (getPathError(r.path)) return false
-    if (getServiceNameError(r.serviceName)) return false
-    if (getServicePortError(r.servicePort)) return false
+  for (let gIdx = 0; gIdx < ruleGroups.value.length; gIdx++) {
+    const group = ruleGroups.value[gIdx]
+    if (!group) continue
+    if (getHostError(group.host, gIdx)) return false
+
+    for (let pIdx = 0; pIdx < group.paths.length; pIdx++) {
+      const p = group.paths[pIdx]
+      if (!p) continue
+      if (getPathError(group.host, p.path, gIdx, pIdx)) return false
+      if (getServiceNameError(p.serviceName)) return false
+      if (getServicePortError(p.servicePort)) return false
+    }
   }
 
   for (const tls of tlsConfigs.value) {
@@ -226,16 +250,17 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
 
   // Rules
   const rawRules = Array.isArray(spec.rules) ? (spec.rules as Record<string, unknown>[]) : []
-  const parsedRules: IngressRuleRow[] = []
+  const parsedGroups: IngressRuleGroup[] = []
 
   for (const rule of rawRules) {
     const host = typeof rule.host === 'string' ? rule.host : ''
     const http = (rule.http as Record<string, unknown>) || {}
     const paths = Array.isArray(http.paths) ? (http.paths as Record<string, unknown>[]) : []
+    const parsedPaths: IngressPathRule[] = []
 
     if (paths.length === 0) {
-      parsedRules.push({
-        host,
+      parsedPaths.push({
+        id: crypto.randomUUID(),
         path: '/',
         pathType: 'Prefix',
         serviceName: '',
@@ -246,7 +271,7 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
         const pathStr = typeof p.path === 'string' ? p.path : '/'
         const rawPathType = typeof p.pathType === 'string' ? p.pathType : 'Prefix'
         const pathType = pathTypeOptions.includes(rawPathType)
-          ? (rawPathType as IngressRuleRow['pathType'])
+          ? (rawPathType as IngressPathRule['pathType'])
           : 'Prefix'
 
         const backend = (p.backend as Record<string, unknown>) || {}
@@ -260,8 +285,8 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
               ? portObj.name
               : '80'
 
-        parsedRules.push({
-          host,
+        parsedPaths.push({
+          id: crypto.randomUUID(),
           path: pathStr,
           pathType,
           serviceName,
@@ -269,9 +294,20 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
         })
       }
     }
+
+    const existingGroup = parsedGroups.find((g) => g.host === host)
+    if (existingGroup) {
+      existingGroup.paths.push(...parsedPaths)
+    } else {
+      parsedGroups.push({
+        id: crypto.randomUUID(),
+        host,
+        paths: parsedPaths
+      })
+    }
   }
 
-  rules.value = parsedRules
+  ruleGroups.value = parsedGroups
 
   // TLS
   const rawTls = Array.isArray(spec.tls) ? (spec.tls as Record<string, unknown>[]) : []
@@ -279,6 +315,7 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
     const secretName = typeof t.secretName === 'string' ? t.secretName : ''
     const hostsArr = Array.isArray(t.hosts) ? (t.hosts as string[]) : []
     return {
+      id: crypto.randomUUID(),
       secretName,
       hosts: hostsArr.join(', ')
     }
@@ -336,20 +373,11 @@ const emitUpdate = () => {
   }
 
   // 4. Rules
-  if (rules.value.length > 0) {
-    // Group paths by host
-    const hostMap = new Map<string, IngressRuleRow[]>()
-    for (const r of rules.value) {
-      const h = r.host.trim()
-      if (!hostMap.has(h)) {
-        hostMap.set(h, [])
-      }
-      hostMap.get(h)!.push(r)
-    }
-
+  if (ruleGroups.value.length > 0) {
     const generatedRules: Record<string, unknown>[] = []
-    for (const [host, hostRules] of hostMap.entries()) {
-      const paths = hostRules
+
+    for (const group of ruleGroups.value) {
+      const paths = group.paths
         .filter((r) => r.serviceName.trim() !== '')
         .map((r) => {
           const portVal = r.servicePort
@@ -383,8 +411,8 @@ const emitUpdate = () => {
             paths
           }
         }
-        if (host) {
-          ruleItem.host = host
+        if (group.host.trim()) {
+          ruleItem.host = group.host.trim()
         }
         generatedRules.push(ruleItem)
       }
@@ -437,9 +465,31 @@ const handleFieldChange = () => {
 }
 
 // Rules operations
-const addRuleRow = () => {
-  rules.value.push({
+const addRuleGroup = () => {
+  ruleGroups.value.push({
+    id: crypto.randomUUID(),
     host: '',
+    paths: [
+      {
+        id: crypto.randomUUID(),
+        path: '/',
+        pathType: 'Prefix',
+        serviceName: '',
+        servicePort: '80'
+      }
+    ]
+  })
+  handleFieldChange()
+}
+
+const removeRuleGroup = (index: number) => {
+  ruleGroups.value.splice(index, 1)
+  handleFieldChange()
+}
+
+const addPathToGroup = (groupIndex: number) => {
+  ruleGroups.value[groupIndex]?.paths.push({
+    id: crypto.randomUUID(),
     path: '/',
     pathType: 'Prefix',
     serviceName: '',
@@ -448,14 +498,15 @@ const addRuleRow = () => {
   handleFieldChange()
 }
 
-const removeRuleRow = (index: number) => {
-  rules.value.splice(index, 1)
+const removePathFromGroup = (groupIndex: number, pathIndex: number) => {
+  ruleGroups.value[groupIndex]?.paths.splice(pathIndex, 1)
   handleFieldChange()
 }
 
 // TLS operations
 const addTlsRow = () => {
   tlsConfigs.value.push({
+    id: crypto.randomUUID(),
     secretName: '',
     hosts: ''
   })
@@ -569,22 +620,22 @@ const removeTlsRow = (index: number) => {
                 Routing Rules
               </span>
               <p class="text-xs text-muted-color leading-relaxed">
-                Configure HTTP routing paths mapping incoming domain hosts and URI paths to backend
-                target services.
+                Configure HTTP routing paths grouped by host domains and URI paths to backend target
+                services.
               </p>
             </div>
 
             <div class="md:col-span-8 flex flex-col gap-4">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-medium text-muted-color"
-                  >{{ rules.length }} Rule{{ rules.length === 1 ? '' : 's' }}</span
-                >
+                <span class="text-xs font-medium text-muted-color">
+                  {{ ruleGroups.length }} Host Group{{ ruleGroups.length === 1 ? '' : 's' }}
+                </span>
                 <Button
                   size="small"
                   variant="text"
-                  label="Add Path Rule"
+                  label="Add Host Group"
                   class="text-xs"
-                  @click="addRuleRow"
+                  @click="addRuleGroup"
                 >
                   <template #icon>
                     <Plus class="w-3.5 h-3.5 mr-1" />
@@ -592,26 +643,45 @@ const removeTlsRow = (index: number) => {
                 </Button>
               </div>
 
-              <div v-if="rules.length === 0" class="text-xs text-muted-color italic py-2">
+              <div v-if="ruleGroups.length === 0" class="text-xs text-muted-color italic py-2">
                 No routing rules configured.
               </div>
 
               <div
-                v-for="(rule, idx) in rules"
-                :key="'rule-' + idx"
-                class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3"
+                v-for="(group, gIdx) in ruleGroups"
+                :key="group.id"
+                class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-4"
               >
-                <div class="flex items-center justify-between border-b border-(--border) pb-2">
-                  <span class="text-xs font-semibold text-primary font-mono"
-                    >Rule #{{ idx + 1 }}</span
-                  >
+                <!-- Group Header: Host input + Remove Host Group -->
+                <div class="flex items-start justify-between gap-3 border-b border-(--border) pb-3">
+                  <div class="flex flex-col gap-1 flex-1 max-w-md">
+                    <label class="text-[11px] font-medium text-muted-color">
+                      Host (Empty matches all domain hosts)
+                    </label>
+                    <InputText
+                      v-model="group.host"
+                      placeholder="e.g. app.example.com or *.example.com"
+                      :invalid="Boolean(getHostError(group.host, gIdx))"
+                      size="small"
+                      fluid
+                      class="text-xs"
+                      @input="handleFieldChange"
+                    />
+                    <small
+                      v-if="getHostError(group.host, gIdx)"
+                      class="text-(--danger) text-[11px] leading-tight"
+                    >
+                      {{ getHostError(group.host, gIdx) }}
+                    </small>
+                  </div>
+
                   <Button
                     variant="text"
                     severity="danger"
                     size="small"
-                    class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
-                    aria-label="Remove Rule"
-                    @click="removeRuleRow(idx)"
+                    class="p-1! text-muted-color hover:text-(--danger) cursor-pointer mt-5"
+                    aria-label="Remove Host Group"
+                    @click="removeRuleGroup(gIdx)"
                   >
                     <template #icon>
                       <Trash2 class="w-4 h-4" />
@@ -619,94 +689,119 @@ const removeTlsRow = (index: number) => {
                   </Button>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div class="flex flex-col gap-1">
-                    <label class="text-[11px] font-medium text-muted-color"
-                      >Host (Empty for all)</label
+                <!-- Paths Section within Host Group -->
+                <div class="flex flex-col gap-3">
+                  <div class="flex items-center justify-between">
+                    <span
+                      class="text-[11px] font-semibold tracking-wider text-muted-color uppercase"
                     >
-                    <InputText
-                      v-model="rule.host"
-                      placeholder="e.g. app.example.com"
-                      :invalid="Boolean(getHostError(rule.host, rule.path, idx))"
+                      Paths ({{ group.paths.length }})
+                    </span>
+                    <Button
                       size="small"
-                      fluid
-                      class="text-xs"
-                      @input="handleFieldChange"
-                    />
-                    <small
-                      v-if="getHostError(rule.host, rule.path, idx)"
-                      class="text-(--danger) text-[11px] leading-tight"
+                      variant="text"
+                      label="Add Path"
+                      class="text-[11px] py-1! px-2!"
+                      @click="addPathToGroup(gIdx)"
                     >
-                      {{ getHostError(rule.host, rule.path, idx) }}
-                    </small>
+                      <template #icon>
+                        <Plus class="w-3 h-3 mr-1" />
+                      </template>
+                    </Button>
                   </div>
-                  <div class="flex flex-col gap-1">
-                    <label class="text-[11px] font-medium text-muted-color">Path</label>
-                    <InputText
-                      v-model="rule.path"
-                      placeholder="e.g. / or /api"
-                      :invalid="Boolean(getPathError(rule.path))"
-                      size="small"
-                      fluid
-                      class="text-xs"
-                      @input="handleFieldChange"
-                    />
-                    <small
-                      v-if="getPathError(rule.path)"
-                      class="text-(--danger) text-[11px] leading-tight"
-                    >
-                      {{ getPathError(rule.path) }}
-                    </small>
-                  </div>
-                </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div class="flex flex-col gap-1">
-                    <label class="text-[11px] font-medium text-muted-color">Path Type</label>
-                    <Select
-                      v-model="rule.pathType"
-                      :options="pathTypeOptions"
-                      size="small"
-                      fluid
-                      class="text-xs"
-                      @change="handleFieldChange"
-                    />
+                  <div v-if="group.paths.length === 0" class="text-xs text-muted-color italic py-1">
+                    No paths configured for this host group.
                   </div>
-                  <div class="flex flex-col gap-1">
-                    <label class="text-[11px] font-medium text-muted-color">Service Name</label>
-                    <InputText
-                      v-model="rule.serviceName"
-                      placeholder="e.g. my-service"
-                      :invalid="Boolean(getServiceNameError(rule.serviceName))"
-                      size="small"
-                      fluid
-                      class="text-xs"
-                      @input="handleFieldChange"
-                    />
-                    <small
-                      v-if="getServiceNameError(rule.serviceName)"
-                      class="text-(--danger) text-[11px] leading-tight"
-                    >
-                      {{ getServiceNameError(rule.serviceName) }}
-                    </small>
-                  </div>
-                  <div class="flex flex-col gap-1">
-                    <label class="text-[11px] font-medium text-muted-color">Port</label>
-                    <InputText
-                      v-model="rule.servicePort"
-                      placeholder="e.g. 80 or http"
-                      :invalid="Boolean(getServicePortError(rule.servicePort))"
-                      size="small"
-                      fluid
-                      class="text-xs"
-                      @input="handleFieldChange"
-                    />
-                    <small
-                      v-if="getServicePortError(rule.servicePort)"
-                      class="text-(--danger) text-[11px] leading-tight"
-                    >
-                      {{ getServicePortError(rule.servicePort) }}
-                    </small>
+
+                  <div
+                    v-for="(path, pIdx) in group.paths"
+                    :key="path.id"
+                    class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start p-3 rounded-lg bg-(--bg-hover)/40"
+                  >
+                    <div class="sm:col-span-3 flex flex-col gap-1">
+                      <label class="text-[11px] font-medium text-muted-color">Path</label>
+                      <InputText
+                        v-model="path.path"
+                        placeholder="e.g. / or /api"
+                        :invalid="Boolean(getPathError(group.host, path.path, gIdx, pIdx))"
+                        size="small"
+                        fluid
+                        class="text-xs"
+                        @input="handleFieldChange"
+                      />
+                      <small
+                        v-if="getPathError(group.host, path.path, gIdx, pIdx)"
+                        class="text-(--danger) text-[11px] leading-tight"
+                      >
+                        {{ getPathError(group.host, path.path, gIdx, pIdx) }}
+                      </small>
+                    </div>
+
+                    <div class="sm:col-span-3 flex flex-col gap-1">
+                      <label class="text-[11px] font-medium text-muted-color">Path Type</label>
+                      <Select
+                        v-model="path.pathType"
+                        :options="pathTypeOptions"
+                        size="small"
+                        fluid
+                        class="text-xs"
+                        @change="handleFieldChange"
+                      />
+                    </div>
+
+                    <div class="sm:col-span-3 flex flex-col gap-1">
+                      <label class="text-[11px] font-medium text-muted-color">Service Name</label>
+                      <InputText
+                        v-model="path.serviceName"
+                        placeholder="e.g. my-service"
+                        :invalid="Boolean(getServiceNameError(path.serviceName))"
+                        size="small"
+                        fluid
+                        class="text-xs"
+                        @input="handleFieldChange"
+                      />
+                      <small
+                        v-if="getServiceNameError(path.serviceName)"
+                        class="text-(--danger) text-[11px] leading-tight"
+                      >
+                        {{ getServiceNameError(path.serviceName) }}
+                      </small>
+                    </div>
+
+                    <div class="sm:col-span-2 flex flex-col gap-1">
+                      <label class="text-[11px] font-medium text-muted-color">Port</label>
+                      <InputText
+                        v-model="path.servicePort"
+                        placeholder="e.g. 80 or http"
+                        :invalid="Boolean(getServicePortError(path.servicePort))"
+                        size="small"
+                        fluid
+                        class="text-xs"
+                        @input="handleFieldChange"
+                      />
+                      <small
+                        v-if="getServicePortError(path.servicePort)"
+                        class="text-(--danger) text-[11px] leading-tight"
+                      >
+                        {{ getServicePortError(path.servicePort) }}
+                      </small>
+                    </div>
+
+                    <div class="sm:col-span-1 flex items-center justify-end sm:pt-6">
+                      <Button
+                        variant="text"
+                        severity="danger"
+                        size="small"
+                        class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
+                        aria-label="Remove Path"
+                        @click="removePathFromGroup(gIdx, pIdx)"
+                      >
+                        <template #icon>
+                          <Trash2 class="w-4 h-4" />
+                        </template>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -752,7 +847,7 @@ const removeTlsRow = (index: number) => {
 
               <div
                 v-for="(tls, idx) in tlsConfigs"
-                :key="'tls-' + idx"
+                :key="tls.id"
                 class="flex flex-col gap-3 p-3.5 rounded bg-(--bg-hover)/40"
               >
                 <div class="flex items-center justify-between">
@@ -761,7 +856,7 @@ const removeTlsRow = (index: number) => {
                     variant="text"
                     severity="danger"
                     size="small"
-                    class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
+                    class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
                     aria-label="Remove TLS"
                     @click="removeTlsRow(idx)"
                   >
