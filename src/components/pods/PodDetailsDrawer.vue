@@ -10,8 +10,8 @@ import { OrbitEvents } from '@/types/events'
 import type { PodInfo } from '@/types/kubernetes'
 import { Activity, FileCode, Server, Shield, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
+import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
-import Drawer from 'primevue/drawer'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
@@ -157,48 +157,28 @@ const viewPodLogs = (containerName?: string) => {
 </script>
 
 <template>
-  <Drawer
+  <BaseResourceDrawer
     :visible="visible"
-    position="right"
-    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
-    :dismissable="true"
+    :has-resource="!!pod"
+    :title="pod?.name ?? ''"
+    kind="Pod"
+    kind-severity="info"
+    :status-badge-class="getStatusBadgeClass(podStatus)"
+    :namespace="pod?.namespace"
     @update:visible="(val) => emit('update:visible', val)"
   >
-    <template #header>
-      <div v-if="pod" class="flex items-center justify-between w-full pr-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <span
-            class="w-3 h-3 rounded-full shrink-0 animate-pulse"
-            :class="getStatusBadgeClass(podStatus)"
-          ></span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h3
-                class="text-base font-bold text-primary font-mono truncate max-w-70"
-                :title="pod.name"
-              >
-                {{ pod.name }}
-              </h3>
-              <Tag rounded severity="info" class="font-mono" value="Pod" />
-            </div>
-            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
-              <span>ns: {{ pod.namespace }}</span>
-            </div>
-          </div>
-        </div>
-
-        <Button
-          severity="secondary"
-          size="small"
-          variant="outlined"
-          class="text-xs flex items-center gap-1.5"
-          title="View Pod Logs"
-          @click="viewPodLogs()"
-        >
-          <Terminal class="w-3.5 h-3.5" />
-          <span>Logs</span>
-        </Button>
-      </div>
+    <template #actions>
+      <Button
+        severity="secondary"
+        size="small"
+        variant="outlined"
+        class="text-xs flex items-center gap-1.5"
+        title="View Pod Logs"
+        @click="viewPodLogs()"
+      >
+        <Terminal class="w-3.5 h-3.5" />
+        <span>Logs</span>
+      </Button>
     </template>
 
     <div v-if="pod" class="flex flex-col h-full">
@@ -246,5 +226,5 @@ const viewPodLogs = (containerName?: string) => {
         </TabPanels>
       </Tabs>
     </div>
-  </Drawer>
+  </BaseResourceDrawer>
 </template>

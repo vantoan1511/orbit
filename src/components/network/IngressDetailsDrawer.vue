@@ -8,14 +8,15 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import type { IngressInfo } from '@/types/kubernetes'
-import { Activity, Clock, FileCode, Globe, Network, Server } from '@lucide/vue'
+import { Activity, FileCode, Globe, Network, Server } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
-import Drawer from 'primevue/drawer'
+import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Tab from 'primevue/tab'
 import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
+import Tag from 'primevue/tag'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import * as yaml from 'yaml'
 
@@ -192,45 +193,26 @@ const copyYaml = async () => {
 </script>
 
 <template>
-  <Drawer
+  <BaseResourceDrawer
     :visible="props.visible"
-    position="right"
-    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
-    :dismissable="true"
+    :has-resource="!!props.ingress"
+    :title="props.ingress?.name ?? ''"
+    kind="Ingress"
+    kind-severity="info"
+    status-badge-class="bg-emerald-500"
+    :namespace="props.ingress?.namespace"
+    :age="props.ingress?.age"
     @update:visible="emit('update:visible', $event)"
   >
-    <template #header>
-      <div v-if="props.ingress" class="flex items-center justify-between w-full pr-4">
-        <div class="flex items-center gap-3 min-w-0">
-          <span class="w-3 h-3 rounded-full shrink-0 animate-pulse bg-emerald-500"></span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2">
-              <h3
-                class="text-base font-bold text-primary font-mono truncate max-w-70"
-                :title="props.ingress.name"
-              >
-                {{ props.ingress.name }}
-              </h3>
-              <Tag rounded severity="info" class="font-mono" value="Ingress" />
-              <Tag
-                v-if="props.ingress.className"
-                rounded
-                severity="secondary"
-                class="font-mono"
-                :value="props.ingress.className"
-              />
-            </div>
-            <div class="flex items-center gap-2 text-xs text-muted-color font-mono mt-0.5">
-              <span>ns: {{ props.ingress.namespace }}</span>
-              <span class="text-muted-color/60">•</span>
-              <span class="flex items-center gap-1">
-                <Clock class="w-3 h-3" />
-                <ReactiveAge :age="props.ingress.age" />
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+    <template #tags>
+      <Tag rounded severity="info" class="font-mono" value="Ingress" />
+      <Tag
+        v-if="props.ingress?.className"
+        rounded
+        severity="secondary"
+        class="font-mono"
+        :value="props.ingress.className"
+      />
     </template>
 
     <div v-if="props.ingress" class="flex flex-col h-full">
@@ -402,5 +384,5 @@ const copyYaml = async () => {
         </TabPanels>
       </Tabs>
     </div>
-  </Drawer>
+  </BaseResourceDrawer>
 </template>
