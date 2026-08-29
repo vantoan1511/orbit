@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useNotificationStore } from '@/stores/notificationStore'
-import type { NotificationSeverity } from '@/types/notification'
+import type { NotificationItem, NotificationSeverity } from '@/types/notification'
 import {
   AlertTriangle,
   BellOff,
   Check,
   CheckCheck,
   CircleCheck,
+  Copy,
   Info,
   Trash2,
   X,
@@ -23,6 +24,20 @@ import { computed, ref } from 'vue'
 
 const notificationStore = useNotificationStore()
 const activeTab = ref('all')
+const copiedMap = ref<Record<string, boolean>>({})
+
+const copyNotification = async (item: NotificationItem) => {
+  try {
+    const text = `${item.title}\n${item.message}`
+    await navigator.clipboard.writeText(text)
+    copiedMap.value[item.id] = true
+    setTimeout(() => {
+      copiedMap.value[item.id] = false
+    }, 1500)
+  } catch (err) {
+    console.error('Failed to copy notification to clipboard:', err)
+  }
+}
 
 const filteredNotifications = computed(() => {
   if (activeTab.value === 'unread') {
@@ -185,6 +200,18 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
+                        class="w-5! h-5! p-0! text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
+                        :class="{ 'opacity-100! text-emerald-500!': copiedMap[item.id] }"
+                        :title="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
+                        @click.stop="copyNotification(item)"
+                      >
+                        <Check v-if="copiedMap[item.id]" class="w-3 h-3 text-emerald-500" />
+                        <Copy v-else class="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant="text"
+                        rounded
+                        size="small"
                         class="w-5! h-5! p-0! text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
                         @click.stop="notificationStore.removeNotification(item.id)"
                       >
@@ -245,6 +272,18 @@ const formatRelativeTime = (timestamp: number): string => {
                       <span class="text-[10px] font-medium text-muted-color">
                         {{ formatRelativeTime(item.timestamp) }}
                       </span>
+                      <Button
+                        variant="text"
+                        rounded
+                        size="small"
+                        class="w-5! h-5! p-0! text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
+                        :class="{ 'opacity-100! text-emerald-500!': copiedMap[item.id] }"
+                        :title="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
+                        @click.stop="copyNotification(item)"
+                      >
+                        <Check v-if="copiedMap[item.id]" class="w-3 h-3 text-emerald-500" />
+                        <Copy v-else class="w-3 h-3" />
+                      </Button>
                       <Button
                         variant="text"
                         rounded
