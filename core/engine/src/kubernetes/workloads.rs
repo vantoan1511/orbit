@@ -146,6 +146,21 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
         }
     }
 
+    let conditions = if let Some(conds) = status_replicas.and_then(|st| st.conditions.as_ref()) {
+        conds
+            .iter()
+            .map(|c| models::ResourceCondition {
+                r#type: c.type_.clone(),
+                status: c.status.clone(),
+                reason: c.reason.clone(),
+                message: c.message.clone(),
+                last_transition_time: c.last_transition_time.as_ref().map(|t| t.0.to_rfc3339()),
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     let mut images = Vec::new();
     let mut containers = Vec::new();
     if let Some(spec) = d.spec.as_ref() {
@@ -174,6 +189,7 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
         name,
         namespace: namespace_name,
         status,
+        conditions,
         replicas,
         available,
         up_to_date,
@@ -888,6 +904,49 @@ mod tests {
         let labels = template.metadata.unwrap().labels.unwrap();
         assert_eq!(labels.get("app").map(|s| s.as_str()), Some("web"));
         assert!(!labels.contains_key("pod-template-hash"));
+    }
+
+    #[test]
+    fn test_map_deployment_conditions() {
+        use k8s_openapi::api::apps::v1::{DeploymentStatus, DeploymentCondition};
+
+        let dep = Deployment {
+            metadata: ObjectMeta {
+                name: Some("test-deploy".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            status: Some(DeploymentStatus {
+                conditions: Some(vec![
+                    DeploymentCondition {
+                        type_: "Available".to_string(),
+                        status: "True".to_string(),
+                        reason: Some("MinimumReplicasAvailable".to_string()),
+                        message: Some("Deployment has minimum availability.".to_string()),
+                        last_transition_time: None,
+                        last_update_time: None,
+                    },
+                    DeploymentCondition {
+                        type_: "Progressing".to_string(),
+                        status: "True".to_string(),
+                        reason: Some("NewReplicaSetAvailable".to_string()),
+                        message: Some("ReplicaSet is progressing.".to_string()),
+                        last_transition_time: None,
+                        last_update_time: None,
+                    },
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_deployment(&dep);
+        assert_eq!(mapped.name, "test-deploy");
+        assert_eq!(mapped.conditions.len(), 2);
+        assert_eq!(mapped.conditions[0].r#type, "Available");
+        assert_eq!(mapped.conditions[0].status, "True");
+        assert_eq!(mapped.conditions[0].reason.as_deref(), Some("MinimumReplicasAvailable"));
+        assert_eq!(mapped.conditions[1].r#type, "Progressing");
     }
 }
 

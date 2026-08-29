@@ -2,7 +2,7 @@
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { ContainerImageInfo, DeploymentInfo } from '@/types/kubernetes'
+import type { ContainerImageInfo, DeploymentInfo, ResourceCondition } from '@/types/kubernetes'
 import { Pencil } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -35,6 +35,7 @@ const deployments = computed(() => {
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
   { field: 'status', header: 'Status', visible: true },
+  { field: 'conditions', header: 'Conditions', visible: true },
   { field: 'replicas', header: 'Replicas', visible: true },
   { field: 'available', header: 'Available', visible: true },
   { field: 'upToDate', header: 'Up-To-Date', visible: true },
@@ -44,6 +45,37 @@ const columns = [
 ]
 
 const statuses = ['All Statuses', 'Running', 'Progressing', 'Failed']
+
+const CONDITION_ORDER: Record<string, number> = {
+  Available: 1,
+  Progressing: 2,
+  ReplicaFailure: 3
+}
+
+const getOrderedConditions = (conditions?: ResourceCondition[]) => {
+  if (!conditions || conditions.length === 0) return []
+  return [...conditions]
+    .filter((c) => c.status === 'True')
+    .sort((a, b) => {
+      const orderA = CONDITION_ORDER[a.type] ?? 99
+      const orderB = CONDITION_ORDER[b.type] ?? 99
+      if (orderA !== orderB) return orderA - orderB
+      return a.type.localeCompare(b.type)
+    })
+}
+
+const getConditionSeverity = (type: string) => {
+  switch (type) {
+    case 'ReplicaFailure':
+      return 'danger'
+    case 'Available':
+      return 'success'
+    case 'Progressing':
+      return 'info'
+    default:
+      return 'secondary'
+  }
+}
 
 const fetchDeployments = async () => {
   loading.value = true
@@ -138,6 +170,25 @@ const saveImages = async () => {
     @refresh="fetchDeployments"
   >
     <template #default="{ visibleCols }">
+      <!-- Conditions Column -->
+      <Column v-if="visibleCols['conditions']" header="Conditions" class="p-3">
+        <template #body="{ data }">
+          <div class="flex flex-wrap gap-1">
+            <template v-if="getOrderedConditions(data.conditions).length > 0">
+              <Tag
+                v-for="cond in getOrderedConditions(data.conditions)"
+                :key="cond.type"
+                :value="cond.type"
+                :severity="getConditionSeverity(cond.type)"
+                class="font-mono text-xs"
+                v-tooltip.top="cond.message || cond.reason || cond.type"
+              />
+            </template>
+            <span v-else class="text-muted-color">-</span>
+          </div>
+        </template>
+      </Column>
+
       <!-- Replicas Column -->
       <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
         <template #body="{ data }">
