@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { ServiceInfo } from '@/types/kubernetes'
@@ -212,6 +213,13 @@ const getTypeSeverity = (type: string) => {
                   </div>
                 </div>
               </div>
+
+              <!-- Active Port Forwards -->
+              <ActivePortForwardsList
+                kind="Service"
+                :namespace="props.service.namespace"
+                :name="props.service.name"
+              />
 
               <!-- Selector Section -->
               <div class="space-y-3">

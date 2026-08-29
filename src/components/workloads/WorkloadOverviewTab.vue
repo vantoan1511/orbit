@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import ReplicasProgressBar from '@/components/shared/ReplicasProgressBar.vue'
@@ -305,6 +306,13 @@ const formatEnvValue = (e: ContainerEnvItem): string => {
         </div>
       </div>
     </div>
+
+    <!-- Active Port Forwards -->
+    <ActivePortForwardsList
+      :kind="workloadKind"
+      :namespace="workloadNamespace"
+      :name="workload?.name || ''"
+    />
 
     <!-- Pod Selectors -->
     <KeyValueBadgeList
