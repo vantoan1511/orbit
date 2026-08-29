@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import type { PodInfo } from '@/types/kubernetes'
@@ -95,6 +96,9 @@ defineProps<{
         </div>
       </div>
     </div>
+
+    <!-- Active Port Forwards -->
+    <ActivePortForwardsList kind="Pod" :namespace="pod.namespace" :name="pod.name" />
 
     <!-- Container Images -->
     <div v-if="pod.images && pod.images.length > 0">
