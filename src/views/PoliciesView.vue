@@ -1,68 +1,67 @@
 <script setup lang="ts">
-import ViewLayout from '@/components/shared/ViewLayout.vue'
-import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
-import Tabs from 'primevue/tabs'
-import { ref } from 'vue'
-
+import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
 import PoliciesDataTable from '../components/policies/PoliciesDataTable.vue'
 import PoliciesMetricsCards from '../components/policies/PoliciesMetricsCards.vue'
 
-const activeTab = ref('overview')
+const tabs: ResourceTab[] = [
+  { id: 'overview' },
+  { id: 'network' },
+  { id: 'pod-security' },
+  { id: 'resource' },
+  { id: 'rbac' },
+  { id: 'admission' }
+]
 </script>
 
 <template>
-  <ViewLayout title="Policies">
-    <!-- Tabs Navigation -->
-    <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
-      <TabPanels>
-        <!-- Overview Tab -->
-        <TabPanel value="overview" class="flex flex-col gap-6">
-          <PoliciesMetricsCards />
-          <PoliciesDataTable />
-        </TabPanel>
+  <ResourceTabsLayout title="Policies" default-tab="overview" :tabs="tabs">
+    <!-- Overview Tab -->
+    <template #tab-overview>
+      <div class="flex flex-col gap-6">
+        <PoliciesMetricsCards />
+        <PoliciesDataTable />
+      </div>
+    </template>
 
-        <!-- Other Tabs (Placeholder logic) -->
-        <TabPanel value="network">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            Network Policies specific view coming soon.
-          </div>
-        </TabPanel>
+    <!-- Other Tabs (Placeholder logic) -->
+    <template #tab-network>
+      <div
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+      >
+        Network Policies specific view coming soon.
+      </div>
+    </template>
 
-        <TabPanel value="pod-security">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            Pod Security specific view coming soon.
-          </div>
-        </TabPanel>
+    <template #tab-pod-security>
+      <div
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+      >
+        Pod Security specific view coming soon.
+      </div>
+    </template>
 
-        <TabPanel value="resource">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            Resource Policies specific view coming soon.
-          </div>
-        </TabPanel>
+    <template #tab-resource>
+      <div
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+      >
+        Resource Policies specific view coming soon.
+      </div>
+    </template>
 
-        <TabPanel value="rbac">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            RBAC specific view coming soon.
-          </div>
-        </TabPanel>
+    <template #tab-rbac>
+      <div
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+      >
+        RBAC specific view coming soon.
+      </div>
+    </template>
 
-        <TabPanel value="admission">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            Admission Policies specific view coming soon.
-          </div>
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
-  </ViewLayout>
+    <template #tab-admission>
+      <div
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+      >
+        Admission Policies specific view coming soon.
+      </div>
+    </template>
+  </ResourceTabsLayout>
 </template>

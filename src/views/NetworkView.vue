@@ -1,44 +1,43 @@
 <script setup lang="ts">
-import ViewLayout from '@/components/shared/ViewLayout.vue'
-import { ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
+import { useDialog } from 'primevue/usedialog'
+import CreateIngressDialog from '@/components/network/CreateIngressDialog.vue'
 import IngressesTable from '../components/network/IngressesTable.vue'
 import ServicesTable from '../components/network/ServicesTable.vue'
 
-const route = useRoute()
-const activeTab = ref((route.query.tab as string) || 'services')
-const visitedTabs = ref(new Set([activeTab.value]))
+const dialog = useDialog()
 
-watch(
-  () => route.query.tab,
-  (newTab) => {
-    if (newTab && typeof newTab === 'string') {
-      activeTab.value = newTab
-      visitedTabs.value.add(newTab)
+const openCreateIngressDialog = () => {
+  dialog.open(CreateIngressDialog, {
+    props: {
+      header: 'Create Ingress',
+      style: {
+        width: '420px'
+      },
+      modal: true
     }
-  },
-  { immediate: true }
-)
+  })
+}
 
-watch(activeTab, (newTab) => {
-  visitedTabs.value.add(newTab)
-})
+const tabs: ResourceTab[] = [
+  { id: 'services' },
+  {
+    id: 'ingresses',
+    createAction: { handler: openCreateIngressDialog }
+  }
+]
 </script>
 
 <template>
-  <ViewLayout title="Network">
-    <Tabs v-model:value="activeTab">
-      <TabPanels>
-        <!-- Services Tab -->
-        <TabPanel value="services">
-          <ServicesTable v-if="visitedTabs.has('services')" />
-        </TabPanel>
+  <ResourceTabsLayout title="Network" default-tab="services" :tabs="tabs">
+    <!-- Services Tab -->
+    <template #tab-services>
+      <ServicesTable />
+    </template>
 
-        <!-- Ingresses Tab -->
-        <TabPanel value="ingresses">
-          <IngressesTable v-if="visitedTabs.has('ingresses')" />
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
-  </ViewLayout>
+    <!-- Ingresses Tab -->
+    <template #tab-ingresses>
+      <IngressesTable />
+    </template>
+  </ResourceTabsLayout>
 </template>

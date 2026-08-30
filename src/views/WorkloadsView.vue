@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import ViewLayout from '@/components/shared/ViewLayout.vue'
-import { ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import Button from 'primevue/button'
+import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
 import { useDialog } from 'primevue/usedialog'
 import CreateDeploymentDialog from '@/components/workloads/CreateDeploymentDialog.vue'
 import CronJobsTable from '@/components/workloads/CronJobsTable.vue'
@@ -15,25 +12,7 @@ import ReplicaSetsTable from '@/components/workloads/ReplicaSetsTable.vue'
 import StatefulSetsTable from '@/components/workloads/StatefulSetsTable.vue'
 import WorkloadMetricsCards from '@/components/workloads/WorkloadMetricsCards.vue'
 
-const route = useRoute()
 const dialog = useDialog()
-const activeTab = ref((route.query.tab as string) || 'deployments')
-const visitedTabs = ref(new Set([activeTab.value]))
-
-watch(
-  () => route.query.tab,
-  (newTab) => {
-    if (newTab && typeof newTab === 'string') {
-      activeTab.value = newTab
-      visitedTabs.value.add(newTab)
-    }
-  },
-  { immediate: true }
-)
-
-watch(activeTab, (newTab) => {
-  visitedTabs.value.add(newTab)
-})
 
 const openCreateDeploymentDialog = () => {
   dialog.open(CreateDeploymentDialog, {
@@ -46,64 +25,65 @@ const openCreateDeploymentDialog = () => {
     }
   })
 }
+
+const tabs: ResourceTab[] = [
+  { id: 'overview' },
+  { id: 'pods' },
+  {
+    id: 'deployments',
+    createAction: { handler: openCreateDeploymentDialog }
+  },
+  { id: 'statefulsets' },
+  { id: 'daemonsets' },
+  { id: 'replicasets' },
+  { id: 'jobs' },
+  { id: 'cronjobs' }
+]
 </script>
 
 <template>
-  <ViewLayout title="Workloads">
-    <template #actions>
-      <Button
-        v-if="activeTab === 'deployments'"
-        label="Create"
-        icon="pi pi-plus"
-        size="small"
-        @click="openCreateDeploymentDialog"
-      />
+  <ResourceTabsLayout title="Workloads" default-tab="deployments" :tabs="tabs">
+    <!-- Overview Tab -->
+    <template #tab-overview>
+      <WorkloadMetricsCards />
     </template>
-    <Tabs v-model:value="activeTab">
-      <TabPanels>
-        <!-- Overview Tab -->
-        <TabPanel value="overview">
-          <WorkloadMetricsCards v-if="visitedTabs.has('overview')" />
-        </TabPanel>
 
-        <!-- Pods Tab -->
-        <TabPanel value="pods">
-          <div v-if="visitedTabs.has('pods')" class="flex flex-col gap-6">
-            <PodMetricsCards />
-            <PodsDataTable />
-          </div>
-        </TabPanel>
+    <!-- Pods Tab -->
+    <template #tab-pods>
+      <div class="flex flex-col gap-6">
+        <PodMetricsCards />
+        <PodsDataTable />
+      </div>
+    </template>
 
-        <!-- Deployments Tab -->
-        <TabPanel value="deployments">
-          <DeploymentsTable v-if="visitedTabs.has('deployments')" />
-        </TabPanel>
+    <!-- Deployments Tab -->
+    <template #tab-deployments>
+      <DeploymentsTable />
+    </template>
 
-        <!-- StatefulSets Tab -->
-        <TabPanel value="statefulsets">
-          <StatefulSetsTable v-if="visitedTabs.has('statefulsets')" />
-        </TabPanel>
+    <!-- StatefulSets Tab -->
+    <template #tab-statefulsets>
+      <StatefulSetsTable />
+    </template>
 
-        <!-- DaemonSets Tab -->
-        <TabPanel value="daemonsets">
-          <DaemonSetsTable v-if="visitedTabs.has('daemonsets')" />
-        </TabPanel>
+    <!-- DaemonSets Tab -->
+    <template #tab-daemonsets>
+      <DaemonSetsTable />
+    </template>
 
-        <!-- ReplicaSets Tab -->
-        <TabPanel value="replicasets">
-          <ReplicaSetsTable v-if="visitedTabs.has('replicasets')" />
-        </TabPanel>
+    <!-- ReplicaSets Tab -->
+    <template #tab-replicasets>
+      <ReplicaSetsTable />
+    </template>
 
-        <!-- Jobs Tab -->
-        <TabPanel value="jobs">
-          <JobsTable v-if="visitedTabs.has('jobs')" />
-        </TabPanel>
+    <!-- Jobs Tab -->
+    <template #tab-jobs>
+      <JobsTable />
+    </template>
 
-        <!-- CronJobs Tab -->
-        <TabPanel value="cronjobs">
-          <CronJobsTable v-if="visitedTabs.has('cronjobs')" />
-        </TabPanel>
-      </TabPanels>
-    </Tabs>
-  </ViewLayout>
+    <!-- CronJobs Tab -->
+    <template #tab-cronjobs>
+      <CronJobsTable />
+    </template>
+  </ResourceTabsLayout>
 </template>
