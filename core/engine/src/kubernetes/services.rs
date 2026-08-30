@@ -55,32 +55,21 @@ pub fn map_service(s: &Service) -> models::ServiceInfo {
 
     // Ports formatting and parsing
     let mut ports_str = Vec::new();
-    let mut ports_list = Vec::new();
-    if let Some(ports) = spec.and_then(|sp| sp.ports.as_ref()) {
-        for p in ports {
-            let port_val = p.port;
-            let target_port_val = p.target_port.as_ref()
-                .map(|tp| match tp {
-                    k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(i) => i.to_string(),
-                    k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String(s) => s.clone(),
-                })
-                .unwrap_or_else(|| port_val.to_string());
-            let protocol = p.protocol.clone().unwrap_or_else(|| "TCP".to_string());
-            let node_port = p.node_port;
+    let ports_list = spec
+        .and_then(|sp| sp.ports.as_ref())
+        .cloned()
+        .unwrap_or_default();
 
-            let mut p_str = format!("{}/{}", port_val, protocol);
-            if let Some(np) = node_port {
-                p_str = format!("{}:{}/{}", port_val, np, protocol);
-            }
-            ports_str.push(p_str);
+    for p in &ports_list {
+        let port_val = p.port;
+        let protocol = p.protocol.as_deref().unwrap_or("TCP");
+        let node_port = p.node_port;
 
-            ports_list.push(models::ServicePort {
-                port: port_val,
-                target_port: target_port_val,
-                protocol,
-                node_port,
-            });
+        let mut p_str = format!("{}/{}", port_val, protocol);
+        if let Some(np) = node_port {
+            p_str = format!("{}:{}/{}", port_val, np, protocol);
         }
+        ports_str.push(p_str);
     }
     let ports = if ports_str.is_empty() { "-".to_string() } else { ports_str.join("\n") };
 

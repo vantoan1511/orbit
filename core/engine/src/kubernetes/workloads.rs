@@ -146,20 +146,9 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
         }
     }
 
-    let conditions = if let Some(conds) = status_replicas.and_then(|st| st.conditions.as_ref()) {
-        conds
-            .iter()
-            .map(|c| models::ResourceCondition {
-                r#type: c.type_.clone(),
-                status: c.status.clone(),
-                reason: c.reason.clone(),
-                message: c.message.clone(),
-                last_transition_time: c.last_transition_time.as_ref().map(|t| t.0.to_rfc3339()),
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let conditions = status_replicas
+        .and_then(|st| st.conditions.as_ref())
+        .cloned();
 
     let mut images = Vec::new();
     let mut containers = Vec::new();

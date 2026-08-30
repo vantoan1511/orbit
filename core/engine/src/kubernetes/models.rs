@@ -1,3 +1,5 @@
+use k8s_openapi::api::apps::v1::DeploymentCondition;
+use k8s_openapi::api::core::v1::{NodeAddress, NodeCondition, NodeSystemInfo, ServicePort, Taint};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -80,21 +82,11 @@ pub struct ContainerImageInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ResourceCondition {
-    pub r#type: String,
-    pub status: String,
-    pub reason: Option<String>,
-    pub message: Option<String>,
-    pub last_transition_time: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct DeploymentInfo {
     pub name: String,
     pub namespace: String,
     pub status: String,
-    pub conditions: Vec<ResourceCondition>,
+    pub conditions: Option<Vec<DeploymentCondition>>,
     pub replicas: Replicas,
     pub available: i32,
     pub up_to_date: i32,
@@ -178,48 +170,6 @@ pub struct CronJobInfo {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct NodeSystemInfo {
-    pub machine_id: String,
-    pub system_uuid: String,
-    pub boot_id: String,
-    pub kernel_version: String,
-    pub os_image: String,
-    pub container_runtime_version: String,
-    pub kubelet_version: String,
-    pub kube_proxy_version: String,
-    pub operating_system: String,
-    pub architecture: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct NodeAddress {
-    pub r#type: String,
-    pub address: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct NodeCondition {
-    pub r#type: String,
-    pub status: String,
-    pub reason: Option<String>,
-    pub message: Option<String>,
-    pub last_transition_time: Option<String>,
-    pub last_heartbeat_time: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct NodeTaint {
-    pub key: String,
-    pub value: Option<String>,
-    pub effect: String,
-    pub time_added: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
 pub struct NodeResources {
     pub cpu: String,
     pub memory: String,
@@ -251,19 +201,10 @@ pub struct NodeInfo {
     pub node_info: Option<NodeSystemInfo>,
     pub addresses: Vec<NodeAddress>,
     pub conditions: Vec<NodeCondition>,
-    pub taints: Vec<NodeTaint>,
+    pub taints: Vec<Taint>,
     pub capacity: Option<NodeResources>,
     pub allocatable: Option<NodeResources>,
     pub images_count: usize,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct ServicePort {
-    pub port: i32,
-    pub target_port: String,
-    pub protocol: String,
-    pub node_port: Option<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
