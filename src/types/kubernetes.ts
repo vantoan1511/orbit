@@ -1,6 +1,19 @@
-import type { DaemonSet, Deployment, ReplicaSet, StatefulSet } from 'kubernetes-types/apps/v1'
+import type {
+  DaemonSet,
+  Deployment,
+  DeploymentCondition,
+  ReplicaSet,
+  StatefulSet
+} from 'kubernetes-types/apps/v1'
 import type { CronJob, Job } from 'kubernetes-types/batch/v1'
-import type { Pod } from 'kubernetes-types/core/v1'
+import type {
+  NodeAddress,
+  NodeCondition,
+  NodeSystemInfo,
+  Pod,
+  ServicePort,
+  Taint
+} from 'kubernetes-types/core/v1'
 import type { ObjectMeta } from 'kubernetes-types/meta/v1'
 
 export interface KubernetesResource {
@@ -76,19 +89,11 @@ export interface ContainerImageInfo {
   image: string
 }
 
-export interface ResourceCondition {
-  type: string
-  status: string
-  reason?: string
-  message?: string
-  lastTransitionTime?: string
-}
-
 export interface DeploymentInfo {
   name: string
   namespace: string
   status: string
-  conditions?: ResourceCondition[]
+  conditions?: DeploymentCondition[]
   replicas: Replicas
   available: number
   upToDate: number
@@ -163,40 +168,6 @@ export interface CronJobInfo {
 export type WorkloadInfo =
   DeploymentInfo | StatefulSetInfo | DaemonSetInfo | ReplicaSetInfo | JobInfo | CronJobInfo
 
-export interface NodeSystemInfo {
-  machineId: string
-  systemUuid: string
-  bootId: string
-  kernelVersion: string
-  osImage: string
-  containerRuntimeVersion: string
-  kubeletVersion: string
-  kubeProxyVersion: string
-  operatingSystem: string
-  architecture: string
-}
-
-export interface NodeAddress {
-  type: string
-  address: string
-}
-
-export interface NodeCondition {
-  type: string
-  status: string
-  reason?: string
-  message?: string
-  lastTransitionTime?: string
-  lastHeartbeatTime?: string
-}
-
-export interface NodeTaint {
-  key: string
-  value?: string
-  effect: string
-  timeAdded?: string
-}
-
 export interface NodeResources {
   cpu: string
   memory: string
@@ -226,17 +197,10 @@ export interface NodeInfo {
   nodeInfo?: NodeSystemInfo
   addresses?: NodeAddress[]
   conditions?: NodeCondition[]
-  taints?: NodeTaint[]
+  taints?: Taint[]
   capacity?: NodeResources
   allocatable?: NodeResources
   imagesCount?: number
-}
-
-export interface ServicePort {
-  port: number
-  targetPort: number | string
-  protocol: string
-  nodePort?: number
 }
 
 export interface ServiceEvent {

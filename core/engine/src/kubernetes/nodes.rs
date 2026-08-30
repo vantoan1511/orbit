@@ -149,53 +149,21 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
 
         let system_info = node.status.as_ref()
             .and_then(|s| s.node_info.as_ref())
-            .map(|ni| models::NodeSystemInfo {
-                machine_id: ni.machine_id.clone(),
-                system_uuid: ni.system_uuid.clone(),
-                boot_id: ni.boot_id.clone(),
-                kernel_version: ni.kernel_version.clone(),
-                os_image: ni.os_image.clone(),
-                container_runtime_version: ni.container_runtime_version.clone(),
-                kubelet_version: ni.kubelet_version.clone(),
-                kube_proxy_version: ni.kube_proxy_version.clone(),
-                operating_system: ni.operating_system.clone(),
-                architecture: ni.architecture.clone(),
-            });
+            .cloned();
 
         let addresses = node.status.as_ref()
             .and_then(|s| s.addresses.as_ref())
-            .map(|addrs| {
-                addrs.iter().map(|a| models::NodeAddress {
-                    r#type: a.type_.clone(),
-                    address: a.address.clone(),
-                }).collect()
-            })
+            .cloned()
             .unwrap_or_default();
 
         let conditions = node.status.as_ref()
             .and_then(|s| s.conditions.as_ref())
-            .map(|conds| {
-                conds.iter().map(|c| models::NodeCondition {
-                    r#type: c.type_.clone(),
-                    status: c.status.clone(),
-                    reason: c.reason.clone(),
-                    message: c.message.clone(),
-                    last_transition_time: c.last_transition_time.as_ref().map(|t| t.0.to_rfc3339()),
-                    last_heartbeat_time: c.last_heartbeat_time.as_ref().map(|t| t.0.to_rfc3339()),
-                }).collect()
-            })
+            .cloned()
             .unwrap_or_default();
 
         let taints = node.spec.as_ref()
             .and_then(|s| s.taints.as_ref())
-            .map(|ts| {
-                ts.iter().map(|t| models::NodeTaint {
-                    key: t.key.clone(),
-                    value: t.value.clone(),
-                    effect: t.effect.clone(),
-                    time_added: t.time_added.as_ref().map(|time| time.0.to_rfc3339()),
-                }).collect()
-            })
+            .cloned()
             .unwrap_or_default();
 
         let capacity = node.status.as_ref()

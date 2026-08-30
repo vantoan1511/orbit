@@ -2,7 +2,8 @@
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { ContainerImageInfo, DeploymentInfo, ResourceCondition } from '@/types/kubernetes'
+import type { ContainerImageInfo, DeploymentInfo } from '@/types/kubernetes'
+import type { DeploymentCondition } from 'kubernetes-types/apps/v1'
 import { Pencil } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -52,7 +53,7 @@ const CONDITION_ORDER: Record<string, number> = {
   ReplicaFailure: 3
 }
 
-const getOrderedConditions = (conditions?: ResourceCondition[]) => {
+const getOrderedConditions = (conditions?: DeploymentCondition[]) => {
   if (!conditions || conditions.length === 0) return []
   return [...conditions]
     .filter((c) => c.status === 'True')

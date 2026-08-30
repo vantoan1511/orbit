@@ -195,22 +195,22 @@ const getTaintEffectSeverity = (effect: string) => {
             node.nodeInfo.kubeProxyVersion || '-'
           }}</span>
         </div>
-        <div v-if="node.nodeInfo.machineId">
+        <div v-if="node.nodeInfo.machineID">
           <span class="text-muted-color">Machine ID: </span>
           <span
             class="font-medium text-primary font-mono truncate max-w-48 inline-block align-bottom"
-            :title="node.nodeInfo.machineId"
+            :title="node.nodeInfo.machineID"
           >
-            {{ node.nodeInfo.machineId }}
+            {{ node.nodeInfo.machineID }}
           </span>
         </div>
-        <div v-if="node.nodeInfo.systemUuid">
+        <div v-if="node.nodeInfo.systemUUID">
           <span class="text-muted-color">System UUID: </span>
           <span
             class="font-medium text-primary font-mono truncate max-w-48 inline-block align-bottom"
-            :title="node.nodeInfo.systemUuid"
+            :title="node.nodeInfo.systemUUID"
           >
-            {{ node.nodeInfo.systemUuid }}
+            {{ node.nodeInfo.systemUUID }}
           </span>
         </div>
       </div>
