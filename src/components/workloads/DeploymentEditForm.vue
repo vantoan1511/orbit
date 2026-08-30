@@ -20,12 +20,20 @@ import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import StringListEditor from '@/components/shared/StringListEditor.vue'
 import { isValidK8sLabel, isValidK8sName, isValidPath } from '@/utils/validators'
 
+import type { Deployment } from 'kubernetes-types/apps/v1'
+import type {
+  Container,
+  EnvFromSource,
+  EnvVar,
+  ResourceRequirements
+} from 'kubernetes-types/core/v1'
+
 const props = defineProps<{
-  rawData: Record<string, unknown> | null
+  rawData: Deployment | null
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:rawData', value: Record<string, unknown>): void
+  (e: 'update:rawData', value: Deployment): void
   (e: 'update:isValid', value: boolean): void
 }>()
 
@@ -52,8 +60,7 @@ const restartPolicy = ref<string>('Always')
 const terminationGracePeriodSeconds = ref<number>(30)
 const nodeSelector = ref<{ key: string; value: string }[]>([])
 const deploymentNamespace = computed(() => {
-  const meta = (props.rawData?.metadata as Record<string, unknown>) || {}
-  return typeof meta.namespace === 'string' ? meta.namespace : ''
+  return props.rawData?.metadata?.namespace ?? ''
 })
 
 interface ContainerFormState {
@@ -69,7 +76,7 @@ interface ContainerFormState {
   memoryRequest: string
   cpuLimit: string
   memoryLimit: string
-  rawContainer: Record<string, unknown>
+  rawContainer: Container
 }
 
 const containers = ref<ContainerFormState[]>([])
@@ -102,7 +109,7 @@ watch(
 let isEmitting = false
 
 const kvObjectToArray = (
-  obj: Record<string, unknown> | undefined
+  obj: Record<string, string> | undefined
 ): { key: string; value: string }[] => {
   if (!obj || typeof obj !== 'object') return []
   return Object.entries(obj).map(([key, value]) => ({ key, value: String(value ?? '') }))
@@ -118,70 +125,65 @@ const kvArrayToObject = (arr: { key: string; value: string }[]): Record<string, 
   return res
 }
 
-const syncFromRawData = (data: Record<string, unknown> | null) => {
+const syncFromRawData = (data: Deployment | null) => {
   if (!data || isEmitting) return
 
-  const spec = (data.spec as Record<string, unknown>) || {}
-  replicas.value = typeof spec.replicas === 'number' ? spec.replicas : 1
-  paused.value = Boolean(spec.paused)
+  const spec = data.spec
+  replicas.value = typeof spec?.replicas === 'number' ? spec.replicas : 1
+  paused.value = Boolean(spec?.paused)
 
-  const strat = (spec.strategy as Record<string, unknown>) || {}
-  strategyType.value = typeof strat.type === 'string' ? strat.type : 'RollingUpdate'
-  const rolling = (strat.rollingUpdate as Record<string, unknown>) || {}
-  maxSurge.value = rolling.maxSurge !== undefined ? String(rolling.maxSurge) : '25%'
+  const strat = spec?.strategy
+  strategyType.value = strat?.type || 'RollingUpdate'
+  const rolling = strat?.rollingUpdate
+  maxSurge.value = rolling?.maxSurge !== undefined ? String(rolling.maxSurge) : '25%'
   maxUnavailable.value =
-    rolling.maxUnavailable !== undefined ? String(rolling.maxUnavailable) : '25%'
+    rolling?.maxUnavailable !== undefined ? String(rolling.maxUnavailable) : '25%'
 
-  minReadySeconds.value = typeof spec.minReadySeconds === 'number' ? spec.minReadySeconds : 0
+  minReadySeconds.value = typeof spec?.minReadySeconds === 'number' ? spec.minReadySeconds : 0
   revisionHistoryLimit.value =
-    typeof spec.revisionHistoryLimit === 'number' ? spec.revisionHistoryLimit : 10
+    typeof spec?.revisionHistoryLimit === 'number' ? spec.revisionHistoryLimit : 10
   progressDeadlineSeconds.value =
-    typeof spec.progressDeadlineSeconds === 'number' ? spec.progressDeadlineSeconds : 600
+    typeof spec?.progressDeadlineSeconds === 'number' ? spec.progressDeadlineSeconds : 600
 
-  const selector = (spec.selector as Record<string, unknown>) || {}
-  const matchLbls = (selector.matchLabels as Record<string, unknown>) || {}
+  const selector = spec?.selector
+  const matchLbls = selector?.matchLabels
   selectorLabels.value = kvObjectToArray(matchLbls)
 
   // Metadata
-  const metadata = (data.metadata as Record<string, unknown>) || {}
-  deploymentLabels.value = kvObjectToArray(metadata.labels as Record<string, unknown>)
-  deploymentAnnotations.value = kvObjectToArray(metadata.annotations as Record<string, unknown>)
+  deploymentLabels.value = kvObjectToArray(data.metadata?.labels)
+  deploymentAnnotations.value = kvObjectToArray(data.metadata?.annotations)
 
   // Pod Template Metadata
-  const template = (spec.template as Record<string, unknown>) || {}
-  const podMeta = (template.metadata as Record<string, unknown>) || {}
-  podLabels.value = kvObjectToArray(podMeta.labels as Record<string, unknown>)
-  podAnnotations.value = kvObjectToArray(podMeta.annotations as Record<string, unknown>)
+  const template = spec?.template
+  podLabels.value = kvObjectToArray(template?.metadata?.labels)
+  podAnnotations.value = kvObjectToArray(template?.metadata?.annotations)
 
   // Pod Spec
-  const podSpec = (template.spec as Record<string, unknown>) || {}
-  serviceAccountName.value =
-    typeof podSpec.serviceAccountName === 'string' ? podSpec.serviceAccountName : ''
-  restartPolicy.value = typeof podSpec.restartPolicy === 'string' ? podSpec.restartPolicy : 'Always'
+  const podSpec = template?.spec
+  serviceAccountName.value = podSpec?.serviceAccountName || ''
+  restartPolicy.value = podSpec?.restartPolicy || 'Always'
   terminationGracePeriodSeconds.value =
-    typeof podSpec.terminationGracePeriodSeconds === 'number'
+    typeof podSpec?.terminationGracePeriodSeconds === 'number'
       ? podSpec.terminationGracePeriodSeconds
       : 30
-  nodeSelector.value = kvObjectToArray(podSpec.nodeSelector as Record<string, unknown>)
+  nodeSelector.value = kvObjectToArray(podSpec?.nodeSelector)
 
   // Containers
-  const rawContainers: Record<string, unknown>[] = Array.isArray(podSpec.containers)
-    ? (podSpec.containers as Record<string, unknown>[])
-    : []
-  containers.value = rawContainers.map((c) => {
+  const rawContainers: Container[] = podSpec?.containers || []
+  containers.value = rawContainers.map((c: Container) => {
     const environments: ContainerEnvItem[] = []
 
-    const envList = Array.isArray(c.env) ? (c.env as Record<string, unknown>[]) : []
+    const envList = c.env || []
     for (const e of envList) {
-      if (e && typeof e === 'object' && typeof e.name === 'string') {
+      if (e && typeof e === 'object' && e.name) {
         if ('value' in e) {
           environments.push({
             type: 'Literal',
             name: e.name,
             value: String(e.value ?? '')
           })
-        } else if (e.valueFrom && typeof e.valueFrom === 'object') {
-          const vf = e.valueFrom as Record<string, Record<string, unknown>>
+        } else if (e.valueFrom) {
+          const vf = e.valueFrom
           if (vf.configMapKeyRef) {
             environments.push({
               type: 'ConfigMapKey',
@@ -213,44 +215,44 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
       }
     }
 
-    const envFromList = Array.isArray(c.envFrom) ? (c.envFrom as Record<string, unknown>[]) : []
+    const envFromList = c.envFrom || []
     for (const ef of envFromList) {
-      if (ef && typeof ef === 'object') {
-        const prefix = typeof ef.prefix === 'string' ? ef.prefix : ''
-        if (ef.configMapRef && typeof ef.configMapRef === 'object') {
+      if (ef) {
+        const prefix = ef.prefix || ''
+        if (ef.configMapRef) {
           environments.push({
             type: 'ConfigMapEnvFrom',
             prefix,
-            refName: String((ef.configMapRef as Record<string, unknown>).name || '')
+            refName: String(ef.configMapRef.name || '')
           })
-        } else if (ef.secretRef && typeof ef.secretRef === 'object') {
+        } else if (ef.secretRef) {
           environments.push({
             type: 'SecretEnvFrom',
             prefix,
-            refName: String((ef.secretRef as Record<string, unknown>).name || '')
+            refName: String(ef.secretRef.name || '')
           })
         }
       }
     }
 
-    const portList = Array.isArray(c.ports) ? (c.ports as Record<string, unknown>[]) : []
+    const portList = c.ports || []
     const parsedPorts = portList.map((p) => ({
-      name: typeof p.name === 'string' ? p.name : '',
+      name: p.name || '',
       containerPort: typeof p.containerPort === 'number' ? p.containerPort : 80,
-      protocol: typeof p.protocol === 'string' ? p.protocol : 'TCP'
+      protocol: p.protocol || 'TCP'
     }))
 
-    const resources = (c.resources as Record<string, unknown>) || {}
-    const reqs = (resources.requests as Record<string, unknown>) || {}
-    const lims = (resources.limits as Record<string, unknown>) || {}
+    const resources = c.resources || {}
+    const reqs = resources.requests || {}
+    const lims = resources.limits || {}
 
     return {
-      name: typeof c.name === 'string' ? c.name : '',
-      image: typeof c.image === 'string' ? c.image : '',
-      imagePullPolicy: typeof c.imagePullPolicy === 'string' ? c.imagePullPolicy : 'IfNotPresent',
-      workingDir: typeof c.workingDir === 'string' ? c.workingDir : '',
-      command: Array.isArray(c.command) ? (c.command as string[]) : [],
-      args: Array.isArray(c.args) ? (c.args as string[]) : [],
+      name: c.name || '',
+      image: c.image || '',
+      imagePullPolicy: c.imagePullPolicy || 'IfNotPresent',
+      workingDir: c.workingDir || '',
+      command: c.command ? [...c.command] : [],
+      args: c.args ? [...c.args] : [],
       environments,
       ports: parsedPorts,
       cpuRequest: reqs.cpu ? String(reqs.cpu) : '',
@@ -299,60 +301,64 @@ const emitUpdate = () => {
   if (!props.rawData) return
   isEmitting = true
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawObj = JSON.parse(JSON.stringify(toRaw(props.rawData))) as Record<string, any>
+  const rawObj = JSON.parse(JSON.stringify(toRaw(props.rawData))) as Deployment
   if (!rawObj.metadata) rawObj.metadata = {}
-  if (!rawObj.spec) rawObj.spec = {}
-  if (!rawObj.spec.template) rawObj.spec.template = {}
-  if (!rawObj.spec.template.metadata) rawObj.spec.template.metadata = {}
-  if (!rawObj.spec.template.spec) rawObj.spec.template.spec = {}
+  if (!rawObj.spec) {
+    rawObj.spec = {
+      selector: { matchLabels: {} },
+      template: { spec: { containers: [] } }
+    }
+  }
+  const spec = rawObj.spec
+  if (!spec.template) spec.template = { spec: { containers: [] } }
+  if (!spec.template.metadata) spec.template.metadata = {}
+  if (!spec.template.spec) spec.template.spec = { containers: [] }
 
   // 1. General & Strategy
-  rawObj.spec.replicas = replicas.value
-  rawObj.spec.paused = paused.value
+  spec.replicas = replicas.value
+  spec.paused = paused.value
 
-  if (!rawObj.spec.strategy) rawObj.spec.strategy = {}
-  rawObj.spec.strategy.type = strategyType.value
+  if (!spec.strategy) spec.strategy = {}
+  spec.strategy.type = strategyType.value
 
   if (strategyType.value === 'RollingUpdate') {
-    if (!rawObj.spec.strategy.rollingUpdate) rawObj.spec.strategy.rollingUpdate = {}
-    if (maxSurge.value) rawObj.spec.strategy.rollingUpdate.maxSurge = maxSurge.value
-    if (maxUnavailable.value)
-      rawObj.spec.strategy.rollingUpdate.maxUnavailable = maxUnavailable.value
+    if (!spec.strategy.rollingUpdate) spec.strategy.rollingUpdate = {}
+    if (maxSurge.value) spec.strategy.rollingUpdate.maxSurge = maxSurge.value
+    if (maxUnavailable.value) spec.strategy.rollingUpdate.maxUnavailable = maxUnavailable.value
   } else {
-    delete rawObj.spec.strategy.rollingUpdate
+    delete spec.strategy.rollingUpdate
   }
 
-  rawObj.spec.minReadySeconds = minReadySeconds.value
-  rawObj.spec.revisionHistoryLimit = revisionHistoryLimit.value
-  rawObj.spec.progressDeadlineSeconds = progressDeadlineSeconds.value
+  spec.minReadySeconds = minReadySeconds.value
+  spec.revisionHistoryLimit = revisionHistoryLimit.value
+  spec.progressDeadlineSeconds = progressDeadlineSeconds.value
 
   // 2. Metadata
   rawObj.metadata.labels = kvArrayToObject(deploymentLabels.value)
   rawObj.metadata.annotations = kvArrayToObject(deploymentAnnotations.value)
-  rawObj.spec.template.metadata.labels = kvArrayToObject(podLabels.value)
-  rawObj.spec.template.metadata.annotations = kvArrayToObject(podAnnotations.value)
+  spec.template.metadata.labels = kvArrayToObject(podLabels.value)
+  spec.template.metadata.annotations = kvArrayToObject(podAnnotations.value)
 
   // 3. Pod Spec
   if (serviceAccountName.value) {
-    rawObj.spec.template.spec.serviceAccountName = serviceAccountName.value
+    spec.template.spec.serviceAccountName = serviceAccountName.value
   } else {
-    delete rawObj.spec.template.spec.serviceAccountName
+    delete spec.template.spec.serviceAccountName
   }
 
-  rawObj.spec.template.spec.restartPolicy = restartPolicy.value
-  rawObj.spec.template.spec.terminationGracePeriodSeconds = terminationGracePeriodSeconds.value
+  spec.template.spec.restartPolicy = restartPolicy.value
+  spec.template.spec.terminationGracePeriodSeconds = terminationGracePeriodSeconds.value
 
   const nodeSel = kvArrayToObject(nodeSelector.value)
   if (Object.keys(nodeSel).length > 0) {
-    rawObj.spec.template.spec.nodeSelector = nodeSel
+    spec.template.spec.nodeSelector = nodeSel
   } else {
-    delete rawObj.spec.template.spec.nodeSelector
+    delete spec.template.spec.nodeSelector
   }
 
   // 4. Containers
-  const updatedContainers = containers.value.map((c) => {
-    const containerObj: Record<string, unknown> = { ...c.rawContainer }
+  const updatedContainers: Container[] = containers.value.map((c) => {
+    const containerObj: Container = { ...c.rawContainer }
     containerObj.name = c.name
     containerObj.image = c.image
     containerObj.imagePullPolicy = c.imagePullPolicy
@@ -376,13 +382,13 @@ const emitUpdate = () => {
     }
 
     // Env vars
-    const envObjList: Record<string, unknown>[] = []
-    const envFromObjList: Record<string, unknown>[] = []
+    const envObjList: EnvVar[] = []
+    const envFromObjList: EnvFromSource[] = []
 
     for (const e of c.environments) {
       if (e.type === 'ConfigMapEnvFrom' || e.type === 'SecretEnvFrom') {
         if (!e.refName?.trim()) continue
-        const item: Record<string, unknown> = {}
+        const item: EnvFromSource = {}
         if (e.prefix?.trim()) item.prefix = e.prefix.trim()
         if (e.type === 'ConfigMapEnvFrom') {
           item.configMapRef = { name: e.refName.trim() }
@@ -392,7 +398,7 @@ const emitUpdate = () => {
         envFromObjList.push(item)
       } else {
         if (!e.name?.trim()) continue
-        const item: Record<string, unknown> = { name: e.name.trim() }
+        const item: EnvVar = { name: e.name.trim() }
         if (e.type === 'Literal') {
           item.value = e.value || ''
         } else if (e.type === 'ConfigMapKey' && e.refName?.trim() && e.refKey?.trim()) {
@@ -404,7 +410,6 @@ const emitUpdate = () => {
         } else if (e.type === 'ResourceFieldRef' && e.fieldPath?.trim()) {
           item.valueFrom = { resourceFieldRef: { resource: e.fieldPath.trim() } }
         } else {
-          // Incomplete complex ref, skip or just save as literal
           continue
         }
         envObjList.push(item)
@@ -448,7 +453,7 @@ const emitUpdate = () => {
     if (c.memoryLimit.trim()) lims.memory = c.memoryLimit.trim()
 
     if (Object.keys(reqs).length > 0 || Object.keys(lims).length > 0) {
-      const resObj = (containerObj.resources as Record<string, unknown>) || {}
+      const resObj: ResourceRequirements = { ...containerObj.resources }
       if (Object.keys(reqs).length > 0) resObj.requests = reqs
       else delete resObj.requests
 
@@ -463,7 +468,7 @@ const emitUpdate = () => {
     return containerObj
   })
 
-  rawObj.spec.template.spec.containers = updatedContainers
+  spec.template.spec.containers = updatedContainers
 
   emit('update:rawData', rawObj)
 

@@ -1,3 +1,19 @@
+import type { DaemonSet, Deployment, ReplicaSet, StatefulSet } from 'kubernetes-types/apps/v1'
+import type { CronJob, Job } from 'kubernetes-types/batch/v1'
+import type { Pod } from 'kubernetes-types/core/v1'
+import type { ObjectMeta } from 'kubernetes-types/meta/v1'
+
+export interface KubernetesResource {
+  apiVersion?: string
+  kind?: string
+  metadata?: ObjectMeta
+  spec?: unknown
+  status?: unknown
+}
+
+export type RawWorkloadResource =
+  Deployment | DaemonSet | StatefulSet | ReplicaSet | Job | CronJob | Pod
+
 export interface PodContainer {
   name: string
   image: string

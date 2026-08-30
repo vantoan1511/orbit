@@ -1,3 +1,4 @@
+import type { KubernetesResource } from '@/types/kubernetes'
 import { coreEngine } from './nativeService'
 
 export const kubernetesService = {
@@ -214,7 +215,7 @@ export const kubernetesService = {
     namespace: string
     kind: string
     name: string
-    data: Record<string, unknown>
+    data: KubernetesResource | Record<string, unknown>
   }): Promise<void> {
     await coreEngine.dispatch('applyResource', params)
   },
@@ -223,7 +224,7 @@ export const kubernetesService = {
     namespace: string
     kind: string
     name: string
-    data: Record<string, unknown>
+    data: KubernetesResource | Record<string, unknown>
   }): Promise<void> {
     await coreEngine.dispatch('createResource', params)
   },

@@ -13,9 +13,12 @@ import * as yaml from 'yaml'
 
 import { ArrowLeft, Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
-import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import IngressEditForm from '@/components/network/IngressEditForm.vue'
+import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
+import type { KubernetesResource } from '@/types/kubernetes'
+import type { Deployment } from 'kubernetes-types/apps/v1'
+import type { Ingress } from 'kubernetes-types/networking/v1'
 
 const props = defineProps<{
   kind: string
@@ -27,7 +30,9 @@ const router = useRouter()
 const toast = useToast()
 const { isDark } = useTheme()
 
-const rawData = ref<Record<string, unknown> | null>(null)
+const rawData = ref<KubernetesResource | null>(null)
+const deploymentRawData = computed(() => (rawData.value as Deployment | null) ?? null)
+const ingressRawData = computed(() => (rawData.value as Ingress | null) ?? null)
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -56,28 +61,28 @@ const formValues = ref({
   annotations: [] as { key: string; value: string }[]
 })
 
-let eventHandler: (data: { name: string; kind: string; data: Record<string, unknown> }) => void
+let eventHandler: (data: { name: string; kind: string; data: KubernetesResource }) => void
 let errorHandler: (data: { message: string }) => void
 let successHandler: (data: { message?: string }) => void
 
 onMounted(() => {
-  eventHandler = (data: { name: string; kind: string; data: Record<string, unknown> }) => {
+  eventHandler = (data: { name: string; kind: string; data: KubernetesResource }) => {
     if (data.name === props.name && data.kind === props.kind) {
       rawData.value = data.data
       yamlContent.value = yaml.stringify(rawData.value)
 
       // Populate basic form fields
-      const metadata = (rawData.value?.metadata as Record<string, unknown>) || {}
-      formValues.value.name = typeof metadata.name === 'string' ? metadata.name : ''
-      formValues.value.namespace = typeof metadata.namespace === 'string' ? metadata.namespace : ''
+      const metadata = rawData.value?.metadata || {}
+      formValues.value.name = metadata.name || ''
+      formValues.value.namespace = metadata.namespace || ''
 
-      const lbls = (metadata.labels as Record<string, unknown>) || {}
+      const lbls = metadata.labels || {}
       formValues.value.labels = Object.entries(lbls).map(([key, value]) => ({
         key,
         value: String(value)
       }))
 
-      const anns = (metadata.annotations as Record<string, unknown>) || {}
+      const anns = metadata.annotations || {}
       formValues.value.annotations = Object.entries(anns).map(([key, value]) => ({
         key,
         value: String(value)
@@ -123,7 +128,7 @@ const handleModeToggle = () => {
   if (!isYamlMode.value) {
     // Toggled from YAML to Form mode -> sync YAML back to rawData
     try {
-      const parsed = yaml.parse(yamlContent.value) as Record<string, unknown>
+      const parsed = yaml.parse(yamlContent.value) as KubernetesResource
       if (parsed && typeof parsed === 'object') {
         rawData.value = parsed
       }
@@ -148,9 +153,9 @@ const saveChanges = () => {
   if (isSaving.value || isLoading.value) return
   isSaving.value = true
   try {
-    let updatedData: Record<string, unknown>
+    let updatedData: KubernetesResource
     if (isYamlMode.value) {
-      updatedData = yaml.parse(yamlContent.value) as Record<string, unknown>
+      updatedData = yaml.parse(yamlContent.value) as KubernetesResource
     } else {
       updatedData = rawData.value || {}
     }
@@ -166,7 +171,7 @@ const saveChanges = () => {
   }
 }
 
-const handleCustomFormUpdate = (updatedData: Record<string, unknown>) => {
+const handleCustomFormUpdate = (updatedData: KubernetesResource) => {
   rawData.value = updatedData
   yamlContent.value = yaml.stringify(updatedData)
 }
@@ -274,7 +279,7 @@ watch(
       <template v-if="!isYamlMode">
         <div v-if="props.kind === 'Deployment'" class="w-full h-full overflow-hidden flex flex-col">
           <DeploymentEditForm
-            :raw-data="rawData"
+            :raw-data="deploymentRawData"
             @update:raw-data="handleCustomFormUpdate"
             @update:is-valid="(val) => (isChildFormValid = val)"
           />
@@ -285,7 +290,7 @@ watch(
           class="w-full h-full overflow-hidden flex flex-col"
         >
           <IngressEditForm
-            :raw-data="rawData"
+            :raw-data="ingressRawData"
             @update:raw-data="handleCustomFormUpdate"
             @update:is-valid="(val) => (isChildFormValid = val)"
           />

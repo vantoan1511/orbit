@@ -4,6 +4,8 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { isValidK8sName, isValidPort } from '@/utils/validators'
+import type { Deployment } from 'kubernetes-types/apps/v1'
+import type { Container } from 'kubernetes-types/core/v1'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -115,7 +117,7 @@ const handleCreate = async () => {
   const trimmedNamespace = namespace.value.trim()
   const trimmedImage = image.value.trim()
 
-  const containerObj: Record<string, unknown> = {
+  const containerObj: Container = {
     name: trimmedName,
     image: trimmedImage
   }
@@ -129,7 +131,7 @@ const handleCreate = async () => {
     ]
   }
 
-  const manifest: Record<string, unknown> = {
+  const manifest: Deployment = {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
     metadata: {
