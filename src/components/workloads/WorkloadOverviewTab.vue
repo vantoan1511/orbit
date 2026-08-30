@@ -3,7 +3,13 @@ import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.v
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import ReplicasProgressBar from '@/components/shared/ReplicasProgressBar.vue'
-import type { DaemonSetReplicas, WorkloadInfo } from '@/types/kubernetes'
+import type {
+  DaemonSetReplicas,
+  KubernetesResource,
+  RawWorkloadResource,
+  WorkloadInfo
+} from '@/types/kubernetes'
+import type { Container, EnvVar, PodSpec, Toleration } from 'kubernetes-types/core/v1'
 import { computed } from 'vue'
 import * as yaml from 'yaml'
 
@@ -30,22 +36,22 @@ const props = defineProps<{
   workloadImages: string[]
   workloadLabels: Record<string, string>
   workloadAnnotations: Record<string, string>
-  rawResourceData?: Record<string, unknown> | null
+  rawResourceData?: RawWorkloadResource | KubernetesResource | null
 }>()
 
 // 1. Revision info
 const revision = computed<string | undefined>(() => {
-  const meta = props.rawResourceData?.metadata as Record<string, unknown> | undefined
-  const annotations = (meta?.annotations || props.workloadAnnotations) as
-    Record<string, string> | undefined
+  const meta = props.rawResourceData?.metadata
+  const annotations = meta?.annotations || props.workloadAnnotations
   return annotations?.['deployment.kubernetes.io/revision']
 })
 
 // 2. Pod Selectors (matchLabels)
 const selectorMatchLabels = computed<Record<string, string>>(() => {
-  const spec = props.rawResourceData?.spec as Record<string, unknown> | undefined
-  const selector = spec?.selector as Record<string, unknown> | undefined
-  return (selector?.matchLabels as Record<string, string>) || {}
+  const raw = props.rawResourceData
+  if (!raw || typeof raw !== 'object' || !('spec' in raw) || !raw.spec) return {}
+  const spec = raw.spec as { selector?: { matchLabels?: Record<string, string> } }
+  return spec.selector?.matchLabels || {}
 })
 
 // 3. Conditions
@@ -59,8 +65,10 @@ interface ConditionItem {
 }
 
 const conditions = computed<ConditionItem[]>(() => {
-  const status = props.rawResourceData?.status as Record<string, unknown> | undefined
-  return Array.isArray(status?.conditions) ? (status.conditions as ConditionItem[]) : []
+  const raw = props.rawResourceData
+  if (!raw || typeof raw !== 'object' || !('status' in raw) || !raw.status) return []
+  const status = raw.status as { conditions?: ConditionItem[] }
+  return Array.isArray(status.conditions) ? status.conditions : []
 })
 
 const getConditionSeverity = (status: string, type: string) => {
@@ -83,40 +91,41 @@ const getConditionSeverity = (status: string, type: string) => {
 }
 
 // Helper to extract pod spec from standard workloads or CronJobs
-const podSpec = computed<Record<string, unknown> | undefined>(() => {
-  if (!props.rawResourceData) return undefined
-  const spec = props.rawResourceData.spec as Record<string, unknown> | undefined
-  if (!spec) return undefined
-  const jobTemplate = spec.jobTemplate as Record<string, unknown> | undefined
-  const jobSpec = jobTemplate?.spec as Record<string, unknown> | undefined
-  const cronTemplate = jobSpec?.template as Record<string, unknown> | undefined
-  if (cronTemplate?.spec) {
-    return cronTemplate.spec as Record<string, unknown>
+const podSpec = computed<PodSpec | undefined>(() => {
+  const raw = props.rawResourceData
+  if (!raw || typeof raw !== 'object') return undefined
+  if ('spec' in raw && raw.spec && typeof raw.spec === 'object') {
+    const rawSpec = raw.spec as {
+      jobTemplate?: { spec?: { template?: { spec?: PodSpec } } }
+      template?: { spec?: PodSpec }
+      containers?: Container[]
+    }
+    // CronJob
+    if (rawSpec.jobTemplate?.spec?.template?.spec) {
+      return rawSpec.jobTemplate.spec.template.spec
+    }
+    // Standard Workload (Deployment, StatefulSet, DaemonSet, ReplicaSet, Job)
+    if (rawSpec.template?.spec) {
+      return rawSpec.template.spec
+    }
+    // Direct Pod
+    if (rawSpec.containers) {
+      return rawSpec as PodSpec
+    }
   }
-  const template = spec.template as Record<string, unknown> | undefined
-  return template?.spec as Record<string, unknown> | undefined
+  return undefined
 })
 
 // 4. Scheduling Constraints
 const nodeSelector = computed<Record<string, string>>(() => {
-  return (podSpec.value?.nodeSelector as Record<string, string>) || {}
+  return podSpec.value?.nodeSelector || {}
 })
 
-interface TolerationItem {
-  key?: string
-  operator?: string
-  value?: string
-  effect?: string
-  tolerationSeconds?: number
-}
-
-const tolerations = computed<TolerationItem[]>(() => {
-  return Array.isArray(podSpec.value?.tolerations)
-    ? (podSpec.value.tolerations as TolerationItem[])
-    : []
+const tolerations = computed<Toleration[]>(() => {
+  return Array.isArray(podSpec.value?.tolerations) ? podSpec.value.tolerations : []
 })
 
-const formatToleration = (t: TolerationItem): string => {
+const formatToleration = (t: Toleration): string => {
   const parts: string[] = []
   if (t.key) {
     if (t.operator === 'Exists') {
@@ -146,36 +155,11 @@ const affinityYaml = computed<string | null>(() => {
 })
 
 // 5. Pod Template Containers
-interface ContainerEnvItem {
-  name: string
-  value?: string
-  valueFrom?: {
-    configMapKeyRef?: { name: string; key: string }
-    secretKeyRef?: { name: string; key: string }
-    fieldRef?: { fieldPath: string }
-    resourceFieldRef?: { resource: string }
-  }
-}
-
-interface ContainerSpecItem {
-  name: string
-  image: string
-  ports?: { name?: string; containerPort: number; protocol?: string }[]
-  resources?: {
-    requests?: { cpu?: string; memory?: string }
-    limits?: { cpu?: string; memory?: string }
-  }
-  env?: ContainerEnvItem[]
-  envFrom?: { prefix?: string; configMapRef?: { name: string }; secretRef?: { name: string } }[]
-}
-
-const templateContainers = computed<ContainerSpecItem[]>(() => {
-  return Array.isArray(podSpec.value?.containers)
-    ? (podSpec.value.containers as ContainerSpecItem[])
-    : []
+const templateContainers = computed<Container[]>(() => {
+  return Array.isArray(podSpec.value?.containers) ? podSpec.value.containers : []
 })
 
-const formatEnvValue = (e: ContainerEnvItem): string => {
+const formatEnvValue = (e: EnvVar): string => {
   if (e.value !== undefined) return e.value
   if (e.valueFrom) {
     const vf = e.valueFrom

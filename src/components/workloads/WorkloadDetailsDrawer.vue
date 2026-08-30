@@ -7,7 +7,13 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
-import type { CronJobInfo, DaemonSetReplicas, JobInfo, WorkloadInfo } from '@/types/kubernetes'
+import type {
+  CronJobInfo,
+  DaemonSetReplicas,
+  JobInfo,
+  RawWorkloadResource,
+  WorkloadInfo
+} from '@/types/kubernetes'
 import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -38,7 +44,7 @@ const getWorkloadKind = (w: WorkloadInfo): string => {
   if ('completions' in w) return 'Job'
   if ('strategy' in w) return 'Deployment'
   if ('replicas' in w && w.replicas) {
-    const reps = w.replicas as unknown as Record<string, unknown>
+    const reps = w.replicas
     if ('ready' in reps && 'upToDate' in reps) return 'DaemonSet'
     if (w.name.includes('stateful')) return 'StatefulSet'
     return 'ReplicaSet'
@@ -187,7 +193,7 @@ const editYaml = () => {
 }
 
 // Live Raw YAML & JSON Fetching
-const rawResourceData = ref<Record<string, unknown> | null>(null)
+const rawResourceData = ref<RawWorkloadResource | null>(null)
 const rawYamlData = ref<string | null>(null)
 const isYamlLoading = ref<boolean>(false)
 const copied = ref<boolean>(false)
@@ -210,7 +216,7 @@ const fetchRawData = async () => {
 const handleRawData = (data: { kind?: string; name?: string; data?: unknown }) => {
   if (data && data.kind === workloadKind.value && data.name === workloadName.value) {
     if (data.data && typeof data.data === 'object') {
-      rawResourceData.value = data.data as Record<string, unknown>
+      rawResourceData.value = data.data as RawWorkloadResource
       rawYamlData.value = yaml.stringify(data.data)
     }
     isYamlLoading.value = false
@@ -272,8 +278,7 @@ const generateYaml = (w: WorkloadInfo) => {
         image: ${j.images?.[0] || 'unknown'}
       restartPolicy: OnFailure`
   } else {
-    const reps = (w as unknown as Record<string, unknown>).replicas as
-      Record<string, number> | undefined
+    const reps = 'replicas' in w ? (w.replicas as { desired?: number } | undefined) : undefined
     specSection = `spec:
   replicas: ${reps?.desired ?? 1}
   selector:

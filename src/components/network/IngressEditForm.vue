@@ -21,12 +21,20 @@ import {
   parseRuleSummary
 } from '@/utils/validators'
 
+import type {
+  HTTPIngressPath,
+  Ingress,
+  IngressRule,
+  IngressTLS,
+  ServiceBackendPort
+} from 'kubernetes-types/networking/v1'
+
 const props = defineProps<{
-  rawData: Record<string, unknown> | null
+  rawData: Ingress | null
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:rawData', value: Record<string, unknown>): void
+  (e: 'update:rawData', value: Ingress): void
   (e: 'update:isValid', value: boolean): void
 }>()
 
@@ -73,13 +81,11 @@ let isEmitting = false
 const k8sStore = useKubernetesStore()
 
 const currentIngressName = computed(() => {
-  const meta = (props.rawData?.metadata as Record<string, unknown>) || {}
-  return typeof meta.name === 'string' ? meta.name : ''
+  return props.rawData?.metadata?.name ?? ''
 })
 
 const currentIngressNamespace = computed(() => {
-  const meta = (props.rawData?.metadata as Record<string, unknown>) || {}
-  return typeof meta.namespace === 'string' ? meta.namespace : ''
+  return props.rawData?.metadata?.namespace ?? ''
 })
 
 const otherIngressRulesMap = computed(() => {
@@ -207,7 +213,7 @@ watch(
 )
 
 const kvObjectToArray = (
-  obj: Record<string, unknown> | undefined
+  obj: Record<string, string> | undefined
 ): { key: string; value: string }[] => {
   if (!obj || typeof obj !== 'object') return []
   return Object.entries(obj).map(([key, value]) => ({ key, value: String(value ?? '') }))
@@ -223,39 +229,35 @@ const kvArrayToObject = (arr: { key: string; value: string }[]): Record<string, 
   return res
 }
 
-const syncFromRawData = (data: Record<string, unknown> | null) => {
+const syncFromRawData = (data: Ingress | null) => {
   if (!data || isEmitting) return
 
   // Metadata
-  const metadata = (data.metadata as Record<string, unknown>) || {}
-  labels.value = kvObjectToArray(metadata.labels as Record<string, unknown>)
-  annotations.value = kvObjectToArray(metadata.annotations as Record<string, unknown>)
+  labels.value = kvObjectToArray(data.metadata?.labels)
+  annotations.value = kvObjectToArray(data.metadata?.annotations)
 
   // Spec
-  const spec = (data.spec as Record<string, unknown>) || {}
-  ingressClassName.value = typeof spec.ingressClassName === 'string' ? spec.ingressClassName : ''
+  const spec = data.spec || {}
+  ingressClassName.value = spec.ingressClassName || ''
 
   // Default Backend
-  const defaultBackend = (spec.defaultBackend as Record<string, unknown>) || {}
-  const defaultService = (defaultBackend.service as Record<string, unknown>) || {}
-  defaultBackendServiceName.value =
-    typeof defaultService.name === 'string' ? defaultService.name : ''
-  const defaultPort = (defaultService.port as Record<string, unknown>) || {}
+  const defaultService = spec.defaultBackend?.service
+  defaultBackendServiceName.value = defaultService?.name || ''
+  const defaultPort = defaultService?.port
   defaultBackendServicePort.value =
-    typeof defaultPort.number === 'number'
+    typeof defaultPort?.number === 'number'
       ? String(defaultPort.number)
-      : typeof defaultPort.name === 'string'
+      : defaultPort?.name
         ? defaultPort.name
         : ''
 
   // Rules
-  const rawRules = Array.isArray(spec.rules) ? (spec.rules as Record<string, unknown>[]) : []
+  const rawRules = spec.rules || []
   const parsedGroups: IngressRuleGroup[] = []
 
   for (const rule of rawRules) {
-    const host = typeof rule.host === 'string' ? rule.host : ''
-    const http = (rule.http as Record<string, unknown>) || {}
-    const paths = Array.isArray(http.paths) ? (http.paths as Record<string, unknown>[]) : []
+    const host = rule.host || ''
+    const paths = rule.http?.paths || []
     const parsedPaths: IngressPathRule[] = []
 
     if (paths.length === 0) {
@@ -268,20 +270,19 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
       })
     } else {
       for (const p of paths) {
-        const pathStr = typeof p.path === 'string' ? p.path : '/'
-        const rawPathType = typeof p.pathType === 'string' ? p.pathType : 'Prefix'
+        const pathStr = p.path || '/'
+        const rawPathType = p.pathType || 'Prefix'
         const pathType = pathTypeOptions.includes(rawPathType)
           ? (rawPathType as IngressPathRule['pathType'])
           : 'Prefix'
 
-        const backend = (p.backend as Record<string, unknown>) || {}
-        const service = (backend.service as Record<string, unknown>) || {}
-        const serviceName = typeof service.name === 'string' ? service.name : ''
-        const portObj = (service.port as Record<string, unknown>) || {}
+        const service = p.backend?.service
+        const serviceName = service?.name || ''
+        const portObj = service?.port
         const servicePort =
-          typeof portObj.number === 'number'
+          typeof portObj?.number === 'number'
             ? String(portObj.number)
-            : typeof portObj.name === 'string'
+            : portObj?.name
               ? portObj.name
               : '80'
 
@@ -310,10 +311,10 @@ const syncFromRawData = (data: Record<string, unknown> | null) => {
   ruleGroups.value = parsedGroups
 
   // TLS
-  const rawTls = Array.isArray(spec.tls) ? (spec.tls as Record<string, unknown>[]) : []
+  const rawTls = spec.tls || []
   tlsConfigs.value = rawTls.map((t) => {
-    const secretName = typeof t.secretName === 'string' ? t.secretName : ''
-    const hostsArr = Array.isArray(t.hosts) ? (t.hosts as string[]) : []
+    const secretName = t.secretName || ''
+    const hostsArr = t.hosts || []
     return {
       id: crypto.randomUUID(),
       secretName,
@@ -334,8 +335,7 @@ const emitUpdate = () => {
   if (!props.rawData) return
   isEmitting = true
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rawObj = JSON.parse(JSON.stringify(toRaw(props.rawData))) as Record<string, any>
+  const rawObj = JSON.parse(JSON.stringify(toRaw(props.rawData))) as Ingress
   if (!rawObj.metadata) rawObj.metadata = {}
   if (!rawObj.spec) rawObj.spec = {}
 
@@ -353,7 +353,7 @@ const emitUpdate = () => {
   // 3. Default Backend
   if (defaultBackendServiceName.value.trim()) {
     const portVal = defaultBackendServicePort.value
-    const portObj: Record<string, unknown> = {}
+    const portObj: ServiceBackendPort = {}
     if (typeof portVal === 'number' || (typeof portVal === 'string' && /^\d+$/.test(portVal))) {
       portObj.number = Number(portVal)
     } else if (typeof portVal === 'string' && portVal.trim()) {
@@ -374,14 +374,14 @@ const emitUpdate = () => {
 
   // 4. Rules
   if (ruleGroups.value.length > 0) {
-    const generatedRules: Record<string, unknown>[] = []
+    const generatedRules: IngressRule[] = []
 
     for (const group of ruleGroups.value) {
-      const paths = group.paths
+      const paths: HTTPIngressPath[] = group.paths
         .filter((r) => r.serviceName.trim() !== '')
         .map((r) => {
           const portVal = r.servicePort
-          const portObj: Record<string, unknown> = {}
+          const portObj: ServiceBackendPort = {}
           if (
             typeof portVal === 'number' ||
             (typeof portVal === 'string' && /^\d+$/.test(portVal))
@@ -406,7 +406,7 @@ const emitUpdate = () => {
         })
 
       if (paths.length > 0) {
-        const ruleItem: Record<string, unknown> = {
+        const ruleItem: IngressRule = {
           http: {
             paths
           }
@@ -428,10 +428,10 @@ const emitUpdate = () => {
   }
 
   // 5. TLS
-  const validTls = tlsConfigs.value
+  const validTls: IngressTLS[] = tlsConfigs.value
     .filter((t) => t.secretName.trim() !== '' || t.hosts.trim() !== '')
     .map((t) => {
-      const item: Record<string, unknown> = {}
+      const item: IngressTLS = {}
       if (t.secretName.trim()) {
         item.secretName = t.secretName.trim()
       }
