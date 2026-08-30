@@ -9,7 +9,7 @@ import type { CronJob, Job } from 'kubernetes-types/batch/v1'
 import type {
   NodeAddress,
   NodeCondition,
-  NodeSystemInfo as KubeNodeSystemInfo,
+  NodeSystemInfo,
   Pod,
   ServicePort,
   Taint
@@ -89,8 +89,6 @@ export interface ContainerImageInfo {
   image: string
 }
 
-export type ResourceCondition = DeploymentCondition
-
 export interface DeploymentInfo {
   name: string
   namespace: string
@@ -169,15 +167,6 @@ export interface CronJobInfo {
 
 export type WorkloadInfo =
   DeploymentInfo | StatefulSetInfo | DaemonSetInfo | ReplicaSetInfo | JobInfo | CronJobInfo
-
-export type { NodeAddress, NodeCondition, ServicePort, Taint }
-export type NodeTaint = Taint
-
-export type NodeSystemInfo = Partial<KubeNodeSystemInfo> & {
-  machineId?: string
-  systemUuid?: string
-  bootId?: string
-}
 
 export interface NodeResources {
   cpu: string
