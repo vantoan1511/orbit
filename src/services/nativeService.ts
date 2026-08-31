@@ -1,4 +1,4 @@
-import { OrbitEvents, type OrbitEventMap, type OrbitEventName } from '@/types/events'
+import type { OrbitEventMap, OrbitEventName } from '@/types/events'
 import {
   app as neuApp,
   events as neuEvents,
@@ -74,27 +74,6 @@ export const os = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const eventHandlerMap = new Map<string, Map<any, any>>()
 
-const INTERCEPTOR_KEY = Symbol('interceptor')
-
-// rAF-based batch queue for resourceUpdated events only.
-// Prevents multiple Vue reactivity cycles per animation frame.
-const resourceUpdateQueue: Array<OrbitEventMap['resourceUpdated']> = []
-let resourceUpdateRafPending = false
-
-function flushResourceUpdateQueue() {
-  resourceUpdateRafPending = false
-  if (resourceUpdateQueue.length === 0) return
-  const batch = resourceUpdateQueue.splice(0)
-  const handlers = eventHandlerMap.get(OrbitEvents.ResourceUpdated)
-  if (!handlers) return
-  for (const [key, wrapper] of handlers) {
-    if (key === INTERCEPTOR_KEY) continue
-    for (const payload of batch) {
-      wrapper({ detail: payload })
-    }
-  }
-}
-
 /**
  * Safe wrapper for Neutralino events API
  */
@@ -104,28 +83,6 @@ export const events = {
     const wrapper = (evt: any) => {
       const payload = evt?.detail as OrbitEventMap[K]
       handler(payload)
-    }
-
-    if (event === (OrbitEvents.ResourceUpdated as K)) {
-      let handlers = eventHandlerMap.get(event)
-      if (!handlers) {
-        handlers = new Map()
-        eventHandlerMap.set(event, handlers)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const interceptor = (evt: any) => {
-          const payload = evt?.detail as OrbitEventMap['resourceUpdated']
-          resourceUpdateQueue.push(payload)
-          if (!resourceUpdateRafPending) {
-            resourceUpdateRafPending = true
-            requestAnimationFrame(flushResourceUpdateQueue)
-          }
-        }
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        handlers.set(INTERCEPTOR_KEY, interceptor as any)
-        neuEvents.on(event, interceptor)
-      }
-      handlers.set(handler, wrapper)
-      return Promise.resolve()
     }
 
     let handlers = eventHandlerMap.get(event)
@@ -138,22 +95,6 @@ export const events = {
     return neuEvents.on(event, wrapper)
   },
   off<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
-    if (event === (OrbitEvents.ResourceUpdated as K)) {
-      const handlers = eventHandlerMap.get(event)
-      if (handlers) {
-        handlers.delete(handler)
-        if (handlers.size <= 1) {
-          const interceptor = handlers.get(INTERCEPTOR_KEY)
-          if (interceptor) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            neuEvents.off(event, interceptor as any)
-          }
-          eventHandlerMap.delete(event)
-        }
-      }
-      return Promise.resolve()
-    }
-
     const handlers = eventHandlerMap.get(event)
     if (handlers) {
       const wrapper = handlers.get(handler)
