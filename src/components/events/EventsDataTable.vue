@@ -23,12 +23,7 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = [
-  'All Types',
-  KUBERNETES_EVENT_TYPE.Normal,
-  KUBERNETES_EVENT_TYPE.Warning,
-  KUBERNETES_EVENT_TYPE.Error
-]
+const types = ['All Types', ...Object.values(KUBERNETES_EVENT_TYPE)]
 
 const eventsWithResourceItem = computed(() =>
   events.value.map((e) => ({ ...e, name: e.objectName }))

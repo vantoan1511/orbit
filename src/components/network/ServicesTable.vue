@@ -23,13 +23,7 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = [
-  'All Types',
-  KUBERNETES_SERVICE_TYPE.ClusterIP,
-  KUBERNETES_SERVICE_TYPE.NodePort,
-  KUBERNETES_SERVICE_TYPE.LoadBalancer,
-  KUBERNETES_SERVICE_TYPE.ExternalName
-]
+const types = ['All Types', ...Object.values(KUBERNETES_SERVICE_TYPE)]
 
 const filteredServices = computed(() => {
   return k8sStore.services.filter((s) => {

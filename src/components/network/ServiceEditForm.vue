@@ -28,12 +28,7 @@ const emit = defineEmits<{
 const activeTab = ref('general')
 
 // Types and options
-const serviceTypeOptions: KubernetesServiceType[] = [
-  KUBERNETES_SERVICE_TYPE.ClusterIP,
-  KUBERNETES_SERVICE_TYPE.NodePort,
-  KUBERNETES_SERVICE_TYPE.LoadBalancer,
-  KUBERNETES_SERVICE_TYPE.ExternalName
-]
+const serviceTypeOptions: KubernetesServiceType[] = Object.values(KUBERNETES_SERVICE_TYPE)
 const sessionAffinityOptions = ['None', 'ClientIP']
 const externalTrafficPolicyOptions = ['Cluster', 'Local']
 const protocolOptions = ['TCP', 'UDP', 'SCTP']
