@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import {
+  KUBERNETES_EVENT_TYPE,
+  KUBERNETES_RESOURCE_KIND
+} from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { getEventTypeSeverity } from '@/utils/severity'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
 import { computed, ref } from 'vue'
@@ -22,7 +26,12 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = ['All Types', KUBERNETES_EVENT_TYPE.Normal, KUBERNETES_EVENT_TYPE.Warning, 'Error']
+const types = [
+  'All Types',
+  KUBERNETES_EVENT_TYPE.Normal,
+  KUBERNETES_EVENT_TYPE.Warning,
+  'Error'
+]
 
 const eventsWithResourceItem = computed(() =>
   events.value.map((e) => ({ ...e, name: e.objectName }))
@@ -42,19 +51,6 @@ const handleRefresh = async () => {
     await k8sStore.fetchEvents()
   } catch (error) {
     console.error('Error fetching events:', error)
-  }
-}
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case KUBERNETES_EVENT_TYPE.Warning:
-      return 'warn'
-    case 'Error':
-      return 'danger'
-    case KUBERNETES_EVENT_TYPE.Normal:
-      return 'success'
-    default:
-      return 'secondary'
   }
 }
 </script>
@@ -99,7 +95,7 @@ const getTypeSeverity = (type: string) => {
       <!-- Type Column -->
       <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3 min-w-24">
         <template #body="{ data }">
-          <Tag :severity="getTypeSeverity(data.type)" :value="data.type" />
+          <Tag :severity="getEventTypeSeverity(data.type)" :value="data.type" />
         </template>
       </Column>
 

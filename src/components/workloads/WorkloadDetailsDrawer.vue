@@ -15,6 +15,7 @@ import type {
   RawWorkloadResource,
   WorkloadInfo
 } from '@/types/kubernetes'
+import { getWorkloadKindSeverity } from '@/utils/severity'
 import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -56,21 +57,6 @@ const getWorkloadKind = (w: WorkloadInfo): string => {
 const workloadKind = computed(() => {
   return props.workload ? getWorkloadKind(props.workload) : 'Workload'
 })
-
-const getWorkloadSeverity = (kind: string) => {
-  switch (kind) {
-    case KUBERNETES_RESOURCE_KIND.Deployment:
-    case KUBERNETES_RESOURCE_KIND.StatefulSet:
-    case KUBERNETES_RESOURCE_KIND.DaemonSet:
-    case KUBERNETES_RESOURCE_KIND.ReplicaSet:
-      return 'info'
-    case KUBERNETES_RESOURCE_KIND.Job:
-    case KUBERNETES_RESOURCE_KIND.CronJob:
-      return 'warn'
-    default:
-      return 'secondary'
-  }
-}
 
 const workloadStatus = computed(() => {
   if (!props.workload) return 'Active'
@@ -332,7 +318,7 @@ const copyYaml = async () => {
     :has-resource="!!props.workload"
     :title="workloadName"
     :kind="workloadKind"
-    :kind-severity="getWorkloadSeverity(workloadKind)"
+    :kind-severity="getWorkloadKindSeverity(workloadKind)"
     :status-badge-class="getStatusBadgeClass(workloadStatus)"
     :namespace="workloadNamespace"
     :age="workloadAge"

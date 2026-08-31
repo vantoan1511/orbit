@@ -4,6 +4,7 @@ import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { getServiceTypeSeverity } from '@/utils/severity'
 import { ExternalLink } from '@lucide/vue'
 import Column from 'primevue/column'
 import { computed, ref } from 'vue'
@@ -42,21 +43,6 @@ const filteredServices = computed(() => {
 const handleRefresh = async () => {
   await kubernetesService.getServices()
 }
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case KUBERNETES_SERVICE_TYPE.LoadBalancer:
-      return 'info'
-    case KUBERNETES_SERVICE_TYPE.ClusterIP:
-      return 'success'
-    case KUBERNETES_SERVICE_TYPE.NodePort:
-      return 'warn'
-    case KUBERNETES_SERVICE_TYPE.ExternalName:
-      return 'contrast'
-    default:
-      return 'secondary'
-  }
-}
 </script>
 
 <template>
@@ -82,7 +68,7 @@ const getTypeSeverity = (type: string) => {
       <!-- Type Column -->
       <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3">
         <template #body="{ data }">
-          <Tag :severity="getTypeSeverity(data.type)" :value="data.type" />
+          <Tag :severity="getServiceTypeSeverity(data.type)" :value="data.type" />
         </template>
       </Column>
 

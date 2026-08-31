@@ -6,8 +6,12 @@ import ServicePortsTab from '@/components/services/ServicePortsTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
-import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
+import {
+  KUBERNETES_RESOURCE_KIND,
+  KUBERNETES_SERVICE_TYPE
+} from '@/constants/kubernetes'
 import type { ServiceInfo } from '@/types/kubernetes'
+import { getServiceTypeSeverity } from '@/utils/severity'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import { Activity, Shield } from '@lucide/vue'
 import Tab from 'primevue/tab'
@@ -25,21 +29,6 @@ const emit = defineEmits<{
 }>()
 
 const activeTab = ref('overview')
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case KUBERNETES_SERVICE_TYPE.LoadBalancer:
-      return 'info'
-    case KUBERNETES_SERVICE_TYPE.ClusterIP:
-      return 'success'
-    case KUBERNETES_SERVICE_TYPE.NodePort:
-      return 'warn'
-    case KUBERNETES_SERVICE_TYPE.ExternalName:
-      return 'contrast'
-    default:
-      return 'secondary'
-  }
-}
 
 // Live Raw YAML & JSON Fetching
 const rawYamlData = ref<string | null>(null)
@@ -154,7 +143,7 @@ const copyYaml = async () => {
     :has-resource="!!props.service"
     :title="props.service?.name ?? ''"
     :kind="props.service?.type ?? ''"
-    :kind-severity="props.service ? getTypeSeverity(props.service.type) : 'info'"
+    :kind-severity="props.service ? getServiceTypeSeverity(props.service.type) : 'info'"
     status-badge-class="bg-emerald-500"
     :namespace="props.service?.namespace"
     :age="props.service?.age"

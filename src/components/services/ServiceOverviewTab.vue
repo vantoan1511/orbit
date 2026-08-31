@@ -2,29 +2,15 @@
 import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
-import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { ServiceInfo } from '@/types/kubernetes'
+import { getServiceTypeSeverity } from '@/utils/severity'
 import { ExternalLink } from '@lucide/vue'
 import Tag from 'primevue/tag'
 
 defineProps<{
   service: ServiceInfo
 }>()
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case KUBERNETES_SERVICE_TYPE.LoadBalancer:
-      return 'info'
-    case KUBERNETES_SERVICE_TYPE.ClusterIP:
-      return 'success'
-    case KUBERNETES_SERVICE_TYPE.NodePort:
-      return 'warn'
-    case KUBERNETES_SERVICE_TYPE.ExternalName:
-      return 'contrast'
-    default:
-      return 'secondary'
-  }
-}
 </script>
 
 <template>
@@ -44,7 +30,7 @@ const getTypeSeverity = (type: string) => {
             <span class="text-muted-color font-medium">Type</span>
             <div>
               <Tag
-                :severity="getTypeSeverity(service.type)"
+                :severity="getServiceTypeSeverity(service.type)"
                 :value="service.type"
                 class="text-xs"
               />

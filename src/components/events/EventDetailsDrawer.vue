@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
-import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import {
+  KUBERNETES_EVENT_TYPE,
+  KUBERNETES_RESOURCE_KIND
+} from '@/constants/kubernetes'
 import type { EventInfo } from '@/types/kubernetes'
+import { getEventTypeSeverity } from '@/utils/severity'
 import { Clock } from '@lucide/vue'
 import { ref } from 'vue'
 
@@ -44,19 +48,6 @@ type: ${e.type}
 `
 }
 
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case KUBERNETES_EVENT_TYPE.Warning:
-      return 'warn'
-    case 'Error':
-      return 'danger'
-    case KUBERNETES_EVENT_TYPE.Normal:
-      return 'success'
-    default:
-      return 'secondary'
-  }
-}
-
 const getEventBadgeClass = (type: string) => {
   if (type === KUBERNETES_EVENT_TYPE.Normal) return 'bg-emerald-500'
   if (type === KUBERNETES_EVENT_TYPE.Warning) return 'bg-amber-500'
@@ -71,7 +62,7 @@ const getEventBadgeClass = (type: string) => {
     :has-resource="!!props.event"
     :title="props.event?.reason ?? ''"
     :kind="props.event?.type ?? ''"
-    :kind-severity="props.event ? getTypeSeverity(props.event.type) : 'info'"
+    :kind-severity="props.event ? getEventTypeSeverity(props.event.type) : 'info'"
     :status-badge-class="props.event ? getEventBadgeClass(props.event.type) : 'bg-emerald-500'"
     @update:visible="emit('update:visible', $event)"
   >
