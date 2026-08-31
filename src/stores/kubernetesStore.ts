@@ -1,5 +1,6 @@
 import { kubernetesService } from '@/services/kubernetesService'
 import { events as nativeEvents } from '@/services/nativeService'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { OrbitEvents } from '@/types/events'
 import {
   KUBERNETES_ACTION,
@@ -13,6 +14,7 @@ import {
   type EventInfo,
   type IngressInfo,
   type JobInfo,
+  type KubernetesAction,
   type NamespaceInfo,
   type NodeInfo,
   type PersistentVolumeClaimInfo,
@@ -25,9 +27,43 @@ import {
   type StatefulSetInfo,
   type StorageClassInfo
 } from '@/types/kubernetes'
-import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { defineStore } from 'pinia'
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+
+type ResourceMatcher<T> = (existing: T, incoming: T) => boolean
+
+const matchNamespaced: ResourceMatcher<{ name: string; namespace: string }> = (a, b) =>
+  a.name === b.name && a.namespace === b.namespace
+
+const matchByName: ResourceMatcher<{ name?: string }> = (a, b) =>
+  Boolean(a.name && a.name === b.name)
+
+const matchByUid: ResourceMatcher<{ uid?: string }> = (a, b) => Boolean(a.uid && a.uid === b.uid)
+
+const matchService: ResourceMatcher<ServiceInfo> = (a, b) =>
+  (Boolean(a.uid) && a.uid === b.uid) || (a.name === b.name && a.namespace === b.namespace)
+
+function updateResourceList<T>(
+  listRef: Ref<T[]>,
+  action: KubernetesAction,
+  item: T,
+  match: ResourceMatcher<T>
+) {
+  const current = listRef.value
+  const index = current.findIndex((existing) => match(existing, item))
+
+  if (action === KUBERNETES_ACTION.Applied) {
+    if (index !== -1) {
+      current.splice(index, 1, item)
+    } else {
+      current.push(item)
+    }
+  } else if (action === KUBERNETES_ACTION.Deleted) {
+    if (index !== -1) {
+      current.splice(index, 1)
+    }
+  }
+}
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
@@ -65,15 +101,6 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
   const storageClasses = ref<StorageClassInfo[]>([])
 
-  interface NamespacedResource {
-    name: string
-    namespace: string
-  }
-
-  interface ClusterScopedResource {
-    name?: string
-    uid?: string
-  }
   const persistentVolumesLoading = ref(false)
   const persistentVolumeClaimsLoading = ref(false)
   const storageClassesLoading = ref(false)
@@ -444,6 +471,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   type ResourceInfo =
     | ServiceInfo
+    | IngressInfo
     | DeploymentInfo
     | PodInfo
     | StatefulSetInfo
@@ -451,6 +479,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     | ReplicaSetInfo
     | JobInfo
     | CronJobInfo
+    | NodeInfo
     | NamespaceInfo
     | ConfigMapInfo
     | SecretInfo
@@ -460,92 +489,58 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     | StorageClassInfo
     | PolicyInfo
 
+  const resourceUpdaters: Record<string, (action: KubernetesAction, data: ResourceInfo) => void> = {
+    [KUBERNETES_RESOURCE_KIND.Deployment]: (action, data) =>
+      updateResourceList(deployments, action, data as DeploymentInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.DaemonSet]: (action, data) =>
+      updateResourceList(daemonSets, action, data as DaemonSetInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.StatefulSet]: (action, data) =>
+      updateResourceList(statefulSets, action, data as StatefulSetInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.ReplicaSet]: (action, data) =>
+      updateResourceList(replicaSets, action, data as ReplicaSetInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.Job]: (action, data) =>
+      updateResourceList(jobs, action, data as JobInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.CronJob]: (action, data) =>
+      updateResourceList(cronJobs, action, data as CronJobInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.Pod]: (action, data) =>
+      updateResourceList(pods, action, data as PodInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.ConfigMap]: (action, data) =>
+      updateResourceList(configMaps, action, data as ConfigMapInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.Secret]: (action, data) =>
+      updateResourceList(secrets, action, data as SecretInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim]: (action, data) =>
+      updateResourceList(
+        persistentVolumeClaims,
+        action,
+        data as PersistentVolumeClaimInfo,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.Ingress]: (action, data) =>
+      updateResourceList(ingresses, action, data as IngressInfo, matchNamespaced),
+    [KUBERNETES_RESOURCE_KIND.Service]: (action, data) =>
+      updateResourceList(services, action, data as ServiceInfo, matchService),
+    [KUBERNETES_RESOURCE_KIND.Namespace]: (action, data) =>
+      updateResourceList(namespaceList, action, data as NamespaceInfo, matchByName),
+    [KUBERNETES_RESOURCE_KIND.Node]: (action, data) =>
+      updateResourceList(nodes, action, data as NodeInfo, matchByName),
+    [KUBERNETES_RESOURCE_KIND.PersistentVolume]: (action, data) =>
+      updateResourceList(persistentVolumes, action, data as PersistentVolumeInfo, matchByName),
+    [KUBERNETES_RESOURCE_KIND.StorageClass]: (action, data) =>
+      updateResourceList(storageClasses, action, data as StorageClassInfo, matchByName),
+    [KUBERNETES_RESOURCE_KIND.Event]: (action, data) =>
+      updateResourceList(events, action, data as EventInfo, matchByUid),
+    [KUBERNETES_RESOURCE_KIND.Policy]: (action, data) =>
+      updateResourceList(policies, action, data as PolicyInfo, matchByUid)
+  }
+
   function onResourceUpdated(payload: {
     kind: string
-    action: 'Applied' | 'Deleted'
+    action: KubernetesAction
     data: ResourceInfo
   }) {
-    const { kind, action, data } = payload
-
-    // Helper to update a namespaced list
-    const updateNamespaced = <T extends NamespacedResource>(listRef: { value: T[] }, item: T) => {
-      if (action === 'Applied') {
-        const index = listRef.value.findIndex(
-          (x) => x.name === item.name && x.namespace === item.namespace
-        )
-        if (index !== -1) listRef.value.splice(index, 1, item)
-        else listRef.value.push(item)
-      } else if (action === 'Deleted') {
-        listRef.value = listRef.value.filter(
-          (x) => !(x.name === item.name && x.namespace === item.namespace)
-        )
-      }
-    }
-
-    // Helper to update a cluster-scoped list (using name or uid)
-    const updateClusterScoped = <T extends ClusterScopedResource, K extends 'name' | 'uid'>(
-      listRef: { value: T[] },
-      item: T,
-      key: K
-    ) => {
-      if (action === KUBERNETES_ACTION.Applied) {
-        const index = listRef.value.findIndex((x) => x[key] === item[key])
-        if (index !== -1) listRef.value.splice(index, 1, item)
-        else listRef.value.push(item)
-      } else if (action === KUBERNETES_ACTION.Deleted) {
-        listRef.value = listRef.value.filter((x) => x[key] !== item[key])
-      }
-    }
-
-    switch (kind) {
-      case KUBERNETES_RESOURCE_KIND.Service:
-        updateClusterScoped(services, data as ServiceInfo, 'uid')
-        break
-      case KUBERNETES_RESOURCE_KIND.Deployment:
-        updateNamespaced(deployments, data as DeploymentInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.Pod:
-        updateNamespaced(pods, data as PodInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.StatefulSet:
-        updateNamespaced(statefulSets, data as StatefulSetInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.DaemonSet:
-        updateNamespaced(daemonSets, data as DaemonSetInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.ReplicaSet:
-        updateNamespaced(replicaSets, data as ReplicaSetInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.Job:
-        updateNamespaced(jobs, data as JobInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.CronJob:
-        updateNamespaced(cronJobs, data as CronJobInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.Namespace:
-        updateClusterScoped(namespaceList, data as NamespaceInfo, 'name')
-        break
-      case KUBERNETES_RESOURCE_KIND.ConfigMap:
-        updateNamespaced(configMaps, data as ConfigMapInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.Secret:
-        updateNamespaced(secrets, data as SecretInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.Event:
-        updateClusterScoped(events, data as EventInfo, 'uid')
-        break
-      case KUBERNETES_RESOURCE_KIND.PersistentVolume:
-        updateClusterScoped(persistentVolumes, data as PersistentVolumeInfo, 'name')
-        break
-      case KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim:
-        updateNamespaced(persistentVolumeClaims, data as PersistentVolumeClaimInfo)
-        break
-      case KUBERNETES_RESOURCE_KIND.StorageClass:
-        updateClusterScoped(storageClasses, data as StorageClassInfo, 'name')
-        break
-      case KUBERNETES_RESOURCE_KIND.Policy:
-        updateClusterScoped(policies, data as PolicyInfo, 'uid')
-        break
+    const handler = resourceUpdaters[payload.kind]
+    if (handler) {
+      handler(payload.action, payload.data)
     }
   }
 
