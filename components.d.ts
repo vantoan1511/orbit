@@ -95,6 +95,7 @@ declare module 'vue' {
     ScaleDialog: typeof import('./src/components/shared/ScaleDialog.vue')['default']
     SelectButton: typeof import('primevue/selectbutton')['default']
     ServiceDetailsDrawer: typeof import('./src/components/services/ServiceDetailsDrawer.vue')['default']
+    ServiceEditForm: typeof import('./src/components/network/ServiceEditForm.vue')['default']
     ServiceEndpointsTab: typeof import('./src/components/services/ServiceEndpointsTab.vue')['default']
     ServiceMetricsCards: typeof import('./src/components/services/ServiceMetricsCards.vue')['default']
     ServiceOverviewTab: typeof import('./src/components/services/ServiceOverviewTab.vue')['default']
