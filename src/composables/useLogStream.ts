@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents, TAIL_ALL_LINES } from '@/types/events'
@@ -128,15 +128,34 @@ export function useLogStream(options: {
   }
 
   const isAtBottom = ref<boolean>(true)
+  let scrollTimeout: ReturnType<typeof setTimeout> | null = null
+  let scrollUnlockTimeout: ReturnType<typeof setTimeout> | null = null
+  let isProgrammaticScrolling = false
 
   const scrollToBottom = () => {
     isAtBottom.value = true
     isFollowing.value = true
-    nextTick(() => {
+    isProgrammaticScrolling = true
+
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout)
+    }
+    if (scrollUnlockTimeout) {
+      clearTimeout(scrollUnlockTimeout)
+    }
+
+    scrollTimeout = setTimeout(() => {
       if (virtualScrollerRef.value && filteredLogLines.value.length > 0) {
         virtualScrollerRef.value.scrollToIndex(filteredLogLines.value.length - 1)
       }
-    })
+
+      scrollUnlockTimeout = setTimeout(() => {
+        isProgrammaticScrolling = false
+        scrollUnlockTimeout = null
+      }, 50)
+
+      scrollTimeout = null
+    }, 50)
   }
 
   const onScroll = (event: Event) => {
@@ -145,6 +164,8 @@ export function useLogStream(options: {
     const tolerance = 20
     const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= tolerance
     isAtBottom.value = atBottom
+
+    if (isProgrammaticScrolling) return
 
     if (!atBottom && isFollowing.value) {
       isFollowing.value = false
@@ -216,6 +237,12 @@ export function useLogStream(options: {
   })
 
   onUnmounted(async () => {
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout)
+    }
+    if (scrollUnlockTimeout) {
+      clearTimeout(scrollUnlockTimeout)
+    }
     events.off(OrbitEvents.LogLineReceived, handleLogLine)
     events.off(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
     await kubernetesService.stopLogs()
