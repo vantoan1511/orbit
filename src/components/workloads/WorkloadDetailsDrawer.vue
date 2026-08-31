@@ -8,9 +8,10 @@ import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import {
-  KUBERNETES_NAMESPACE_STATUS,
+  KUBERNETES_JOB_STATUS,
   KUBERNETES_POD_STATUS,
-  KUBERNETES_RESOURCE_KIND
+  KUBERNETES_RESOURCE_KIND,
+  KUBERNETES_WORKLOAD_STATUS
 } from '@/constants/kubernetes'
 import type {
   CronJobInfo,
@@ -65,20 +66,20 @@ const workloadKind = computed(() => {
 })
 
 const workloadStatus = computed(() => {
-  if (!props.workload) return KUBERNETES_NAMESPACE_STATUS.Active
+  if (!props.workload) return KUBERNETES_WORKLOAD_STATUS.Running
   if ('status' in props.workload) {
     return (props.workload as Exclude<WorkloadInfo, CronJobInfo>).status
   }
-  return KUBERNETES_NAMESPACE_STATUS.Active
+  return KUBERNETES_WORKLOAD_STATUS.Running
 })
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  [KUBERNETES_POD_STATUS.Running]: 'bg-emerald-500',
-  [KUBERNETES_POD_STATUS.Succeeded]: 'bg-emerald-500',
-  [KUBERNETES_NAMESPACE_STATUS.Active]: 'bg-emerald-500',
-  Progressing: 'bg-amber-500',
+  [KUBERNETES_WORKLOAD_STATUS.Running]: 'bg-emerald-500',
+  [KUBERNETES_JOB_STATUS.Succeeded]: 'bg-emerald-500',
+  [KUBERNETES_JOB_STATUS.Active]: 'bg-emerald-500',
+  [KUBERNETES_WORKLOAD_STATUS.Progressing]: 'bg-amber-500',
   [KUBERNETES_POD_STATUS.Pending]: 'bg-amber-500',
-  [KUBERNETES_POD_STATUS.Failed]: 'bg-rose-500',
+  [KUBERNETES_WORKLOAD_STATUS.Failed]: 'bg-rose-500',
   [KUBERNETES_POD_STATUS.CrashLoopBackOff]: 'bg-rose-500'
 }
 

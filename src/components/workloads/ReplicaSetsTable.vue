@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
-import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -18,7 +18,11 @@ const columns = [
   { field: 'images', header: 'Images', visible: true }
 ]
 
-const statuses = ['All Statuses', KUBERNETES_POD_STATUS.Running, 'Progressing']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_WORKLOAD_STATUS.Running,
+  KUBERNETES_WORKLOAD_STATUS.Progressing
+]
 
 const fetchReplicaSets = async () => {
   loading.value = true

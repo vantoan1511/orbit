@@ -57,6 +57,33 @@ export const KUBERNETES_POD_STATUS = {
 export type KubernetesPodStatus = (typeof KUBERNETES_POD_STATUS)[keyof typeof KUBERNETES_POD_STATUS]
 
 /**
+ * Common Kubernetes Workload statuses (Deployment, DaemonSet, StatefulSet, ReplicaSet).
+ */
+export const KUBERNETES_WORKLOAD_STATUS = {
+  Running: 'Running',
+  Progressing: 'Progressing',
+  Failed: 'Failed',
+  Paused: 'Paused',
+  Completed: 'Completed'
+} as const
+
+export type KubernetesWorkloadStatus =
+  (typeof KUBERNETES_WORKLOAD_STATUS)[keyof typeof KUBERNETES_WORKLOAD_STATUS]
+
+/**
+ * Common Kubernetes Job statuses.
+ */
+export const KUBERNETES_JOB_STATUS = {
+  Active: 'Active',
+  Succeeded: 'Succeeded',
+  Failed: 'Failed',
+  Unknown: 'Unknown',
+  Suspended: 'Suspended'
+} as const
+
+export type KubernetesJobStatus = (typeof KUBERNETES_JOB_STATUS)[keyof typeof KUBERNETES_JOB_STATUS]
+
+/**
  * Common Kubernetes Namespace phases.
  */
 export const KUBERNETES_NAMESPACE_STATUS = {

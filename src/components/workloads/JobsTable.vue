@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
-import {
-  KUBERNETES_NAMESPACE_STATUS,
-  KUBERNETES_POD_STATUS,
-  KUBERNETES_RESOURCE_KIND
-} from '@/constants/kubernetes'
+import { KUBERNETES_JOB_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -25,10 +21,10 @@ const columns = [
 
 const statuses = [
   'All Statuses',
-  KUBERNETES_NAMESPACE_STATUS.Active,
-  KUBERNETES_POD_STATUS.Succeeded,
-  KUBERNETES_POD_STATUS.Failed,
-  KUBERNETES_POD_STATUS.Unknown
+  KUBERNETES_JOB_STATUS.Active,
+  KUBERNETES_JOB_STATUS.Succeeded,
+  KUBERNETES_JOB_STATUS.Failed,
+  KUBERNETES_JOB_STATUS.Unknown
 ]
 
 const fetchJobs = async () => {

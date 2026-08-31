@@ -2,8 +2,10 @@
 import {
   KUBERNETES_EVENT_TYPE,
   KUBERNETES_NAMESPACE_STATUS,
+  KUBERNETES_NODE_STATUS,
   KUBERNETES_POD_STATUS,
-  KUBERNETES_VOLUME_STATUS
+  KUBERNETES_VOLUME_STATUS,
+  KUBERNETES_WORKLOAD_STATUS
 } from '@/constants/kubernetes'
 import { computed } from 'vue'
 
@@ -16,13 +18,13 @@ const statusColor = computed(() => {
     case KUBERNETES_POD_STATUS.Running:
     case KUBERNETES_POD_STATUS.Completed:
     case KUBERNETES_NAMESPACE_STATUS.Active:
-    case 'Ready':
+    case KUBERNETES_NODE_STATUS.Ready:
     case KUBERNETES_VOLUME_STATUS.Bound:
     case KUBERNETES_VOLUME_STATUS.Available:
     case KUBERNETES_POD_STATUS.Succeeded:
       return 'emerald'
     case KUBERNETES_POD_STATUS.Pending:
-    case 'Progressing':
+    case KUBERNETES_WORKLOAD_STATUS.Progressing:
     case KUBERNETES_VOLUME_STATUS.Released:
     case KUBERNETES_POD_STATUS.ContainerCreating:
     case KUBERNETES_EVENT_TYPE.Warning:

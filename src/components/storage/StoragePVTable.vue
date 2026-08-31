@@ -35,7 +35,7 @@ const statuses = [
   KUBERNETES_VOLUME_STATUS.Bound,
   KUBERNETES_VOLUME_STATUS.Available,
   KUBERNETES_VOLUME_STATUS.Released,
-  KUBERNETES_POD_STATUS.Failed
+  KUBERNETES_VOLUME_STATUS.Failed
 ]
 
 const storageClasses = computed(() => {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
-import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ContainerImageInfo, DeploymentInfo } from '@/types/kubernetes'
@@ -48,9 +48,9 @@ const columns = [
 
 const statuses = [
   'All Statuses',
-  KUBERNETES_POD_STATUS.Running,
-  'Progressing',
-  KUBERNETES_POD_STATUS.Failed
+  KUBERNETES_WORKLOAD_STATUS.Running,
+  KUBERNETES_WORKLOAD_STATUS.Progressing,
+  KUBERNETES_WORKLOAD_STATUS.Failed
 ]
 
 const CONDITION_ORDER: Record<string, number> = {
