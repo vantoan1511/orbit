@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import NodeDetailsDrawer from '@/components/nodes/NodeDetailsDrawer.vue'
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -34,7 +35,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
-    kind="Node"
+    :kind="KUBERNETES_RESOURCE_KIND.Node"
     :data="k8sStore.nodes"
     :initialColumns="columns"
     :statuses="statuses"

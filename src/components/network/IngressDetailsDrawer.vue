@@ -7,6 +7,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { IngressInfo } from '@/types/kubernetes'
 import { Activity, Globe, Network } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
@@ -117,7 +118,7 @@ const fetchRawYaml = async () => {
   try {
     await kubernetesService.getResourceRaw({
       namespace: props.ingress.namespace,
-      kind: 'Ingress',
+      kind: KUBERNETES_RESOURCE_KIND.Ingress,
       name: props.ingress.name
     })
   } catch (e) {
@@ -128,7 +129,10 @@ const fetchRawYaml = async () => {
 
 const handleRawData = (payload: { name?: string; kind?: string; data?: unknown }) => {
   if (!props.visible || !props.ingress) return
-  if (payload?.name === props.ingress.name && (payload?.kind === 'Ingress' || !payload?.kind)) {
+  if (
+    payload?.name === props.ingress.name &&
+    (payload?.kind === KUBERNETES_RESOURCE_KIND.Ingress || !payload?.kind)
+  ) {
     if (payload.data) {
       rawYamlData.value =
         typeof payload.data === 'string' ? payload.data : JSON.stringify(payload.data)
@@ -147,21 +151,15 @@ onUnmounted(() => {
 
 watch(
   () => [props.visible, props.ingress?.name, props.ingress?.namespace],
-  ([newVisible]) => {
-    if (newVisible && props.ingress) {
+  ([visible, name]) => {
+    if (visible && name) {
+      fetchRawYaml()
+    } else {
       rawYamlData.value = null
-      if (activeTab.value === 'yaml') {
-        fetchRawYaml()
-      }
     }
-  }
+  },
+  { immediate: true }
 )
-
-watch(activeTab, (newTab) => {
-  if (newTab === 'yaml' && !rawYamlData.value && !isYamlLoading.value) {
-    fetchRawYaml()
-  }
-})
 
 const displayedYaml = computed(() => {
   if (!rawYamlData.value) {
@@ -195,7 +193,7 @@ const copyYaml = async () => {
     :visible="props.visible"
     :has-resource="!!props.ingress"
     :title="props.ingress?.name ?? ''"
-    kind="Ingress"
+    :kind="KUBERNETES_RESOURCE_KIND.Ingress"
     kind-severity="info"
     status-badge-class="bg-emerald-500"
     :namespace="props.ingress?.namespace"
@@ -203,7 +201,7 @@ const copyYaml = async () => {
     @update:visible="emit('update:visible', $event)"
   >
     <template #tags>
-      <Tag rounded severity="info" class="font-mono" value="Ingress" />
+      <Tag rounded severity="info" class="font-mono" :value="KUBERNETES_RESOURCE_KIND.Ingress" />
       <Tag
         v-if="props.ingress?.className"
         rounded

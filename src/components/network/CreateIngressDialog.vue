@@ -3,6 +3,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { isValidHost, isValidK8sName, isValidPath, isValidPort } from '@/utils/validators'
 import type { HTTPIngressPath, Ingress, IngressRule } from 'kubernetes-types/networking/v1'
 import Button from 'primevue/button'
@@ -184,7 +185,7 @@ const handleCreate = async () => {
 
   const manifest: Ingress = {
     apiVersion: 'networking.k8s.io/v1',
-    kind: 'Ingress',
+    kind: KUBERNETES_RESOURCE_KIND.Ingress,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -203,7 +204,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: 'Ingress',
+      kind: KUBERNETES_RESOURCE_KIND.Ingress,
       name: trimmedName,
       data: manifest
     })

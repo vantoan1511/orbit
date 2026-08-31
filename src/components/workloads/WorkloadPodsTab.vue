@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import type { PodInfo } from '@/types/kubernetes'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
+import { getPodStatusBadgeClass as defaultGetStatusBadgeClass } from '@/utils/severity'
 import { Info, Terminal } from '@lucide/vue'
 import Button from 'primevue/button'
 
-defineProps<{
-  pods: PodInfo[]
-  getStatusBadgeClass: (status: string) => string
-}>()
+withDefaults(
+  defineProps<{
+    pods: PodInfo[]
+    getStatusBadgeClass?: (status: string) => string
+  }>(),
+  {
+    getStatusBadgeClass: () => defaultGetStatusBadgeClass
+  }
+)
 
 const emit = defineEmits<{
   (e: 'view-pod-logs', podName: string): void

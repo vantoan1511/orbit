@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_JOB_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -18,7 +19,13 @@ const columns = [
   { field: 'images', header: 'Images', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Active', 'Succeeded', 'Failed', 'Unknown']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_JOB_STATUS.Active,
+  KUBERNETES_JOB_STATUS.Succeeded,
+  KUBERNETES_JOB_STATUS.Failed,
+  KUBERNETES_JOB_STATUS.Unknown
+]
 
 const fetchJobs = async () => {
   loading.value = true
@@ -38,7 +45,7 @@ const fetchJobs = async () => {
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
-    kind="Job"
+    :kind="KUBERNETES_RESOURCE_KIND.Job"
     searchPlaceholder="Search jobs or images..."
     emptyMessage="No jobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} jobs"

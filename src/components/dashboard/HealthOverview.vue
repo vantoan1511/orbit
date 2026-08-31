@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_POD_STATUS } from '@/constants/kubernetes'
 import { computed } from 'vue'
 
 const store = useKubernetesStore()
@@ -9,10 +10,12 @@ const podHealth = computed(() => {
   const pods = store.pods
   const total = pods.length || 1 // prevent division by zero
 
-  const runningCount = pods.filter((p) => p.status === 'Running').length
-  const pendingCount = pods.filter((p) => p.status === 'Pending').length
-  const failedCount = pods.filter((p) => p.status === 'Failed').length
-  const crashLoopCount = pods.filter((p) => p.status.includes('CrashLoop')).length
+  const runningCount = pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Running).length
+  const pendingCount = pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Pending).length
+  const failedCount = pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Failed).length
+  const crashLoopCount = pods.filter((p) =>
+    p.status.includes(KUBERNETES_POD_STATUS.CrashLoopBackOff)
+  ).length
 
   return {
     running: {
@@ -85,9 +88,9 @@ const healthSections = computed(() => [
     title: 'Pod Health',
     gridCols: 'grid-cols-4',
     items: [
-      { label: 'Running', ...podHealth.value.running },
-      { label: 'Pending', ...podHealth.value.pending },
-      { label: 'Failed', ...podHealth.value.failed },
+      { label: KUBERNETES_POD_STATUS.Running, ...podHealth.value.running },
+      { label: KUBERNETES_POD_STATUS.Pending, ...podHealth.value.pending },
+      { label: KUBERNETES_POD_STATUS.Failed, ...podHealth.value.failed },
       { label: 'CrashLoop', ...podHealth.value.crashLoop }
     ]
   },

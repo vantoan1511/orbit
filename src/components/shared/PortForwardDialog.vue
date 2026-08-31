@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import Select from 'primevue/select'
 import { computed, inject, onMounted, ref, type Ref } from 'vue'
 
@@ -24,7 +25,7 @@ const dialogRef = inject<
 
 const sourceName = ref('')
 const sourceNamespace = ref('')
-const kind = ref('Deployment')
+const kind = ref<string>(KUBERNETES_RESOURCE_KIND.Deployment)
 
 const localPort = ref<number | null>(8080)
 const availablePorts = ref<number[]>([])
@@ -47,7 +48,7 @@ onMounted(() => {
   if (dialogRef?.value?.data) {
     sourceName.value = dialogRef.value.data.sourceName
     sourceNamespace.value = dialogRef.value.data.sourceNamespace || 'default'
-    kind.value = dialogRef.value.data.kind || 'Deployment'
+    kind.value = dialogRef.value.data.kind || KUBERNETES_RESOURCE_KIND.Deployment
 
     if (dialogRef.value.data.availablePorts && dialogRef.value.data.availablePorts.length > 0) {
       availablePorts.value = dialogRef.value.data.availablePorts

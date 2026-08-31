@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { AlertCircle } from '@lucide/vue'
@@ -25,7 +26,13 @@ const selectedStorageClass = computed({
   get: () => filterStore.getExtraFilter(STORE_KEY, 'storageClass', 'All Storage Classes'),
   set: (val: string) => filterStore.setExtraFilter(STORE_KEY, 'storageClass', val)
 })
-const statuses = ['All Statuses', 'Bound', 'Available', 'Released', 'Failed']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_VOLUME_STATUS.Bound,
+  KUBERNETES_VOLUME_STATUS.Available,
+  KUBERNETES_VOLUME_STATUS.Released,
+  KUBERNETES_VOLUME_STATUS.Failed
+]
 
 const storageClasses = computed(() => {
   const classes = new Set(k8sStore.persistentVolumes.map((pv) => pv.storageClass))
@@ -61,7 +68,7 @@ const handleRefresh = async () => {
     :searchFields="['name', 'storageClass']"
     :hideNamespaceFilter="true"
     :hideNamespaceColumn="true"
-    kind="PersistentVolume"
+    :kind="KUBERNETES_RESOURCE_KIND.PersistentVolume"
     searchPlaceholder="Search PVs..."
     emptyMessage="No Persistent Volumes found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} volumes"
@@ -80,7 +87,7 @@ const handleRefresh = async () => {
           {{ data.name }}
         </span>
         <AlertCircle
-          v-if="data.status === 'Failed'"
+          v-if="data.status === KUBERNETES_VOLUME_STATUS.Failed"
           class="w-3.5 h-3.5 text-rose-400"
           :title="data.reason"
         />

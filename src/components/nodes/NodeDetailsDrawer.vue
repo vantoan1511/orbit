@@ -6,7 +6,9 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { NodeInfo } from '@/types/kubernetes'
+import { getNodeStatusBadgeClass } from '@/utils/severity'
 import { Activity } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -29,23 +31,13 @@ const { events: clusterEvents } = storeToRefs(k8sStore)
 
 const activeTab = ref('overview')
 
-const nodeStatus = computed(() => {
-  return props.node?.status || 'Unknown'
-})
-
-const getStatusBadgeClass = (status: string) => {
-  const s = status.toLowerCase()
-  if (s === 'ready') {
-    return 'bg-emerald-500'
-  }
-  return 'bg-rose-500'
-}
+const nodeStatus = computed(() => props.node?.status || 'Unknown')
 
 const nodeEvents = computed(() => {
   if (!props.node) return []
   const name = props.node.name
   return clusterEvents.value.filter((ev) => {
-    return ev.objectName === name || (ev.source && ev.source.includes(name))
+    return ev.objectName === name || ev.message?.includes(name)
   })
 })
 
@@ -59,7 +51,7 @@ const fetchRawYaml = async () => {
   try {
     await kubernetesService.getResourceRaw({
       namespace: '',
-      kind: 'Node',
+      kind: KUBERNETES_RESOURCE_KIND.Node,
       name: props.node.name
     })
   } catch (e) {
@@ -75,7 +67,8 @@ const handleRawData = (payload: {
   data?: unknown
 }) => {
   if (!props.visible || !props.node) return
-  const matchesKind = !payload?.kind || payload.kind.toLowerCase() === 'node'
+  const matchesKind =
+    !payload?.kind || payload.kind.toLowerCase() === KUBERNETES_RESOURCE_KIND.Node.toLowerCase()
   const matchesName = payload?.name === props.node.name
   if (matchesKind && matchesName) {
     if (payload.data) {
@@ -144,9 +137,9 @@ const copyYaml = async () => {
     :visible="visible"
     :has-resource="!!node"
     :title="node?.name ?? ''"
-    kind="Node"
+    :kind="KUBERNETES_RESOURCE_KIND.Node"
     kind-severity="info"
-    :status-badge-class="getStatusBadgeClass(nodeStatus)"
+    :status-badge-class="getNodeStatusBadgeClass(nodeStatus)"
     @update:visible="(val) => emit('update:visible', val)"
   >
     <template #metadata>

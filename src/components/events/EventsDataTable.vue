@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { getEventTypeSeverity } from '@/utils/severity'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
 import { computed, ref } from 'vue'
@@ -21,7 +23,7 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = ['All Types', 'Normal', 'Warning', 'Error']
+const types = ['All Types', ...Object.values(KUBERNETES_EVENT_TYPE)]
 
 const eventsWithResourceItem = computed(() =>
   events.value.map((e) => ({ ...e, name: e.objectName }))
@@ -43,19 +45,6 @@ const handleRefresh = async () => {
     console.error('Error fetching events:', error)
   }
 }
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case 'Warning':
-      return 'warn'
-    case 'Error':
-      return 'danger'
-    case 'Normal':
-      return 'success'
-    default:
-      return 'secondary'
-  }
-}
 </script>
 
 <template>
@@ -68,7 +57,7 @@ const getTypeSeverity = (type: string) => {
     :hideStatusColumn="true"
     :hideAgeColumn="true"
     :searchFields="['message', 'reason', 'name', 'objectKind', 'source']"
-    kind="Event"
+    :kind="KUBERNETES_RESOURCE_KIND.Event"
     searchPlaceholder="Search events..."
     emptyMessage="No events found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} events"
@@ -98,7 +87,7 @@ const getTypeSeverity = (type: string) => {
       <!-- Type Column -->
       <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3 min-w-24">
         <template #body="{ data }">
-          <Tag :severity="getTypeSeverity(data.type)" :value="data.type" />
+          <Tag :severity="getEventTypeSeverity(data.type)" :value="data.type" />
         </template>
       </Column>
 

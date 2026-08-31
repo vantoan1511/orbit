@@ -17,6 +17,7 @@ import IngressEditForm from '@/components/network/IngressEditForm.vue'
 import ServiceEditForm from '@/components/network/ServiceEditForm.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
 import type { Deployment } from 'kubernetes-types/apps/v1'
 import type { Service } from 'kubernetes-types/core/v1'
@@ -185,9 +186,9 @@ watch(
   (newVal) => {
     if (
       !rawData.value ||
-      props.kind === 'Deployment' ||
-      props.kind === 'Ingress' ||
-      props.kind === 'Service'
+      props.kind === KUBERNETES_RESOURCE_KIND.Deployment ||
+      props.kind === KUBERNETES_RESOURCE_KIND.Ingress ||
+      props.kind === KUBERNETES_RESOURCE_KIND.Service
     )
       return
     try {
@@ -286,7 +287,10 @@ watch(
     <div v-else class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <!-- Form Mode -->
       <template v-if="!isYamlMode">
-        <div v-if="props.kind === 'Deployment'" class="w-full h-full overflow-hidden flex flex-col">
+        <div
+          v-if="props.kind === KUBERNETES_RESOURCE_KIND.Deployment"
+          class="w-full h-full overflow-hidden flex flex-col"
+        >
           <DeploymentEditForm
             :raw-data="deploymentRawData"
             @update:raw-data="handleCustomFormUpdate"
@@ -295,7 +299,7 @@ watch(
         </div>
 
         <div
-          v-else-if="props.kind === 'Ingress'"
+          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Ingress"
           class="w-full h-full overflow-hidden flex flex-col"
         >
           <IngressEditForm
@@ -306,7 +310,7 @@ watch(
         </div>
 
         <div
-          v-else-if="props.kind === 'Service'"
+          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Service"
           class="w-full h-full overflow-hidden flex flex-col"
         >
           <ServiceEditForm

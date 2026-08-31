@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_POD_STATUS } from '@/constants/kubernetes'
 import { AlertTriangle, Box, CheckCircle2, HelpCircle, Loader2 } from '@lucide/vue'
 import { Card } from 'primevue'
 import Chart from 'primevue/chart'
@@ -10,11 +11,21 @@ const k8sStore = useKubernetesStore()
 const totalPods = computed(() => k8sStore.pods.length)
 const maxPods = computed(() => Math.max(k8sStore.nodes.length * 110, 110))
 
-const runningCount = computed(() => k8sStore.pods.filter((p) => p.status === 'Running').length)
-const pendingCount = computed(() => k8sStore.pods.filter((p) => p.status === 'Pending').length)
-const failedCount = computed(() => k8sStore.pods.filter((p) => p.status === 'Failed').length)
+const runningCount = computed(
+  () => k8sStore.pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Running).length
+)
+const pendingCount = computed(
+  () => k8sStore.pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Pending).length
+)
+const failedCount = computed(
+  () => k8sStore.pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Failed).length
+)
 const unknownCount = computed(() => {
-  const recognized = ['Running', 'Pending', 'Failed']
+  const recognized: readonly string[] = [
+    KUBERNETES_POD_STATUS.Running,
+    KUBERNETES_POD_STATUS.Pending,
+    KUBERNETES_POD_STATUS.Failed
+  ]
   return k8sStore.pods.filter((p) => !recognized.includes(p.status)).length
 })
 

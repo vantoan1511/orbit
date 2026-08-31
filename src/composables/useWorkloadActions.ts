@@ -4,8 +4,10 @@ import { useConfirm } from 'primevue/useconfirm'
 import { useDialog } from 'primevue/usedialog'
 import { computed, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
-import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { kubernetesService } from '@/services/kubernetesService'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import type { ActivePortForward } from '@/types/kubernetes'
 import ScaleDialog from '@/components/shared/ScaleDialog.vue'
 import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
@@ -54,12 +56,18 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
 
   const actionMenuItems = computed<MenuItem[]>(() => {
     const items: MenuItem[] = []
-    const resourceKind = toValue(options.kind) || 'Deployment'
+    const resourceKind = toValue(options.kind) || KUBERNETES_RESOURCE_KIND.Deployment
 
     // Logs
-    if (
-      ['Deployment', 'StatefulSet', 'DaemonSet', 'ReplicaSet', 'Job', 'Pod'].includes(resourceKind)
-    ) {
+    const logKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.DaemonSet,
+      KUBERNETES_RESOURCE_KIND.ReplicaSet,
+      KUBERNETES_RESOURCE_KIND.Job,
+      KUBERNETES_RESOURCE_KIND.Pod
+    ]
+    if (logKinds.includes(resourceKind)) {
       items.push({
         label: 'View Logs',
         icon: 'pi pi-compass',
@@ -79,7 +87,12 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // View Details
-    if (!['PersistentVolume', 'PersistentVolumeClaim', 'Node'].includes(resourceKind)) {
+    const noDetailsKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.PersistentVolume,
+      KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim,
+      KUBERNETES_RESOURCE_KIND.Node
+    ]
+    if (!noDetailsKinds.includes(resourceKind)) {
       items.push({
         label: 'View Details',
         icon: 'pi pi-info',
@@ -94,7 +107,14 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     items.push({ separator: true })
 
     // Port Forwarding
-    if (['Deployment', 'Pod', 'Service', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
+    const portForwardKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.Pod,
+      KUBERNETES_RESOURCE_KIND.Service,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.ReplicaSet
+    ]
+    if (portForwardKinds.includes(resourceKind)) {
       items.push({
         label: 'Port Forwarding',
         icon: 'pi pi-arrow-right-arrow-left',
@@ -115,7 +135,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
               sourceNamespace: row.namespace || 'default',
               kind: resourceKind,
               availablePorts:
-                resourceKind === 'Service' && 'portsList' in row
+                resourceKind === KUBERNETES_RESOURCE_KIND.Service && 'portsList' in row
                   ? (row as { portsList?: Array<{ port: number }> }).portsList?.map(
                       (p) => p.port
                     ) || []
@@ -159,7 +179,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         const targetName = row.name.toLowerCase()
 
         const activeForwards = k8sStore.activePortForwards.filter(
-          (f) =>
+          (f: ActivePortForward) =>
             f.namespace.toLowerCase() === targetNamespace &&
             f.kind.toLowerCase() === targetKind &&
             f.name.toLowerCase() === targetName
@@ -201,7 +221,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     items.push({ separator: true })
 
     // Clone (Ingress only)
-    if (resourceKind === 'Ingress') {
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Ingress) {
       items.push({
         label: 'Clone',
         icon: 'pi pi-copy',
@@ -258,7 +278,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // Clone (Deployment only)
-    if (resourceKind === 'Deployment') {
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Deployment) {
       items.push({
         label: 'Clone',
         icon: 'pi pi-copy',
@@ -304,7 +324,12 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // Redeploy
-    if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(resourceKind)) {
+    const redeployKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.DaemonSet
+    ]
+    if (redeployKinds.includes(resourceKind)) {
       items.push({
         label: 'Redeploy',
         icon: 'pi pi-refresh',
@@ -322,11 +347,17 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                   kind: resourceKind,
                   name: row.name
                 })
+                toast.add({
+                  severity: 'success',
+                  summary: 'Redeployed',
+                  detail: `${resourceKind} ${row.name} redeploy triggered`,
+                  life: 3000
+                })
               } catch (e) {
                 toast.add({
                   severity: 'error',
                   summary: 'Error',
-                  detail: e instanceof Error ? e.message : 'Failed to redeploy',
+                  detail: `Failed to redeploy: ${e instanceof Error ? e.message : 'Unknown error'}`,
                   life: 5000
                 })
               }
@@ -338,7 +369,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // Rollback
-    if (resourceKind === 'Deployment') {
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Deployment) {
       items.push({
         label: 'Rollback',
         icon: 'pi pi-history',
@@ -371,7 +402,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // Restart
-    if (resourceKind === 'Pod') {
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Pod) {
       items.push({
         label: 'Restart',
         icon: 'pi pi-power-off',
@@ -403,7 +434,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // Edit
-    if (resourceKind !== 'Event') {
+    if (resourceKind !== KUBERNETES_RESOURCE_KIND.Event) {
       items.push({
         label: 'Edit',
         icon: 'pi pi-file-edit',
@@ -423,7 +454,12 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // Scale
-    if (['Deployment', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
+    const scaleKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.ReplicaSet
+    ]
+    if (scaleKinds.includes(resourceKind)) {
       items.push({
         label: 'Scale',
         icon: 'pi pi-sliders-h',
@@ -477,8 +513,8 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     items.push({ separator: true })
 
     // Delete / Terminate
-    if (resourceKind !== 'Event') {
-      const deleteLabel = resourceKind === 'Pod' ? 'Terminate' : 'Delete'
+    if (resourceKind !== KUBERNETES_RESOURCE_KIND.Event) {
+      const deleteLabel = resourceKind === KUBERNETES_RESOURCE_KIND.Pod ? 'Terminate' : 'Delete'
       items.push({
         label: deleteLabel,
         icon: 'pi pi-trash',

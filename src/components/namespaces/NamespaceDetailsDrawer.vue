@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { NamespaceInfo } from '@/types/kubernetes'
+import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { getNamespaceStatusBadgeClass } from '@/utils/severity'
 import { BarChart2, Clock, FileCode, Layers } from '@lucide/vue'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
@@ -27,7 +29,7 @@ interface LimitRangeInfo {
   min: string
   max: string
   default: string
-  defaultRequest: string
+  defaultRequest?: string
 }
 
 export interface DrawerNamespaceInfo extends NamespaceInfo {
@@ -118,22 +120,11 @@ watch(
   { immediate: true }
 )
 
-const getStatusBadgeClass = (status: string) => {
-  switch (status) {
-    case 'Active':
-      return 'bg-emerald-500'
-    case 'Terminating':
-      return 'bg-amber-500'
-    default:
-      return 'bg-gray-400'
-  }
-}
-
 const getStatusTextClass = (status: string) => {
   switch (status) {
-    case 'Active':
+    case KUBERNETES_NAMESPACE_STATUS.Active:
       return 'text-emerald-400'
-    case 'Terminating':
+    case KUBERNETES_NAMESPACE_STATUS.Terminating:
       return 'text-amber-400'
     default:
       return 'text-gray-400'
@@ -147,10 +138,12 @@ const getStatusTextClass = (status: string) => {
     :visible="props.visible"
     :has-resource="!!props.namespace"
     :title="props.namespace?.name ?? ''"
-    kind="Namespace"
-    :kind-severity="props.namespace?.status === 'Active' ? 'success' : 'warn'"
+    :kind="KUBERNETES_RESOURCE_KIND.Namespace"
+    :kind-severity="
+      props.namespace?.status === KUBERNETES_NAMESPACE_STATUS.Active ? 'success' : 'warn'
+    "
     :status-badge-class="
-      props.namespace ? getStatusBadgeClass(props.namespace.status) : 'bg-gray-400'
+      props.namespace ? getNamespaceStatusBadgeClass(props.namespace.status) : 'bg-gray-400'
     "
     :show-yaml-tab="false"
     @update:visible="emit('update:visible', $event)"
@@ -199,7 +192,7 @@ const getStatusTextClass = (status: string) => {
               <div class="flex items-center gap-1.5">
                 <span
                   class="w-1.5 h-1.5 rounded-full"
-                  :class="getStatusBadgeClass(props.namespace.status)"
+                  :class="getNamespaceStatusBadgeClass(props.namespace.status)"
                 ></span>
                 <span class="font-semibold" :class="getStatusTextClass(props.namespace.status)">{{
                   props.namespace.status

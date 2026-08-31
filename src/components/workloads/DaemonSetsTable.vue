@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -19,7 +20,11 @@ const columns = [
   { field: 'images', header: 'Images', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Running', 'Progressing']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_WORKLOAD_STATUS.Running,
+  KUBERNETES_WORKLOAD_STATUS.Progressing
+]
 
 const fetchDaemonSets = async () => {
   loading.value = true
@@ -39,7 +44,7 @@ const fetchDaemonSets = async () => {
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
-    kind="DaemonSet"
+    :kind="KUBERNETES_RESOURCE_KIND.DaemonSet"
     searchPlaceholder="Search daemonsets or images..."
     emptyMessage="No daemonsets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} daemonsets"

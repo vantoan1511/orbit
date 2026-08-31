@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
 
@@ -16,7 +17,12 @@ const columns = [
   { field: 'age', header: 'Age', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Bound', 'Pending', 'Lost']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_VOLUME_STATUS.Bound,
+  KUBERNETES_VOLUME_STATUS.Pending,
+  KUBERNETES_VOLUME_STATUS.Lost
+]
 
 const handleRefresh = async () => {
   try {
@@ -33,7 +39,7 @@ const handleRefresh = async () => {
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'volume', 'storageClass']"
-    kind="PersistentVolumeClaim"
+    :kind="KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim"
     searchPlaceholder="Search Claims..."
     emptyMessage="No PVCs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} claims"

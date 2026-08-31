@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -28,7 +29,7 @@ const handleRefresh = async () => {
     :hideStatusFilter="true"
     :hideStatusColumn="true"
     :searchFields="['name', 'hosts', 'address']"
-    kind="Ingress"
+    :kind="KUBERNETES_RESOURCE_KIND.Ingress"
     searchPlaceholder="Search ingresses..."
     emptyMessage="No ingresses found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} ingresses"

@@ -7,13 +7,22 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import {
+  KUBERNETES_JOB_STATUS,
+  KUBERNETES_POD_STATUS,
+  KUBERNETES_RESOURCE_KIND,
+  KUBERNETES_WORKLOAD_STATUS
+} from '@/constants/kubernetes'
 import type {
   CronJobInfo,
   DaemonSetReplicas,
+  EventInfo,
   JobInfo,
+  PodInfo,
   RawWorkloadResource,
   WorkloadInfo
 } from '@/types/kubernetes'
+import { getPodStatusBadgeClass, getWorkloadKindSeverity } from '@/utils/severity'
 import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -40,14 +49,14 @@ const { pods, events: clusterEvents } = storeToRefs(k8sStore)
 const activeTab = ref('overview')
 
 const getWorkloadKind = (w: WorkloadInfo): string => {
-  if ('schedule' in w) return 'CronJob'
-  if ('completions' in w) return 'Job'
-  if ('strategy' in w) return 'Deployment'
+  if ('schedule' in w) return KUBERNETES_RESOURCE_KIND.CronJob
+  if ('completions' in w) return KUBERNETES_RESOURCE_KIND.Job
+  if ('strategy' in w) return KUBERNETES_RESOURCE_KIND.Deployment
   if ('replicas' in w && w.replicas) {
     const reps = w.replicas
-    if ('ready' in reps && 'upToDate' in reps) return 'DaemonSet'
-    if (w.name.includes('stateful')) return 'StatefulSet'
-    return 'ReplicaSet'
+    if ('ready' in reps && 'upToDate' in reps) return KUBERNETES_RESOURCE_KIND.DaemonSet
+    if (w.name.includes('stateful')) return KUBERNETES_RESOURCE_KIND.StatefulSet
+    return KUBERNETES_RESOURCE_KIND.ReplicaSet
   }
   return 'Workload'
 }
@@ -56,37 +65,22 @@ const workloadKind = computed(() => {
   return props.workload ? getWorkloadKind(props.workload) : 'Workload'
 })
 
-const getWorkloadSeverity = (kind: string) => {
-  switch (kind) {
-    case 'Deployment':
-    case 'StatefulSet':
-    case 'DaemonSet':
-    case 'ReplicaSet':
-      return 'info'
-    case 'Job':
-    case 'CronJob':
-      return 'warn'
-    default:
-      return 'secondary'
-  }
-}
-
 const workloadStatus = computed(() => {
-  if (!props.workload) return 'Active'
+  if (!props.workload) return KUBERNETES_WORKLOAD_STATUS.Running
   if ('status' in props.workload) {
     return (props.workload as Exclude<WorkloadInfo, CronJobInfo>).status
   }
-  return 'Active'
+  return KUBERNETES_WORKLOAD_STATUS.Running
 })
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  Running: 'bg-emerald-500',
-  Succeeded: 'bg-emerald-500',
-  Active: 'bg-emerald-500',
-  Progressing: 'bg-amber-500',
-  Pending: 'bg-amber-500',
-  Failed: 'bg-rose-500',
-  CrashLoopBackOff: 'bg-rose-500'
+  [KUBERNETES_WORKLOAD_STATUS.Running]: 'bg-emerald-500',
+  [KUBERNETES_JOB_STATUS.Succeeded]: 'bg-emerald-500',
+  [KUBERNETES_JOB_STATUS.Active]: 'bg-emerald-500',
+  [KUBERNETES_WORKLOAD_STATUS.Progressing]: 'bg-amber-500',
+  [KUBERNETES_POD_STATUS.Pending]: 'bg-amber-500',
+  [KUBERNETES_WORKLOAD_STATUS.Failed]: 'bg-rose-500',
+  [KUBERNETES_POD_STATUS.CrashLoopBackOff]: 'bg-rose-500'
 }
 
 const getStatusBadgeClass = (status: string) => STATUS_BADGE_CLASSES[status] ?? 'bg-emerald-500'
@@ -138,7 +132,7 @@ const workloadPods = computed(() => {
   if (!props.workload) return []
   const ns = workloadNamespace.value
   const name = workloadName.value
-  return pods.value.filter((p) => {
+  return pods.value.filter((p: PodInfo) => {
     if (p.namespace !== ns) return false
     return p.name.startsWith(name + '-') || p.name === name
   })
@@ -149,7 +143,7 @@ const workloadEvents = computed(() => {
   if (!props.workload) return []
   const ns = workloadNamespace.value
   const name = workloadName.value
-  return clusterEvents.value.filter((ev) => {
+  return clusterEvents.value.filter((ev: EventInfo) => {
     if (ev.namespace !== ns) return false
     return ev.objectName === name || ev.objectName.startsWith(name + '-')
   })
@@ -256,7 +250,7 @@ const generateYaml = (w: WorkloadInfo) => {
     : ''
 
   let specSection = ''
-  if (kind === 'CronJob') {
+  if (kind === KUBERNETES_RESOURCE_KIND.CronJob) {
     const cj = w as CronJobInfo
     specSection = `spec:
   schedule: "${cj.schedule}"
@@ -268,7 +262,7 @@ const generateYaml = (w: WorkloadInfo) => {
           containers:
           - name: ${cj.name}
             image: ${cj.images?.[0] || 'unknown'}`
-  } else if (kind === 'Job') {
+  } else if (kind === KUBERNETES_RESOURCE_KIND.Job) {
     const j = w as JobInfo
     specSection = `spec:
   template:
@@ -331,7 +325,7 @@ const copyYaml = async () => {
     :has-resource="!!props.workload"
     :title="workloadName"
     :kind="workloadKind"
-    :kind-severity="getWorkloadSeverity(workloadKind)"
+    :kind-severity="getWorkloadKindSeverity(workloadKind)"
     :status-badge-class="getStatusBadgeClass(workloadStatus)"
     :namespace="workloadNamespace"
     :age="workloadAge"
@@ -411,7 +405,7 @@ const copyYaml = async () => {
       <TabPanel value="pods">
         <WorkloadPodsTab
           :pods="workloadPods"
-          :get-status-badge-class="getStatusBadgeClass"
+          :get-status-badge-class="getPodStatusBadgeClass"
           @view-pod-logs="viewPodLogs"
         />
       </TabPanel>

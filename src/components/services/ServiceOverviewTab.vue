@@ -2,28 +2,15 @@
 import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { ServiceInfo } from '@/types/kubernetes'
+import { getServiceTypeSeverity } from '@/utils/severity'
 import { ExternalLink } from '@lucide/vue'
 import Tag from 'primevue/tag'
 
 defineProps<{
   service: ServiceInfo
 }>()
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case 'LoadBalancer':
-      return 'info'
-    case 'ClusterIP':
-      return 'success'
-    case 'NodePort':
-      return 'warn'
-    case 'ExternalName':
-      return 'contrast'
-    default:
-      return 'secondary'
-  }
-}
 </script>
 
 <template>
@@ -43,7 +30,7 @@ const getTypeSeverity = (type: string) => {
             <span class="text-muted-color font-medium">Type</span>
             <div>
               <Tag
-                :severity="getTypeSeverity(service.type)"
+                :severity="getServiceTypeSeverity(service.type)"
                 :value="service.type"
                 class="text-xs"
               />
@@ -89,7 +76,11 @@ const getTypeSeverity = (type: string) => {
     </div>
 
     <!-- Active Port Forwards -->
-    <ActivePortForwardsList kind="Service" :namespace="service.namespace" :name="service.name" />
+    <ActivePortForwardsList
+      :kind="KUBERNETES_RESOURCE_KIND.Service"
+      :namespace="service.namespace"
+      :name="service.name"
+    />
 
     <!-- Pod Selectors -->
     <KeyValueBadgeList

@@ -1,4 +1,5 @@
 import { kubernetesService } from '@/services/kubernetesService'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import ScaleDialog from '@/components/shared/ScaleDialog.vue'
 import { useConfirm } from 'primevue/useconfirm'
 import { useDialog } from 'primevue/usedialog'
@@ -55,7 +56,7 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
 
   const bulkActions = computed<BulkActionItem[]>(() => {
     const items: BulkActionItem[] = []
-    const resourceKind = toValue(options.kind) || 'Deployment'
+    const resourceKind = toValue(options.kind) || KUBERNETES_RESOURCE_KIND.Deployment
     const count = selectedItems.value.length
 
     if (count === 0) {
@@ -63,7 +64,12 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
     }
 
     // Redeploy (Workloads)
-    if (['Deployment', 'StatefulSet', 'DaemonSet'].includes(resourceKind)) {
+    const redeployKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.DaemonSet
+    ]
+    if (redeployKinds.includes(resourceKind)) {
       items.push({
         label: 'Redeploy',
         icon: 'pi pi-refresh',
@@ -106,7 +112,7 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
     }
 
     // Restart (Pods)
-    if (resourceKind === 'Pod') {
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Pod) {
       items.push({
         label: 'Restart',
         icon: 'pi pi-power-off',
@@ -147,7 +153,12 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
     }
 
     // Scale (Deployment, StatefulSet, ReplicaSet)
-    if (['Deployment', 'StatefulSet', 'ReplicaSet'].includes(resourceKind)) {
+    const scaleKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.ReplicaSet
+    ]
+    if (scaleKinds.includes(resourceKind)) {
       items.push({
         label: 'Scale',
         icon: 'pi pi-sliders-h',
@@ -202,8 +213,8 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
     }
 
     // Delete / Terminate
-    if (resourceKind !== 'Event') {
-      const deleteLabel = resourceKind === 'Pod' ? 'Terminate' : 'Delete'
+    if (resourceKind !== KUBERNETES_RESOURCE_KIND.Event) {
+      const deleteLabel = resourceKind === KUBERNETES_RESOURCE_KIND.Pod ? 'Terminate' : 'Delete'
       items.push({
         label: deleteLabel,
         icon: 'pi pi-trash',

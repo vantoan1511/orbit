@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import {
+  KUBERNETES_NAMESPACE_STATUS,
+  KUBERNETES_POD_STATUS,
+  KUBERNETES_VOLUME_STATUS
+} from '@/constants/kubernetes'
 import { Box, ClipboardList, Clock, Database, HardDrive, Layers } from '@lucide/vue'
 import { computed } from 'vue'
 
@@ -12,7 +17,7 @@ const items = computed(() => {
       count: store.deployments.length,
       icon: Layers,
       iconColor: 'text-deployment bg-(--deployment)/10',
-      statusLabel: 'Available',
+      statusLabel: KUBERNETES_VOLUME_STATUS.Available,
       statusVal: store.deployments.reduce((acc, d) => acc + d.available, 0),
       statusSeverity: 'success'
     },
@@ -40,8 +45,9 @@ const items = computed(() => {
       icon: ClipboardList,
       iconColor: 'text-job bg-(--job)/10',
       statusLabel: 'Completed',
-      statusVal: store.jobs.filter((j) => j.status === 'Complete' || j.status === 'Completed')
-        .length,
+      statusVal: store.jobs.filter(
+        (j) => j.status === 'Complete' || j.status === KUBERNETES_POD_STATUS.Completed
+      ).length,
       statusSeverity: 'success'
     },
     {
@@ -49,8 +55,10 @@ const items = computed(() => {
       count: store.persistentVolumes.length,
       icon: HardDrive,
       iconColor: 'text-muted-color bg-(--bg-hover)',
-      statusLabel: 'Bound',
-      statusVal: store.persistentVolumes.filter((pv) => pv.status === 'Bound').length,
+      statusLabel: KUBERNETES_VOLUME_STATUS.Bound,
+      statusVal: store.persistentVolumes.filter(
+        (pv) => pv.status === KUBERNETES_VOLUME_STATUS.Bound
+      ).length,
       statusSeverity: 'success'
     },
     {
@@ -58,7 +66,7 @@ const items = computed(() => {
       count: store.cronJobs.length,
       icon: Clock,
       iconColor: 'text-rose-500 bg-rose-500/10',
-      statusLabel: 'Active',
+      statusLabel: KUBERNETES_NAMESPACE_STATUS.Active,
       statusVal: store.cronJobs.reduce((acc, c) => acc + c.active, 0),
       statusSeverity: 'warn'
     }

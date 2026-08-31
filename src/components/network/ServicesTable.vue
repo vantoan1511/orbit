@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { getServiceTypeSeverity } from '@/utils/severity'
 import { ExternalLink } from '@lucide/vue'
 import Column from 'primevue/column'
 import { computed, ref } from 'vue'
@@ -21,7 +23,7 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = ['All Types', 'ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName']
+const types = ['All Types', ...Object.values(KUBERNETES_SERVICE_TYPE)]
 
 const filteredServices = computed(() => {
   return k8sStore.services.filter((s) => {
@@ -35,21 +37,6 @@ const filteredServices = computed(() => {
 const handleRefresh = async () => {
   await kubernetesService.getServices()
 }
-
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case 'LoadBalancer':
-      return 'info'
-    case 'ClusterIP':
-      return 'success'
-    case 'NodePort':
-      return 'warn'
-    case 'ExternalName':
-      return 'contrast'
-    default:
-      return 'secondary'
-  }
-}
 </script>
 
 <template>
@@ -59,7 +46,7 @@ const getTypeSeverity = (type: string) => {
     :hideStatusFilter="true"
     :hideStatusColumn="true"
     :searchFields="['name', 'clusterIP', 'externalIP']"
-    kind="Service"
+    :kind="KUBERNETES_RESOURCE_KIND.Service"
     searchPlaceholder="Search services..."
     emptyMessage="No services found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} services"
@@ -75,7 +62,7 @@ const getTypeSeverity = (type: string) => {
       <!-- Type Column -->
       <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3">
         <template #body="{ data }">
-          <Tag :severity="getTypeSeverity(data.type)" :value="data.type" />
+          <Tag :severity="getServiceTypeSeverity(data.type)" :value="data.type" />
         </template>
       </Column>
 

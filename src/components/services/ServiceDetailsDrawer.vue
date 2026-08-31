@@ -6,7 +6,9 @@ import ServicePortsTab from '@/components/services/ServicePortsTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import type { ServiceInfo } from '@/types/kubernetes'
+import { getServiceTypeSeverity } from '@/utils/severity'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import { Activity, Shield } from '@lucide/vue'
 import Tab from 'primevue/tab'
@@ -25,21 +27,6 @@ const emit = defineEmits<{
 
 const activeTab = ref('overview')
 
-const getTypeSeverity = (type: string) => {
-  switch (type) {
-    case 'LoadBalancer':
-      return 'info'
-    case 'ClusterIP':
-      return 'success'
-    case 'NodePort':
-      return 'warn'
-    case 'ExternalName':
-      return 'contrast'
-    default:
-      return 'secondary'
-  }
-}
-
 // Live Raw YAML & JSON Fetching
 const rawYamlData = ref<string | null>(null)
 const isYamlLoading = ref<boolean>(false)
@@ -51,7 +38,7 @@ const fetchRawData = async () => {
   try {
     await kubernetesService.getResourceRaw({
       namespace: props.service.namespace,
-      kind: 'Service',
+      kind: KUBERNETES_RESOURCE_KIND.Service,
       name: props.service.name
     })
   } catch (e) {
@@ -61,7 +48,7 @@ const fetchRawData = async () => {
 }
 
 const handleRawData = (data: { kind?: string; name?: string; data?: unknown }) => {
-  if (data && data.kind === 'Service' && data.name === props.service?.name) {
+  if (data && data.kind === KUBERNETES_RESOURCE_KIND.Service && data.name === props.service?.name) {
     if (data.data && typeof data.data === 'object') {
       rawYamlData.value = yaml.stringify(data.data)
     } else if (typeof data.data === 'string') {
@@ -95,7 +82,7 @@ watch(
 
 const generateYaml = (s: ServiceInfo) => {
   return `apiVersion: v1
-kind: Service
+kind: ${KUBERNETES_RESOURCE_KIND.Service}
 metadata:
   name: ${s.name}
   namespace: ${s.namespace}
@@ -123,7 +110,7 @@ ${s.portsList
   )
   .join('\n')}
 status:
-  loadBalancer: ${s.type === 'LoadBalancer' ? `\n    ingress:\n    - ip: ${s.externalIP}` : '{}'}
+  loadBalancer: ${s.type === KUBERNETES_SERVICE_TYPE.LoadBalancer ? `\n    ingress:\n    - ip: ${s.externalIP}` : '{}'}
 `
 }
 
@@ -153,7 +140,7 @@ const copyYaml = async () => {
     :has-resource="!!props.service"
     :title="props.service?.name ?? ''"
     :kind="props.service?.type ?? ''"
-    :kind-severity="props.service ? getTypeSeverity(props.service.type) : 'info'"
+    :kind-severity="props.service ? getServiceTypeSeverity(props.service.type) : 'info'"
     status-badge-class="bg-emerald-500"
     :namespace="props.service?.namespace"
     :age="props.service?.age"

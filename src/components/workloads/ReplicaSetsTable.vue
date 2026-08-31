@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -17,7 +18,11 @@ const columns = [
   { field: 'images', header: 'Images', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Running', 'Progressing']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_WORKLOAD_STATUS.Running,
+  KUBERNETES_WORKLOAD_STATUS.Progressing
+]
 
 const fetchReplicaSets = async () => {
   loading.value = true
@@ -37,7 +42,7 @@ const fetchReplicaSets = async () => {
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
-    kind="ReplicaSet"
+    :kind="KUBERNETES_RESOURCE_KIND.ReplicaSet"
     searchPlaceholder="Search replicasets or images..."
     emptyMessage="No replicasets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} replicasets"
