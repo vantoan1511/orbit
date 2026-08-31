@@ -8,6 +8,10 @@ use tokio::sync::Mutex;
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 
+const HTTP_STATUS_BAD_REQUEST: u16 = 400;
+const CONTAINER_WAITING_TO_START_SUBSTRING: &str = "waiting to start";
+const LOG_LINE_SYSTEM_PREFIX: &str = "[Orbit]";
+
 #[allow(clippy::too_many_arguments)]
 pub async fn stream_pod_logs(
     client: Client,
@@ -31,6 +35,19 @@ pub async fn stream_pod_logs(
     let log_stream = match pods.log_stream(&pod_name, &lp).await {
         Ok(s) => s,
         Err(e) => {
+            if let Some(msg) = extract_waiting_container_message(&e) {
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::LogLinesChunkReceived {
+                        pod: pod_name.clone(),
+                        container: container.clone().unwrap_or_default(),
+                        lines: vec![format!("{} {}", LOG_LINE_SYSTEM_PREFIX, msg)],
+                    },
+                ).await;
+                return;
+            }
+
             log::error!("Failed to open log stream for {}: {}", pod_name, e);
             let _ = Bridge::send_event(
                 &writer,
@@ -187,4 +204,54 @@ pub async fn get_workload_pods(
     }
 
     Ok(pod_names)
+}
+
+pub fn extract_waiting_container_message(err: &kube::Error) -> Option<&str> {
+    if let kube::Error::Api(api_err) = err
+        && api_err.code == HTTP_STATUS_BAD_REQUEST
+        && api_err.message.contains(CONTAINER_WAITING_TO_START_SUBSTRING)
+    {
+        return Some(&api_err.message);
+    }
+    None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kube::error::ErrorResponse;
+
+    #[test]
+    fn test_extract_waiting_container_message_matches() {
+        let err = kube::Error::Api(ErrorResponse {
+            status: "Failure".to_string(),
+            message: "container \"guestbook\" in pod \"test-pod\" is waiting to start: trying and failing to pull image".to_string(),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        });
+
+        let extracted = extract_waiting_container_message(&err);
+        assert_eq!(
+            extracted,
+            Some("container \"guestbook\" in pod \"test-pod\" is waiting to start: trying and failing to pull image")
+        );
+    }
+
+    #[test]
+    fn test_extract_waiting_container_message_ignores_other_api_errors() {
+        let err = kube::Error::Api(ErrorResponse {
+            status: "Failure".to_string(),
+            message: "pods \"test-pod\" not found".to_string(),
+            reason: "NotFound".to_string(),
+            code: 404,
+        });
+
+        assert_eq!(extract_waiting_container_message(&err), None);
+    }
+
+    #[test]
+    fn test_extract_waiting_container_message_ignores_non_api_errors() {
+        let err = kube::Error::Discovery(kube::error::DiscoveryError::MissingKind("Foo".into()));
+        assert_eq!(extract_waiting_container_message(&err), None);
+    }
 }
