@@ -931,11 +931,12 @@ mod tests {
 
         let mapped = map_deployment(&dep);
         assert_eq!(mapped.name, "test-deploy");
-        assert_eq!(mapped.conditions.len(), 2);
-        assert_eq!(mapped.conditions[0].r#type, "Available");
-        assert_eq!(mapped.conditions[0].status, "True");
-        assert_eq!(mapped.conditions[0].reason.as_deref(), Some("MinimumReplicasAvailable"));
-        assert_eq!(mapped.conditions[1].r#type, "Progressing");
+        let conditions = mapped.conditions.as_ref().unwrap();
+        assert_eq!(conditions.len(), 2);
+        assert_eq!(conditions[0].type_, "Available");
+        assert_eq!(conditions[0].status, "True");
+        assert_eq!(conditions[0].reason.as_deref(), Some("MinimumReplicasAvailable"));
+        assert_eq!(conditions[1].type_, "Progressing");
     }
 }
 
