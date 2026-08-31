@@ -1,6 +1,12 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ResourceUpdate {
+    pub action: String,
+    pub data: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "event", content = "data")]
 pub enum OrbitEvent {
     #[serde(rename = "engineConnected")]
@@ -100,11 +106,10 @@ pub enum OrbitEvent {
     PoliciesUpdated {
         policies: Vec<crate::kubernetes::models::PolicyInfo>,
     },
-    #[serde(rename = "resourceUpdated")]
-    ResourceUpdated {
+    #[serde(rename = "resourceBatchUpdated")]
+    ResourceBatchUpdated {
         kind: String,
-        action: String,
-        data: serde_json::Value,
+        updates: Vec<ResourceUpdate>,
     },
     #[serde(rename = "podMetricsUpdated")]
     PodMetricsUpdated {
@@ -194,7 +199,7 @@ impl OrbitEvent {
             OrbitEvent::PersistentVolumeClaimsUpdated { .. } => "persistentVolumeClaimsUpdated",
             OrbitEvent::StorageClassesUpdated { .. } => "storageClassesUpdated",
             OrbitEvent::PoliciesUpdated { .. } => "policiesUpdated",
-            OrbitEvent::ResourceUpdated { .. } => "resourceUpdated",
+            OrbitEvent::ResourceBatchUpdated { .. } => "resourceBatchUpdated",
             OrbitEvent::PodMetricsUpdated { .. } => "podMetricsUpdated",
             OrbitEvent::ErrorOccurred { .. } => "errorOccurred",
             OrbitEvent::LogLineReceived { .. } => "logLineReceived",

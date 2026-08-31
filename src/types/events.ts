@@ -35,6 +35,31 @@ export interface UpdateManifest {
   release_notes?: string
 }
 
+export type KubernetesResourceInfo =
+  | ServiceInfo
+  | IngressInfo
+  | DeploymentInfo
+  | PodInfo
+  | StatefulSetInfo
+  | DaemonSetInfo
+  | ReplicaSetInfo
+  | JobInfo
+  | CronJobInfo
+  | NodeInfo
+  | NamespaceInfo
+  | ConfigMapInfo
+  | SecretInfo
+  | EventInfo
+  | PersistentVolumeInfo
+  | PersistentVolumeClaimInfo
+  | StorageClassInfo
+  | PolicyInfo
+
+export interface ResourceUpdateItem {
+  action: KubernetesAction
+  data: KubernetesResourceInfo
+}
+
 export interface OrbitEventMap {
   engineConnected: {
     status: 'ready' | 'error'
@@ -110,10 +135,9 @@ export interface OrbitEventMap {
   policiesUpdated: {
     policies: PolicyInfo[]
   }
-  resourceUpdated: {
+  resourceBatchUpdated: {
     kind: KubernetesResourceKind | string
-    action: KubernetesAction
-    data: ServiceInfo | DeploymentInfo | PodInfo
+    updates: ResourceUpdateItem[]
   }
   podMetricsUpdated: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
@@ -192,7 +216,7 @@ export const OrbitEvents = {
   PersistentVolumeClaimsUpdated: 'persistentVolumeClaimsUpdated',
   StorageClassesUpdated: 'storageClassesUpdated',
   PoliciesUpdated: 'policiesUpdated',
-  ResourceUpdated: 'resourceUpdated',
+  ResourceBatchUpdated: 'resourceBatchUpdated',
   PodMetricsUpdated: 'podMetricsUpdated',
   ErrorOccurred: 'errorOccurred',
   LogLineReceived: 'logLineReceived',

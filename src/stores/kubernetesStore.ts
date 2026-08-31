@@ -1,7 +1,7 @@
 import { kubernetesService } from '@/services/kubernetesService'
 import { events as nativeEvents } from '@/services/nativeService'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
-import { OrbitEvents } from '@/types/events'
+import { OrbitEvents, type KubernetesResourceInfo } from '@/types/events'
 import {
   KUBERNETES_ACTION,
   KUBERNETES_RESOURCE_KIND,
@@ -28,7 +28,7 @@ import {
   type StorageClassInfo
 } from '@/types/kubernetes'
 import { defineStore } from 'pinia'
-import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, triggerRef, watch, type ShallowRef } from 'vue'
 
 type ResourceMatcher<T> = (existing: T, incoming: T) => boolean
 
@@ -43,45 +43,56 @@ const matchByUid: ResourceMatcher<{ uid?: string }> = (a, b) => Boolean(a.uid &&
 const matchService: ResourceMatcher<ServiceInfo> = (a, b) =>
   (Boolean(a.uid) && a.uid === b.uid) || (a.name === b.name && a.namespace === b.namespace)
 
-function updateResourceList<T>(
-  listRef: Ref<T[]>,
-  action: KubernetesAction,
-  item: T,
+function updateResourceBatch<T>(
+  listRef: ShallowRef<T[]>,
+  updates: Array<{ action: KubernetesAction; data: T }>,
   match: ResourceMatcher<T>
 ) {
-  const current = listRef.value
-  const index = current.findIndex((existing) => match(existing, item))
+  if (!updates || updates.length === 0) return
+  let current: T[] | null = null
+  let changed = false
 
-  if (action === KUBERNETES_ACTION.Applied) {
-    if (index !== -1) {
-      current.splice(index, 1, item)
-    } else {
-      current.push(item)
-    }
-  } else if (action === KUBERNETES_ACTION.Deleted) {
-    if (index !== -1) {
+  for (const update of updates) {
+    const list = current ?? listRef.value
+    const index = list.findIndex((existing) => match(existing, update.data))
+
+    if (update.action === KUBERNETES_ACTION.Applied) {
+      if (!current) current = [...listRef.value]
+      if (index !== -1) {
+        current[index] = update.data
+      } else {
+        current.push(update.data)
+      }
+      changed = true
+    } else if (update.action === KUBERNETES_ACTION.Deleted && index !== -1) {
+      if (!current) current = [...listRef.value]
       current.splice(index, 1)
+      changed = true
     }
+  }
+
+  if (changed && current) {
+    listRef.value = current
   }
 }
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
   const isAppLoading = ref(true)
-  const pods = ref<PodInfo[]>([])
-  const deployments = ref<DeploymentInfo[]>([])
-  const statefulSets = ref<StatefulSetInfo[]>([])
-  const daemonSets = ref<DaemonSetInfo[]>([])
-  const replicaSets = ref<ReplicaSetInfo[]>([])
-  const jobs = ref<JobInfo[]>([])
-  const cronJobs = ref<CronJobInfo[]>([])
-  const nodes = ref<NodeInfo[]>([])
-  const services = ref<ServiceInfo[]>([])
-  const ingresses = ref<IngressInfo[]>([])
-  const configMaps = ref<ConfigMapInfo[]>([])
-  const secrets = ref<SecretInfo[]>([])
-  const events = ref<EventInfo[]>([])
-  const policies = ref<PolicyInfo[]>([])
+  const pods = shallowRef<PodInfo[]>([])
+  const deployments = shallowRef<DeploymentInfo[]>([])
+  const statefulSets = shallowRef<StatefulSetInfo[]>([])
+  const daemonSets = shallowRef<DaemonSetInfo[]>([])
+  const replicaSets = shallowRef<ReplicaSetInfo[]>([])
+  const jobs = shallowRef<JobInfo[]>([])
+  const cronJobs = shallowRef<CronJobInfo[]>([])
+  const nodes = shallowRef<NodeInfo[]>([])
+  const services = shallowRef<ServiceInfo[]>([])
+  const ingresses = shallowRef<IngressInfo[]>([])
+  const configMaps = shallowRef<ConfigMapInfo[]>([])
+  const secrets = shallowRef<SecretInfo[]>([])
+  const events = shallowRef<EventInfo[]>([])
+  const policies = shallowRef<PolicyInfo[]>([])
   const configMapsLoading = ref(false)
   const secretsLoading = ref(false)
   const eventsLoading = ref(false)
@@ -97,47 +108,43 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const servicesLoading = ref(false)
   const ingressesLoading = ref(false)
   const namespacesLoading = ref(false)
-  const persistentVolumes = ref<PersistentVolumeInfo[]>([])
-  const persistentVolumeClaims = ref<PersistentVolumeClaimInfo[]>([])
-  const storageClasses = ref<StorageClassInfo[]>([])
+  const persistentVolumes = shallowRef<PersistentVolumeInfo[]>([])
+  const persistentVolumeClaims = shallowRef<PersistentVolumeClaimInfo[]>([])
+  const storageClasses = shallowRef<StorageClassInfo[]>([])
 
   const persistentVolumesLoading = ref(false)
   const persistentVolumeClaimsLoading = ref(false)
   const storageClassesLoading = ref(false)
-  const namespaceList = ref<NamespaceInfo[]>([])
-  const clusters = ref<ClusterInfo[]>([])
+  const namespaceList = shallowRef<NamespaceInfo[]>([])
+  const clusters = shallowRef<ClusterInfo[]>([])
   const activeClusterId = ref<string | null>(null)
   const lastUpdatedAt = ref<Date | null>(null)
 
   const cpuHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
   const memHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
 
-  watch(
-    nodes,
-    (newNodes: NodeInfo[]) => {
-      let totalCpu = 0
-      let usedCpu = 0
-      let totalMem = 0
-      let usedMem = 0
+  watch(nodes, (newNodes: NodeInfo[]) => {
+    let totalCpu = 0
+    let usedCpu = 0
+    let totalMem = 0
+    let usedMem = 0
 
-      for (const node of newNodes) {
-        totalCpu += parseFloat(node.cpuTotal || '0')
-        usedCpu += parseFloat(node.cpuUsed || '0')
-        totalMem += parseFloat(node.memTotal || '0')
-        usedMem += parseFloat(node.memUsed || '0')
-      }
+    for (const node of newNodes) {
+      totalCpu += parseFloat(node.cpuTotal || '0')
+      usedCpu += parseFloat(node.cpuUsed || '0')
+      totalMem += parseFloat(node.memTotal || '0')
+      usedMem += parseFloat(node.memUsed || '0')
+    }
 
-      const cpuPct = totalCpu > 0 ? (usedCpu / totalCpu) * 100 : 0
-      const memPct = totalMem > 0 ? (usedMem / totalMem) * 100 : 0
+    const cpuPct = totalCpu > 0 ? (usedCpu / totalCpu) * 100 : 0
+    const memPct = totalMem > 0 ? (usedMem / totalMem) * 100 : 0
 
-      cpuHistory.value.shift()
-      cpuHistory.value.push(cpuPct)
+    cpuHistory.value.shift()
+    cpuHistory.value.push(cpuPct)
 
-      memHistory.value.shift()
-      memHistory.value.push(memPct)
-    },
-    { deep: true }
-  )
+    memHistory.value.shift()
+    memHistory.value.push(memPct)
+  })
 
   function setEngineReady(ready: boolean) {
     isEngineReady.value = ready
@@ -469,78 +476,127 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
-  type ResourceInfo =
-    | ServiceInfo
-    | IngressInfo
-    | DeploymentInfo
-    | PodInfo
-    | StatefulSetInfo
-    | DaemonSetInfo
-    | ReplicaSetInfo
-    | JobInfo
-    | CronJobInfo
-    | NodeInfo
-    | NamespaceInfo
-    | ConfigMapInfo
-    | SecretInfo
-    | EventInfo
-    | PersistentVolumeInfo
-    | PersistentVolumeClaimInfo
-    | StorageClassInfo
-    | PolicyInfo
-
-  const resourceUpdaters: Record<string, (action: KubernetesAction, data: ResourceInfo) => void> = {
-    [KUBERNETES_RESOURCE_KIND.Deployment]: (action, data) =>
-      updateResourceList(deployments, action, data as DeploymentInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.DaemonSet]: (action, data) =>
-      updateResourceList(daemonSets, action, data as DaemonSetInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.StatefulSet]: (action, data) =>
-      updateResourceList(statefulSets, action, data as StatefulSetInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.ReplicaSet]: (action, data) =>
-      updateResourceList(replicaSets, action, data as ReplicaSetInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.Job]: (action, data) =>
-      updateResourceList(jobs, action, data as JobInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.CronJob]: (action, data) =>
-      updateResourceList(cronJobs, action, data as CronJobInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.Pod]: (action, data) =>
-      updateResourceList(pods, action, data as PodInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.ConfigMap]: (action, data) =>
-      updateResourceList(configMaps, action, data as ConfigMapInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.Secret]: (action, data) =>
-      updateResourceList(secrets, action, data as SecretInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim]: (action, data) =>
-      updateResourceList(
-        persistentVolumeClaims,
-        action,
-        data as PersistentVolumeClaimInfo,
+  const resourceUpdaters: Record<
+    string,
+    (updates: Array<{ action: KubernetesAction; data: KubernetesResourceInfo }>) => void
+  > = {
+    [KUBERNETES_RESOURCE_KIND.Deployment]: (updates) =>
+      updateResourceBatch(
+        deployments,
+        updates as Array<{ action: KubernetesAction; data: DeploymentInfo }>,
         matchNamespaced
       ),
-    [KUBERNETES_RESOURCE_KIND.Ingress]: (action, data) =>
-      updateResourceList(ingresses, action, data as IngressInfo, matchNamespaced),
-    [KUBERNETES_RESOURCE_KIND.Service]: (action, data) =>
-      updateResourceList(services, action, data as ServiceInfo, matchService),
-    [KUBERNETES_RESOURCE_KIND.Namespace]: (action, data) =>
-      updateResourceList(namespaceList, action, data as NamespaceInfo, matchByName),
-    [KUBERNETES_RESOURCE_KIND.Node]: (action, data) =>
-      updateResourceList(nodes, action, data as NodeInfo, matchByName),
-    [KUBERNETES_RESOURCE_KIND.PersistentVolume]: (action, data) =>
-      updateResourceList(persistentVolumes, action, data as PersistentVolumeInfo, matchByName),
-    [KUBERNETES_RESOURCE_KIND.StorageClass]: (action, data) =>
-      updateResourceList(storageClasses, action, data as StorageClassInfo, matchByName),
-    [KUBERNETES_RESOURCE_KIND.Event]: (action, data) =>
-      updateResourceList(events, action, data as EventInfo, matchByUid),
-    [KUBERNETES_RESOURCE_KIND.Policy]: (action, data) =>
-      updateResourceList(policies, action, data as PolicyInfo, matchByUid)
+    [KUBERNETES_RESOURCE_KIND.DaemonSet]: (updates) =>
+      updateResourceBatch(
+        daemonSets,
+        updates as Array<{ action: KubernetesAction; data: DaemonSetInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.StatefulSet]: (updates) =>
+      updateResourceBatch(
+        statefulSets,
+        updates as Array<{ action: KubernetesAction; data: StatefulSetInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.ReplicaSet]: (updates) =>
+      updateResourceBatch(
+        replicaSets,
+        updates as Array<{ action: KubernetesAction; data: ReplicaSetInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.Job]: (updates) =>
+      updateResourceBatch(
+        jobs,
+        updates as Array<{ action: KubernetesAction; data: JobInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.CronJob]: (updates) =>
+      updateResourceBatch(
+        cronJobs,
+        updates as Array<{ action: KubernetesAction; data: CronJobInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.Pod]: (updates) =>
+      updateResourceBatch(
+        pods,
+        updates as Array<{ action: KubernetesAction; data: PodInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.ConfigMap]: (updates) =>
+      updateResourceBatch(
+        configMaps,
+        updates as Array<{ action: KubernetesAction; data: ConfigMapInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.Secret]: (updates) =>
+      updateResourceBatch(
+        secrets,
+        updates as Array<{ action: KubernetesAction; data: SecretInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim]: (updates) =>
+      updateResourceBatch(
+        persistentVolumeClaims,
+        updates as Array<{ action: KubernetesAction; data: PersistentVolumeClaimInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.Ingress]: (updates) =>
+      updateResourceBatch(
+        ingresses,
+        updates as Array<{ action: KubernetesAction; data: IngressInfo }>,
+        matchNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.Service]: (updates) =>
+      updateResourceBatch(
+        services,
+        updates as Array<{ action: KubernetesAction; data: ServiceInfo }>,
+        matchService
+      ),
+    [KUBERNETES_RESOURCE_KIND.Namespace]: (updates) =>
+      updateResourceBatch(
+        namespaceList,
+        updates as Array<{ action: KubernetesAction; data: NamespaceInfo }>,
+        matchByName
+      ),
+    [KUBERNETES_RESOURCE_KIND.Node]: (updates) =>
+      updateResourceBatch(
+        nodes,
+        updates as Array<{ action: KubernetesAction; data: NodeInfo }>,
+        matchByName
+      ),
+    [KUBERNETES_RESOURCE_KIND.PersistentVolume]: (updates) =>
+      updateResourceBatch(
+        persistentVolumes,
+        updates as Array<{ action: KubernetesAction; data: PersistentVolumeInfo }>,
+        matchByName
+      ),
+    [KUBERNETES_RESOURCE_KIND.StorageClass]: (updates) =>
+      updateResourceBatch(
+        storageClasses,
+        updates as Array<{ action: KubernetesAction; data: StorageClassInfo }>,
+        matchByName
+      ),
+    [KUBERNETES_RESOURCE_KIND.Event]: (updates) =>
+      updateResourceBatch(
+        events,
+        updates as Array<{ action: KubernetesAction; data: EventInfo }>,
+        matchByUid
+      ),
+    [KUBERNETES_RESOURCE_KIND.Policy]: (updates) =>
+      updateResourceBatch(
+        policies,
+        updates as Array<{ action: KubernetesAction; data: PolicyInfo }>,
+        matchByUid
+      )
   }
 
-  function onResourceUpdated(payload: {
+  function onResourceBatchUpdated(payload: {
     kind: string
-    action: KubernetesAction
-    data: ResourceInfo
+    updates: Array<{ action: KubernetesAction; data: KubernetesResourceInfo }>
   }) {
     const handler = resourceUpdaters[payload.kind]
     if (handler) {
-      handler(payload.action, payload.data)
+      handler(payload.updates)
     }
   }
 
@@ -549,12 +605,17 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   function onPodMetricsUpdated(payload: {
     metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
   }) {
+    let changed = false
     for (const m of payload.metrics) {
       const pod = pods.value.find((p) => p.name === m.name && p.namespace === m.namespace)
       if (pod) {
         pod.cpu = m.cpu
         pod.memory = m.memory
+        changed = true
       }
+    }
+    if (changed) {
+      triggerRef(pods)
     }
   }
 
@@ -568,13 +629,13 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     activePortForwards.value = activePortForwards.value.filter((f) => f.id !== payload.id)
   }
 
-  nativeEvents.on(OrbitEvents.ResourceUpdated, onResourceUpdated)
+  nativeEvents.on(OrbitEvents.ResourceBatchUpdated, onResourceBatchUpdated)
   nativeEvents.on(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
   nativeEvents.on(OrbitEvents.PortForwardStarted, onPortForwardStarted)
   nativeEvents.on(OrbitEvents.PortForwardStopped, onPortForwardStopped)
 
   onScopeDispose(() => {
-    nativeEvents.off(OrbitEvents.ResourceUpdated, onResourceUpdated)
+    nativeEvents.off(OrbitEvents.ResourceBatchUpdated, onResourceBatchUpdated)
     nativeEvents.off(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
     nativeEvents.off(OrbitEvents.PortForwardStarted, onPortForwardStarted)
     nativeEvents.off(OrbitEvents.PortForwardStopped, onPortForwardStopped)

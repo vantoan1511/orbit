@@ -7,7 +7,7 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 use tokio::sync::watch;
 use crate::ipc::bridge::{Bridge, WsWriter};
-use crate::ipc::events::OrbitEvent;
+use crate::ipc::events::{OrbitEvent, ResourceUpdate};
 
 pub async fn watch_resource<K, M, F>(
     client: Client,
@@ -29,16 +29,23 @@ pub async fn watch_resource<K, M, F>(
         let mut stream = watcher(api, watcher::Config::default()).boxed();
 
         // 50ms coalescing window buffer to prevent flooding IPC on high frequency events
-        let mut buffer: Vec<OrbitEvent> = Vec::new();
+        let mut buffer: Vec<ResourceUpdate> = Vec::new();
         let mut flush_interval = tokio::time::interval(tokio::time::Duration::from_millis(50));
         flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-        async fn flush_buffer(buffer: &mut Vec<OrbitEvent>, writer: &Arc<Mutex<WsWriter>>, ipc_token: &str) {
+        async fn flush_buffer(
+            buffer: &mut Vec<ResourceUpdate>,
+            writer: &Arc<Mutex<WsWriter>>,
+            ipc_token: &str,
+            kind: &str,
+        ) {
             if !buffer.is_empty() {
-                let batch = std::mem::take(buffer);
-                for event in &batch {
-                    let _ = Bridge::send_event(writer, ipc_token, event).await;
-                }
+                let updates = std::mem::take(buffer);
+                let event = OrbitEvent::ResourceBatchUpdated {
+                    kind: kind.to_string(),
+                    updates,
+                };
+                let _ = Bridge::send_event(writer, ipc_token, &event).await;
             }
         }
 
@@ -47,12 +54,12 @@ pub async fn watch_resource<K, M, F>(
                 res = cancel_rx.changed() => {
                     if res.is_ok() && *cancel_rx.borrow() {
                         log::info!("Stopping watcher for {}", kind);
-                        flush_buffer(&mut buffer, &writer, &ipc_token).await;
+                        flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                         break 'outer;
                     }
                 }
                 _ = flush_interval.tick() => {
-                    flush_buffer(&mut buffer, &writer, &ipc_token).await;
+                    flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                 }
                 event = stream.next() => {
                     match event {
@@ -60,13 +67,12 @@ pub async fn watch_resource<K, M, F>(
                             let mapped = mapper(&obj);
                             if let Ok(data) = serde_json::to_value(&mapped) {
                                 log::debug!("Watcher Applied {} {:?}", kind, data);
-                                buffer.push(OrbitEvent::ResourceUpdated {
-                                    kind: kind.clone(),
+                                buffer.push(ResourceUpdate {
                                     action: "Applied".to_string(),
                                     data,
                                 });
                                 if buffer.len() >= 100 {
-                                    flush_buffer(&mut buffer, &writer, &ipc_token).await;
+                                    flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                                 }
                             }
                         }
@@ -74,18 +80,17 @@ pub async fn watch_resource<K, M, F>(
                             let mapped = mapper(&obj);
                             if let Ok(data) = serde_json::to_value(&mapped) {
                                 log::debug!("Watcher Deleted {} {:?}", kind, data);
-                                buffer.push(OrbitEvent::ResourceUpdated {
-                                    kind: kind.clone(),
+                                buffer.push(ResourceUpdate {
                                     action: "Deleted".to_string(),
                                     data,
                                 });
                                 if buffer.len() >= 100 {
-                                    flush_buffer(&mut buffer, &writer, &ipc_token).await;
+                                    flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                                 }
                             }
                         }
                         Some(Ok(watcher::Event::InitDone)) => {
-                            flush_buffer(&mut buffer, &writer, &ipc_token).await;
+                            flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                             log::info!("Watcher initial sync done for {}", kind);
                         }
                         Some(Ok(_)) => {}
@@ -94,6 +99,7 @@ pub async fn watch_resource<K, M, F>(
                         }
                         None => {
                             log::info!("Watcher stream ended for {}. Reconnecting...", kind);
+                            flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                             break;
                         }
                     }
