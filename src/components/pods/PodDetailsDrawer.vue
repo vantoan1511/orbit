@@ -9,6 +9,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { PodInfo } from '@/types/kubernetes'
+import { getPodStatusBadgeClass } from '@/utils/severity'
 import { Activity, Shield, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -35,23 +36,6 @@ const { events: clusterEvents } = storeToRefs(k8sStore)
 const activeTab = ref('overview')
 
 const podStatus = computed(() => props.pod?.status || 'Unknown')
-
-const getStatusBadgeClass = (status: string) => {
-  switch (status.toLowerCase()) {
-    case 'running':
-    case 'completed':
-      return 'bg-emerald-500'
-    case 'pending':
-    case 'containercreating':
-      return 'bg-amber-500'
-    case 'crashloopbackoff':
-    case 'error':
-    case 'failed':
-      return 'bg-rose-500'
-    default:
-      return 'bg-muted-color'
-  }
-}
 
 const podEvents = computed(() => {
   if (!props.pod) return []
@@ -166,7 +150,7 @@ const viewPodLogs = (containerName?: string) => {
     :title="pod?.name ?? ''"
     :kind="KUBERNETES_RESOURCE_KIND.Pod"
     kind-severity="info"
-    :status-badge-class="getStatusBadgeClass(podStatus)"
+    :status-badge-class="getPodStatusBadgeClass(podStatus)"
     :namespace="pod?.namespace"
     @update:visible="(val) => emit('update:visible', val)"
   >

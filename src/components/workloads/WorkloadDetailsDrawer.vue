@@ -21,7 +21,7 @@ import type {
   RawWorkloadResource,
   WorkloadInfo
 } from '@/types/kubernetes'
-import { getWorkloadKindSeverity } from '@/utils/severity'
+import { getPodStatusBadgeClass, getWorkloadKindSeverity } from '@/utils/severity'
 import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -404,7 +404,7 @@ const copyYaml = async () => {
       <TabPanel value="pods">
         <WorkloadPodsTab
           :pods="workloadPods"
-          :get-status-badge-class="getStatusBadgeClass"
+          :get-status-badge-class="getPodStatusBadgeClass"
           @view-pod-logs="viewPodLogs"
         />
       </TabPanel>

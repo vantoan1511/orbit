@@ -68,6 +68,18 @@ export type KubernetesNamespaceStatus =
   (typeof KUBERNETES_NAMESPACE_STATUS)[keyof typeof KUBERNETES_NAMESPACE_STATUS]
 
 /**
+ * Common Kubernetes Node statuses.
+ */
+export const KUBERNETES_NODE_STATUS = {
+  Ready: 'Ready',
+  NotReady: 'NotReady',
+  Unknown: 'Unknown'
+} as const
+
+export type KubernetesNodeStatus =
+  (typeof KUBERNETES_NODE_STATUS)[keyof typeof KUBERNETES_NODE_STATUS]
+
+/**
  * Kubernetes Event types.
  */
 export const KUBERNETES_EVENT_TYPE = {

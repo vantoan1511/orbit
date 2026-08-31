@@ -8,6 +8,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { NodeInfo } from '@/types/kubernetes'
+import { getNodeStatusBadgeClass } from '@/utils/severity'
 import { Activity } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -31,17 +32,6 @@ const { events: clusterEvents } = storeToRefs(k8sStore)
 const activeTab = ref('overview')
 
 const nodeStatus = computed(() => props.node?.status || 'Unknown')
-
-const getStatusBadgeClass = (status: string) => {
-  switch (status.toLowerCase()) {
-    case 'ready':
-      return 'bg-emerald-500'
-    case 'notready':
-      return 'bg-rose-500'
-    default:
-      return 'bg-amber-500'
-  }
-}
 
 const nodeEvents = computed(() => {
   if (!props.node) return []
@@ -149,7 +139,7 @@ const copyYaml = async () => {
     :title="node?.name ?? ''"
     :kind="KUBERNETES_RESOURCE_KIND.Node"
     kind-severity="info"
-    :status-badge-class="getStatusBadgeClass(nodeStatus)"
+    :status-badge-class="getNodeStatusBadgeClass(nodeStatus)"
     @update:visible="(val) => emit('update:visible', val)"
   >
     <template #metadata>

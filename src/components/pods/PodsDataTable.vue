@@ -17,15 +17,7 @@ const columns = [
   { field: 'age', header: 'Age', visible: true }
 ]
 
-const statuses = [
-  'All Statuses',
-  KUBERNETES_POD_STATUS.Running,
-  KUBERNETES_POD_STATUS.Pending,
-  KUBERNETES_POD_STATUS.Failed,
-  KUBERNETES_POD_STATUS.CrashLoopBackOff,
-  KUBERNETES_POD_STATUS.Completed,
-  KUBERNETES_POD_STATUS.Unknown
-]
+const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
 </script>
 
 <template>
