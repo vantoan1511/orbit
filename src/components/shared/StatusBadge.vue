@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   KUBERNETES_EVENT_TYPE,
+  KUBERNETES_NAMESPACE_STATUS,
   KUBERNETES_POD_STATUS,
   KUBERNETES_VOLUME_STATUS
 } from '@/constants/kubernetes'
@@ -14,7 +15,7 @@ const statusColor = computed(() => {
   switch (props.status) {
     case KUBERNETES_POD_STATUS.Running:
     case KUBERNETES_POD_STATUS.Completed:
-    case 'Active':
+    case KUBERNETES_NAMESPACE_STATUS.Active:
     case 'Ready':
     case KUBERNETES_VOLUME_STATUS.Bound:
     case KUBERNETES_VOLUME_STATUS.Available:

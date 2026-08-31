@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { NamespaceInfo } from '@/types/kubernetes'
@@ -34,7 +34,7 @@ const columns = [
   { field: 'labels', header: 'Labels', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Active', KUBERNETES_POD_STATUS.Terminating]
+const statuses = ['All Statuses', ...Object.values(KUBERNETES_NAMESPACE_STATUS)]
 
 // Collect unique label keys across all namespaces
 const labelOptions = computed(() => {
@@ -136,7 +136,7 @@ const getSparklineData = (ns: MappedNamespaceInfo) => ({
   datasets: [
     {
       data: ns.podSparkline,
-      borderColor: ns.status === KUBERNETES_POD_STATUS.Terminating ? '#f59e0b' : '#10b981',
+      borderColor: ns.status === KUBERNETES_NAMESPACE_STATUS.Terminating ? '#f59e0b' : '#10b981',
       backgroundColor: 'transparent',
       fill: false
     }

@@ -57,6 +57,17 @@ export const KUBERNETES_POD_STATUS = {
 export type KubernetesPodStatus = (typeof KUBERNETES_POD_STATUS)[keyof typeof KUBERNETES_POD_STATUS]
 
 /**
+ * Common Kubernetes Namespace phases.
+ */
+export const KUBERNETES_NAMESPACE_STATUS = {
+  Active: 'Active',
+  Terminating: 'Terminating'
+} as const
+
+export type KubernetesNamespaceStatus =
+  (typeof KUBERNETES_NAMESPACE_STATUS)[keyof typeof KUBERNETES_NAMESPACE_STATUS]
+
+/**
  * Kubernetes Event types.
  */
 export const KUBERNETES_EVENT_TYPE = {

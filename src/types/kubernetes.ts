@@ -18,6 +18,7 @@ import type { ObjectMeta } from 'kubernetes-types/meta/v1'
 import type {
   KubernetesClusterStatus,
   KubernetesEventType,
+  KubernetesNamespaceStatus,
   KubernetesPodStatus,
   KubernetesQosClass,
   KubernetesReclaimPolicy,
@@ -329,7 +330,7 @@ export interface StorageClassInfo {
 
 export interface NamespaceInfo {
   name: string
-  status: string
+  status: KubernetesNamespaceStatus | string
   isSystem: boolean
   age: string
   labels: Record<string, string>

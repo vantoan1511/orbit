@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -21,7 +21,7 @@ const columns = [
 ]
 
 const selectedSuspend = ref('All Suspend States')
-const suspendOptions = ['All Suspend States', 'Suspended', 'Active']
+const suspendOptions = ['All Suspend States', 'Suspended', KUBERNETES_NAMESPACE_STATUS.Active]
 
 const filteredCronJobs = computed(() => {
   return k8sStore.cronJobs.filter((cj) => {

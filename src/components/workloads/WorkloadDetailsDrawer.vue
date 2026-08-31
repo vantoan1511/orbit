@@ -7,11 +7,17 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
-import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import {
+  KUBERNETES_NAMESPACE_STATUS,
+  KUBERNETES_POD_STATUS,
+  KUBERNETES_RESOURCE_KIND
+} from '@/constants/kubernetes'
 import type {
   CronJobInfo,
   DaemonSetReplicas,
+  EventInfo,
   JobInfo,
+  PodInfo,
   RawWorkloadResource,
   WorkloadInfo
 } from '@/types/kubernetes'
@@ -59,21 +65,21 @@ const workloadKind = computed(() => {
 })
 
 const workloadStatus = computed(() => {
-  if (!props.workload) return 'Active'
+  if (!props.workload) return KUBERNETES_NAMESPACE_STATUS.Active
   if ('status' in props.workload) {
     return (props.workload as Exclude<WorkloadInfo, CronJobInfo>).status
   }
-  return 'Active'
+  return KUBERNETES_NAMESPACE_STATUS.Active
 })
 
 const STATUS_BADGE_CLASSES: Record<string, string> = {
-  Running: 'bg-emerald-500',
-  Succeeded: 'bg-emerald-500',
-  Active: 'bg-emerald-500',
+  [KUBERNETES_POD_STATUS.Running]: 'bg-emerald-500',
+  [KUBERNETES_POD_STATUS.Succeeded]: 'bg-emerald-500',
+  [KUBERNETES_NAMESPACE_STATUS.Active]: 'bg-emerald-500',
   Progressing: 'bg-amber-500',
-  Pending: 'bg-amber-500',
-  Failed: 'bg-rose-500',
-  CrashLoopBackOff: 'bg-rose-500'
+  [KUBERNETES_POD_STATUS.Pending]: 'bg-amber-500',
+  [KUBERNETES_POD_STATUS.Failed]: 'bg-rose-500',
+  [KUBERNETES_POD_STATUS.CrashLoopBackOff]: 'bg-rose-500'
 }
 
 const getStatusBadgeClass = (status: string) => STATUS_BADGE_CLASSES[status] ?? 'bg-emerald-500'
@@ -125,7 +131,7 @@ const workloadPods = computed(() => {
   if (!props.workload) return []
   const ns = workloadNamespace.value
   const name = workloadName.value
-  return pods.value.filter((p) => {
+  return pods.value.filter((p: PodInfo) => {
     if (p.namespace !== ns) return false
     return p.name.startsWith(name + '-') || p.name === name
   })
@@ -136,7 +142,7 @@ const workloadEvents = computed(() => {
   if (!props.workload) return []
   const ns = workloadNamespace.value
   const name = workloadName.value
-  return clusterEvents.value.filter((ev) => {
+  return clusterEvents.value.filter((ev: EventInfo) => {
     if (ev.namespace !== ns) return false
     return ev.objectName === name || ev.objectName.startsWith(name + '-')
   })

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { NamespaceInfo } from '@/types/kubernetes'
-import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { BarChart2, Clock, FileCode, Layers } from '@lucide/vue'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
@@ -121,9 +121,9 @@ watch(
 
 const getStatusBadgeClass = (status: string) => {
   switch (status) {
-    case 'Active':
+    case KUBERNETES_NAMESPACE_STATUS.Active:
       return 'bg-emerald-500'
-    case KUBERNETES_POD_STATUS.Terminating:
+    case KUBERNETES_NAMESPACE_STATUS.Terminating:
       return 'bg-amber-500'
     default:
       return 'bg-gray-400'
@@ -132,9 +132,9 @@ const getStatusBadgeClass = (status: string) => {
 
 const getStatusTextClass = (status: string) => {
   switch (status) {
-    case 'Active':
+    case KUBERNETES_NAMESPACE_STATUS.Active:
       return 'text-emerald-400'
-    case KUBERNETES_POD_STATUS.Terminating:
+    case KUBERNETES_NAMESPACE_STATUS.Terminating:
       return 'text-amber-400'
     default:
       return 'text-gray-400'
@@ -149,7 +149,9 @@ const getStatusTextClass = (status: string) => {
     :has-resource="!!props.namespace"
     :title="props.namespace?.name ?? ''"
     :kind="KUBERNETES_RESOURCE_KIND.Namespace"
-    :kind-severity="props.namespace?.status === 'Active' ? 'success' : 'warn'"
+    :kind-severity="
+      props.namespace?.status === KUBERNETES_NAMESPACE_STATUS.Active ? 'success' : 'warn'
+    "
     :status-badge-class="
       props.namespace ? getStatusBadgeClass(props.namespace.status) : 'bg-gray-400'
     "
