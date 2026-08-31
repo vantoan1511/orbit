@@ -21,12 +21,12 @@ const failedCount = computed(
   () => k8sStore.pods.filter((p) => p.status === KUBERNETES_POD_STATUS.Failed).length
 )
 const unknownCount = computed(() => {
-  const recognized = [
+  const recognized: readonly string[] = [
     KUBERNETES_POD_STATUS.Running,
     KUBERNETES_POD_STATUS.Pending,
     KUBERNETES_POD_STATUS.Failed
   ]
-  return k8sStore.pods.filter((p) => !recognized.includes(p.status as any)).length
+  return k8sStore.pods.filter((p) => !recognized.includes(p.status)).length
 })
 
 // Chart config and options

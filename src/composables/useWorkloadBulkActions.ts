@@ -64,13 +64,12 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
     }
 
     // Redeploy (Workloads)
-    if (
-      [
-        KUBERNETES_RESOURCE_KIND.Deployment,
-        KUBERNETES_RESOURCE_KIND.StatefulSet,
-        KUBERNETES_RESOURCE_KIND.DaemonSet
-      ].includes(resourceKind as any)
-    ) {
+    const redeployKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.DaemonSet
+    ]
+    if (redeployKinds.includes(resourceKind)) {
       items.push({
         label: 'Redeploy',
         icon: 'pi pi-refresh',
@@ -154,13 +153,12 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
     }
 
     // Scale (Deployment, StatefulSet, ReplicaSet)
-    if (
-      [
-        KUBERNETES_RESOURCE_KIND.Deployment,
-        KUBERNETES_RESOURCE_KIND.StatefulSet,
-        KUBERNETES_RESOURCE_KIND.ReplicaSet
-      ].includes(resourceKind as any)
-    ) {
+    const scaleKinds: readonly string[] = [
+      KUBERNETES_RESOURCE_KIND.Deployment,
+      KUBERNETES_RESOURCE_KIND.StatefulSet,
+      KUBERNETES_RESOURCE_KIND.ReplicaSet
+    ]
+    if (scaleKinds.includes(resourceKind)) {
       items.push({
         label: 'Scale',
         icon: 'pi pi-sliders-h',
