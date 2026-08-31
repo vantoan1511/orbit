@@ -61,7 +61,8 @@ export type KubernetesPodStatus = (typeof KUBERNETES_POD_STATUS)[keyof typeof KU
  */
 export const KUBERNETES_EVENT_TYPE = {
   Normal: 'Normal',
-  Warning: 'Warning'
+  Warning: 'Warning',
+  Error: 'Error'
 } as const
 
 export type KubernetesEventType = (typeof KUBERNETES_EVENT_TYPE)[keyof typeof KUBERNETES_EVENT_TYPE]

@@ -31,7 +31,7 @@ export function getEventTypeSeverity(type?: string): TagSeverity {
   switch (type) {
     case KUBERNETES_EVENT_TYPE.Warning:
       return 'warn'
-    case 'Error':
+    case KUBERNETES_EVENT_TYPE.Error:
       return 'danger'
     case KUBERNETES_EVENT_TYPE.Normal:
       return 'success'

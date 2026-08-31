@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import {
-  KUBERNETES_EVENT_TYPE,
-  KUBERNETES_RESOURCE_KIND
-} from '@/constants/kubernetes'
+import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { getEventTypeSeverity } from '@/utils/severity'
 import { storeToRefs } from 'pinia'
@@ -30,7 +27,7 @@ const types = [
   'All Types',
   KUBERNETES_EVENT_TYPE.Normal,
   KUBERNETES_EVENT_TYPE.Warning,
-  'Error'
+  KUBERNETES_EVENT_TYPE.Error
 ]
 
 const eventsWithResourceItem = computed(() =>

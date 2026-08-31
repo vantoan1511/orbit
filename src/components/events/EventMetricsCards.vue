@@ -15,14 +15,16 @@ const normalCount = computed(
 const warningCount = computed(
   () => events.value.filter((e) => e.type === KUBERNETES_EVENT_TYPE.Warning).length
 )
-const errorCount = computed(() => events.value.filter((e) => e.type === 'Error').length)
+const errorCount = computed(
+  () => events.value.filter((e) => e.type === KUBERNETES_EVENT_TYPE.Error).length
+)
 const otherCount = computed(
   () =>
     events.value.filter(
       (e) =>
         e.type !== KUBERNETES_EVENT_TYPE.Normal &&
         e.type !== KUBERNETES_EVENT_TYPE.Warning &&
-        e.type !== 'Error'
+        e.type !== KUBERNETES_EVENT_TYPE.Error
     ).length
 )
 

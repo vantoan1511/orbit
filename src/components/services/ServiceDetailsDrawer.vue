@@ -6,10 +6,7 @@ import ServicePortsTab from '@/components/services/ServicePortsTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
-import {
-  KUBERNETES_RESOURCE_KIND,
-  KUBERNETES_SERVICE_TYPE
-} from '@/constants/kubernetes'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import type { ServiceInfo } from '@/types/kubernetes'
 import { getServiceTypeSeverity } from '@/utils/severity'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'

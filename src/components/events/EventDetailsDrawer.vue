@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
-import {
-  KUBERNETES_EVENT_TYPE,
-  KUBERNETES_RESOURCE_KIND
-} from '@/constants/kubernetes'
+import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { EventInfo } from '@/types/kubernetes'
 import { getEventTypeSeverity } from '@/utils/severity'
 import { Clock } from '@lucide/vue'
