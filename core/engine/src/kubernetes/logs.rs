@@ -8,6 +8,10 @@ use tokio::sync::Mutex;
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 
+const HTTP_STATUS_BAD_REQUEST: u16 = 400;
+const CONTAINER_WAITING_TO_START_SUBSTRING: &str = "waiting to start";
+const LOG_LINE_SYSTEM_PREFIX: &str = "[Orbit]";
+
 #[allow(clippy::too_many_arguments)]
 pub async fn stream_pod_logs(
     client: Client,
@@ -38,7 +42,7 @@ pub async fn stream_pod_logs(
                     &OrbitEvent::LogLinesChunkReceived {
                         pod: pod_name.clone(),
                         container: container.clone().unwrap_or_default(),
-                        lines: vec![format!("[Orbit] {}", msg)],
+                        lines: vec![format!("{} {}", LOG_LINE_SYSTEM_PREFIX, msg)],
                     },
                 ).await;
                 return;
@@ -203,10 +207,11 @@ pub async fn get_workload_pods(
 }
 
 pub fn extract_waiting_container_message(err: &kube::Error) -> Option<&str> {
-    if let kube::Error::Api(api_err) = err {
-        if api_err.code == 400 && api_err.message.contains("waiting to start") {
-            return Some(&api_err.message);
-        }
+    if let kube::Error::Api(api_err) = err
+        && api_err.code == HTTP_STATUS_BAD_REQUEST
+        && api_err.message.contains(CONTAINER_WAITING_TO_START_SUBSTRING)
+    {
+        return Some(&api_err.message);
     }
     None
 }
