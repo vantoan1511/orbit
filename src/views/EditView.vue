@@ -13,6 +13,8 @@ import * as yaml from 'yaml'
 
 import { ArrowLeft, Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
+import ConfigMapEditForm from '@/components/config/ConfigMapEditForm.vue'
+import SecretEditForm from '@/components/config/SecretEditForm.vue'
 import IngressEditForm from '@/components/network/IngressEditForm.vue'
 import ServiceEditForm from '@/components/network/ServiceEditForm.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
@@ -20,7 +22,7 @@ import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
 import type { Deployment } from 'kubernetes-types/apps/v1'
-import type { Service } from 'kubernetes-types/core/v1'
+import type { ConfigMap, Secret, Service } from 'kubernetes-types/core/v1'
 import type { Ingress } from 'kubernetes-types/networking/v1'
 
 const props = defineProps<{
@@ -37,6 +39,8 @@ const rawData = ref<KubernetesResource | null>(null)
 const deploymentRawData = computed(() => (rawData.value as Deployment | null) ?? null)
 const ingressRawData = computed(() => (rawData.value as Ingress | null) ?? null)
 const serviceRawData = computed(() => (rawData.value as Service | null) ?? null)
+const configMapRawData = computed(() => (rawData.value as ConfigMap | null) ?? null)
+const secretRawData = computed(() => (rawData.value as Secret | null) ?? null)
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -188,7 +192,9 @@ watch(
       !rawData.value ||
       props.kind === KUBERNETES_RESOURCE_KIND.Deployment ||
       props.kind === KUBERNETES_RESOURCE_KIND.Ingress ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Service
+      props.kind === KUBERNETES_RESOURCE_KIND.Service ||
+      props.kind === KUBERNETES_RESOURCE_KIND.ConfigMap ||
+      props.kind === KUBERNETES_RESOURCE_KIND.Secret
     )
       return
     try {
@@ -315,6 +321,28 @@ watch(
         >
           <ServiceEditForm
             :raw-data="serviceRawData"
+            @update:raw-data="handleCustomFormUpdate"
+            @update:is-valid="(val) => (isChildFormValid = val)"
+          />
+        </div>
+
+        <div
+          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.ConfigMap"
+          class="w-full h-full overflow-hidden flex flex-col"
+        >
+          <ConfigMapEditForm
+            :raw-data="configMapRawData"
+            @update:raw-data="handleCustomFormUpdate"
+            @update:is-valid="(val) => (isChildFormValid = val)"
+          />
+        </div>
+
+        <div
+          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Secret"
+          class="w-full h-full overflow-hidden flex flex-col"
+        >
+          <SecretEditForm
+            :raw-data="secretRawData"
             @update:raw-data="handleCustomFormUpdate"
             @update:is-valid="(val) => (isChildFormValid = val)"
           />
