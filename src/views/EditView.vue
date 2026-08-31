@@ -14,10 +14,12 @@ import * as yaml from 'yaml'
 import { ArrowLeft, Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import IngressEditForm from '@/components/network/IngressEditForm.vue'
+import ServiceEditForm from '@/components/network/ServiceEditForm.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import type { KubernetesResource } from '@/types/kubernetes'
 import type { Deployment } from 'kubernetes-types/apps/v1'
+import type { Service } from 'kubernetes-types/core/v1'
 import type { Ingress } from 'kubernetes-types/networking/v1'
 
 const props = defineProps<{
@@ -33,6 +35,7 @@ const { isDark } = useTheme()
 const rawData = ref<KubernetesResource | null>(null)
 const deploymentRawData = computed(() => (rawData.value as Deployment | null) ?? null)
 const ingressRawData = computed(() => (rawData.value as Ingress | null) ?? null)
+const serviceRawData = computed(() => (rawData.value as Service | null) ?? null)
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -180,7 +183,13 @@ const handleCustomFormUpdate = (updatedData: KubernetesResource) => {
 watch(
   () => formValues.value,
   (newVal) => {
-    if (!rawData.value || props.kind === 'Deployment' || props.kind === 'Ingress') return
+    if (
+      !rawData.value ||
+      props.kind === 'Deployment' ||
+      props.kind === 'Ingress' ||
+      props.kind === 'Service'
+    )
+      return
     try {
       const currentData = yaml.parse(yamlContent.value) || {}
       if (!currentData.metadata) currentData.metadata = {}
@@ -291,6 +300,17 @@ watch(
         >
           <IngressEditForm
             :raw-data="ingressRawData"
+            @update:raw-data="handleCustomFormUpdate"
+            @update:is-valid="(val) => (isChildFormValid = val)"
+          />
+        </div>
+
+        <div
+          v-else-if="props.kind === 'Service'"
+          class="w-full h-full overflow-hidden flex flex-col"
+        >
+          <ServiceEditForm
+            :raw-data="serviceRawData"
             @update:raw-data="handleCustomFormUpdate"
             @update:is-valid="(val) => (isChildFormValid = val)"
           />
