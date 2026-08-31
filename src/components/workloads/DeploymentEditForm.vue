@@ -18,7 +18,6 @@ import ContainerPortsEditor from '@/components/shared/ContainerPortsEditor.vue'
 import ContainerResourcesEditor from '@/components/shared/ContainerResourcesEditor.vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import StringListEditor from '@/components/shared/StringListEditor.vue'
-import { KUBERNETES_NAMESPACE_STATUS } from '@/constants/kubernetes'
 import { isValidK8sLabel, isValidK8sName, isValidPath } from '@/utils/validators'
 
 import type { Deployment } from 'kubernetes-types/apps/v1'
@@ -528,7 +527,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <div class="flex items-center gap-2 mt-1">
                   <ToggleSwitch v-model="paused" @change="handleFieldChange" />
                   <span class="text-xs text-muted-color">
-                    {{ paused ? 'Deployment Paused' : KUBERNETES_NAMESPACE_STATUS.Active }}
+                    {{ paused ? 'Deployment Paused' : 'Active' }}
                   </span>
                 </div>
               </div>

@@ -1,11 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import {
-  KUBERNETES_POD_STATUS,
-  KUBERNETES_RESOURCE_KIND,
-  KUBERNETES_VOLUME_STATUS
-} from '@/constants/kubernetes'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { AlertCircle } from '@lucide/vue'
@@ -91,7 +87,7 @@ const handleRefresh = async () => {
           {{ data.name }}
         </span>
         <AlertCircle
-          v-if="data.status === KUBERNETES_POD_STATUS.Failed"
+          v-if="data.status === KUBERNETES_VOLUME_STATUS.Failed"
           class="w-3.5 h-3.5 text-rose-400"
           :title="data.reason"
         />
