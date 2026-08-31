@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { NamespaceInfo } from '@/types/kubernetes'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { BarChart2, Clock, FileCode, Layers } from '@lucide/vue'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
@@ -27,7 +28,7 @@ interface LimitRangeInfo {
   min: string
   max: string
   default: string
-  defaultRequest: string
+  defaultRequest?: string
 }
 
 export interface DrawerNamespaceInfo extends NamespaceInfo {
@@ -122,7 +123,7 @@ const getStatusBadgeClass = (status: string) => {
   switch (status) {
     case 'Active':
       return 'bg-emerald-500'
-    case 'Terminating':
+    case KUBERNETES_POD_STATUS.Terminating:
       return 'bg-amber-500'
     default:
       return 'bg-gray-400'
@@ -133,7 +134,7 @@ const getStatusTextClass = (status: string) => {
   switch (status) {
     case 'Active':
       return 'text-emerald-400'
-    case 'Terminating':
+    case KUBERNETES_POD_STATUS.Terminating:
       return 'text-amber-400'
     default:
       return 'text-gray-400'
@@ -147,7 +148,7 @@ const getStatusTextClass = (status: string) => {
     :visible="props.visible"
     :has-resource="!!props.namespace"
     :title="props.namespace?.name ?? ''"
-    kind="Namespace"
+    :kind="KUBERNETES_RESOURCE_KIND.Namespace"
     :kind-severity="props.namespace?.status === 'Active' ? 'success' : 'warn'"
     :status-badge-class="
       props.namespace ? getStatusBadgeClass(props.namespace.status) : 'bg-gray-400'

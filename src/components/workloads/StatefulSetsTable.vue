@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -17,7 +18,7 @@ const columns = [
   { field: 'images', header: 'Images', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Running', 'Progressing']
+const statuses = ['All Statuses', KUBERNETES_POD_STATUS.Running, 'Progressing']
 
 const fetchStatefulSets = async () => {
   loading.value = true
@@ -37,7 +38,7 @@ const fetchStatefulSets = async () => {
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
-    kind="StatefulSet"
+    :kind="KUBERNETES_RESOURCE_KIND.StatefulSet"
     searchPlaceholder="Search statefulsets or images..."
     emptyMessage="No statefulsets found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} statefulsets"

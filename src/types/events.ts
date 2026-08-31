@@ -7,6 +7,8 @@ import type {
   EventInfo,
   IngressInfo,
   JobInfo,
+  KubernetesAction,
+  KubernetesResourceKind,
   NamespaceInfo,
   NodeInfo,
   PersistentVolumeClaimInfo,
@@ -109,8 +111,8 @@ export interface OrbitEventMap {
     policies: PolicyInfo[]
   }
   resourceUpdated: {
-    kind: string
-    action: 'Applied' | 'Deleted'
+    kind: KubernetesResourceKind | string
+    action: KubernetesAction
     data: ServiceInfo | DeploymentInfo | PodInfo
   }
   podMetricsUpdated: {

@@ -6,6 +6,7 @@ import ServicePortsTab from '@/components/services/ServicePortsTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import type { ServiceInfo } from '@/types/kubernetes'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import { Activity, Shield } from '@lucide/vue'
@@ -27,13 +28,13 @@ const activeTab = ref('overview')
 
 const getTypeSeverity = (type: string) => {
   switch (type) {
-    case 'LoadBalancer':
+    case KUBERNETES_SERVICE_TYPE.LoadBalancer:
       return 'info'
-    case 'ClusterIP':
+    case KUBERNETES_SERVICE_TYPE.ClusterIP:
       return 'success'
-    case 'NodePort':
+    case KUBERNETES_SERVICE_TYPE.NodePort:
       return 'warn'
-    case 'ExternalName':
+    case KUBERNETES_SERVICE_TYPE.ExternalName:
       return 'contrast'
     default:
       return 'secondary'
@@ -51,7 +52,7 @@ const fetchRawData = async () => {
   try {
     await kubernetesService.getResourceRaw({
       namespace: props.service.namespace,
-      kind: 'Service',
+      kind: KUBERNETES_RESOURCE_KIND.Service,
       name: props.service.name
     })
   } catch (e) {
@@ -61,7 +62,7 @@ const fetchRawData = async () => {
 }
 
 const handleRawData = (data: { kind?: string; name?: string; data?: unknown }) => {
-  if (data && data.kind === 'Service' && data.name === props.service?.name) {
+  if (data && data.kind === KUBERNETES_RESOURCE_KIND.Service && data.name === props.service?.name) {
     if (data.data && typeof data.data === 'object') {
       rawYamlData.value = yaml.stringify(data.data)
     } else if (typeof data.data === 'string') {
@@ -95,7 +96,7 @@ watch(
 
 const generateYaml = (s: ServiceInfo) => {
   return `apiVersion: v1
-kind: Service
+kind: ${KUBERNETES_RESOURCE_KIND.Service}
 metadata:
   name: ${s.name}
   namespace: ${s.namespace}
@@ -123,7 +124,7 @@ ${s.portsList
   )
   .join('\n')}
 status:
-  loadBalancer: ${s.type === 'LoadBalancer' ? `\n    ingress:\n    - ip: ${s.externalIP}` : '{}'}
+  loadBalancer: ${s.type === KUBERNETES_SERVICE_TYPE.LoadBalancer ? `\n    ingress:\n    - ip: ${s.externalIP}` : '{}'}
 `
 }
 

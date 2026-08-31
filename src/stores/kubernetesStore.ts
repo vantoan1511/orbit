@@ -1,27 +1,29 @@
 import { kubernetesService } from '@/services/kubernetesService'
 import { events as nativeEvents } from '@/services/nativeService'
 import { OrbitEvents } from '@/types/events'
-import type {
-  ClusterInfo,
-  ConfigMapInfo,
-  CronJobInfo,
-  DaemonSetInfo,
-  DeploymentInfo,
-  EventInfo,
-  IngressInfo,
-  JobInfo,
-  NamespaceInfo,
-  NodeInfo,
-  PersistentVolumeClaimInfo,
-  PersistentVolumeInfo,
-  PodInfo,
-  PolicyInfo,
-  ReplicaSetInfo,
-  SecretInfo,
-  ServiceInfo,
-  StatefulSetInfo,
-  StorageClassInfo,
-  ActivePortForward
+import {
+  KUBERNETES_ACTION,
+  KUBERNETES_RESOURCE_KIND,
+  type ActivePortForward,
+  type ClusterInfo,
+  type ConfigMapInfo,
+  type CronJobInfo,
+  type DaemonSetInfo,
+  type DeploymentInfo,
+  type EventInfo,
+  type IngressInfo,
+  type JobInfo,
+  type NamespaceInfo,
+  type NodeInfo,
+  type PersistentVolumeClaimInfo,
+  type PersistentVolumeInfo,
+  type PodInfo,
+  type PolicyInfo,
+  type ReplicaSetInfo,
+  type SecretInfo,
+  type ServiceInfo,
+  type StatefulSetInfo,
+  type StorageClassInfo
 } from '@/types/kubernetes'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { defineStore } from 'pinia'
@@ -486,62 +488,62 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       item: T,
       key: K
     ) => {
-      if (action === 'Applied') {
+      if (action === KUBERNETES_ACTION.Applied) {
         const index = listRef.value.findIndex((x) => x[key] === item[key])
         if (index !== -1) listRef.value.splice(index, 1, item)
         else listRef.value.push(item)
-      } else if (action === 'Deleted') {
+      } else if (action === KUBERNETES_ACTION.Deleted) {
         listRef.value = listRef.value.filter((x) => x[key] !== item[key])
       }
     }
 
     switch (kind) {
-      case 'Service':
+      case KUBERNETES_RESOURCE_KIND.Service:
         updateClusterScoped(services, data as ServiceInfo, 'uid')
         break
-      case 'Deployment':
+      case KUBERNETES_RESOURCE_KIND.Deployment:
         updateNamespaced(deployments, data as DeploymentInfo)
         break
-      case 'Pod':
+      case KUBERNETES_RESOURCE_KIND.Pod:
         updateNamespaced(pods, data as PodInfo)
         break
-      case 'StatefulSet':
+      case KUBERNETES_RESOURCE_KIND.StatefulSet:
         updateNamespaced(statefulSets, data as StatefulSetInfo)
         break
-      case 'DaemonSet':
+      case KUBERNETES_RESOURCE_KIND.DaemonSet:
         updateNamespaced(daemonSets, data as DaemonSetInfo)
         break
-      case 'ReplicaSet':
+      case KUBERNETES_RESOURCE_KIND.ReplicaSet:
         updateNamespaced(replicaSets, data as ReplicaSetInfo)
         break
-      case 'Job':
+      case KUBERNETES_RESOURCE_KIND.Job:
         updateNamespaced(jobs, data as JobInfo)
         break
-      case 'CronJob':
+      case KUBERNETES_RESOURCE_KIND.CronJob:
         updateNamespaced(cronJobs, data as CronJobInfo)
         break
-      case 'Namespace':
+      case KUBERNETES_RESOURCE_KIND.Namespace:
         updateClusterScoped(namespaceList, data as NamespaceInfo, 'name')
         break
-      case 'ConfigMap':
+      case KUBERNETES_RESOURCE_KIND.ConfigMap:
         updateNamespaced(configMaps, data as ConfigMapInfo)
         break
-      case 'Secret':
+      case KUBERNETES_RESOURCE_KIND.Secret:
         updateNamespaced(secrets, data as SecretInfo)
         break
-      case 'Event':
+      case KUBERNETES_RESOURCE_KIND.Event:
         updateClusterScoped(events, data as EventInfo, 'uid')
         break
-      case 'PersistentVolume':
+      case KUBERNETES_RESOURCE_KIND.PersistentVolume:
         updateClusterScoped(persistentVolumes, data as PersistentVolumeInfo, 'name')
         break
-      case 'PersistentVolumeClaim':
+      case KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim:
         updateNamespaced(persistentVolumeClaims, data as PersistentVolumeClaimInfo)
         break
-      case 'StorageClass':
+      case KUBERNETES_RESOURCE_KIND.StorageClass:
         updateClusterScoped(storageClasses, data as StorageClassInfo, 'name')
         break
-      case 'Policy':
+      case KUBERNETES_RESOURCE_KIND.Policy:
         updateClusterScoped(policies, data as PolicyInfo, 'uid')
         break
     }

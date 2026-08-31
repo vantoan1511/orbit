@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
@@ -18,12 +19,12 @@ const columns = [
 
 const statuses = [
   'All Statuses',
-  'Running',
-  'Pending',
-  'Failed',
-  'CrashLoopBackOff',
-  'Completed',
-  'Unknown'
+  KUBERNETES_POD_STATUS.Running,
+  KUBERNETES_POD_STATUS.Pending,
+  KUBERNETES_POD_STATUS.Failed,
+  KUBERNETES_POD_STATUS.CrashLoopBackOff,
+  KUBERNETES_POD_STATUS.Completed,
+  KUBERNETES_POD_STATUS.Unknown
 ]
 </script>
 
@@ -33,7 +34,7 @@ const statuses = [
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'node']"
-    kind="Pod"
+    :kind="KUBERNETES_RESOURCE_KIND.Pod"
     searchPlaceholder="Search pods, images or nodes..."
     emptyMessage="No pods found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} pods"

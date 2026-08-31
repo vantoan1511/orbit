@@ -3,6 +3,11 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import {
+  KUBERNETES_RESOURCE_KIND,
+  KUBERNETES_SERVICE_TYPE,
+  type KubernetesServiceType
+} from '@/constants/kubernetes'
 import { isValidK8sLabel, isValidK8sName, isValidPort } from '@/utils/validators'
 import type { Service, ServicePort } from 'kubernetes-types/core/v1'
 import Button from 'primevue/button'
@@ -30,11 +35,15 @@ const namespaceOptions = computed(() => {
   return list
 })
 
-const serviceTypeOptions = ['ClusterIP', 'NodePort', 'LoadBalancer']
+const serviceTypeOptions: KubernetesServiceType[] = [
+  KUBERNETES_SERVICE_TYPE.ClusterIP,
+  KUBERNETES_SERVICE_TYPE.NodePort,
+  KUBERNETES_SERVICE_TYPE.LoadBalancer
+]
 
 const name = ref('')
 const namespace = ref('default')
-const serviceType = ref<'ClusterIP' | 'NodePort' | 'LoadBalancer'>('ClusterIP')
+const serviceType = ref<KubernetesServiceType>(KUBERNETES_SERVICE_TYPE.ClusterIP)
 const selectorApp = ref('')
 const port = ref<number>(80)
 const targetPort = ref<number | null>(null)
@@ -118,7 +127,11 @@ const targetPortErrorMessage = computed(() => {
 })
 
 const nodePortErrorMessage = computed(() => {
-  if (serviceType.value !== 'NodePort' || nodePort.value === null || nodePort.value === undefined) {
+  if (
+    serviceType.value !== KUBERNETES_SERVICE_TYPE.NodePort ||
+    nodePort.value === null ||
+    nodePort.value === undefined
+  ) {
     return null
   }
   if (!isValidPort(nodePort.value)) {
@@ -167,13 +180,17 @@ const handleCreate = async () => {
     servicePortObj.targetPort = targetPort.value
   }
 
-  if (serviceType.value === 'NodePort' && nodePort.value !== null && nodePort.value !== undefined) {
+  if (
+    serviceType.value === KUBERNETES_SERVICE_TYPE.NodePort &&
+    nodePort.value !== null &&
+    nodePort.value !== undefined
+  ) {
     servicePortObj.nodePort = nodePort.value
   }
 
   const manifest: Service = {
     apiVersion: 'v1',
-    kind: 'Service',
+    kind: KUBERNETES_RESOURCE_KIND.Service,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -198,7 +215,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: 'Service',
+      kind: KUBERNETES_RESOURCE_KIND.Service,
       name: trimmedName,
       data: manifest
     })
@@ -215,30 +232,28 @@ const handleCreate = async () => {
       Create a new Kubernetes Service with standard networking configuration:
     </p>
 
-    <!-- Name -->
-    <div class="flex flex-col gap-1.5">
-      <label for="create-service-name" class="text-xs font-semibold text-muted-color">
-        Name <span class="text-(--danger)">*</span>
-      </label>
-      <InputText
-        id="create-service-name"
-        v-model="name"
-        placeholder="e.g. my-service"
-        fluid
-        size="small"
-        :invalid="Boolean(name.trim() && nameErrorMessage)"
-        class="text-xs"
-      />
-      <small
-        v-if="name.trim() && nameErrorMessage"
-        class="text-(--danger) text-[11px] leading-tight"
-      >
-        {{ nameErrorMessage }}
-      </small>
-    </div>
+    <!-- Basic Information (Name & Namespace) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1.5">
+        <label for="create-service-name" class="text-xs font-semibold text-muted-color">
+          Name <span class="text-(--danger)">*</span>
+        </label>
+        <InputText
+          id="create-service-name"
+          v-model="name"
+          placeholder="e.g. backend-svc"
+          fluid
+          size="small"
+          :invalid="Boolean(name.trim() && nameErrorMessage)"
+        />
+        <small
+          v-if="name.trim() && nameErrorMessage"
+          class="text-(--danger) text-[11px] leading-tight"
+        >
+          {{ nameErrorMessage }}
+        </small>
+      </div>
 
-    <!-- Namespace & Type Row -->
-    <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
         <label for="create-service-namespace" class="text-xs font-semibold text-muted-color">
           Namespace <span class="text-(--danger)">*</span>
@@ -247,51 +262,52 @@ const handleCreate = async () => {
           id="create-service-namespace"
           v-model="namespace"
           :options="namespaceOptions"
+          placeholder="Select Namespace"
           fluid
           size="small"
-          class="text-xs"
         />
       </div>
+    </div>
 
+    <!-- Service Type & Selector -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
         <label for="create-service-type" class="text-xs font-semibold text-muted-color">
-          Type <span class="text-(--danger)">*</span>
+          Service Type <span class="text-(--danger)">*</span>
         </label>
         <Select
           id="create-service-type"
           v-model="serviceType"
           :options="serviceTypeOptions"
+          placeholder="Select Type"
           fluid
           size="small"
-          class="text-xs"
         />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label for="create-service-selector" class="text-xs font-semibold text-muted-color">
+          Selector (App label)
+        </label>
+        <InputText
+          id="create-service-selector"
+          v-model="selectorApp"
+          placeholder="e.g. backend"
+          fluid
+          size="small"
+          :invalid="Boolean(selectorApp.trim() && selectorAppErrorMessage)"
+        />
+        <small
+          v-if="selectorApp.trim() && selectorAppErrorMessage"
+          class="text-(--danger) text-[11px] leading-tight"
+        >
+          {{ selectorAppErrorMessage }}
+        </small>
       </div>
     </div>
 
-    <!-- Target App Selector -->
-    <div class="flex flex-col gap-1.5">
-      <label for="create-service-selector" class="text-xs font-semibold text-muted-color">
-        Target App Selector (Optional)
-      </label>
-      <InputText
-        id="create-service-selector"
-        v-model="selectorApp"
-        placeholder="e.g. my-app (matches app=my-app)"
-        fluid
-        size="small"
-        :invalid="Boolean(selectorApp.trim() && selectorAppErrorMessage)"
-        class="text-xs"
-      />
-      <small
-        v-if="selectorApp.trim() && selectorAppErrorMessage"
-        class="text-(--danger) text-[11px] leading-tight"
-      >
-        {{ selectorAppErrorMessage }}
-      </small>
-    </div>
-
-    <!-- Port & Target Port Row -->
-    <div class="grid grid-cols-2 gap-3">
+    <!-- Ports Configuration -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
         <label for="create-service-port" class="text-xs font-semibold text-muted-color">
           Port <span class="text-(--danger)">*</span>
@@ -335,7 +351,7 @@ const handleCreate = async () => {
     </div>
 
     <!-- Node Port Row (shown only when NodePort is selected) -->
-    <div v-if="serviceType === 'NodePort'" class="flex flex-col gap-1.5">
+    <div v-if="serviceType === KUBERNETES_SERVICE_TYPE.NodePort" class="flex flex-col gap-1.5">
       <label for="create-service-node-port" class="text-xs font-semibold text-muted-color">
         Node Port (Optional)
       </label>

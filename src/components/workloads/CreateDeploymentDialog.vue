@@ -3,6 +3,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { isValidK8sName, isValidPort } from '@/utils/validators'
 import type { Deployment } from 'kubernetes-types/apps/v1'
 import type { Container } from 'kubernetes-types/core/v1'
@@ -133,7 +134,7 @@ const handleCreate = async () => {
 
   const manifest: Deployment = {
     apiVersion: 'apps/v1',
-    kind: 'Deployment',
+    kind: KUBERNETES_RESOURCE_KIND.Deployment,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -166,7 +167,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: 'Deployment',
+      kind: KUBERNETES_RESOURCE_KIND.Deployment,
       name: trimmedName,
       data: manifest
     })

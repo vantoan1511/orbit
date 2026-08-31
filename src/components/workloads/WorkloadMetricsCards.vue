@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_POD_STATUS } from '@/constants/kubernetes'
 import { AlertTriangle, Boxes, CheckCircle2, Server, TrendingUp } from '@lucide/vue'
 import Chart from 'primevue/chart'
 import { computed, onMounted, ref } from 'vue'
@@ -22,9 +23,9 @@ const totals = computed(() => {
     desiredReplicas += d.replicas.desired
     availableReplicas += d.available
     upToDateReplicas += d.upToDate
-    if (d.status === 'Running') running++
+    if (d.status === KUBERNETES_POD_STATUS.Running) running++
     else if (d.status === 'Progressing') progressing++
-    else if (d.status === 'Failed') failed++
+    else if (d.status === KUBERNETES_POD_STATUS.Failed) failed++
   })
 
   return {

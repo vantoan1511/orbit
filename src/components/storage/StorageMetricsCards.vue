@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Card } from 'primevue'
 import { Database, HardDrive, FileSpreadsheet, Layers } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 
 const k8sStore = useKubernetesStore()
 
@@ -38,9 +39,9 @@ const metrics = computed(() => {
   pvs.forEach((pv) => {
     const cap = parseCapacityToGiB(pv.capacity)
     totalCapGiB += cap
-    if (pv.status === 'Bound') {
+    if (pv.status === KUBERNETES_VOLUME_STATUS.Bound) {
       usedCapGiB += cap
-    } else if (pv.status === 'Available') {
+    } else if (pv.status === KUBERNETES_VOLUME_STATUS.Available) {
       availableCapGiB += cap
     }
   })

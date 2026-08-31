@@ -7,6 +7,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { PodInfo } from '@/types/kubernetes'
 import { Activity, Shield, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
@@ -33,19 +34,23 @@ const { events: clusterEvents } = storeToRefs(k8sStore)
 
 const activeTab = ref('overview')
 
-const podStatus = computed(() => {
-  return props.pod?.status || 'Unknown'
-})
+const podStatus = computed(() => props.pod?.status || 'Unknown')
 
 const getStatusBadgeClass = (status: string) => {
-  const s = status.toLowerCase()
-  if (s === 'running' || s === 'succeeded' || s === 'completed') {
-    return 'bg-emerald-500'
+  switch (status.toLowerCase()) {
+    case 'running':
+    case 'completed':
+      return 'bg-emerald-500'
+    case 'pending':
+    case 'containercreating':
+      return 'bg-amber-500'
+    case 'crashloopbackoff':
+    case 'error':
+    case 'failed':
+      return 'bg-rose-500'
+    default:
+      return 'bg-muted-color'
   }
-  if (s === 'pending' || s === 'containercreating') {
-    return 'bg-amber-500'
-  }
-  return 'bg-rose-500'
 }
 
 const podEvents = computed(() => {
@@ -67,7 +72,7 @@ const fetchRawYaml = async () => {
   try {
     await kubernetesService.getResourceRaw({
       namespace: props.pod.namespace,
-      kind: 'Pod',
+      kind: KUBERNETES_RESOURCE_KIND.Pod,
       name: props.pod.name
     })
   } catch (e) {
@@ -145,7 +150,7 @@ const viewPodLogs = (containerName?: string) => {
     query: {
       namespace: props.pod.namespace,
       workload: props.pod.name,
-      kind: 'Pod',
+      kind: KUBERNETES_RESOURCE_KIND.Pod,
       pod: props.pod.name,
       container: containerName || 'All'
     }
@@ -159,7 +164,7 @@ const viewPodLogs = (containerName?: string) => {
     :visible="visible"
     :has-resource="!!pod"
     :title="pod?.name ?? ''"
-    kind="Pod"
+    :kind="KUBERNETES_RESOURCE_KIND.Pod"
     kind-severity="info"
     :status-badge-class="getStatusBadgeClass(podStatus)"
     :namespace="pod?.namespace"

@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  KUBERNETES_EVENT_TYPE,
+  KUBERNETES_POD_STATUS,
+  KUBERNETES_VOLUME_STATUS
+} from '@/constants/kubernetes'
 import { computed } from 'vue'
 
 const props = defineProps<{
@@ -7,24 +12,24 @@ const props = defineProps<{
 
 const statusColor = computed(() => {
   switch (props.status) {
-    case 'Running':
-    case 'Completed':
+    case KUBERNETES_POD_STATUS.Running:
+    case KUBERNETES_POD_STATUS.Completed:
     case 'Active':
     case 'Ready':
-    case 'Bound':
-    case 'Available':
-    case 'Succeeded':
+    case KUBERNETES_VOLUME_STATUS.Bound:
+    case KUBERNETES_VOLUME_STATUS.Available:
+    case KUBERNETES_POD_STATUS.Succeeded:
       return 'emerald'
-    case 'Pending':
+    case KUBERNETES_POD_STATUS.Pending:
     case 'Progressing':
-    case 'Released':
-    case 'ContainerCreating':
-    case 'Warning':
+    case KUBERNETES_VOLUME_STATUS.Released:
+    case KUBERNETES_POD_STATUS.ContainerCreating:
+    case KUBERNETES_EVENT_TYPE.Warning:
       return 'amber'
-    case 'Failed':
-    case 'CrashLoopBackOff':
-    case 'Terminating':
-    case 'Error':
+    case KUBERNETES_POD_STATUS.Failed:
+    case KUBERNETES_POD_STATUS.CrashLoopBackOff:
+    case KUBERNETES_POD_STATUS.Terminating:
+    case KUBERNETES_POD_STATUS.Error:
       return 'rose'
     default:
       return 'gray'

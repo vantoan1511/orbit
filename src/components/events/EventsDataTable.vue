@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { storeToRefs } from 'pinia'
 import Column from 'primevue/column'
@@ -21,7 +22,7 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = ['All Types', 'Normal', 'Warning', 'Error']
+const types = ['All Types', KUBERNETES_EVENT_TYPE.Normal, KUBERNETES_EVENT_TYPE.Warning, 'Error']
 
 const eventsWithResourceItem = computed(() =>
   events.value.map((e) => ({ ...e, name: e.objectName }))
@@ -46,11 +47,11 @@ const handleRefresh = async () => {
 
 const getTypeSeverity = (type: string) => {
   switch (type) {
-    case 'Warning':
+    case KUBERNETES_EVENT_TYPE.Warning:
       return 'warn'
     case 'Error':
       return 'danger'
-    case 'Normal':
+    case KUBERNETES_EVENT_TYPE.Normal:
       return 'success'
     default:
       return 'secondary'
@@ -68,7 +69,7 @@ const getTypeSeverity = (type: string) => {
     :hideStatusColumn="true"
     :hideAgeColumn="true"
     :searchFields="['message', 'reason', 'name', 'objectKind', 'source']"
-    kind="Event"
+    :kind="KUBERNETES_RESOURCE_KIND.Event"
     searchPlaceholder="Search events..."
     emptyMessage="No events found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} events"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
 
@@ -32,7 +33,7 @@ const handleRefresh = async () => {
     :hideStatusFilter="true"
     :hideStatusColumn="true"
     :searchFields="['name', 'provisioner']"
-    kind="StorageClass"
+    :kind="KUBERNETES_RESOURCE_KIND.StorageClass"
     searchPlaceholder="Search Storage Classes..."
     emptyMessage="No Storage Classes found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} classes"

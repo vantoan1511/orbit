@@ -12,6 +12,7 @@ import Tabs from 'primevue/tabs'
 import { computed, ref, toRaw, watch } from 'vue'
 
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
+import { KUBERNETES_SERVICE_TYPE, type KubernetesServiceType } from '@/constants/kubernetes'
 import { isValidHost, isValidK8sLabel, isValidPort } from '@/utils/validators'
 import type { Service, ServicePort, ServiceSpec } from 'kubernetes-types/core/v1'
 
@@ -27,13 +28,18 @@ const emit = defineEmits<{
 const activeTab = ref('general')
 
 // Types and options
-const serviceTypeOptions = ['ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName']
+const serviceTypeOptions: KubernetesServiceType[] = [
+  KUBERNETES_SERVICE_TYPE.ClusterIP,
+  KUBERNETES_SERVICE_TYPE.NodePort,
+  KUBERNETES_SERVICE_TYPE.LoadBalancer,
+  KUBERNETES_SERVICE_TYPE.ExternalName
+]
 const sessionAffinityOptions = ['None', 'ClientIP']
 const externalTrafficPolicyOptions = ['Cluster', 'Local']
 const protocolOptions = ['TCP', 'UDP', 'SCTP']
 
 // General Spec
-const serviceType = ref<string>('ClusterIP')
+const serviceType = ref<KubernetesServiceType | string>(KUBERNETES_SERVICE_TYPE.ClusterIP)
 const clusterIP = ref<string>('')
 const externalName = ref<string>('')
 const sessionAffinity = ref<string>('None')
@@ -119,7 +125,10 @@ const getTargetPortError = (targetPortVal: string): string | null => {
 }
 
 const getNodePortError = (nodePortVal: number | null, index: number): string | null => {
-  if (serviceType.value !== 'NodePort' && serviceType.value !== 'LoadBalancer') {
+  if (
+    serviceType.value !== KUBERNETES_SERVICE_TYPE.NodePort &&
+    serviceType.value !== KUBERNETES_SERVICE_TYPE.LoadBalancer
+  ) {
     return null
   }
   if (nodePortVal === null || nodePortVal === undefined) {
@@ -136,7 +145,7 @@ const getNodePortError = (nodePortVal: number | null, index: number): string | n
 }
 
 const externalNameError = computed(() => {
-  if (serviceType.value !== 'ExternalName') return null
+  if (serviceType.value !== KUBERNETES_SERVICE_TYPE.ExternalName) return null
   const trimmed = externalName.value.trim()
   if (!trimmed) {
     return 'External name is required for ExternalName services.'
@@ -202,7 +211,7 @@ const syncFromRawData = (data: Service | null) => {
 
   // Spec
   const spec = data.spec || {}
-  serviceType.value = spec.type || 'ClusterIP'
+  serviceType.value = spec.type || KUBERNETES_SERVICE_TYPE.ClusterIP
   clusterIP.value = spec.clusterIP || ''
   externalName.value = spec.externalName || ''
   sessionAffinity.value = spec.sessionAffinity || 'None'
@@ -258,7 +267,7 @@ const emitUpdate = () => {
   // 2. General Spec
   rawObj.spec.type = serviceType.value as ServiceSpec['type']
 
-  if (serviceType.value === 'ExternalName') {
+  if (serviceType.value === KUBERNETES_SERVICE_TYPE.ExternalName) {
     if (externalName.value.trim()) {
       rawObj.spec.externalName = externalName.value.trim()
     } else {
@@ -275,13 +284,16 @@ const emitUpdate = () => {
       rawObj.spec.clusterIP = clusterIP.value.trim()
     }
 
-    if (serviceType.value === 'NodePort' || serviceType.value === 'LoadBalancer') {
+    if (
+      serviceType.value === KUBERNETES_SERVICE_TYPE.NodePort ||
+      serviceType.value === KUBERNETES_SERVICE_TYPE.LoadBalancer
+    ) {
       rawObj.spec.externalTrafficPolicy = externalTrafficPolicy.value
     } else {
       delete rawObj.spec.externalTrafficPolicy
     }
 
-    if (serviceType.value === 'LoadBalancer' && loadBalancerIP.value.trim()) {
+    if (serviceType.value === KUBERNETES_SERVICE_TYPE.LoadBalancer && loadBalancerIP.value.trim()) {
       rawObj.spec.loadBalancerIP = loadBalancerIP.value.trim()
     } else {
       delete rawObj.spec.loadBalancerIP
@@ -302,7 +314,10 @@ const emitUpdate = () => {
 
   // 3. Selector
   const selectorObj = kvArrayToObject(selectorList.value)
-  if (Object.keys(selectorObj).length > 0 && serviceType.value !== 'ExternalName') {
+  if (
+    Object.keys(selectorObj).length > 0 &&
+    serviceType.value !== KUBERNETES_SERVICE_TYPE.ExternalName
+  ) {
     rawObj.spec.selector = selectorObj
   } else {
     delete rawObj.spec.selector
@@ -331,7 +346,8 @@ const emitUpdate = () => {
         }
 
         if (
-          (serviceType.value === 'NodePort' || serviceType.value === 'LoadBalancer') &&
+          (serviceType.value === KUBERNETES_SERVICE_TYPE.NodePort ||
+            serviceType.value === KUBERNETES_SERVICE_TYPE.LoadBalancer) &&
           p.nodePort !== null &&
           isValidPort(p.nodePort)
         ) {
@@ -424,7 +440,10 @@ const removePort = (index: number) => {
                   />
                 </div>
 
-                <div v-if="serviceType !== 'ExternalName'" class="flex flex-col gap-1.5">
+                <div
+                  v-if="serviceType !== KUBERNETES_SERVICE_TYPE.ExternalName"
+                  class="flex flex-col gap-1.5"
+                >
                   <label class="text-xs font-medium text-muted-color">Cluster IP</label>
                   <InputText
                     v-model="clusterIP"
@@ -457,7 +476,10 @@ const removePort = (index: number) => {
 
               <!-- Extra fields for LoadBalancer / NodePort -->
               <div
-                v-if="serviceType === 'NodePort' || serviceType === 'LoadBalancer'"
+                v-if="
+                  serviceType === KUBERNETES_SERVICE_TYPE.NodePort ||
+                  serviceType === KUBERNETES_SERVICE_TYPE.LoadBalancer
+                "
                 class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2"
               >
                 <div class="flex flex-col gap-1.5">
@@ -474,7 +496,10 @@ const removePort = (index: number) => {
                   />
                 </div>
 
-                <div v-if="serviceType === 'LoadBalancer'" class="flex flex-col gap-1.5">
+                <div
+                  v-if="serviceType === KUBERNETES_SERVICE_TYPE.LoadBalancer"
+                  class="flex flex-col gap-1.5"
+                >
                   <label class="text-xs font-medium text-muted-color">LoadBalancer IP</label>
                   <InputText
                     v-model="loadBalancerIP"
@@ -697,7 +722,10 @@ const removePort = (index: number) => {
                   class="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-2 border-t border-(--border)/50"
                 >
                   <div
-                    v-if="serviceType === 'NodePort' || serviceType === 'LoadBalancer'"
+                    v-if="
+                      serviceType === KUBERNETES_SERVICE_TYPE.NodePort ||
+                      serviceType === KUBERNETES_SERVICE_TYPE.LoadBalancer
+                    "
                     class="sm:col-span-4 flex flex-col gap-1"
                   >
                     <label class="text-[11px] font-medium text-muted-color"

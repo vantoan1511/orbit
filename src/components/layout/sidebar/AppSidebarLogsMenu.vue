@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useLogsStore, type RecentLogInfo } from '@/stores/logsStore'
 import { highlightMatch } from '@/utils/text'
@@ -32,6 +33,8 @@ const toggleNode = (key: string) => {
 }
 
 const isNodeExpanded = (key: string) => {
+  // Auto-expand when searching
+  if (searchQuery.value.trim()) return true
   return !!expandedNodes.value[key]
 }
 
@@ -46,6 +49,7 @@ interface TreeNamespace {
   workloads: TreeWorkload[]
 }
 
+// Tree data grouped by namespace, filtered by search
 const treeData = computed<TreeNamespace[]>(() => {
   const query = searchQuery.value.trim().toLowerCase()
   const namespaces = k8sStore.namespaces.filter((n) => n !== 'All Namespaces')
@@ -58,21 +62,33 @@ const treeData = computed<TreeNamespace[]>(() => {
     // Deployments
     for (const d of k8sStore.deployments) {
       if (d.namespace === ns) {
-        allWorkloads.push({ name: d.name, kind: 'Deployment', namespace: ns })
+        allWorkloads.push({
+          name: d.name,
+          kind: KUBERNETES_RESOURCE_KIND.Deployment,
+          namespace: ns
+        })
       }
     }
 
     // StatefulSets
     for (const s of k8sStore.statefulSets) {
       if (s.namespace === ns) {
-        allWorkloads.push({ name: s.name, kind: 'StatefulSet', namespace: ns })
+        allWorkloads.push({
+          name: s.name,
+          kind: KUBERNETES_RESOURCE_KIND.StatefulSet,
+          namespace: ns
+        })
       }
     }
 
     // DaemonSets
     for (const d of k8sStore.daemonSets) {
       if (d.namespace === ns) {
-        allWorkloads.push({ name: d.name, kind: 'DaemonSet', namespace: ns })
+        allWorkloads.push({
+          name: d.name,
+          kind: KUBERNETES_RESOURCE_KIND.DaemonSet,
+          namespace: ns
+        })
       }
     }
 
@@ -85,28 +101,44 @@ const treeData = computed<TreeNamespace[]>(() => {
         r.namespace === ns &&
         !Array.from(deploymentNames).some((depName) => r.name.startsWith(depName + '-'))
       ) {
-        allWorkloads.push({ name: r.name, kind: 'ReplicaSet', namespace: ns })
+        allWorkloads.push({
+          name: r.name,
+          kind: KUBERNETES_RESOURCE_KIND.ReplicaSet,
+          namespace: ns
+        })
       }
     }
 
     // Jobs
     for (const j of k8sStore.jobs) {
       if (j.namespace === ns) {
-        allWorkloads.push({ name: j.name, kind: 'Job', namespace: ns })
+        allWorkloads.push({
+          name: j.name,
+          kind: KUBERNETES_RESOURCE_KIND.Job,
+          namespace: ns
+        })
       }
     }
 
     // CronJobs
     for (const c of k8sStore.cronJobs) {
       if (c.namespace === ns) {
-        allWorkloads.push({ name: c.name, kind: 'CronJob', namespace: ns })
+        allWorkloads.push({
+          name: c.name,
+          kind: KUBERNETES_RESOURCE_KIND.CronJob,
+          namespace: ns
+        })
       }
     }
 
     // Standalone Pods (pods without controlledBy)
     for (const p of k8sStore.pods) {
       if (p.namespace === ns && (!p.controlledBy || p.controlledBy === '')) {
-        allWorkloads.push({ name: p.name, kind: 'Pod', namespace: ns })
+        allWorkloads.push({
+          name: p.name,
+          kind: KUBERNETES_RESOURCE_KIND.Pod,
+          namespace: ns
+        })
       }
     }
 
@@ -140,18 +172,18 @@ const treeData = computed<TreeNamespace[]>(() => {
 
 const getWorkloadColorClass = (kind: string) => {
   switch (kind) {
-    case 'Deployment':
+    case KUBERNETES_RESOURCE_KIND.Deployment:
       return 'text-deployment'
-    case 'DaemonSet':
+    case KUBERNETES_RESOURCE_KIND.DaemonSet:
       return 'text-daemonset'
-    case 'StatefulSet':
+    case KUBERNETES_RESOURCE_KIND.StatefulSet:
       return 'text-statefulset'
-    case 'Job':
-    case 'CronJob':
+    case KUBERNETES_RESOURCE_KIND.Job:
+    case KUBERNETES_RESOURCE_KIND.CronJob:
       return 'text-job'
-    case 'ReplicaSet':
+    case KUBERNETES_RESOURCE_KIND.ReplicaSet:
       return 'text-replicaset'
-    case 'Pod':
+    case KUBERNETES_RESOURCE_KIND.Pod:
       return 'text-pod'
     default:
       return 'text-primary'

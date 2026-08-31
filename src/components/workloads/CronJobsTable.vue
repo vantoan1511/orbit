@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -51,7 +52,7 @@ const fetchCronJobs = async () => {
     :hideStatusFilter="true"
     :hideStatusColumn="true"
     :searchFields="['name', 'images']"
-    kind="CronJob"
+    :kind="KUBERNETES_RESOURCE_KIND.CronJob"
     searchPlaceholder="Search cronjobs or images..."
     emptyMessage="No cronjobs found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} cronjobs"

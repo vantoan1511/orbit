@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
 import { Eye, EyeOff, Shield, Tag as TagIcon } from '@lucide/vue'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -49,7 +50,7 @@ const decodeSecretValue = (val: string) => {
 const generateYaml = (res: ConfigMapInfo | SecretInfo) => {
   const isSec = isSecret(res)
   const baseYaml = `apiVersion: v1
-kind: ${isSec ? 'Secret' : 'ConfigMap'}
+kind: ${isSec ? KUBERNETES_RESOURCE_KIND.Secret : KUBERNETES_RESOURCE_KIND.ConfigMap}
 metadata:
   name: ${res.name}
   namespace: ${res.namespace}
@@ -86,7 +87,13 @@ ${Object.entries(res.data)
     :visible="props.visible"
     :has-resource="!!props.resource"
     :title="props.resource?.name ?? ''"
-    :kind="props.resource ? (isSecret(props.resource) ? 'Secret' : 'ConfigMap') : ''"
+    :kind="
+      props.resource
+        ? isSecret(props.resource)
+          ? KUBERNETES_RESOURCE_KIND.Secret
+          : KUBERNETES_RESOURCE_KIND.ConfigMap
+        : ''
+    "
     :kind-severity="props.resource ? (isSecret(props.resource) ? 'danger' : 'info') : 'info'"
     status-badge-class="bg-emerald-500"
     :namespace="props.resource?.namespace"
@@ -201,7 +208,7 @@ ${Object.entries(res.data)
               </div>
               <Tag
                 rounded
-                :severity="pod.status === 'Running' ? 'success' : 'secondary'"
+                :severity="pod.status === KUBERNETES_POD_STATUS.Running ? 'success' : 'secondary'"
                 :value="pod.status"
               />
             </div>

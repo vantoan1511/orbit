@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_POD_STATUS } from '@/constants/kubernetes'
 import type { NamespaceInfo } from '@/types/kubernetes'
 import { CheckCircle2, FolderOpen, Loader2, Shield, XCircle } from '@lucide/vue'
 import { Card } from 'primevue'
@@ -14,7 +15,9 @@ const activeCount = computed(
   () => store.namespaceList.filter((n: NamespaceInfo) => n.status === 'Active').length
 )
 const terminatingCount = computed(
-  () => store.namespaceList.filter((n: NamespaceInfo) => n.status === 'Terminating').length
+  () =>
+    store.namespaceList.filter((n: NamespaceInfo) => n.status === KUBERNETES_POD_STATUS.Terminating)
+      .length
 )
 // Placeholder: Namespaces themselves do not have a "failed" status phase in Kubernetes (only Active/Terminating).
 // This is kept for visual alignment with other dashboard pages.

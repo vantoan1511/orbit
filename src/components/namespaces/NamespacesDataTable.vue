@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { NamespaceInfo } from '@/types/kubernetes'
@@ -33,7 +34,7 @@ const columns = [
   { field: 'labels', header: 'Labels', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Active', 'Terminating']
+const statuses = ['All Statuses', 'Active', KUBERNETES_POD_STATUS.Terminating]
 
 // Collect unique label keys across all namespaces
 const labelOptions = computed(() => {
@@ -135,7 +136,7 @@ const getSparklineData = (ns: MappedNamespaceInfo) => ({
   datasets: [
     {
       data: ns.podSparkline,
-      borderColor: ns.status === 'Terminating' ? '#f59e0b' : '#10b981',
+      borderColor: ns.status === KUBERNETES_POD_STATUS.Terminating ? '#f59e0b' : '#10b981',
       backgroundColor: 'transparent',
       fill: false
     }
@@ -152,7 +153,7 @@ const MAX_VISIBLE_LABELS = 2
     :statuses="statuses"
     :hideNamespaceFilter="true"
     :hideNamespaceColumn="true"
-    kind="Namespace"
+    :kind="KUBERNETES_RESOURCE_KIND.Namespace"
     searchPlaceholder="Search namespaces..."
     emptyMessage="No namespaces found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} namespaces"

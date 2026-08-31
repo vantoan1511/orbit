@@ -3,18 +3,27 @@ import { computed } from 'vue'
 import { Card } from 'primevue'
 import { Bell, CheckCircle, AlertTriangle, XCircle, Info } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_EVENT_TYPE } from '@/constants/kubernetes'
 
 const k8sStore = useKubernetesStore()
 const events = computed(() => k8sStore.events)
 
 const totalCount = computed(() => events.value.length)
-const normalCount = computed(() => events.value.filter((e) => e.type === 'Normal').length)
-const warningCount = computed(() => events.value.filter((e) => e.type === 'Warning').length)
+const normalCount = computed(
+  () => events.value.filter((e) => e.type === KUBERNETES_EVENT_TYPE.Normal).length
+)
+const warningCount = computed(
+  () => events.value.filter((e) => e.type === KUBERNETES_EVENT_TYPE.Warning).length
+)
 const errorCount = computed(() => events.value.filter((e) => e.type === 'Error').length)
 const otherCount = computed(
   () =>
-    events.value.filter((e) => e.type !== 'Normal' && e.type !== 'Warning' && e.type !== 'Error')
-      .length
+    events.value.filter(
+      (e) =>
+        e.type !== KUBERNETES_EVENT_TYPE.Normal &&
+        e.type !== KUBERNETES_EVENT_TYPE.Warning &&
+        e.type !== 'Error'
+    ).length
 )
 
 const normalPct = computed(() =>

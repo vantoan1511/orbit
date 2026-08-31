@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ContainerImageInfo, DeploymentInfo } from '@/types/kubernetes'
@@ -45,7 +46,12 @@ const columns = [
   { field: 'images', header: 'Images', visible: true }
 ]
 
-const statuses = ['All Statuses', 'Running', 'Progressing', 'Failed']
+const statuses = [
+  'All Statuses',
+  KUBERNETES_POD_STATUS.Running,
+  'Progressing',
+  KUBERNETES_POD_STATUS.Failed
+]
 
 const CONDITION_ORDER: Record<string, number> = {
   Available: 1,
@@ -107,7 +113,7 @@ const saveReplicas = async () => {
   try {
     await kubernetesService.scaleResource({
       namespace: editingDeployment.value.namespace,
-      kind: 'Deployment',
+      kind: KUBERNETES_RESOURCE_KIND.Deployment,
       name: editingDeployment.value.name,
       replicas: editReplicasValue.value
     })
@@ -143,7 +149,7 @@ const saveImages = async () => {
   try {
     await kubernetesService.updateResourceImages({
       namespace: editingDeployment.value.namespace,
-      kind: 'Deployment',
+      kind: KUBERNETES_RESOURCE_KIND.Deployment,
       name: editingDeployment.value.name,
       containers: editContainers.value
     })
@@ -162,7 +168,7 @@ const saveImages = async () => {
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
-    kind="Deployment"
+    :kind="KUBERNETES_RESOURCE_KIND.Deployment"
     searchPlaceholder="Search deployments or images..."
     emptyMessage="No deployments found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} deployments"

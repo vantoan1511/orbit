@@ -24,6 +24,7 @@ import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns, type TableColumn } from '@/composables/useTableColumns'
 import { useWorkloadActions, type WorkloadActionOptions } from '@/composables/useWorkloadActions'
 import { useWorkloadBulkActions } from '@/composables/useWorkloadBulkActions'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -63,7 +64,7 @@ const props = withDefaults(
     ],
     searchFields: () => ['name'],
     statuses: () => [],
-    kind: 'Deployment',
+    kind: KUBERNETES_RESOURCE_KIND.Deployment,
     searchPlaceholder: 'Search...',
     emptyMessage: 'No records found matching the filter criteria.',
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',

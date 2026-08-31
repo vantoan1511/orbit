@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { FileText, Lock } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
@@ -60,7 +61,11 @@ const filteredItems = computed(() => {
   })
 })
 
-const activeKind = computed(() => (props.activeTab === 'configmaps' ? 'ConfigMap' : 'Secret'))
+const activeKind = computed(() =>
+  props.activeTab === 'configmaps'
+    ? KUBERNETES_RESOURCE_KIND.ConfigMap
+    : KUBERNETES_RESOURCE_KIND.Secret
+)
 
 const handleRefresh = async () => {
   if (props.activeTab === 'configmaps') {

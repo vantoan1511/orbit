@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
+import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { EventInfo } from '@/types/kubernetes'
 import { Clock } from '@lucide/vue'
 import { ref } from 'vue'
@@ -18,7 +19,7 @@ const activeTab = ref('overview')
 
 const generateYaml = (e: EventInfo) => {
   return `apiVersion: v1
-kind: Event
+kind: ${KUBERNETES_RESOURCE_KIND.Event}
 metadata:
   name: ${e.objectName}.${e.uid.substring(0, 8)}
   namespace: ${e.namespace}
@@ -33,7 +34,7 @@ involvedObject:
   name: ${e.objectName}
   namespace: ${e.namespace}
 reason: ${e.reason}
-message: ${e.message}
+message: "${e.message}"
 source:
   component: ${e.source}
 firstTimestamp: "${e.firstSeen}"
@@ -45,11 +46,11 @@ type: ${e.type}
 
 const getTypeSeverity = (type: string) => {
   switch (type) {
-    case 'Warning':
+    case KUBERNETES_EVENT_TYPE.Warning:
       return 'warn'
     case 'Error':
       return 'danger'
-    case 'Normal':
+    case KUBERNETES_EVENT_TYPE.Normal:
       return 'success'
     default:
       return 'secondary'
@@ -57,8 +58,8 @@ const getTypeSeverity = (type: string) => {
 }
 
 const getEventBadgeClass = (type: string) => {
-  if (type === 'Normal') return 'bg-emerald-500'
-  if (type === 'Warning') return 'bg-amber-500'
+  if (type === KUBERNETES_EVENT_TYPE.Normal) return 'bg-emerald-500'
+  if (type === KUBERNETES_EVENT_TYPE.Warning) return 'bg-amber-500'
   return 'bg-rose-500'
 }
 </script>

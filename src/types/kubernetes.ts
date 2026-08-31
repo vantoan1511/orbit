@@ -15,10 +15,22 @@ import type {
   Taint
 } from 'kubernetes-types/core/v1'
 import type { ObjectMeta } from 'kubernetes-types/meta/v1'
+import type {
+  KubernetesClusterStatus,
+  KubernetesEventType,
+  KubernetesPodStatus,
+  KubernetesQosClass,
+  KubernetesReclaimPolicy,
+  KubernetesResourceKind,
+  KubernetesVolumeMode,
+  KubernetesVolumeStatus
+} from '../constants/kubernetes'
+
+export * from '../constants/kubernetes'
 
 export interface KubernetesResource {
   apiVersion?: string
-  kind?: string
+  kind?: KubernetesResourceKind | string
   metadata?: ObjectMeta
   spec?: unknown
   status?: unknown
@@ -37,7 +49,7 @@ export interface PodContainer {
 }
 
 export interface PodEvent {
-  type: 'Normal' | 'Warning'
+  type: KubernetesEventType
   reason: string
   message: string
   age: string
@@ -46,7 +58,7 @@ export interface PodEvent {
 export interface PodInfo {
   name: string
   namespace: string
-  status: string
+  status: KubernetesPodStatus | string
   age: string
   cpu?: string
   cpuPct?: number
@@ -60,7 +72,7 @@ export interface PodInfo {
   ip?: string
   nodeIP?: string
   controlledBy?: string
-  qosClass?: 'Guaranteed' | 'Burstable' | 'BestEffort'
+  qosClass?: KubernetesQosClass
   containers?: PodContainer[]
   events?: PodEvent[]
 }
@@ -68,7 +80,7 @@ export interface PodInfo {
 export interface ClusterInfo {
   id: string
   name: string
-  status: 'healthy' | 'offline' | string
+  status: KubernetesClusterStatus | string
 }
 
 export interface Replicas {
@@ -247,7 +259,7 @@ export interface IngressInfo {
 
 export interface UsedByPod {
   name: string
-  status: 'Running' | 'Pending' | 'Failed' | 'Completed' | string
+  status: KubernetesPodStatus | string
 }
 
 export interface ConfigMapInfo {
@@ -287,18 +299,18 @@ export interface PersistentVolumeInfo {
   name: string
   capacity: string
   accessMode: string
-  reclaimPolicy: string
-  status: 'Bound' | 'Available' | 'Released' | 'Failed' | string
+  reclaimPolicy: KubernetesReclaimPolicy | string
+  status: KubernetesVolumeStatus | string
   storageClass: string
   age: string
-  volumeMode: 'Filesystem' | 'Block' | string
+  volumeMode: KubernetesVolumeMode | string
   reason?: string
 }
 
 export interface PersistentVolumeClaimInfo {
   name: string
   namespace: string
-  status: 'Bound' | 'Lost' | 'Pending' | string
+  status: KubernetesVolumeStatus | string
   volume: string
   capacity: string
   accessMode: string

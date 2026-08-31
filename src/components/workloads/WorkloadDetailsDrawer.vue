@@ -7,6 +7,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type {
   CronJobInfo,
   DaemonSetReplicas,
@@ -40,14 +41,14 @@ const { pods, events: clusterEvents } = storeToRefs(k8sStore)
 const activeTab = ref('overview')
 
 const getWorkloadKind = (w: WorkloadInfo): string => {
-  if ('schedule' in w) return 'CronJob'
-  if ('completions' in w) return 'Job'
-  if ('strategy' in w) return 'Deployment'
+  if ('schedule' in w) return KUBERNETES_RESOURCE_KIND.CronJob
+  if ('completions' in w) return KUBERNETES_RESOURCE_KIND.Job
+  if ('strategy' in w) return KUBERNETES_RESOURCE_KIND.Deployment
   if ('replicas' in w && w.replicas) {
     const reps = w.replicas
-    if ('ready' in reps && 'upToDate' in reps) return 'DaemonSet'
-    if (w.name.includes('stateful')) return 'StatefulSet'
-    return 'ReplicaSet'
+    if ('ready' in reps && 'upToDate' in reps) return KUBERNETES_RESOURCE_KIND.DaemonSet
+    if (w.name.includes('stateful')) return KUBERNETES_RESOURCE_KIND.StatefulSet
+    return KUBERNETES_RESOURCE_KIND.ReplicaSet
   }
   return 'Workload'
 }
@@ -58,13 +59,13 @@ const workloadKind = computed(() => {
 
 const getWorkloadSeverity = (kind: string) => {
   switch (kind) {
-    case 'Deployment':
-    case 'StatefulSet':
-    case 'DaemonSet':
-    case 'ReplicaSet':
+    case KUBERNETES_RESOURCE_KIND.Deployment:
+    case KUBERNETES_RESOURCE_KIND.StatefulSet:
+    case KUBERNETES_RESOURCE_KIND.DaemonSet:
+    case KUBERNETES_RESOURCE_KIND.ReplicaSet:
       return 'info'
-    case 'Job':
-    case 'CronJob':
+    case KUBERNETES_RESOURCE_KIND.Job:
+    case KUBERNETES_RESOURCE_KIND.CronJob:
       return 'warn'
     default:
       return 'secondary'
@@ -256,7 +257,7 @@ const generateYaml = (w: WorkloadInfo) => {
     : ''
 
   let specSection = ''
-  if (kind === 'CronJob') {
+  if (kind === KUBERNETES_RESOURCE_KIND.CronJob) {
     const cj = w as CronJobInfo
     specSection = `spec:
   schedule: "${cj.schedule}"
@@ -268,7 +269,7 @@ const generateYaml = (w: WorkloadInfo) => {
           containers:
           - name: ${cj.name}
             image: ${cj.images?.[0] || 'unknown'}`
-  } else if (kind === 'Job') {
+  } else if (kind === KUBERNETES_RESOURCE_KIND.Job) {
     const j = w as JobInfo
     specSection = `spec:
   template:

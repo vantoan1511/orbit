@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { ExternalLink } from '@lucide/vue'
@@ -21,7 +22,13 @@ const columns = [
 ]
 
 const selectedType = ref('All Types')
-const types = ['All Types', 'ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName']
+const types = [
+  'All Types',
+  KUBERNETES_SERVICE_TYPE.ClusterIP,
+  KUBERNETES_SERVICE_TYPE.NodePort,
+  KUBERNETES_SERVICE_TYPE.LoadBalancer,
+  KUBERNETES_SERVICE_TYPE.ExternalName
+]
 
 const filteredServices = computed(() => {
   return k8sStore.services.filter((s) => {
@@ -38,13 +45,13 @@ const handleRefresh = async () => {
 
 const getTypeSeverity = (type: string) => {
   switch (type) {
-    case 'LoadBalancer':
+    case KUBERNETES_SERVICE_TYPE.LoadBalancer:
       return 'info'
-    case 'ClusterIP':
+    case KUBERNETES_SERVICE_TYPE.ClusterIP:
       return 'success'
-    case 'NodePort':
+    case KUBERNETES_SERVICE_TYPE.NodePort:
       return 'warn'
-    case 'ExternalName':
+    case KUBERNETES_SERVICE_TYPE.ExternalName:
       return 'contrast'
     default:
       return 'secondary'
@@ -59,7 +66,7 @@ const getTypeSeverity = (type: string) => {
     :hideStatusFilter="true"
     :hideStatusColumn="true"
     :searchFields="['name', 'clusterIP', 'externalIP']"
-    kind="Service"
+    :kind="KUBERNETES_RESOURCE_KIND.Service"
     searchPlaceholder="Search services..."
     emptyMessage="No services found matching the filter criteria."
     reportTemplate="Showing {first} to {last} of {totalRecords} services"

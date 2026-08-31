@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EventListCard, { type EventListItem } from '@/components/dashboard/EventListCard.vue'
+import { KUBERNETES_EVENT_TYPE } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import {
   AlertTriangle,
@@ -23,18 +24,28 @@ const EVENT_ICONS = {
   persistentvolume: HardDrive,
   persistentvolumeclaim: HardDrive,
   job: CheckCircle2,
-  cronjob: CheckCircle2
+  cronjob: CheckCircle2,
+  deployment: RefreshCw,
+  statefulset: RefreshCw,
+  daemonset: RefreshCw,
+  service: RefreshCw,
+  ingress: RefreshCw
 } as const
 
 const EVENT_ICON_CLASSES: Record<string, string> = {
-  pod: 'text-blue-400 bg-blue-500/10',
-  node: 'text-violet-400 bg-violet-500/10',
-  secret: 'text-amber-400 bg-amber-500/10',
-  configmap: 'text-indigo-400 bg-indigo-500/10',
-  persistentvolume: 'text-sky-400 bg-sky-500/10',
-  persistentvolumeclaim: 'text-sky-400 bg-sky-500/10',
-  job: 'text-emerald-400 bg-emerald-500/10',
-  cronjob: 'text-emerald-400 bg-emerald-500/10'
+  pod: 'text-sky-500 bg-sky-500/10',
+  node: 'text-emerald-500 bg-emerald-500/10',
+  secret: 'text-amber-500 bg-amber-500/10',
+  configmap: 'text-blue-500 bg-blue-500/10',
+  persistentvolume: 'text-indigo-500 bg-indigo-500/10',
+  persistentvolumeclaim: 'text-purple-500 bg-purple-500/10',
+  job: 'text-teal-500 bg-teal-500/10',
+  cronjob: 'text-teal-500 bg-teal-500/10',
+  deployment: 'text-sky-500 bg-sky-500/10',
+  statefulset: 'text-sky-500 bg-sky-500/10',
+  daemonset: 'text-sky-500 bg-sky-500/10',
+  service: 'text-emerald-500 bg-emerald-500/10',
+  ingress: 'text-emerald-500 bg-emerald-500/10'
 }
 
 function getEventIcon(kind?: string) {
@@ -47,13 +58,13 @@ function getEventIconClass(kind?: string) {
 
 const warnings = computed<EventListItem[]>(() => {
   return kubernetesStore.events
-    .filter((e) => e.type === 'Warning')
+    .filter((e) => e.type === KUBERNETES_EVENT_TYPE.Warning)
     .slice(0, 5)
     .map((e) => ({
       uid: e.uid,
       icon: AlertTriangle,
       iconClass: 'text-rose-500 bg-rose-500/10',
-      label: e.reason || 'Warning',
+      label: e.reason || KUBERNETES_EVENT_TYPE.Warning,
       message: e.message || '',
       time: e.lastSeen || e.firstSeen || e.time || 'unknown'
     }))
@@ -61,7 +72,7 @@ const warnings = computed<EventListItem[]>(() => {
 
 const normalEvents = computed<EventListItem[]>(() => {
   return kubernetesStore.events
-    .filter((e) => e.type === 'Normal')
+    .filter((e) => e.type === KUBERNETES_EVENT_TYPE.Normal)
     .slice(0, 5)
     .map((e) => ({
       uid: e.uid,

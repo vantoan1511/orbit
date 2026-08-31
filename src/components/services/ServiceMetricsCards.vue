@@ -3,19 +3,22 @@ import { computed } from 'vue'
 import { Card } from 'primevue'
 import { Network, Circle, Cpu, Cloud, Globe } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 
 const k8sStore = useKubernetesStore()
 
 const totalServices = computed(() => k8sStore.services.length)
 const clusterIPCount = computed(
-  () => k8sStore.services.filter((s) => s.type === 'ClusterIP').length
+  () => k8sStore.services.filter((s) => s.type === KUBERNETES_SERVICE_TYPE.ClusterIP).length
 )
-const nodePortCount = computed(() => k8sStore.services.filter((s) => s.type === 'NodePort').length)
+const nodePortCount = computed(
+  () => k8sStore.services.filter((s) => s.type === KUBERNETES_SERVICE_TYPE.NodePort).length
+)
 const loadBalancerCount = computed(
-  () => k8sStore.services.filter((s) => s.type === 'LoadBalancer').length
+  () => k8sStore.services.filter((s) => s.type === KUBERNETES_SERVICE_TYPE.LoadBalancer).length
 )
 const externalNameCount = computed(
-  () => k8sStore.services.filter((s) => s.type === 'ExternalName').length
+  () => k8sStore.services.filter((s) => s.type === KUBERNETES_SERVICE_TYPE.ExternalName).length
 )
 
 const clusterIPPct = computed(() => {
