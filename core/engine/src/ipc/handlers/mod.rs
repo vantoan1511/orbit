@@ -27,7 +27,7 @@ pub fn dispatch(
     token: String,
     manager: Arc<RwLock<KubeManager>>,
 ) {
-    tracing::info!(event = %event_name, "Dispatching UI request");
+    tracing::debug!(event = %event_name, "Dispatching UI event");
     match event_name {
         "getClusters" => cluster::get_clusters(writer, token, manager),
         "getUserProfile" => cluster::get_user_profile(writer, token, manager),

@@ -48,7 +48,7 @@ pub async fn stream_pod_logs(
                 return;
             }
 
-            log::error!("Failed to open log stream for {}: {}", pod_name, e);
+            tracing::error!(pod = %pod_name, error = %e, "Failed to open log stream");
             let _ = Bridge::send_event(
                 &writer,
                 &token,
@@ -101,7 +101,7 @@ pub async fn stream_pod_logs(
                         }
                     }
                     Some(Err(e)) => {
-                        log::error!("Error reading log stream: {}", e);
+                        tracing::error!(pod = %pod_name, error = %e, "Error reading log stream");
                         break;
                     }
                     None => {

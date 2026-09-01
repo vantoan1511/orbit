@@ -1573,7 +1573,6 @@ dependencies = [
  "futures-util",
  "k8s-openapi",
  "kube",
- "log",
  "reqwest 0.13.4",
  "semver",
  "serde",

@@ -13,7 +13,7 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
     let pods = match pods_api.list(&ListParams::default()).await {
         Ok(list) => list.items,
         Err(e) => {
-            log::warn!("Could not list pods for node metrics calculation (RBAC?): {}", e);
+            tracing::warn!(error = %e, "Could not list pods for node metrics calculation (RBAC?)");
             Vec::new()
         }
     };
@@ -24,7 +24,7 @@ pub async fn list_nodes(client: &Client) -> Result<Vec<models::NodeInfo>, kube::
     let node_metrics = match metrics_api.list(&ListParams::default()).await {
         Ok(list) => Some(list.items),
         Err(e) => {
-            log::warn!("Could not fetch node metrics (Metrics Server installed?): {}", e);
+            tracing::warn!(error = %e, "Could not fetch node metrics (Metrics Server installed?)");
             None
         }
     };
@@ -280,7 +280,7 @@ pub(crate) fn parse_memory_quantity(q: &str) -> f64 {
     } else {
         let val = q.parse::<f64>().unwrap_or(0.0);
         if q.parse::<f64>().is_err() {
-            log::warn!("parse_memory_quantity: unrecognised suffix in {:?}, treating as bytes", q);
+            tracing::warn!(quantity = %q, "parse_memory_quantity: unrecognised suffix, treating as bytes");
         }
         val / (1024.0 * 1024.0 * 1024.0)
     }

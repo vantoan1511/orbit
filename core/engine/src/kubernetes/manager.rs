@@ -39,7 +39,7 @@ impl KubeManager {
         // Reload persisted custom kubeconfig files
         for path in manager.config.custom_kubeconfig_paths.clone() {
             if let Err(e) = manager.merge_kubeconfig_from_path(&path) {
-                log::warn!("Failed to load persisted kubeconfig from {}: {}", path, e);
+                tracing::warn!(path = %path, error = %e, "Failed to load persisted kubeconfig");
             }
         }
 
@@ -232,7 +232,7 @@ impl KubeManager {
         self.merge_kubeconfig_from_path(file_path)?;
 
         if let Err(e) = self.config.add_kubeconfig_path(file_path) {
-            log::warn!("Failed to persist kubeconfig path {}: {}", file_path, e);
+            tracing::warn!(path = %file_path, error = %e, "Failed to persist kubeconfig path");
         }
         
         // Try to switch to the new config's current context if none is active

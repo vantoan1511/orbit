@@ -141,9 +141,9 @@ impl Bridge {
                 Some(Ok(Message::Text(text))) => {
                     let msg: WsMessage = serde_json::from_str(&text)?;
                     if let Some(ref ev) = msg.event {
-                        tracing::info!(event = %ev, id = ?msg.id, "Received request/event from UI");
+                        tracing::info!(event = %ev, id = ?msg.id, "IPC request received");
                     } else if let Some(ref method) = msg.method {
-                        tracing::info!(method = %method, id = ?msg.id, "Received method from UI");
+                        tracing::debug!(method = %method, id = ?msg.id, "IPC method acknowledgement received");
                     }
                     return Ok(msg);
                 }

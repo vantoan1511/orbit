@@ -22,7 +22,7 @@ pub async fn watch_resource<K, M, F>(
     M: Serialize + Send + Sync + 'static,
     F: Fn(&K) -> M + Send + Sync + 'static,
 {
-    log::info!("Starting watcher for {}", kind);
+    tracing::info!(kind = %kind, "Starting watcher");
 
     'outer: loop {
         let api = Api::<K>::all(client.clone());
@@ -53,7 +53,7 @@ pub async fn watch_resource<K, M, F>(
             tokio::select! {
                 res = cancel_rx.changed() => {
                     if res.is_ok() && *cancel_rx.borrow() {
-                        log::info!("Stopping watcher for {}", kind);
+                        tracing::info!(kind = %kind, "Stopping watcher");
                         flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                         break 'outer;
                     }
@@ -66,7 +66,7 @@ pub async fn watch_resource<K, M, F>(
                         Some(Ok(watcher::Event::Apply(obj))) | Some(Ok(watcher::Event::InitApply(obj))) => {
                             let mapped = mapper(&obj);
                             if let Ok(data) = serde_json::to_value(&mapped) {
-                                log::debug!("Watcher Applied {} {:?}", kind, data);
+                                tracing::debug!(kind = %kind, data = ?data, "Watcher Applied");
                                 buffer.push(ResourceUpdate {
                                     action: "Applied".to_string(),
                                     data,
@@ -79,7 +79,7 @@ pub async fn watch_resource<K, M, F>(
                         Some(Ok(watcher::Event::Delete(obj))) => {
                             let mapped = mapper(&obj);
                             if let Ok(data) = serde_json::to_value(&mapped) {
-                                log::debug!("Watcher Deleted {} {:?}", kind, data);
+                                tracing::debug!(kind = %kind, data = ?data, "Watcher Deleted");
                                 buffer.push(ResourceUpdate {
                                     action: "Deleted".to_string(),
                                     data,
@@ -91,14 +91,14 @@ pub async fn watch_resource<K, M, F>(
                         }
                         Some(Ok(watcher::Event::InitDone)) => {
                             flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
-                            log::info!("Watcher initial sync done for {}", kind);
+                            tracing::info!(kind = %kind, "Watcher initial sync done");
                         }
                         Some(Ok(_)) => {}
                         Some(Err(e)) => {
-                            log::error!("Watcher error for {}: {:?}", kind, e);
+                            tracing::error!(kind = %kind, error = ?e, "Watcher error");
                         }
                         None => {
-                            log::info!("Watcher stream ended for {}. Reconnecting...", kind);
+                            tracing::info!(kind = %kind, "Watcher stream ended, reconnecting...");
                             flush_buffer(&mut buffer, &writer, &ipc_token, &kind).await;
                             break;
                         }
