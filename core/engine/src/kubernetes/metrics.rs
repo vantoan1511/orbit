@@ -71,14 +71,14 @@ pub async fn poll_pod_metrics(
             }
             Err(e) => {
                 // Metrics Server may not be installed — log at debug level and keep polling.
-                log::debug!("Pod metrics unavailable (Metrics Server not installed?): {:?}", e);
+                tracing::debug!(error = ?e, "Pod metrics unavailable (Metrics Server not installed?)");
             }
         }
 
         tokio::select! {
             _ = cancel_rx.changed() => {
                 if *cancel_rx.borrow() {
-                    log::debug!("Pod metrics poller cancelled.");
+                    tracing::debug!("Pod metrics poller cancelled");
                     break;
                 }
             }

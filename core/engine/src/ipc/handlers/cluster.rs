@@ -13,6 +13,7 @@ pub fn get_clusters(
     manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
+        tracing::debug!("Refreshing active cluster health and fetching clusters");
         {
             let mut w_manager = manager.write().await;
             w_manager.refresh_active_cluster_health().await;
@@ -41,6 +42,7 @@ pub fn get_user_profile(
     manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
+        tracing::debug!("Fetching user profile");
         let r_manager = manager.read().await;
         let profile = r_manager.get_user_profile();
         let _ = Bridge::send_event(
@@ -61,9 +63,11 @@ pub fn switch_cluster(
         let cluster_id = get_string(&data, "clusterId");
 
         if let Some(id) = cluster_id {
+            tracing::info!(cluster_id = %id, "Switching cluster");
             let mut w_manager = manager.write().await;
             match w_manager.switch_context(&id).await {
                 Ok(()) => {
+                    tracing::info!(cluster_id = %id, "Cluster switch completed");
                     let active_cluster_id = w_manager.active_context.clone();
                     let clusters = w_manager.get_clusters();
                     let profile = w_manager.get_user_profile();
@@ -100,7 +104,7 @@ pub fn switch_cluster(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error switching cluster: {:?}", e);
+                    tracing::error!(cluster_id = %id, error = %e, "Cluster switch failed");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -124,9 +128,11 @@ pub fn add_cluster(
         let file_path = get_string(&data, "filePath");
 
         if let Some(path) = file_path {
+            tracing::info!(file_path = %path, "Adding cluster kubeconfig");
             let mut w_manager = manager.write().await;
             match w_manager.add_kubeconfig_file(&path).await {
                 Ok(()) => {
+                    tracing::info!(file_path = %path, "Cluster added successfully");
                     let clusters = w_manager.get_clusters();
                     let active_cluster_id = w_manager.active_context.clone();
                     let client = w_manager.active_client.clone();
@@ -156,7 +162,7 @@ pub fn add_cluster(
                     }
                 }
                 Err(e) => {
-                    log::error!("Error adding cluster: {:?}", e);
+                    tracing::error!(file_path = %path, error = %e, "Failed to add cluster");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,

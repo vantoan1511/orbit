@@ -33,7 +33,7 @@ impl OrbitConfig {
             Ok(content) => match serde_json::from_str(&content) {
                 Ok(config) => config,
                 Err(err) => {
-                    log::warn!("Failed to parse Orbit configuration file at {:?}: {}", path, err);
+                    tracing::warn!(path = ?path, error = %err, "Failed to parse Orbit configuration file");
                     Self::default()
                 }
             },

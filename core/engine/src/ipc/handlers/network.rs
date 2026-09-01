@@ -15,18 +15,19 @@ pub fn get_services(
 ) {
     tokio::spawn(async move {
         let namespace = get_string(&data, "namespace");
+        tracing::debug!(namespace = ?namespace, "Fetching services");
 
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
         };
         if let Some(ref client) = client {
-            match kubernetes::list_services(client, namespace).await {
+            match kubernetes::list_services(client, namespace.clone()).await {
                 Ok(services) => {
                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::ServicesUpdated { services }).await;
                 }
                 Err(e) => {
-                    log::error!("Error listing services: {:?}", e);
+                    tracing::error!(namespace = ?namespace, error = %e, "Failed to list services");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -48,18 +49,19 @@ pub fn get_ingresses(
 ) {
     tokio::spawn(async move {
         let namespace = get_string(&data, "namespace");
+        tracing::debug!(namespace = ?namespace, "Fetching ingresses");
 
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
         };
         if let Some(ref client) = client {
-            match kubernetes::list_ingresses(client, namespace).await {
+            match kubernetes::list_ingresses(client, namespace.clone()).await {
                 Ok(ingresses) => {
                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::IngressesUpdated { ingresses }).await;
                 }
                 Err(e) => {
-                    log::error!("Error listing ingresses: {:?}", e);
+                    tracing::error!(namespace = ?namespace, error = %e, "Failed to list ingresses");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -96,6 +98,15 @@ pub fn clone_ingress(
             })
             .unwrap_or_default();
 
+        tracing::info!(
+            event = "cloneIngress",
+            source_namespace = %source_namespace,
+            source_name = %source_name,
+            new_namespace = %new_namespace,
+            new_name = %new_name,
+            "Kubernetes operation started"
+        );
+
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
@@ -113,6 +124,12 @@ pub fn clone_ingress(
             .await
             {
                 Ok(()) => {
+                    tracing::info!(
+                        event = "cloneIngress",
+                        new_namespace = %new_namespace,
+                        new_name = %new_name,
+                        "Kubernetes operation completed"
+                    );
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -123,7 +140,13 @@ pub fn clone_ingress(
                     .await;
                 }
                 Err(e) => {
-                    log::error!("Error cloning Ingress {}: {:?}", source_name, e);
+                    tracing::error!(
+                        event = "cloneIngress",
+                        source_namespace = %source_namespace,
+                        source_name = %source_name,
+                        error = %e,
+                        "Kubernetes operation failed"
+                    );
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -164,6 +187,16 @@ pub fn start_port_forward(
         }
 
         let forward_id = format!("{}/{}/{}:{}:{}", namespace, kind, name, local_port, remote_port);
+        tracing::info!(
+            event = "startPortForward",
+            forward_id = %forward_id,
+            namespace = %namespace,
+            kind = %kind,
+            name = %name,
+            local_port = local_port,
+            remote_port = remote_port,
+            "Starting port forwarding"
+        );
 
         let (kubeconfig_paths, active_context) = {
             let r_manager = manager.read().await;
@@ -205,7 +238,7 @@ pub fn start_port_forward(
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
-                log::error!("Failed to spawn kubectl port-forward: {:?}", e);
+                tracing::error!(forward_id = %forward_id, error = ?e, "Failed to spawn kubectl port-forward");
                 let _ = Bridge::send_event(
                     &writer,
                     &token,
@@ -227,11 +260,12 @@ pub fn start_port_forward(
         // Spawn background task to consume stdout and detect when port forwarding is listening
         if let Some(stdout) = stdout_reader {
             let started_tx_clone = started_tx.clone();
+            let forward_id_stdout = forward_id.clone();
             tokio::spawn(async move {
                 use tokio::io::{AsyncBufReadExt, BufReader};
                 let mut reader = BufReader::new(stdout).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
-                    log::debug!("kubectl port-forward stdout: {}", line);
+                    tracing::debug!(forward_id = %forward_id_stdout, stdout = %line, "kubectl port-forward stdout");
                     if line.contains("Forwarding from") {
                         let mut lock = started_tx_clone.lock().await;
                         if let Some(tx) = lock.take() {
@@ -280,6 +314,7 @@ pub fn start_port_forward(
                     ready = &mut started_rx => {
                         if ready.unwrap_or(false) {
                             has_started = true;
+                            tracing::info!(forward_id = %forward_id_clone, "Port forwarding connected successfully");
                             let _ = Bridge::send_event(
                                 &writer_clone,
                                 &token_clone,
@@ -326,6 +361,7 @@ pub fn start_port_forward(
 
                 if has_started {
                     // Notify UI that port forwarding has stopped
+                    tracing::info!(forward_id = %forward_id_clone, "Port forwarding stopped");
                     let _ = Bridge::send_event(
                         &writer_clone,
                         &token_clone,
@@ -361,24 +397,24 @@ async fn handle_port_forward_exit(
                 } else {
                     format!("kubectl port-forward for {} exited with status {:?}", forward_id, status)
                 };
-                log::error!("{}", message);
+                tracing::error!(forward_id = %forward_id, error = %message, "kubectl port-forward process exited with error");
                 let _ = Bridge::send_event(
                     writer,
                     token,
                     &OrbitEvent::ErrorOccurred { message },
                 ).await;
             } else {
-                log::info!("kubectl port-forward for {} exited cleanly", forward_id);
+                tracing::info!(forward_id = %forward_id, "kubectl port-forward exited cleanly");
             }
         }
         Err(e) => {
-            log::error!("kubectl port-forward for {} wait error: {:?}", forward_id, e);
+            tracing::error!(forward_id = %forward_id, error = ?e, "kubectl port-forward wait error");
         }
     }
 }
 
 async fn kill_port_forward_child(child: &mut tokio::process::Child, forward_id: &str) {
-    log::info!("Killing kubectl port-forward for {}", forward_id);
+    tracing::info!(forward_id = %forward_id, "Killing kubectl port-forward process");
 
     #[cfg(windows)]
     {
@@ -400,6 +436,7 @@ pub fn stop_port_forward(
 ) {
     tokio::spawn(async move {
         let forward_id = get_string(&data, "id");
+        tracing::info!(forward_id = ?forward_id, "Stopping port forward");
         let mut tasks_to_cancel = Vec::new();
 
         {

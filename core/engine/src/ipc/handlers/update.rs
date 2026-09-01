@@ -15,10 +15,12 @@ pub fn check_for_updates(
             .unwrap_or_else(|| "https://raw.githubusercontent.com/vantoan1511/orbit/main/update-manifest.json".to_string());
         
         let current_engine = env!("CARGO_PKG_VERSION");
+        tracing::info!(manifest_url = %url, current_version = %current_engine, "Checking for updates");
 
         match crate::updater::UpdateManifest::fetch(&url, current_engine).await {
             Ok(manifest) => {
                 let has_update = manifest.has_update(current_engine).unwrap_or(false);
+                tracing::info!(has_update = has_update, "Update check finished");
 
                 let _ = Bridge::send_event(
                     &writer,
@@ -30,7 +32,7 @@ pub fn check_for_updates(
                 ).await;
             }
             Err(e) => {
-                log::error!("Failed to fetch update manifest: {:?}", e);
+                tracing::error!(manifest_url = %url, error = ?e, "Failed to fetch update manifest");
                 let _ = Bridge::send_event(
                     &writer,
                     &token,
@@ -52,6 +54,7 @@ pub fn apply_update(
         let url = get_string(&data, "url");
             
         if let Some(url) = url {
+            tracing::info!(download_url = %url, "Applying update");
             let (tx, mut rx) = tokio::sync::mpsc::channel(100);
             let writer_clone = writer.clone();
             let token_clone = token.clone();
@@ -98,7 +101,7 @@ pub fn apply_update(
                         
                         let ext = if cfg!(target_os = "windows") { ".exe" } else { "" };
                         let exe_name = format!("orbit-{}_{}{}", neu_os, neu_arch, ext);
-                        log::info!("Spawning updater: {:?} with zip: {:?}, target_dir: {:?}, exe_name: {}", updater_path, path, app_dir, exe_name);
+                        tracing::info!(updater_path = ?updater_path, zip_path = ?path, target_dir = ?app_dir, exe_name = %exe_name, "Spawning updater process");
                         
                         match std::process::Command::new(&updater_path)
                             .arg("--zip-path")
@@ -109,10 +112,10 @@ pub fn apply_update(
                             .arg(exe_name)
                             .spawn() {
                                 Ok(_) => {
-                                    log::info!("Updater spawned successfully.");
+                                    tracing::info!("Updater spawned successfully");
                                 }
                                 Err(e) => {
-                                    log::error!("Failed to spawn updater: {:?}", e);
+                                    tracing::error!(error = ?e, "Failed to spawn updater");
                                 }
                             }
                     }

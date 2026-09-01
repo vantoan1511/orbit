@@ -47,7 +47,7 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
             all_policies.push(format_network_policy(&p));
         }
     } else if let Err(e) = net_res {
-        log::warn!("Failed to list NetworkPolicies: {}", e);
+        tracing::warn!(error = %e, "Failed to list NetworkPolicies");
     }
 
     if let Ok(list) = quota_res {
@@ -55,7 +55,7 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
             all_policies.push(format_resource_quota(&p));
         }
     } else if let Err(e) = quota_res {
-        log::warn!("Failed to list ResourceQuotas: {}", e);
+        tracing::warn!(error = %e, "Failed to list ResourceQuotas");
     }
 
     if let Ok(list) = limit_res {
@@ -63,7 +63,7 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
             all_policies.push(format_limit_range(&p));
         }
     } else if let Err(e) = limit_res {
-        log::warn!("Failed to list LimitRanges: {}", e);
+        tracing::warn!(error = %e, "Failed to list LimitRanges");
     }
 
     if namespace.is_none() {
@@ -72,7 +72,7 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
                 all_policies.push(format_val_webhook(&p));
             }
         } else if let Err(e) = val_res {
-            log::warn!("Failed to list ValidatingWebhookConfigurations: {}", e);
+            tracing::warn!(error = %e, "Failed to list ValidatingWebhookConfigurations");
         }
 
         if let Ok(list) = mut_res {
@@ -80,7 +80,7 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
                 all_policies.push(format_mut_webhook(&p));
             }
         } else if let Err(e) = mut_res {
-            log::warn!("Failed to list MutatingWebhookConfigurations: {}", e);
+            tracing::warn!(error = %e, "Failed to list MutatingWebhookConfigurations");
         }
     }
 

@@ -13,6 +13,7 @@ pub fn get_persistent_volumes(
     manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
+        tracing::debug!("Fetching persistent volumes");
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
@@ -23,7 +24,7 @@ pub fn get_persistent_volumes(
                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumesUpdated { persistent_volumes }).await;
                 }
                 Err(e) => {
-                    log::error!("Error listing persistent volumes: {:?}", e);
+                    tracing::error!(error = %e, "Failed to list persistent volumes");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -45,18 +46,19 @@ pub fn get_persistent_volume_claims(
 ) {
     tokio::spawn(async move {
         let namespace = get_string(&data, "namespace");
+        tracing::debug!(namespace = ?namespace, "Fetching persistent volume claims");
 
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
         };
         if let Some(ref client) = client {
-            match kubernetes::list_pvcs(client, namespace).await {
+            match kubernetes::list_pvcs(client, namespace.clone()).await {
                 Ok(persistent_volume_claims) => {
                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::PersistentVolumeClaimsUpdated { persistent_volume_claims }).await;
                 }
                 Err(e) => {
-                    log::error!("Error listing persistent volume claims: {:?}", e);
+                    tracing::error!(namespace = ?namespace, error = %e, "Failed to list persistent volume claims");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -76,6 +78,7 @@ pub fn get_storage_classes(
     manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
+        tracing::debug!("Fetching storage classes");
         let client = {
             let r_manager = manager.read().await;
             r_manager.active_client.clone()
@@ -86,7 +89,7 @@ pub fn get_storage_classes(
                     let _ = Bridge::send_event(&writer, &token, &OrbitEvent::StorageClassesUpdated { storage_classes }).await;
                 }
                 Err(e) => {
-                    log::error!("Error listing storage classes: {:?}", e);
+                    tracing::error!(error = %e, "Failed to list storage classes");
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
