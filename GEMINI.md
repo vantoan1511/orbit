@@ -517,24 +517,26 @@ Do not duplicate backend state inside multiple frontend stores.
 
 # Configuration System
 
-Application settings and user preferences are owned and persisted by the Rust backend.
+Application settings and user preferences are owned and defined by the Rust backend, delivered across the IPC boundary using a unified `Configuration` model, and dynamically presented on the frontend.
 
 ## Architecture
 
-- **Storage**: Persisted on disk as JSON in `~/.orbit/config.json`.
+- **Storage**: User customizations are persisted on disk strictly as key-value pairs (`{"key": value}`) in `~/.orbit/config.json`.
 - **Logs Directory**: Application logs are stored in `~/.orbit/logs/`.
 - **Backend Model (`core/engine/src/config.rs`)**:
-  - Represented by `OrbitConfig`.
-  - Serialized using `#[serde(rename_all = "camelCase")]` across the IPC boundary.
-  - Supports backward compatibility aliases (`#[serde(alias = "...")]`) for legacy disk formats.
+  - `Configuration`: Represents individual setting metadata (`key`, `name`, `description`, `datatype`, `defaultValue`, `value`, `isConfidential`, `cardinality`, `enable`, `createdAt`, `lastUpdatedAt`).
+  - `Configuration::system_definitions()`: Canonical source of truth defining all system configurations.
+  - `OrbitConfig`: Transparent map (`HashMap<String, Value>`) for `~/.orbit/config.json` persistence with legacy alias normalization.
+  - Base64 encoding/decoding is automatically applied for confidential configurations (`isConfidential = true`).
 - **IPC Protocol**:
-  - `getAppSettings`: Dispatched from frontend to request settings.
-  - `updateAppSettings`: Dispatched from frontend with updated settings payload.
-  - `appSettingsUpdated`: Event emitted by backend to broadcast updated configuration.
+  - `getAppSettings`: Dispatched from frontend to request unified configuration list (`Vec<Configuration>`).
+  - `updateAppSettings`: Dispatched from frontend with updated `Vec<Configuration>` or key-value payload.
+  - `appSettingsUpdated`: Event emitted by backend carrying `{ settings: Vec<Configuration> }`.
 - **Frontend Layer**:
-  - Strongly typed TS model in `@/types/settings`.
+  - Strongly typed TS model (`Configuration`, `ConfigurationMap`) in `@/types/settings`.
   - Service abstraction in `@/services/appSettingsService`.
-  - Central reactive store in `@/stores/settingsStore`.
+  - Central reactive store in `@/stores/settingsStore` providing `settings`, `getConfig`, `getConfigValue`, and `updateConfigValue`.
+  - Dynamic UI rendering in `src/components/settings/GeneralSettingsForm.vue` using PrimeVue v4 components based on configuration metadata.
 
 ---
 

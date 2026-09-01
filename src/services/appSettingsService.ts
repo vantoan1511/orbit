@@ -1,4 +1,4 @@
-import type { OrbitConfig } from '@/types/settings'
+import type { Configuration, ConfigurationMap } from '@/types/settings'
 import { coreEngine } from './nativeService'
 
 export const appSettingsService = {
@@ -10,9 +10,9 @@ export const appSettingsService = {
   },
 
   /**
-   * Update application settings in backend
+   * Update application settings in backend using unified Configuration array or key-value map
    */
-  async updateAppSettings(settings: OrbitConfig): Promise<void> {
+  async updateAppSettings(settings: Configuration[] | ConfigurationMap): Promise<void> {
     await coreEngine.dispatch('updateAppSettings', settings)
   }
 }
