@@ -170,6 +170,10 @@ pub enum OrbitEvent {
     PortForwardStopped {
         id: String,
     },
+    #[serde(rename = "appSettingsUpdated")]
+    AppSettingsUpdated {
+        settings: crate::config::OrbitConfig,
+    },
 }
 
 impl OrbitEvent {
@@ -211,6 +215,7 @@ impl OrbitEvent {
             OrbitEvent::ResourceRawData { .. } => "resourceRawData",
             OrbitEvent::PortForwardStarted { .. } => "portForwardStarted",
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
+            OrbitEvent::AppSettingsUpdated { .. } => "appSettingsUpdated",
         }
     }
 }

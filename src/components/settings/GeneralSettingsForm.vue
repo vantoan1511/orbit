@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useProfileStore } from '@/stores/profileStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { AlertTriangle, Folder, RefreshCw } from '@lucide/vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 
 const profileStore = useProfileStore()
 const k8sStore = useKubernetesStore()
+const settingsStore = useSettingsStore()
 const toast = useToast()
 
 // Startup settings state (placeholders)
@@ -22,6 +25,28 @@ const startMinimized = ref(false)
 const autoCheckUpdates = ref(true)
 const updateChannel = ref('Stable')
 const channels = ref(['Stable', 'Beta', 'Nightly'])
+
+// Log Retention settings state
+const logRetentionOptions = ref([
+  { label: '5 files', value: 5 },
+  { label: '10 files (Default)', value: 10 },
+  { label: '20 files', value: 20 },
+  { label: '50 files', value: 50 },
+  { label: 'Unlimited (Keep all)', value: 0 }
+])
+
+const selectedLogRetention = computed({
+  get: () => settingsStore.settings.maxLogFiles ?? 10,
+  set: (val: number) => {
+    settingsStore.updateSettings({ maxLogFiles: val })
+    toast.add({
+      severity: 'success',
+      summary: 'Settings Saved',
+      detail: 'Log retention limit updated.',
+      life: 2000
+    })
+  }
+})
 
 // Kubeconfig settings state
 const kubeconfigPath = computed(() => {
@@ -152,6 +177,32 @@ const handleReloadKubeconfig = async () => {
           <Select v-model="updateChannel" :options="channels" disabled class="text-xs w-full" />
           <span class="text-[11px] text-muted-color"
             >Beta and Nightly channels will be available in future releases.</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <!-- Logs Section -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Logs</h4>
+        <p class="text-[11px] text-muted-color">
+          Manage activity log retention and cleanup policy.
+        </p>
+      </div>
+      <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-4">
+        <div class="flex flex-col gap-1.5 max-w-xs">
+          <label class="text-xs font-semibold text-primary">Log Retention Limit</label>
+          <Select
+            v-model="selectedLogRetention"
+            :options="logRetentionOptions"
+            optionLabel="label"
+            optionValue="value"
+            :disabled="settingsStore.isSaving"
+            class="text-xs w-full"
+          />
+          <span class="text-[11px] text-muted-color"
+            >Automatically cleans up older log files beyond the selected limit.</span
           >
         </div>
       </div>

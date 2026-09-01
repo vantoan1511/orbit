@@ -515,6 +515,29 @@ Do not duplicate backend state inside multiple frontend stores.
 
 ---
 
+# Configuration System
+
+Application settings and user preferences are owned and persisted by the Rust backend.
+
+## Architecture
+
+- **Storage**: Persisted on disk as JSON in `~/.orbit/config.json`.
+- **Logs Directory**: Application logs are stored in `~/.orbit/logs/`.
+- **Backend Model (`core/engine/src/config.rs`)**:
+  - Represented by `OrbitConfig`.
+  - Serialized using `#[serde(rename_all = "camelCase")]` across the IPC boundary.
+  - Supports backward compatibility aliases (`#[serde(alias = "...")]`) for legacy disk formats.
+- **IPC Protocol**:
+  - `getAppSettings`: Dispatched from frontend to request settings.
+  - `updateAppSettings`: Dispatched from frontend with updated settings payload.
+  - `appSettingsUpdated`: Event emitted by backend to broadcast updated configuration.
+- **Frontend Layer**:
+  - Strongly typed TS model in `@/types/settings`.
+  - Service abstraction in `@/services/appSettingsService`.
+  - Central reactive store in `@/stores/settingsStore`.
+
+---
+
 # Kubernetes
 
 The Rust backend owns every interaction with Kubernetes.

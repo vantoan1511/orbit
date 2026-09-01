@@ -23,6 +23,7 @@ import type {
 } from './kubernetes'
 
 import type { UserProfileInfo } from './profile'
+import type { OrbitConfig } from './settings'
 
 export interface ComponentVersion {
   version: string
@@ -71,6 +72,9 @@ export interface OrbitEventMap {
   }
   pong: {
     reply: string
+  }
+  appSettingsUpdated: {
+    settings: OrbitConfig
   }
   userProfileUpdated: {
     profile: UserProfileInfo
@@ -195,6 +199,7 @@ export const OrbitEvents = {
   EngineTimeout: 'engineTimeout',
   Ping: 'ping',
   Pong: 'pong',
+  AppSettingsUpdated: 'appSettingsUpdated',
   NamespacesUpdated: 'namespacesUpdated',
   PodsUpdated: 'podsUpdated',
   DeploymentsUpdated: 'deploymentsUpdated',
