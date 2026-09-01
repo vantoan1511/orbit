@@ -1,5 +1,5 @@
 export type ConfigurationDataType = 'string' | 'number' | 'boolean'
-export type ConfigurationCoordinary = '0..1' | '0..*' | '1..*' | '1..1' | string
+export type ConfigurationCardinality = '0..1' | '0..*' | '1..*' | '1..1' | string
 
 export interface Configuration<T = unknown> {
   /** Unique identification key of config */
@@ -17,7 +17,7 @@ export interface Configuration<T = unknown> {
   /** Confidential flag (backend encodes/decodes, temporarily base64) */
   isConfidential: boolean
   /** Multiplicity / Cardinality: '0..1' | '0..*' | '1..*' | '1..1' */
-  coordinary: ConfigurationCoordinary
+  cardinality: ConfigurationCardinality
   /** Flag to control if a config is enabled / applicable */
   enable: boolean
   /** Timestamp when config was created */

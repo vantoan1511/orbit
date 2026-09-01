@@ -29,7 +29,7 @@ pub struct Configuration {
     /// Whether this configuration is confidential (backend will encode/decode, temporarily base64)
     pub is_confidential: bool,
     /// Multiplicity / cardinality: "0..1", "0..*", "1..*", "1..1"
-    pub coordinary: String,
+    pub cardinality: String,
     /// Whether the configuration is enabled/active in the system
     pub enable: bool,
     /// ISO timestamp when configuration definition was created
@@ -53,7 +53,7 @@ impl Configuration {
                 default_value: Some(serde_json::json!(default_max_log_files())),
                 value: None,
                 is_confidential: false,
-                coordinary: "1..1".to_string(),
+                cardinality: "1..1".to_string(),
                 enable: true,
                 created_at: Some(created.clone()),
                 last_updated_at: None,
@@ -66,7 +66,7 @@ impl Configuration {
                 default_value: Some(serde_json::json!(Vec::<String>::new())),
                 value: None,
                 is_confidential: false,
-                coordinary: "0..*".to_string(),
+                cardinality: "0..*".to_string(),
                 enable: true,
                 created_at: Some(created.clone()),
                 last_updated_at: None,
@@ -79,7 +79,7 @@ impl Configuration {
                 default_value: Some(serde_json::json!(true)),
                 value: None,
                 is_confidential: false,
-                coordinary: "1..1".to_string(),
+                cardinality: "1..1".to_string(),
                 enable: false, // Planned for future release
                 created_at: Some(created.clone()),
                 last_updated_at: None,
@@ -92,7 +92,7 @@ impl Configuration {
                 default_value: Some(serde_json::json!(false)),
                 value: None,
                 is_confidential: false,
-                coordinary: "1..1".to_string(),
+                cardinality: "1..1".to_string(),
                 enable: false, // Planned for future release
                 created_at: Some(created.clone()),
                 last_updated_at: None,
@@ -105,7 +105,7 @@ impl Configuration {
                 default_value: Some(serde_json::json!(false)),
                 value: None,
                 is_confidential: false,
-                coordinary: "1..1".to_string(),
+                cardinality: "1..1".to_string(),
                 enable: false, // Disabled
                 created_at: Some(created),
                 last_updated_at: None,
@@ -352,7 +352,7 @@ mod tests {
         assert_eq!(max_log_cfg.datatype, "number");
         assert_eq!(max_log_cfg.value, Some(serde_json::json!(25)));
         assert_eq!(max_log_cfg.default_value, Some(serde_json::json!(10)));
-        assert_eq!(max_log_cfg.coordinary, "1..1");
+        assert_eq!(max_log_cfg.cardinality, "1..1");
         assert!(max_log_cfg.enable);
     }
 
@@ -366,7 +366,7 @@ mod tests {
             default_value: None,
             value: Some(serde_json::json!("super-secret-token")),
             is_confidential: true,
-            coordinary: "0..1".to_string(),
+            cardinality: "0..1".to_string(),
             enable: true,
             created_at: None,
             last_updated_at: None,
@@ -394,7 +394,7 @@ mod tests {
                 default_value: Some(serde_json::json!(10)),
                 value: Some(serde_json::json!(50)),
                 is_confidential: false,
-                coordinary: "1..1".to_string(),
+                cardinality: "1..1".to_string(),
                 enable: true,
                 created_at: None,
                 last_updated_at: None,

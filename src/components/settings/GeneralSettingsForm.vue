@@ -168,7 +168,7 @@ const formatArrayValue = (val: unknown): string => {
         <div
           v-else-if="
             config.datatype === 'string' &&
-            (config.coordinary === '0..*' || config.coordinary === '1..*')
+            (config.cardinality === '0..*' || config.cardinality === '1..*')
           "
           class="flex flex-col gap-1.5 max-w-lg"
         >
