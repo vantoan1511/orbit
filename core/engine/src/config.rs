@@ -1,6 +1,5 @@
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine as _;
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -40,10 +39,12 @@ pub struct Configuration {
     pub last_updated_at: Option<String>,
 }
 
+pub const SYSTEM_CONFIG_CREATED_AT: &str = "2026-01-01T00:00:00Z";
+
 impl Configuration {
     /// Returns the system-defined list of application configurations.
     pub fn system_definitions() -> Vec<Configuration> {
-        let created = "2026-01-01T00:00:00Z".to_string();
+        let created = SYSTEM_CONFIG_CREATED_AT.to_string();
         vec![
             Configuration {
                 key: "maxLogFiles".to_string(),
@@ -226,7 +227,6 @@ impl OrbitConfig {
     /// Generates the unified `Configuration` model list sent to the frontend.
     pub fn get_configurations(&self) -> Vec<Configuration> {
         let mut defs = Configuration::system_definitions();
-        let now = Utc::now().to_rfc3339();
 
         for config in &mut defs {
             let raw_val = self.values.get(&config.key).cloned().or_else(|| config.default_value.clone());
@@ -243,9 +243,6 @@ impl OrbitConfig {
                     config.value = Some(val);
                 }
             }
-            if self.values.contains_key(&config.key) {
-                config.last_updated_at = Some(now.clone());
-            }
         }
         defs
     }
@@ -256,21 +253,26 @@ impl OrbitConfig {
         let def_map: HashMap<&str, &Configuration> = defs.iter().map(|d| (d.key.as_str(), d)).collect();
 
         for incoming in updated_configs {
-            if let Some(def) = def_map.get(incoming.key.as_str()) {
-                if let Some(mut val) = incoming.value.clone() {
-                    // If confidential, decode base64 before storing locally
-                    if def.is_confidential {
-                        if let Some(encoded_str) = val.as_str() {
-                            if let Ok(decoded_bytes) = BASE64_STANDARD.decode(encoded_str) {
-                                if let Ok(decoded_str) = String::from_utf8(decoded_bytes) {
-                                    val = serde_json::Value::String(decoded_str);
-                                }
-                            }
-                        }
-                    }
-                    self.values.insert(incoming.key.clone(), val);
-                }
+            let Some(def) = def_map.get(incoming.key.as_str()) else {
+                tracing::trace!(key = %incoming.key, "Ignoring unknown configuration key");
+                continue;
+            };
+
+            let Some(mut val) = incoming.value.clone() else {
+                tracing::trace!(key = %incoming.key, "Skipped config update: value is None");
+                continue;
+            };
+
+            // If confidential, decode base64 before storing locally
+            if def.is_confidential {
+                val = val
+                    .as_str()
+                    .and_then(|s| BASE64_STANDARD.decode(s).ok())
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .map(serde_json::Value::String)
+                    .unwrap_or(val);
             }
+            self.values.insert(incoming.key.clone(), val);
         }
     }
 

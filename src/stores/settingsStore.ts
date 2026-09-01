@@ -20,13 +20,13 @@ export const useSettingsStore = defineStore('settings', () => {
     if (Array.isArray(data)) {
       settings.value = data
     } else if (data && typeof data === 'object') {
-      // If a key-value map was received, update values in existing configuration list
-      for (const [key, val] of Object.entries(data)) {
-        const target = settings.value.find((c) => c.key === key)
-        if (target) {
-          target.value = val
+      // If a key-value map was received, update values in existing configuration list immutably
+      settings.value = settings.value.map((item) => {
+        if (Object.prototype.hasOwnProperty.call(data, item.key)) {
+          return { ...item, value: data[item.key] }
         }
-      }
+        return item
+      })
     }
     isLoading.value = false
     isSaving.value = false
@@ -48,20 +48,25 @@ export const useSettingsStore = defineStore('settings', () => {
       await appSettingsService.getAppSettings()
     } catch (e) {
       console.error('Failed to fetch app settings:', e)
+    } finally {
       isLoading.value = false
     }
   }
 
   async function updateConfigValue(key: string, value: unknown) {
-    const config = settings.value.find((c) => c.key === key)
-    if (config) {
-      config.value = value
+    const index = settings.value.findIndex((c) => c.key === key)
+    if (index !== -1) {
+      const target = settings.value[index]
+      if (target) {
+        settings.value[index] = { ...target, value }
+      }
     }
     isSaving.value = true
     try {
       await appSettingsService.updateAppSettings(settings.value)
     } catch (e) {
       console.error(`Failed to update config ${key}:`, e)
+    } finally {
       isSaving.value = false
     }
   }
@@ -72,6 +77,7 @@ export const useSettingsStore = defineStore('settings', () => {
       await appSettingsService.updateAppSettings(newSettings)
     } catch (e) {
       console.error('Failed to update app settings:', e)
+    } finally {
       isSaving.value = false
     }
   }

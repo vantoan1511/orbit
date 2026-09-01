@@ -2,7 +2,7 @@
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useProfileStore } from '@/stores/profileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import type { Configuration } from '@/types/settings'
+import { CONFIG_KEYS, type Configuration } from '@/types/settings'
 import { AlertTriangle, Folder, Lock, RefreshCw } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -145,8 +145,9 @@ const formatArrayValue = (val: unknown): string => {
 
         <!-- Number Type (Specialized for Log Retention or Generic InputNumber) -->
         <div v-else-if="config.datatype === 'number'" class="flex flex-col gap-1.5 max-w-xs">
+          <!-- Preset options selector for log retention limit -->
           <Select
-            v-if="config.key === 'maxLogFiles'"
+            v-if="config.key === CONFIG_KEYS.MAX_LOG_FILES"
             :modelValue="Number(config.value ?? config.defaultValue ?? 10)"
             :options="logRetentionOptions"
             optionLabel="label"
@@ -172,7 +173,8 @@ const formatArrayValue = (val: unknown): string => {
           "
           class="flex flex-col gap-1.5 max-w-lg"
         >
-          <div v-if="config.key === 'customKubeconfigPaths'" class="flex gap-2">
+          <!-- Specialized kubeconfig path display with cluster context reload action -->
+          <div v-if="config.key === CONFIG_KEYS.CUSTOM_KUBECONFIG_PATHS" class="flex gap-2">
             <div class="relative flex-1">
               <Folder class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-color" />
               <InputText

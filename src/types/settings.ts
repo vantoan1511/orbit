@@ -1,5 +1,18 @@
 export type ConfigurationDataType = 'string' | 'number' | 'boolean'
-export type ConfigurationCardinality = '0..1' | '0..*' | '1..*' | '1..1' | string
+export type ConfigurationCardinality = '0..1' | '0..*' | '1..*' | '1..1' | (string & {})
+
+/**
+ * Well-known configuration keys defined across backend and frontend.
+ */
+export const CONFIG_KEYS = {
+  MAX_LOG_FILES: 'maxLogFiles',
+  CUSTOM_KUBECONFIG_PATHS: 'customKubeconfigPaths',
+  AUTO_CHECK_UPDATES: 'autoCheckUpdates',
+  LAUNCH_ON_STARTUP: 'launchOnStartup',
+  SHARE_TELEMETRY: 'shareTelemetry'
+} as const
+
+export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
 
 export interface Configuration<T = unknown> {
   /** Unique identification key of config */

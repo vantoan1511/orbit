@@ -62,12 +62,14 @@ impl Inner {
         let mut archive_files = Vec::new();
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                    if file_name.starts_with("orbit.log.") {
-                        archive_files.push(path);
-                    }
-                }
+            let is_archive = path.is_file()
+                && path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|name| name.starts_with("orbit.log."));
+
+            if is_archive {
+                archive_files.push(path);
             }
         }
 
