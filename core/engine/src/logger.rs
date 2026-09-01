@@ -89,7 +89,7 @@ impl Inner {
     }
 
     fn cleanup(&self) {
-        let max_logs = crate::config::OrbitConfig::load().max_log_files;
+        let max_logs = crate::config::OrbitConfig::load().max_log_files();
         Self::cleanup_old_logs(&self.dir, max_logs);
     }
 

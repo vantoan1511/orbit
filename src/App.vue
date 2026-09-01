@@ -31,7 +31,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import type { UserProfileInfo } from '@/types/profile'
-import type { OrbitConfig } from '@/types/settings'
+import type { Configuration } from '@/types/settings'
 import ConfirmDialog from 'primevue/confirmdialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
@@ -63,7 +63,7 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
   }
 }
 
-const handleAppSettingsUpdated = (payload: { settings: OrbitConfig }) => {
+const handleAppSettingsUpdated = (payload: { settings: Configuration[] }) => {
   settingsStore.setSettings(payload.settings)
 }
 

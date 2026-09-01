@@ -37,7 +37,7 @@ impl KubeManager {
         }
         
         // Reload persisted custom kubeconfig files
-        for path in manager.config.custom_kubeconfig_paths.clone() {
+        for path in manager.config.custom_kubeconfig_paths() {
             if let Err(e) = manager.merge_kubeconfig_from_path(&path) {
                 tracing::warn!(path = %path, error = %e, "Failed to load persisted kubeconfig");
             }
@@ -124,7 +124,7 @@ impl KubeManager {
                 kubeconfig_paths.push(norm);
             }
         }
-        for path in &self.config.custom_kubeconfig_paths {
+        for path in &self.config.custom_kubeconfig_paths() {
             let norm = OrbitConfig::normalize_path(path);
             let is_duplicate = if cfg!(windows) {
                 kubeconfig_paths.iter().any(|p| p.eq_ignore_ascii_case(&norm))

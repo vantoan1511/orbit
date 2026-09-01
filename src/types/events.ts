@@ -23,7 +23,7 @@ import type {
 } from './kubernetes'
 
 import type { UserProfileInfo } from './profile'
-import type { OrbitConfig } from './settings'
+import type { Configuration } from './settings'
 
 export interface ComponentVersion {
   version: string
@@ -74,7 +74,7 @@ export interface OrbitEventMap {
     reply: string
   }
   appSettingsUpdated: {
-    settings: OrbitConfig
+    settings: Configuration[]
   }
   userProfileUpdated: {
     profile: UserProfileInfo

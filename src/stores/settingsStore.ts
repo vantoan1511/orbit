@@ -1,27 +1,45 @@
 import { appSettingsService } from '@/services/appSettingsService'
-import type { OrbitConfig } from '@/types/settings'
+import type { Configuration, ConfigurationMap } from '@/types/settings'
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const settings = ref<OrbitConfig>({
-    customKubeconfigPaths: [],
-    maxLogFiles: 10
-  })
+  const settings = ref<Configuration[]>([])
   const isLoading = ref(false)
   const isSaving = ref(false)
 
-  function setSettings(data: OrbitConfig | Record<string, unknown>) {
-    settings.value = {
-      customKubeconfigPaths:
-        (data as OrbitConfig).customKubeconfigPaths ??
-        (data as Record<string, unknown>).custom_kubeconfig_paths ??
-        [],
-      maxLogFiles:
-        (data as OrbitConfig).maxLogFiles ?? (data as Record<string, unknown>).max_log_files ?? 10
-    } as OrbitConfig
+  const settingsMap = computed(() => {
+    const map = new Map<string, Configuration>()
+    for (const item of settings.value) {
+      map.set(item.key, item)
+    }
+    return map
+  })
+
+  function setSettings(data: Configuration[] | ConfigurationMap) {
+    if (Array.isArray(data)) {
+      settings.value = data
+    } else if (data && typeof data === 'object') {
+      // If a key-value map was received, update values in existing configuration list
+      for (const [key, val] of Object.entries(data)) {
+        const target = settings.value.find((c) => c.key === key)
+        if (target) {
+          target.value = val
+        }
+      }
+    }
     isLoading.value = false
     isSaving.value = false
+  }
+
+  function getConfig(key: string): Configuration | undefined {
+    return settingsMap.value.get(key)
+  }
+
+  function getConfigValue<T = unknown>(key: string, fallback?: T): T {
+    const config = settingsMap.value.get(key)
+    if (!config) return fallback as T
+    return (config.value ?? config.defaultValue ?? fallback) as T
   }
 
   async function fetchSettings() {
@@ -34,15 +52,24 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
-  async function updateSettings(newSettings: Partial<OrbitConfig>) {
-    isSaving.value = true
-    const updated: OrbitConfig = {
-      customKubeconfigPaths:
-        newSettings.customKubeconfigPaths ?? settings.value.customKubeconfigPaths ?? [],
-      maxLogFiles: newSettings.maxLogFiles ?? settings.value.maxLogFiles ?? 10
+  async function updateConfigValue(key: string, value: unknown) {
+    const config = settings.value.find((c) => c.key === key)
+    if (config) {
+      config.value = value
     }
+    isSaving.value = true
     try {
-      await appSettingsService.updateAppSettings(updated)
+      await appSettingsService.updateAppSettings(settings.value)
+    } catch (e) {
+      console.error(`Failed to update config ${key}:`, e)
+      isSaving.value = false
+    }
+  }
+
+  async function updateSettings(newSettings: Configuration[] | ConfigurationMap) {
+    isSaving.value = true
+    try {
+      await appSettingsService.updateAppSettings(newSettings)
     } catch (e) {
       console.error('Failed to update app settings:', e)
       isSaving.value = false
@@ -51,10 +78,14 @@ export const useSettingsStore = defineStore('settings', () => {
 
   return {
     settings,
+    settingsMap,
     isLoading,
     isSaving,
     setSettings,
+    getConfig,
+    getConfigValue,
     fetchSettings,
+    updateConfigValue,
     updateSettings
   }
 })

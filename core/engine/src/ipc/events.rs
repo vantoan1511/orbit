@@ -172,7 +172,7 @@ pub enum OrbitEvent {
     },
     #[serde(rename = "appSettingsUpdated")]
     AppSettingsUpdated {
-        settings: crate::config::OrbitConfig,
+        settings: Vec<crate::config::Configuration>,
     },
 }
 
