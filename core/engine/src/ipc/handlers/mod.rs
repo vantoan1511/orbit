@@ -9,6 +9,7 @@ pub mod config;
 pub mod logs;
 pub mod network;
 pub mod resource;
+pub mod settings;
 pub mod storage;
 pub mod system;
 pub mod update;
@@ -29,6 +30,8 @@ pub fn dispatch(
 ) {
     tracing::debug!(event = %event_name, "Dispatching UI event");
     match event_name {
+        "getAppSettings" => settings::get_app_settings(writer, token),
+        "updateAppSettings" => settings::update_app_settings(data, writer, token),
         "getClusters" => cluster::get_clusters(writer, token, manager),
         "getUserProfile" => cluster::get_user_profile(writer, token, manager),
         "switchCluster" => cluster::switch_cluster(data, writer, token, manager),

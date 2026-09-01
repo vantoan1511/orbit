@@ -7,6 +7,7 @@ import { app, events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { OrbitEvents } from '@/types/events'
 import type {
   ClusterInfo,
@@ -30,6 +31,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import type { UserProfileInfo } from '@/types/profile'
+import type { OrbitConfig } from '@/types/settings'
 import ConfirmDialog from 'primevue/confirmdialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
@@ -41,6 +43,7 @@ import AppLayout from './components/layout/AppLayout.vue'
 const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
+const settingsStore = useSettingsStore()
 const toast = useToast()
 const confirm = useConfirm()
 
@@ -48,6 +51,7 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
   if (payload.status === 'ready') {
     k8sStore.setEngineReady(true)
     profileStore.fetchProfile()
+    settingsStore.fetchSettings()
   } else {
     k8sStore.setEngineReady(false)
     notificationStore.addNotification({
@@ -57,6 +61,10 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
       category: 'system'
     })
   }
+}
+
+const handleAppSettingsUpdated = (payload: { settings: OrbitConfig }) => {
+  settingsStore.setSettings(payload.settings)
 }
 
 const handleUserProfileUpdated = (payload: { profile: UserProfileInfo }) => {
@@ -240,6 +248,7 @@ onMounted(() => {
   window.addEventListener('contextmenu', handleContextMenu)
 
   events.on(OrbitEvents.EngineConnected, handleEngineConnected)
+  events.on(OrbitEvents.AppSettingsUpdated, handleAppSettingsUpdated)
   events.on(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.on(OrbitEvents.PodsUpdated, handlePodsUpdated)
   events.on(OrbitEvents.DeploymentsUpdated, handleDeploymentsUpdated)
@@ -270,6 +279,7 @@ onUnmounted(() => {
   window.removeEventListener('contextmenu', handleContextMenu)
 
   events.off(OrbitEvents.EngineConnected, handleEngineConnected)
+  events.off(OrbitEvents.AppSettingsUpdated, handleAppSettingsUpdated)
   events.off(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
   events.off(OrbitEvents.PodsUpdated, handlePodsUpdated)
   events.off(OrbitEvents.DeploymentsUpdated, handleDeploymentsUpdated)

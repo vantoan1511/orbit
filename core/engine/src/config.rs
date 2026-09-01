@@ -1,10 +1,26 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub fn default_max_log_files() -> usize {
+    10
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct OrbitConfig {
-    #[serde(default)]
+    #[serde(default, alias = "custom_kubeconfig_paths")]
     pub custom_kubeconfig_paths: Vec<String>,
+    #[serde(default = "default_max_log_files", alias = "max_log_files")]
+    pub max_log_files: usize,
+}
+
+impl Default for OrbitConfig {
+    fn default() -> Self {
+        Self {
+            custom_kubeconfig_paths: Vec::new(),
+            max_log_files: default_max_log_files(),
+        }
+    }
 }
 
 impl OrbitConfig {
@@ -13,6 +29,13 @@ impl OrbitConfig {
         let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
         let mut path = PathBuf::from(home);
         path.push(".orbit");
+        Some(path)
+    }
+
+    /// Returns the path to the Orbit logs directory (`~/.orbit/logs`).
+    pub fn logs_dir() -> Option<PathBuf> {
+        let mut path = Self::config_dir()?;
+        path.push("logs");
         Some(path)
     }
 
@@ -98,17 +121,31 @@ mod tests {
     fn test_orbit_config_default() {
         let config = OrbitConfig::default();
         assert!(config.custom_kubeconfig_paths.is_empty());
+        assert_eq!(config.max_log_files, 10);
     }
 
     #[test]
     fn test_orbit_config_serde() {
-        let json = r#"{"custom_kubeconfig_paths": ["/path/to/kubeconfig.yaml"]}"#;
+        let json = r#"{"custom_kubeconfig_paths": ["/path/to/kubeconfig.yaml"], "max_log_files": 5}"#;
         let config: OrbitConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.custom_kubeconfig_paths.len(), 1);
         assert_eq!(config.custom_kubeconfig_paths[0], "/path/to/kubeconfig.yaml");
+        assert_eq!(config.max_log_files, 5);
 
         let serialized = serde_json::to_string(&config).unwrap();
         assert!(serialized.contains("/path/to/kubeconfig.yaml"));
+        assert!(serialized.contains("\"maxLogFiles\":5"));
+        assert!(serialized.contains("\"customKubeconfigPaths\""));
+
+        // Test fallback to default when maxLogFiles is missing
+        let json_no_max = r#"{"customKubeconfigPaths": []}"#;
+        let config_default_max: OrbitConfig = serde_json::from_str(json_no_max).unwrap();
+        assert_eq!(config_default_max.max_log_files, 10);
+
+        // Test camelCase deserialization
+        let json_camel = r#"{"customKubeconfigPaths": [], "maxLogFiles": 20}"#;
+        let config_camel: OrbitConfig = serde_json::from_str(json_camel).unwrap();
+        assert_eq!(config_camel.max_log_files, 20);
     }
 
     #[test]
