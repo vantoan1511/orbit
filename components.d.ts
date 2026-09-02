@@ -77,6 +77,7 @@ declare module 'vue' {
     NotificationDrawer: typeof import('./src/components/layout/NotificationDrawer.vue')['default']
     PodContainersTab: typeof import('./src/components/pods/PodContainersTab.vue')['default']
     PodDetailsDrawer: typeof import('./src/components/pods/PodDetailsDrawer.vue')['default']
+    PodEditForm: typeof import('./src/components/workloads/PodEditForm.vue')['default']
     PodMetricsCards: typeof import('./src/components/pods/PodMetricsCards.vue')['default']
     PodOverviewTab: typeof import('./src/components/pods/PodOverviewTab.vue')['default']
     PodsDataTable: typeof import('./src/components/pods/PodsDataTable.vue')['default']
