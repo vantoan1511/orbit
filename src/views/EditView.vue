@@ -8,6 +8,7 @@ import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import type { Component } from 'vue'
 import { useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
@@ -22,9 +23,6 @@ import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
-import type { Deployment } from 'kubernetes-types/apps/v1'
-import type { ConfigMap, Namespace, Secret, Service } from 'kubernetes-types/core/v1'
-import type { Ingress } from 'kubernetes-types/networking/v1'
 
 const props = defineProps<{
   kind: string
@@ -37,12 +35,15 @@ const toast = useToast()
 const { isDark } = useTheme()
 
 const rawData = ref<KubernetesResource | null>(null)
-const deploymentRawData = computed(() => (rawData.value as Deployment | null) ?? null)
-const ingressRawData = computed(() => (rawData.value as Ingress | null) ?? null)
-const serviceRawData = computed(() => (rawData.value as Service | null) ?? null)
-const configMapRawData = computed(() => (rawData.value as ConfigMap | null) ?? null)
-const secretRawData = computed(() => (rawData.value as Secret | null) ?? null)
-const namespaceRawData = computed(() => (rawData.value as Namespace | null) ?? null)
+const formComponentMap: Record<string, Component> = {
+  [KUBERNETES_RESOURCE_KIND.Deployment]: DeploymentEditForm,
+  [KUBERNETES_RESOURCE_KIND.Ingress]: IngressEditForm,
+  [KUBERNETES_RESOURCE_KIND.Service]: ServiceEditForm,
+  [KUBERNETES_RESOURCE_KIND.ConfigMap]: ConfigMapEditForm,
+  [KUBERNETES_RESOURCE_KIND.Secret]: SecretEditForm,
+  [KUBERNETES_RESOURCE_KIND.Namespace]: NamespaceEditForm
+}
+const activeFormComponent = computed(() => formComponentMap[props.kind] || null)
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -190,16 +191,7 @@ const handleCustomFormUpdate = (updatedData: KubernetesResource) => {
 watch(
   () => formValues.value,
   (newVal) => {
-    if (
-      !rawData.value ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Deployment ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Ingress ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Service ||
-      props.kind === KUBERNETES_RESOURCE_KIND.ConfigMap ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Secret ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Namespace
-    )
-      return
+    if (!rawData.value || activeFormComponent.value) return
     try {
       const currentData = yaml.parse(yamlContent.value) || {}
       if (!currentData.metadata) currentData.metadata = {}
@@ -296,69 +288,12 @@ watch(
     <div v-else class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <!-- Form Mode -->
       <template v-if="!isYamlMode">
-        <div
-          v-if="props.kind === KUBERNETES_RESOURCE_KIND.Deployment"
-          class="w-full h-full overflow-hidden flex flex-col"
-        >
-          <DeploymentEditForm
-            :raw-data="deploymentRawData"
+        <div v-if="activeFormComponent" class="w-full h-full overflow-hidden flex flex-col">
+          <component
+            :is="activeFormComponent"
+            :raw-data="rawData"
             @update:raw-data="handleCustomFormUpdate"
-            @update:is-valid="(val) => (isChildFormValid = val)"
-          />
-        </div>
-
-        <div
-          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Ingress"
-          class="w-full h-full overflow-hidden flex flex-col"
-        >
-          <IngressEditForm
-            :raw-data="ingressRawData"
-            @update:raw-data="handleCustomFormUpdate"
-            @update:is-valid="(val) => (isChildFormValid = val)"
-          />
-        </div>
-
-        <div
-          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Service"
-          class="w-full h-full overflow-hidden flex flex-col"
-        >
-          <ServiceEditForm
-            :raw-data="serviceRawData"
-            @update:raw-data="handleCustomFormUpdate"
-            @update:is-valid="(val) => (isChildFormValid = val)"
-          />
-        </div>
-
-        <div
-          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.ConfigMap"
-          class="w-full h-full overflow-hidden flex flex-col"
-        >
-          <ConfigMapEditForm
-            :raw-data="configMapRawData"
-            @update:raw-data="handleCustomFormUpdate"
-            @update:is-valid="(val) => (isChildFormValid = val)"
-          />
-        </div>
-
-        <div
-          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Secret"
-          class="w-full h-full overflow-hidden flex flex-col"
-        >
-          <SecretEditForm
-            :raw-data="secretRawData"
-            @update:raw-data="handleCustomFormUpdate"
-            @update:is-valid="(val) => (isChildFormValid = val)"
-          />
-        </div>
-
-        <div
-          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Namespace"
-          class="w-full h-full overflow-hidden flex flex-col"
-        >
-          <NamespaceEditForm
-            :raw-data="namespaceRawData"
-            @update:raw-data="handleCustomFormUpdate"
-            @update:is-valid="(val) => (isChildFormValid = val)"
+            @update:is-valid="(val: boolean) => (isChildFormValid = val)"
           />
         </div>
 
