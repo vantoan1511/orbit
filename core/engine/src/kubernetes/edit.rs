@@ -2,7 +2,7 @@ use kube::{
     api::{Api, PostParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Node};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
@@ -91,6 +91,11 @@ pub async fn get_resource_raw(
             let resource = api.get(name).await?;
             to_json_val(&resource, kind)
         }
+        "Node" => {
+            let api: Api<Node> = Api::all(client.clone());
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
         _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported get resource kind: {}", kind),
@@ -124,6 +129,21 @@ pub async fn apply_resource(
         }};
     }
 
+    macro_rules! replace_cluster_resource {
+        ($api_type:ty) => {{
+            let api: Api<$api_type> = Api::all(client.clone());
+            let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
+                kube::Error::Api(kube::error::ErrorResponse {
+                    status: "Failure".to_string(),
+                    message: format!("Failed to parse {}: {}", kind, e),
+                    reason: "BadRequest".to_string(),
+                    code: 400,
+                })
+            })?;
+            api.replace(name, &post_params, &parsed).await?;
+        }};
+    }
+
     match kind {
         "Pod" => replace_resource!(Pod),
         "Deployment" => replace_resource!(Deployment),
@@ -138,6 +158,7 @@ pub async fn apply_resource(
         "PersistentVolumeClaim" => replace_resource!(PersistentVolumeClaim),
         "NetworkPolicy" => replace_resource!(NetworkPolicy),
         "Ingress" => replace_resource!(Ingress),
+        "Node" => replace_cluster_resource!(Node),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported apply resource kind: {}", kind),
@@ -171,6 +192,21 @@ pub async fn create_resource(
         }};
     }
 
+    macro_rules! create_cluster_resource {
+        ($api_type:ty) => {{
+            let api: Api<$api_type> = Api::all(client.clone());
+            let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
+                kube::Error::Api(kube::error::ErrorResponse {
+                    status: "Failure".to_string(),
+                    message: format!("Failed to parse {}: {}", kind, e),
+                    reason: "BadRequest".to_string(),
+                    code: 400,
+                })
+            })?;
+            api.create(&post_params, &parsed).await?;
+        }};
+    }
+
     match kind {
         "Pod" => create_resource!(Pod),
         "Deployment" => create_resource!(Deployment),
@@ -185,6 +221,7 @@ pub async fn create_resource(
         "PersistentVolumeClaim" => create_resource!(PersistentVolumeClaim),
         "NetworkPolicy" => create_resource!(NetworkPolicy),
         "Ingress" => create_resource!(Ingress),
+        "Node" => create_cluster_resource!(Node),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported create resource kind: {}", kind),
