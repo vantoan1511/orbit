@@ -18,11 +18,12 @@ import SecretEditForm from '@/components/config/SecretEditForm.vue'
 import IngressEditForm from '@/components/network/IngressEditForm.vue'
 import ServiceEditForm from '@/components/network/ServiceEditForm.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
+import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
 import type { Deployment } from 'kubernetes-types/apps/v1'
-import type { ConfigMap, Secret, Service } from 'kubernetes-types/core/v1'
+import type { ConfigMap, Namespace, Secret, Service } from 'kubernetes-types/core/v1'
 import type { Ingress } from 'kubernetes-types/networking/v1'
 
 const props = defineProps<{
@@ -41,6 +42,7 @@ const ingressRawData = computed(() => (rawData.value as Ingress | null) ?? null)
 const serviceRawData = computed(() => (rawData.value as Service | null) ?? null)
 const configMapRawData = computed(() => (rawData.value as ConfigMap | null) ?? null)
 const secretRawData = computed(() => (rawData.value as Secret | null) ?? null)
+const namespaceRawData = computed(() => (rawData.value as Namespace | null) ?? null)
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -194,7 +196,8 @@ watch(
       props.kind === KUBERNETES_RESOURCE_KIND.Ingress ||
       props.kind === KUBERNETES_RESOURCE_KIND.Service ||
       props.kind === KUBERNETES_RESOURCE_KIND.ConfigMap ||
-      props.kind === KUBERNETES_RESOURCE_KIND.Secret
+      props.kind === KUBERNETES_RESOURCE_KIND.Secret ||
+      props.kind === KUBERNETES_RESOURCE_KIND.Namespace
     )
       return
     try {
@@ -343,6 +346,17 @@ watch(
         >
           <SecretEditForm
             :raw-data="secretRawData"
+            @update:raw-data="handleCustomFormUpdate"
+            @update:is-valid="(val) => (isChildFormValid = val)"
+          />
+        </div>
+
+        <div
+          v-else-if="props.kind === KUBERNETES_RESOURCE_KIND.Namespace"
+          class="w-full h-full overflow-hidden flex flex-col"
+        >
+          <NamespaceEditForm
+            :raw-data="namespaceRawData"
             @update:raw-data="handleCustomFormUpdate"
             @update:is-valid="(val) => (isChildFormValid = val)"
           />

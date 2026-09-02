@@ -2,7 +2,7 @@ use kube::{
     api::{Api, DeleteParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Namespace};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
@@ -66,6 +66,10 @@ pub async fn delete_resource(
         }
         "Ingress" => {
             let api: Api<Ingress> = Api::namespaced(client.clone(), namespace);
+            api.delete(name, &delete_params).await?;
+        }
+        "Namespace" => {
+            let api: Api<Namespace> = Api::all(client.clone());
             api.delete(name, &delete_params).await?;
         }
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {

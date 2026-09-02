@@ -66,6 +66,7 @@ declare module 'vue' {
     LogHighlightRulesDialog: typeof import('./src/components/logs/LogHighlightRulesDialog.vue')['default']
     NamespaceBadge: typeof import('./src/components/shared/NamespaceBadge.vue')['default']
     NamespaceDetailsDrawer: typeof import('./src/components/namespaces/NamespaceDetailsDrawer.vue')['default']
+    NamespaceEditForm: typeof import('./src/components/namespaces/NamespaceEditForm.vue')['default']
     NamespaceFilter: typeof import('./src/components/shared/NamespaceFilter.vue')['default']
     NamespaceMetricsCards: typeof import('./src/components/namespaces/NamespaceMetricsCards.vue')['default']
     NamespacesDataTable: typeof import('./src/components/namespaces/NamespacesDataTable.vue')['default']
