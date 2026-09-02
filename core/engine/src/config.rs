@@ -259,9 +259,15 @@ impl OrbitConfig {
             };
 
             let Some(mut val) = incoming.value.clone() else {
-                tracing::trace!(key = %incoming.key, "Skipped config update: value is None");
+                // If value was omitted or null in payload, remove to revert to default
+                self.values.remove(&incoming.key);
                 continue;
             };
+
+            if val.is_null() || def.default_value.as_ref() == Some(&val) {
+                self.values.remove(&incoming.key);
+                continue;
+            }
 
             // If confidential, decode base64 before storing locally
             if def.is_confidential {
@@ -405,5 +411,46 @@ mod tests {
 
         config.update_from_configurations(&updated);
         assert_eq!(config.max_log_files(), 50);
+
+        // Test resetting to default via matching default value (e.g. 10)
+        let reset_with_default = vec![
+            Configuration {
+                key: "maxLogFiles".to_string(),
+                name: "Log Retention Limit".to_string(),
+                description: "Test".to_string(),
+                datatype: "number".to_string(),
+                default_value: Some(serde_json::json!(10)),
+                value: Some(serde_json::json!(10)),
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
+                created_at: None,
+                last_updated_at: None,
+            }
+        ];
+        config.update_from_configurations(&reset_with_default);
+        assert_eq!(config.max_log_files(), 10);
+        assert!(!config.values.contains_key("maxLogFiles"));
+
+        // Re-set and test resetting to default via None
+        config.values.insert("maxLogFiles".to_string(), serde_json::json!(50));
+        let reset_with_none = vec![
+            Configuration {
+                key: "maxLogFiles".to_string(),
+                name: "Log Retention Limit".to_string(),
+                description: "Test".to_string(),
+                datatype: "number".to_string(),
+                default_value: Some(serde_json::json!(10)),
+                value: None,
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
+                created_at: None,
+                last_updated_at: None,
+            }
+        ];
+        config.update_from_configurations(&reset_with_none);
+        assert_eq!(config.max_log_files(), 10);
+        assert!(!config.values.contains_key("maxLogFiles"));
     }
 }

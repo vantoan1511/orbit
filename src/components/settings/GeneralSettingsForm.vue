@@ -3,7 +3,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useProfileStore } from '@/stores/profileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { CONFIG_KEYS, type Configuration } from '@/types/settings'
-import { AlertTriangle, Folder, Lock, RefreshCw } from '@lucide/vue'
+import { AlertTriangle, Folder, Lock, RefreshCw, RotateCcw } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
@@ -22,7 +22,7 @@ const isReloading = ref(false)
 
 const logRetentionOptions = [
   { label: '5 files', value: 5 },
-  { label: '10 files (Default)', value: 10 },
+  { label: '10 files', value: 10 },
   { label: '20 files', value: 20 },
   { label: '50 files', value: 50 },
   { label: 'Unlimited (Keep all)', value: 0 }
@@ -34,6 +34,20 @@ const kubeconfigDisplayPath = computed(() => {
   }
   return 'Auto-detected'
 })
+
+const isConfigModified = (config: Configuration): boolean => {
+  if (config.value === undefined || config.value === null) return false
+  if (config.defaultValue === undefined || config.defaultValue === null) return false
+  return JSON.stringify(config.value) !== JSON.stringify(config.defaultValue)
+}
+
+const handleReset = async (config: Configuration) => {
+  if (!config.enable) return
+  const defaultVal = Array.isArray(config.defaultValue)
+    ? [...config.defaultValue]
+    : (config.defaultValue ?? null)
+  await handleValueChange(config, defaultVal)
+}
 
 const handleReloadKubeconfig = async () => {
   if (isReloading.value) return
@@ -61,11 +75,13 @@ const handleReloadKubeconfig = async () => {
 
 const handleValueChange = async (config: Configuration, newValue: unknown) => {
   if (!config.enable) return
+  const isResetting =
+    newValue === null || JSON.stringify(newValue) === JSON.stringify(config.defaultValue)
   await settingsStore.updateConfigValue(config.key, newValue)
   toast.add({
     severity: 'success',
-    summary: 'Settings Saved',
-    detail: `${config.name} updated.`,
+    summary: isResetting ? 'Settings Reset' : 'Settings Saved',
+    detail: isResetting ? `${config.name} reset to default.` : `${config.name} updated.`,
     life: 2000
   })
 }
@@ -136,33 +152,61 @@ const formatArrayValue = (val: unknown): string => {
           class="flex items-center justify-between gap-4 max-w-lg"
         >
           <span class="text-xs text-primary font-medium select-none">{{ config.name }}</span>
-          <ToggleSwitch
-            :modelValue="Boolean(config.value ?? config.defaultValue ?? false)"
-            :disabled="!config.enable || settingsStore.isSaving"
-            @update:modelValue="(val: boolean) => handleValueChange(config, val)"
-          />
+          <div class="flex items-center gap-2">
+            <Button
+              v-if="isConfigModified(config)"
+              v-tooltip.top="'Reset to default'"
+              severity="secondary"
+              variant="text"
+              rounded
+              class="w-7 h-7 p-0! shrink-0"
+              :disabled="!config.enable || settingsStore.isSaving"
+              @click="handleReset(config)"
+            >
+              <RotateCcw class="w-3.5 h-3.5" />
+            </Button>
+            <ToggleSwitch
+              :modelValue="Boolean(config.value ?? config.defaultValue ?? false)"
+              :disabled="!config.enable || settingsStore.isSaving"
+              @update:modelValue="(val: boolean) => handleValueChange(config, val)"
+            />
+          </div>
         </div>
 
         <!-- Number Type (Specialized for Log Retention or Generic InputNumber) -->
-        <div v-else-if="config.datatype === 'number'" class="flex flex-col gap-1.5 max-w-xs">
+        <div v-else-if="config.datatype === 'number'" class="flex items-center gap-2 max-w-xs">
           <!-- Preset options selector for log retention limit -->
-          <Select
-            v-if="config.key === CONFIG_KEYS.MAX_LOG_FILES"
-            :modelValue="Number(config.value ?? config.defaultValue ?? 10)"
-            :options="logRetentionOptions"
-            optionLabel="label"
-            optionValue="value"
+          <div class="flex-1">
+            <Select
+              v-if="config.key === CONFIG_KEYS.MAX_LOG_FILES"
+              :modelValue="Number(config.value ?? config.defaultValue ?? 10)"
+              :options="logRetentionOptions"
+              optionLabel="label"
+              optionValue="value"
+              :disabled="!config.enable || settingsStore.isSaving"
+              class="text-xs w-full"
+              @update:modelValue="(val: number) => handleValueChange(config, val)"
+            />
+            <InputNumber
+              v-else
+              :modelValue="Number(config.value ?? config.defaultValue ?? 0)"
+              :disabled="!config.enable || settingsStore.isSaving"
+              class="text-xs w-full"
+              @update:modelValue="(val: number | null) => handleValueChange(config, val ?? 0)"
+            />
+          </div>
+          <Button
+            v-if="isConfigModified(config)"
+            v-tooltip.top="'Reset to default'"
+            severity="secondary"
+            variant="text"
+            rounded
+            class="w-7 h-7 p-0! shrink-0"
             :disabled="!config.enable || settingsStore.isSaving"
-            class="text-xs w-full"
-            @update:modelValue="(val: number) => handleValueChange(config, val)"
-          />
-          <InputNumber
-            v-else
-            :modelValue="Number(config.value ?? config.defaultValue ?? 0)"
-            :disabled="!config.enable || settingsStore.isSaving"
-            class="text-xs w-full"
-            @update:modelValue="(val: number | null) => handleValueChange(config, val ?? 0)"
-          />
+            @click="handleReset(config)"
+          >
+            <RotateCcw class="w-3.5 h-3.5" />
+          </Button>
         </div>
 
         <!-- Multi-value String Array (e.g. 0..* or 1..*) -->
@@ -185,6 +229,18 @@ const formatArrayValue = (val: unknown): string => {
               />
             </div>
             <Button
+              v-if="isConfigModified(config)"
+              v-tooltip.top="'Reset to default'"
+              severity="secondary"
+              variant="text"
+              rounded
+              class="w-7 h-7 p-0! shrink-0 self-center"
+              :disabled="!config.enable || settingsStore.isSaving"
+              @click="handleReset(config)"
+            >
+              <RotateCcw class="w-3.5 h-3.5" />
+            </Button>
+            <Button
               size="small"
               severity="secondary"
               variant="outlined"
@@ -197,28 +253,52 @@ const formatArrayValue = (val: unknown): string => {
               <span>Reload</span>
             </Button>
           </div>
-          <div v-else class="flex flex-col gap-1">
+          <div v-else class="flex items-center gap-2">
             <InputText
               :modelValue="formatArrayValue(config.value ?? config.defaultValue)"
               :disabled="!config.enable || settingsStore.isSaving"
-              class="text-xs w-full"
+              class="text-xs w-full flex-1"
               placeholder="Comma-separated values"
               @change="
                 (e: Event) => handleArrayChange(config, (e.target as HTMLInputElement).value)
               "
             />
+            <Button
+              v-if="isConfigModified(config)"
+              v-tooltip.top="'Reset to default'"
+              severity="secondary"
+              variant="text"
+              rounded
+              class="w-7 h-7 p-0! shrink-0"
+              :disabled="!config.enable || settingsStore.isSaving"
+              @click="handleReset(config)"
+            >
+              <RotateCcw class="w-3.5 h-3.5" />
+            </Button>
           </div>
         </div>
 
         <!-- Single String Type -->
-        <div v-else class="flex flex-col gap-1.5 max-w-lg">
+        <div v-else class="flex items-center gap-2 max-w-lg">
           <InputText
             :modelValue="String(config.value ?? config.defaultValue ?? '')"
             :disabled="!config.enable || settingsStore.isSaving"
             :type="config.isConfidential ? 'password' : 'text'"
-            class="text-xs w-full"
+            class="text-xs w-full flex-1"
             @change="(e: Event) => handleValueChange(config, (e.target as HTMLInputElement).value)"
           />
+          <Button
+            v-if="isConfigModified(config)"
+            v-tooltip.top="'Reset to default'"
+            severity="secondary"
+            variant="text"
+            rounded
+            class="w-7 h-7 p-0! shrink-0"
+            :disabled="!config.enable || settingsStore.isSaving"
+            @click="handleReset(config)"
+          >
+            <RotateCcw class="w-3.5 h-3.5" />
+          </Button>
         </div>
       </div>
     </div>
