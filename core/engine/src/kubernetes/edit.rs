@@ -2,7 +2,7 @@ use kube::{
     api::{Api, PostParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Node};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Node, Namespace};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
@@ -96,6 +96,11 @@ pub async fn get_resource_raw(
             let resource = api.get(name).await?;
             to_json_val(&resource, kind)
         }
+        "Namespace" => {
+            let api: Api<Namespace> = Api::all(client.clone());
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
         _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported get resource kind: {}", kind),
@@ -159,6 +164,7 @@ pub async fn apply_resource(
         "NetworkPolicy" => replace_resource!(NetworkPolicy),
         "Ingress" => replace_resource!(Ingress),
         "Node" => replace_cluster_resource!(Node),
+        "Namespace" => replace_cluster_resource!(Namespace),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported apply resource kind: {}", kind),
@@ -222,6 +228,7 @@ pub async fn create_resource(
         "NetworkPolicy" => create_resource!(NetworkPolicy),
         "Ingress" => create_resource!(Ingress),
         "Node" => create_cluster_resource!(Node),
+        "Namespace" => create_cluster_resource!(Namespace),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported create resource kind: {}", kind),
