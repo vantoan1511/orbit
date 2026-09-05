@@ -46,7 +46,8 @@ const props = withDefaults(
     hideRefresh: false,
     hideConfig: false,
     hideRowsPerPage: false,
-    columns: () => []
+    columns: () => [],
+    dataKey: 'name'
   }
 )
 
@@ -58,14 +59,6 @@ const emit = defineEmits<{
   (e: 'row-click', event: any): void
   (e: 'row-contextmenu', event: { originalEvent: Event; data: any; index?: number }): void
 }>()
-
-const defaultDataKeyResolver = (item: any) =>
-  item?.uid ||
-  (item?.namespace ? `${item.namespace}/${item.name}` : item?.name) ||
-  item?.id ||
-  item?.name
-
-const resolvedDataKey = computed(() => props.dataKey ?? defaultDataKeyResolver)
 
 const rowsPerPage = ref(
   props.rowsPerPageOptions.includes(props.rows) ? props.rows : ALLOWED_ROW_OPTIONS[0]
@@ -320,7 +313,7 @@ const isIndeterminate = computed(() => {
         v-else
         :value="data"
         v-model:selection="selection"
-        :dataKey="resolvedDataKey"
+        :dataKey="dataKey"
         paginator
         :rowHover="true"
         v-model:rows="rowsPerPage"

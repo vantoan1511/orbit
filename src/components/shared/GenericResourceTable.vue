@@ -3,7 +3,7 @@
   lang="ts"
   generic="
     T extends {
-      name: string
+      name?: string
       namespace?: string
       status?: string
       age?: string
@@ -48,6 +48,7 @@ const props = withDefaults(
     reportTemplate?: string
     loading?: boolean
     selectable?: boolean
+    dataKey?: string
     hideNamespaceFilter?: boolean
     hideStatusFilter?: boolean
     hideNameColumn?: boolean
@@ -71,6 +72,7 @@ const props = withDefaults(
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
     selectable: true,
+    dataKey: 'name',
     hideNamespaceFilter: false,
     hideStatusFilter: false,
     hideNameColumn: false,
@@ -128,12 +130,22 @@ watch(selectedStatus, (val) => {
 })
 
 // Row selection persistence
+const getRowKey = (item: T): string => {
+  const keyProp = props.dataKey as keyof T
+  if (keyProp && item[keyProp] != null) {
+    return String(item[keyProp])
+  }
+  const record = item as Record<string, unknown>
+  const fallback = record.uid || record.objectName || record.id || ''
+  return item.name || String(fallback)
+}
+
 const storedRowKeys = filterStore.getFilters(
   resolvedStoreKey,
   k8sStore.activeClusterId || undefined
 ).selectedRowKeys
 if (storedRowKeys.length > 0) {
-  const matched = props.data.filter((item) => storedRowKeys.includes(item.name))
+  const matched = props.data.filter((item) => storedRowKeys.includes(getRowKey(item)))
   if (matched.length > 0) {
     selection.value = matched
   }
@@ -147,7 +159,7 @@ watch(
       k8sStore.activeClusterId || undefined
     ).selectedRowKeys
     if (keys.length > 0 && selection.value.length === 0) {
-      const matched = newData.filter((item) => keys.includes(item.name))
+      const matched = newData.filter((item) => keys.includes(getRowKey(item)))
       if (matched.length > 0) {
         selection.value = matched
       }
@@ -156,12 +168,12 @@ watch(
 )
 
 watch(
-  () => selection.value.map((item) => item.name).join(','),
+  () => selection.value.map((item) => getRowKey(item)).join(','),
   () => {
     filterStore.setFilter(
       resolvedStoreKey,
       'selectedRowKeys',
-      selection.value.map((item) => item.name),
+      selection.value.map((item) => getRowKey(item)),
       k8sStore.activeClusterId || undefined
     )
   }
@@ -268,7 +280,9 @@ const portForwardsMap = computed(() => {
 
 const getPortForwards = (data: T): ActivePortForward[] => {
   if (portForwardsMap.value.size === 0) return EMPTY_PORT_FORWARDS
-  const key = `${data.namespace || ''}:${data.name}`
+  const record = data as Record<string, unknown>
+  const resourceName = data.name || (record.objectName ? String(record.objectName) : '')
+  const key = `${data.namespace || ''}:${resourceName}`
   return portForwardsMap.value.get(key) ?? EMPTY_PORT_FORWARDS
 }
 </script>
@@ -276,6 +290,7 @@ const getPortForwards = (data: T): ActivePortForward[] => {
 <template>
   <ResourceDataTable
     :data="filteredData"
+    :dataKey="dataKey"
     v-model:selection="selection"
     v-model:searchQuery="searchQuery"
     v-model:columns="tableColumns"

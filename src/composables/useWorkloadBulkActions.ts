@@ -20,7 +20,7 @@ export interface WorkloadBulkActionOptions {
   clearSelection?: () => void
 }
 
-export function useWorkloadBulkActions<T extends { name: string; namespace?: string }>(
+export function useWorkloadBulkActions<T extends { name?: string; namespace?: string }>(
   selectedItems: Ref<T[]>,
   options: WorkloadBulkActionOptions = {}
 ) {
@@ -89,7 +89,7 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
                     await kubernetesService.redeployResource({
                       namespace: row.namespace || 'default',
                       kind: resourceKind,
-                      name: row.name
+                      name: row.name || ''
                     })
                     successCount++
                   } catch {
@@ -131,7 +131,7 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
                   try {
                     await kubernetesService.restartPod({
                       namespace: row.namespace || 'default',
-                      name: row.name
+                      name: row.name || ''
                     })
                     successCount++
                   } catch {
@@ -189,7 +189,7 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
                       await kubernetesService.scaleResource({
                         namespace: row.namespace || 'default',
                         kind: resourceKind,
-                        name: row.name,
+                        name: row.name || '',
                         replicas: newReplicas
                       })
                       successCount++
@@ -235,7 +235,7 @@ export function useWorkloadBulkActions<T extends { name: string; namespace?: str
                     await kubernetesService.deleteResource({
                       namespace: row.namespace || 'default',
                       kind: resourceKind,
-                      name: row.name
+                      name: row.name || ''
                     })
                     successCount++
                   } catch {

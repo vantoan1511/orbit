@@ -25,17 +25,10 @@ const columns = [
 const selectedType = ref('All Types')
 const types = ['All Types', ...Object.values(KUBERNETES_EVENT_TYPE)]
 
-const eventsWithResourceItem = computed(() =>
-  events.value.map((e) => ({ ...e, name: e.objectName }))
-)
-
 const filteredEvents = computed(() => {
-  return eventsWithResourceItem.value.filter((e) => {
-    if (selectedType.value !== 'All Types' && e.type !== selectedType.value) {
-      return false
-    }
-    return true
-  })
+  const type = selectedType.value
+  if (type === 'All Types') return events.value
+  return events.value.filter((e) => e.type === type)
 })
 
 const handleRefresh = async () => {
@@ -50,13 +43,16 @@ const handleRefresh = async () => {
 <template>
   <GenericResourceTable
     :data="filteredEvents"
+    :dataKey="'uid'"
+    :selectable="false"
+    :hideActionsColumn="true"
     :initialColumns="columns"
     :hideStatusFilter="true"
     :hideNameColumn="true"
     :hideNamespaceColumn="true"
     :hideStatusColumn="true"
     :hideAgeColumn="true"
-    :searchFields="['message', 'reason', 'name', 'objectKind', 'source']"
+    :searchFields="['message', 'reason', 'objectName', 'objectKind', 'source']"
     :kind="KUBERNETES_RESOURCE_KIND.Event"
     searchPlaceholder="Search events..."
     emptyMessage="No events found matching the filter criteria."
@@ -78,11 +74,7 @@ const handleRefresh = async () => {
         sortable
         class="p-3 min-w-16"
         bodyClass="text-muted-color font-mono"
-      >
-        <template #body="{ data }">
-          <span>{{ data.time }}</span>
-        </template>
-      </Column>
+      />
 
       <!-- Type Column -->
       <Column v-if="visibleCols['type']" field="type" header="Type" sortable class="p-3 min-w-24">
@@ -98,12 +90,8 @@ const handleRefresh = async () => {
         header="Reason"
         sortable
         class="p-3"
-        bodyClass="font-semibold text-primary"
-      >
-        <template #body="{ data }">
-          <span class="font-mono">{{ data.reason }}</span>
-        </template>
-      </Column>
+        bodyClass="font-semibold font-mono text-primary"
+      />
 
       <!-- Object Column -->
       <Column
@@ -149,11 +137,8 @@ const handleRefresh = async () => {
         header="Namespace"
         sortable
         class="p-3"
-      >
-        <template #body="{ data }">
-          <span class="font-mono text-muted-color">{{ data.namespace }}</span>
-        </template>
-      </Column>
+        bodyClass="font-mono text-muted-color"
+      />
 
       <!-- Source Column -->
       <Column
