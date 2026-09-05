@@ -6,7 +6,7 @@ import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
@@ -31,6 +31,7 @@ const props = withDefaults(
     hideConfig?: boolean
     hideRowsPerPage?: boolean
     columns?: TableColumn[]
+    dataKey?: string | ((data: any) => string)
   }>(),
   {
     searchQuery: '',
@@ -45,7 +46,8 @@ const props = withDefaults(
     hideRefresh: false,
     hideConfig: false,
     hideRowsPerPage: false,
-    columns: () => []
+    columns: () => [],
+    dataKey: 'name'
   }
 )
 
@@ -75,9 +77,58 @@ watch(
   }
 )
 
-const onSearchUpdate = (val: string | undefined) => {
-  emit('update:searchQuery', val ?? '')
+const localSearchQuery = ref(props.searchQuery ?? '')
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => props.searchQuery,
+  (newVal) => {
+    if (newVal !== localSearchQuery.value) {
+      localSearchQuery.value = newVal ?? ''
+    }
+  }
+)
+
+const emitSearch = (val: string) => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  emit('update:searchQuery', val)
 }
+
+const onSearchUpdate = (val: string | undefined) => {
+  const query = val ?? ''
+  localSearchQuery.value = query
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+  }
+  if (query === '') {
+    emitSearch('')
+    return
+  }
+  searchDebounceTimer = setTimeout(() => {
+    emitSearch(query)
+  }, 150)
+}
+
+const onSearchKeyDown = (event: KeyboardEvent) => {
+  if (event.key === 'Enter') {
+    emitSearch(localSearchQuery.value)
+  }
+}
+
+const clearSearch = () => {
+  localSearchQuery.value = ''
+  emitSearch('')
+}
+
+onUnmounted(() => {
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+})
 
 const configPopover = ref()
 const toggleConfig = (event: Event) => {
@@ -148,12 +199,18 @@ const isIndeterminate = computed(() => {
           <IconField>
             <InputIcon class="pi pi-search" />
             <InputText
-              :model-value="searchQuery"
+              :model-value="localSearchQuery"
               :placeholder="searchPlaceholder"
               @update:model-value="onSearchUpdate"
+              @keydown="onSearchKeyDown"
               variant="filled"
               size="small"
               fluid
+            />
+            <InputIcon
+              v-if="localSearchQuery"
+              class="pi pi-times cursor-pointer hover:text-primary transition-colors"
+              @click="clearSearch"
             />
           </IconField>
         </div>
@@ -256,7 +313,7 @@ const isIndeterminate = computed(() => {
         v-else
         :value="data"
         v-model:selection="selection"
-        dataKey="name"
+        :dataKey="dataKey"
         paginator
         :rowHover="true"
         v-model:rows="rowsPerPage"

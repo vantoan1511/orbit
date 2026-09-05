@@ -1,9 +1,18 @@
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
-import { computed, ref, unref, watch, type MaybeRef, type Ref } from 'vue'
+import {
+  computed,
+  onScopeDispose,
+  ref,
+  shallowRef,
+  unref,
+  watch,
+  type MaybeRef,
+  type Ref
+} from 'vue'
 
 export interface ResourceItem {
-  name: string
+  name?: string
   namespace?: string
   [key: string]: unknown
 }
@@ -25,6 +34,31 @@ export function useResourceFilters<T extends ResourceItem>(
 
   const searchQuery = ref(stored?.searchQuery ?? '')
   const selectedNamespace = ref<string[]>(stored ? [...stored.selectedNamespace] : [])
+  const activeNamespaceFilter = shallowRef<string[]>(selectedNamespace.value)
+
+  let namespaceTimer: ReturnType<typeof setTimeout> | null = null
+
+  const syncActiveNamespace = (val: string[], immediate = false) => {
+    if (namespaceTimer) {
+      clearTimeout(namespaceTimer)
+      namespaceTimer = null
+    }
+    if (immediate) {
+      activeNamespaceFilter.value = val
+      return
+    }
+    namespaceTimer = setTimeout(() => {
+      activeNamespaceFilter.value = val
+      namespaceTimer = null
+    }, 40)
+  }
+
+  onScopeDispose(() => {
+    if (namespaceTimer) {
+      clearTimeout(namespaceTimer)
+      namespaceTimer = null
+    }
+  })
 
   const shouldHideNamespace = computed(() => unref(hideNamespaceFilter))
 
@@ -41,6 +75,7 @@ export function useResourceFilters<T extends ResourceItem>(
           [...val],
           k8sStore.activeClusterId || undefined
         )
+        syncActiveNamespace(val, false)
       },
       { deep: true }
     )
@@ -51,6 +86,7 @@ export function useResourceFilters<T extends ResourceItem>(
         const state = filterStore.getFilters(storeKey, newClusterId || undefined)
         searchQuery.value = state.searchQuery
         selectedNamespace.value = [...state.selectedNamespace]
+        syncActiveNamespace(selectedNamespace.value, true)
       }
     )
 
@@ -66,6 +102,7 @@ export function useResourceFilters<T extends ResourceItem>(
             .filter((n) => !SYSTEM_NAMESPACES.includes(n))
 
           selectedNamespace.value = userNamespaces
+          syncActiveNamespace(userNamespaces, true)
           filterStore.setFilter(storeKey, 'isNamespaceInitialized', true, cluster)
         } else if (
           state.isNamespaceInitialized &&
@@ -80,8 +117,10 @@ export function useResourceFilters<T extends ResourceItem>(
               .map((n) => n.name)
               .filter((n) => !SYSTEM_NAMESPACES.includes(n))
             selectedNamespace.value = userNamespaces
+            syncActiveNamespace(userNamespaces, true)
           } else if (validNamespaces.length !== selectedNamespace.value.length) {
             selectedNamespace.value = validNamespaces
+            syncActiveNamespace(validNamespaces, true)
           }
         }
       },
@@ -90,38 +129,57 @@ export function useResourceFilters<T extends ResourceItem>(
   }
 
   const filteredResources = computed(() => {
+    const rawQuery = searchQuery.value.trim().toLowerCase()
+    const hasQuery = rawQuery.length > 0
+
+    const filterNamespace = !shouldHideNamespace.value && activeNamespaceFilter.value.length > 0
+    const selectedNsSet = filterNamespace ? new Set(activeNamespaceFilter.value) : null
+
+    // Fast-path: if no search query and no namespace filter, return entire array directly
+    if (!hasQuery && !filterNamespace) {
+      return resources.value
+    }
+
     return resources.value.filter((item) => {
-      // 1. Search Query filter
-      if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase()
-        const matches = searchFields.some((field) => {
-          const val = item[field]
-          if (typeof val === 'string') return val.toLowerCase().includes(query)
-          if (Array.isArray(val))
-            return val.some(
-              (v: unknown) => typeof v === 'string' && v.toLowerCase().includes(query)
-            )
+      // 1. Namespace filter: check before search for early exit
+      if (filterNamespace && selectedNsSet) {
+        const ns = item.namespace
+        const isNamespaced =
+          typeof ns === 'string' &&
+          ns.trim().length > 0 &&
+          ns !== '-' &&
+          ns !== 'Cluster' &&
+          ns !== 'All' &&
+          item.scope !== 'Cluster'
+
+        if (isNamespaced && !selectedNsSet.has(ns)) {
           return false
-        })
-        if (!matches) return false
+        }
       }
 
-      // 2. Namespace filter: only filter resources that belong to a specific namespace
-      const isNamespaced =
-        typeof item.namespace === 'string' &&
-        item.namespace.trim().length > 0 &&
-        item.namespace !== '-' &&
-        item.namespace !== 'Cluster' &&
-        item.namespace !== 'All' &&
-        item.scope !== 'Cluster'
-
-      if (
-        !shouldHideNamespace.value &&
-        selectedNamespace.value.length > 0 &&
-        isNamespaced &&
-        !selectedNamespace.value.includes(item.namespace as string)
-      ) {
-        return false
+      // 2. Search Query filter
+      if (hasQuery) {
+        let matches = false
+        for (let i = 0; i < searchFields.length; i++) {
+          const field = searchFields[i]!
+          const val = item[field]
+          if (typeof val === 'string') {
+            if (val.toLowerCase().includes(rawQuery)) {
+              matches = true
+              break
+            }
+          } else if (Array.isArray(val)) {
+            for (let j = 0; j < val.length; j++) {
+              const v = val[j]
+              if (typeof v === 'string' && v.toLowerCase().includes(rawQuery)) {
+                matches = true
+                break
+              }
+            }
+            if (matches) break
+          }
+        }
+        if (!matches) return false
       }
 
       return true
