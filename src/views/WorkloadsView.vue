@@ -2,6 +2,7 @@
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
 import { useDialog } from 'primevue/usedialog'
 import CreateDeploymentDialog from '@/components/workloads/CreateDeploymentDialog.vue'
+import CreatePodDialog from '@/components/pods/CreatePodDialog.vue'
 import CronJobsTable from '@/components/workloads/CronJobsTable.vue'
 import DaemonSetsTable from '@/components/workloads/DaemonSetsTable.vue'
 import DeploymentsTable from '@/components/workloads/DeploymentsTable.vue'
@@ -13,6 +14,18 @@ import StatefulSetsTable from '@/components/workloads/StatefulSetsTable.vue'
 import WorkloadMetricsCards from '@/components/workloads/WorkloadMetricsCards.vue'
 
 const dialog = useDialog()
+
+const openCreatePodDialog = () => {
+  dialog.open(CreatePodDialog, {
+    props: {
+      header: 'Create Pod',
+      style: {
+        width: '460px'
+      },
+      modal: true
+    }
+  })
+}
 
 const openCreateDeploymentDialog = () => {
   dialog.open(CreateDeploymentDialog, {
@@ -28,7 +41,10 @@ const openCreateDeploymentDialog = () => {
 
 const tabs: ResourceTab[] = [
   { id: 'overview' },
-  { id: 'pods' },
+  {
+    id: 'pods',
+    createAction: { handler: openCreatePodDialog }
+  },
   {
     id: 'deployments',
     createAction: { handler: openCreateDeploymentDialog }

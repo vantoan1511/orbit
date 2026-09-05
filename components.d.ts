@@ -41,6 +41,7 @@ declare module 'vue' {
     CreateDeploymentDialog: typeof import('./src/components/workloads/CreateDeploymentDialog.vue')['default']
     CreateIngressDialog: typeof import('./src/components/network/CreateIngressDialog.vue')['default']
     CreateNamespaceDialog: typeof import('./src/components/namespaces/CreateNamespaceDialog.vue')['default']
+    CreatePodDialog: typeof import('./src/components/pods/CreatePodDialog.vue')['default']
     CreateSecretDialog: typeof import('./src/components/config/CreateSecretDialog.vue')['default']
     CreateServiceDialog: typeof import('./src/components/network/CreateServiceDialog.vue')['default']
     CronJobsTable: typeof import('./src/components/workloads/CronJobsTable.vue')['default']

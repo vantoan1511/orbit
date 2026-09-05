@@ -57,6 +57,21 @@ export const KUBERNETES_POD_STATUS = {
 export type KubernetesPodStatus = (typeof KUBERNETES_POD_STATUS)[keyof typeof KUBERNETES_POD_STATUS]
 
 /**
+ * Common Kubernetes Pod restart policies.
+ */
+export const KUBERNETES_RESTART_POLICY = {
+  Always: 'Always',
+  OnFailure: 'OnFailure',
+  Never: 'Never'
+} as const
+
+export type KubernetesRestartPolicy =
+  (typeof KUBERNETES_RESTART_POLICY)[keyof typeof KUBERNETES_RESTART_POLICY]
+
+export const KUBERNETES_RESTART_POLICIES: KubernetesRestartPolicy[] =
+  Object.values(KUBERNETES_RESTART_POLICY)
+
+/**
  * Common Kubernetes Workload statuses (Deployment, DaemonSet, StatefulSet, ReplicaSet).
  */
 export const KUBERNETES_WORKLOAD_STATUS = {
