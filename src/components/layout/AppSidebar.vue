@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSidebarActivityBar from './sidebar/AppSidebarActivityBar.vue'
 import AppSidebarClusters from './sidebar/AppSidebarClusters.vue'
@@ -7,6 +8,9 @@ import AppSidebarLogsMenu from './sidebar/AppSidebarLogsMenu.vue'
 import AppSidebarNavMenu from './sidebar/AppSidebarNavMenu.vue'
 import AppSidebarPanel from './sidebar/AppSidebarPanel.vue'
 import { type CategoryId, type SidebarCategory } from './sidebar/navigation'
+
+const k8sStore = useKubernetesStore()
+const hasActiveCluster = computed(() => k8sStore.activeClusterId !== null)
 
 const activeTab = ref<CategoryId | null>('clusters')
 const route = useRoute()
@@ -28,14 +32,30 @@ watch(
   () => route.path,
   (newPath) => {
     const category = getCategoryForRoute(newPath)
-    if (category && activeTab.value !== 'clusters') {
+    if (category && activeTab.value !== 'clusters' && hasActiveCluster.value) {
       activeTab.value = category
     }
   },
   { immediate: true }
 )
 
+watch(
+  () => k8sStore.activeClusterId,
+  (clusterId) => {
+    if (!clusterId && activeTab.value !== 'clusters') {
+      if (route.path !== '/settings') {
+        activeTab.value = 'clusters'
+      } else {
+        activeTab.value = null
+      }
+    }
+  }
+)
+
 const toggleCategory = (cat: SidebarCategory) => {
+  if (cat.requiresCluster && !hasActiveCluster.value) {
+    return
+  }
   if (cat.id === activeTab.value) {
     activeTab.value = null
     return
@@ -55,7 +75,11 @@ const handleClusterSwitched = () => {
 <template>
   <aside class="flex h-full text-primary select-none">
     <!-- Activity Bar (Far Left Strip) -->
-    <AppSidebarActivityBar :active-tab="activeTab" @toggle-category="toggleCategory" />
+    <AppSidebarActivityBar
+      :active-tab="activeTab"
+      :has-active-cluster="hasActiveCluster"
+      @toggle-category="toggleCategory"
+    />
 
     <!-- Contextual Sidebar Panel -->
     <AppSidebarPanel :active-tab="activeTab" @collapse="activeTab = null">
