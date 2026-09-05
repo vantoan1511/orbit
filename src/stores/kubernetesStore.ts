@@ -305,8 +305,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   function setActiveClusterId(id: string | null) {
     if (activeClusterId.value === id) return
     activeClusterId.value = id
-    // Clear filters when switching clusters
-    useTableFilterStore().resetAll()
+    // Sync active cluster and reset transient table selection state when switching clusters
+    const tableFilterStore = useTableFilterStore()
+    tableFilterStore.setActiveClusterId(id)
+    tableFilterStore.resetAllSelections()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
     deployments.value = []
