@@ -33,32 +33,54 @@ export interface SidebarCategory {
   name: string
   icon: Component
   defaultPath: string | null
+  requiresCluster?: boolean
 }
 
 export const categories: SidebarCategory[] = [
-  { id: 'clusters', name: 'Clusters', icon: Server, defaultPath: null },
-  { id: 'core', name: 'Overview & Core', icon: LayoutDashboard, defaultPath: '/' },
+  { id: 'clusters', name: 'Clusters', icon: Server, defaultPath: null, requiresCluster: false },
+  {
+    id: 'core',
+    name: 'Overview & Core',
+    icon: LayoutDashboard,
+    defaultPath: '/',
+    requiresCluster: true
+  },
   {
     id: 'workloads',
     name: 'Workloads',
     icon: Boxes,
-    defaultPath: '/workloads?tab=deployments'
+    defaultPath: '/workloads?tab=deployments',
+    requiresCluster: true
   },
-  { id: 'network', name: 'Network', icon: Network, defaultPath: '/network?tab=services' },
+  {
+    id: 'network',
+    name: 'Network',
+    icon: Network,
+    defaultPath: '/network?tab=services',
+    requiresCluster: true
+  },
   {
     id: 'storage',
     name: 'Storage',
     icon: HardDrive,
-    defaultPath: '/storage?tab=overview'
+    defaultPath: '/storage?tab=overview',
+    requiresCluster: true
   },
   {
     id: 'config',
     name: 'Config & Secrets',
     icon: Settings2,
-    defaultPath: '/config?tab=configmaps'
+    defaultPath: '/config?tab=configmaps',
+    requiresCluster: true
   },
-  { id: 'security', name: 'Security', icon: ShieldCheck, defaultPath: '/policies' },
-  { id: 'logs', name: 'Logs', icon: FileText, defaultPath: '/logs' }
+  {
+    id: 'security',
+    name: 'Security',
+    icon: ShieldCheck,
+    defaultPath: '/policies',
+    requiresCluster: true
+  },
+  { id: 'logs', name: 'Logs', icon: FileText, defaultPath: '/logs', requiresCluster: true }
 ]
 
 export interface AppSidebarMenuItem extends Omit<MenuItem, 'icon'> {

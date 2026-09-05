@@ -9,13 +9,24 @@ import { useRoute, useRouter } from 'vue-router'
 import { GitHubIcon } from 'vue3-simple-icons'
 import { categories, type CategoryId, type SidebarCategory } from './navigation'
 
-defineProps<{
-  activeTab: CategoryId | null
-}>()
+const props = withDefaults(
+  defineProps<{
+    activeTab: CategoryId | null
+    hasActiveCluster?: boolean
+  }>(),
+  {
+    hasActiveCluster: false
+  }
+)
 
 const emit = defineEmits<{
   (e: 'toggleCategory', category: SidebarCategory): void
 }>()
+
+const isCategoryDisabled = (cat: SidebarCategory): boolean => {
+  if (!cat.requiresCluster) return false
+  return !props.hasActiveCluster
+}
 
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
@@ -35,24 +46,33 @@ const { isDark, toggleTheme } = useTheme()
 
     <!-- Main Activity Items (Categories) -->
     <div class="flex flex-col gap-1.5 w-full items-center">
-      <Button
+      <div
         v-for="cat in categories"
         :key="cat.id"
-        v-tooltip.right="cat.name"
-        variant="text"
-        severity="secondary"
-        :class="[
-          'w-10 h-10',
-          activeTab === cat.id
-            ? 'bg-(--bg-active) text-(--text-primary)'
-            : 'text-muted-color hover:bg-(--bg-hover)'
-        ]"
-        @click="emit('toggleCategory', cat)"
+        v-tooltip.right="
+          isCategoryDisabled(cat) ? `${cat.name} (Requires active cluster)` : cat.name
+        "
+        :class="['inline-flex', isCategoryDisabled(cat) && 'cursor-not-allowed']"
       >
-        <template #icon>
-          <component :is="cat.icon" class="w-5 h-5" />
-        </template>
-      </Button>
+        <Button
+          variant="text"
+          severity="secondary"
+          :disabled="isCategoryDisabled(cat)"
+          :class="[
+            'w-10 h-10',
+            activeTab === cat.id
+              ? 'bg-(--bg-active) text-(--text-primary)'
+              : isCategoryDisabled(cat)
+                ? 'opacity-40 text-muted-color/50'
+                : 'text-muted-color hover:bg-(--bg-hover)'
+          ]"
+          @click="!isCategoryDisabled(cat) && emit('toggleCategory', cat)"
+        >
+          <template #icon>
+            <component :is="cat.icon" class="w-5 h-5" />
+          </template>
+        </Button>
+      </div>
     </div>
 
     <!-- Bottom Actions Spacer -->
