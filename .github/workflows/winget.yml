@@ -1,0 +1,104 @@
+name: Publish to WinGet
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v0.9.0). If empty, the latest release will be used.'
+        required: false
+        type: string
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+  release:
+    types:
+      - published
+
+env:
+  PACKAGE_IDENTIFIER: "vantoan1511.Orbit"
+
+jobs:
+  publish-winget:
+    name: Submit Package to WinGet
+    runs-on: windows-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'release' && !github.event.release.prerelease) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    steps:
+      - name: Resolve Release Tag
+        id: resolve-tag
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $Tag = "${{ inputs.tag }}".Trim()
+
+          if ([string]::IsNullOrWhiteSpace($Tag) -and "${{ github.event_name }}" -eq "release") {
+            $Tag = "${{ github.event.release.tag_name }}".Trim()
+          }
+
+          if ([string]::IsNullOrWhiteSpace($Tag)) {
+            Write-Output "No explicit tag provided. Fetching latest release from GitHub API..."
+            $headers = @{
+              "Accept" = "application/vnd.github.v3+json"
+              "Authorization" = "Bearer $env:GITHUB_TOKEN"
+            }
+            try {
+              $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/latest" -Headers $headers
+              $Tag = $latestRelease.tag_name
+            } catch {
+              Write-Error "Failed to fetch latest release: $_"
+              exit 1
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($Tag)) {
+            Write-Error "Could not resolve a release tag to submit."
+            exit 1
+          }
+
+          Write-Output "Resolved release tag: $Tag"
+          "tag=$Tag" >> $env:GITHUB_OUTPUT
+
+      - name: Validate WINGET_TOKEN Secret
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINGET_TOKEN)) {
+            Write-Error @"
+          [ERROR] The secret WINGET_TOKEN is missing or empty!
+          
+          To publish to Windows Package Manager (WinGet), please:
+          1. Create a GitHub Personal Access Token (Classic) with the 'public_repo' scope.
+          2. Ensure you have forked 'microsoft/winget-pkgs' to '${{ github.repository_owner }}/winget-pkgs'.
+          3. Go to Repository Settings -> Secrets and variables -> Actions -> New repository secret.
+          4. Name: WINGET_TOKEN, Value: <Your PAT>.
+          "@
+            exit 1
+          }
+          Write-Output "WINGET_TOKEN secret is configured."
+
+      - name: Sync WinGet Fork from Upstream
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          Write-Output "Syncing ${{ github.repository_owner }}/winget-pkgs from microsoft/winget-pkgs (master branch)..."
+          gh repo sync "${{ github.repository_owner }}/winget-pkgs" --source "microsoft/winget-pkgs" --branch master --force
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to sync fork from upstream. Please ensure '${{ github.repository_owner }}/winget-pkgs' exists and WINGET_TOKEN has write access."
+            exit 1
+          }
+          Write-Output "Fork successfully synced with upstream."
+
+      - name: Submit to WinGet Community Repository
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: ${{ env.PACKAGE_IDENTIFIER }}
+          release-tag: ${{ steps.resolve-tag.outputs.tag }}
+          installers-regex: 'Orbit-Setup-.*\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: ${{ github.repository_owner }}
