@@ -285,4 +285,50 @@ mod tests {
         let annotations = ns.metadata.annotations.expect("annotations should be present");
         assert_eq!(annotations.get("description").map(|s| s.as_str()), Some("Dev team namespace"));
     }
+
+    #[test]
+    fn test_pod_manifest_parse() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": "test-pod",
+                "namespace": "default",
+                "labels": {
+                    "app": "test-pod"
+                }
+            },
+            "spec": {
+                "restartPolicy": "Always",
+                "containers": [{
+                    "name": "test-pod",
+                    "image": "nginx:alpine",
+                    "ports": [{
+                        "containerPort": 80,
+                        "protocol": "TCP"
+                    }],
+                    "env": [{
+                        "name": "ENV_VAR",
+                        "value": "prod"
+                    }]
+                }]
+            }
+        });
+        let parsed: Result<Pod, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let pod = parsed.unwrap();
+        assert_eq!(pod.metadata.name.as_deref(), Some("test-pod"));
+        assert_eq!(pod.metadata.namespace.as_deref(), Some("default"));
+        let labels = pod.metadata.labels.expect("labels should be present");
+        assert_eq!(labels.get("app").map(|s| s.as_str()), Some("test-pod"));
+
+        let spec = pod.spec.expect("spec should be present");
+        assert_eq!(spec.restart_policy.as_deref(), Some("Always"));
+        assert_eq!(spec.containers.len(), 1);
+        assert_eq!(spec.containers[0].name, "test-pod");
+        assert_eq!(spec.containers[0].image.as_deref(), Some("nginx:alpine"));
+        let ports = spec.containers[0].ports.as_ref().expect("ports should be present");
+        assert_eq!(ports.len(), 1);
+        assert_eq!(ports[0].container_port, 80);
+    }
 }

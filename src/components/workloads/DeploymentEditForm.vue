@@ -18,6 +18,11 @@ import ContainerPortsEditor from '@/components/shared/ContainerPortsEditor.vue'
 import ContainerResourcesEditor from '@/components/shared/ContainerResourcesEditor.vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
 import StringListEditor from '@/components/shared/StringListEditor.vue'
+import {
+  KUBERNETES_RESTART_POLICY,
+  KUBERNETES_RESTART_POLICIES,
+  type KubernetesRestartPolicy
+} from '@/constants/kubernetes'
 import { isValidK8sLabel, isValidK8sName, isValidPath } from '@/utils/validators'
 
 import type { Deployment } from 'kubernetes-types/apps/v1'
@@ -56,7 +61,7 @@ const podLabels = ref<{ key: string; value: string }[]>([])
 const podAnnotations = ref<{ key: string; value: string }[]>([])
 
 const serviceAccountName = ref<string>('')
-const restartPolicy = ref<string>('Always')
+const restartPolicy = ref<KubernetesRestartPolicy>(KUBERNETES_RESTART_POLICY.Always)
 const terminationGracePeriodSeconds = ref<number>(30)
 const nodeSelector = ref<{ key: string; value: string }[]>([])
 const deploymentNamespace = computed(() => {
@@ -161,7 +166,8 @@ const syncFromRawData = (data: Deployment | null) => {
   // Pod Spec
   const podSpec = template?.spec
   serviceAccountName.value = podSpec?.serviceAccountName || ''
-  restartPolicy.value = podSpec?.restartPolicy || 'Always'
+  restartPolicy.value =
+    (podSpec?.restartPolicy as KubernetesRestartPolicy) || KUBERNETES_RESTART_POLICY.Always
   terminationGracePeriodSeconds.value =
     typeof podSpec?.terminationGracePeriodSeconds === 'number'
       ? podSpec.terminationGracePeriodSeconds
@@ -751,7 +757,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <label class="text-xs font-medium text-muted-color">Restart Policy</label>
                   <Select
                     v-model="restartPolicy"
-                    :options="['Always', 'OnFailure', 'Never']"
+                    :options="KUBERNETES_RESTART_POLICIES"
                     size="small"
                     fluid
                     @change="handleFieldChange"
