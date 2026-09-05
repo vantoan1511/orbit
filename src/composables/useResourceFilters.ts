@@ -90,38 +90,57 @@ export function useResourceFilters<T extends ResourceItem>(
   }
 
   const filteredResources = computed(() => {
+    const rawQuery = searchQuery.value.trim().toLowerCase()
+    const hasQuery = rawQuery.length > 0
+
+    const filterNamespace = !shouldHideNamespace.value && selectedNamespace.value.length > 0
+    const selectedNsSet = filterNamespace ? new Set(selectedNamespace.value) : null
+
+    // Fast-path: if no search query and no namespace filter, return entire array directly
+    if (!hasQuery && !filterNamespace) {
+      return resources.value
+    }
+
     return resources.value.filter((item) => {
-      // 1. Search Query filter
-      if (searchQuery.value) {
-        const query = searchQuery.value.toLowerCase()
-        const matches = searchFields.some((field) => {
-          const val = item[field]
-          if (typeof val === 'string') return val.toLowerCase().includes(query)
-          if (Array.isArray(val))
-            return val.some(
-              (v: unknown) => typeof v === 'string' && v.toLowerCase().includes(query)
-            )
+      // 1. Namespace filter: check before search for early exit
+      if (filterNamespace && selectedNsSet) {
+        const ns = item.namespace
+        const isNamespaced =
+          typeof ns === 'string' &&
+          ns.trim().length > 0 &&
+          ns !== '-' &&
+          ns !== 'Cluster' &&
+          ns !== 'All' &&
+          item.scope !== 'Cluster'
+
+        if (isNamespaced && !selectedNsSet.has(ns)) {
           return false
-        })
-        if (!matches) return false
+        }
       }
 
-      // 2. Namespace filter: only filter resources that belong to a specific namespace
-      const isNamespaced =
-        typeof item.namespace === 'string' &&
-        item.namespace.trim().length > 0 &&
-        item.namespace !== '-' &&
-        item.namespace !== 'Cluster' &&
-        item.namespace !== 'All' &&
-        item.scope !== 'Cluster'
-
-      if (
-        !shouldHideNamespace.value &&
-        selectedNamespace.value.length > 0 &&
-        isNamespaced &&
-        !selectedNamespace.value.includes(item.namespace as string)
-      ) {
-        return false
+      // 2. Search Query filter
+      if (hasQuery) {
+        let matches = false
+        for (let i = 0; i < searchFields.length; i++) {
+          const field = searchFields[i]!
+          const val = item[field]
+          if (typeof val === 'string') {
+            if (val.toLowerCase().includes(rawQuery)) {
+              matches = true
+              break
+            }
+          } else if (Array.isArray(val)) {
+            for (let j = 0; j < val.length; j++) {
+              const v = val[j]
+              if (typeof v === 'string' && v.toLowerCase().includes(rawQuery)) {
+                matches = true
+                break
+              }
+            }
+            if (matches) break
+          }
+        }
+        if (!matches) return false
       }
 
       return true

@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useTicker } from '@/composables/useTicker'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   age?: string
 }>()
 
-const displayAge = ref(props.age || '-')
-let interval: ReturnType<typeof setInterval>
+const { currentTimestamp, subscribe, unsubscribe } = useTicker()
+
 let initialAgeSeconds = 0
 let receivedAt = Date.now()
+const lastAgeProp = ref(props.age)
 
 const parseAgeToSeconds = (ageStr?: string): number => {
   if (!ageStr) return 0
@@ -38,47 +40,43 @@ const formatSeconds = (seconds: number): string => {
   return `${Math.floor(seconds / 86400)}d`
 }
 
-const updateDisplay = () => {
+watch(
+  () => props.age,
+  (newAge) => {
+    if (newAge && newAge !== 'Unknown' && newAge !== '-') {
+      // If incoming age matches our computed value, avoid resetting timestamp
+      if (newAge !== lastAgeProp.value) {
+        lastAgeProp.value = newAge
+        initialAgeSeconds = parseAgeToSeconds(newAge)
+        receivedAt = Date.now()
+      }
+    } else {
+      lastAgeProp.value = newAge
+      initialAgeSeconds = 0
+    }
+  },
+  { immediate: true }
+)
+
+const displayAge = computed(() => {
   if (
     !props.age ||
     props.age === '-' ||
     props.age === 'Unknown' ||
     (initialAgeSeconds === 0 && !props.age.endsWith('s'))
   ) {
-    displayAge.value = props.age || '-'
-    return
+    return props.age || '-'
   }
-  const elapsed = Math.floor((Date.now() - receivedAt) / 1000)
-  displayAge.value = formatSeconds(initialAgeSeconds + elapsed)
-}
-
-watch(
-  () => props.age,
-  (newAge) => {
-    if (newAge && newAge !== 'Unknown' && newAge !== '-') {
-      // If the incoming age matches our current fake-counted display,
-      // don't reset. This prevents losing precision when the backend
-      // sends an update that matches our rounded value.
-      if (newAge === displayAge.value) {
-        return
-      }
-
-      initialAgeSeconds = parseAgeToSeconds(newAge)
-      receivedAt = Date.now()
-    } else {
-      initialAgeSeconds = 0
-    }
-    updateDisplay()
-  },
-  { immediate: true }
-)
+  const elapsed = Math.floor((currentTimestamp.value - receivedAt) / 1000)
+  return formatSeconds(initialAgeSeconds + elapsed)
+})
 
 onMounted(() => {
-  interval = setInterval(updateDisplay, 1000)
+  subscribe()
 })
 
 onUnmounted(() => {
-  clearInterval(interval)
+  unsubscribe()
 })
 </script>
 

@@ -26,6 +26,7 @@ import { useWorkloadActions, type WorkloadActionOptions } from '@/composables/us
 import { useWorkloadBulkActions } from '@/composables/useWorkloadBulkActions'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { ActivePortForward } from '@/types/kubernetes'
 import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
@@ -155,16 +156,15 @@ watch(
 )
 
 watch(
-  selection,
-  (val) => {
+  () => selection.value.map((item) => item.name).join(','),
+  () => {
     filterStore.setFilter(
       resolvedStoreKey,
       'selectedRowKeys',
-      val.map((item) => item.name),
+      selection.value.map((item) => item.name),
       k8sStore.activeClusterId || undefined
     )
-  },
-  { deep: true }
+  }
 )
 
 watch(selectedNamespace, (newNs) => {
@@ -246,14 +246,30 @@ const { bulkActions } = useWorkloadBulkActions(selection, {
 })
 
 // Port forward helpers
-const getPortForwards = (data: T) => {
-  if (!props.kind) return []
-  return k8sStore.activePortForwards.filter(
-    (pf) =>
-      pf.kind.toLowerCase() === props.kind!.toLowerCase() &&
-      (!data.namespace || !pf.namespace || pf.namespace === data.namespace) &&
-      pf.name === data.name
-  )
+const EMPTY_PORT_FORWARDS: ActivePortForward[] = []
+
+const portForwardsMap = computed(() => {
+  const map = new Map<string, ActivePortForward[]>()
+  if (!props.kind || k8sStore.activePortForwards.length === 0) return map
+  const targetKind = props.kind.toLowerCase()
+  for (const pf of k8sStore.activePortForwards) {
+    if (pf.kind.toLowerCase() === targetKind) {
+      const key = `${pf.namespace || ''}:${pf.name}`
+      const existing = map.get(key)
+      if (existing) {
+        existing.push(pf)
+      } else {
+        map.set(key, [pf])
+      }
+    }
+  }
+  return map
+})
+
+const getPortForwards = (data: T): ActivePortForward[] => {
+  if (portForwardsMap.value.size === 0) return EMPTY_PORT_FORWARDS
+  const key = `${data.namespace || ''}:${data.name}`
+  return portForwardsMap.value.get(key) ?? EMPTY_PORT_FORWARDS
 }
 </script>
 
@@ -335,7 +351,10 @@ const getPortForwards = (data: T) => {
           <slot name="name" :data="data">
             <span class="font-semibold transition-colors">{{ data.name }}</span>
           </slot>
-          <ActivePortForwardBadge :portForwards="getPortForwards(data)" />
+          <ActivePortForwardBadge
+            v-if="portForwardsMap.size > 0 && getPortForwards(data).length > 0"
+            :portForwards="getPortForwards(data)"
+          />
         </div>
       </template>
     </Column>
