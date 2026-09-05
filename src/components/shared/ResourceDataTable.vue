@@ -10,6 +10,7 @@ import { computed, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
+import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const selection = defineModel<any[]>('selection')
@@ -35,7 +36,7 @@ const props = withDefaults(
     searchQuery: '',
     searchPlaceholder: 'Search...',
     rows: 25,
-    rowsPerPageOptions: () => [25, 50, 100, 200],
+    rowsPerPageOptions: () => [...ALLOWED_ROW_OPTIONS],
     emptyMessage: 'No records found matching the filter criteria.',
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
@@ -57,7 +58,9 @@ const emit = defineEmits<{
   (e: 'row-contextmenu', event: { originalEvent: Event; data: any; index?: number }): void
 }>()
 
-const rowsPerPage = ref(props.rowsPerPageOptions.includes(props.rows) ? props.rows : 25)
+const rowsPerPage = ref(
+  props.rowsPerPageOptions.includes(props.rows) ? props.rows : ALLOWED_ROW_OPTIONS[0]
+)
 
 watch(rowsPerPage, (newVal) => {
   emit('update:rows', newVal)

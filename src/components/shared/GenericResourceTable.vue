@@ -105,17 +105,32 @@ const { searchQuery, selectedNamespace, filteredResources } = useResourceFilters
 )
 
 // Status filtering
-const storedStatus = filterStore.getFilters(resolvedStoreKey).selectedStatus
+const storedStatus = filterStore.getFilters(
+  resolvedStoreKey,
+  k8sStore.activeClusterId || undefined
+).selectedStatus
 const defaultStatus: string =
   props.statuses.length > 0 ? (props.statuses[0] ?? 'All Statuses') : 'All Statuses'
-const selectedStatus = ref<string>(storedStatus || defaultStatus)
+const initialStatus =
+  storedStatus && (props.statuses.length === 0 || props.statuses.includes(storedStatus))
+    ? storedStatus
+    : defaultStatus
+const selectedStatus = ref<string>(initialStatus)
 
 watch(selectedStatus, (val) => {
-  filterStore.setFilter(resolvedStoreKey, 'selectedStatus', val)
+  filterStore.setFilter(
+    resolvedStoreKey,
+    'selectedStatus',
+    val,
+    k8sStore.activeClusterId || undefined
+  )
 })
 
 // Row selection persistence
-const storedRowKeys = filterStore.getFilters(resolvedStoreKey).selectedRowKeys
+const storedRowKeys = filterStore.getFilters(
+  resolvedStoreKey,
+  k8sStore.activeClusterId || undefined
+).selectedRowKeys
 if (storedRowKeys.length > 0) {
   const matched = props.data.filter((item) => storedRowKeys.includes(item.name))
   if (matched.length > 0) {
@@ -126,7 +141,10 @@ if (storedRowKeys.length > 0) {
 watch(
   () => props.data,
   (newData) => {
-    const keys = filterStore.getFilters(resolvedStoreKey).selectedRowKeys
+    const keys = filterStore.getFilters(
+      resolvedStoreKey,
+      k8sStore.activeClusterId || undefined
+    ).selectedRowKeys
     if (keys.length > 0 && selection.value.length === 0) {
       const matched = newData.filter((item) => keys.includes(item.name))
       if (matched.length > 0) {
@@ -142,7 +160,8 @@ watch(
     filterStore.setFilter(
       resolvedStoreKey,
       'selectedRowKeys',
-      val.map((item) => item.name)
+      val.map((item) => item.name),
+      k8sStore.activeClusterId || undefined
     )
   },
   { deep: true }
@@ -194,12 +213,29 @@ const { actionMenuItems } = useWorkloadActions(selectedActionRow, {
 })
 
 // Rows per page persistence
-const storedRows = filterStore.getFilters(resolvedStoreKey).rows
+const storedRows = filterStore.getFilters(
+  resolvedStoreKey,
+  k8sStore.activeClusterId || undefined
+).rows
 const rowsPerPage = ref<number>(storedRows ?? 25)
 
 watch(rowsPerPage, (val) => {
-  filterStore.setFilter(resolvedStoreKey, 'rows', val)
+  filterStore.setFilter(resolvedStoreKey, 'rows', val, k8sStore.activeClusterId || undefined)
 })
+
+watch(
+  () => k8sStore.activeClusterId,
+  (newClusterId) => {
+    selection.value = []
+    const state = filterStore.getFilters(resolvedStoreKey, newClusterId || undefined)
+    rowsPerPage.value = state.rows
+    const targetStatus = state.selectedStatus || defaultStatus
+    selectedStatus.value =
+      props.statuses.length > 0 && !props.statuses.includes(targetStatus)
+        ? defaultStatus
+        : targetStatus
+  }
+)
 
 // Bulk actions wiring
 const { bulkActions } = useWorkloadBulkActions(selection, {

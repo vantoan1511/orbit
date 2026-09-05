@@ -17,8 +17,11 @@ export function useResourceFilters<T extends ResourceItem>(
   hideNamespaceFilter: MaybeRef<boolean> = false
 ) {
   const filterStore = storeKey ? useTableFilterStore() : null
-  const stored = storeKey && filterStore ? filterStore.getFilters(storeKey) : null
   const k8sStore = useKubernetesStore()
+  const stored =
+    storeKey && filterStore
+      ? filterStore.getFilters(storeKey, k8sStore.activeClusterId || undefined)
+      : null
 
   const searchQuery = ref(stored?.searchQuery ?? '')
   const selectedNamespace = ref<string[]>(stored ? [...stored.selectedNamespace] : [])
@@ -27,28 +30,59 @@ export function useResourceFilters<T extends ResourceItem>(
 
   if (storeKey && filterStore) {
     watch(searchQuery, (val) => {
-      filterStore.setFilter(storeKey, 'searchQuery', val)
+      filterStore.setFilter(storeKey, 'searchQuery', val, k8sStore.activeClusterId || undefined)
     })
     watch(
       selectedNamespace,
       (val) => {
-        filterStore.setFilter(storeKey, 'selectedNamespace', [...val])
+        filterStore.setFilter(
+          storeKey,
+          'selectedNamespace',
+          [...val],
+          k8sStore.activeClusterId || undefined
+        )
       },
       { deep: true }
+    )
+
+    watch(
+      () => k8sStore.activeClusterId,
+      (newClusterId) => {
+        const state = filterStore.getFilters(storeKey, newClusterId || undefined)
+        searchQuery.value = state.searchQuery
+        selectedNamespace.value = [...state.selectedNamespace]
+      }
     )
 
     watch(
       () => k8sStore.namespaceList,
       (newList) => {
         if (shouldHideNamespace.value) return
-        const state = filterStore.getFilters(storeKey)
+        const cluster = k8sStore.activeClusterId || undefined
+        const state = filterStore.getFilters(storeKey, cluster)
         if (!state.isNamespaceInitialized && newList.length > 0) {
           const userNamespaces = newList
             .map((n) => n.name)
             .filter((n) => !SYSTEM_NAMESPACES.includes(n))
 
           selectedNamespace.value = userNamespaces
-          filterStore.setFilter(storeKey, 'isNamespaceInitialized', true)
+          filterStore.setFilter(storeKey, 'isNamespaceInitialized', true, cluster)
+        } else if (
+          state.isNamespaceInitialized &&
+          newList.length > 0 &&
+          selectedNamespace.value.length > 0
+        ) {
+          const availableNamespaces = new Set(newList.map((n) => n.name))
+          const validNamespaces = selectedNamespace.value.filter((n) => availableNamespaces.has(n))
+
+          if (validNamespaces.length === 0) {
+            const userNamespaces = newList
+              .map((n) => n.name)
+              .filter((n) => !SYSTEM_NAMESPACES.includes(n))
+            selectedNamespace.value = userNamespaces
+          } else if (validNamespaces.length !== selectedNamespace.value.length) {
+            selectedNamespace.value = validNamespaces
+          }
         }
       },
       { immediate: true }
