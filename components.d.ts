@@ -40,6 +40,7 @@ declare module 'vue' {
     CreateConfigMapDialog: typeof import('./src/components/config/CreateConfigMapDialog.vue')['default']
     CreateDeploymentDialog: typeof import('./src/components/workloads/CreateDeploymentDialog.vue')['default']
     CreateIngressDialog: typeof import('./src/components/network/CreateIngressDialog.vue')['default']
+    CreateNamespaceDialog: typeof import('./src/components/namespaces/CreateNamespaceDialog.vue')['default']
     CreateSecretDialog: typeof import('./src/components/config/CreateSecretDialog.vue')['default']
     CreateServiceDialog: typeof import('./src/components/network/CreateServiceDialog.vue')['default']
     CronJobsTable: typeof import('./src/components/workloads/CronJobsTable.vue')['default']

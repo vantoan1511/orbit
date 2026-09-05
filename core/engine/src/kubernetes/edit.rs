@@ -260,4 +260,29 @@ mod tests {
         assert_eq!(val["name"], "test-dep");
         assert_eq!(val["replicas"], 3);
     }
+
+    #[test]
+    fn test_namespace_manifest_parse() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": "dev-team",
+                "labels": {
+                    "environment": "development"
+                },
+                "annotations": {
+                    "description": "Dev team namespace"
+                }
+            }
+        });
+        let parsed: Result<Namespace, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let ns = parsed.unwrap();
+        assert_eq!(ns.metadata.name.as_deref(), Some("dev-team"));
+        let labels = ns.metadata.labels.expect("labels should be present");
+        assert_eq!(labels.get("environment").map(|s| s.as_str()), Some("development"));
+        let annotations = ns.metadata.annotations.expect("annotations should be present");
+        assert_eq!(annotations.get("description").map(|s| s.as_str()), Some("Dev team namespace"));
+    }
 }
