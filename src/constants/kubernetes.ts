@@ -118,6 +118,38 @@ export const KUBERNETES_JOB_RESTART_POLICIES: KubernetesJobRestartPolicy[] = [
 ]
 
 /**
+ * Kubernetes Job Completion Modes.
+ */
+export const KUBERNETES_JOB_COMPLETION_MODE = {
+  NonIndexed: 'NonIndexed',
+  Indexed: 'Indexed'
+} as const
+
+export type KubernetesJobCompletionMode =
+  (typeof KUBERNETES_JOB_COMPLETION_MODE)[keyof typeof KUBERNETES_JOB_COMPLETION_MODE]
+
+export const KUBERNETES_JOB_COMPLETION_MODES: KubernetesJobCompletionMode[] = [
+  KUBERNETES_JOB_COMPLETION_MODE.NonIndexed,
+  KUBERNETES_JOB_COMPLETION_MODE.Indexed
+]
+
+/**
+ * Kubernetes Job Pod Replacement Policies.
+ */
+export const KUBERNETES_POD_REPLACEMENT_POLICY = {
+  TerminatingOrFailed: 'TerminatingOrFailed',
+  Failed: 'Failed'
+} as const
+
+export type KubernetesPodReplacementPolicy =
+  (typeof KUBERNETES_POD_REPLACEMENT_POLICY)[keyof typeof KUBERNETES_POD_REPLACEMENT_POLICY]
+
+export const KUBERNETES_POD_REPLACEMENT_POLICIES: KubernetesPodReplacementPolicy[] = [
+  KUBERNETES_POD_REPLACEMENT_POLICY.TerminatingOrFailed,
+  KUBERNETES_POD_REPLACEMENT_POLICY.Failed
+]
+
+/**
  * Kubernetes CronJob Concurrency Policies.
  */
 export const KUBERNETES_CONCURRENCY_POLICY = {
