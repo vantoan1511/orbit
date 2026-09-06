@@ -3,7 +3,7 @@ import { useCreateResourceDialog } from '@/composables/useCreateResourceDialog'
 import { kubernetesService } from '@/services/kubernetesService'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { isValidK8sName, isValidPort, sanitizeK8sLabel } from '@/utils/validators'
-import type { Deployment } from 'kubernetes-types/apps/v1'
+import type { StatefulSet } from 'kubernetes-types/apps/v1'
 import type { Container } from 'kubernetes-types/core/v1'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -23,6 +23,7 @@ const {
 } = useCreateResourceDialog()
 
 const name = ref('')
+const serviceName = ref('')
 const image = ref('')
 const replicas = ref<number>(1)
 const port = ref<number | null>(null)
@@ -33,8 +34,17 @@ const nameErrorMessage = computed(() => {
   if (!isValidK8sName(trimmed)) {
     return 'Name must be a valid DNS-1123 subdomain (lowercase letters, numbers, hyphens, dots).'
   }
-  if (isNameTaken(trimmed, k8sStore.deployments)) {
-    return `A Deployment named "${trimmed}" already exists in namespace "${namespace.value}".`
+  if (isNameTaken(trimmed, k8sStore.statefulSets)) {
+    return `A StatefulSet named "${trimmed}" already exists in namespace "${namespace.value}".`
+  }
+  return null
+})
+
+const serviceNameErrorMessage = computed(() => {
+  const trimmed = serviceName.value.trim()
+  if (!trimmed) return null
+  if (!isValidK8sName(trimmed)) {
+    return 'Service name must be a valid DNS-1123 subdomain.'
   }
   return null
 })
@@ -52,10 +62,11 @@ const isFormValid = computed(() => {
   const trimmedImage = image.value.trim()
   const hasValidName = Boolean(trimmedName) && !nameErrorMessage.value
   const hasValidNamespace = Boolean(namespace.value)
+  const hasValidServiceName = !serviceNameErrorMessage.value
   const hasValidImage = Boolean(trimmedImage)
   const hasValidPort = port.value === null || port.value === undefined || isValidPort(port.value)
 
-  return hasValidName && hasValidNamespace && hasValidImage && hasValidPort
+  return hasValidName && hasValidNamespace && hasValidServiceName && hasValidImage && hasValidPort
 })
 
 const handleCreate = async () => {
@@ -64,6 +75,7 @@ const handleCreate = async () => {
   const trimmedName = name.value.trim()
   const trimmedNamespace = namespace.value.trim()
   const trimmedImage = image.value.trim()
+  const trimmedServiceName = serviceName.value.trim() || trimmedName
   const containerName = sanitizeK8sLabel(trimmedName)
 
   const containerObj: Container = {
@@ -80,9 +92,9 @@ const handleCreate = async () => {
     ]
   }
 
-  const manifest: Deployment = {
+  const manifest: StatefulSet = {
     apiVersion: 'apps/v1',
-    kind: KUBERNETES_RESOURCE_KIND.Deployment,
+    kind: KUBERNETES_RESOURCE_KIND.StatefulSet,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -91,6 +103,7 @@ const handleCreate = async () => {
       }
     },
     spec: {
+      serviceName: trimmedServiceName,
       replicas: replicas.value ?? 1,
       selector: {
         matchLabels: {
@@ -114,7 +127,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: KUBERNETES_RESOURCE_KIND.Deployment,
+      kind: KUBERNETES_RESOURCE_KIND.StatefulSet,
       name: trimmedName,
       data: manifest
     })
@@ -127,27 +140,27 @@ const handleCreate = async () => {
 <template>
   <form @submit.prevent="handleCreate" class="flex flex-col gap-3.5">
     <p class="text-xs text-muted-color">
-      Create a new Kubernetes Deployment with standard configuration:
+      Create a new Kubernetes StatefulSet with standard configuration:
     </p>
 
     <!-- Name -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-name" class="text-xs font-semibold text-muted-color">
+      <label for="create-statefulset-name" class="text-xs font-semibold text-muted-color">
         Name <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-name"
+        id="create-statefulset-name"
         v-model="name"
-        placeholder="e.g. my-app"
+        placeholder="e.g. redis-cluster"
         fluid
         size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
-        aria-describedby="create-deployment-name-error"
+        aria-describedby="create-statefulset-name-error"
         class="text-xs"
       />
       <small
         v-if="name.trim() && nameErrorMessage"
-        id="create-deployment-name-error"
+        id="create-statefulset-name-error"
         class="text-(--danger) text-[11px] leading-tight"
       >
         {{ nameErrorMessage }}
@@ -156,11 +169,11 @@ const handleCreate = async () => {
 
     <!-- Namespace -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-namespace" class="text-xs font-semibold text-muted-color">
+      <label for="create-statefulset-namespace" class="text-xs font-semibold text-muted-color">
         Namespace <span class="text-(--danger)">*</span>
       </label>
       <Select
-        id="create-deployment-namespace"
+        id="create-statefulset-namespace"
         v-model="namespace"
         :options="namespaceOptions"
         fluid
@@ -169,15 +182,39 @@ const handleCreate = async () => {
       />
     </div>
 
+    <!-- Headless Service Name -->
+    <div class="flex flex-col gap-1.5">
+      <label for="create-statefulset-service" class="text-xs font-semibold text-muted-color">
+        Headless Service Name
+      </label>
+      <InputText
+        id="create-statefulset-service"
+        v-model="serviceName"
+        placeholder="e.g. redis-service (defaults to StatefulSet name)"
+        fluid
+        size="small"
+        :invalid="Boolean(serviceName.trim() && serviceNameErrorMessage)"
+        aria-describedby="create-statefulset-service-error"
+        class="text-xs"
+      />
+      <small
+        v-if="serviceName.trim() && serviceNameErrorMessage"
+        id="create-statefulset-service-error"
+        class="text-(--danger) text-[11px] leading-tight"
+      >
+        {{ serviceNameErrorMessage }}
+      </small>
+    </div>
+
     <!-- Image -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-image" class="text-xs font-semibold text-muted-color">
+      <label for="create-statefulset-image" class="text-xs font-semibold text-muted-color">
         Image <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-image"
+        id="create-statefulset-image"
         v-model="image"
-        placeholder="e.g. nginx:latest"
+        placeholder="e.g. redis:7-alpine"
         fluid
         size="small"
         class="text-xs"
@@ -187,11 +224,11 @@ const handleCreate = async () => {
     <!-- Replicas & Port Row -->
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-replicas" class="text-xs font-semibold text-muted-color">
+        <label for="create-statefulset-replicas" class="text-xs font-semibold text-muted-color">
           Replicas
         </label>
         <InputNumber
-          id="create-deployment-replicas"
+          id="create-statefulset-replicas"
           v-model="replicas"
           :min="1"
           :max="1000"
@@ -202,23 +239,23 @@ const handleCreate = async () => {
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-port" class="text-xs font-semibold text-muted-color">
+        <label for="create-statefulset-port" class="text-xs font-semibold text-muted-color">
           Port (Optional)
         </label>
         <InputNumber
-          id="create-deployment-port"
+          id="create-statefulset-port"
           v-model="port"
           :min="1"
           :max="65535"
-          placeholder="e.g. 80"
+          placeholder="e.g. 6379"
           fluid
           size="small"
           :invalid="Boolean(port !== null && portErrorMessage)"
-          aria-describedby="create-deployment-port-error"
+          aria-describedby="create-statefulset-port-error"
         />
         <small
           v-if="port !== null && portErrorMessage"
-          id="create-deployment-port-error"
+          id="create-statefulset-port-error"
           class="text-(--danger) text-[11px] leading-tight"
         >
           {{ portErrorMessage }}

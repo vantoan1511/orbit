@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
 import { useDialog } from 'primevue/usedialog'
+import CreateCronJobDialog from '@/components/workloads/CreateCronJobDialog.vue'
+import CreateDaemonSetDialog from '@/components/workloads/CreateDaemonSetDialog.vue'
 import CreateDeploymentDialog from '@/components/workloads/CreateDeploymentDialog.vue'
+import CreateJobDialog from '@/components/workloads/CreateJobDialog.vue'
 import CreatePodDialog from '@/components/pods/CreatePodDialog.vue'
+import CreateReplicaSetDialog from '@/components/workloads/CreateReplicaSetDialog.vue'
+import CreateStatefulSetDialog from '@/components/workloads/CreateStatefulSetDialog.vue'
 import CronJobsTable from '@/components/workloads/CronJobsTable.vue'
 import DaemonSetsTable from '@/components/workloads/DaemonSetsTable.vue'
 import DeploymentsTable from '@/components/workloads/DeploymentsTable.vue'
@@ -32,7 +37,67 @@ const openCreateDeploymentDialog = () => {
     props: {
       header: 'Create Deployment',
       style: {
-        width: '420px'
+        width: '460px'
+      },
+      modal: true
+    }
+  })
+}
+
+const openCreateStatefulSetDialog = () => {
+  dialog.open(CreateStatefulSetDialog, {
+    props: {
+      header: 'Create StatefulSet',
+      style: {
+        width: '460px'
+      },
+      modal: true
+    }
+  })
+}
+
+const openCreateDaemonSetDialog = () => {
+  dialog.open(CreateDaemonSetDialog, {
+    props: {
+      header: 'Create DaemonSet',
+      style: {
+        width: '460px'
+      },
+      modal: true
+    }
+  })
+}
+
+const openCreateJobDialog = () => {
+  dialog.open(CreateJobDialog, {
+    props: {
+      header: 'Create Job',
+      style: {
+        width: '460px'
+      },
+      modal: true
+    }
+  })
+}
+
+const openCreateCronJobDialog = () => {
+  dialog.open(CreateCronJobDialog, {
+    props: {
+      header: 'Create CronJob',
+      style: {
+        width: '460px'
+      },
+      modal: true
+    }
+  })
+}
+
+const openCreateReplicaSetDialog = () => {
+  dialog.open(CreateReplicaSetDialog, {
+    props: {
+      header: 'Create ReplicaSet',
+      style: {
+        width: '460px'
       },
       modal: true
     }
@@ -49,11 +114,26 @@ const tabs: ResourceTab[] = [
     id: 'deployments',
     createAction: { handler: openCreateDeploymentDialog }
   },
-  { id: 'statefulsets' },
-  { id: 'daemonsets' },
-  { id: 'replicasets' },
-  { id: 'jobs' },
-  { id: 'cronjobs' }
+  {
+    id: 'statefulsets',
+    createAction: { handler: openCreateStatefulSetDialog }
+  },
+  {
+    id: 'daemonsets',
+    createAction: { handler: openCreateDaemonSetDialog }
+  },
+  {
+    id: 'replicasets',
+    createAction: { handler: openCreateReplicaSetDialog }
+  },
+  {
+    id: 'jobs',
+    createAction: { handler: openCreateJobDialog }
+  },
+  {
+    id: 'cronjobs',
+    createAction: { handler: openCreateCronJobDialog }
+  }
 ]
 </script>
 

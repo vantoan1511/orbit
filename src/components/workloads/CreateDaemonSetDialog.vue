@@ -3,7 +3,7 @@ import { useCreateResourceDialog } from '@/composables/useCreateResourceDialog'
 import { kubernetesService } from '@/services/kubernetesService'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { isValidK8sName, isValidPort, sanitizeK8sLabel } from '@/utils/validators'
-import type { Deployment } from 'kubernetes-types/apps/v1'
+import type { DaemonSet } from 'kubernetes-types/apps/v1'
 import type { Container } from 'kubernetes-types/core/v1'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -24,7 +24,6 @@ const {
 
 const name = ref('')
 const image = ref('')
-const replicas = ref<number>(1)
 const port = ref<number | null>(null)
 
 const nameErrorMessage = computed(() => {
@@ -33,8 +32,8 @@ const nameErrorMessage = computed(() => {
   if (!isValidK8sName(trimmed)) {
     return 'Name must be a valid DNS-1123 subdomain (lowercase letters, numbers, hyphens, dots).'
   }
-  if (isNameTaken(trimmed, k8sStore.deployments)) {
-    return `A Deployment named "${trimmed}" already exists in namespace "${namespace.value}".`
+  if (isNameTaken(trimmed, k8sStore.daemonSets)) {
+    return `A DaemonSet named "${trimmed}" already exists in namespace "${namespace.value}".`
   }
   return null
 })
@@ -80,9 +79,9 @@ const handleCreate = async () => {
     ]
   }
 
-  const manifest: Deployment = {
+  const manifest: DaemonSet = {
     apiVersion: 'apps/v1',
-    kind: KUBERNETES_RESOURCE_KIND.Deployment,
+    kind: KUBERNETES_RESOURCE_KIND.DaemonSet,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -91,7 +90,6 @@ const handleCreate = async () => {
       }
     },
     spec: {
-      replicas: replicas.value ?? 1,
       selector: {
         matchLabels: {
           app: trimmedName
@@ -114,7 +112,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: KUBERNETES_RESOURCE_KIND.Deployment,
+      kind: KUBERNETES_RESOURCE_KIND.DaemonSet,
       name: trimmedName,
       data: manifest
     })
@@ -127,27 +125,27 @@ const handleCreate = async () => {
 <template>
   <form @submit.prevent="handleCreate" class="flex flex-col gap-3.5">
     <p class="text-xs text-muted-color">
-      Create a new Kubernetes Deployment with standard configuration:
+      Create a new Kubernetes DaemonSet that runs a copy of a pod on each node:
     </p>
 
     <!-- Name -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-name" class="text-xs font-semibold text-muted-color">
+      <label for="create-daemonset-name" class="text-xs font-semibold text-muted-color">
         Name <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-name"
+        id="create-daemonset-name"
         v-model="name"
-        placeholder="e.g. my-app"
+        placeholder="e.g. node-exporter"
         fluid
         size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
-        aria-describedby="create-deployment-name-error"
+        aria-describedby="create-daemonset-name-error"
         class="text-xs"
       />
       <small
         v-if="name.trim() && nameErrorMessage"
-        id="create-deployment-name-error"
+        id="create-daemonset-name-error"
         class="text-(--danger) text-[11px] leading-tight"
       >
         {{ nameErrorMessage }}
@@ -156,11 +154,11 @@ const handleCreate = async () => {
 
     <!-- Namespace -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-namespace" class="text-xs font-semibold text-muted-color">
+      <label for="create-daemonset-namespace" class="text-xs font-semibold text-muted-color">
         Namespace <span class="text-(--danger)">*</span>
       </label>
       <Select
-        id="create-deployment-namespace"
+        id="create-daemonset-namespace"
         v-model="namespace"
         :options="namespaceOptions"
         fluid
@@ -171,59 +169,42 @@ const handleCreate = async () => {
 
     <!-- Image -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-image" class="text-xs font-semibold text-muted-color">
+      <label for="create-daemonset-image" class="text-xs font-semibold text-muted-color">
         Image <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-image"
+        id="create-daemonset-image"
         v-model="image"
-        placeholder="e.g. nginx:latest"
+        placeholder="e.g. prom/node-exporter:latest"
         fluid
         size="small"
         class="text-xs"
       />
     </div>
 
-    <!-- Replicas & Port Row -->
-    <div class="grid grid-cols-2 gap-3">
-      <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-replicas" class="text-xs font-semibold text-muted-color">
-          Replicas
-        </label>
-        <InputNumber
-          id="create-deployment-replicas"
-          v-model="replicas"
-          :min="1"
-          :max="1000"
-          showButtons
-          fluid
-          size="small"
-        />
-      </div>
-
-      <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-port" class="text-xs font-semibold text-muted-color">
-          Port (Optional)
-        </label>
-        <InputNumber
-          id="create-deployment-port"
-          v-model="port"
-          :min="1"
-          :max="65535"
-          placeholder="e.g. 80"
-          fluid
-          size="small"
-          :invalid="Boolean(port !== null && portErrorMessage)"
-          aria-describedby="create-deployment-port-error"
-        />
-        <small
-          v-if="port !== null && portErrorMessage"
-          id="create-deployment-port-error"
-          class="text-(--danger) text-[11px] leading-tight"
-        >
-          {{ portErrorMessage }}
-        </small>
-      </div>
+    <!-- Port -->
+    <div class="flex flex-col gap-1.5">
+      <label for="create-daemonset-port" class="text-xs font-semibold text-muted-color">
+        Port (Optional)
+      </label>
+      <InputNumber
+        id="create-daemonset-port"
+        v-model="port"
+        :min="1"
+        :max="65535"
+        placeholder="e.g. 9100"
+        fluid
+        size="small"
+        :invalid="Boolean(port !== null && portErrorMessage)"
+        aria-describedby="create-daemonset-port-error"
+      />
+      <small
+        v-if="port !== null && portErrorMessage"
+        id="create-daemonset-port-error"
+        class="text-(--danger) text-[11px] leading-tight"
+      >
+        {{ portErrorMessage }}
+      </small>
     </div>
 
     <div class="flex justify-end gap-2 pt-2">
