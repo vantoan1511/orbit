@@ -38,7 +38,7 @@ Do not begin implementation before completing this phase.
 
 For non-trivial tasks:
 
-1. Following workflow /plan to create or update the corresponding plan under `.agents/PRPs/plans/`.
+1. Following the skill /prp-plan to create or update the corresponding plan under `.agents/PRPs/plans/`.
 2. Record:
 
    - problem
