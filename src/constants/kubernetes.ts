@@ -72,6 +72,36 @@ export const KUBERNETES_RESTART_POLICIES: KubernetesRestartPolicy[] =
   Object.values(KUBERNETES_RESTART_POLICY)
 
 /**
+ * Kubernetes Pod DNS policies.
+ */
+export const KUBERNETES_DNS_POLICY = {
+  ClusterFirst: 'ClusterFirst',
+  ClusterFirstWithHostNet: 'ClusterFirstWithHostNet',
+  Default: 'Default',
+  None: 'None'
+} as const
+
+export type KubernetesDnsPolicy = (typeof KUBERNETES_DNS_POLICY)[keyof typeof KUBERNETES_DNS_POLICY]
+
+export const KUBERNETES_DNS_POLICIES: KubernetesDnsPolicy[] = Object.values(KUBERNETES_DNS_POLICY)
+
+/**
+ * Kubernetes Container image pull policies.
+ */
+export const KUBERNETES_IMAGE_PULL_POLICY = {
+  Always: 'Always',
+  IfNotPresent: 'IfNotPresent',
+  Never: 'Never'
+} as const
+
+export type KubernetesImagePullPolicy =
+  (typeof KUBERNETES_IMAGE_PULL_POLICY)[keyof typeof KUBERNETES_IMAGE_PULL_POLICY]
+
+export const KUBERNETES_IMAGE_PULL_POLICIES: KubernetesImagePullPolicy[] = Object.values(
+  KUBERNETES_IMAGE_PULL_POLICY
+)
+
+/**
  * Valid restart policies for Kubernetes Job and CronJob pod templates (Job specs disallow 'Always').
  */
 export const KUBERNETES_JOB_RESTART_POLICY = {
@@ -130,6 +160,20 @@ export type KubernetesStatefulSetPodManagementPolicy =
 
 export const KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICIES: KubernetesStatefulSetPodManagementPolicy[] =
   Object.values(KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICY)
+
+/**
+ * Kubernetes DaemonSet update strategies.
+ */
+export const KUBERNETES_DAEMONSET_UPDATE_STRATEGY = {
+  RollingUpdate: 'RollingUpdate',
+  OnDelete: 'OnDelete'
+} as const
+
+export type KubernetesDaemonSetUpdateStrategy =
+  (typeof KUBERNETES_DAEMONSET_UPDATE_STRATEGY)[keyof typeof KUBERNETES_DAEMONSET_UPDATE_STRATEGY]
+
+export const KUBERNETES_DAEMONSET_UPDATE_STRATEGIES: KubernetesDaemonSetUpdateStrategy[] =
+  Object.values(KUBERNETES_DAEMONSET_UPDATE_STRATEGY)
 
 /**
  * Common Kubernetes Workload statuses (Deployment, DaemonSet, StatefulSet, ReplicaSet).

@@ -19,6 +19,7 @@ import SecretEditForm from '@/components/config/SecretEditForm.vue'
 import IngressEditForm from '@/components/network/IngressEditForm.vue'
 import ServiceEditForm from '@/components/network/ServiceEditForm.vue'
 import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
+import DaemonSetEditForm from '@/components/workloads/DaemonSetEditForm.vue'
 import StatefulSetEditForm from '@/components/workloads/StatefulSetEditForm.vue'
 import PodEditForm from '@/components/workloads/PodEditForm.vue'
 import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
@@ -39,6 +40,7 @@ const { isDark } = useTheme()
 const rawData = ref<KubernetesResource | null>(null)
 const formComponentMap: Record<string, Component> = {
   [KUBERNETES_RESOURCE_KIND.Deployment]: DeploymentEditForm,
+  [KUBERNETES_RESOURCE_KIND.DaemonSet]: DaemonSetEditForm,
   [KUBERNETES_RESOURCE_KIND.StatefulSet]: StatefulSetEditForm,
   [KUBERNETES_RESOURCE_KIND.Pod]: PodEditForm,
   [KUBERNETES_RESOURCE_KIND.Ingress]: IngressEditForm,
