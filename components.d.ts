@@ -95,6 +95,7 @@ declare module 'vue' {
     PortForwardDialog: typeof import('./src/components/shared/PortForwardDialog.vue')['default']
     ProfileDrawer: typeof import('./src/components/layout/ProfileDrawer.vue')['default']
     ReactiveAge: typeof import('./src/components/shared/ReactiveAge.vue')['default']
+    ReplicaSetEditForm: typeof import('./src/components/workloads/ReplicaSetEditForm.vue')['default']
     ReplicaSetsTable: typeof import('./src/components/workloads/ReplicaSetsTable.vue')['default']
     ReplicasProgressBar: typeof import('./src/components/shared/ReplicasProgressBar.vue')['default']
     ResourceActionMenu: typeof import('./src/components/shared/ResourceActionMenu.vue')['default']

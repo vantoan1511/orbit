@@ -22,6 +22,7 @@ import DeploymentEditForm from '@/components/workloads/DeploymentEditForm.vue'
 import DaemonSetEditForm from '@/components/workloads/DaemonSetEditForm.vue'
 import StatefulSetEditForm from '@/components/workloads/StatefulSetEditForm.vue'
 import PodEditForm from '@/components/workloads/PodEditForm.vue'
+import ReplicaSetEditForm from '@/components/workloads/ReplicaSetEditForm.vue'
 import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
@@ -42,6 +43,7 @@ const formComponentMap: Record<string, Component> = {
   [KUBERNETES_RESOURCE_KIND.Deployment]: DeploymentEditForm,
   [KUBERNETES_RESOURCE_KIND.DaemonSet]: DaemonSetEditForm,
   [KUBERNETES_RESOURCE_KIND.StatefulSet]: StatefulSetEditForm,
+  [KUBERNETES_RESOURCE_KIND.ReplicaSet]: ReplicaSetEditForm,
   [KUBERNETES_RESOURCE_KIND.Pod]: PodEditForm,
   [KUBERNETES_RESOURCE_KIND.Ingress]: IngressEditForm,
   [KUBERNETES_RESOURCE_KIND.Service]: ServiceEditForm,
