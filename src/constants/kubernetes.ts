@@ -72,6 +72,38 @@ export const KUBERNETES_RESTART_POLICIES: KubernetesRestartPolicy[] =
   Object.values(KUBERNETES_RESTART_POLICY)
 
 /**
+ * Valid restart policies for Kubernetes Job and CronJob pod templates (Job specs disallow 'Always').
+ */
+export const KUBERNETES_JOB_RESTART_POLICY = {
+  OnFailure: KUBERNETES_RESTART_POLICY.OnFailure,
+  Never: KUBERNETES_RESTART_POLICY.Never
+} as const
+
+export type KubernetesJobRestartPolicy =
+  (typeof KUBERNETES_JOB_RESTART_POLICY)[keyof typeof KUBERNETES_JOB_RESTART_POLICY]
+
+export const KUBERNETES_JOB_RESTART_POLICIES: KubernetesJobRestartPolicy[] = [
+  KUBERNETES_RESTART_POLICY.OnFailure,
+  KUBERNETES_RESTART_POLICY.Never
+]
+
+/**
+ * Kubernetes CronJob Concurrency Policies.
+ */
+export const KUBERNETES_CONCURRENCY_POLICY = {
+  Allow: 'Allow',
+  Forbid: 'Forbid',
+  Replace: 'Replace'
+} as const
+
+export type KubernetesConcurrencyPolicy =
+  (typeof KUBERNETES_CONCURRENCY_POLICY)[keyof typeof KUBERNETES_CONCURRENCY_POLICY]
+
+export const KUBERNETES_CONCURRENCY_POLICIES: KubernetesConcurrencyPolicy[] = Object.values(
+  KUBERNETES_CONCURRENCY_POLICY
+)
+
+/**
  * Common Kubernetes Workload statuses (Deployment, DaemonSet, StatefulSet, ReplicaSet).
  */
 export const KUBERNETES_WORKLOAD_STATUS = {

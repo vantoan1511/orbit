@@ -77,3 +77,51 @@ export function parseRuleSummary(ruleStr: string): { host: string; path: string 
     path: (pathPart || '/').toLowerCase()
   }
 }
+
+/**
+ * Validates a standard 5-part Kubernetes CronJob schedule or standard macro.
+ * Supports expressions like "* * * * *", "0 9 * * MON-FRI", "0 0 1 JAN *",
+ * or macros like "@yearly", "@annually", "@monthly", "@weekly", "@daily", "@midnight", "@hourly".
+ */
+export function isValidCron(schedule: string): boolean {
+  if (!schedule || typeof schedule !== 'string') return false
+  const trimmed = schedule.trim()
+  if (!trimmed) return false
+
+  const standardMacros = [
+    '@yearly',
+    '@annually',
+    '@monthly',
+    '@weekly',
+    '@daily',
+    '@midnight',
+    '@hourly'
+  ]
+  if (standardMacros.includes(trimmed)) {
+    return true
+  }
+
+  const parts = trimmed.split(/\s+/)
+  if (parts.length !== 5) return false
+
+  const cronFieldRegex = /^[*a-zA-Z0-9,\-\/]+$/
+  return parts.every((part) => cronFieldRegex.test(part))
+}
+
+/**
+ * Sanitizes an arbitrary string into a valid Kubernetes DNS-1123 label (RFC 1123).
+ * - Converts to lowercase
+ * - Replaces non-alphanumeric characters (including dots) with '-'
+ * - Strips leading and trailing hyphens
+ * - Truncates to 63 characters
+ * - Falls back to a default value (e.g. 'main') if empty
+ */
+export function sanitizeK8sLabel(name: string, fallback = 'main'): string {
+  if (!name || typeof name !== 'string') return fallback
+  const sanitized = name
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63)
+  return sanitized || fallback
+}

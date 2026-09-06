@@ -3,7 +3,7 @@ import { useCreateResourceDialog } from '@/composables/useCreateResourceDialog'
 import { kubernetesService } from '@/services/kubernetesService'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { isValidK8sName, isValidPort, sanitizeK8sLabel } from '@/utils/validators'
-import type { Deployment } from 'kubernetes-types/apps/v1'
+import type { ReplicaSet } from 'kubernetes-types/apps/v1'
 import type { Container } from 'kubernetes-types/core/v1'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -33,8 +33,8 @@ const nameErrorMessage = computed(() => {
   if (!isValidK8sName(trimmed)) {
     return 'Name must be a valid DNS-1123 subdomain (lowercase letters, numbers, hyphens, dots).'
   }
-  if (isNameTaken(trimmed, k8sStore.deployments)) {
-    return `A Deployment named "${trimmed}" already exists in namespace "${namespace.value}".`
+  if (isNameTaken(trimmed, k8sStore.replicaSets)) {
+    return `A ReplicaSet named "${trimmed}" already exists in namespace "${namespace.value}".`
   }
   return null
 })
@@ -80,9 +80,9 @@ const handleCreate = async () => {
     ]
   }
 
-  const manifest: Deployment = {
+  const manifest: ReplicaSet = {
     apiVersion: 'apps/v1',
-    kind: KUBERNETES_RESOURCE_KIND.Deployment,
+    kind: KUBERNETES_RESOURCE_KIND.ReplicaSet,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -114,7 +114,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: KUBERNETES_RESOURCE_KIND.Deployment,
+      kind: KUBERNETES_RESOURCE_KIND.ReplicaSet,
       name: trimmedName,
       data: manifest
     })
@@ -126,28 +126,26 @@ const handleCreate = async () => {
 
 <template>
   <form @submit.prevent="handleCreate" class="flex flex-col gap-3.5">
-    <p class="text-xs text-muted-color">
-      Create a new Kubernetes Deployment with standard configuration:
-    </p>
+    <p class="text-xs text-muted-color">Create a new Kubernetes ReplicaSet:</p>
 
     <!-- Name -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-name" class="text-xs font-semibold text-muted-color">
+      <label for="create-replicaset-name" class="text-xs font-semibold text-muted-color">
         Name <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-name"
+        id="create-replicaset-name"
         v-model="name"
-        placeholder="e.g. my-app"
+        placeholder="e.g. frontend-replicaset"
         fluid
         size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
-        aria-describedby="create-deployment-name-error"
+        aria-describedby="create-replicaset-name-error"
         class="text-xs"
       />
       <small
         v-if="name.trim() && nameErrorMessage"
-        id="create-deployment-name-error"
+        id="create-replicaset-name-error"
         class="text-(--danger) text-[11px] leading-tight"
       >
         {{ nameErrorMessage }}
@@ -156,11 +154,11 @@ const handleCreate = async () => {
 
     <!-- Namespace -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-namespace" class="text-xs font-semibold text-muted-color">
+      <label for="create-replicaset-namespace" class="text-xs font-semibold text-muted-color">
         Namespace <span class="text-(--danger)">*</span>
       </label>
       <Select
-        id="create-deployment-namespace"
+        id="create-replicaset-namespace"
         v-model="namespace"
         :options="namespaceOptions"
         fluid
@@ -171,13 +169,13 @@ const handleCreate = async () => {
 
     <!-- Image -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-image" class="text-xs font-semibold text-muted-color">
+      <label for="create-replicaset-image" class="text-xs font-semibold text-muted-color">
         Image <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-image"
+        id="create-replicaset-image"
         v-model="image"
-        placeholder="e.g. nginx:latest"
+        placeholder="e.g. nginx:alpine"
         fluid
         size="small"
         class="text-xs"
@@ -187,11 +185,11 @@ const handleCreate = async () => {
     <!-- Replicas & Port Row -->
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-replicas" class="text-xs font-semibold text-muted-color">
+        <label for="create-replicaset-replicas" class="text-xs font-semibold text-muted-color">
           Replicas
         </label>
         <InputNumber
-          id="create-deployment-replicas"
+          id="create-replicaset-replicas"
           v-model="replicas"
           :min="1"
           :max="1000"
@@ -202,11 +200,11 @@ const handleCreate = async () => {
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-port" class="text-xs font-semibold text-muted-color">
+        <label for="create-replicaset-port" class="text-xs font-semibold text-muted-color">
           Port (Optional)
         </label>
         <InputNumber
-          id="create-deployment-port"
+          id="create-replicaset-port"
           v-model="port"
           :min="1"
           :max="65535"
@@ -214,11 +212,11 @@ const handleCreate = async () => {
           fluid
           size="small"
           :invalid="Boolean(port !== null && portErrorMessage)"
-          aria-describedby="create-deployment-port-error"
+          aria-describedby="create-replicaset-port-error"
         />
         <small
           v-if="port !== null && portErrorMessage"
-          id="create-deployment-port-error"
+          id="create-replicaset-port-error"
           class="text-(--danger) text-[11px] leading-tight"
         >
           {{ portErrorMessage }}

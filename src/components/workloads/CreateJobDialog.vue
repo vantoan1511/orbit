@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { useCreateResourceDialog } from '@/composables/useCreateResourceDialog'
 import { kubernetesService } from '@/services/kubernetesService'
-import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
-import { isValidK8sName, isValidPort, sanitizeK8sLabel } from '@/utils/validators'
-import type { Deployment } from 'kubernetes-types/apps/v1'
+import {
+  KUBERNETES_JOB_RESTART_POLICIES,
+  KUBERNETES_JOB_RESTART_POLICY,
+  KUBERNETES_RESOURCE_KIND,
+  type KubernetesJobRestartPolicy
+} from '@/constants/kubernetes'
+import { isValidK8sName, sanitizeK8sLabel } from '@/utils/validators'
+import type { Job } from 'kubernetes-types/batch/v1'
 import type { Container } from 'kubernetes-types/core/v1'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -24,8 +29,11 @@ const {
 
 const name = ref('')
 const image = ref('')
-const replicas = ref<number>(1)
-const port = ref<number | null>(null)
+const command = ref('')
+const completions = ref<number>(1)
+const parallelism = ref<number>(1)
+const backoffLimit = ref<number>(6)
+const restartPolicy = ref<KubernetesJobRestartPolicy>(KUBERNETES_JOB_RESTART_POLICY.Never)
 
 const nameErrorMessage = computed(() => {
   const trimmed = name.value.trim()
@@ -33,16 +41,8 @@ const nameErrorMessage = computed(() => {
   if (!isValidK8sName(trimmed)) {
     return 'Name must be a valid DNS-1123 subdomain (lowercase letters, numbers, hyphens, dots).'
   }
-  if (isNameTaken(trimmed, k8sStore.deployments)) {
-    return `A Deployment named "${trimmed}" already exists in namespace "${namespace.value}".`
-  }
-  return null
-})
-
-const portErrorMessage = computed(() => {
-  if (port.value === null || port.value === undefined) return null
-  if (!isValidPort(port.value)) {
-    return 'Port must be an integer between 1 and 65535.'
+  if (isNameTaken(trimmed, k8sStore.jobs)) {
+    return `A Job named "${trimmed}" already exists in namespace "${namespace.value}".`
   }
   return null
 })
@@ -53,9 +53,8 @@ const isFormValid = computed(() => {
   const hasValidName = Boolean(trimmedName) && !nameErrorMessage.value
   const hasValidNamespace = Boolean(namespace.value)
   const hasValidImage = Boolean(trimmedImage)
-  const hasValidPort = port.value === null || port.value === undefined || isValidPort(port.value)
 
-  return hasValidName && hasValidNamespace && hasValidImage && hasValidPort
+  return hasValidName && hasValidNamespace && hasValidImage
 })
 
 const handleCreate = async () => {
@@ -64,6 +63,7 @@ const handleCreate = async () => {
   const trimmedName = name.value.trim()
   const trimmedNamespace = namespace.value.trim()
   const trimmedImage = image.value.trim()
+  const trimmedCommand = command.value.trim()
   const containerName = sanitizeK8sLabel(trimmedName)
 
   const containerObj: Container = {
@@ -71,18 +71,13 @@ const handleCreate = async () => {
     image: trimmedImage
   }
 
-  if (port.value !== null && port.value !== undefined && isValidPort(port.value)) {
-    containerObj.ports = [
-      {
-        containerPort: port.value,
-        protocol: 'TCP'
-      }
-    ]
+  if (trimmedCommand) {
+    containerObj.command = ['/bin/sh', '-c', trimmedCommand]
   }
 
-  const manifest: Deployment = {
-    apiVersion: 'apps/v1',
-    kind: KUBERNETES_RESOURCE_KIND.Deployment,
+  const manifest: Job = {
+    apiVersion: 'batch/v1',
+    kind: KUBERNETES_RESOURCE_KIND.Job,
     metadata: {
       name: trimmedName,
       namespace: trimmedNamespace,
@@ -91,12 +86,9 @@ const handleCreate = async () => {
       }
     },
     spec: {
-      replicas: replicas.value ?? 1,
-      selector: {
-        matchLabels: {
-          app: trimmedName
-        }
-      },
+      completions: completions.value ?? 1,
+      parallelism: parallelism.value ?? 1,
+      backoffLimit: backoffLimit.value ?? 6,
       template: {
         metadata: {
           labels: {
@@ -104,6 +96,7 @@ const handleCreate = async () => {
           }
         },
         spec: {
+          restartPolicy: restartPolicy.value,
           containers: [containerObj]
         }
       }
@@ -114,7 +107,7 @@ const handleCreate = async () => {
   try {
     await kubernetesService.createResource({
       namespace: trimmedNamespace,
-      kind: KUBERNETES_RESOURCE_KIND.Deployment,
+      kind: KUBERNETES_RESOURCE_KIND.Job,
       name: trimmedName,
       data: manifest
     })
@@ -127,27 +120,27 @@ const handleCreate = async () => {
 <template>
   <form @submit.prevent="handleCreate" class="flex flex-col gap-3.5">
     <p class="text-xs text-muted-color">
-      Create a new Kubernetes Deployment with standard configuration:
+      Create a new Kubernetes batch Job to execute pods to completion:
     </p>
 
     <!-- Name -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-name" class="text-xs font-semibold text-muted-color">
+      <label for="create-job-name" class="text-xs font-semibold text-muted-color">
         Name <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-name"
+        id="create-job-name"
         v-model="name"
-        placeholder="e.g. my-app"
+        placeholder="e.g. data-migration-job"
         fluid
         size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
-        aria-describedby="create-deployment-name-error"
+        aria-describedby="create-job-name-error"
         class="text-xs"
       />
       <small
         v-if="name.trim() && nameErrorMessage"
-        id="create-deployment-name-error"
+        id="create-job-name-error"
         class="text-(--danger) text-[11px] leading-tight"
       >
         {{ nameErrorMessage }}
@@ -156,11 +149,11 @@ const handleCreate = async () => {
 
     <!-- Namespace -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-namespace" class="text-xs font-semibold text-muted-color">
+      <label for="create-job-namespace" class="text-xs font-semibold text-muted-color">
         Namespace <span class="text-(--danger)">*</span>
       </label>
       <Select
-        id="create-deployment-namespace"
+        id="create-job-namespace"
         v-model="namespace"
         :options="namespaceOptions"
         fluid
@@ -171,28 +164,43 @@ const handleCreate = async () => {
 
     <!-- Image -->
     <div class="flex flex-col gap-1.5">
-      <label for="create-deployment-image" class="text-xs font-semibold text-muted-color">
+      <label for="create-job-image" class="text-xs font-semibold text-muted-color">
         Image <span class="text-(--danger)">*</span>
       </label>
       <InputText
-        id="create-deployment-image"
+        id="create-job-image"
         v-model="image"
-        placeholder="e.g. nginx:latest"
+        placeholder="e.g. perl:5.34.0 or busybox:latest"
         fluid
         size="small"
         class="text-xs"
       />
     </div>
 
-    <!-- Replicas & Port Row -->
+    <!-- Command (Optional) -->
+    <div class="flex flex-col gap-1.5">
+      <label for="create-job-command" class="text-xs font-semibold text-muted-color">
+        Command (Optional)
+      </label>
+      <InputText
+        id="create-job-command"
+        v-model="command"
+        placeholder="e.g. echo hello world"
+        fluid
+        size="small"
+        class="text-xs"
+      />
+    </div>
+
+    <!-- Completions & Parallelism Row -->
     <div class="grid grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-replicas" class="text-xs font-semibold text-muted-color">
-          Replicas
+        <label for="create-job-completions" class="text-xs font-semibold text-muted-color">
+          Completions
         </label>
         <InputNumber
-          id="create-deployment-replicas"
-          v-model="replicas"
+          id="create-job-completions"
+          v-model="completions"
           :min="1"
           :max="1000"
           showButtons
@@ -202,27 +210,50 @@ const handleCreate = async () => {
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label for="create-deployment-port" class="text-xs font-semibold text-muted-color">
-          Port (Optional)
+        <label for="create-job-parallelism" class="text-xs font-semibold text-muted-color">
+          Parallelism
         </label>
         <InputNumber
-          id="create-deployment-port"
-          v-model="port"
+          id="create-job-parallelism"
+          v-model="parallelism"
           :min="1"
-          :max="65535"
-          placeholder="e.g. 80"
+          :max="1000"
+          showButtons
           fluid
           size="small"
-          :invalid="Boolean(port !== null && portErrorMessage)"
-          aria-describedby="create-deployment-port-error"
         />
-        <small
-          v-if="port !== null && portErrorMessage"
-          id="create-deployment-port-error"
-          class="text-(--danger) text-[11px] leading-tight"
-        >
-          {{ portErrorMessage }}
-        </small>
+      </div>
+    </div>
+
+    <!-- Backoff Limit & Restart Policy Row -->
+    <div class="grid grid-cols-2 gap-3">
+      <div class="flex flex-col gap-1.5">
+        <label for="create-job-backoff" class="text-xs font-semibold text-muted-color">
+          Backoff Limit
+        </label>
+        <InputNumber
+          id="create-job-backoff"
+          v-model="backoffLimit"
+          :min="0"
+          :max="100"
+          showButtons
+          fluid
+          size="small"
+        />
+      </div>
+
+      <div class="flex flex-col gap-1.5">
+        <label for="create-job-restart-policy" class="text-xs font-semibold text-muted-color">
+          Restart Policy
+        </label>
+        <Select
+          id="create-job-restart-policy"
+          v-model="restartPolicy"
+          :options="KUBERNETES_JOB_RESTART_POLICIES"
+          fluid
+          size="small"
+          class="text-xs"
+        />
       </div>
     </div>
 
