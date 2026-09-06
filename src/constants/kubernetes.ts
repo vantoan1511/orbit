@@ -104,6 +104,34 @@ export const KUBERNETES_CONCURRENCY_POLICIES: KubernetesConcurrencyPolicy[] = Ob
 )
 
 /**
+ * Kubernetes StatefulSet update strategies.
+ */
+export const KUBERNETES_STATEFULSET_UPDATE_STRATEGY = {
+  RollingUpdate: 'RollingUpdate',
+  OnDelete: 'OnDelete'
+} as const
+
+export type KubernetesStatefulSetUpdateStrategy =
+  (typeof KUBERNETES_STATEFULSET_UPDATE_STRATEGY)[keyof typeof KUBERNETES_STATEFULSET_UPDATE_STRATEGY]
+
+export const KUBERNETES_STATEFULSET_UPDATE_STRATEGIES: KubernetesStatefulSetUpdateStrategy[] =
+  Object.values(KUBERNETES_STATEFULSET_UPDATE_STRATEGY)
+
+/**
+ * Kubernetes StatefulSet pod management policies.
+ */
+export const KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICY = {
+  OrderedReady: 'OrderedReady',
+  Parallel: 'Parallel'
+} as const
+
+export type KubernetesStatefulSetPodManagementPolicy =
+  (typeof KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICY)[keyof typeof KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICY]
+
+export const KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICIES: KubernetesStatefulSetPodManagementPolicy[] =
+  Object.values(KUBERNETES_STATEFULSET_POD_MANAGEMENT_POLICY)
+
+/**
  * Common Kubernetes Workload statuses (Deployment, DaemonSet, StatefulSet, ReplicaSet).
  */
 export const KUBERNETES_WORKLOAD_STATUS = {
