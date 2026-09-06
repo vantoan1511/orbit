@@ -9,6 +9,7 @@
     "neu:update": "neu update",
     "neu:build": "neu build",
     "package": "node scripts/build-installer.js",
+    "release": "node scripts/release.js",
     "build": "run-p type-check \"build-only {@}\" --",
     "preview": "vite preview",
     "build-only": "vite build",
