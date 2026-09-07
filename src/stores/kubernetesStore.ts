@@ -1,7 +1,8 @@
-import { kubernetesService } from '@/services/kubernetesService'
-import { events as nativeEvents } from '@/services/nativeService'
-import { useTableFilterStore } from '@/stores/tableFilterStore'
-import { OrbitEvents, type KubernetesResourceInfo } from '@/types/events'
+import { kubernetesService } from '../services/kubernetesService.ts'
+import { events as nativeEvents } from '../services/nativeService.ts'
+import { useTableFilterStore } from './tableFilterStore.ts'
+import { OrbitEvents, type KubernetesResourceInfo } from '../types/events.ts'
+import { formatCpuCores, formatDecimal, formatMemoryMiB } from '../utils/metrics.ts'
 import {
   KUBERNETES_ACTION,
   KUBERNETES_RESOURCE_KIND,
@@ -26,9 +27,9 @@ import {
   type ServiceInfo,
   type StatefulSetInfo,
   type StorageClassInfo
-} from '@/types/kubernetes'
+} from '../types/kubernetes.ts'
 import { defineStore } from 'pinia'
-import { computed, onScopeDispose, ref, shallowRef, triggerRef, watch, type ShallowRef } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch, type ShallowRef } from 'vue'
 
 type ResourceMatcher<T> = (existing: T, incoming: T) => boolean
 
@@ -46,7 +47,8 @@ const matchService: ResourceMatcher<ServiceInfo> = (a, b) =>
 function updateResourceBatch<T>(
   listRef: ShallowRef<T[]>,
   updates: Array<{ action: KubernetesAction; data: T }>,
-  match: ResourceMatcher<T>
+  match: ResourceMatcher<T>,
+  merge?: (existing: T, incoming: T) => T
 ) {
   if (!updates || updates.length === 0) return
   let current: T[] | null = null
@@ -59,7 +61,9 @@ function updateResourceBatch<T>(
     if (update.action === KUBERNETES_ACTION.Applied) {
       if (!current) current = [...listRef.value]
       if (index !== -1) {
-        current[index] = update.data
+        const existing = current[index]
+        current[index] =
+          merge && existing !== undefined ? merge(existing, update.data) : update.data
       } else {
         current.push(update.data)
       }
@@ -146,6 +150,63 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     memHistory.value.push(memPct)
   })
 
+  const podMetricsMap = new Map<
+    string,
+    {
+      cpu: string
+      memory: string
+      cpuCores?: number
+      memoryBytes?: number
+    }
+  >()
+
+  function enrichPodWithMetrics(pod: PodInfo, nodesList: NodeInfo[] = nodes.value): PodInfo {
+    const key = `${pod.namespace}/${pod.name}`
+    const cached = podMetricsMap.get(key)
+
+    const cpuCores = typeof pod.cpuCores === 'number' ? pod.cpuCores : cached?.cpuCores
+    const memoryBytes = typeof pod.memoryBytes === 'number' ? pod.memoryBytes : cached?.memoryBytes
+    let cpu = pod.cpu ?? cached?.cpu
+    let memory = pod.memory ?? cached?.memory
+    let cpuPct = typeof pod.cpuPct === 'number' ? pod.cpuPct : undefined
+    let memoryPct = typeof pod.memoryPct === 'number' ? pod.memoryPct : undefined
+
+    const node = pod.node ? nodesList.find((n) => n.name === pod.node) : undefined
+
+    if (cpuCores !== undefined && node) {
+      const nodeCpuTotal = parseFloat(node.cpuTotal || '0')
+      if (nodeCpuTotal > 0) {
+        cpuPct = Number(((cpuCores / nodeCpuTotal) * 100).toFixed(2))
+        cpu = `${formatDecimal(cpuCores, 2)}/${formatDecimal(nodeCpuTotal, 2)} cores`
+      }
+    } else if (cpuCores !== undefined && (!cpu || cpu === '-')) {
+      cpu = formatCpuCores(cpuCores)
+    }
+
+    if (memoryBytes !== undefined && node) {
+      const nodeMemGib = parseFloat(node.memTotal || '0')
+      if (nodeMemGib > 0) {
+        const nodeMemBytes = nodeMemGib * 1024 * 1024 * 1024
+        memoryPct = Number(((memoryBytes / nodeMemBytes) * 100).toFixed(2))
+      }
+    }
+
+    if (memoryBytes !== undefined && (!memory || memory === '-')) {
+      const memMib = memoryBytes / (1024 * 1024)
+      memory = formatMemoryMiB(memMib)
+    }
+
+    return {
+      ...pod,
+      cpu,
+      cpuCores,
+      cpuPct,
+      memory,
+      memoryBytes,
+      memoryPct
+    }
+  }
+
   function setEngineReady(ready: boolean) {
     isEngineReady.value = ready
   }
@@ -155,7 +216,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setPods(newPods: PodInfo[]) {
-    pods.value = newPods
+    pods.value = newPods.map((p) => enrichPodWithMetrics(p))
     podsLoading.value = false
   }
 
@@ -192,6 +253,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   function setNodes(newNodes: NodeInfo[]) {
     nodes.value = newNodes
     nodesLoading.value = false
+    if (pods.value.length > 0) {
+      pods.value = pods.value.map((p) => enrichPodWithMetrics(p, newNodes))
+    }
   }
 
   function setServices(newServices: ServiceInfo[]) {
@@ -309,6 +373,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const tableFilterStore = useTableFilterStore()
     tableFilterStore.setActiveClusterId(id)
     tableFilterStore.resetAllSelections()
+    podMetricsMap.clear()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
     deployments.value = []
@@ -522,7 +587,21 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       updateResourceBatch(
         pods,
         updates as Array<{ action: KubernetesAction; data: PodInfo }>,
-        matchNamespaced
+        matchNamespaced,
+        (existing, incoming) =>
+          enrichPodWithMetrics({
+            ...incoming,
+            cpu: incoming.cpu ?? existing.cpu,
+            cpuCores: typeof incoming.cpuCores === 'number' ? incoming.cpuCores : existing.cpuCores,
+            cpuPct: typeof incoming.cpuPct === 'number' ? incoming.cpuPct : existing.cpuPct,
+            memory: incoming.memory ?? existing.memory,
+            memoryBytes:
+              typeof incoming.memoryBytes === 'number'
+                ? incoming.memoryBytes
+                : existing.memoryBytes,
+            memoryPct:
+              typeof incoming.memoryPct === 'number' ? incoming.memoryPct : existing.memoryPct
+          })
       ),
     [KUBERNETES_RESOURCE_KIND.ConfigMap]: (updates) =>
       updateResourceBatch(
@@ -605,19 +684,25 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const activePortForwards = ref<ActivePortForward[]>([])
 
   function onPodMetricsUpdated(payload: {
-    metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
+    metrics: Array<{
+      name: string
+      namespace: string
+      cpu: string
+      memory: string
+      cpuCores?: number
+      memoryBytes?: number
+    }>
   }) {
-    let changed = false
     for (const m of payload.metrics) {
-      const pod = pods.value.find((p) => p.name === m.name && p.namespace === m.namespace)
-      if (pod) {
-        pod.cpu = m.cpu
-        pod.memory = m.memory
-        changed = true
-      }
+      podMetricsMap.set(`${m.namespace}/${m.name}`, {
+        cpu: m.cpu,
+        memory: m.memory,
+        cpuCores: m.cpuCores,
+        memoryBytes: m.memoryBytes
+      })
     }
-    if (changed) {
-      triggerRef(pods)
+    if (pods.value.length > 0) {
+      pods.value = pods.value.map((p) => enrichPodWithMetrics(p))
     }
   }
 

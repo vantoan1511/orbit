@@ -79,6 +79,14 @@ const eventHandlerMap = new Map<string, Map<any, any>>()
  */
 export const events = {
   on<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
+    if (
+      typeof globalThis.window === 'undefined' ||
+      typeof (globalThis.window as unknown as { addEventListener?: unknown }).addEventListener !==
+        'function'
+    ) {
+      return Promise.resolve()
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const wrapper = (evt: any) => {
       const payload = evt?.detail as OrbitEventMap[K]
@@ -95,6 +103,14 @@ export const events = {
     return neuEvents.on(event, wrapper)
   },
   off<K extends OrbitEventName>(event: K, handler: (data: OrbitEventMap[K]) => void) {
+    if (
+      typeof globalThis.window === 'undefined' ||
+      typeof (globalThis.window as unknown as { removeEventListener?: unknown })
+        .removeEventListener !== 'function'
+    ) {
+      return Promise.resolve()
+    }
+
     const handlers = eventHandlerMap.get(event)
     if (handlers) {
       const wrapper = handlers.get(handler)
@@ -110,6 +126,13 @@ export const events = {
     return neuEvents.off(event, handler as any)
   },
   dispatch(event: string, data?: unknown) {
+    if (
+      typeof globalThis.window === 'undefined' ||
+      typeof (globalThis.window as unknown as { dispatchEvent?: unknown }).dispatchEvent !==
+        'function'
+    ) {
+      return Promise.resolve()
+    }
     return neuEvents.dispatch(event, data)
   }
 }

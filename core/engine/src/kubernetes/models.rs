@@ -22,6 +22,14 @@ pub struct PodInfo {
     pub age: String,
     pub cpu: Option<String>,
     pub memory: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_cores: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_pct: Option<f64>,
     pub node: Option<String>,
     pub restarts: i32,
     pub images: Vec<String>,
@@ -392,4 +400,8 @@ pub struct PodMetricItem {
     pub namespace: String,
     pub cpu: String,
     pub memory: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_cores: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<f64>,
 }

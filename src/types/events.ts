@@ -144,7 +144,14 @@ export interface OrbitEventMap {
     updates: ResourceUpdateItem[]
   }
   podMetricsUpdated: {
-    metrics: Array<{ name: string; namespace: string; cpu: string; memory: string }>
+    metrics: Array<{
+      name: string
+      namespace: string
+      cpu: string
+      memory: string
+      cpuCores?: number
+      memoryBytes?: number
+    }>
   }
   errorOccurred: {
     message: string
