@@ -19,10 +19,7 @@ function updateFile(filePath, updater) {
 
 function updateCargoVersion(filePath, newVersion) {
   updateFile(filePath, (content) => {
-    return content.replace(
-      /(\[package\][\s\S]*?\bversion\s*=\s*")([^"]+)(")/,
-      `$1${newVersion}$3`
-    )
+    return content.replace(/(\[package\][\s\S]*?\bversion\s*=\s*")([^"]+)(")/, `$1${newVersion}$3`)
   })
 }
 
@@ -91,11 +88,15 @@ Options:
   if (!targetVersion) {
     const semver = parseSemver(currentVersion)
     if (!semver) {
-      console.error(`Current version (${currentVersion}) is not standard semver. Please provide a version: npm run release <version>`)
+      console.error(
+        `Current version (${currentVersion}) is not standard semver. Please provide a version: npm run release <version>`
+      )
       process.exit(1)
     }
     targetVersion = `${semver.major}.${semver.minor}.${semver.patch + 1}`
-    console.log(`No version specified. Auto-bumping patch version from ${currentVersion} to ${targetVersion}`)
+    console.log(
+      `No version specified. Auto-bumping patch version from ${currentVersion} to ${targetVersion}`
+    )
   }
 
   // Remove leading 'v' if provided
@@ -108,7 +109,9 @@ Options:
     process.exit(1)
   }
 
-  console.log(`\n=== Preparing Orbit Release v${targetVersion}${isDryRun ? ' (DRY RUN)' : ''} ===\n`)
+  console.log(
+    `\n=== Preparing Orbit Release v${targetVersion}${isDryRun ? ' (DRY RUN)' : ''} ===\n`
+  )
 
   const branchName = `release/v${targetVersion}`
   const commitMsg = `chore: release v${targetVersion}`
@@ -117,7 +120,9 @@ Options:
   // Ensure git working tree is clean
   const statusOutput = execSync('git status --porcelain', { encoding: 'utf8' }).trim()
   if (statusOutput.length > 0) {
-    console.error('Error: Git working tree has uncommitted changes. Please stash or commit them before releasing.')
+    console.error(
+      'Error: Git working tree has uncommitted changes. Please stash or commit them before releasing.'
+    )
     process.exit(1)
   }
 
@@ -161,18 +166,24 @@ Options:
   if (isDryRun) {
     console.log('\n[DRY RUN] Skipping git commit, push, and PR creation.')
     console.log(`[DRY RUN] Would execute:`)
-    console.log(`  git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock`)
+    console.log(
+      `  git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock`
+    )
     console.log(`  git commit -m "${commitMsg}"`)
     console.log(`  git push origin ${branchName}`)
     if (!skipPr) {
-      console.log(`  gh pr create --title "${commitMsg}" --base main --head ${branchName} --label chore --body ...`)
+      console.log(
+        `  gh pr create --title "${commitMsg}" --base main --head ${branchName} --label chore --body ...`
+      )
     }
     console.log(`\nDry run completed for v${targetVersion}!`)
     return
   }
 
   console.log('\n5. Staging modified release files and committing...')
-  run('git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock')
+  run(
+    'git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock'
+  )
   run(`git commit -m "${commitMsg}"`)
 
   console.log('\n6. Pushing branch to origin...')
@@ -191,9 +202,13 @@ Options:
   } catch {
     console.log('Retrying PR creation with fallback without labels...')
     try {
-      run(`gh pr create --title "${commitMsg}" --base main --head ${branchName} --body "${prBody.replace(/"/g, '\\"')}"`)
+      run(
+        `gh pr create --title "${commitMsg}" --base main --head ${branchName} --body "${prBody.replace(/"/g, '\\"')}"`
+      )
     } catch {
-      console.warn('\nWarning: Failed to create PR automatically via gh cli. You can create it manually on GitHub.')
+      console.warn(
+        '\nWarning: Failed to create PR automatically via gh cli. You can create it manually on GitHub.'
+      )
     }
   }
 

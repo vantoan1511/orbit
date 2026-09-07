@@ -1,5 +1,5 @@
 import type { KubernetesResource } from '@/types/kubernetes'
-import { coreEngine } from './nativeService'
+import { coreEngine } from './nativeService.ts'
 
 export const kubernetesService = {
   /**

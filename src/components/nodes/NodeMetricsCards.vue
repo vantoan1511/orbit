@@ -19,7 +19,7 @@ const cpuMetrics = computed(() => {
     used += parseFloat(n.cpuUsed) || 0
     total += parseFloat(n.cpuTotal) || 0
   })
-  const pct = total > 0 ? Math.round((used / total) * 100) : 0
+  const pct = total > 0 ? Number(((used / total) * 100).toFixed(2)) : 0
   return { used, total, pct }
 })
 
@@ -30,7 +30,7 @@ const memMetrics = computed(() => {
     used += parseFloat(n.memUsed) || 0
     total += parseFloat(n.memTotal) || 0
   })
-  const pct = total > 0 ? Math.round((used / total) * 100) : 0
+  const pct = total > 0 ? Number(((used / total) * 100).toFixed(2)) : 0
   return { used, total, pct }
 })
 
@@ -99,7 +99,7 @@ const pressures = computed(() => [
         </div>
         <div class="mt-4">
           <div class="flex justify-between text-xs text-muted-color mb-1 font-mono">
-            <span>{{ cpuMetrics.used.toFixed(1) }} / {{ cpuMetrics.total.toFixed(0) }} cores</span>
+            <span>{{ cpuMetrics.used.toFixed(2) }} / {{ cpuMetrics.total.toFixed(0) }} cores</span>
           </div>
           <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
@@ -129,7 +129,7 @@ const pressures = computed(() => [
         </div>
         <div class="mt-4">
           <div class="flex justify-between text-xs text-muted-color mb-1 font-mono">
-            <span>{{ memMetrics.used.toFixed(1) }} / {{ memMetrics.total.toFixed(0) }} GiB</span>
+            <span>{{ memMetrics.used.toFixed(2) }} / {{ memMetrics.total.toFixed(0) }} GiB</span>
           </div>
           <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div

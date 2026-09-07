@@ -55,7 +55,7 @@ defineProps<{
           <span class="text-muted-color">Node: </span>
           <span
             class="font-semibold text-primary font-mono truncate inline-block max-w-50 align-bottom"
-            :title="pod.node || '-'"
+            v-tooltip="pod.node || '-'"
           >
             {{ pod.node || '-' }}
           </span>
@@ -76,7 +76,7 @@ defineProps<{
           <span class="text-muted-color">Controlled By: </span>
           <span
             class="font-semibold text-primary font-mono truncate inline-block max-w-50 align-bottom"
-            :title="pod.controlledBy || '-'"
+            v-tooltip="pod.controlledBy || '-'"
           >
             {{ pod.controlledBy || '-' }}
           </span>

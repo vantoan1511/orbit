@@ -46,13 +46,13 @@ const METRIC_CONFIGS: Record<
   cpu: {
     sortKey: 'cpuPct',
     getValue: (p) => p.cpu || '0m',
-    getPct: (p) => Math.min(Math.max(Math.round(p.cpuPct || 0), 0), 100),
+    getPct: (p) => Math.min(Math.max(Number((p.cpuPct || 0).toFixed(2)), 0), 100),
     color: 'bg-blue-500'
   },
   memory: {
     sortKey: 'memoryPct',
     getValue: (p) => p.memory || '0Mi',
-    getPct: (p) => Math.min(Math.max(Math.round(p.memoryPct || 0), 0), 100),
+    getPct: (p) => Math.min(Math.max(Number((p.memoryPct || 0).toFixed(2)), 0), 100),
     color: 'bg-violet-500'
   },
   restarts: {
@@ -124,7 +124,7 @@ const consumers = computed<ConsumerItem[]>(() => {
                 :key="item.pod"
                 class="text-surface-500 hover:text-primary"
               >
-                <td class="py-2.5 font-medium truncate max-w-25" :title="item.pod">
+                <td class="py-2.5 font-medium truncate max-w-25" v-tooltip="item.pod">
                   {{ item.pod }}
                 </td>
                 <td class="py-2.5 text-muted-color">{{ item.namespace }}</td>
@@ -133,7 +133,7 @@ const consumers = computed<ConsumerItem[]>(() => {
                 </td>
                 <td v-if="activeTab !== 'restarts'" class="py-2.5 text-right font-mono">
                   <div class="flex items-center justify-end gap-2">
-                    <span class="w-8 text-right">{{ item.pct }}%</span>
+                    <span class="min-w-12 text-right">{{ item.pct }}%</span>
                     <div
                       class="w-16 h-1.5 rounded-full bg-(--bg-hover) overflow-hidden hidden sm:block"
                     >

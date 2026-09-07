@@ -1,5 +1,5 @@
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, DeleteParams, PostParams},
+    api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams, DeleteParams, PostParams},
     Client,
 };
 use k8s_openapi::api::core::v1::Pod;
@@ -93,6 +93,10 @@ pub fn map_pod(p: &Pod) -> models::PodInfo {
         age,
         cpu: None,
         memory: None,
+        cpu_cores: None,
+        memory_bytes: None,
+        cpu_pct: None,
+        memory_pct: None,
         node,
         restarts: total_restarts,
         images,
@@ -107,15 +111,46 @@ pub fn map_pod(p: &Pod) -> models::PodInfo {
 }
 
 pub async fn list_pods(client: &Client, namespace: Option<String>) -> Result<Vec<models::PodInfo>, kube::Error> {
-    let pods: Api<Pod> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
+    let pods: Api<Pod> = if let Some(ref ns) = namespace {
+        Api::namespaced(client.clone(), ns)
     } else {
         Api::all(client.clone())
     };
 
+    let gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "PodMetrics");
+    let ar = ApiResource::from_gvk(&gvk);
+    let metrics_api: Api<DynamicObject> = if let Some(ref ns) = namespace {
+        Api::namespaced_with(client.clone(), ns, &ar)
+    } else {
+        Api::all_with(client.clone(), &ar)
+    };
+
+    let lp = ListParams::default();
+    let (pods_res, metrics_res) = tokio::join!(
+        pods.list(&lp),
+        metrics_api.list(&lp)
+    );
+
+    let pod_items = pods_res?;
+
+    let metrics_map = match metrics_res {
+        Ok(metric_list) => crate::kubernetes::metrics::parse_pod_metrics_map(&metric_list.items),
+        Err(e) => {
+            tracing::debug!(error = ?e, "Could not fetch pod metrics on list (Metrics Server not installed?)");
+            std::collections::HashMap::new()
+        }
+    };
+
     let mut pod_list = Vec::new();
-    for p in pods.list(&ListParams::default()).await? {
-        pod_list.push(map_pod(&p));
+    for p in pod_items {
+        let mut info = map_pod(&p);
+        if let Some(metric) = metrics_map.get(&(info.name.clone(), info.namespace.clone())) {
+            info.cpu = Some(metric.cpu.clone());
+            info.memory = Some(metric.memory.clone());
+            info.cpu_cores = metric.cpu_cores;
+            info.memory_bytes = metric.memory_bytes;
+        }
+        pod_list.push(info);
     }
 
     Ok(pod_list)

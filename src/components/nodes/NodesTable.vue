@@ -83,7 +83,7 @@ const handleRefresh = async () => {
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-muted-color">
-              <span>{{ Number(data.cpuPct.toFixed(1)) }}%</span>
+              <span>{{ data.cpuPct != null ? Number(data.cpuPct.toFixed(2)) : 0 }}%</span>
               <span class="text-muted-color text-[10px]"
                 >{{ data.cpuUsed }} / {{ data.cpuTotal }}C</span
               >
@@ -91,7 +91,7 @@ const handleRefresh = async () => {
             <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
                 class="h-full bg-blue-500 rounded-full"
-                :style="{ width: data.cpuPct + '%' }"
+                :style="{ width: Math.min(data.cpuPct || 0, 100) + '%' }"
               ></div>
             </div>
           </div>
@@ -111,7 +111,7 @@ const handleRefresh = async () => {
         <template #body="{ data }">
           <div class="flex flex-col gap-1 w-full">
             <div class="flex justify-between font-mono text-muted-color">
-              <span>{{ Number(data.memPct.toFixed(1)) }}%</span>
+              <span>{{ data.memPct != null ? Number(data.memPct.toFixed(2)) : 0 }}%</span>
               <span class="text-muted-color text-[10px]"
                 >{{ data.memUsed }} / {{ data.memTotal }}G</span
               >
@@ -119,7 +119,7 @@ const handleRefresh = async () => {
             <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
                 class="h-full bg-indigo-500 rounded-full"
-                :style="{ width: data.memPct + '%' }"
+                :style="{ width: Math.min(data.memPct || 0, 100) + '%' }"
               ></div>
             </div>
           </div>

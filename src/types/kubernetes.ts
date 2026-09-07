@@ -25,9 +25,9 @@ import type {
   KubernetesResourceKind,
   KubernetesVolumeMode,
   KubernetesVolumeStatus
-} from '../constants/kubernetes'
+} from '../constants/kubernetes.ts'
 
-export * from '../constants/kubernetes'
+export * from '../constants/kubernetes.ts'
 
 export interface KubernetesResource {
   apiVersion?: string
@@ -62,8 +62,10 @@ export interface PodInfo {
   status: KubernetesPodStatus | string
   age: string
   cpu?: string
+  cpuCores?: number
   cpuPct?: number
   memory?: string
+  memoryBytes?: number
   memoryPct?: number
   node?: string
   restarts?: number

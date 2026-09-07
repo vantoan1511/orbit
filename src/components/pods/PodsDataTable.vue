@@ -67,20 +67,22 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
       <!-- CPU Column -->
       <Column v-if="visibleCols['cpu']" field="cpu" header="CPU" sortable class="p-3">
         <template #body="{ data }">
-          <div class="flex flex-col gap-1 w-24">
+          <div class="flex flex-col gap-1 w-28">
             <div class="flex justify-between font-mono text-[10px]">
               <span class="text-muted-color">{{ data.cpu || '-' }}</span>
-              <span class="text-muted-color" v-if="data.cpu && data.cpu !== '-'"
-                >{{ data.cpuPct || 0 }}%</span
+              <span
+                class="text-muted-color"
+                v-if="typeof data.cpuPct === 'number' && data.cpu && data.cpu !== '-'"
+                >{{ data.cpuPct }}%</span
               >
             </div>
             <div
               class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-              v-if="data.cpu && data.cpu !== '-'"
+              v-if="typeof data.cpuPct === 'number' && data.cpu && data.cpu !== '-'"
             >
               <div
                 class="h-full rounded-full bg-violet-500"
-                :style="{ width: (data.cpuPct || 0) + '%' }"
+                :style="{ width: Math.min(data.cpuPct || 0, 100) + '%' }"
               ></div>
             </div>
           </div>
@@ -90,20 +92,22 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
       <!-- Memory Column -->
       <Column v-if="visibleCols['memory']" field="memory" header="Memory" sortable class="p-3">
         <template #body="{ data }">
-          <div class="flex flex-col gap-1 w-24">
+          <div class="flex flex-col gap-1 w-28">
             <div class="flex justify-between font-mono text-[10px]">
               <span class="text-muted-color">{{ data.memory || '-' }}</span>
-              <span class="text-muted-color" v-if="data.memory && data.memory !== '-'"
-                >{{ data.memoryPct || 0 }}%</span
+              <span
+                class="text-muted-color"
+                v-if="typeof data.memoryPct === 'number' && data.memory && data.memory !== '-'"
+                >{{ data.memoryPct }}%</span
               >
             </div>
             <div
               class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-              v-if="data.memory && data.memory !== '-'"
+              v-if="typeof data.memoryPct === 'number' && data.memory && data.memory !== '-'"
             >
               <div
                 class="h-full rounded-full bg-blue-500"
-                :style="{ width: (data.memoryPct || 0) + '%' }"
+                :style="{ width: Math.min(data.memoryPct || 0, 100) + '%' }"
               ></div>
             </div>
           </div>
