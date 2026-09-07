@@ -1,119 +1,128 @@
-import type { TableColumn } from '@/composables/useTableColumns'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import {
+  createDefaultFilters,
+  TABLE_FILTER_STORAGE_KEY,
+  tableFilterService
+} from '../services/tableFilterService.ts'
+import type {
+  AllowedRowOption,
+  PersistedTableFilters,
+  TableColumn,
+  TableFilterState
+} from '../types/tableFilter.ts'
+import { ALLOWED_ROW_OPTIONS, isAllowedRowOption } from '../types/tableFilter.ts'
 
-export interface TableFilterState {
-  searchQuery: string
-  selectedNamespace: string[]
-  isNamespaceInitialized: boolean
-  selectedStatus: string
-  rows: number
-  columns: TableColumn[]
-  selectedRowKeys: string[]
-  extraFilters: Record<string, string>
-}
-
-export interface PersistedTableFilters {
-  version: number
-  defaultRows: number
-  tables: Record<string, { rows?: number; columns?: TableColumn[] }>
-  clusters: Record<
-    string,
-    Record<
-      string,
-      {
-        searchQuery?: string
-        selectedNamespace?: string[]
-        isNamespaceInitialized?: boolean
-        selectedStatus?: string
-        extraFilters?: Record<string, string>
-      }
-    >
-  >
-}
-
-const STORAGE_KEY = 'orbit_table_filter_preferences'
-export const ALLOWED_ROW_OPTIONS = [25, 50, 100, 200] as const
-export type AllowedRowOption = (typeof ALLOWED_ROW_OPTIONS)[number]
-
-export function isAllowedRowOption(value: unknown): value is AllowedRowOption {
-  return typeof value === 'number' && (ALLOWED_ROW_OPTIONS as readonly number[]).includes(value)
-}
-
-function getInitialStorage(): PersistedTableFilters {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<PersistedTableFilters>
-      if (parsed && typeof parsed === 'object') {
-        const defaultRowsCandidate = parsed.defaultRows
-        const isValidDefaultRows = isAllowedRowOption(defaultRowsCandidate)
-
-        return {
-          version: parsed.version ?? 1,
-          defaultRows: isValidDefaultRows ? defaultRowsCandidate : 25,
-          tables:
-            parsed.tables && typeof parsed.tables === 'object' && !Array.isArray(parsed.tables)
-              ? parsed.tables
-              : {},
-          clusters:
-            parsed.clusters &&
-            typeof parsed.clusters === 'object' &&
-            !Array.isArray(parsed.clusters)
-              ? parsed.clusters
-              : {}
-        }
-      }
-    }
-  } catch (e) {
-    console.error('Failed to load table filters from localStorage:', e)
-  }
-  return {
-    version: 1,
-    defaultRows: 25,
-    tables: {},
-    clusters: {}
-  }
-}
+export { ALLOWED_ROW_OPTIONS, isAllowedRowOption, TABLE_FILTER_STORAGE_KEY }
+export type { AllowedRowOption, PersistedTableFilters, TableColumn, TableFilterState }
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 let currentPersistedRef: PersistedTableFilters | null = null
 
-function flushSave() {
-  if (saveTimeout && currentPersistedRef) {
-    clearTimeout(saveTimeout)
-    saveTimeout = null
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(currentPersistedRef))
-    } catch (e) {
-      console.error('Failed to save table filters to localStorage:', e)
+async function flushSave() {
+  if (currentPersistedRef) {
+    if (saveTimeout) {
+      clearTimeout(saveTimeout)
+      saveTimeout = null
     }
+    await tableFilterService.saveFilters(currentPersistedRef)
   }
 }
 
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', flushSave)
+  window.addEventListener('beforeunload', () => {
+    void flushSave()
+  })
 }
 
-function scheduleSave(persisted: PersistedTableFilters) {
+function scheduleSave(persisted: PersistedTableFilters, immediate = false) {
   currentPersistedRef = persisted
-  if (saveTimeout) clearTimeout(saveTimeout)
-  saveTimeout = setTimeout(() => {
+  if (saveTimeout) {
+    clearTimeout(saveTimeout)
     saveTimeout = null
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(persisted))
-    } catch (e) {
-      console.error('Failed to save table filters to localStorage:', e)
-    }
+  }
+  if (immediate) {
+    void tableFilterService.saveFilters(persisted)
+    return
+  }
+  saveTimeout = setTimeout(async () => {
+    saveTimeout = null
+    await tableFilterService.saveFilters(persisted)
   }, 250)
 }
 
 export const useTableFilterStore = defineStore('tableFilter', () => {
-  const persistedData = getInitialStorage()
+  let persistedData: PersistedTableFilters = createDefaultFilters()
   currentPersistedRef = persistedData
+
+  const isInitialized = ref<boolean>(false)
   const defaultRows = ref<number>(persistedData.defaultRows)
   const activeClusterId = ref<string>('default')
   const filters = ref<Record<string, TableFilterState>>({})
+
+  function applyPersistedData(loaded: PersistedTableFilters) {
+    persistedData = loaded
+    currentPersistedRef = loaded
+    defaultRows.value = loaded.defaultRows
+
+    // Sync any existing in-memory cached tables with loaded data
+    for (const [fullKey, state] of Object.entries(filters.value)) {
+      const [cluster, ...keyParts] = fullKey.split(':')
+      const key = keyParts.join(':')
+      if (cluster && key) {
+        const savedTable = loaded.tables[key]
+        const savedClusterTable = loaded.clusters[cluster]?.[key]
+
+        if (savedTable?.rows && isAllowedRowOption(savedTable.rows)) {
+          state.rows = savedTable.rows
+        }
+        if (savedTable?.columns && savedTable.columns.length > 0) {
+          state.columns = savedTable.columns.map((c) => ({ ...c }))
+        }
+        if (savedClusterTable) {
+          if (savedClusterTable.searchQuery !== undefined) {
+            state.searchQuery = savedClusterTable.searchQuery
+          }
+          if (savedClusterTable.selectedNamespace !== undefined) {
+            state.selectedNamespace = [...savedClusterTable.selectedNamespace]
+          }
+          if (savedClusterTable.isNamespaceInitialized !== undefined) {
+            state.isNamespaceInitialized = savedClusterTable.isNamespaceInitialized
+          }
+          if (savedClusterTable.selectedStatus !== undefined) {
+            state.selectedStatus = savedClusterTable.selectedStatus
+          }
+          if (savedClusterTable.extraFilters !== undefined) {
+            state.extraFilters = { ...savedClusterTable.extraFilters }
+          }
+        }
+      }
+    }
+  }
+
+  let initPromise: Promise<PersistedTableFilters> | null = null
+
+  async function init(): Promise<PersistedTableFilters> {
+    if (isInitialized.value) return persistedData
+    if (initPromise) return initPromise
+
+    initPromise = (async () => {
+      try {
+        const loaded = await tableFilterService.loadFilters()
+        applyPersistedData(loaded)
+        isInitialized.value = true
+        return loaded
+      } catch (e) {
+        console.warn('Failed to initialize table filters:', e)
+        isInitialized.value = true
+        return persistedData
+      } finally {
+        initPromise = null
+      }
+    })()
+
+    return initPromise
+  }
 
   function setActiveClusterId(clusterId: string | null) {
     activeClusterId.value = clusterId || 'default'
@@ -180,12 +189,12 @@ export const useTableFilterStore = defineStore('tableFilter', () => {
         persistedData.defaultRows = numRows
         if (!persistedData.tables[key]) persistedData.tables[key] = {}
         persistedData.tables[key].rows = numRows
-        scheduleSave(persistedData)
+        scheduleSave(persistedData, true)
       }
     } else if (field === 'columns') {
       if (!persistedData.tables[key]) persistedData.tables[key] = {}
       persistedData.tables[key].columns = (value as TableColumn[]).map((c) => ({ ...c }))
-      scheduleSave(persistedData)
+      scheduleSave(persistedData, true)
     } else if (field === 'searchQuery') {
       const record = getClusterTableRecord(cluster, key)
       record.searchQuery = value as string
@@ -251,7 +260,7 @@ export const useTableFilterStore = defineStore('tableFilter', () => {
     const clusterMap = persistedData.clusters[cluster]
     if (clusterMap && clusterMap[key]) {
       delete clusterMap[key]
-      scheduleSave(persistedData)
+      scheduleSave(persistedData, true)
     }
   }
 
@@ -265,7 +274,15 @@ export const useTableFilterStore = defineStore('tableFilter', () => {
   // Alias for backward compatibility
   const resetAll = resetAllSelections
 
+  // Automatically trigger hydration on store creation in browser runtime
+  if (typeof window !== 'undefined') {
+    void init()
+  }
+
   return {
+    isInitialized,
+    init,
+    flushSave,
     defaultRows,
     activeClusterId,
     setActiveClusterId,
