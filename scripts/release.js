@@ -37,6 +37,32 @@ function parseSemver(versionStr) {
   }
 }
 
+function buildPrBody(targetVersion, currentVersion) {
+  return `## Summary
+
+Release preparation for Orbit **v${targetVersion}**.
+
+## Changes
+
+- Bumps version from \`${currentVersion}\` to \`${targetVersion}\` in:
+  - \`neutralino.config.json\`
+  - \`package.json\`
+  - \`core/engine/Cargo.toml\`
+  - \`core/updater/Cargo.toml\`
+- Synchronizes lockfiles (\`package-lock.json\` and \`core/Cargo.lock\`).
+- Verified TypeScript checks via \`npm run type-check\`.
+
+## Automated Release Process
+
+Upon merging this PR into \`main\`:
+1. The GitHub Actions \`Release\` workflow will build desktop binaries and packages.
+2. An update zip package and installer executable will be generated.
+3. \`update-manifest.json\` will be updated and committed.
+4. Git tag \`v${targetVersion}\` and GitHub Release notes will be published.
+5. Automated WinGet package submission workflow will be dispatched.
+`
+}
+
 function main() {
   const args = process.argv.slice(2)
   if (args.includes('--help') || args.includes('-h')) {
@@ -47,13 +73,15 @@ Arguments:
   [version]       Target semver version (e.g. 0.10.0 or v0.10.0). If omitted, bumps current patch.
 
 Options:
-  --dry-run       Preview changes and commands without committing or pushing.
+  --dry-run       Preview changes and commands without committing, pushing, or creating PR.
+  --no-pr         Skip creating a GitHub Pull Request.
   -h, --help      Display this help message.
 `)
     process.exit(0)
   }
 
   const isDryRun = args.includes('--dry-run')
+  const skipPr = args.includes('--no-pr')
   const versionArg = args.find((arg) => !arg.startsWith('--') && !arg.startsWith('-'))
   let targetVersion = versionArg
 
@@ -83,6 +111,8 @@ Options:
   console.log(`\n=== Preparing Orbit Release v${targetVersion}${isDryRun ? ' (DRY RUN)' : ''} ===\n`)
 
   const branchName = `release/v${targetVersion}`
+  const commitMsg = `chore: release v${targetVersion}`
+  const prBody = buildPrBody(targetVersion, currentVersion)
 
   // Ensure git working tree is clean
   const statusOutput = execSync('git status --porcelain', { encoding: 'utf8' }).trim()
@@ -128,15 +158,15 @@ Options:
   console.log('\n4. Running typecheck...')
   run('npm run type-check')
 
-  const commitMsg = `chore: release v${targetVersion}`
-
   if (isDryRun) {
     console.log('\n[DRY RUN] Skipping git commit, push, and PR creation.')
     console.log(`[DRY RUN] Would execute:`)
     console.log(`  git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock`)
     console.log(`  git commit -m "${commitMsg}"`)
     console.log(`  git push origin ${branchName}`)
-    console.log(`  gh pr create --title "${commitMsg}" --body "Release v${targetVersion}" --base main --head ${branchName}`)
+    if (!skipPr) {
+      console.log(`  gh pr create --title "${commitMsg}" --base main --head ${branchName} --label chore --body ...`)
+    }
     console.log(`\nDry run completed for v${targetVersion}!`)
     return
   }
@@ -148,14 +178,26 @@ Options:
   console.log('\n6. Pushing branch to origin...')
   run(`git push origin ${branchName}`)
 
-  console.log('\n7. Creating GitHub Pull Request...')
-  try {
-    run(`gh pr create --title "${commitMsg}" --body "Release v${targetVersion}" --base main --head ${branchName}`)
-  } catch (err) {
-    console.warn('\nWarning: Failed to create PR automatically via gh cli. You can create it manually on GitHub.')
+  if (skipPr) {
+    console.log('\nSkipping GitHub Pull Request creation (--no-pr flag set).')
+    console.log(`\nRelease v${targetVersion} prepared and pushed successfully!`)
+    return
   }
 
-  console.log(`\nRelease v${targetVersion} prepared successfully!`)
+  console.log('\n7. Creating GitHub Pull Request...')
+  try {
+    const prCommand = `gh pr create --title "${commitMsg}" --base main --head ${branchName} --label chore --body "${prBody.replace(/"/g, '\\"')}"`
+    run(prCommand)
+  } catch {
+    console.log('Retrying PR creation with fallback without labels...')
+    try {
+      run(`gh pr create --title "${commitMsg}" --base main --head ${branchName} --body "${prBody.replace(/"/g, '\\"')}"`)
+    } catch {
+      console.warn('\nWarning: Failed to create PR automatically via gh cli. You can create it manually on GitHub.')
+    }
+  }
+
+  console.log(`\nRelease v${targetVersion} prepared and PR opened successfully!`)
 }
 
 main()
