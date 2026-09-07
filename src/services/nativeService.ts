@@ -159,6 +159,9 @@ export const storage = {
   getData(key: string) {
     return neuStorage.getData(key)
   },
+  removeData(key: string) {
+    return neuStorage.removeData(key)
+  },
   getKeys() {
     return neuStorage.getKeys()
   }

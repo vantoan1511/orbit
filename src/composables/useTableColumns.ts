@@ -1,11 +1,8 @@
 import { useTableFilterStore } from '@/stores/tableFilterStore'
+import type { TableColumn } from '@/types/tableFilter'
 import { computed, ref, watch } from 'vue'
 
-export interface TableColumn {
-  field: string
-  header: string
-  visible: boolean
-}
+export type { TableColumn }
 
 export function useTableColumns(initialColumns: TableColumn[], storeKey?: string) {
   const filterStore = storeKey ? useTableFilterStore() : null
