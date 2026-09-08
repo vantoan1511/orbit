@@ -4,7 +4,6 @@ import { useTableFilterStore } from './tableFilterStore.ts'
 import { OrbitEvents, type KubernetesResourceInfo } from '../types/events.ts'
 import { formatCpuCores, formatDecimal, formatMemoryMiB } from '../utils/metrics.ts'
 import {
-  KUBERNETES_ACTION,
   KUBERNETES_RESOURCE_KIND,
   type ActivePortForward,
   type ClusterInfo,
@@ -29,55 +28,25 @@ import {
   type StorageClassInfo
 } from '../types/kubernetes.ts'
 import { defineStore } from 'pinia'
-import { computed, onScopeDispose, ref, shallowRef, watch, type ShallowRef } from 'vue'
+import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
+import {
+  keyByName,
+  keyByUid,
+  keyNamespaced,
+  keyService,
+  MAX_EVENTS_RETAINED,
+  updateResourceBatch,
+  type ResourceKeyExtractor
+} from './kubernetesStoreBatch.ts'
 
-type ResourceMatcher<T> = (existing: T, incoming: T) => boolean
-
-const matchNamespaced: ResourceMatcher<{ name: string; namespace: string }> = (a, b) =>
-  a.name === b.name && a.namespace === b.namespace
-
-const matchByName: ResourceMatcher<{ name?: string }> = (a, b) =>
-  Boolean(a.name && a.name === b.name)
-
-const matchByUid: ResourceMatcher<{ uid?: string }> = (a, b) => Boolean(a.uid && a.uid === b.uid)
-
-const matchService: ResourceMatcher<ServiceInfo> = (a, b) =>
-  (Boolean(a.uid) && a.uid === b.uid) || (a.name === b.name && a.namespace === b.namespace)
-
-function updateResourceBatch<T>(
-  listRef: ShallowRef<T[]>,
-  updates: Array<{ action: KubernetesAction; data: T }>,
-  match: ResourceMatcher<T>,
-  merge?: (existing: T, incoming: T) => T
-) {
-  if (!updates || updates.length === 0) return
-  let current: T[] | null = null
-  let changed = false
-
-  for (const update of updates) {
-    const list = current ?? listRef.value
-    const index = list.findIndex((existing) => match(existing, update.data))
-
-    if (update.action === KUBERNETES_ACTION.Applied) {
-      if (!current) current = [...listRef.value]
-      if (index !== -1) {
-        const existing = current[index]
-        current[index] =
-          merge && existing !== undefined ? merge(existing, update.data) : update.data
-      } else {
-        current.push(update.data)
-      }
-      changed = true
-    } else if (update.action === KUBERNETES_ACTION.Deleted && index !== -1) {
-      if (!current) current = [...listRef.value]
-      current.splice(index, 1)
-      changed = true
-    }
-  }
-
-  if (changed && current) {
-    listRef.value = current
-  }
+export {
+  MAX_EVENTS_RETAINED,
+  type ResourceKeyExtractor,
+  keyNamespaced,
+  keyByName,
+  keyByUid,
+  keyService,
+  updateResourceBatch
 }
 
 export const useKubernetesStore = defineStore('kubernetes', () => {
@@ -551,43 +520,43 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       updateResourceBatch(
         deployments,
         updates as Array<{ action: KubernetesAction; data: DeploymentInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.DaemonSet]: (updates) =>
       updateResourceBatch(
         daemonSets,
         updates as Array<{ action: KubernetesAction; data: DaemonSetInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.StatefulSet]: (updates) =>
       updateResourceBatch(
         statefulSets,
         updates as Array<{ action: KubernetesAction; data: StatefulSetInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.ReplicaSet]: (updates) =>
       updateResourceBatch(
         replicaSets,
         updates as Array<{ action: KubernetesAction; data: ReplicaSetInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.Job]: (updates) =>
       updateResourceBatch(
         jobs,
         updates as Array<{ action: KubernetesAction; data: JobInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.CronJob]: (updates) =>
       updateResourceBatch(
         cronJobs,
         updates as Array<{ action: KubernetesAction; data: CronJobInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.Pod]: (updates) =>
       updateResourceBatch(
         pods,
         updates as Array<{ action: KubernetesAction; data: PodInfo }>,
-        matchNamespaced,
+        keyNamespaced,
         (existing, incoming) =>
           enrichPodWithMetrics({
             ...incoming,
@@ -607,67 +576,69 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       updateResourceBatch(
         configMaps,
         updates as Array<{ action: KubernetesAction; data: ConfigMapInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.Secret]: (updates) =>
       updateResourceBatch(
         secrets,
         updates as Array<{ action: KubernetesAction; data: SecretInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim]: (updates) =>
       updateResourceBatch(
         persistentVolumeClaims,
         updates as Array<{ action: KubernetesAction; data: PersistentVolumeClaimInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.Ingress]: (updates) =>
       updateResourceBatch(
         ingresses,
         updates as Array<{ action: KubernetesAction; data: IngressInfo }>,
-        matchNamespaced
+        keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.Service]: (updates) =>
       updateResourceBatch(
         services,
         updates as Array<{ action: KubernetesAction; data: ServiceInfo }>,
-        matchService
+        keyService
       ),
     [KUBERNETES_RESOURCE_KIND.Namespace]: (updates) =>
       updateResourceBatch(
         namespaceList,
         updates as Array<{ action: KubernetesAction; data: NamespaceInfo }>,
-        matchByName
+        keyByName
       ),
     [KUBERNETES_RESOURCE_KIND.Node]: (updates) =>
       updateResourceBatch(
         nodes,
         updates as Array<{ action: KubernetesAction; data: NodeInfo }>,
-        matchByName
+        keyByName
       ),
     [KUBERNETES_RESOURCE_KIND.PersistentVolume]: (updates) =>
       updateResourceBatch(
         persistentVolumes,
         updates as Array<{ action: KubernetesAction; data: PersistentVolumeInfo }>,
-        matchByName
+        keyByName
       ),
     [KUBERNETES_RESOURCE_KIND.StorageClass]: (updates) =>
       updateResourceBatch(
         storageClasses,
         updates as Array<{ action: KubernetesAction; data: StorageClassInfo }>,
-        matchByName
+        keyByName
       ),
     [KUBERNETES_RESOURCE_KIND.Event]: (updates) =>
       updateResourceBatch(
         events,
         updates as Array<{ action: KubernetesAction; data: EventInfo }>,
-        matchByUid
+        keyByUid,
+        undefined,
+        MAX_EVENTS_RETAINED
       ),
     [KUBERNETES_RESOURCE_KIND.Policy]: (updates) =>
       updateResourceBatch(
         policies,
         updates as Array<{ action: KubernetesAction; data: PolicyInfo }>,
-        matchByUid
+        keyByUid
       )
   }
 
