@@ -17,20 +17,31 @@ import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 const k8sStore = useKubernetesStore()
 const loading = ref(false)
 
-const getRestarts = (deployment: DeploymentInfo) => {
-  const deploymentPods = k8sStore.pods.filter((p) => {
-    return (
-      p.namespace === deployment.namespace &&
-      p.controlledBy?.startsWith(`ReplicaSet/${deployment.name}-`)
-    )
-  })
-  return deploymentPods.reduce((sum, pod) => sum + (pod.restarts ?? 0), 0)
-}
+const REPLICA_SET_PREFIX = 'ReplicaSet/'
+
+const deploymentRestartsMap = computed(() => {
+  const map = new Map<string, number>()
+  for (const pod of k8sStore.pods) {
+    const restarts = pod.restarts
+    if (restarts == null || restarts === 0 || !pod.controlledBy || !pod.namespace) continue
+    if (pod.controlledBy.startsWith(REPLICA_SET_PREFIX)) {
+      const rsName = pod.controlledBy.slice(REPLICA_SET_PREFIX.length)
+      const lastDash = rsName.lastIndexOf('-')
+      if (lastDash > 0) {
+        const depName = rsName.slice(0, lastDash)
+        const key = `${pod.namespace}/${depName}`
+        map.set(key, (map.get(key) ?? 0) + restarts)
+      }
+    }
+  }
+  return map
+})
 
 const deployments = computed(() => {
+  const restartMap = deploymentRestartsMap.value
   return k8sStore.deployments.map((d) => ({
     ...d,
-    restarts: getRestarts(d)
+    restarts: restartMap.get(`${d.namespace}/${d.name}`) ?? 0
   }))
 })
 
