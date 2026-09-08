@@ -187,5 +187,8 @@ export const storage = {
   },
   getKeys() {
     return neuStorage.getKeys()
+  },
+  clear() {
+    return neuStorage.clear()
   }
 }

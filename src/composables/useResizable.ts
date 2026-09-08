@@ -1,4 +1,6 @@
-import { onUnmounted, ref, type Ref } from 'vue'
+import { getCurrentInstance, onUnmounted, ref, type Ref } from 'vue'
+import { storage } from '../services/nativeService.ts'
+import { DEFAULT_STORAGE_TIMEOUT_MS, withTimeout } from '../utils/async.ts'
 
 export interface UseResizableOptions {
   minWidth?: number
@@ -16,16 +18,58 @@ export function useResizable(options: UseResizableOptions = {}) {
   const collapseThreshold = options.collapseThreshold ?? 90
   const storageKey = options.storageKey
 
-  const initialWidth = storageKey
-    ? parseInt(localStorage.getItem(storageKey) || `${defaultWidth}`, 10)
-    : defaultWidth
-
-  const width: Ref<number> = ref(
-    isNaN(initialWidth) || initialWidth < minWidth ? defaultWidth : initialWidth
-  )
+  const width: Ref<number> = ref(defaultWidth)
   const isResizing = ref(false)
   let startLeft = 0
-  let lastValidWidth = width.value
+  let lastValidWidth = defaultWidth
+
+  const loadStoredWidth = async () => {
+    if (!storageKey) return
+    try {
+      let raw: string | null = null
+      try {
+        if (typeof window !== 'undefined' && !(window as unknown as { NL_PORT?: number }).NL_PORT) {
+          throw new Error('Neutralino runtime not available')
+        }
+        raw = await withTimeout(storage.getData(storageKey), DEFAULT_STORAGE_TIMEOUT_MS)
+      } catch {
+        // Fallback check for legacy localStorage
+        if (typeof localStorage !== 'undefined') {
+          try {
+            const legacy = localStorage.getItem(storageKey)
+            if (legacy) {
+              raw = legacy
+              try {
+                await storage.setData(storageKey, legacy)
+                localStorage.removeItem(storageKey)
+              } catch (migrationErr) {
+                console.warn(
+                  `Failed to write migrated width for ${storageKey} to native storage:`,
+                  migrationErr
+                )
+              }
+            }
+          } catch {
+            // localStorage not accessible
+          }
+        }
+      }
+
+      if (raw) {
+        const parsed = parseInt(raw, 10)
+        if (!isNaN(parsed) && parsed >= minWidth && parsed <= maxWidth) {
+          width.value = parsed
+          lastValidWidth = parsed
+        }
+      }
+    } catch (e) {
+      console.warn(`Failed to load stored width for ${storageKey}:`, e)
+    }
+  }
+
+  if (storageKey) {
+    void loadStoredWidth()
+  }
 
   const startResize = (e: MouseEvent, targetElement?: HTMLElement | null) => {
     e.preventDefault()
@@ -64,17 +108,22 @@ export function useResizable(options: UseResizableOptions = {}) {
       width.value = lastValidWidth >= minWidth ? lastValidWidth : defaultWidth
       options.onCollapse?.()
     } else if (storageKey) {
-      localStorage.setItem(storageKey, width.value.toString())
+      void storage.setData(storageKey, width.value.toString()).catch((err) => {
+        console.warn(`Failed to persist width for ${storageKey}:`, err)
+      })
     }
   }
 
-  onUnmounted(() => {
-    stopResize()
-  })
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      stopResize()
+    })
+  }
 
   return {
     width,
     isResizing,
-    startResize
+    startResize,
+    loadStoredWidth
   }
 }

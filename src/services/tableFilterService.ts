@@ -1,19 +1,10 @@
 import { storage } from './nativeService.ts'
 import type { PersistedTableFilters } from '../types/tableFilter.ts'
 import { isAllowedRowOption } from '../types/tableFilter.ts'
+import { DEFAULT_STORAGE_TIMEOUT_MS, withTimeout } from '../utils/async.ts'
 
 export const TABLE_FILTER_STORAGE_KEY = 'orbit_table_filter_preferences'
-const STORAGE_TIMEOUT_MS = 1500
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Storage operation timed out after ${ms}ms`)), ms)
-  })
-  return Promise.race([promise, timeoutPromise]).finally(() => {
-    if (timer) clearTimeout(timer)
-  })
-}
+export const STORAGE_TIMEOUT_MS = DEFAULT_STORAGE_TIMEOUT_MS
 
 function sanitizeObjectRecord<T>(record: unknown): Record<string, T> {
   if (!record || typeof record !== 'object' || Array.isArray(record)) {

@@ -371,6 +371,14 @@ The frontend should avoid implementing business logic.
 
 Whenever logic requires Kubernetes knowledge or system access, it belongs in Rust.
 
+### Application Startup & Lifecycle Sequence
+
+- `app.mount('#app')` in `src/main.ts` must execute synchronously before `init()` is called.
+- `init()` must run after `app.mount('#app')`.
+- Never block `app.mount('#app')` with top-level `await` operations.
+- Rationale: `App.vue`'s `onMounted()` registers listeners for core IPC broadcast events (`engineConnected`, `clustersUpdated`, `activeClusterChanged`). If `init()` runs before `app.mount('#app')` or mounting is delayed by asynchronous promises, the backend engine connects to Neutralino's WebSocket and emits these initial handshake events before frontend listeners are mounted, causing lost clusters and spurious engine connection timeouts.
+- Store hydration from native storage (`initTheme`, `tableFilterStore.init()`, `notificationStore.init()`) must occur asynchronously after mounting and `init()` in the background (e.g. `void Promise.allSettled(...)`).
+
 ---
 
 # IPC
