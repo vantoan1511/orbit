@@ -108,6 +108,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScaleDialog: typeof import('./src/components/shared/ScaleDialog.vue')['default']
+    SearchEverywhereDialog: typeof import('./src/components/search/SearchEverywhereDialog.vue')['default']
     SecretEditForm: typeof import('./src/components/config/SecretEditForm.vue')['default']
     SelectButton: typeof import('primevue/selectbutton')['default']
     ServiceDetailsDrawer: typeof import('./src/components/services/ServiceDetailsDrawer.vue')['default']

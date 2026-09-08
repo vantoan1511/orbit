@@ -1,4 +1,4 @@
-import { storage } from '@/services/nativeService'
+import { storage } from '../services/nativeService.ts'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 

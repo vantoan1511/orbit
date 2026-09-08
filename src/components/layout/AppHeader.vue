@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import Breadcrumb from 'primevue/breadcrumb'
+import Button from 'primevue/button'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useSearchStore } from '@/stores/searchStore'
+import { Search } from '@lucide/vue'
 
 const route = useRoute()
+const searchStore = useSearchStore()
+
+const isMac =
+  typeof navigator !== 'undefined' &&
+  navigator.platform &&
+  navigator.platform.toUpperCase().indexOf('MAC') >= 0
 
 const home = computed(() => ({
   icon: 'pi pi-home',
@@ -130,5 +139,22 @@ const items = computed(() => {
         </span>
       </template>
     </Breadcrumb>
+    <Button
+      type="button"
+      severity="secondary"
+      variant="outlined"
+      size="small"
+      class="flex items-center gap-2 px-2.5 py-1 text-xs text-muted-color bg-(--bg-card)! border-(--border)! hover:border-(--border-strong)! hover:text-primary! rounded-md font-normal cursor-pointer ml-auto"
+      v-tooltip.bottom="isMac ? 'Search everywhere (⌘⇧P)' : 'Search everywhere (Ctrl+Shift+P)'"
+      @click="searchStore.open()"
+    >
+      <Search class="w-3.5 h-3.5 text-muted-color" />
+      <span class="hidden sm:inline">Search everywhere...</span>
+      <kbd
+        class="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-(--bg-hover) text-muted-color rounded border border-(--border)"
+      >
+        {{ isMac ? '⌘⇧P' : 'Ctrl+Shift+P' }}
+      </kbd>
+    </Button>
   </header>
 </template>

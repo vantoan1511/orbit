@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import NotificationDrawer from '@/components/layout/NotificationDrawer.vue'
 import ProfileDrawer from '@/components/layout/ProfileDrawer.vue'
+import SearchEverywhereDialog from '@/components/search/SearchEverywhereDialog.vue'
 import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 import { app, events } from '@/services/nativeService'
@@ -316,4 +317,5 @@ onUnmounted(() => {
   <UpdaterDialog />
   <NotificationDrawer />
   <ProfileDrawer />
+  <SearchEverywhereDialog />
 </template>
