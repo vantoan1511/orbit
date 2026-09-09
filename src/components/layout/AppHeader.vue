@@ -1,9 +1,18 @@
 <script setup lang="ts">
 import Breadcrumb from 'primevue/breadcrumb'
+import Button from 'primevue/button'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useSearchStore } from '@/stores/searchStore'
+import { Search } from '@lucide/vue'
 
 const route = useRoute()
+const searchStore = useSearchStore()
+
+const isMac =
+  typeof navigator !== 'undefined' &&
+  navigator.platform &&
+  navigator.platform.toUpperCase().indexOf('MAC') >= 0
 
 const home = computed(() => ({
   icon: 'pi pi-home',
@@ -111,7 +120,11 @@ const items = computed(() => {
   <header
     class="flex items-center select-none bg-(--bg-sidebar) border-b border-(--border) px-3 py-2 text-xs shrink-0 z-20"
   >
-    <Breadcrumb :home="home" :model="items" class="p-0! bg-transparent! border-none! text-xs">
+    <Breadcrumb
+      :home="home"
+      :model="items"
+      class="p-0! bg-transparent! border-none! text-xs min-w-0 flex-1 overflow-hidden"
+    >
       <template #item="{ item, props }">
         <router-link v-if="item.route" v-slot="{ href, navigate }" :to="item.route" custom>
           <a
@@ -130,5 +143,30 @@ const items = computed(() => {
         </span>
       </template>
     </Breadcrumb>
+    <Button
+      type="button"
+      severity="secondary"
+      variant="outlined"
+      size="small"
+      class="group flex items-center justify-between gap-2 h-7 w-auto sm:w-56 md:w-64 lg:w-72 px-2 sm:px-2.5 text-xs text-muted-color bg-(--bg-hover)/40! dark:bg-(--bg-hover)/30! border-(--border)! hover:bg-(--bg-hover)/80! hover:border-(--border-strong)! hover:text-primary! active:bg-(--bg-active)! rounded-md font-normal cursor-pointer ml-auto shrink-0 transition-all duration-150"
+      v-tooltip.bottom="isMac ? 'Search everywhere (⌘⇧P)' : 'Search everywhere (Ctrl+Shift+P)'"
+      @click="searchStore.open()"
+    >
+      <div class="flex items-center gap-2 min-w-0">
+        <Search
+          class="w-3.5 h-3.5 shrink-0 text-muted-color group-hover:text-primary transition-colors"
+        />
+        <span
+          class="hidden sm:inline truncate text-muted-color group-hover:text-primary transition-colors font-normal"
+        >
+          Search everywhere...
+        </span>
+      </div>
+      <kbd
+        class="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium leading-none text-muted-color bg-(--bg-card) dark:bg-(--bg-card) border border-(--border) rounded group-hover:border-(--border-strong) group-hover:text-primary transition-colors shrink-0"
+      >
+        {{ isMac ? '⌘⇧P' : 'Ctrl+Shift+P' }}
+      </kbd>
+    </Button>
   </header>
 </template>
