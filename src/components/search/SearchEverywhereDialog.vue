@@ -185,6 +185,19 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
   }
   return 'info'
 }
+
+const categoryLabels: Record<string, string> = {
+  resources: 'Resources',
+  logs: 'Logs',
+  navigation: 'Navigation'
+}
+
+function shouldShowCategoryHeader(idx: number): boolean {
+  if (searchStore.activeCategory !== 'all') return false
+  const results = searchStore.filteredResults
+  if (idx === 0) return true
+  return results[idx]?.category !== results[idx - 1]?.category
+}
 </script>
 
 <template>
@@ -199,7 +212,7 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
     class="search-everywhere-modal !border-none"
     :style="{ width: '640px', maxWidth: '94vw', marginTop: '10vh' }"
     :pt="{
-      mask: { class: 'bg-black/50' },
+      mask: { class: 'bg-black/50 backdrop-blur-[2px]' },
       content: {
         class:
           'p-0 overflow-hidden rounded-lg border border-(--border) bg-(--bg-card) shadow-(--shadow)'
@@ -209,13 +222,16 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
     <div class="flex flex-col select-none text-sm">
       <!-- Search Input Bar -->
       <div class="flex items-center gap-3 px-4 py-3 border-b border-(--border) bg-(--bg-card)">
-        <Search class="w-4 h-4 text-muted-color shrink-0" />
+        <Search
+          class="w-4 h-4 shrink-0 transition-colors"
+          :class="searchStore.searchQuery ? 'text-primary' : 'text-muted-color'"
+        />
         <InputText
           ref="searchInputRef"
           v-model="searchStore.searchQuery"
           type="text"
           placeholder="Search resources, logs, navigation..."
-          class="flex-1 !border-none !shadow-none !bg-transparent !p-0 !text-sm !font-medium text-primary focus:!ring-0 placeholder:text-muted-color"
+          class="flex-1 border-0 shadow-none bg-transparent p-0 text-sm font-medium text-primary focus:ring-0 placeholder:text-muted-color/60 outline-none"
           @input="searchStore.selectedIndex = 0"
         />
         <Button
@@ -225,7 +241,7 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
           severity="secondary"
           size="small"
           rounded
-          class="!p-1 !w-6 !h-6 text-muted-color hover:text-primary"
+          class="w-6! h-6! p-0! text-muted-color hover:text-primary"
           v-tooltip.top="'Clear search'"
           aria-label="Clear search"
           @click="clearSearch"
@@ -241,113 +257,135 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
 
       <!-- Category Filter Pills -->
       <div
-        class="flex items-center gap-1.5 px-3 py-2 border-b border-(--border)/50 bg-(--bg-hover)/20 text-xs overflow-x-auto"
+        class="flex items-center gap-1.5 px-3 py-1.5 border-b border-(--border) bg-(--bg-hover)/30 text-xs overflow-x-auto"
       >
-        <button
+        <Button
           v-for="cat in categories"
           :key="cat.id"
           type="button"
-          class="flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors font-medium cursor-pointer"
+          unstyled
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors text-xs font-medium cursor-pointer select-none"
           :class="[
             searchStore.activeCategory === cat.id
-              ? 'bg-primary text-primary-inverse shadow-xs'
+              ? 'bg-primary text-slate-50 dark:text-slate-950 shadow-xs font-semibold'
               : 'text-muted-color hover:text-primary hover:bg-(--bg-hover)'
           ]"
           @click="searchStore.setCategory(cat.id)"
         >
           <span>{{ cat.label }}</span>
           <span
-            class="text-[10px] opacity-70 px-1 py-0.5 rounded-full font-mono"
+            class="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold"
             :class="[
-              searchStore.activeCategory === cat.id ? 'bg-black/20 text-inherit' : 'bg-(--bg-hover)'
+              searchStore.activeCategory === cat.id
+                ? 'bg-white/20 text-slate-50 dark:bg-black/15 dark:text-slate-950'
+                : 'bg-(--bg-hover) text-muted-color'
             ]"
           >
             {{ searchStore.categoryCounts[cat.id] }}
           </span>
-        </button>
+        </Button>
       </div>
 
       <!-- Results Scroll Area -->
-      <div
-        ref="scrollContainerRef"
-        class="max-h-96 overflow-y-auto divide-y divide-(--border)/30 p-1"
-      >
+      <div ref="scrollContainerRef" class="max-h-96 overflow-y-auto p-1.5 flex flex-col gap-0.5">
         <!-- Empty State -->
         <div
           v-if="searchStore.filteredResults.length === 0"
           class="flex flex-col items-center justify-center p-8 text-center text-muted-color"
         >
-          <Search class="w-8 h-8 mb-2 opacity-30" />
+          <Search class="w-8 h-8 mb-2 text-muted-color/40" />
           <p class="text-sm font-semibold text-primary">No results found</p>
-          <p class="text-xs mt-0.5 max-w-xs text-muted-color">
-            No matching resources, logs, or views found for "{{ searchStore.searchQuery }}"
+          <p class="text-xs mt-1 max-w-xs text-muted-color leading-relaxed">
+            No matching resources, logs, or views found for
+            <span class="text-primary font-medium">"{{ searchStore.searchQuery }}"</span>
           </p>
+          <Button
+            v-if="searchStore.activeCategory !== 'all'"
+            label="Search in All Categories"
+            variant="text"
+            severity="secondary"
+            size="small"
+            class="mt-3 text-xs"
+            @click="searchStore.setCategory('all')"
+          />
         </div>
 
-        <!-- Result Item Rows -->
-        <div
-          v-for="(item, idx) in searchStore.filteredResults"
-          :key="item.id"
-          :ref="(el) => setResultItemRef(el, idx)"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors group"
-          :class="[
-            idx === searchStore.selectedIndex
-              ? 'bg-(--bg-hover) text-primary font-medium'
-              : 'text-secondary hover:bg-(--bg-hover)/60'
-          ]"
-          @mouseenter="searchStore.selectedIndex = idx"
-          @click="searchStore.executeSelected()"
-        >
-          <!-- Kind / Category Icon -->
+        <!-- Result Item Rows with Category Headers -->
+        <template v-for="(item, idx) in searchStore.filteredResults" :key="item.id">
+          <!-- Category Eyebrow Header -->
           <div
-            class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-(--bg-hover)/60 border border-(--border)/40"
+            v-if="shouldShowCategoryHeader(idx)"
+            class="px-3 pt-2.5 pb-1 text-[10px] font-semibold font-mono tracking-wider text-muted-color uppercase select-none"
           >
-            <component
-              :is="item.icon"
-              v-if="item.icon"
-              class="w-4 h-4 shrink-0"
-              :class="item.iconColorClass || 'text-primary'"
-            />
+            {{ categoryLabels[item.category] || item.category }}
           </div>
 
-          <!-- Content Details -->
-          <div class="flex flex-col min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-semibold text-primary truncate">
-                <HighlightedText :text="item.title" :query="searchStore.searchQuery" />
-              </span>
-              <Tag
-                v-if="item.status"
-                :value="item.status"
-                :severity="getStatusSeverity(item.status)"
-                class="text-[10px] px-1.5 py-0 h-4 uppercase font-semibold"
+          <!-- Result Row -->
+          <div
+            :ref="(el) => setResultItemRef(el, idx)"
+            class="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors group select-none"
+            :class="[
+              idx === searchStore.selectedIndex
+                ? 'bg-(--bg-hover) text-primary font-medium'
+                : 'text-secondary hover:bg-(--bg-hover)/60'
+            ]"
+            @mouseenter="searchStore.selectedIndex = idx"
+            @click="searchStore.executeSelected()"
+          >
+            <!-- Kind / Category Icon -->
+            <div
+              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-(--bg-hover)/50 group-hover:bg-(--bg-hover) transition-colors"
+            >
+              <component
+                :is="item.icon"
+                v-if="item.icon"
+                class="w-4 h-4 shrink-0"
+                :class="item.iconColorClass || 'text-primary'"
               />
             </div>
-            <div v-if="item.subtitle" class="text-xs text-muted-color truncate font-mono mt-0.5">
-              <HighlightedText :text="item.subtitle" :query="searchStore.searchQuery" />
+
+            <!-- Content Details -->
+            <div class="flex flex-col min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold text-primary truncate">
+                  <HighlightedText :text="item.title" :query="searchStore.searchQuery" />
+                </span>
+                <Tag
+                  v-if="item.status"
+                  :value="item.status"
+                  :severity="getStatusSeverity(item.status)"
+                  class="text-[10px] px-1.5 py-0 h-4 uppercase font-semibold"
+                />
+              </div>
+              <div
+                v-if="item.subtitle"
+                class="text-[11px] text-muted-color truncate font-mono mt-0.5"
+              >
+                <HighlightedText :text="item.subtitle" :query="searchStore.searchQuery" />
+              </div>
+            </div>
+
+            <!-- Category Badge & Action Hint -->
+            <div class="flex items-center gap-2 shrink-0">
+              <span
+                class="text-[10px] font-mono text-muted-color uppercase tracking-wider px-1.5 py-0.5 rounded bg-(--bg-hover)/50"
+              >
+                {{ item.category }}
+              </span>
+              <kbd
+                v-if="idx === searchStore.selectedIndex"
+                class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-(--bg-card) text-muted-color rounded border border-(--border) shadow-xs"
+              >
+                ↵
+              </kbd>
             </div>
           </div>
-
-          <!-- Category Badge & Action Hint -->
-          <div class="flex items-center gap-2 shrink-0">
-            <span
-              class="text-[10px] font-mono text-muted-color uppercase tracking-wider px-1.5 py-0.5 rounded bg-(--bg-hover)/50"
-            >
-              {{ item.category }}
-            </span>
-            <kbd
-              v-if="idx === searchStore.selectedIndex"
-              class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-(--bg-card) text-muted-color rounded border border-(--border) shadow-xs"
-            >
-              ↵
-            </kbd>
-          </div>
-        </div>
+        </template>
       </div>
 
       <!-- Footer Keyboard Shortcut Bar -->
       <div
-        class="flex items-center justify-between px-3.5 py-2 border-t border-(--border) bg-(--bg-card) text-[11px] text-muted-color"
+        class="flex items-center justify-between px-3.5 py-2 border-t border-(--border) bg-(--bg-card) text-[11px] text-muted-color select-none"
       >
         <div class="flex items-center gap-3">
           <span class="flex items-center gap-1">
@@ -363,13 +401,13 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
             <kbd class="px-1 py-0.5 font-mono bg-(--bg-hover) rounded border border-(--border)"
               >↵</kbd
             >
-            <span>Select</span>
+            <span>Open</span>
           </span>
           <span class="flex items-center gap-1">
             <kbd class="px-1 py-0.5 font-mono bg-(--bg-hover) rounded border border-(--border)"
               >Tab</kbd
             >
-            <span>Filter</span>
+            <span>Category</span>
           </span>
           <span class="flex items-center gap-1">
             <kbd class="px-1 py-0.5 font-mono bg-(--bg-hover) rounded border border-(--border)"
@@ -380,7 +418,10 @@ const getStatusSeverity = (status?: string): 'success' | 'warn' | 'danger' | 'in
         </div>
 
         <div class="hidden sm:flex items-center gap-1 text-[10px] font-mono">
-          <span class="opacity-60">Orbit Search Everywhere</span>
+          <span
+            >{{ searchStore.filteredResults.length }}
+            {{ searchStore.filteredResults.length === 1 ? 'result' : 'results' }}</span
+          >
         </div>
       </div>
     </div>

@@ -28,6 +28,7 @@ const NoirPreset: Preset = {
       light: {
         primary: {
           color: '{zinc.950}',
+          contrastColor: '#ffffff',
           inverseColor: '#ffffff',
           hoverColor: '{zinc.900}',
           activeColor: '{zinc.800}'
@@ -42,6 +43,7 @@ const NoirPreset: Preset = {
       dark: {
         primary: {
           color: '{slate.50}',
+          contrastColor: '{slate.950}',
           inverseColor: '{slate.950}',
           hoverColor: '{slate.100}',
           activeColor: '{slate.200}'
