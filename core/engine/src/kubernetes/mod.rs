@@ -16,6 +16,7 @@ pub mod metrics;
 pub mod logs;
 pub mod delete;
 pub mod edit;
+pub mod port_forward;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;

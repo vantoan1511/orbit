@@ -106,6 +106,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
         // Restart watchers with the new bridge writer
         restart_watchers(&bridge, &kube_manager).await;
 
+        // Restore persisted port forwards for the active cluster context
+        let active_context = {
+            let r_manager = kube_manager.read().await;
+            r_manager.active_context.clone()
+        };
+        if let Some(ctx) = active_context {
+            ipc::handlers::network::restore_cluster_port_forwards(
+                bridge.writer.clone(),
+                bridge.token.clone(),
+                kube_manager.clone(),
+                ctx,
+            );
+        }
+
         let mut ping_interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECS));
         ping_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -130,6 +144,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
                     if msg.event.as_deref() == Some("windowClose") {
                         tracing::info!("Received windowClose, shutting down.");
+                        ipc::handlers::network::stop_all_active_port_forwards(&kube_manager).await;
                         break 'reconnect;
                     }
 
@@ -161,6 +176,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tokio::time::sleep(Duration::from_secs(backoff_secs)).await;
         backoff_secs = next_backoff(backoff_secs);
     }
+
+    ipc::handlers::network::stop_all_active_port_forwards(&kube_manager).await;
 
     Ok(())
 }
