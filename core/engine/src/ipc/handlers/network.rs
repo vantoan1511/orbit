@@ -457,6 +457,127 @@ async fn kill_port_forward_child(child: &mut tokio::process::Child, forward_id: 
     let _ = child.wait().await;
 }
 
+/// Probes each port in `local_ports`. For any that is already occupied,
+/// attempts to kill the owning process if it is a `kubectl` process.
+/// Called before restoring persisted port forwards to clear stale processes
+/// from a previous ungraceful shutdown.
+async fn kill_orphaned_port_forward_processes(local_ports: &[u16]) {
+    let mut killed_any = false;
+    for &port in local_ports {
+        // Blocking bind probe — acceptable here because this runs once at startup
+        // and the number of persisted ports is always small in practice.
+        if std::net::TcpListener::bind(("127.0.0.1", port)).is_ok() {
+            continue;
+        }
+        tracing::info!(port = port, "Local port is occupied; attempting to kill orphaned kubectl process");
+        if kill_process_on_port(port).await {
+            killed_any = true;
+        }
+    }
+    if killed_any {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+}
+
+#[cfg(windows)]
+async fn kill_process_on_port(port: u16) -> bool {
+    // netstat -ano lists all TCP connections with their PIDs.
+    let Ok(output) = tokio::process::Command::new("netstat")
+        .args(["-ano"])
+        .output()
+        .await
+    else {
+        return false;
+    };
+    let mut killed = false;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 5 {
+            continue;
+        }
+        if !parts[3].eq_ignore_ascii_case("LISTENING") {
+            continue;
+        }
+        let local_addr = parts[1];
+        // rsplit handles both IPv4 (0.0.0.0:PORT) and IPv6 (:::PORT) address formats.
+        let Some(addr_port_str) = local_addr.rsplit(':').next() else {
+            continue;
+        };
+        let Ok(addr_port) = addr_port_str.parse::<u16>() else {
+            continue;
+        };
+        if addr_port != port {
+            continue;
+        }
+        let Ok(pid) = parts[4].parse::<u32>() else {
+            continue;
+        };
+        // Confirm the process is kubectl before killing.
+        let Ok(check) = tokio::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {}", pid), "/NH", "/FO", "CSV"])
+            .output()
+            .await
+        else {
+            continue;
+        };
+        let check_out = String::from_utf8_lossy(&check.stdout).to_ascii_lowercase();
+        if check_out.contains("kubectl") {
+            tracing::info!(pid = pid, port = port, "Killing orphaned kubectl port-forward process");
+            let _ = tokio::process::Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .output()
+                .await;
+            killed = true;
+        }
+    }
+    killed
+}
+
+#[cfg(not(windows))]
+async fn kill_process_on_port(port: u16) -> bool {
+    // lsof -ti tcp:<port> returns PIDs listening on the port.
+    let Ok(output) = tokio::process::Command::new("lsof")
+        .args(["-ti", &format!("tcp:{}", port)])
+        .output()
+        .await
+    else {
+        return false;
+    };
+    let mut killed = false;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for pid_str in stdout.split_whitespace() {
+        let Ok(pid) = pid_str.trim().parse::<u32>() else {
+            continue;
+        };
+        // Confirm the process is kubectl before killing.
+        let Ok(check) = tokio::process::Command::new("ps")
+            .args(["-p", &pid.to_string(), "-o", "comm="])
+            .output()
+            .await
+        else {
+            continue;
+        };
+        let comm = String::from_utf8_lossy(&check.stdout).trim().to_ascii_lowercase();
+        if comm.contains("kubectl") {
+            tracing::info!(pid = pid, port = port, "Killing orphaned kubectl port-forward process");
+            // Send SIGTERM first to allow kubectl to clean up connections gracefully.
+            let _ = tokio::process::Command::new("kill")
+                .args([&pid.to_string()])
+                .output()
+                .await;
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            // Escalate to SIGKILL in case SIGTERM was ignored.
+            let _ = tokio::process::Command::new("kill")
+                .args(["-9", &pid.to_string()])
+                .output()
+                .await;
+            killed = true;
+        }
+    }
+    killed
+}
+
 pub fn stop_port_forward(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -584,6 +705,13 @@ pub fn restore_cluster_port_forwards(
         }
         tracing::info!(cluster_id = %cluster_id, count = persisted.len(), "Restoring persisted port forwards for cluster");
 
+        // Before restoring, kill any orphaned kubectl processes occupying the
+        // persisted local ports (e.g. left behind by an ungraceful shutdown).
+        let mut local_ports: Vec<u16> = persisted.iter().map(|f| f.local_port).collect();
+        local_ports.sort_unstable();
+        local_ports.dedup();
+        kill_orphaned_port_forward_processes(&local_ports).await;
+
         for forward in persisted {
             let is_already_running = {
                 let r_manager = manager.read().await;
@@ -602,5 +730,34 @@ pub fn restore_cluster_port_forwards(
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_kill_orphaned_skips_free_ports() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+
+        kill_orphaned_port_forward_processes(&[port]).await;
+    }
+
+    #[tokio::test]
+    async fn test_kill_orphaned_does_not_kill_non_kubectl_process() {
+        let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        kill_orphaned_port_forward_processes(&[port]).await;
+
+        // The listener (a non-kubectl process) must still hold the port — rebinding must fail.
+        assert!(
+            std::net::TcpListener::bind(("127.0.0.1", port)).is_err(),
+            "Non-kubectl process should NOT have been killed"
+        );
+        drop(listener);
+    }
 }
 
