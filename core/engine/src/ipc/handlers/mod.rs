@@ -70,7 +70,8 @@ pub fn dispatch(
         "cloneDeployment" => workloads::clone_deployment(data, writer, token, manager),
         "rollbackDeployment" => workloads::rollback_deployment(data, writer, token, manager),
         "startPortForward" => network::start_port_forward(data, writer, token, manager),
-        "stopPortForward" => network::stop_port_forward(data, manager),
+        "stopPortForward" => network::stop_port_forward(data, writer, token, manager),
+        "getPortForwards" => network::get_port_forwards(writer, token, manager),
         other => {
             tracing::debug!(event = %other, "Unhandled UI event in dispatcher");
         }

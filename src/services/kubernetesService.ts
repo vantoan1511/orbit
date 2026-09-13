@@ -268,5 +268,9 @@ export const kubernetesService = {
 
   async stopPortForward(params?: { id?: string }): Promise<void> {
     await coreEngine.dispatch('stopPortForward', params)
+  },
+
+  async getPortForwards(): Promise<void> {
+    await coreEngine.dispatch('getPortForwards')
   }
 }

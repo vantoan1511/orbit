@@ -1,4 +1,5 @@
 import type {
+  ActivePortForward,
   ClusterInfo,
   ConfigMapInfo,
   CronJobInfo,
@@ -196,6 +197,9 @@ export interface OrbitEventMap {
   portForwardStopped: {
     id: string
   }
+  portForwardsUpdated: {
+    portForwards: ActivePortForward[]
+  }
 }
 
 /** Sentinel value for the tailLines IPC field meaning "fetch all log lines". */
@@ -239,7 +243,8 @@ export const OrbitEvents = {
   CommandSucceeded: 'commandSucceeded',
   ResourceRawData: 'resourceRawData',
   PortForwardStarted: 'portForwardStarted',
-  PortForwardStopped: 'portForwardStopped'
+  PortForwardStopped: 'portForwardStopped',
+  PortForwardsUpdated: 'portForwardsUpdated'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

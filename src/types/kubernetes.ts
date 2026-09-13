@@ -374,6 +374,7 @@ export interface PolicyInfo {
 
 export interface ActivePortForward {
   id: string
+  clusterId?: string
   namespace: string
   kind: string
   name: string

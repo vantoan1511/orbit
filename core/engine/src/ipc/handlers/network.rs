@@ -5,6 +5,10 @@ use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes;
 use crate::kubernetes::manager::KubeManager;
+use crate::kubernetes::port_forward::{
+    add_persisted_port_forward, get_persisted_for_cluster, remove_persisted_port_forward,
+    remove_persisted_port_forwards_for_cluster, PersistedPortForward,
+};
 use super::utils::get_string;
 
 pub fn get_services(
@@ -303,6 +307,7 @@ pub fn start_port_forward(
         let namespace_clone = namespace.clone();
         let kind_clone = kind.clone();
         let name_clone = name.clone();
+        let active_context_for_persist = active_context.clone();
 
         {
             let mut w_manager = manager.write().await;
@@ -315,6 +320,19 @@ pub fn start_port_forward(
                         if ready.unwrap_or(false) {
                             has_started = true;
                             tracing::info!(forward_id = %forward_id_clone, "Port forwarding connected successfully");
+
+                            if let Some(ref ctx) = active_context_for_persist {
+                                add_persisted_port_forward(PersistedPortForward {
+                                    id: forward_id_clone.clone(),
+                                    cluster_id: ctx.clone(),
+                                    namespace: namespace_clone.clone(),
+                                    kind: kind_clone.clone(),
+                                    name: name_clone.clone(),
+                                    local_port,
+                                    remote_port,
+                                });
+                            }
+
                             let _ = Bridge::send_event(
                                 &writer_clone,
                                 &token_clone,
@@ -332,8 +350,17 @@ pub fn start_port_forward(
                     }
                     res = child.wait() => {
                         handle_port_forward_exit(res, &stderr_output, &forward_id_clone, &writer_clone, &token_clone).await;
+                        remove_persisted_port_forward(&forward_id_clone);
                         let mut w_manager = manager_clone.write().await;
                         w_manager.port_forward_cancel.remove(&forward_id_clone);
+                        let _ = Bridge::send_event(
+                            &writer_clone,
+                            &token_clone,
+                            &OrbitEvent::PortForwardStopped {
+                                id: forward_id_clone,
+                            },
+                        )
+                        .await;
                         return;
                     }
                     _ = &mut cancel_rx => {
@@ -432,17 +459,32 @@ async fn kill_port_forward_child(child: &mut tokio::process::Child, forward_id: 
 
 pub fn stop_port_forward(
     data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
     manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
         let forward_id = get_string(&data, "id");
         tracing::info!(forward_id = ?forward_id, "Stopping port forward");
+
+        if let Some(ref id) = forward_id {
+            remove_persisted_port_forward(id);
+        } else {
+            let active_context = {
+                let r_manager = manager.read().await;
+                r_manager.active_context.clone()
+            };
+            if let Some(ref ctx) = active_context {
+                remove_persisted_port_forwards_for_cluster(ctx);
+            }
+        }
+
         let mut tasks_to_cancel = Vec::new();
 
         {
             let mut w_manager = manager.write().await;
-            if let Some(id) = forward_id {
-                if let Some(task) = w_manager.port_forward_cancel.remove(&id) {
+            if let Some(ref id) = forward_id {
+                if let Some(task) = w_manager.port_forward_cancel.remove(id) {
                     tasks_to_cancel.push(task);
                 }
             } else {
@@ -456,6 +498,108 @@ pub fn stop_port_forward(
         for (cancel, join_handle) in tasks_to_cancel {
             let _ = cancel.send(());
             let _ = join_handle.await;
+        }
+
+        if let Some(id) = forward_id {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::PortForwardStopped { id },
+            )
+            .await;
+        } else {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::PortForwardsUpdated {
+                    port_forwards: Vec::new(),
+                },
+            )
+            .await;
+        }
+    });
+}
+
+pub async fn stop_all_active_port_forwards(manager: &Arc<RwLock<KubeManager>>) {
+    tracing::info!("Stopping all active port forwards");
+    let mut tasks_to_cancel = Vec::new();
+
+    {
+        let mut w_manager = manager.write().await;
+        for (_id, task) in w_manager.port_forward_cancel.drain() {
+            tasks_to_cancel.push(task);
+        }
+    }
+
+    for (cancel, join_handle) in tasks_to_cancel {
+        let _ = cancel.send(());
+        let _ = join_handle.await;
+    }
+}
+
+pub fn get_port_forwards(
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let active_context = {
+            let r_manager = manager.read().await;
+            r_manager.active_context.clone()
+        };
+
+        let forwards = if let Some(ref ctx) = active_context {
+            restore_cluster_port_forwards(
+                writer.clone(),
+                token.clone(),
+                manager.clone(),
+                ctx.clone(),
+            );
+            get_persisted_for_cluster(ctx)
+        } else {
+            Vec::new()
+        };
+
+        let _ = Bridge::send_event(
+            &writer,
+            &token,
+            &OrbitEvent::PortForwardsUpdated {
+                port_forwards: forwards,
+            },
+        )
+        .await;
+    });
+}
+
+pub fn restore_cluster_port_forwards(
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+    cluster_id: String,
+) {
+    tokio::spawn(async move {
+        let persisted = get_persisted_for_cluster(&cluster_id);
+        if persisted.is_empty() {
+            return;
+        }
+        tracing::info!(cluster_id = %cluster_id, count = persisted.len(), "Restoring persisted port forwards for cluster");
+
+        for forward in persisted {
+            let is_already_running = {
+                let r_manager = manager.read().await;
+                r_manager.port_forward_cancel.contains_key(&forward.id)
+            };
+
+            if !is_already_running {
+                let data = serde_json::json!({
+                    "namespace": forward.namespace,
+                    "kind": forward.kind,
+                    "name": forward.name,
+                    "localPort": forward.local_port,
+                    "remotePort": forward.remote_port,
+                });
+                start_port_forward(Some(data), writer.clone(), token.clone(), manager.clone());
+            }
         }
     });
 }

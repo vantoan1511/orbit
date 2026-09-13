@@ -4,6 +4,7 @@ use tokio::sync::{Mutex, RwLock};
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::manager::KubeManager;
+use super::network;
 use super::utils::get_string;
 use super::watchers::spawn_watchers;
 
@@ -102,6 +103,15 @@ pub fn switch_cluster(
                     if let Some(ref client) = client {
                         spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
                     }
+
+                    // Stop previous active forwards and restore persisted forwards for the new cluster
+                    network::stop_all_active_port_forwards(&manager).await;
+                    network::restore_cluster_port_forwards(
+                        writer.clone(),
+                        token.clone(),
+                        manager.clone(),
+                        id.clone(),
+                    );
                 }
                 Err(e) => {
                     tracing::error!(cluster_id = %id, error = %e, "Cluster switch failed");

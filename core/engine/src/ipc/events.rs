@@ -170,6 +170,11 @@ pub enum OrbitEvent {
     PortForwardStopped {
         id: String,
     },
+    #[serde(rename = "portForwardsUpdated")]
+    #[serde(rename_all = "camelCase")]
+    PortForwardsUpdated {
+        port_forwards: Vec<crate::kubernetes::port_forward::PersistedPortForward>,
+    },
     #[serde(rename = "appSettingsUpdated")]
     AppSettingsUpdated {
         settings: Vec<crate::config::Configuration>,
@@ -215,6 +220,7 @@ impl OrbitEvent {
             OrbitEvent::ResourceRawData { .. } => "resourceRawData",
             OrbitEvent::PortForwardStarted { .. } => "portForwardStarted",
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
+            OrbitEvent::PortForwardsUpdated { .. } => "portForwardsUpdated",
             OrbitEvent::AppSettingsUpdated { .. } => "appSettingsUpdated",
         }
     }

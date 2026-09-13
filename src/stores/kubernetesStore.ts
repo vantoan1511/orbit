@@ -379,9 +379,6 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     eventsLoading.value = true
     policiesLoading.value = true
     namespacesLoading.value = true
-    kubernetesService.stopPortForward().catch((err) => {
-      console.error('Failed to stop port forwards on cluster switch:', err)
-    })
     activePortForwards.value = []
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
@@ -506,7 +503,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         fetchPersistentVolumeClaims(),
         fetchStorageClasses(),
         fetchEvents(),
-        fetchPolicies()
+        fetchPolicies(),
+        kubernetesService.getPortForwards()
       ])
       lastUpdatedAt.value = new Date()
     }
@@ -687,16 +685,22 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     activePortForwards.value = activePortForwards.value.filter((f) => f.id !== payload.id)
   }
 
+  function onPortForwardsUpdated(payload: { portForwards: ActivePortForward[] }) {
+    activePortForwards.value = payload.portForwards
+  }
+
   nativeEvents.on(OrbitEvents.ResourceBatchUpdated, onResourceBatchUpdated)
   nativeEvents.on(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
   nativeEvents.on(OrbitEvents.PortForwardStarted, onPortForwardStarted)
   nativeEvents.on(OrbitEvents.PortForwardStopped, onPortForwardStopped)
+  nativeEvents.on(OrbitEvents.PortForwardsUpdated, onPortForwardsUpdated)
 
   onScopeDispose(() => {
     nativeEvents.off(OrbitEvents.ResourceBatchUpdated, onResourceBatchUpdated)
     nativeEvents.off(OrbitEvents.PodMetricsUpdated, onPodMetricsUpdated)
     nativeEvents.off(OrbitEvents.PortForwardStarted, onPortForwardStarted)
     nativeEvents.off(OrbitEvents.PortForwardStopped, onPortForwardStopped)
+    nativeEvents.off(OrbitEvents.PortForwardsUpdated, onPortForwardsUpdated)
   })
 
   return {
