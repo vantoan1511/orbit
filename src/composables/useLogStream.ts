@@ -108,8 +108,9 @@ export function useLogStream(options: {
   let scrollRafId: number | null = null
 
   const scheduleFollowScroll = () => {
-    if (isScrollScheduled) return
+    if (isScrollScheduled || !isFollowing.value) return
     isScrollScheduled = true
+    isProgrammaticScrolling = true
 
     void nextTick(() => {
       const runScroll = () => {
@@ -117,6 +118,16 @@ export function useLogStream(options: {
         scrollRafId = null
         if (isFollowing.value) {
           performScrollToBottom()
+        }
+
+        if (typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(() => {
+            isProgrammaticScrolling = false
+          })
+        } else {
+          setTimeout(() => {
+            isProgrammaticScrolling = false
+          }, 20)
         }
       }
 
@@ -173,19 +184,26 @@ export function useLogStream(options: {
     if (isPaused.value) return
 
     const { text, timestamp } = parseLogLine(data.line)
-    logLines.value.push({
-      pod: data.pod,
-      container: data.container,
-      text,
-      timestamp
-    })
+    const nextLines = [
+      ...logLines.value,
+      {
+        pod: data.pod,
+        container: data.container,
+        text,
+        timestamp
+      }
+    ]
 
     if (options.tailLines.value === TAIL_ALL_LINES) {
-      if (logLines.value.length > maxLogLinesAll) {
-        logLines.value = logLines.value.slice(-maxLogLinesAll)
+      if (nextLines.length > maxLogLinesAll) {
+        logLines.value = nextLines.slice(-maxLogLinesAll)
+      } else {
+        logLines.value = nextLines
       }
-    } else if (logLines.value.length > maxLogLines + 100) {
-      logLines.value = logLines.value.slice(-maxLogLines)
+    } else if (nextLines.length > maxLogLines + 100) {
+      logLines.value = nextLines.slice(-maxLogLines)
+    } else {
+      logLines.value = nextLines
     }
 
     if (isFollowing.value) {
@@ -194,7 +212,7 @@ export function useLogStream(options: {
   }
 
   const handleLogLinesChunk = (data: { pod: string; container: string; lines: string[] }) => {
-    if (isPaused.value) return
+    if (isPaused.value || !data.lines || data.lines.length === 0) return
 
     const parsedLines: LogLine[] = data.lines.map((rawLine) => {
       const { text, timestamp } = parseLogLine(rawLine)
@@ -206,14 +224,18 @@ export function useLogStream(options: {
       }
     })
 
-    logLines.value.push(...parsedLines)
+    const nextLines = [...logLines.value, ...parsedLines]
 
     if (options.tailLines.value === TAIL_ALL_LINES) {
-      if (logLines.value.length > maxLogLinesAll) {
-        logLines.value = logLines.value.slice(-maxLogLinesAll)
+      if (nextLines.length > maxLogLinesAll) {
+        logLines.value = nextLines.slice(-maxLogLinesAll)
+      } else {
+        logLines.value = nextLines
       }
-    } else if (logLines.value.length > maxLogLines + 100) {
-      logLines.value = logLines.value.slice(-maxLogLines)
+    } else if (nextLines.length > maxLogLines + 100) {
+      logLines.value = nextLines.slice(-maxLogLines)
+    } else {
+      logLines.value = nextLines
     }
 
     if (isFollowing.value) {
@@ -329,6 +351,8 @@ export function useLogStream(options: {
     clearLogs,
     downloadLogs,
     copyLogs,
-    isCopied
+    isCopied,
+    handleLogLine,
+    handleLogLinesChunk
   }
 }

@@ -170,3 +170,120 @@ test('onScroll protects isFollowing and isAtBottom during programmatic scroll', 
   assert.equal(stream.isFollowing.value, true)
   assert.equal(stream.isAtBottom.value, true)
 })
+
+test('handleLogLinesChunk and handleLogLine create new array references for VirtualScroller reactivity', () => {
+  const stream = useLogStream(createMockOptions())
+
+  // Initial reference
+  const initialRef = stream.logLines.value
+  assert.equal(initialRef.length, 0)
+
+  // Append chunk
+  stream.handleLogLinesChunk({
+    pod: 'pod-1',
+    container: 'container-1',
+    lines: ['line 1', 'line 2']
+  })
+
+  const chunkRef = stream.logLines.value
+  assert.notEqual(chunkRef, initialRef, 'handleLogLinesChunk must assign a new array reference')
+  assert.equal(chunkRef.length, 2)
+  assert.equal(stream.filteredLogLines.value.length, 2)
+  assert.equal(stream.filteredLogLines.value, chunkRef)
+
+  // Append single line
+  stream.handleLogLine({
+    pod: 'pod-1',
+    container: 'container-1',
+    line: 'line 3'
+  })
+
+  const singleLineRef = stream.logLines.value
+  assert.notEqual(singleLineRef, chunkRef, 'handleLogLine must assign a new array reference')
+  assert.equal(singleLineRef.length, 3)
+  assert.equal(stream.filteredLogLines.value.length, 3)
+})
+
+test('handleLogLinesChunk trims buffer when exceeding maxLogLines', () => {
+  const stream = useLogStream(createMockOptions())
+
+  // Feed maxLogLines (2000) lines
+  const batch1 = Array.from({ length: 2000 }, (_, i) => `init-line-${i}`)
+  stream.handleLogLinesChunk({
+    pod: 'pod-1',
+    container: 'container-1',
+    lines: batch1
+  })
+  assert.equal(stream.logLines.value.length, 2000)
+
+  // Feed 150 more lines (exceeds maxLogLines + 100 threshold)
+  const batch2 = Array.from({ length: 150 }, (_, i) => `new-line-${i}`)
+  stream.handleLogLinesChunk({
+    pod: 'pod-1',
+    container: 'container-1',
+    lines: batch2
+  })
+
+  // Buffer should be capped at maxLogLines (2000)
+  assert.equal(stream.logLines.value.length, stream.maxLogLines)
+  // Last line should be the latest appended line
+  assert.equal(stream.logLines.value[stream.logLines.value.length - 1].text, 'new-line-149')
+})
+
+test('scheduleFollowScroll sets programmatic scroll flag and scrolls to bottom', async () => {
+  const stream = useLogStream(createMockOptions())
+
+  let targetScrollTop = 0
+  const mockElement = {
+    scrollHeight: 3000,
+    clientHeight: 600,
+    get scrollTop() {
+      return targetScrollTop
+    },
+    set scrollTop(val: number) {
+      targetScrollTop = val
+    },
+    scrollTo(options?: ScrollToOptions) {
+      if (options && typeof options.top === 'number') {
+        targetScrollTop = options.top
+      }
+    }
+  }
+
+  stream.virtualScrollerRef.value = {
+    $el: mockElement as unknown as HTMLElement,
+    element: mockElement as unknown as HTMLElement,
+    scrollTo: (opts?: ScrollToOptions) => mockElement.scrollTo(opts),
+    scrollToIndex: () => {},
+    scrollInView: () => {},
+    getRenderedRange: () => ({ first: 0, last: 0, viewport: { first: 0, last: 0 } })
+  }
+
+  // Incoming chunk while isFollowing is true triggers scheduleFollowScroll
+  stream.handleLogLinesChunk({
+    pod: 'pod-1',
+    container: 'container-1',
+    lines: ['new line']
+  })
+
+  // Await nextTick / event loop
+  await new Promise((resolve) => setTimeout(resolve, 10))
+
+  // While programmatic follow scroll is active, an intermediate scroll event should not disable follow
+  const inFlightEvent = {
+    target: {
+      scrollHeight: 3000,
+      scrollTop: 1000,
+      clientHeight: 600
+    }
+  } as unknown as Event
+
+  stream.onScroll(inFlightEvent)
+  assert.equal(stream.isFollowing.value, true)
+
+  // Wait for RAF to settle
+  await new Promise((resolve) => setTimeout(resolve, 50))
+
+  // Container was scrolled to bottom
+  assert.equal(targetScrollTop, 3000)
+})
