@@ -9,6 +9,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { IngressInfo } from '@/types/kubernetes'
+import { sortEventsDesc } from '@/utils/events'
 import { Activity, Globe, Network } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -36,9 +37,10 @@ const ingressEvents = computed(() => {
   if (!props.ingress) return []
   const ns = props.ingress.namespace
   const name = props.ingress.name
-  return clusterEvents.value.filter((ev) => {
+  const filtered = clusterEvents.value.filter((ev) => {
     return ev.namespace === ns && ev.objectName === name
   })
+  return sortEventsDesc(filtered)
 })
 
 interface ParsedIngressRule {
