@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import type { EventInfo } from '@/types/kubernetes'
+import { sortEventsDesc } from '@/utils/events'
 import { Info } from '@lucide/vue'
+import { computed } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   events: EventInfo[]
 }>()
+
+const sortedEvents = computed(() => sortEventsDesc(props.events))
 </script>
 
 <template>
@@ -12,8 +16,11 @@ defineProps<{
     <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1">
       Recent Events ({{ events.length }})
     </div>
-    <div v-if="events.length > 0" class="relative pl-4 border-l border-(--border) space-y-4 ml-2">
-      <div v-for="(ev, idx) in events" :key="idx" class="relative">
+    <div
+      v-if="sortedEvents.length > 0"
+      class="relative pl-4 border-l border-(--border) space-y-4 ml-2"
+    >
+      <div v-for="(ev, idx) in sortedEvents" :key="ev.uid || idx" class="relative">
         <span
           class="absolute -left-5.25 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-(--bg-card)"
           :class="ev.type === 'Warning' ? 'bg-rose-500' : 'bg-emerald-500'"

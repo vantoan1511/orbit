@@ -8,6 +8,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { NodeInfo } from '@/types/kubernetes'
+import { sortEventsDesc } from '@/utils/events'
 import { getNodeStatusBadgeClass } from '@/utils/severity'
 import { Activity } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
@@ -36,9 +37,10 @@ const nodeStatus = computed(() => props.node?.status || 'Unknown')
 const nodeEvents = computed(() => {
   if (!props.node) return []
   const name = props.node.name
-  return clusterEvents.value.filter((ev) => {
+  const filtered = clusterEvents.value.filter((ev) => {
     return ev.objectName === name || ev.message?.includes(name)
   })
+  return sortEventsDesc(filtered)
 })
 
 const rawYamlData = ref<string | null>(null)
