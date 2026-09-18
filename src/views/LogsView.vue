@@ -319,7 +319,7 @@ const LOG_ITEM_HEIGHT = 28
           class="absolute bottom-6 left-1/2 -translate-x-1/2 shadow-lg z-10"
           size="small"
           severity="secondary"
-          title="Scroll to bottom"
+          v-tooltip.top="'Scroll to bottom'"
           @click="scrollToBottom"
         />
       </Transition>
