@@ -1,7 +1,16 @@
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
-import { kubernetesService } from '@/services/kubernetesService'
-import { events } from '@/services/nativeService'
-import { OrbitEvents, TAIL_ALL_LINES } from '@/types/events'
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  getCurrentInstance,
+  type Ref
+} from 'vue'
+import { kubernetesService } from '../services/kubernetesService.ts'
+import { events } from '../services/nativeService.ts'
+import { OrbitEvents, TAIL_ALL_LINES } from '../types/events.ts'
 import type { VirtualScrollerMethods } from 'primevue/virtualscroller'
 
 export interface LogLine {
@@ -75,6 +84,91 @@ export function useLogStream(options: {
     return { text, timestamp }
   }
 
+  const getScrollElement = (): HTMLElement | null => {
+    if (!virtualScrollerRef.value) return null
+    const vs = virtualScrollerRef.value as unknown as {
+      $el?: HTMLElement
+      element?: HTMLElement
+    }
+    return vs.element || vs.$el || null
+  }
+
+  const performScrollToBottom = () => {
+    const el = getScrollElement()
+    if (el) {
+      el.scrollTop = el.scrollHeight
+    } else if (virtualScrollerRef.value && filteredLogLines.value.length > 0) {
+      virtualScrollerRef.value.scrollToIndex(filteredLogLines.value.length - 1)
+    }
+  }
+
+  const isAtBottom = ref<boolean>(true)
+  let isProgrammaticScrolling = false
+  let isScrollScheduled = false
+  let scrollRafId: number | null = null
+
+  const scheduleFollowScroll = () => {
+    if (isScrollScheduled) return
+    isScrollScheduled = true
+
+    void nextTick(() => {
+      const runScroll = () => {
+        isScrollScheduled = false
+        scrollRafId = null
+        if (isFollowing.value) {
+          performScrollToBottom()
+        }
+      }
+
+      if (typeof requestAnimationFrame === 'function') {
+        scrollRafId = requestAnimationFrame(runScroll)
+      } else {
+        runScroll()
+      }
+    })
+  }
+
+  const scrollToBottom = () => {
+    isAtBottom.value = true
+    isFollowing.value = true
+    isProgrammaticScrolling = true
+
+    performScrollToBottom()
+
+    void nextTick(() => {
+      performScrollToBottom()
+      if (typeof requestAnimationFrame === 'function') {
+        scrollRafId = requestAnimationFrame(() => {
+          performScrollToBottom()
+          isProgrammaticScrolling = false
+          scrollRafId = null
+        })
+      } else {
+        isProgrammaticScrolling = false
+      }
+    })
+  }
+
+  const onScroll = (event: Event) => {
+    const target = event.target as HTMLElement
+    if (!target) return
+    const tolerance = 20
+    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= tolerance
+
+    if (isProgrammaticScrolling) {
+      if (atBottom) {
+        isAtBottom.value = true
+      }
+      return
+    }
+
+    isAtBottom.value = atBottom
+
+    if (!atBottom && isFollowing.value) {
+      isFollowing.value = false
+    }
+  }
+
   const handleLogLine = (data: { pod: string; container: string; line: string }) => {
     if (isPaused.value) return
 
@@ -95,7 +189,7 @@ export function useLogStream(options: {
     }
 
     if (isFollowing.value) {
-      scrollToBottom()
+      scheduleFollowScroll()
     }
   }
 
@@ -123,52 +217,7 @@ export function useLogStream(options: {
     }
 
     if (isFollowing.value) {
-      scrollToBottom()
-    }
-  }
-
-  const isAtBottom = ref<boolean>(true)
-  let scrollTimeout: ReturnType<typeof setTimeout> | null = null
-  let scrollUnlockTimeout: ReturnType<typeof setTimeout> | null = null
-  let isProgrammaticScrolling = false
-
-  const scrollToBottom = () => {
-    isAtBottom.value = true
-    isFollowing.value = true
-    isProgrammaticScrolling = true
-
-    if (scrollTimeout) {
-      clearTimeout(scrollTimeout)
-    }
-    if (scrollUnlockTimeout) {
-      clearTimeout(scrollUnlockTimeout)
-    }
-
-    scrollTimeout = setTimeout(() => {
-      if (virtualScrollerRef.value && filteredLogLines.value.length > 0) {
-        virtualScrollerRef.value.scrollToIndex(filteredLogLines.value.length - 1)
-      }
-
-      scrollUnlockTimeout = setTimeout(() => {
-        isProgrammaticScrolling = false
-        scrollUnlockTimeout = null
-      }, 50)
-
-      scrollTimeout = null
-    }, 50)
-  }
-
-  const onScroll = (event: Event) => {
-    const target = event.target as HTMLElement
-    if (!target) return
-    const tolerance = 20
-    const atBottom = target.scrollHeight - target.scrollTop - target.clientHeight <= tolerance
-    isAtBottom.value = atBottom
-
-    if (isProgrammaticScrolling) return
-
-    if (!atBottom && isFollowing.value) {
-      isFollowing.value = false
+      scheduleFollowScroll()
     }
   }
 
@@ -225,28 +274,29 @@ export function useLogStream(options: {
     document.body.removeChild(link)
   }
 
-  onMounted(async () => {
-    if (options.onMountedCallback) {
-      await options.onMountedCallback()
-    }
-    // LogLineReceived is kept for backward compatibility; stream_pod_logs now
-    // always emits LogLinesChunkReceived (even for single lines).
-    events.on(OrbitEvents.LogLineReceived, handleLogLine)
-    events.on(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
-    startStreaming()
-  })
+  if (getCurrentInstance()) {
+    onMounted(async () => {
+      if (options.onMountedCallback) {
+        await options.onMountedCallback()
+      }
+      // LogLineReceived is kept for backward compatibility; stream_pod_logs now
+      // always emits LogLinesChunkReceived (even for single lines).
+      events.on(OrbitEvents.LogLineReceived, handleLogLine)
+      events.on(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
+      startStreaming()
+    })
 
-  onUnmounted(async () => {
-    if (scrollTimeout) {
-      clearTimeout(scrollTimeout)
-    }
-    if (scrollUnlockTimeout) {
-      clearTimeout(scrollUnlockTimeout)
-    }
-    events.off(OrbitEvents.LogLineReceived, handleLogLine)
-    events.off(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
-    await kubernetesService.stopLogs()
-  })
+    onUnmounted(async () => {
+      if (scrollRafId !== null && typeof cancelAnimationFrame === 'function') {
+        cancelAnimationFrame(scrollRafId)
+        scrollRafId = null
+      }
+      isScrollScheduled = false
+      events.off(OrbitEvents.LogLineReceived, handleLogLine)
+      events.off(OrbitEvents.LogLinesChunkReceived, handleLogLinesChunk)
+      await kubernetesService.stopLogs()
+    })
+  }
 
   watch(
     [
