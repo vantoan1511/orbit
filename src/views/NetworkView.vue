@@ -2,8 +2,10 @@
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
 import { useDialog } from 'primevue/usedialog'
 import CreateIngressDialog from '@/components/network/CreateIngressDialog.vue'
+import CreatePortForwardDialog from '@/components/network/CreatePortForwardDialog.vue'
 import CreateServiceDialog from '@/components/network/CreateServiceDialog.vue'
 import IngressesTable from '../components/network/IngressesTable.vue'
+import PortForwardsTable from '../components/network/PortForwardsTable.vue'
 import ServicesTable from '../components/network/ServicesTable.vue'
 
 const dialog = useDialog()
@@ -32,6 +34,18 @@ const openCreateIngressDialog = () => {
   })
 }
 
+const openCreatePortForwardDialog = () => {
+  dialog.open(CreatePortForwardDialog, {
+    props: {
+      header: 'Forward Port',
+      style: {
+        width: '440px'
+      },
+      modal: true
+    }
+  })
+}
+
 const tabs: ResourceTab[] = [
   {
     id: 'services',
@@ -40,6 +54,14 @@ const tabs: ResourceTab[] = [
   {
     id: 'ingresses',
     createAction: { handler: openCreateIngressDialog }
+  },
+  {
+    id: 'port-forward',
+    createAction: {
+      label: 'Forward Port',
+      icon: 'pi pi-plus',
+      handler: openCreatePortForwardDialog
+    }
   }
 ]
 </script>
@@ -54,6 +76,11 @@ const tabs: ResourceTab[] = [
     <!-- Ingresses Tab -->
     <template #tab-ingresses>
       <IngressesTable />
+    </template>
+
+    <!-- Port Forward Tab -->
+    <template #tab-port-forward>
+      <PortForwardsTable />
     </template>
   </ResourceTabsLayout>
 </template>

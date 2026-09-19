@@ -3,6 +3,7 @@ import {
   Archive,
   Box,
   Boxes,
+  Cable,
   Clock,
   Copy,
   Database,
@@ -149,6 +150,12 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
       label: 'Ingresses',
       customIcon: Globe,
       route: '/network?tab=ingresses'
+    },
+    {
+      key: 'network-port-forward',
+      label: 'Port Forward',
+      customIcon: Cable,
+      route: '/network?tab=port-forward'
     }
   ],
   storage: [
