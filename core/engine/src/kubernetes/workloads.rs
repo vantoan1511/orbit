@@ -187,6 +187,7 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
 
     let mut images = Vec::new();
     let mut containers = Vec::new();
+    let mut ports = Vec::new();
     if let Some(spec) = d.spec.as_ref() {
         for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
             if let Some(img) = &c.image {
@@ -196,6 +197,13 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
                 name: c.name.clone(),
                 image: c.image.clone().unwrap_or_default(),
             });
+            if let Some(c_ports) = &c.ports {
+                for cp in c_ports {
+                    if cp.container_port > 0 && !ports.contains(&cp.container_port) {
+                        ports.push(cp.container_port);
+                    }
+                }
+            }
         }
     }
 
@@ -225,6 +233,7 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
         revision_history,
         labels,
         annotations,
+        ports,
     }
 }
 
@@ -972,6 +981,83 @@ mod tests {
         assert_eq!(conditions[0].status, "True");
         assert_eq!(conditions[0].reason.as_deref(), Some("MinimumReplicasAvailable"));
         assert_eq!(conditions[1].type_, "Progressing");
+    }
+
+    #[test]
+    fn test_map_deployment_ports() {
+        use k8s_openapi::api::apps::v1::DeploymentSpec;
+        use k8s_openapi::api::core::v1::{Container, ContainerPort, PodSpec, PodTemplateSpec};
+
+        let dep = Deployment {
+            metadata: ObjectMeta {
+                name: Some("web-app".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            spec: Some(DeploymentSpec {
+                template: PodTemplateSpec {
+                    spec: Some(PodSpec {
+                        containers: vec![
+                            Container {
+                                name: "nginx".to_string(),
+                                ports: Some(vec![
+                                    ContainerPort {
+                                        container_port: 80,
+                                        protocol: Some("TCP".to_string()),
+                                        ..Default::default()
+                                    },
+                                    ContainerPort {
+                                        container_port: 443,
+                                        protocol: Some("TCP".to_string()),
+                                        ..Default::default()
+                                    },
+                                ]),
+                                ..Default::default()
+                            },
+                            Container {
+                                name: "sidecar".to_string(),
+                                ports: Some(vec![
+                                    ContainerPort {
+                                        container_port: 80, // Duplicate port to test deduplication
+                                        protocol: Some("TCP".to_string()),
+                                        ..Default::default()
+                                    },
+                                    ContainerPort {
+                                        container_port: 9090,
+                                        protocol: Some("TCP".to_string()),
+                                        ..Default::default()
+                                    },
+                                ]),
+                                ..Default::default()
+                            },
+                        ],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_deployment(&dep);
+        assert_eq!(mapped.name, "web-app");
+        assert_eq!(mapped.ports, vec![80, 443, 9090]);
+    }
+
+    #[test]
+    fn test_map_deployment_no_ports() {
+        let dep = Deployment {
+            metadata: ObjectMeta {
+                name: Some("no-ports".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mapped = map_deployment(&dep);
+        assert_eq!(mapped.ports, Vec::<i32>::new());
     }
 }
 

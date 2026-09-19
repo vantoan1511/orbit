@@ -12,6 +12,9 @@ import ScaleDialog from '@/components/shared/ScaleDialog.vue'
 import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
 import PortForwardDialog from '@/components/shared/PortForwardDialog.vue'
+import { getAvailablePorts } from '@/utils/portForward'
+
+export { getAvailablePorts }
 
 export interface WorkloadActionOptions<T> {
   kind?: MaybeRefOrGetter<string>
@@ -134,12 +137,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
               sourceName: row.name,
               sourceNamespace: row.namespace || 'default',
               kind: resourceKind,
-              availablePorts:
-                resourceKind === KUBERNETES_RESOURCE_KIND.Service && 'portsList' in row
-                  ? (row as { portsList?: Array<{ port: number }> }).portsList?.map(
-                      (p) => p.port
-                    ) || []
-                  : []
+              availablePorts: getAvailablePorts(row, resourceKind)
             },
             onClose: async (options) => {
               const result = options?.data as { localPort: number; remotePort: number } | undefined

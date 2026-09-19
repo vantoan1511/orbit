@@ -120,6 +120,7 @@ export interface DeploymentInfo {
   revisionHistory?: number
   labels: Record<string, string>
   annotations: Record<string, string>
+  ports?: number[]
 }
 
 export interface StatefulSetInfo {
