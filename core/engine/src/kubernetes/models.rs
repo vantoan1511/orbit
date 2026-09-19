@@ -106,6 +106,8 @@ pub struct DeploymentInfo {
     pub revision_history: Option<i32>,
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub ports: Vec<i32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
