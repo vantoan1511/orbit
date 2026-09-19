@@ -22,6 +22,7 @@ import type {
   RawWorkloadResource,
   WorkloadInfo
 } from '@/types/kubernetes'
+import { sortEventsDesc } from '@/utils/events'
 import { getPodStatusBadgeClass, getWorkloadKindSeverity } from '@/utils/severity'
 import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
@@ -143,10 +144,11 @@ const workloadEvents = computed(() => {
   if (!props.workload) return []
   const ns = workloadNamespace.value
   const name = workloadName.value
-  return clusterEvents.value.filter((ev: EventInfo) => {
+  const filtered = clusterEvents.value.filter((ev: EventInfo) => {
     if (ev.namespace !== ns) return false
     return ev.objectName === name || ev.objectName.startsWith(name + '-')
   })
+  return sortEventsDesc(filtered)
 })
 
 // Quick Actions

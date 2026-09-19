@@ -9,6 +9,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { PodInfo } from '@/types/kubernetes'
+import { sortEventsDesc } from '@/utils/events'
 import { getPodStatusBadgeClass } from '@/utils/severity'
 import { Activity, Shield, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
@@ -41,9 +42,10 @@ const podEvents = computed(() => {
   if (!props.pod) return []
   const ns = props.pod.namespace
   const name = props.pod.name
-  return clusterEvents.value.filter((ev) => {
+  const filtered = clusterEvents.value.filter((ev) => {
     return ev.namespace === ns && ev.objectName === name
   })
+  return sortEventsDesc(filtered)
 })
 
 const rawYamlData = ref<string | null>(null)
