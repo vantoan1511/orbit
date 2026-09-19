@@ -41,6 +41,8 @@ export function useLogStream(options: {
   const isPaused = ref<boolean>(false)
   const isFullscreen = ref<boolean>(false)
   const isFollowing = ref<boolean>(true)
+  const isRefreshing = ref<boolean>(false)
+  let refreshTimeout: ReturnType<typeof setTimeout> | null = null
 
   const startStreaming = async () => {
     logLines.value = []
@@ -59,6 +61,26 @@ export function useLogStream(options: {
           : options.selectedContainerName.value,
       tailLines: options.tailLines.value
     })
+  }
+
+  const refreshLogs = async () => {
+    if (isRefreshing.value) return
+    isRefreshing.value = true
+    isPaused.value = false
+    isFollowing.value = true
+    try {
+      await startStreaming()
+    } catch (error) {
+      console.error('Failed to refresh logs:', error)
+    } finally {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout)
+      }
+      refreshTimeout = setTimeout(() => {
+        isRefreshing.value = false
+        refreshTimeout = null
+      }, 400)
+    }
   }
 
   const parseLogLine = (rawLine: string) => {
@@ -309,6 +331,10 @@ export function useLogStream(options: {
     })
 
     onUnmounted(async () => {
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout)
+        refreshTimeout = null
+      }
       if (scrollRafId !== null && typeof cancelAnimationFrame === 'function') {
         cancelAnimationFrame(scrollRafId)
         scrollRafId = null
@@ -352,6 +378,8 @@ export function useLogStream(options: {
     downloadLogs,
     copyLogs,
     isCopied,
+    isRefreshing,
+    refreshLogs,
     handleLogLine,
     handleLogLinesChunk
   }

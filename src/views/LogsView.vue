@@ -72,7 +72,9 @@ const {
   clearLogs,
   downloadLogs,
   copyLogs,
-  isCopied
+  isCopied,
+  isRefreshing,
+  refreshLogs
 } = useLogStream({
   selectedNamespace,
   selectedWorkloadName,
@@ -159,8 +161,18 @@ const LOG_ITEM_HEIGHT = 28
             variant="text"
             size="small"
             class="p-1! w-7! h-7!"
+            icon="pi pi-refresh"
+            :loading="isRefreshing"
+            v-tooltip.bottom="'Refresh Stream'"
+            @click="refreshLogs"
+          />
+          <Button
+            severity="secondary"
+            variant="text"
+            size="small"
+            class="p-1! w-7! h-7!"
             :icon="isPaused ? 'pi pi-play' : 'pi pi-pause'"
-            :title="isPaused ? 'Resume Stream' : 'Pause Stream'"
+            v-tooltip.bottom="isPaused ? 'Resume Stream' : 'Pause Stream'"
             @click="isPaused = !isPaused"
           />
           <Button
@@ -169,7 +181,7 @@ const LOG_ITEM_HEIGHT = 28
             size="small"
             variant="text"
             class="p-1! w-7! h-7!"
-            title="Clear Logs"
+            v-tooltip.bottom="'Clear Logs'"
             @click="clearLogs"
           />
           <div class="w-px h-3.5 bg-(--border) mx-1"></div>
@@ -179,7 +191,7 @@ const LOG_ITEM_HEIGHT = 28
             size="small"
             variant="text"
             class="p-1! w-7! h-7!"
-            title="Highlight Rules"
+            v-tooltip.bottom="'Highlight Rules'"
             @click="showRulesDialog = true"
           />
           <Button
@@ -189,7 +201,7 @@ const LOG_ITEM_HEIGHT = 28
             variant="text"
             class="p-1! w-7! h-7!"
             :disabled="logLines.length <= 0"
-            title="Copy Logs"
+            v-tooltip.bottom="'Copy Logs'"
             @click="copyLogs"
           />
           <Button
@@ -199,7 +211,7 @@ const LOG_ITEM_HEIGHT = 28
             variant="text"
             class="p-1! w-7! h-7!"
             :disabled="logLines.length <= 0"
-            title="Download Logs"
+            v-tooltip.bottom="'Download Logs'"
             @click="downloadLogs"
           />
           <Button
@@ -208,7 +220,7 @@ const LOG_ITEM_HEIGHT = 28
             variant="text"
             class="p-1! w-7! h-7!"
             :icon="isFullscreen ? 'pi pi-window-minimize' : 'pi pi-window-maximize'"
-            :title="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
+            v-tooltip.bottom="isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'"
             @click="isFullscreen = !isFullscreen"
           />
         </div>
