@@ -12,6 +12,7 @@ import { initTheme } from './composables/useTheme'
 import router from './router'
 import { useNotificationStore } from './stores/notificationStore'
 import { useTableFilterStore } from './stores/tableFilterStore'
+import { useTabsStore } from './stores/tabsStore'
 import { Noir } from './theme/orbitTheme'
 
 import ConfirmationService from 'primevue/confirmationservice'
@@ -50,7 +51,8 @@ if (typeof window !== 'undefined' && window.NL_PORT) {
 void Promise.allSettled([
   initTheme(),
   useTableFilterStore(pinia).init(),
-  useNotificationStore(pinia).init()
+  useNotificationStore(pinia).init(),
+  useTabsStore(pinia).init()
 ]).then((results) => {
   results.forEach((result) => {
     if (result.status === 'rejected') {
