@@ -8,6 +8,7 @@ import AppSidebarLogsMenu from './sidebar/AppSidebarLogsMenu.vue'
 import AppSidebarNavMenu from './sidebar/AppSidebarNavMenu.vue'
 import AppSidebarPanel from './sidebar/AppSidebarPanel.vue'
 import { type CategoryId, type SidebarCategory } from './sidebar/navigation'
+import { RESOURCE_BREADCRUMB_MAP } from '@/utils/breadcrumb'
 
 const k8sStore = useKubernetesStore()
 const hasActiveCluster = computed(() => k8sStore.activeClusterId !== null)
@@ -17,6 +18,12 @@ const route = useRoute()
 const router = useRouter()
 
 const getCategoryForRoute = (path: string): CategoryId | null => {
+  if (route.name === 'edit-workload') {
+    const kind = route.params.kind as string
+    if (kind && RESOURCE_BREADCRUMB_MAP[kind]) {
+      return RESOURCE_BREADCRUMB_MAP[kind].categoryId
+    }
+  }
   if (path === '/logs') return 'logs'
   if (path === '/' || path === '/nodes' || path === '/namespaces' || path === '/events')
     return 'core'

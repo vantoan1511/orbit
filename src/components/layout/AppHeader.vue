@@ -5,6 +5,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSearchStore } from '@/stores/searchStore'
 import { Search } from '@lucide/vue'
+import { getResourceBreadcrumbs } from '@/utils/breadcrumb'
 
 const route = useRoute()
 const searchStore = useSearchStore()
@@ -61,32 +62,11 @@ const items = computed(() => {
   const breadcrumbs: Array<{ label: string; route?: string }> = []
 
   if (currentRouteName === 'edit-workload') {
-    breadcrumbs.push({ label: 'Workloads', route: '/workloads' })
-
-    const kind = (route.params.kind as string) || ''
-    if (kind) {
-      breadcrumbs.push({
-        label: kind,
-        route: `/workloads?tab=${kind.toLowerCase()}s`
-      })
-    }
-
-    const namespace = (route.params.namespace as string) || ''
-    if (namespace) {
-      breadcrumbs.push({ label: namespace })
-    }
-
-    const workloadName = (route.params.name as string) || ''
-    if (workloadName) {
-      breadcrumbs.push({ label: workloadName })
-    }
-
-    breadcrumbs.push({
-      label: 'Edit',
-      route: route.path
+    return getResourceBreadcrumbs({
+      kind: route.params.kind as string,
+      namespace: route.params.namespace as string,
+      name: route.params.name as string
     })
-
-    return breadcrumbs
   }
 
   const label =
