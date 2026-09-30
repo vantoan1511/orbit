@@ -1,5 +1,6 @@
 import { kubernetesService } from '../services/kubernetesService.ts'
 import { events as nativeEvents } from '../services/nativeService.ts'
+import { useLogsStore } from './logsStore.ts'
 import { useTableFilterStore } from './tableFilterStore.ts'
 import { OrbitEvents, type KubernetesResourceInfo } from '../types/events.ts'
 import { formatCpuCores, formatDecimal, formatMemoryMiB } from '../utils/metrics.ts'
@@ -342,9 +343,12 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const tableFilterStore = useTableFilterStore()
     tableFilterStore.setActiveClusterId(id)
     tableFilterStore.resetAllSelections()
+    const logsStore = useLogsStore()
+    void logsStore.setClusterId(id)
     podMetricsMap.clear()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
+    pods.value = []
     deployments.value = []
     statefulSets.value = []
     daemonSets.value = []
@@ -382,12 +386,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     activePortForwards.value = []
     cpuHistory.value = [0, 0, 0, 0, 0, 0, 0]
     memHistory.value = [0, 0, 0, 0, 0, 0, 0]
+    lastUpdatedAt.value = null
 
     // Load data for the newly selected cluster
     if (id !== null) {
       loadInitialData()
-    } else {
-      lastUpdatedAt.value = null
     }
   }
 

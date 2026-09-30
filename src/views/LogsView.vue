@@ -13,10 +13,12 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import VirtualScroller from 'primevue/virtualscroller'
 import { useRouter } from 'vue-router'
 
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useLogsStore } from '@/stores/logsStore'
 import { watch } from 'vue'
 
 const router = useRouter()
+const k8sStore = useKubernetesStore()
 const logsStore = useLogsStore()
 
 const {
@@ -46,7 +48,8 @@ watch(
         workloadKind: kind,
         workloadName: workload,
         pod: pod || 'All',
-        container: container || 'All'
+        container: container || 'All',
+        clusterId: k8sStore.activeClusterId ?? undefined
       })
     }
   },

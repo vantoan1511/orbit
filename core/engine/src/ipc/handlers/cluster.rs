@@ -77,6 +77,9 @@ pub fn switch_cluster(
                     if let Some(cancel) = w_manager.watch_cancel.take() {
                         let _ = cancel.send(true);
                     }
+                    for cancel in w_manager.log_cancel.drain(..) {
+                        let _ = cancel.send(());
+                    }
                     let (tx, rx) = tokio::sync::watch::channel(false);
                     w_manager.watch_cancel = Some(tx);
                     drop(w_manager);
@@ -150,6 +153,9 @@ pub fn add_cluster(
                     if let Some(cancel) = w_manager.watch_cancel.take() {
                         let _ = cancel.send(true);
                     }
+                    for cancel in w_manager.log_cancel.drain(..) {
+                        let _ = cancel.send(());
+                    }
                     let (tx, rx) = tokio::sync::watch::channel(false);
                     w_manager.watch_cancel = Some(tx);
                     drop(w_manager);
@@ -163,12 +169,23 @@ pub fn add_cluster(
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
-                        &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+                        &OrbitEvent::ActiveClusterChanged { active_cluster_id: active_cluster_id.clone() },
                     ).await;
 
                     // Spawn watchers and metrics poller for the new cluster.
                     if let Some(ref client) = client {
                         spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
+                    }
+
+                    // Stop previous active forwards and restore persisted forwards for the new cluster
+                    network::stop_all_active_port_forwards(&manager).await;
+                    if let Some(ref id) = active_cluster_id {
+                        network::restore_cluster_port_forwards(
+                            writer.clone(),
+                            token.clone(),
+                            manager.clone(),
+                            id.clone(),
+                        );
                     }
                 }
                 Err(e) => {
@@ -185,3 +202,22 @@ pub fn add_cluster(
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    #[tokio::test]
+    async fn test_drain_log_cancel_signals() {
+        let (tx1, mut rx1) = tokio::sync::oneshot::channel();
+        let (tx2, mut rx2) = tokio::sync::oneshot::channel();
+        let mut log_cancels = vec![tx1, tx2];
+
+        for cancel in log_cancels.drain(..) {
+            let _ = cancel.send(());
+        }
+
+        assert_eq!(rx1.try_recv(), Ok(()));
+        assert_eq!(rx2.try_recv(), Ok(()));
+        assert!(log_cancels.is_empty());
+    }
+}
+

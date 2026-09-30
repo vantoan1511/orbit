@@ -221,6 +221,10 @@ export const useTabsStore = defineStore('tabs', () => {
   }
 
   async function init(clusterId?: string): Promise<void> {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
     currentClusterId.value = clusterId
     try {
       const state = await tabStorageService.loadTabsState(clusterId)
@@ -241,6 +245,9 @@ export const useTabsStore = defineStore('tabs', () => {
           return t
         })
         activeTabId.value = state.activeTabId
+      } else {
+        tabs.value = []
+        activeTabId.value = null
       }
     } finally {
       isHydrated.value = true

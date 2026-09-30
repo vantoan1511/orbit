@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useCluster } from '@/composables/useCluster.ts'
+import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTabsStore } from '@/stores/tabsStore'
 import OfflineClusterView from '@/views/OfflineClusterView.vue'
@@ -28,6 +29,7 @@ const route = useRoute()
 const router = useRouter()
 
 const emptyPickerRef = ref<InstanceType<typeof AppTabResourcePicker> | null>(null)
+const isSwitchingCluster = ref(false)
 
 const currentLayoutMeta = computed(() => {
   return resolveRouteLayoutMeta(route.path, route.meta as LayoutRouteMeta)
@@ -37,7 +39,12 @@ const currentLayoutMeta = computed(() => {
 watch(
   () => [route.path, route.query],
   ([newPath, newQuery]) => {
-    if (k8sStore.activeClusterId !== null && newPath !== '/welcome' && newPath !== '/settings') {
+    if (
+      !isSwitchingCluster.value &&
+      k8sStore.activeClusterId !== null &&
+      newPath !== '/welcome' &&
+      newPath !== '/settings'
+    ) {
       const meta = getTabMetadataForRoute(newPath as string, newQuery as Record<string, string>)
       tabsStore.syncWithRoute(
         newPath as string,
@@ -54,9 +61,20 @@ watch(
 // Rehydrate tabs on active cluster change
 watch(
   () => k8sStore.activeClusterId,
-  (newClusterId) => {
+  async (newClusterId) => {
     if (newClusterId) {
-      void tabsStore.init(newClusterId)
+      isSwitchingCluster.value = true
+      try {
+        void kubernetesService.stopLogs()
+        await tabsStore.init(newClusterId)
+        if (tabsStore.activeTab) {
+          await router.push(tabsStore.activeTab.route)
+        } else if (route.path !== '/settings' && route.path !== '/welcome') {
+          await router.push('/')
+        }
+      } finally {
+        isSwitchingCluster.value = false
+      }
     }
   }
 )
