@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppTab } from '@/types/tabs'
 import { getTabMetadataForRoute } from '@/utils/tabIcons'
+import { getTabCloseButtonClass, getTabContainerClass } from '@/utils/tabStyles'
 import { X } from '@lucide/vue'
 import Button from 'primevue/button'
 import ContextMenu from 'primevue/contextmenu'
@@ -85,12 +86,7 @@ const handleMiddleClick = () => {
 
 <template>
   <div
-    :class="[
-      'group relative flex items-center gap-2 h-8 px-3 border-r border-(--border) text-xs cursor-pointer select-none transition-all duration-150 shrink-0 max-w-52 min-w-28',
-      isActive
-        ? 'bg-(--bg-card) text-primary font-medium border-t-2 border-t-(--accent)'
-        : 'bg-(--bg-sidebar)/70 text-muted-color hover:bg-(--bg-hover)/60 hover:text-primary border-t-2 border-t-transparent'
-    ]"
+    :class="getTabContainerClass(isActive)"
     @click="emit('select')"
     @mousedown.middle.prevent="handleMiddleClick"
     @contextmenu="handleContextMenu"
@@ -115,7 +111,7 @@ const handleMiddleClick = () => {
       variant="text"
       rounded
       size="small"
-      class="w-4! h-4! p-0! shrink-0 opacity-0 group-hover:opacity-100 hover:bg-(--bg-hover)! text-muted-color hover:text-primary transition-opacity"
+      :class="getTabCloseButtonClass(isActive)"
       v-tooltip.bottom="'Close (Ctrl+W)'"
       @click="handleCloseClick"
     >
