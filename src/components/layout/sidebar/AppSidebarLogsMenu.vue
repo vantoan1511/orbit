@@ -348,11 +348,11 @@ const selectRecentLog = (log: RecentLogInfo) => {
               <span>Recent</span>
               <Button
                 v-if="logsStore.recentLogs.length > 0"
+                v-tooltip.top="'Clear recent logs'"
                 severity="secondary"
                 variant="text"
                 size="small"
                 class="w-5! h-5! p-0! shrink-0 text-muted-color hover:text-primary"
-                title="Clear recent logs"
                 aria-label="Clear recent logs"
                 @click.stop="logsStore.clearRecentLogs()"
               >
