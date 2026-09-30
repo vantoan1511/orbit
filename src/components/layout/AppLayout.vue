@@ -4,9 +4,15 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTabsStore } from '@/stores/tabsStore'
 import OfflineClusterView from '@/views/OfflineClusterView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getTabMetadataForRoute } from '@/utils/tabIcons'
+import {
+  getLayoutContentPaddingClass,
+  getLayoutMainClass,
+  resolveRouteLayoutMeta,
+  type LayoutRouteMeta
+} from '@/utils/layout'
 import AppFooter from './AppFooter.vue'
 import AppHeader from './AppHeader.vue'
 import AppLoadingScreen from './AppLoadingScreen.vue'
@@ -22,6 +28,10 @@ const route = useRoute()
 const router = useRouter()
 
 const emptyPickerRef = ref<InstanceType<typeof AppTabResourcePicker> | null>(null)
+
+const currentLayoutMeta = computed(() => {
+  return resolveRouteLayoutMeta(route.path, route.meta as LayoutRouteMeta)
+})
 
 // Synchronize current route with tabsStore
 watch(
@@ -112,8 +122,8 @@ onUnmounted(() => {
           <!-- Top Main Tabs -->
           <AppTabBar v-if="k8sStore.activeClusterId !== null" />
 
-          <main class="flex-1 h-full overflow-y-auto relative">
-            <div class="p-8">
+          <main :class="getLayoutMainClass(currentLayoutMeta)">
+            <div :class="getLayoutContentPaddingClass(currentLayoutMeta)">
               <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
                 <EmptyWorkspaceView
                   v-if="tabsStore.tabs.length === 0 && route.path !== '/settings'"

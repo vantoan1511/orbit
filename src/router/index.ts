@@ -84,7 +84,11 @@ const router = createRouter({
     {
       path: '/logs',
       name: 'logs',
-      component: LogsView
+      component: LogsView,
+      meta: {
+        fullHeight: true,
+        padding: 'compact'
+      }
     }
   ]
 })
