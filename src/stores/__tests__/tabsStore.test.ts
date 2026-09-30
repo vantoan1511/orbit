@@ -134,6 +134,74 @@ test('tabsStore reorderTabs reorders array items', () => {
   )
 })
 
+test('tabsStore.moveTabLeft moves tab one position to the left', () => {
+  const store = useTabsStore()
+
+  store.openTab({ route: '/tab1', title: 'Tab 1' })
+  store.openTab({ route: '/tab2', title: 'Tab 2' })
+  store.openTab({ route: '/tab3', title: 'Tab 3' })
+
+  store.moveTabLeft('/tab2')
+  assert.deepEqual(
+    store.tabs.map((t) => t.route),
+    ['/tab2', '/tab1', '/tab3']
+  )
+})
+
+test('tabsStore.moveTabLeft is a no-op when tab is already at index 0 or not found', () => {
+  const store = useTabsStore()
+
+  store.openTab({ route: '/tab1', title: 'Tab 1' })
+  store.openTab({ route: '/tab2', title: 'Tab 2' })
+  store.openTab({ route: '/tab3', title: 'Tab 3' })
+
+  store.moveTabLeft('/tab1')
+  assert.deepEqual(
+    store.tabs.map((t) => t.route),
+    ['/tab1', '/tab2', '/tab3']
+  )
+
+  store.moveTabLeft('/non-existent')
+  assert.deepEqual(
+    store.tabs.map((t) => t.route),
+    ['/tab1', '/tab2', '/tab3']
+  )
+})
+
+test('tabsStore.moveTabRight moves tab one position to the right', () => {
+  const store = useTabsStore()
+
+  store.openTab({ route: '/tab1', title: 'Tab 1' })
+  store.openTab({ route: '/tab2', title: 'Tab 2' })
+  store.openTab({ route: '/tab3', title: 'Tab 3' })
+
+  store.moveTabRight('/tab2')
+  assert.deepEqual(
+    store.tabs.map((t) => t.route),
+    ['/tab1', '/tab3', '/tab2']
+  )
+})
+
+test('tabsStore.moveTabRight is a no-op when tab is at the last index or not found', () => {
+  const store = useTabsStore()
+
+  store.openTab({ route: '/tab1', title: 'Tab 1' })
+  store.openTab({ route: '/tab2', title: 'Tab 2' })
+  store.openTab({ route: '/tab3', title: 'Tab 3' })
+
+  store.moveTabRight('/tab3')
+  assert.deepEqual(
+    store.tabs.map((t) => t.route),
+    ['/tab1', '/tab2', '/tab3']
+  )
+
+  store.moveTabRight('/non-existent')
+  assert.deepEqual(
+    store.tabs.map((t) => t.route),
+    ['/tab1', '/tab2', '/tab3']
+  )
+})
+
 test('tabsStore.init hydrates tabs state from storage', async () => {
   const store = useTabsStore()
   const originalLoad = tabStorageService.loadTabsState
