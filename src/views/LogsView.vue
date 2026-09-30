@@ -91,11 +91,11 @@ const LOG_ITEM_HEIGHT = 28
 
 <template>
   <div
-    class="flex flex-col gap-2.5 h-[calc(100vh-6rem)]"
+    class="flex flex-col gap-2.5 h-full min-h-0 flex-1 overflow-hidden"
     :class="{ 'fixed inset-0 z-50 bg-surface-200 dark:bg-surface-700 p-4 h-screen': isFullscreen }"
   >
     <!-- Header -->
-    <div class="flex items-center justify-between" v-if="!isFullscreen">
+    <div class="flex items-center justify-between shrink-0" v-if="!isFullscreen">
       <div class="flex items-center gap-2">
         <Button severity="secondary" variant="text" size="small" @click="router.back()">
           <ArrowLeft class="w-4 h-4" />
@@ -108,7 +108,7 @@ const LOG_ITEM_HEIGHT = 28
     </div>
 
     <!-- Controls Bar -->
-    <div class="flex flex-col gap-2.5">
+    <div class="flex flex-col gap-2.5 shrink-0">
       <!-- Row 1: Context Selection & Actions -->
       <div class="flex items-center justify-between gap-4 flex-wrap">
         <div class="flex items-center gap-4 flex-wrap">
@@ -273,7 +273,7 @@ const LOG_ITEM_HEIGHT = 28
 
     <!-- Console Viewer -->
     <div
-      class="flex-1 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed min-h-0 selection:bg-surface-200 dark:selection:bg-primary-700 h-full overflow-hidden relative"
+      class="flex-1 min-h-0 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed selection:bg-surface-200 dark:selection:bg-primary-700 overflow-hidden relative"
     >
       <div
         v-if="filteredLogLines.length === 0"
