@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTabDragDrop } from '@/composables/useTabDragDrop'
 import { useTabsStore } from '@/stores/tabsStore'
 import type { AppTab } from '@/types/tabs'
 import { Plus } from '@lucide/vue'
@@ -14,6 +15,18 @@ const router = useRouter()
 const resourcePickerRef = ref<InstanceType<typeof AppTabResourcePicker> | null>(null)
 const tabsContainerRef = ref<HTMLElement | null>(null)
 
+const {
+  isDraggingTab,
+  getDropIndicator,
+  handleDragStart,
+  handleDragOver,
+  handleDragLeave,
+  handleDrop,
+  handleDragEnd
+} = useTabDragDrop({
+  onReorder: (from, to) => tabsStore.reorderTabs(from, to)
+})
+
 const handleWheel = (e: WheelEvent) => {
   if (tabsContainerRef.value && e.deltaY !== 0) {
     tabsContainerRef.value.scrollLeft += e.deltaY
@@ -24,6 +37,14 @@ const handleWheel = (e: WheelEvent) => {
 const handleSelectTab = (tab: AppTab) => {
   tabsStore.setActiveTab(tab.id)
   void router.push(tab.route)
+}
+
+const handleMoveTabLeft = (tabId: string) => {
+  tabsStore.moveTabLeft(tabId)
+}
+
+const handleMoveTabRight = (tabId: string) => {
+  tabsStore.moveTabRight(tabId)
 }
 
 const handleCloseTab = (tabId: string) => {
@@ -80,15 +101,26 @@ const handleResourceSelected = (payload: {
       @wheel="handleWheel"
     >
       <AppTabItem
-        v-for="tab in tabsStore.tabs"
+        v-for="(tab, index) in tabsStore.tabs"
         :key="tab.id"
         :tab="tab"
+        :index="index"
+        :total-tabs="tabsStore.tabs.length"
         :is-active="tab.id === tabsStore.activeTabId"
+        :is-dragging="isDraggingTab(tab.id)"
+        :drop-indicator="getDropIndicator(index)"
         @select="handleSelectTab(tab)"
         @close="handleCloseTab(tab.id)"
         @close-others="handleCloseOtherTabs(tab.id)"
         @close-right="handleCloseTabsToTheRight(tab.id)"
         @close-all="handleCloseAllTabs"
+        @move-left="handleMoveTabLeft(tab.id)"
+        @move-right="handleMoveTabRight(tab.id)"
+        @dragstart="handleDragStart(index, tab.id, $event)"
+        @dragover="handleDragOver(index, $event)"
+        @dragleave="handleDragLeave(index, $event)"
+        @drop="handleDrop(index, $event)"
+        @dragend="handleDragEnd"
       />
 
       <!-- New Tab (+) Button -->

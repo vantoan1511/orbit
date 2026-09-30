@@ -8,10 +8,22 @@ import ContextMenu from 'primevue/contextmenu'
 import type { MenuItem } from 'primevue/menuitem'
 import { computed, ref } from 'vue'
 
-const props = defineProps<{
-  tab: AppTab
-  isActive: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    tab: AppTab
+    isActive: boolean
+    index?: number
+    totalTabs?: number
+    isDragging?: boolean
+    dropIndicator?: 'before' | 'after' | null
+  }>(),
+  {
+    index: 0,
+    totalTabs: 1,
+    isDragging: false,
+    dropIndicator: null
+  }
+)
 
 const emit = defineEmits<{
   (e: 'select'): void
@@ -19,6 +31,8 @@ const emit = defineEmits<{
   (e: 'close-others'): void
   (e: 'close-right'): void
   (e: 'close-all'): void
+  (e: 'move-left'): void
+  (e: 'move-right'): void
 }>()
 
 const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
@@ -47,6 +61,21 @@ interface TabMenuItem extends MenuItem {
 }
 
 const menuItems = computed<TabMenuItem[]>(() => [
+  {
+    label: 'Move Tab Left',
+    shortcut: isMac ? '⌥←' : 'Alt+←',
+    disabled: props.index <= 0,
+    command: () => emit('move-left')
+  },
+  {
+    label: 'Move Tab Right',
+    shortcut: isMac ? '⌥→' : 'Alt+→',
+    disabled: props.index >= props.totalTabs - 1,
+    command: () => emit('move-right')
+  },
+  {
+    separator: true
+  },
   {
     label: 'Close Tab',
     shortcut: isMac ? '⌘W' : 'Ctrl+W',
@@ -86,11 +115,22 @@ const handleMiddleClick = () => {
 
 <template>
   <div
-    :class="getTabContainerClass(isActive)"
+    :class="[getTabContainerClass(isActive), isDragging && 'opacity-40']"
+    draggable="true"
     @click="emit('select')"
     @mousedown.middle.prevent="handleMiddleClick"
     @contextmenu="handleContextMenu"
   >
+    <!-- Drop Indicator Line (VS Code style 2px accent bar) -->
+    <div
+      v-if="dropIndicator === 'before'"
+      class="absolute left-0 top-0 bottom-0 w-0.5 bg-(--accent) z-20 pointer-events-none"
+    />
+    <div
+      v-if="dropIndicator === 'after'"
+      class="absolute right-0 top-0 bottom-0 w-0.5 bg-(--accent) z-20 pointer-events-none"
+    />
+
     <!-- Resource Icon -->
     <component
       :is="metadata.icon"
@@ -113,6 +153,8 @@ const handleMiddleClick = () => {
       size="small"
       :class="getTabCloseButtonClass(isActive)"
       v-tooltip.bottom="'Close (Ctrl+W)'"
+      draggable="false"
+      @dragstart.stop.prevent
       @click="handleCloseClick"
     >
       <template #icon>
@@ -131,7 +173,12 @@ const handleMiddleClick = () => {
         <a
           v-else
           v-bind="menuProps.action"
-          class="flex items-center justify-between w-full h-7 px-2.5 rounded-md text-xs font-medium text-muted-color hover:text-primary hover:bg-(--bg-hover) transition-colors cursor-pointer select-none no-underline"
+          :class="[
+            'flex items-center justify-between w-full h-7 px-2.5 rounded-md text-xs font-medium transition-colors select-none no-underline',
+            item.disabled
+              ? 'opacity-40 cursor-not-allowed pointer-events-none text-muted-color'
+              : 'text-muted-color hover:text-primary hover:bg-(--bg-hover) cursor-pointer'
+          ]"
         >
           <span>{{ item.label }}</span>
           <kbd

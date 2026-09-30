@@ -174,6 +174,20 @@ export const useTabsStore = defineStore('tabs', () => {
     }
   }
 
+  function moveTabLeft(tabId: string): void {
+    const index = tabs.value.findIndex((t) => t.id === tabId)
+    if (index > 0) {
+      reorderTabs(index, index - 1)
+    }
+  }
+
+  function moveTabRight(tabId: string): void {
+    const index = tabs.value.findIndex((t) => t.id === tabId)
+    if (index >= 0 && index < tabs.value.length - 1) {
+      reorderTabs(index, index + 1)
+    }
+  }
+
   function syncWithRoute(
     routePath: string,
     routeQuery?: Record<string, string>,
@@ -246,6 +260,8 @@ export const useTabsStore = defineStore('tabs', () => {
     closeTabsToTheRight,
     closeAllTabs,
     reorderTabs,
+    moveTabLeft,
+    moveTabRight,
     syncWithRoute,
     init
   }
