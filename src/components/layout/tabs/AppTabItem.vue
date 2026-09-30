@@ -24,6 +24,18 @@ const contextMenuRef = ref<InstanceType<typeof ContextMenu> | null>(null)
 
 const metadata = computed(() => getTabMetadataForRoute(props.tab.path, props.tab.query))
 
+const displayTitle = computed(() => {
+  return props.tab.title && props.tab.title !== 'Tab' ? props.tab.title : metadata.value.title
+})
+
+const tabTooltip = computed(() => {
+  if (props.tab.path === '/logs') {
+    const ns = props.tab.query?.namespace
+    return ns ? `Logs: ${displayTitle.value} (${ns})` : `Logs: ${displayTitle.value}`
+  }
+  return displayTitle.value
+})
+
 const isMac =
   typeof navigator !== 'undefined' &&
   navigator.platform &&
@@ -93,8 +105,8 @@ const handleMiddleClick = () => {
     />
 
     <!-- Tab Title -->
-    <span class="truncate flex-1 font-medium">
-      {{ tab.title && tab.title !== 'Tab' ? tab.title : metadata.title }}
+    <span v-tooltip.bottom="tabTooltip" class="truncate flex-1 font-medium">
+      {{ displayTitle }}
     </span>
 
     <!-- Close Button -->

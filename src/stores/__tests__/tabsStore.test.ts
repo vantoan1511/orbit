@@ -234,3 +234,73 @@ test('tabsStore upgrades existing tab with "Tab" title when accessed', () => {
   const reopened = store.openTab({ route: '/workloads?tab=deployments' })
   assert.equal(reopened.title, 'Deployments')
 })
+
+test('tabsStore.openTab resolves workload title for log routes', () => {
+  const store = useTabsStore()
+  const tab = store.openTab({ route: '/logs?workload=my-service' })
+  assert.equal(tab.title, 'my-service')
+  assert.equal(tab.iconName, 'FileText')
+  assert.equal(tab.category, 'logs')
+})
+
+test('tabsStore.syncWithRoute resolves workload title for log routes', () => {
+  const store = useTabsStore()
+  const tab = store.syncWithRoute('/logs', { workload: 'order-api' })
+  assert.ok(tab)
+  assert.equal(tab.title, 'order-api')
+  assert.equal(tab.iconName, 'FileText')
+  assert.equal(tab.category, 'logs')
+})
+
+test('tabsStore.init auto-heals legacy log tabs with generic "Logs" or "Tab" title', async () => {
+  const store = useTabsStore()
+  const originalLoad = tabStorageService.loadTabsState
+
+  tabStorageService.loadTabsState = async () => ({
+    tabs: [
+      {
+        id: '/logs?workload=payment-svc',
+        title: 'Logs',
+        route: '/logs?workload=payment-svc',
+        path: '/logs',
+        query: { workload: 'payment-svc' },
+        closable: true
+      },
+      {
+        id: '/logs?workload=auth-svc',
+        title: 'Tab',
+        route: '/logs?workload=auth-svc',
+        path: '/logs',
+        query: { workload: 'auth-svc' },
+        closable: true
+      }
+    ],
+    activeTabId: '/logs?workload=payment-svc'
+  })
+
+  try {
+    await store.init('heal-log-cluster')
+    const paymentTab = store.tabs.find((t) => t.id === '/logs?workload=payment-svc')
+    const authTab = store.tabs.find((t) => t.id === '/logs?workload=auth-svc')
+    assert.equal(paymentTab?.title, 'payment-svc')
+    assert.equal(authTab?.title, 'auth-svc')
+  } finally {
+    tabStorageService.loadTabsState = originalLoad
+  }
+})
+
+test('tabsStore upgrades existing log tab with "Logs" title when accessed with workload query', () => {
+  const store = useTabsStore()
+
+  store.tabs.push({
+    id: '/logs?workload=my-service',
+    title: 'Logs',
+    route: '/logs?workload=my-service',
+    path: '/logs',
+    query: { workload: 'my-service' },
+    closable: true
+  })
+
+  const reopened = store.openTab({ route: '/logs?workload=my-service' })
+  assert.equal(reopened.title, 'my-service')
+})

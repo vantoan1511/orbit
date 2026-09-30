@@ -285,8 +285,14 @@ export function getTabMetadataForRoute(path: string, query?: Record<string, stri
   }
 
   if (path === '/logs') {
+    let title = 'Logs'
+    if (query?.workload && query.workload.trim() && query.workload !== 'All') {
+      title = query.workload.trim()
+    } else if (query?.pod && query.pod.trim() && query.pod !== 'All') {
+      title = query.pod.trim()
+    }
     return {
-      title: 'Logs',
+      title,
       iconName: 'FileText',
       icon: FileText,
       iconColorClass: 'text-primary',

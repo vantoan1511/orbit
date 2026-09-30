@@ -71,3 +71,27 @@ test('getTabMetadataForRoute provides graceful fallback for unknown routes', () 
   assert.equal(unknown.iconName, 'LayoutDashboard')
   assert.ok(unknown.icon)
 })
+
+test('getTabMetadataForRoute resolves Logs tab with workload title', () => {
+  const logs = getTabMetadataForRoute('/logs', { workload: 'my-service' })
+  assert.equal(logs.title, 'my-service')
+  assert.equal(logs.iconName, 'FileText')
+  assert.equal(logs.category, 'logs')
+})
+
+test('getTabMetadataForRoute resolves Logs tab with pod title when workload is missing', () => {
+  const logs = getTabMetadataForRoute('/logs', { pod: 'my-pod-xyz' })
+  assert.equal(logs.title, 'my-pod-xyz')
+  assert.equal(logs.iconName, 'FileText')
+  assert.equal(logs.category, 'logs')
+})
+
+test('getTabMetadataForRoute falls back to "Logs" when workload/pod are empty or "All"', () => {
+  const logs = getTabMetadataForRoute('/logs', { workload: 'All', pod: 'All' })
+  assert.equal(logs.title, 'Logs')
+  assert.equal(logs.iconName, 'FileText')
+  assert.equal(logs.category, 'logs')
+
+  const emptyLogs = getTabMetadataForRoute('/logs', { workload: '', pod: '' })
+  assert.equal(emptyLogs.title, 'Logs')
+})
