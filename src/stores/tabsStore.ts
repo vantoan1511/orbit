@@ -67,7 +67,11 @@ export const useTabsStore = defineStore('tabs', () => {
     const existing = tabs.value.find((t) => t.route === target.route || t.id === target.route)
     if (existing) {
       activeTabId.value = existing.id
-      if (existing.title === 'Tab' || !existing.title) {
+      if (
+        existing.title === 'Tab' ||
+        !existing.title ||
+        (existing.path === '/logs' && existing.title === 'Logs' && resolvedTitle !== 'Logs')
+      ) {
         existing.title = resolvedTitle
       }
       if (!existing.iconName) {
@@ -208,7 +212,10 @@ export const useTabsStore = defineStore('tabs', () => {
       const state = await tabStorageService.loadTabsState(clusterId)
       if (state) {
         tabs.value = state.tabs.map((t) => {
-          if (!t.title || t.title === 'Tab') {
+          const isLegacyTab = !t.title || t.title === 'Tab'
+          const isUnresolvedLogTab =
+            t.path === '/logs' && t.title === 'Logs' && Boolean(t.query?.workload || t.query?.pod)
+          if (isLegacyTab || isUnresolvedLogTab) {
             const meta = getTabMetadataForRoute(t.path, t.query)
             return {
               ...t,
