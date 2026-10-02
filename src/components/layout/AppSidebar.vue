@@ -1,47 +1,43 @@
 <script setup lang="ts">
+import { useSidebarState } from '@/composables/useSidebarState'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSidebarActivityBar from './sidebar/AppSidebarActivityBar.vue'
 import AppSidebarClusters from './sidebar/AppSidebarClusters.vue'
 import AppSidebarLogsMenu from './sidebar/AppSidebarLogsMenu.vue'
 import AppSidebarNavMenu from './sidebar/AppSidebarNavMenu.vue'
 import AppSidebarPanel from './sidebar/AppSidebarPanel.vue'
-import { type CategoryId, type SidebarCategory } from './sidebar/navigation'
-import { RESOURCE_BREADCRUMB_MAP } from '@/utils/breadcrumb'
 
 const k8sStore = useKubernetesStore()
 const hasActiveCluster = computed(() => k8sStore.activeClusterId !== null)
 
-const activeTab = ref<CategoryId | null>('clusters')
 const route = useRoute()
 const router = useRouter()
 
-const getCategoryForRoute = (path: string): CategoryId | null => {
-  if (route.name === 'edit-workload') {
-    const kind = route.params.kind as string
-    if (kind && RESOURCE_BREADCRUMB_MAP[kind]) {
-      return RESOURCE_BREADCRUMB_MAP[kind].categoryId
-    }
-  }
-  if (path === '/logs') return 'logs'
-  if (path === '/' || path === '/nodes' || path === '/namespaces' || path === '/events')
-    return 'core'
-  if (path.startsWith('/workloads') || path === '/pods') return 'workloads'
-  if (path.startsWith('/network')) return 'network'
-  if (path.startsWith('/storage')) return 'storage'
-  if (path.startsWith('/config')) return 'config'
-  if (path.startsWith('/policies')) return 'security'
-  return null
-}
+const {
+  isCollapsed,
+  activeTab,
+  toggleCategory,
+  handleCollapse,
+  handleClusterSwitched,
+  syncWithRoute,
+  loadStoredState
+} = useSidebarState({
+  storageKey: 'orbit_sidebar_collapsed',
+  currentPath: computed(() => route.path),
+  hasActiveCluster,
+  onNavigate: (path) => void router.push(path)
+})
 
 watch(
-  () => route.path,
-  (newPath) => {
-    const category = getCategoryForRoute(newPath)
-    if (category && activeTab.value !== 'clusters' && hasActiveCluster.value) {
-      activeTab.value = category
-    }
+  () => [route.path, route.name, route.params.kind],
+  ([newPath]) => {
+    syncWithRoute(
+      newPath as string,
+      route.name as string | undefined,
+      route.params.kind as string | undefined
+    )
   },
   { immediate: true }
 )
@@ -59,23 +55,16 @@ watch(
   }
 )
 
-const toggleCategory = (cat: SidebarCategory) => {
-  if (cat.requiresCluster && !hasActiveCluster.value) {
-    return
-  }
-  if (cat.id === activeTab.value) {
-    activeTab.value = null
-    return
-  }
+onMounted(() => {
+  void loadStoredState()
+})
 
-  activeTab.value = cat.id
-  if (cat.defaultPath) {
-    router.push(cat.defaultPath)
-  }
-}
-
-const handleClusterSwitched = () => {
-  activeTab.value = getCategoryForRoute(route.path) || 'core'
+const onClusterSwitched = () => {
+  handleClusterSwitched(
+    route.path,
+    route.name as string | undefined,
+    route.params.kind as string | undefined
+  )
 }
 </script>
 
@@ -83,16 +72,16 @@ const handleClusterSwitched = () => {
   <aside class="flex h-full text-primary select-none">
     <!-- Activity Bar (Far Left Strip) -->
     <AppSidebarActivityBar
-      :active-tab="activeTab"
+      :active-tab="isCollapsed ? null : activeTab"
       :has-active-cluster="hasActiveCluster"
       @toggle-category="toggleCategory"
     />
 
     <!-- Contextual Sidebar Panel -->
-    <AppSidebarPanel :active-tab="activeTab" @collapse="activeTab = null">
+    <AppSidebarPanel :active-tab="isCollapsed ? null : activeTab" @collapse="handleCollapse">
       <AppSidebarLogsMenu v-if="activeTab === 'logs'" />
       <AppSidebarNavMenu v-else-if="activeTab !== 'clusters'" :active-tab="activeTab" />
-      <AppSidebarClusters v-else @cluster-switched="handleClusterSwitched" />
+      <AppSidebarClusters v-else @cluster-switched="onClusterSwitched" />
     </AppSidebarPanel>
   </aside>
 </template>
