@@ -15,11 +15,21 @@ import { useRouter } from 'vue-router'
 
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useLogsStore } from '@/stores/logsStore'
-import { watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import {
+  formatWorkloadContextBadge,
+  recalculateVirtualScroller,
+  CONSOLE_CONTAINER_CLASSES,
+  LOG_ROW_CLASSES,
+  LOG_ORIGIN_BADGE_CLASSES
+} from '@/utils/logsViewHelpers'
 
 const router = useRouter()
 const k8sStore = useKubernetesStore()
 const logsStore = useLogsStore()
+
+const consoleContainerRef = ref<HTMLElement | null>(null)
+let resizeObserver: ResizeObserver | null = null
 
 const {
   selectedNamespace,
@@ -32,6 +42,14 @@ const {
   podOptions,
   containerOptions
 } = useLogSelection()
+
+const workloadBadge = computed(() =>
+  formatWorkloadContextBadge(
+    selectedWorkloadKind.value,
+    selectedWorkloadName.value,
+    selectedNamespace.value
+  )
+)
 
 watch(
   [
@@ -88,6 +106,35 @@ const {
   onMountedCallback: loadRules
 })
 
+const handleRecalculate = () => {
+  recalculateVirtualScroller(
+    virtualScrollerRef.value as { init?: () => void } | null,
+    isFollowing.value,
+    scrollToBottom
+  )
+}
+
+watch(isFullscreen, async () => {
+  await nextTick()
+  handleRecalculate()
+})
+
+onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined' && consoleContainerRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      handleRecalculate()
+    })
+    resizeObserver.observe(consoleContainerRef.value)
+  }
+})
+
+onUnmounted(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+})
+
 // Fixed row height for VirtualScroller; must stay in sync with item padding/font.
 const LOG_ITEM_HEIGHT = 28
 </script>
@@ -95,12 +142,18 @@ const LOG_ITEM_HEIGHT = 28
 <template>
   <div
     class="flex flex-col gap-2.5 h-full min-h-0 flex-1 overflow-hidden"
-    :class="{ 'fixed inset-0 z-50 bg-surface-200 dark:bg-surface-700 p-4 h-screen': isFullscreen }"
+    :class="{ 'fixed inset-0 z-50 bg-(--bg-app) p-4 h-screen': isFullscreen }"
   >
     <!-- Header -->
     <div class="flex items-center justify-between shrink-0" v-if="!isFullscreen">
       <div class="flex items-center gap-2">
-        <Button severity="secondary" variant="text" size="small" @click="router.back()">
+        <Button
+          severity="secondary"
+          variant="text"
+          size="small"
+          v-tooltip.bottom="'Back'"
+          @click="router.back()"
+        >
           <ArrowLeft class="w-4 h-4" />
         </Button>
         <div class="flex items-baseline gap-2">
@@ -111,10 +164,26 @@ const LOG_ITEM_HEIGHT = 28
     </div>
 
     <!-- Controls Bar -->
-    <div class="flex flex-col gap-2.5 shrink-0">
+    <div
+      class="bg-(--bg-card) border border-(--border) rounded-lg p-3 flex flex-col gap-2.5 shrink-0"
+    >
       <!-- Row 1: Context Selection & Actions -->
       <div class="flex items-center justify-between gap-4 flex-wrap">
-        <div class="flex items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-3 flex-wrap">
+          <!-- Workload Context Badge -->
+          <div
+            v-if="workloadBadge.badgeText"
+            class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-(--bg-hover) text-xs font-mono text-primary border border-(--border) select-none shrink-0"
+            v-tooltip.bottom="
+              workloadBadge.subText ? `Namespace: ${workloadBadge.subText}` : undefined
+            "
+          >
+            <span class="font-semibold">{{ workloadBadge.badgeText }}</span>
+            <span v-if="workloadBadge.subText" class="text-muted-color text-[11px]">
+              ({{ workloadBadge.subText }})
+            </span>
+          </div>
+
           <div class="flex items-center gap-2 shrink-0">
             <span
               class="text-[10px] font-semibold tracking-wider text-muted-color uppercase select-none"
@@ -242,9 +311,14 @@ const LOG_ITEM_HEIGHT = 28
               fluid
               class="text-xs"
             />
+            <InputIcon
+              v-if="searchQuery"
+              class="pi pi-times cursor-pointer hover:text-primary transition-colors"
+              @click="searchQuery = ''"
+            />
           </IconField>
           <div class="flex items-center gap-1.5 shrink-0">
-            <Checkbox v-model="isRegex" inputId="is-regex" binary class="border-surface" />
+            <Checkbox v-model="isRegex" inputId="is-regex" binary />
             <label for="is-regex" class="text-xs text-muted-color cursor-pointer select-none"
               >Regex</label
             >
@@ -258,15 +332,9 @@ const LOG_ITEM_HEIGHT = 28
               >Timestamps</label
             >
           </div>
-          <div class="flex items-center gap-1.5 shrink-0">
-            <ToggleSwitch
-              v-model="isFollowing"
-              inputId="is-following"
-              class="scale-75 origin-left"
-            />
-            <label
-              for="is-following"
-              class="text-xs text-muted-color cursor-pointer select-none -ml-1"
+          <div class="flex items-center gap-2 shrink-0">
+            <ToggleSwitch v-model="isFollowing" inputId="is-following" />
+            <label for="is-following" class="text-xs text-muted-color cursor-pointer select-none"
               >Follow</label
             >
           </div>
@@ -275,12 +343,10 @@ const LOG_ITEM_HEIGHT = 28
     </div>
 
     <!-- Console Viewer -->
-    <div
-      class="flex-1 min-h-0 dark:bg-zinc-950 rounded p-3 font-mono text-sm text-primary-300 dark:text-surface-600 leading-relaxed selection:bg-surface-200 dark:selection:bg-primary-700 overflow-hidden relative"
-    >
+    <div ref="consoleContainerRef" :class="CONSOLE_CONTAINER_CLASSES">
       <div
         v-if="filteredLogLines.length === 0"
-        class="flex flex-col items-center justify-center h-full text-zinc-500"
+        class="flex flex-col items-center justify-center h-full text-muted-color text-xs"
       >
         <p>No log lines streamed or matching query.</p>
       </div>
@@ -289,24 +355,22 @@ const LOG_ITEM_HEIGHT = 28
         ref="virtualScrollerRef"
         :items="filteredLogLines"
         :itemSize="LOG_ITEM_HEIGHT"
-        class="h-full w-full"
+        scrollHeight="100%"
+        class="h-full! w-full"
         @scroll="onScroll"
       >
         <template #item="{ item: line, options }">
-          <div
-            :style="{ height: options.itemSize + 'px' }"
-            class="flex gap-2 hover:bg-surface-100 dark:hover:bg-primary-800 py-0.5 rounded px-1 items-center whitespace-nowrap overflow-hidden"
-          >
+          <div :style="{ height: options.itemSize + 'px' }" :class="LOG_ROW_CLASSES">
             <!-- Timestamps -->
             <span
               v-if="showTimestamps && line.timestamp"
-              class="text-zinc-600 select-none shrink-0"
+              class="text-zinc-500 font-mono text-[11px] select-none shrink-0"
             >
               {{ line.timestamp }}
             </span>
 
             <!-- Origin Pod/Container Badge -->
-            <span class="text-surface-500 font-bold shrink-0 select-none">
+            <span :class="LOG_ORIGIN_BADGE_CLASSES">
               [{{ line.pod.split('-').pop() }}/{{ line.container }}]
             </span>
 

@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { storage } from '@/services/nativeService'
+import { storage } from '../services/nativeService.ts'
 
 export interface HighlightRule {
   id: string
@@ -359,7 +359,7 @@ export function useLogHighlighting() {
           classes = 'text-fuchsia-500'
           break
         case 'gray':
-          classes = 'text-zinc-400'
+          classes = 'text-zinc-500 dark:text-zinc-400'
           break
         default:
           classes = 'text-muted-color'
