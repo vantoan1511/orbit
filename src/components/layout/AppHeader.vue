@@ -5,7 +5,7 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSearchStore } from '@/stores/searchStore'
 import { Search } from '@lucide/vue'
-import { getResourceBreadcrumbs } from '@/utils/breadcrumb'
+import { getResourceBreadcrumbs, TAB_LABEL_MAP } from '@/utils/breadcrumb'
 
 const route = useRoute()
 const searchStore = useSearchStore()
@@ -32,25 +32,6 @@ const ROUTE_LABEL_MAP: Record<string, string> = {
   settings: 'Settings',
   policies: 'Policies',
   logs: 'Logs'
-}
-
-const TAB_LABEL_MAP: Record<string, string> = {
-  configmaps: 'ConfigMaps',
-  secrets: 'Secrets',
-  deployments: 'Deployments',
-  statefulsets: 'StatefulSets',
-  daemonsets: 'DaemonSets',
-  replicasets: 'ReplicaSets',
-  jobs: 'Jobs',
-  cronjobs: 'CronJobs',
-  overview: 'Overview',
-  services: 'Services',
-  endpoints: 'Endpoints',
-  ingresses: 'Ingresses',
-  pvcs: 'Persistent Volume Claims',
-  pvs: 'Persistent Volumes',
-  storageclasses: 'Storage Classes',
-  networkpolicies: 'Network Policies'
 }
 
 const items = computed(() => {

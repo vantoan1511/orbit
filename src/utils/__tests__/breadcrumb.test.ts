@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { getResourceBreadcrumbs, RESOURCE_BREADCRUMB_MAP } from '../breadcrumb.ts'
+import { getResourceBreadcrumbs, RESOURCE_BREADCRUMB_MAP, TAB_LABEL_MAP } from '../breadcrumb.ts'
 
 test('getResourceBreadcrumbs - Deployment (namespaced workload)', () => {
   const crumbs = getResourceBreadcrumbs({
@@ -246,4 +246,9 @@ test('RESOURCE_BREADCRUMB_MAP provides valid CategoryIds matching sidebar naviga
       `Missing isClusterScoped for ${kind}`
     )
   }
+})
+
+test('TAB_LABEL_MAP formats settings subtabs correctly', () => {
+  assert.equal(TAB_LABEL_MAP['general'], 'General')
+  assert.equal(TAB_LABEL_MAP['about'], 'About')
 })

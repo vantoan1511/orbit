@@ -1,6 +1,27 @@
 import { KUBERNETES_RESOURCE_KIND } from '../constants/kubernetes.ts'
 import type { BreadcrumbItem, ResourceCategoryMetadata } from '../types/breadcrumb.ts'
 
+export const TAB_LABEL_MAP: Record<string, string> = {
+  configmaps: 'ConfigMaps',
+  secrets: 'Secrets',
+  deployments: 'Deployments',
+  statefulsets: 'StatefulSets',
+  daemonsets: 'DaemonSets',
+  replicasets: 'ReplicaSets',
+  jobs: 'Jobs',
+  cronjobs: 'CronJobs',
+  overview: 'Overview',
+  services: 'Services',
+  endpoints: 'Endpoints',
+  ingresses: 'Ingresses',
+  pvcs: 'Persistent Volume Claims',
+  pvs: 'Persistent Volumes',
+  storageclasses: 'Storage Classes',
+  networkpolicies: 'Network Policies',
+  general: 'General',
+  about: 'About'
+}
+
 export const RESOURCE_BREADCRUMB_MAP: Record<string, ResourceCategoryMetadata> = {
   [KUBERNETES_RESOURCE_KIND.Deployment]: {
     kind: KUBERNETES_RESOURCE_KIND.Deployment,

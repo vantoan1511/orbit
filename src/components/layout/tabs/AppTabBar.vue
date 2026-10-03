@@ -53,6 +53,8 @@ const handleCloseTab = (tabId: string) => {
   if (wasActive) {
     if (tabsStore.activeTab) {
       void router.push(tabsStore.activeTab.route)
+    } else {
+      void router.push('/')
     }
   }
 }
@@ -73,6 +75,7 @@ const handleCloseTabsToTheRight = (tabId: string) => {
 
 const handleCloseAllTabs = () => {
   tabsStore.closeAllTabs()
+  void router.push('/')
 }
 
 const handleNewTabClick = (event: MouseEvent) => {
