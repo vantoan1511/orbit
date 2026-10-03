@@ -19,7 +19,12 @@ export const KUBERNETES_RESOURCE_KIND = {
   PersistentVolumeClaim: 'PersistentVolumeClaim',
   StorageClass: 'StorageClass',
   Event: 'Event',
-  Policy: 'Policy'
+  Policy: 'Policy',
+  NetworkPolicy: 'NetworkPolicy',
+  ResourceQuota: 'ResourceQuota',
+  LimitRange: 'LimitRange',
+  ValidatingWebhookConfiguration: 'ValidatingWebhookConfiguration',
+  MutatingWebhookConfiguration: 'MutatingWebhookConfiguration'
 } as const
 
 export type KubernetesResourceKind =

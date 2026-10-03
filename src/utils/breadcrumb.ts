@@ -175,6 +175,51 @@ export const RESOURCE_BREADCRUMB_MAP: Record<string, ResourceCategoryMetadata> =
     typeLabel: 'Policies',
     typeRoute: '/policies',
     isClusterScoped: true
+  },
+  [KUBERNETES_RESOURCE_KIND.NetworkPolicy]: {
+    kind: KUBERNETES_RESOURCE_KIND.NetworkPolicy,
+    categoryId: 'security',
+    categoryLabel: 'Policies',
+    categoryRoute: '/policies',
+    typeLabel: 'Network Policies',
+    typeRoute: '/policies?tab=network',
+    isClusterScoped: false
+  },
+  [KUBERNETES_RESOURCE_KIND.ResourceQuota]: {
+    kind: KUBERNETES_RESOURCE_KIND.ResourceQuota,
+    categoryId: 'security',
+    categoryLabel: 'Policies',
+    categoryRoute: '/policies',
+    typeLabel: 'Resource Quotas',
+    typeRoute: '/policies?tab=resource',
+    isClusterScoped: false
+  },
+  [KUBERNETES_RESOURCE_KIND.LimitRange]: {
+    kind: KUBERNETES_RESOURCE_KIND.LimitRange,
+    categoryId: 'security',
+    categoryLabel: 'Policies',
+    categoryRoute: '/policies',
+    typeLabel: 'Limit Ranges',
+    typeRoute: '/policies?tab=resource',
+    isClusterScoped: false
+  },
+  [KUBERNETES_RESOURCE_KIND.ValidatingWebhookConfiguration]: {
+    kind: KUBERNETES_RESOURCE_KIND.ValidatingWebhookConfiguration,
+    categoryId: 'security',
+    categoryLabel: 'Policies',
+    categoryRoute: '/policies',
+    typeLabel: 'Validating Webhooks',
+    typeRoute: '/policies?tab=admission',
+    isClusterScoped: true
+  },
+  [KUBERNETES_RESOURCE_KIND.MutatingWebhookConfiguration]: {
+    kind: KUBERNETES_RESOURCE_KIND.MutatingWebhookConfiguration,
+    categoryId: 'security',
+    categoryLabel: 'Policies',
+    categoryRoute: '/policies',
+    typeLabel: 'Mutating Webhooks',
+    typeRoute: '/policies?tab=admission',
+    isClusterScoped: true
   }
 }
 

@@ -2,10 +2,11 @@ use kube::{
     api::{Api, PostParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Node, Namespace};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Node, Namespace, ResourceQuota, LimitRange};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
+use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
 use serde_json::Value;
 
 fn to_json_val<T: serde::Serialize>(val: &T, kind: &str) -> Result<Value, kube::Error> {
@@ -101,6 +102,55 @@ pub async fn get_resource_raw(
             let resource = api.get(name).await?;
             to_json_val(&resource, kind)
         }
+        "ResourceQuota" => {
+            let api: Api<ResourceQuota> = Api::namespaced(client.clone(), namespace);
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
+        "LimitRange" => {
+            let api: Api<LimitRange> = Api::namespaced(client.clone(), namespace);
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
+        "ValidatingWebhookConfiguration" => {
+            let api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
+        "MutatingWebhookConfiguration" => {
+            let api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
+        "Policy" => {
+            // Attempt resolution across the 5 policy types supported by Orbit
+            let net_api: Api<NetworkPolicy> = Api::namespaced(client.clone(), namespace);
+            if let Ok(res) = net_api.get(name).await {
+                return to_json_val(&res, "NetworkPolicy");
+            }
+            let quota_api: Api<ResourceQuota> = Api::namespaced(client.clone(), namespace);
+            if let Ok(res) = quota_api.get(name).await {
+                return to_json_val(&res, "ResourceQuota");
+            }
+            let limit_api: Api<LimitRange> = Api::namespaced(client.clone(), namespace);
+            if let Ok(res) = limit_api.get(name).await {
+                return to_json_val(&res, "LimitRange");
+            }
+            let val_api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
+            if let Ok(res) = val_api.get(name).await {
+                return to_json_val(&res, "ValidatingWebhookConfiguration");
+            }
+            let mut_api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
+            if let Ok(res) = mut_api.get(name).await {
+                return to_json_val(&res, "MutatingWebhookConfiguration");
+            }
+            Err(kube::Error::Api(kube::error::ErrorResponse {
+                status: "Failure".to_string(),
+                message: format!("Policy resource not found: {}", name),
+                reason: "NotFound".to_string(),
+                code: 404,
+            }))
+        }
         _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported get resource kind: {}", kind),
@@ -149,7 +199,16 @@ pub async fn apply_resource(
         }};
     }
 
-    match kind {
+    let resolved_kind = if kind == "Policy" {
+        raw_json
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or(kind)
+    } else {
+        kind
+    };
+
+    match resolved_kind {
         "Pod" => replace_resource!(Pod),
         "Deployment" => replace_resource!(Deployment),
         "StatefulSet" => replace_resource!(StatefulSet),
@@ -165,6 +224,10 @@ pub async fn apply_resource(
         "Ingress" => replace_resource!(Ingress),
         "Node" => replace_cluster_resource!(Node),
         "Namespace" => replace_cluster_resource!(Namespace),
+        "ResourceQuota" => replace_resource!(ResourceQuota),
+        "LimitRange" => replace_resource!(LimitRange),
+        "ValidatingWebhookConfiguration" => replace_cluster_resource!(ValidatingWebhookConfiguration),
+        "MutatingWebhookConfiguration" => replace_cluster_resource!(MutatingWebhookConfiguration),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported apply resource kind: {}", kind),
@@ -213,7 +276,16 @@ pub async fn create_resource(
         }};
     }
 
-    match kind {
+    let resolved_kind = if kind == "Policy" {
+        raw_json
+            .get("kind")
+            .and_then(|k| k.as_str())
+            .unwrap_or(kind)
+    } else {
+        kind
+    };
+
+    match resolved_kind {
         "Pod" => create_resource!(Pod),
         "Deployment" => create_resource!(Deployment),
         "StatefulSet" => create_resource!(StatefulSet),
@@ -229,6 +301,10 @@ pub async fn create_resource(
         "Ingress" => create_resource!(Ingress),
         "Node" => create_cluster_resource!(Node),
         "Namespace" => create_cluster_resource!(Namespace),
+        "ResourceQuota" => create_resource!(ResourceQuota),
+        "LimitRange" => create_resource!(LimitRange),
+        "ValidatingWebhookConfiguration" => create_cluster_resource!(ValidatingWebhookConfiguration),
+        "MutatingWebhookConfiguration" => create_cluster_resource!(MutatingWebhookConfiguration),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported create resource kind: {}", kind),
@@ -330,5 +406,49 @@ mod tests {
         let ports = spec.containers[0].ports.as_ref().expect("ports should be present");
         assert_eq!(ports.len(), 1);
         assert_eq!(ports[0].container_port, 80);
+    }
+
+    #[test]
+    fn test_resource_quota_manifest_parse() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "ResourceQuota",
+            "metadata": {
+                "name": "compute-quota",
+                "namespace": "default"
+            },
+            "spec": {
+                "hard": {
+                    "pods": "10",
+                    "requests.cpu": "4"
+                }
+            }
+        });
+        let parsed: Result<ResourceQuota, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let quota = parsed.unwrap();
+        assert_eq!(quota.metadata.name.as_deref(), Some("compute-quota"));
+    }
+
+    #[test]
+    fn test_policy_fallback_kind_resolution_from_json() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                "name": "isolate-net",
+                "namespace": "default"
+            }
+        });
+        let kind = "Policy";
+        let resolved_kind = if kind == "Policy" {
+            manifest_json
+                .get("kind")
+                .and_then(|k| k.as_str())
+                .unwrap_or(kind)
+        } else {
+            kind
+        };
+        assert_eq!(resolved_kind, "NetworkPolicy");
     }
 }

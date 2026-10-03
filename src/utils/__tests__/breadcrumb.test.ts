@@ -217,6 +217,53 @@ test('getResourceBreadcrumbs - Policy (cluster-scoped)', () => {
   ])
 })
 
+test('getResourceBreadcrumbs - NetworkPolicy (namespaced policy)', () => {
+  const crumbs = getResourceBreadcrumbs({
+    kind: 'NetworkPolicy',
+    namespace: 'default',
+    name: 'allow-dns'
+  })
+
+  assert.deepEqual(crumbs, [
+    { label: 'Policies', route: '/policies' },
+    { label: 'Network Policies', route: '/policies?tab=network' },
+    { label: 'default' },
+    { label: 'allow-dns' },
+    { label: 'Edit' }
+  ])
+})
+
+test('getResourceBreadcrumbs - ResourceQuota (namespaced policy)', () => {
+  const crumbs = getResourceBreadcrumbs({
+    kind: 'ResourceQuota',
+    namespace: 'prod',
+    name: 'compute-quota'
+  })
+
+  assert.deepEqual(crumbs, [
+    { label: 'Policies', route: '/policies' },
+    { label: 'Resource Quotas', route: '/policies?tab=resource' },
+    { label: 'prod' },
+    { label: 'compute-quota' },
+    { label: 'Edit' }
+  ])
+})
+
+test('getResourceBreadcrumbs - ValidatingWebhookConfiguration (cluster-scoped policy)', () => {
+  const crumbs = getResourceBreadcrumbs({
+    kind: 'ValidatingWebhookConfiguration',
+    namespace: '-',
+    name: 'val-webhook'
+  })
+
+  assert.deepEqual(crumbs, [
+    { label: 'Policies', route: '/policies' },
+    { label: 'Validating Webhooks', route: '/policies?tab=admission' },
+    { label: 'val-webhook' },
+    { label: 'Edit' }
+  ])
+})
+
 test('getResourceBreadcrumbs - Fallback for unknown kind', () => {
   const crumbs = getResourceBreadcrumbs({
     kind: 'CustomResource',

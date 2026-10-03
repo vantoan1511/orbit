@@ -255,7 +255,11 @@ watch(
             Edit {{ props.kind }}
           </h1>
           <span class="text-xs font-medium text-muted-color font-mono">
-            {{ props.namespace }} / {{ props.name }}
+            {{
+              props.namespace && props.namespace !== '-'
+                ? `${props.namespace} / ${props.name}`
+                : props.name
+            }}
           </span>
         </div>
       </div>
