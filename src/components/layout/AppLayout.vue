@@ -39,12 +39,7 @@ const currentLayoutMeta = computed(() => {
 watch(
   () => [route.path, route.query],
   ([newPath, newQuery]) => {
-    if (
-      !isSwitchingCluster.value &&
-      k8sStore.activeClusterId !== null &&
-      newPath !== '/welcome' &&
-      newPath !== '/settings'
-    ) {
+    if (!isSwitchingCluster.value && k8sStore.activeClusterId !== null && newPath !== '/welcome') {
       const meta = getTabMetadataForRoute(newPath as string, newQuery as Record<string, string>)
       tabsStore.syncWithRoute(
         newPath as string,
@@ -111,6 +106,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
       tabsStore.closeTab(wasActive)
       if (tabsStore.activeTab) {
         void router.push(tabsStore.activeTab.route)
+      } else {
+        void router.push('/')
       }
     }
   }

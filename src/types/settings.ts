@@ -43,3 +43,18 @@ export interface Configuration<T = unknown> {
  * Key-value mapping for direct overrides and backward compatibility.
  */
 export type ConfigurationMap = Record<string, unknown>
+
+export type SettingsSubTab =
+  'general' | 'clusters' | 'preferences' | 'appearance' | 'notifications' | 'proxy' | 'about'
+
+export const VALID_SETTINGS_TABS: readonly SettingsSubTab[] = [
+  'general',
+  'clusters',
+  'preferences',
+  'appearance',
+  'notifications',
+  'proxy',
+  'about'
+] as const
+
+export const ENABLED_SETTINGS_TABS: readonly SettingsSubTab[] = ['general', 'about'] as const

@@ -212,6 +212,26 @@ export const useTabsStore = defineStore('tabs', () => {
     const resolvedIconName = iconName || meta.iconName
     const resolvedCategory = category || meta.category
 
+    if (routePath === '/settings') {
+      const existingSettingsTab = tabs.value.find((t) => t.path === '/settings')
+      if (existingSettingsTab) {
+        existingSettingsTab.route = fullRoute
+        existingSettingsTab.query = routeQuery
+        if (!existingSettingsTab.title || existingSettingsTab.title === 'Tab') {
+          existingSettingsTab.title = resolvedTitle
+        }
+        if (!existingSettingsTab.iconName) {
+          existingSettingsTab.iconName = resolvedIconName
+        }
+        if (!existingSettingsTab.category) {
+          existingSettingsTab.category = resolvedCategory
+        }
+        activeTabId.value = existingSettingsTab.id
+        scheduleSave()
+        return existingSettingsTab
+      }
+    }
+
     return openTab({
       route: fullRoute,
       title: resolvedTitle,

@@ -372,3 +372,67 @@ test('tabsStore upgrades existing log tab with "Logs" title when accessed with w
   const reopened = store.openTab({ route: '/logs?workload=my-service' })
   assert.equal(reopened.title, 'my-service')
 })
+
+test('tabsStore.syncWithRoute creates and activates Settings tab', () => {
+  const store = useTabsStore()
+
+  const tab = store.syncWithRoute('/settings')
+  assert.ok(tab)
+  assert.equal(tab.title, 'Settings')
+  assert.equal(tab.iconName, 'Settings')
+  assert.equal(tab.category, 'settings')
+  assert.equal(tab.route, '/settings')
+  assert.equal(store.activeTabId, '/settings')
+  assert.equal(store.tabs.length, 1)
+})
+
+test('tabsStore.syncWithRoute keeps a single Settings tab across subtabs and updates route', () => {
+  const store = useTabsStore()
+
+  const tab1 = store.syncWithRoute('/settings')
+  assert.ok(tab1)
+  assert.equal(store.tabs.length, 1)
+  assert.equal(store.tabs[0]?.route, '/settings')
+  assert.equal(store.activeTabId, tab1.id)
+
+  const tab2 = store.syncWithRoute('/settings', { tab: 'about' })
+  assert.ok(tab2)
+  assert.equal(store.tabs.length, 1, 'Should keep only 1 tab for Settings')
+  assert.equal(tab2.id, tab1.id, 'Tab id should remain stable')
+  assert.equal(
+    store.tabs[0]?.route,
+    '/settings?tab=about',
+    'Tab route should be updated with new query'
+  )
+  assert.equal(store.activeTabId, tab1.id)
+
+  const tab3 = store.syncWithRoute('/settings', { tab: 'general' })
+  assert.ok(tab3)
+  assert.equal(store.tabs.length, 1)
+  assert.equal(tab3.id, tab1.id)
+  assert.equal(store.tabs[0]?.route, '/settings?tab=general')
+  assert.equal(store.activeTabId, tab1.id)
+})
+
+test('tabsStore.syncWithRoute keeps separate /logs tabs per query', () => {
+  const store = useTabsStore()
+
+  const tab1 = store.syncWithRoute('/logs', { workload: 'frontend' })
+  const tab2 = store.syncWithRoute('/logs', { workload: 'backend' })
+
+  assert.equal(store.tabs.length, 2)
+  assert.notEqual(tab1?.id, tab2?.id)
+})
+
+test('closing only remaining tab leaves activeTab null allowing fallback to empty workspace', () => {
+  const store = useTabsStore()
+
+  store.openTab({ route: '/settings' })
+  assert.equal(store.tabs.length, 1)
+  assert.equal(store.activeTabId, '/settings')
+
+  store.closeTab('/settings')
+  assert.equal(store.tabs.length, 0)
+  assert.equal(store.activeTabId, null)
+  assert.equal(store.activeTab, null)
+})
