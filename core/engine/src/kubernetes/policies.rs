@@ -106,6 +106,7 @@ pub fn format_network_policy(p: &NetworkPolicy) -> PolicyInfo {
         last_updated: age,
         description: "Kubernetes NetworkPolicy".to_string(),
         rules,
+        kind: "NetworkPolicy".to_string(),
     }
 }
 
@@ -128,6 +129,7 @@ pub fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
         last_updated: age,
         description: "Kubernetes ResourceQuota".to_string(),
         rules,
+        kind: "ResourceQuota".to_string(),
     }
 }
 
@@ -150,6 +152,7 @@ pub fn format_limit_range(p: &LimitRange) -> PolicyInfo {
         last_updated: age,
         description: "Kubernetes LimitRange".to_string(),
         rules,
+        kind: "LimitRange".to_string(),
     }
 }
 
@@ -171,6 +174,7 @@ pub fn format_val_webhook(p: &ValidatingWebhookConfiguration) -> PolicyInfo {
         last_updated: age,
         description: "Kubernetes ValidatingWebhookConfiguration".to_string(),
         rules,
+        kind: "ValidatingWebhookConfiguration".to_string(),
     }
 }
 
@@ -192,5 +196,85 @@ pub fn format_mut_webhook(p: &MutatingWebhookConfiguration) -> PolicyInfo {
         last_updated: age,
         description: "Kubernetes MutatingWebhookConfiguration".to_string(),
         rules,
+        kind: "MutatingWebhookConfiguration".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+    #[test]
+    fn test_format_network_policy_sets_kind() {
+        let p = NetworkPolicy {
+            metadata: ObjectMeta {
+                name: Some("test-netpol".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let info = format_network_policy(&p);
+        assert_eq!(info.kind, "NetworkPolicy");
+        assert_eq!(info.name, "test-netpol");
+    }
+
+    #[test]
+    fn test_format_resource_quota_sets_kind() {
+        let p = ResourceQuota {
+            metadata: ObjectMeta {
+                name: Some("test-quota".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let info = format_resource_quota(&p);
+        assert_eq!(info.kind, "ResourceQuota");
+        assert_eq!(info.name, "test-quota");
+    }
+
+    #[test]
+    fn test_format_limit_range_sets_kind() {
+        let p = LimitRange {
+            metadata: ObjectMeta {
+                name: Some("test-limit".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let info = format_limit_range(&p);
+        assert_eq!(info.kind, "LimitRange");
+        assert_eq!(info.name, "test-limit");
+    }
+
+    #[test]
+    fn test_format_val_webhook_sets_kind() {
+        let p = ValidatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("test-val-webhook".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let info = format_val_webhook(&p);
+        assert_eq!(info.kind, "ValidatingWebhookConfiguration");
+        assert_eq!(info.name, "test-val-webhook");
+    }
+
+    #[test]
+    fn test_format_mut_webhook_sets_kind() {
+        let p = MutatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("test-mut-webhook".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let info = format_mut_webhook(&p);
+        assert_eq!(info.kind, "MutatingWebhookConfiguration");
+        assert_eq!(info.name, "test-mut-webhook");
     }
 }
