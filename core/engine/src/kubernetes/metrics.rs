@@ -99,6 +99,7 @@ pub async fn poll_pod_metrics(
     client: Client,
     writer: Arc<Mutex<WsWriter>>,
     token: String,
+    cluster_id: Option<String>,
     mut cancel_rx: tokio::sync::watch::Receiver<bool>,
 ) {
     let gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "PodMetrics");
@@ -119,7 +120,7 @@ pub async fn poll_pod_metrics(
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
-                        &OrbitEvent::PodMetricsUpdated { metrics },
+                        &OrbitEvent::PodMetricsUpdated { cluster_id: cluster_id.clone(), metrics },
                     ).await;
                 }
             }

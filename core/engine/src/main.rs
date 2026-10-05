@@ -50,6 +50,7 @@ async fn restart_watchers(
     }
 
     let client = w_manager.active_client.clone();
+    let active_cluster_id = w_manager.active_context.clone();
     let (tx, rx) = tokio::sync::watch::channel(false);
     w_manager.watch_cancel = Some(tx);
     drop(w_manager);
@@ -60,6 +61,7 @@ async fn restart_watchers(
             bridge.writer.clone(),
             bridge.token.clone(),
             rx,
+            active_cluster_id,
         );
     }
 }

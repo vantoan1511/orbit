@@ -26,6 +26,7 @@ pub async fn watch_resource<K, M, F>(
     client: Client,
     writer: Arc<Mutex<WsWriter>>,
     ipc_token: String,
+    cluster_id: Option<String>,
     kind: String,
     mut cancel_rx: watch::Receiver<bool>,
     mapper: F,
@@ -54,6 +55,7 @@ pub async fn watch_resource<K, M, F>(
             key_index: &mut HashMap<String, usize>,
             writer: &Arc<Mutex<WsWriter>>,
             ipc_token: &str,
+            cluster_id: Option<String>,
             kind: &str,
         ) {
             if !buffer.is_empty() {
@@ -61,6 +63,7 @@ pub async fn watch_resource<K, M, F>(
                 key_index.clear();
                 let event = OrbitEvent::ResourceBatchUpdated {
                     kind: kind.to_string(),
+                    cluster_id,
                     updates,
                 };
                 let _ = Bridge::send_event(writer, ipc_token, &event).await;
@@ -72,12 +75,12 @@ pub async fn watch_resource<K, M, F>(
                 res = cancel_rx.changed() => {
                     if res.is_ok() && *cancel_rx.borrow() {
                         tracing::info!(kind = %kind, "Stopping watcher");
-                        flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, &kind).await;
+                        flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, cluster_id.clone(), &kind).await;
                         break 'outer;
                     }
                 }
                 _ = flush_interval.tick() => {
-                    flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, &kind).await;
+                    flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, cluster_id.clone(), &kind).await;
                 }
                 event = stream.next() => {
                     let maybe_item = match event {
@@ -88,7 +91,7 @@ pub async fn watch_resource<K, M, F>(
                             Some(("Deleted", obj))
                         }
                         Some(Ok(watcher::Event::InitDone)) => {
-                            flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, &kind).await;
+                            flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, cluster_id.clone(), &kind).await;
                             tracing::info!(kind = %kind, "Watcher initial sync done");
                             None
                         }
@@ -99,7 +102,7 @@ pub async fn watch_resource<K, M, F>(
                         }
                         None => {
                             tracing::info!(kind = %kind, "Watcher stream ended, reconnecting...");
-                            flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, &kind).await;
+                            flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, cluster_id.clone(), &kind).await;
                             break;
                         }
                     };
@@ -120,7 +123,7 @@ pub async fn watch_resource<K, M, F>(
                                 buffer.push(update);
                             }
                             if buffer.len() >= 100 {
-                                flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, &kind).await;
+                                flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, cluster_id.clone(), &kind).await;
                             }
                         }
                     }

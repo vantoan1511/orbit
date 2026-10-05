@@ -142,9 +142,11 @@ export interface OrbitEventMap {
   }
   resourceBatchUpdated: {
     kind: KubernetesResourceKind | string
+    cluster_id: string | null
     updates: ResourceUpdateItem[]
   }
   podMetricsUpdated: {
+    cluster_id: string | null
     metrics: Array<{
       name: string
       namespace: string

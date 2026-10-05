@@ -32,7 +32,7 @@ pub fn get_clusters(
         let _ = Bridge::send_event(
             &writer,
             &token,
-            &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+            &OrbitEvent::ActiveClusterChanged { active_cluster_id: active_cluster_id.clone() },
         ).await;
     });
 }
@@ -87,7 +87,7 @@ pub fn switch_cluster(
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
-                        &OrbitEvent::ActiveClusterChanged { active_cluster_id },
+                        &OrbitEvent::ActiveClusterChanged { active_cluster_id: active_cluster_id.clone() },
                     ).await;
 
                     let _ = Bridge::send_event(
@@ -104,7 +104,7 @@ pub fn switch_cluster(
 
                     // Spawn watchers and metrics poller for the new cluster.
                     if let Some(ref client) = client {
-                        spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
+                        spawn_watchers(client, writer.clone(), token.clone(), rx.clone(), active_cluster_id.clone());
                     }
 
                     // Stop previous active forwards and restore persisted forwards for the new cluster
@@ -174,7 +174,7 @@ pub fn add_cluster(
 
                     // Spawn watchers and metrics poller for the new cluster.
                     if let Some(ref client) = client {
-                        spawn_watchers(client, writer.clone(), token.clone(), rx.clone());
+                        spawn_watchers(client, writer.clone(), token.clone(), rx.clone(), active_cluster_id.clone());
                     }
 
                     // Stop previous active forwards and restore persisted forwards for the new cluster
