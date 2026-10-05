@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import type { PolicyInfo } from '@/types/kubernetes'
-import { Clock } from '@lucide/vue'
+import { Clock, FileCode } from '@lucide/vue'
+import Button from 'primevue/button'
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { resolveEditTargetParams } from '@/utils/workloadActions'
 
 const props = defineProps<{
   visible: boolean
@@ -12,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
+
+const router = useRouter()
 
 const activeTab = ref('overview')
 
@@ -33,6 +38,19 @@ const getPolicyBadgeClass = (status: string) => {
   if (status === 'Audit') return 'bg-blue-500'
   return 'bg-gray-500'
 }
+
+const handleEdit = () => {
+  if (!props.policy) return
+  const target = resolveEditTargetParams(props.policy, 'Policy')
+  router.push({
+    name: 'edit-workload',
+    params: {
+      kind: target.kind,
+      namespace: target.namespace,
+      name: target.name
+    }
+  })
+}
 </script>
 
 <template>
@@ -46,6 +64,20 @@ const getPolicyBadgeClass = (status: string) => {
     :status-badge-class="props.policy ? getPolicyBadgeClass(props.policy.status) : 'bg-gray-500'"
     @update:visible="emit('update:visible', $event)"
   >
+    <template #actions>
+      <Button
+        severity="secondary"
+        size="small"
+        variant="outlined"
+        class="text-xs flex items-center gap-1.5"
+        v-tooltip.top="'Edit'"
+        @click="handleEdit"
+      >
+        <FileCode class="w-3.5 h-3.5" />
+        <span>Edit</span>
+      </Button>
+    </template>
+
     <template #metadata>
       <div
         v-if="props.policy"

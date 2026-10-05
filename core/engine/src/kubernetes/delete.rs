@@ -2,10 +2,11 @@ use kube::{
     api::{Api, DeleteParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Namespace};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Namespace, ResourceQuota, LimitRange};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
+use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
 
 pub async fn delete_resource(
     client: &Client,
@@ -70,6 +71,22 @@ pub async fn delete_resource(
         }
         "Namespace" => {
             let api: Api<Namespace> = Api::all(client.clone());
+            api.delete(name, &delete_params).await?;
+        }
+        "ResourceQuota" => {
+            let api: Api<ResourceQuota> = Api::namespaced(client.clone(), namespace);
+            api.delete(name, &delete_params).await?;
+        }
+        "LimitRange" => {
+            let api: Api<LimitRange> = Api::namespaced(client.clone(), namespace);
+            api.delete(name, &delete_params).await?;
+        }
+        "ValidatingWebhookConfiguration" => {
+            let api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
+            api.delete(name, &delete_params).await?;
+        }
+        "MutatingWebhookConfiguration" => {
+            let api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
             api.delete(name, &delete_params).await?;
         }
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {

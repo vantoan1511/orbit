@@ -371,6 +371,7 @@ export interface PolicyInfo {
   lastUpdated: string
   description: string
   rules: string
+  kind: string
 }
 
 export interface ActivePortForward {

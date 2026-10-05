@@ -393,6 +393,7 @@ pub struct PolicyInfo {
     pub last_updated: String,
     pub description: String,
     pub rules: String,
+    pub kind: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

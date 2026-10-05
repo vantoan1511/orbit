@@ -13,6 +13,7 @@ import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
 import PortForwardDialog from '@/components/shared/PortForwardDialog.vue'
 import { getAvailablePorts } from '@/utils/portForward'
+import { resolveEditTargetParams } from '@/utils/workloadActions'
 
 export { getAvailablePorts }
 
@@ -438,12 +439,16 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
         icon: 'pi pi-file-edit',
         command: () => {
           if (selectedActionRow.value) {
+            const target = resolveEditTargetParams(
+              selectedActionRow.value as { name: string; namespace?: string; kind?: string },
+              resourceKind
+            )
             router.push({
               name: 'edit-workload',
               params: {
-                kind: resourceKind,
-                namespace: selectedActionRow.value.namespace || 'default',
-                name: selectedActionRow.value.name
+                kind: target.kind,
+                namespace: target.namespace,
+                name: target.name
               }
             })
           }
