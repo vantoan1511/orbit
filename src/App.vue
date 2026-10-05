@@ -39,7 +39,10 @@ import Toast from 'primevue/toast'
 import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
+import { useEngineConnection } from './composables/useEngineConnection'
 import AppLayout from './components/layout/AppLayout.vue'
+
+useEngineConnection()
 
 const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()

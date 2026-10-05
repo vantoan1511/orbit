@@ -202,12 +202,17 @@ export interface OrbitEventMap {
   portForwardsUpdated: {
     portForwards: ActivePortForward[]
   }
+  serverOffline: {
+    code?: string
+    message?: string
+  }
 }
 
 /** Sentinel value for the tailLines IPC field meaning "fetch all log lines". */
 export const TAIL_ALL_LINES = -1 as const
 
 export const OrbitEvents = {
+  ServerOffline: 'serverOffline',
   EngineConnected: 'engineConnected',
   EngineTimeout: 'engineTimeout',
   Ping: 'ping',
