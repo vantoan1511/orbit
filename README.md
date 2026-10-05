@@ -1,7 +1,7 @@
 # Orbit 🛰️
 
 <p align="center">
-  <strong>Lightweight, high-performance native desktop Kubernetes dashboard.</strong>
+  <strong>A lightweight, native Kubernetes desktop dashboard built with Rust and Neutralinojs.</strong>
 </p>
 
 <p align="center">
@@ -14,54 +14,62 @@
 </p>
 
 ---
-   
-Orbit is a fast, native-feeling desktop dashboard crafted for exploring, monitoring, and managing Kubernetes clusters. Built on top of a compiled **Rust engine** and the lightweight **Neutralinojs** desktop runtime, Orbit delivers instant startup, low memory footprint, and low-latency cluster API communication — without the bloat of traditional Electron applications.
+
+Desktop Kubernetes management shouldn't require running a dedicated Chromium instance consuming 1–2 GB of RAM just to check a Pod status or inspect an ingress rule.
+
+**Orbit** is built for engineers who want a snappy, native-feeling desktop experience without the Electron overhead. By pairing a compiled **Rust core engine** with **Neutralinojs** (which utilizes your operating system's native webview), Orbit starts in milliseconds, sips memory, and keeps cluster operations isolated and fast.
+
+<p align="center">
+  <img src="screenshots/screenshot.png" alt="Orbit Preview" width="850" />
+  <br />
+  <em>Fast, compact, and designed for day-to-day cluster navigation.</em>
+</p>
 
 ---
 
 ## ⚡ Why Orbit?
 
-- **Native Rust Engine**: Low-latency communication with Kubernetes APIs, stream parsing, and credentials management handled by compiled native Rust binaries.
-- **Zero Electron Overhead**: Powered by [Neutralinojs](https://neutralino.js.org/), utilizing native operating system webview capabilities rather than bundling a duplicate Chromium browser.
-- **Security-First Architecture**: Sensitive kubeconfigs, tokens, and certificates are isolated inside the local Rust backend and never directly exposed to the frontend presentation layer.
-- **Compact & Technical Design**: Inspired by modern developer IDEs and the PrimeVue Nora theme — dense, monochrome/noir, and designed for efficient daily cluster operations.
+- **Compiled Rust Core**: High-throughput Kubernetes communication, streaming log parsers, and connection pools run in native Rust via `kube-rs` and `tokio`.
+- **Zero Electron Overhead**: Built on [Neutralinojs](https://neutralino.js.org/). We hook into your OS's built-in webview instead of shipping an entire redundant browser binary.
+- **Security by Isolation**: Kubeconfig credentials, certificates, and cluster tokens live exclusively within the local Rust process—never leaking into the frontend presentation layer.
+- **IDE-Grade Density**: Dark-first, noir-inspired technical design powered by PrimeVue v4 (Nora preset). Information-dense, clean, and distraction-free.
 
 ---
 
 ## ✨ Features
 
-### ☸️ Cluster & Context Management
+### ☸️ Context & Namespace Navigation
 
-- **Instant Context Switching**: Seamlessly toggle between local (k3s, Minikube, Kind) and remote cloud Kubernetes clusters.
-- **Namespace Filtering**: Global namespace scope switcher with immediate resource updates across all views.
-- **Offline Cluster Awareness**: Graceful handling and clear diagnostics when clusters or nodes are unreachable.
+- **Instant Context Switching**: Jump between local clusters (Kind, k3s, Minikube) and remote cloud environments without reload lag.
+- **Isolated Namespace Scoping**: Filter resources globally or inspect multiple namespaces side-by-side with zero cross-cluster state bleed.
+- **Connection Diagnostics**: Immediate visual status when a cluster or control plane endpoint is degraded or unreachable.
 
-### 📦 Complete Resource Explorer
+### 📦 Comprehensive Resource Explorer
 
-- **Workloads**: Inspect Deployments, Pods, StatefulSets, DaemonSets, Jobs, CronJobs, and ReplicaSets with live status indicators.
-- **Configuration & Storage**: Inspect ConfigMaps, Secrets, HPAs, PersistentVolumes, PersistentVolumeClaims, and StorageClasses.
-- **Network & Security**: Explore Services, Ingresses, NetworkPolicies, ResourceQuotas, and LimitRanges.
-- **Cluster Infrastructure**: Deep-dive into Nodes, Namespaces, and system-level events.
+- **Workloads**: Inspect Deployments, Pods, StatefulSets, DaemonSets, Jobs, CronJobs, and ReplicaSets with live health indicators.
+- **Configuration & Storage**: Deep-dive into ConfigMaps, Secrets, HPAs, PersistentVolumes, PVCs, and StorageClasses.
+- **Network & Security**: Audit Services, Ingress routes, NetworkPolicies, ResourceQuotas, and LimitRanges.
+- **Cluster Infrastructure**: Review Nodes, Namespaces, and system-wide cluster events.
 
-### 📝 Live YAML & In-App Apply
+### 📝 Integrated Monaco YAML & Direct Apply
 
-- **Integrated Monaco Editor**: Syntax-highlighted YAML editor with real-time Kubernetes schema awareness.
-- **Direct Apply & Diff**: Edit and apply manifests directly to the cluster with structured error feedback.
+- **Live Manifest Editor**: Syntax-highlighted YAML editing powered by Monaco Editor with real-time Kubernetes schema awareness.
+- **Diff & In-App Apply**: Review edits and apply updates directly to the cluster with structured feedback and validation errors.
 
-### 📊 Real-Time Logs & Events
+### 📊 Real-Time Logs & Cluster Events
 
-- **Pod Log Streaming**: Follow live container logs, switch between multi-container pods, and filter log output.
-- **Cluster Events**: Filter and monitor recent cluster warnings, errors, and lifecycle events.
+- **Pod Log Streaming**: Follow live container output with multi-container tab switching and text filtering.
+- **Event Timeline**: Filter warnings, container crashes, and lifecycle events across namespaces in real time.
 
-### 🔄 Seamless Background Updates
+### 🔌 Persistent Port Forwarding
 
-- **Automatic Version Checks**: Integrated lightweight Rust updater keeps your installation secure and up to date.
+- **Background Tunnels**: Manage port forwarding sessions directly from pod or service views. Sessions cleanly persist across view changes.
 
 ---
 
 ## 🏗️ Architecture
 
-Orbit enforces a strict single-responsibility boundary between the frontend and backend:
+Orbit maintains a clean separation of concerns between frontend rendering and backend system interaction:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -73,15 +81,15 @@ Orbit enforces a strict single-responsibility boundary between the frontend and 
                              │ Neutralino IPC
 ┌────────────────────────────▼────────────────────────────┐
 │                     Rust Backend                        │
-│  - `core/engine`: Kubernetes API, kubeconfig, Cache     │
-│  - `core/updater`: Dedicated auto-update mechanism      │
+│  - `core/engine`: Kubernetes client, kubeconfig, Cache  │
+│  - `core/updater`: Lightweight auto-update engine       │
 │  - Privileged OS, Network & Filesystem operations       │
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **Frontend (`src/`)**: Pure presentation layer communicating only through structured IPC calls.
-- **Backend (`core/engine`, `core/updater`)**: Handles all Kubernetes client logic, kubeconfig discovery, and system interactions.
-- **IPC Boundary**: Strongly typed request/response contracts ensuring stability and strict separation of concerns.
+- **Frontend (`src/`)**: Pure presentation layer communicating strictly across strongly typed IPC contracts.
+- **Backend (`core/engine`, `core/updater`)**: Handles all Kubernetes client logic, token resolution, and background workers.
+- **IPC Protocol**: Strongly typed request/response structs preventing runtime desynchronization and secret leakage.
 
 ---
 
@@ -90,7 +98,7 @@ Orbit enforces a strict single-responsibility boundary between the frontend and 
 | Layer                     | Technology                                                                                  |
 | ------------------------- | ------------------------------------------------------------------------------------------- |
 | **Desktop Runtime**       | [Neutralinojs](https://neutralino.js.org/)                                                  |
-| **Backend**               | [Rust](https://www.rust-lang.org/) (`kube-rs`, `tokio`)                                     |
+| **Backend Engine**        | [Rust](https://www.rust-lang.org/) (`kube-rs`, `tokio`, `serde`)                            |
 | **Frontend Framework**    | [Vue 3](https://vuejs.org/) (Composition API, TypeScript)                                   |
 | **UI Components & Theme** | [PrimeVue v4](https://primevue.org/) (Nora Preset)                                          |
 | **Styling**               | [Tailwind CSS v4](https://tailwindcss.com/)                                                 |
@@ -105,11 +113,11 @@ Orbit enforces a strict single-responsibility boundary between the frontend and 
 
 ### Windows
 
-1. Navigate to the [Releases](https://github.com/vantoan1511/orbit/releases) page.
-2. Download the latest `Orbit-Setup-x.y.z.exe` installer.
-3. Run the installer to complete the setup.
+1. Head over to the [Releases](https://github.com/vantoan1511/orbit/releases) page.
+2. Grab the latest `Orbit-Setup-x.y.z.exe` installer.
+3. Run the installer to get up and running.
 
-> _Note: macOS and Linux support is planned for upcoming releases._
+> _macOS and Linux builds are currently in progress._
 
 ---
 
@@ -119,57 +127,60 @@ Orbit enforces a strict single-responsibility boundary between the frontend and 
 
 - [Node.js](https://nodejs.org/) (`>= 20.19.0` or `>= 22.12.0`)
 - [Rust](https://www.rust-lang.org/) (Stable toolchain)
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php) (Only required for building the Windows installer package)
+- [Inno Setup 6](https://jrsoftware.org/isinfo.php) (Only required if building the Windows installer executable)
 
-### Getting Started
+### Quickstart
 
-1. **Clone the repository:**
+1. **Clone the repo:**
 
    ```bash
    git clone https://github.com/vantoan1511/orbit.git
    cd orbit
    ```
 
-2. **Install dependencies:**
+2. **Install frontend dependencies:**
 
    ```bash
    npm install
    ```
 
-3. **Update Neutralino binaries:**
+3. **Fetch Neutralino binaries:**
 
    ```bash
    npm run neu:update
    ```
 
-4. **Run in development mode:**
+4. **Launch development mode:**
    ```bash
    npm run neu:run
    ```
 
 ### Available Scripts
 
-| Command              | Description                                                                     |
-| -------------------- | ------------------------------------------------------------------------------- |
-| `npm run dev`        | Starts the Vite development server                                              |
-| `npm run neu:run`    | Launches the Neutralino desktop application in dev mode                         |
-| `npm run build`      | Runs type checks and bundles the frontend production assets                     |
-| `npm run package`    | Builds backend binaries, compiles resources, and packages the Windows installer |
-| `npm run type-check` | Runs `vue-tsc` to validate TypeScript types across Vue components               |
-| `npm run lint`       | Lints and fixes source code using ESLint                                        |
-| `npm run format`     | Formats the codebase using Prettier                                             |
+| Command              | Description                                                                      |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`        | Starts the Vite development server                                               |
+| `npm run neu:run`    | Launches the Neutralino desktop client in development mode                       |
+| `npm run build`      | Type-checks and builds frontend production assets                                |
+| `npm run package`    | Compiles backend binaries, packages resources, and outputs the Windows installer |
+| `npm run type-check` | Runs `vue-tsc` to validate TypeScript across Vue components and source files     |
+| `npm run test`       | Runs unit tests using Node 24 native test runner                                 |
+| `npm run lint`       | Lints and fixes source files with ESLint                                         |
+| `npm run format`     | Formats the codebase using Prettier                                              |
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/vantoan1511/orbit/issues).
+Contributions, bug reports, and ideas are always welcome.
 
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feat/amazing-feature`)
-3. Commit your Changes (`git commit -m 'feat: add amazing feature'`)
-4. Push to the Branch (`git push origin feat/amazing-feature`)
+1. Fork the repository
+2. Create your branch (`git checkout -b feat/your-feature` or `fix/issue-description`)
+3. Commit your changes (`git commit -m 'feat: add support for custom CRDs'`)
+4. Push to your branch (`git push origin feat/your-feature`)
 5. Open a Pull Request
+
+Check open [issues](https://github.com/vantoan1511/orbit/issues) for planned roadmap items and bug fixes.
 
 ---
 
