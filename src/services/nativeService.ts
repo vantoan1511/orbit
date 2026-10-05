@@ -1,4 +1,5 @@
 import type { OrbitEventMap, OrbitEventName } from '@/types/events'
+import { withTimeout } from '../utils/async.ts'
 import {
   app as neuApp,
   events as neuEvents,
@@ -33,7 +34,19 @@ function sanitizePath(path: string): string {
  * Initialize Neutralinojs native API
  */
 export function init(): void {
-  neuInit()
+  if (typeof globalThis.window !== 'undefined') {
+    neuInit()
+  }
+}
+
+/**
+ * Re-initialize Neutralinojs native API connection.
+ * Used to re-establish the WebSocket connection after sleep / idle disconnects.
+ */
+export function reconnect(): void {
+  if (typeof globalThis.window !== 'undefined') {
+    neuInit()
+  }
 }
 
 /**
@@ -143,6 +156,22 @@ export const events = {
 export const extensions = {
   dispatch(extensionId: string, event: string, data?: unknown) {
     return neuExtensions.dispatch(extensionId, event, data)
+  },
+  getStats() {
+    return neuExtensions.getStats()
+  }
+}
+
+/**
+ * Probes the Neutralino WebSocket connection by dispatching an extensions.getStats call.
+ * Returns true if the call responds within timeoutMs, false if it times out or rejects.
+ */
+export async function probe(timeoutMs = 1500): Promise<boolean> {
+  try {
+    await withTimeout(extensions.getStats(), timeoutMs)
+    return true
+  } catch {
+    return false
   }
 }
 
