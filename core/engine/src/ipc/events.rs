@@ -109,10 +109,12 @@ pub enum OrbitEvent {
     #[serde(rename = "resourceBatchUpdated")]
     ResourceBatchUpdated {
         kind: String,
+        cluster_id: Option<String>,
         updates: Vec<ResourceUpdate>,
     },
     #[serde(rename = "podMetricsUpdated")]
     PodMetricsUpdated {
+        cluster_id: Option<String>,
         metrics: Vec<crate::kubernetes::models::PodMetricItem>,
     },
     #[serde(rename = "errorOccurred")]

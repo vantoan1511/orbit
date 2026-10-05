@@ -645,8 +645,12 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function onResourceBatchUpdated(payload: {
     kind: string
+    cluster_id: string | null
     updates: Array<{ action: KubernetesAction; data: KubernetesResourceInfo }>
   }) {
+    if (payload.cluster_id && payload.cluster_id !== activeClusterId.value) {
+      return
+    }
     const handler = resourceUpdaters[payload.kind]
     if (handler) {
       handler(payload.updates)
@@ -656,6 +660,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const activePortForwards = ref<ActivePortForward[]>([])
 
   function onPodMetricsUpdated(payload: {
+    cluster_id: string | null
     metrics: Array<{
       name: string
       namespace: string
@@ -665,6 +670,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       memoryBytes?: number
     }>
   }) {
+    if (payload.cluster_id && payload.cluster_id !== activeClusterId.value) {
+      return
+    }
     for (const m of payload.metrics) {
       podMetricsMap.set(`${m.namespace}/${m.name}`, {
         cpu: m.cpu,
