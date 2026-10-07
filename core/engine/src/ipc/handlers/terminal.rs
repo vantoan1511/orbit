@@ -69,11 +69,42 @@ fn get_sessions() -> &'static SessionMap {
     SESSIONS.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
 }
 
-pub fn resolve_shell(req_shell: Option<String>, config_shell: Option<String>) -> String {
+#[cfg(target_os = "windows")]
+fn is_executable_in_path(exe: &str) -> bool {
+    if let Some(path_var) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let full = dir.join(exe);
+            if full.is_file() {
+                return true;
+            }
+        }
+    }
+    if let Some(pf) = std::env::var_os("ProgramFiles") {
+        let p7 = std::path::PathBuf::from(pf).join("PowerShell").join("7").join(exe);
+        if p7.is_file() {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn detect_default_shell() -> String {
     #[cfg(target_os = "windows")]
-    let default_shell = "powershell.exe".to_string();
+    {
+        if is_executable_in_path("pwsh.exe") || is_executable_in_path("pwsh") {
+            "pwsh.exe".to_string()
+        } else {
+            "powershell.exe".to_string()
+        }
+    }
     #[cfg(not(target_os = "windows"))]
-    let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
+    {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+    }
+}
+
+pub fn resolve_shell(req_shell: Option<String>, config_shell: Option<String>) -> String {
+    let default_shell = detect_default_shell();
 
     req_shell
         .map(|s| s.trim().to_string())
@@ -593,6 +624,6 @@ mod tests {
 
         // When both are None/empty, fallback to default shell
         #[cfg(target_os = "windows")]
-        assert_eq!(resolve_shell(None, None), "powershell.exe");
+        assert_eq!(resolve_shell(None, None), detect_default_shell());
     }
 }

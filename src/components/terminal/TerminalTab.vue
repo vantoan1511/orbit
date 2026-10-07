@@ -23,7 +23,7 @@ let resizeObserver: ResizeObserver | null = null
 
 function getTerminalTheme() {
   const computedStyle = getComputedStyle(document.documentElement)
-  const bg = computedStyle.getPropertyValue('--bg-app').trim() || '#121214'
+  const bg = computedStyle.getPropertyValue('--bg-app').trim() || '#0b0d0f'
   const fg = computedStyle.getPropertyValue('--text-primary').trim() || '#ececed'
   const cursor = computedStyle.getPropertyValue('--accent').trim() || '#4f8cff'
 

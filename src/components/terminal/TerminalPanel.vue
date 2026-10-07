@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useTerminalStore } from '@/stores/terminalStore'
 import {
   Box,
@@ -10,10 +11,11 @@ import {
   X
 } from '@lucide/vue'
 import Button from 'primevue/button'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import TerminalTab from './TerminalTab.vue'
 
 const terminalStore = useTerminalStore()
+const settingsStore = useSettingsStore()
 
 const panelHeight = ref(280)
 const isMaximized = ref(false)
@@ -48,14 +50,41 @@ function handleMouseDown(e: MouseEvent) {
   window.addEventListener('mouseup', onMouseUp)
 }
 
+function getDefaultLocalShellTitle(): string {
+  const configured = settingsStore.getConfigValue<string>('defaultTerminalShell', '').trim()
+  if (configured) {
+    const filename = configured.split(/[/\\]/).pop() || configured
+    return filename.replace(/\.exe$/i, '')
+  }
+  const isWin =
+    typeof navigator !== 'undefined' &&
+    (/win/i.test(navigator.platform || '') || /win/i.test(navigator.userAgent || ''))
+  return isWin ? 'pwsh' : 'bash'
+}
+
 function handleNewLocalTerminal() {
   const id = `term-local-${Date.now()}`
+  const shellName = getDefaultLocalShellTitle()
+  const existingCount = terminalStore.sessions.filter(
+    (s) => s.type === 'local' && s.title.startsWith(shellName)
+  ).length
+  const title = existingCount === 0 ? shellName : `${shellName} ${existingCount + 1}`
   terminalStore.addSession({
     id,
-    title: `Local Shell ${terminalStore.sessions.filter((s) => s.type === 'local').length + 1}`,
+    title,
     type: 'local'
   })
 }
+
+// Automatically create a default terminal tab when opening panel if no sessions exist (like VS Code)
+watch(
+  () => terminalStore.isOpen,
+  (open) => {
+    if (open && terminalStore.sessions.length === 0) {
+      handleNewLocalTerminal()
+    }
+  }
+)
 
 function handleToggleMaximize() {
   isMaximized.value = !isMaximized.value
@@ -127,7 +156,7 @@ function handleToggleMaximize() {
           variant="text"
           size="small"
           class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover) shrink-0 ml-1"
-          v-tooltip.top="'New Local Terminal'"
+          v-tooltip.top="'New Terminal'"
           @click="handleNewLocalTerminal"
         >
           <template #icon>
@@ -210,7 +239,7 @@ function handleToggleMaximize() {
           @click="handleNewLocalTerminal"
         >
           <Plus class="w-3.5 h-3.5" />
-          <span>New Local Shell</span>
+          <span>New Terminal</span>
         </Button>
       </div>
     </div>
