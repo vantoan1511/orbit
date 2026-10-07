@@ -76,100 +76,100 @@ function handleToggleMaximize() {
 
     <!-- Terminal Header Bar -->
     <div
-      class="h-8 min-h-8 flex items-center justify-between px-2 bg-(--bg-sidebar) border-b border-(--border) text-xs"
+      class="h-8 min-h-8 flex items-center justify-between bg-(--bg-sidebar) border-b border-(--border) text-xs"
     >
       <!-- Left side: Session Tabs -->
-      <div class="flex items-center gap-1 overflow-x-auto flex-1 no-scrollbar mr-2">
-        <div class="flex items-center gap-1.5 px-2 text-muted-color font-medium shrink-0">
+      <div class="flex items-center h-full overflow-x-auto flex-1 no-scrollbar">
+        <div
+          class="flex items-center gap-1.5 px-3 h-full text-muted-color font-medium shrink-0 border-r border-(--border)"
+        >
           <TerminalIcon class="w-3.5 h-3.5 text-primary" />
           <span class="text-[11px] uppercase tracking-wider font-semibold text-primary"
             >Terminal</span
           >
         </div>
 
-        <div class="h-3.5 w-px bg-(--border) mx-1 shrink-0" />
-
         <!-- Tabs list -->
         <div
           v-for="session in terminalStore.sessions"
           :key="session.id"
-          class="flex items-center gap-1.5 px-2 py-1 rounded text-xs cursor-pointer border transition-colors shrink-0"
+          class="group relative flex items-center gap-2 h-8 px-3 border-r border-(--border) text-xs cursor-pointer select-none transition-all duration-150 shrink-0 max-w-48 font-mono"
           :class="[
             session.id === terminalStore.activeSessionId
-              ? 'bg-(--bg-app) border-(--border) text-primary font-medium'
-              : 'border-transparent text-muted-color hover:text-primary hover:bg-(--surface-hover)'
+              ? 'bg-(--bg-app) text-primary font-medium border-t border-t-transparent border-b border-b-(--bg-app)'
+              : 'bg-(--bg-sidebar)/70 text-muted-color hover:bg-(--bg-hover)/60 hover:text-primary border-t border-t-transparent border-b border-b-(--border)'
           ]"
           @click="terminalStore.setActiveSession(session.id)"
         >
-          <Box v-if="session.type === 'pod'" class="w-3 h-3 text-(--accent)" />
-          <TerminalIcon v-else class="w-3 h-3 text-muted-color" />
-          <span class="max-w-36 truncate">{{ session.title }}</span>
+          <Box v-if="session.type === 'pod'" class="w-3.5 h-3.5 text-(--accent) shrink-0" />
+          <TerminalIcon v-else class="w-3.5 h-3.5 text-muted-color shrink-0" />
+          <span class="truncate flex-1">{{ session.title }}</span>
           <Button
-            rounded
             variant="text"
             size="small"
-            class="w-4! h-4! p-0! text-muted-color hover:text-primary"
+            class="w-4! h-4! p-0! shrink-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)! transition-opacity"
+            :class="
+              session.id === terminalStore.activeSessionId
+                ? 'opacity-100'
+                : 'opacity-0 group-hover:opacity-100'
+            "
             v-tooltip.top="'Close Session'"
             @click.stop="terminalStore.removeSession(session.id)"
           >
             <template #icon>
-              <X :size="10" />
+              <X :size="11" />
             </template>
           </Button>
         </div>
 
         <!-- Add Local Terminal Button -->
         <Button
-          rounded
           variant="text"
           size="small"
-          class="w-5! h-5! p-0! text-muted-color hover:text-primary shrink-0"
+          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover) shrink-0 ml-1"
           v-tooltip.top="'New Local Terminal'"
           @click="handleNewLocalTerminal"
         >
           <template #icon>
-            <Plus :size="12" />
+            <Plus :size="13" />
           </template>
         </Button>
       </div>
 
       <!-- Right controls: Maximize, Minimize, Close -->
-      <div class="flex items-center gap-0.5 shrink-0">
+      <div class="flex items-center gap-0.5 px-1.5 shrink-0">
         <Button
-          rounded
           variant="text"
           size="small"
-          class="w-6! h-6! p-0! text-muted-color hover:text-primary"
+          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
           v-tooltip.top="isMaximized ? 'Restore Terminal' : 'Maximize Terminal'"
           @click="handleToggleMaximize"
         >
           <template #icon>
-            <Minimize2 v-if="isMaximized" :size="12" />
-            <Maximize2 v-else :size="12" />
+            <Minimize2 v-if="isMaximized" :size="13" />
+            <Maximize2 v-else :size="13" />
           </template>
         </Button>
         <Button
-          rounded
           variant="text"
           size="small"
-          class="w-6! h-6! p-0! text-muted-color hover:text-primary"
+          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
           v-tooltip.top="'Minimize Panel'"
           @click="terminalStore.closePanel()"
         >
           <template #icon>
-            <ChevronDown :size="12" />
+            <ChevronDown :size="13" />
           </template>
         </Button>
         <Button
-          rounded
           variant="text"
           size="small"
-          class="w-6! h-6! p-0! text-muted-color hover:text-primary"
+          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
           v-tooltip.top="'Close Terminal'"
           @click="terminalStore.closePanel()"
         >
           <template #icon>
-            <X :size="12" />
+            <X :size="13" />
           </template>
         </Button>
       </div>
@@ -190,14 +190,23 @@ function handleToggleMaximize() {
       <!-- Empty Sessions State -->
       <div
         v-else
-        class="flex flex-col items-center justify-center h-full text-muted-color text-xs gap-3 p-4"
+        class="flex flex-col items-center justify-center h-full text-muted-color text-xs gap-3 p-6 font-mono select-none"
       >
-        <TerminalIcon class="w-8 h-8 opacity-40 text-muted-color" />
-        <span>No active terminal sessions</span>
+        <div
+          class="p-3 rounded-none border border-(--border) bg-(--bg-sidebar)/50 flex items-center justify-center mb-1"
+        >
+          <TerminalIcon class="w-6 h-6 text-muted-color opacity-60" />
+        </div>
+        <div class="flex flex-col items-center gap-1">
+          <span class="font-medium text-primary">No active terminal sessions</span>
+          <span class="text-[11px] text-muted-color"
+            >Open a local shell or connect to a pod container</span
+          >
+        </div>
         <Button
           size="small"
           variant="outlined"
-          class="text-xs flex items-center gap-1.5"
+          class="text-xs font-mono flex items-center gap-1.5 px-3 py-1.5 rounded-none border-(--border) text-primary hover:border-(--accent) mt-2"
           @click="handleNewLocalTerminal"
         >
           <Plus class="w-3.5 h-3.5" />
