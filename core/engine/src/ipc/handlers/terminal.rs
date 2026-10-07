@@ -263,7 +263,7 @@ pub fn open_pod_terminal(
         let mut params = kube::api::AttachParams::default()
             .stdin(true)
             .stdout(true)
-            .stderr(true)
+            .stderr(false)
             .tty(true);
 
         if let Some(ref c) = req.container {
@@ -553,10 +553,11 @@ mod tests {
         let params = AttachParams::default()
             .stdin(true)
             .stdout(true)
-            .stderr(true)
+            .stderr(false)
             .tty(true);
         assert!(params.stdin);
         assert!(params.stdout);
+        assert!(!params.stderr);
         assert!(params.tty);
     }
 }
