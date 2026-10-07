@@ -108,6 +108,19 @@ impl Configuration {
                 is_confidential: false,
                 cardinality: "1..1".to_string(),
                 enable: false, // Disabled
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "defaultTerminalShell".to_string(),
+                name: "Default Terminal Shell".to_string(),
+                description: "Path to the default shell executable to use for local terminal sessions (e.g. pwsh.exe, /bin/zsh).".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!("")),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
                 created_at: Some(created),
                 last_updated_at: None,
             },
@@ -222,6 +235,16 @@ impl OrbitConfig {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Returns the configured default terminal shell path, if set and non-empty.
+    pub fn default_terminal_shell(&self) -> Option<String> {
+        self.values
+            .get("defaultTerminalShell")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
     }
 
     /// Generates the unified `Configuration` model list sent to the frontend.
@@ -452,5 +475,18 @@ mod tests {
         config.update_from_configurations(&reset_with_none);
         assert_eq!(config.max_log_files(), 10);
         assert!(!config.values.contains_key("maxLogFiles"));
+    }
+
+    #[test]
+    fn test_default_terminal_shell_config() {
+        let mut config = OrbitConfig::default();
+        assert_eq!(config.default_terminal_shell(), None);
+
+        config.values.insert("defaultTerminalShell".to_string(), serde_json::json!("pwsh.exe"));
+        assert_eq!(config.default_terminal_shell(), Some("pwsh.exe".to_string()));
+
+        // Empty string should be treated as None
+        config.values.insert("defaultTerminalShell".to_string(), serde_json::json!("   "));
+        assert_eq!(config.default_terminal_shell(), None);
     }
 }

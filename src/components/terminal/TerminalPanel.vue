@@ -76,7 +76,7 @@ function handleToggleMaximize() {
 
     <!-- Terminal Header Bar -->
     <div
-      class="h-8 min-h-8 flex items-center justify-between bg-(--bg-sidebar) border-b border-(--border) text-xs"
+      class="h-8 min-h-8 flex items-center justify-between bg-(--bg-app) border-b border-(--border) text-xs"
     >
       <!-- Left side: Session Tabs -->
       <div class="flex items-center h-full overflow-x-auto flex-1 no-scrollbar">
@@ -97,7 +97,7 @@ function handleToggleMaximize() {
           :class="[
             session.id === terminalStore.activeSessionId
               ? 'bg-(--bg-app) text-primary font-medium border-t border-t-transparent border-b border-b-(--bg-app)'
-              : 'bg-(--bg-sidebar)/70 text-muted-color hover:bg-(--bg-hover)/60 hover:text-primary border-t border-t-transparent border-b border-b-(--border)'
+              : 'bg-transparent text-muted-color hover:bg-(--bg-hover)/60 hover:text-primary border-t border-t-transparent border-b border-b-(--border)'
           ]"
           @click="terminalStore.setActiveSession(session.id)"
         >
@@ -193,7 +193,7 @@ function handleToggleMaximize() {
         class="flex flex-col items-center justify-center h-full text-muted-color text-xs gap-3 p-6 font-mono select-none"
       >
         <div
-          class="p-3 rounded-none border border-(--border) bg-(--bg-sidebar)/50 flex items-center justify-center mb-1"
+          class="p-3 rounded-none border border-(--border) bg-(--bg-app) flex items-center justify-center mb-1"
         >
           <TerminalIcon class="w-6 h-6 text-muted-color opacity-60" />
         </div>
