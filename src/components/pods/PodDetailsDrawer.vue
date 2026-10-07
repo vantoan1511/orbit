@@ -6,12 +6,13 @@ import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTerminalStore } from '@/stores/terminalStore'
 import { OrbitEvents } from '@/types/events'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { PodInfo } from '@/types/kubernetes'
 import { sortEventsDesc } from '@/utils/events'
 import { getPodStatusBadgeClass } from '@/utils/severity'
-import { Activity, Shield, Terminal } from '@lucide/vue'
+import { Activity, Shield, SquareTerminal, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
@@ -32,7 +33,21 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const k8sStore = useKubernetesStore()
+const terminalStore = useTerminalStore()
 const { events: clusterEvents } = storeToRefs(k8sStore)
+
+const openPodTerminal = (containerName?: string) => {
+  if (!props.pod) return
+  const id = `term-pod-${props.pod.name}-${Date.now()}`
+  terminalStore.addSession({
+    id,
+    title: `Pod: ${props.pod.name}`,
+    type: 'pod',
+    namespace: props.pod.namespace,
+    pod: props.pod.name,
+    container: containerName || props.pod.containers?.[0]?.name
+  })
+}
 
 const activeTab = ref('overview')
 
@@ -162,7 +177,18 @@ const viewPodLogs = (containerName?: string) => {
         size="small"
         variant="outlined"
         class="text-xs flex items-center gap-1.5"
-        title="View Pod Logs"
+        v-tooltip.top="'Open Terminal into Pod'"
+        @click="openPodTerminal()"
+      >
+        <SquareTerminal class="w-3.5 h-3.5" />
+        <span>Terminal</span>
+      </Button>
+      <Button
+        severity="secondary"
+        size="small"
+        variant="outlined"
+        class="text-xs flex items-center gap-1.5"
+        v-tooltip.top="'View Pod Logs'"
         @click="viewPodLogs()"
       >
         <Terminal class="w-3.5 h-3.5" />

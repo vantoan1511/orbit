@@ -12,6 +12,7 @@ pub mod resource;
 pub mod settings;
 pub mod storage;
 pub mod system;
+pub mod terminal;
 pub mod update;
 pub mod utils;
 pub mod watchers;
@@ -72,6 +73,11 @@ pub fn dispatch(
         "startPortForward" => network::start_port_forward(data, writer, token, manager),
         "stopPortForward" => network::stop_port_forward(data, writer, token, manager),
         "getPortForwards" => network::get_port_forwards(writer, token, manager),
+        "openLocalTerminal" => terminal::open_local_terminal(data, writer, token),
+        "openPodTerminal" => terminal::open_pod_terminal(data, writer, token, manager),
+        "sendTerminalData" => terminal::send_terminal_data(data),
+        "resizeTerminal" => terminal::resize_terminal(data),
+        "closeTerminal" => terminal::close_terminal(data),
         other => {
             tracing::debug!(event = %other, "Unhandled UI event in dispatcher");
         }

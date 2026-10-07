@@ -21,6 +21,7 @@ import AppSidebar from './AppSidebar.vue'
 import AppTabBar from './tabs/AppTabBar.vue'
 import AppTabResourcePicker from './tabs/AppTabResourcePicker.vue'
 import EmptyWorkspaceView from './tabs/EmptyWorkspaceView.vue'
+import TerminalPanel from '@/components/terminal/TerminalPanel.vue'
 
 const k8sStore = useKubernetesStore()
 const tabsStore = useTabsStore()
@@ -160,6 +161,7 @@ onUnmounted(() => {
               <WelcomeView v-else />
             </div>
           </main>
+          <TerminalPanel />
         </div>
       </div>
 

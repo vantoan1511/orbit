@@ -181,6 +181,18 @@ pub enum OrbitEvent {
     AppSettingsUpdated {
         settings: Vec<crate::config::Configuration>,
     },
+    #[serde(rename = "terminalData")]
+    #[serde(rename_all = "camelCase")]
+    TerminalData {
+        session_id: String,
+        data: String,
+    },
+    #[serde(rename = "terminalClosed")]
+    #[serde(rename_all = "camelCase")]
+    TerminalClosed {
+        session_id: String,
+        exit_code: Option<i32>,
+    },
 }
 
 impl OrbitEvent {
@@ -224,6 +236,8 @@ impl OrbitEvent {
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
             OrbitEvent::PortForwardsUpdated { .. } => "portForwardsUpdated",
             OrbitEvent::AppSettingsUpdated { .. } => "appSettingsUpdated",
+            OrbitEvent::TerminalData { .. } => "terminalData",
+            OrbitEvent::TerminalClosed { .. } => "terminalClosed",
         }
     }
 }
