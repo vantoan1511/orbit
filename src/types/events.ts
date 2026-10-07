@@ -206,6 +206,14 @@ export interface OrbitEventMap {
     code?: string
     message?: string
   }
+  terminalData: {
+    sessionId: string
+    data: string
+  }
+  terminalClosed: {
+    sessionId: string
+    exitCode?: number
+  }
 }
 
 /** Sentinel value for the tailLines IPC field meaning "fetch all log lines". */
@@ -251,7 +259,9 @@ export const OrbitEvents = {
   ResourceRawData: 'resourceRawData',
   PortForwardStarted: 'portForwardStarted',
   PortForwardStopped: 'portForwardStopped',
-  PortForwardsUpdated: 'portForwardsUpdated'
+  PortForwardsUpdated: 'portForwardsUpdated',
+  TerminalData: 'terminalData',
+  TerminalClosed: 'terminalClosed'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

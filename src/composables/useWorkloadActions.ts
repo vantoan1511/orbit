@@ -5,6 +5,7 @@ import { useDialog } from 'primevue/usedialog'
 import { computed, toValue, type Ref, type MaybeRefOrGetter } from 'vue'
 import { useRouter } from 'vue-router'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTerminalStore } from '@/stores/terminalStore'
 import { kubernetesService } from '@/services/kubernetesService'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { ActivePortForward } from '@/types/kubernetes'
@@ -86,6 +87,27 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
               }
             })
           }
+        }
+      })
+    }
+
+    // Terminal (Pod only)
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Pod) {
+      items.push({
+        label: 'Terminal',
+        icon: 'pi pi-terminal',
+        command: () => {
+          const row = selectedActionRow.value
+          if (!row) return
+          const terminalStore = useTerminalStore()
+          const id = `term-pod-${row.name}-${Date.now()}`
+          terminalStore.addSession({
+            id,
+            title: `Pod: ${row.name}`,
+            type: 'pod',
+            namespace: row.namespace || 'default',
+            pod: row.name
+          })
         }
       })
     }

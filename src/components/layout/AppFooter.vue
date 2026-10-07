@@ -2,13 +2,23 @@
 import { useCluster } from '@/composables/useCluster'
 import { useEngineConnection } from '@/composables/useEngineConnection'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTerminalStore } from '@/stores/terminalStore'
 import { detectCloudProvider } from '@/utils/cloudProvider'
-import { AlertCircle, Clock, Cloud, Loader2, RefreshCwIcon, RotateCcw } from '@lucide/vue'
+import {
+  AlertCircle,
+  Clock,
+  Cloud,
+  Loader2,
+  RefreshCwIcon,
+  RotateCcw,
+  Terminal as TerminalIcon
+} from '@lucide/vue'
 import Button from 'primevue/button'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { KubernetesIcon } from 'vue3-simple-icons'
 
 const kubernetesStore = useKubernetesStore()
+const terminalStore = useTerminalStore()
 const { activeCluster, isRefreshing, refreshCluster, lastUpdatedAt } = useCluster()
 const { isReconnecting, isFailed, retryNow, restartApp } = useEngineConnection()
 
@@ -158,6 +168,20 @@ const cloudProvider = computed(() => {
           </template>
         </Button>
       </template>
+
+      <!-- Terminal toggle button -->
+      <Button
+        rounded
+        variant="text"
+        size="small"
+        v-tooltip.top="'Toggle Terminal'"
+        @click="terminalStore.togglePanel()"
+        class="p-1! w-6! h-6!"
+      >
+        <template #icon>
+          <TerminalIcon :size="12" />
+        </template>
+      </Button>
     </div>
   </footer>
 </template>
