@@ -203,8 +203,75 @@ pub fn add_cluster(
     });
 }
 
+pub async fn restart_watchers(
+    writer: &Arc<Mutex<WsWriter>>,
+    token: &str,
+    manager: &Arc<RwLock<KubeManager>>,
+    client: &kube::Client,
+    active_cluster_id: Option<String>,
+) {
+    let mut w_manager = manager.write().await;
+    if let Some(cancel) = w_manager.watch_cancel.take() {
+        let _ = cancel.send(true);
+    }
+    let (tx, rx) = tokio::sync::watch::channel(false);
+    w_manager.watch_cancel = Some(tx);
+    drop(w_manager);
+
+    spawn_watchers(
+        client,
+        writer.clone(),
+        token.to_string(),
+        rx,
+        active_cluster_id,
+    );
+}
+
+pub async fn broadcast_engine_ready(
+    writer: &Arc<Mutex<WsWriter>>,
+    token: &str,
+    manager: &Arc<RwLock<KubeManager>>,
+) {
+    let _ = Bridge::send_event(
+        writer,
+        token,
+        &OrbitEvent::EngineConnected {
+            status: "ready".to_string(),
+            message: "Orbit Engine is connected and ready.".to_string(),
+        },
+    ).await;
+
+    let r_manager = manager.read().await;
+    let clusters = r_manager.get_clusters();
+    let active_cluster_id = r_manager.active_context.clone();
+    let active_client = r_manager.active_client.clone();
+    drop(r_manager);
+
+    let _ = Bridge::send_event(
+        writer,
+        token,
+        &OrbitEvent::ClustersUpdated { clusters },
+    ).await;
+
+    let _ = Bridge::send_event(
+        writer,
+        token,
+        &OrbitEvent::ActiveClusterChanged { active_cluster_id: active_cluster_id.clone() },
+    ).await;
+
+    if let Some(ref client) = active_client {
+        restart_watchers(writer, token, manager, client, active_cluster_id.clone()).await;
+    }
+    if let Some(ref ctx) = active_cluster_id {
+        network::restore_cluster_port_forwards(writer.clone(), token.to_string(), manager.clone(), ctx.clone());
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::ipc::emitter::{set_global_emitter, MockEventEmitter};
+
     #[tokio::test]
     async fn test_drain_log_cancel_signals() {
         let (tx1, mut rx1) = tokio::sync::oneshot::channel();
@@ -218,6 +285,25 @@ mod tests {
         assert_eq!(rx1.try_recv(), Ok(()));
         assert_eq!(rx2.try_recv(), Ok(()));
         assert!(log_cancels.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_broadcast_engine_ready_emits_expected_events() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+
+        broadcast_engine_ready(&writer, "test-token", &manager).await;
+
+        let emitted = mock_emitter.get_emitted_events().await;
+        let event_names: Vec<String> = emitted.iter().map(|(name, _)| name.clone()).collect();
+
+        assert!(event_names.contains(&"engineConnected".to_string()));
+        assert!(event_names.contains(&"clustersUpdated".to_string()));
+        assert!(event_names.contains(&"activeClusterChanged".to_string()));
     }
 }
 

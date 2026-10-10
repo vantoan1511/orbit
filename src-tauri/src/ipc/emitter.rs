@@ -1,16 +1,18 @@
 use async_trait::async_trait;
 use serde_json::Value;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, RwLock};
 use crate::ipc::events::OrbitEvent;
 
-static GLOBAL_EMITTER: OnceLock<Arc<dyn EventEmitter>> = OnceLock::new();
+static GLOBAL_EMITTER: RwLock<Option<Arc<dyn EventEmitter>>> = RwLock::new(None);
 
 pub fn set_global_emitter(emitter: Arc<dyn EventEmitter>) {
-    let _ = GLOBAL_EMITTER.set(emitter);
+    if let Ok(mut lock) = GLOBAL_EMITTER.write() {
+        *lock = Some(emitter);
+    }
 }
 
 pub fn get_global_emitter() -> Option<Arc<dyn EventEmitter>> {
-    GLOBAL_EMITTER.get().cloned()
+    GLOBAL_EMITTER.read().ok().and_then(|lock| lock.clone())
 }
 
 #[async_trait]
@@ -31,6 +33,9 @@ pub trait EventEmitter: Send + Sync + 'static {
 
 #[cfg(test)]
 use tokio::sync::Mutex;
+
+#[cfg(test)]
+pub static TEST_EMITTER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[cfg(test)]
 #[derive(Clone, Default)]

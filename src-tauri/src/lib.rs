@@ -11,7 +11,6 @@ use serde_json::Value;
 use async_trait::async_trait;
 use crate::kubernetes::manager::KubeManager;
 use crate::ipc::emitter::{EventEmitter, set_global_emitter};
-use crate::ipc::events::OrbitEvent;
 
 pub struct AppState {
     pub kube_manager: Arc<RwLock<KubeManager>>,
@@ -38,24 +37,6 @@ async fn dispatch_engine(
     Ok(())
 }
 
-async fn broadcast_engine_ready(
-    emitter: &Arc<dyn EventEmitter>,
-    kube_manager: &Arc<RwLock<KubeManager>>,
-) {
-    let _ = emitter.emit_orbit_event(&OrbitEvent::EngineConnected {
-        status: "ready".to_string(),
-        message: "Orbit Engine is connected and ready.".to_string(),
-    }).await;
-
-    let r_manager = kube_manager.read().await;
-    let clusters = r_manager.get_clusters();
-    let active_cluster_id = r_manager.active_context.clone();
-    drop(r_manager);
-
-    let _ = emitter.emit_orbit_event(&OrbitEvent::ClustersUpdated { clusters }).await;
-    let _ = emitter.emit_orbit_event(&OrbitEvent::ActiveClusterChanged { active_cluster_id }).await;
-}
-
 pub fn run() {
     // Initialize file logger
     if let Err(e) = crate::logger::init() {
@@ -77,10 +58,10 @@ pub fn run() {
             })));
             app.manage(AppState { kube_manager: kube_manager.clone() });
 
-            let emitter_clone = emitter.clone();
             let km_clone = kube_manager.clone();
             tauri::async_runtime::spawn(async move {
-                broadcast_engine_ready(&emitter_clone, &km_clone).await;
+                let writer = Arc::new(tokio::sync::Mutex::new(crate::ipc::bridge::WsWriter::Emitter));
+                crate::ipc::handlers::cluster::broadcast_engine_ready(&writer, "", &km_clone).await;
             });
 
             Ok(())

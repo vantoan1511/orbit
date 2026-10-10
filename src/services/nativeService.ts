@@ -23,15 +23,27 @@ function sanitizePath(path: string): string {
 /**
  * Initialize native API
  */
-export function init(): void {
-  // In Tauri v2, initialization occurs natively upon webview creation
+export async function init(): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await coreEngine.dispatch('clientConnect')
+    } catch (e) {
+      console.warn('Failed to dispatch clientConnect on init:', e)
+    }
+  }
 }
 
 /**
  * Re-initialize native API connection.
  */
-export function reconnect(): void {
-  // In-process Tauri runtime does not drop WebSocket connections
+export async function reconnect(): Promise<void> {
+  if (isTauriEnvironment()) {
+    try {
+      await coreEngine.dispatch('clientConnect')
+    } catch (e) {
+      console.warn('Failed to dispatch clientConnect on reconnect:', e)
+    }
+  }
 }
 
 /**
@@ -263,7 +275,11 @@ export const extensions = {
  */
 export async function probe(timeoutMs = 1500): Promise<boolean> {
   try {
-    await withTimeout(extensions.getStats(), timeoutMs)
+    if (isTauriEnvironment()) {
+      await withTimeout(coreEngine.dispatch('ping'), timeoutMs)
+    } else {
+      await withTimeout(extensions.getStats(), timeoutMs)
+    }
     return true
   } catch {
     return false

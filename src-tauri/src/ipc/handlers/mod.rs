@@ -78,6 +78,25 @@ pub fn dispatch(
         "sendTerminalData" => terminal::send_terminal_data(data),
         "resizeTerminal" => terminal::resize_terminal(data),
         "closeTerminal" => terminal::close_terminal(data),
+        "clientConnect" | "appClientConnect" => {
+            let writer = writer.clone();
+            let token = token.clone();
+            let manager = manager.clone();
+            tokio::spawn(async move {
+                cluster::broadcast_engine_ready(&writer, &token, &manager).await;
+            });
+        }
+        "ping" => {
+            let writer = writer.clone();
+            let token = token.clone();
+            tokio::spawn(async move {
+                let _ = crate::ipc::bridge::Bridge::send_event(
+                    &writer,
+                    &token,
+                    &crate::ipc::events::OrbitEvent::Pong { reply: "pong".to_string() },
+                ).await;
+            });
+        }
         other => {
             tracing::debug!(event = %other, "Unhandled UI event in dispatcher");
         }
@@ -93,4 +112,27 @@ pub fn dispatch_tauri(
     static NATIVE_WRITER: std::sync::OnceLock<Arc<Mutex<WsWriter>>> = std::sync::OnceLock::new();
     let writer = NATIVE_WRITER.get_or_init(|| Arc::new(Mutex::new(WsWriter::Emitter)));
     dispatch(event_name, data, writer.clone(), String::new(), manager);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ipc::emitter::{set_global_emitter, MockEventEmitter};
+
+    #[tokio::test]
+    async fn test_dispatch_ping_responds_with_pong() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+
+        dispatch("ping", None, writer, "token".to_string(), manager);
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let emitted = mock_emitter.get_emitted_events().await;
+        let pong_event = emitted.iter().find(|(name, _)| name == "pong");
+        assert!(pong_event.is_some());
+    }
 }

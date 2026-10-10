@@ -76,3 +76,81 @@ test('probe returns a boolean', async () => {
   const result = await probe(100)
   assert.equal(typeof result, 'boolean')
 })
+
+test('init dispatches clientConnect in Tauri environment', async () => {
+  const { init } = await import('../nativeService.ts')
+  let dispatchedEvent = ''
+  const originalDispatch = coreEngine.dispatch
+  coreEngine.dispatch = async (event: string) => {
+    dispatchedEvent = event
+  }
+
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = { __TAURI_INTERNALS__: {} }
+
+  try {
+    await init()
+    assert.equal(dispatchedEvent, 'clientConnect')
+  } finally {
+    coreEngine.dispatch = originalDispatch
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('reconnect dispatches clientConnect in Tauri environment', async () => {
+  const { reconnect } = await import('../nativeService.ts')
+  let dispatchedEvent = ''
+  const originalDispatch = coreEngine.dispatch
+  coreEngine.dispatch = async (event: string) => {
+    dispatchedEvent = event
+  }
+
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = { __TAURI_INTERNALS__: {} }
+
+  try {
+    await reconnect()
+    assert.equal(dispatchedEvent, 'clientConnect')
+  } finally {
+    coreEngine.dispatch = originalDispatch
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('probe dispatches ping in Tauri environment and resolves true on success', async () => {
+  let pingDispatched = false
+  const originalDispatch = coreEngine.dispatch
+  coreEngine.dispatch = async (event: string) => {
+    if (event === 'ping') pingDispatched = true
+  }
+
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = { __TAURI_INTERNALS__: {} }
+
+  try {
+    const result = await probe(500)
+    assert.equal(result, true)
+    assert.equal(pingDispatched, true)
+  } finally {
+    coreEngine.dispatch = originalDispatch
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('probe returns false when engine ping rejects or times out', async () => {
+  const originalDispatch = coreEngine.dispatch
+  coreEngine.dispatch = async () => {
+    throw new Error('IPC disconnected')
+  }
+
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = { __TAURI_INTERNALS__: {} }
+
+  try {
+    const result = await probe(500)
+    assert.equal(result, false)
+  } finally {
+    coreEngine.dispatch = originalDispatch
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
