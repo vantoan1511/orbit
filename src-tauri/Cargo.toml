@@ -1,6 +1,6 @@
 [package]
 name = "orbit-app"
-version = "0.14.4"
+version = "0.14.5"
 description = "Orbit - Kubernetes Desktop Application"
 authors = ["Toan Nguyen"]
 edition = "2024"
