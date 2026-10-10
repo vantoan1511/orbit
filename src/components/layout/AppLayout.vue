@@ -126,7 +126,10 @@ onUnmounted(() => {
 <template>
   <Transition name="page" mode="out-in">
     <AppLoadingScreen v-if="k8sStore.isAppLoading" @complete="k8sStore.setAppLoading(false)" />
-    <div v-else class="flex flex-col h-screen w-screen overflow-hidden text-primary font-sans">
+    <div
+      v-else
+      class="flex flex-col h-screen w-screen overflow-hidden text-primary font-sans bg-(--bg-app)"
+    >
       <div class="flex-1 flex overflow-hidden">
         <!-- Sidebar -->
         <AppSidebar />

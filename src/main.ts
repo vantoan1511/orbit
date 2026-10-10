@@ -43,11 +43,9 @@ app.use(DialogService)
 
 app.mount('#app')
 
-if (typeof window !== 'undefined' && window.NL_PORT) {
-  init()
-}
+init()
 
-// Hydrate persistent state asynchronously once the app is mounted and Neutralino is initialized
+// Hydrate persistent state asynchronously once the app is mounted and Tauri host is initialized
 void Promise.allSettled([
   initTheme(),
   useTableFilterStore(pinia).init(),

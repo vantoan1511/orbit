@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useTheme } from '@/composables/useTheme'
 import { events } from '@/services/nativeService'
 import { terminalService } from '@/services/terminalService'
 import { OrbitEvents } from '@/types/events'
@@ -13,10 +14,26 @@ const props = defineProps<{
   isActive: boolean
 }>()
 
+const { isDark } = useTheme()
+
 const terminalContainer = ref<HTMLDivElement | null>(null)
 let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
+
+function getTerminalTheme() {
+  const computedStyle = getComputedStyle(document.documentElement)
+  const bg = computedStyle.getPropertyValue('--bg-app').trim() || '#0b0d0f'
+  const fg = computedStyle.getPropertyValue('--text-primary').trim() || '#ececed'
+  const cursor = computedStyle.getPropertyValue('--accent').trim() || '#4f8cff'
+
+  return {
+    background: bg,
+    foreground: fg,
+    cursor: cursor,
+    selectionBackground: 'rgba(79, 140, 255, 0.3)'
+  }
+}
 
 const handleTerminalData = (payload: { sessionId: string; data: string }) => {
   if (payload.sessionId === props.session.id && term) {
@@ -46,23 +63,12 @@ function handleResize() {
 onMounted(async () => {
   if (!terminalContainer.value) return
 
-  // Read current theme colors dynamically from CSS variables
-  const computedStyle = getComputedStyle(document.documentElement)
-  const bg = computedStyle.getPropertyValue('--bg-app').trim() || '#121214'
-  const fg = computedStyle.getPropertyValue('--text-primary').trim() || '#ececed'
-  const cursor = computedStyle.getPropertyValue('--accent').trim() || '#4f8cff'
-
   term = new Terminal({
     cursorBlink: true,
     fontFamily: 'var(--font-mono), monospace',
     fontSize: 12,
     lineHeight: 1.25,
-    theme: {
-      background: bg,
-      foreground: fg,
-      cursor: cursor,
-      selectionBackground: 'rgba(79, 140, 255, 0.3)'
-    },
+    theme: getTerminalTheme(),
     convertEol: true
   })
 
@@ -113,6 +119,14 @@ watch(
     }
   }
 )
+
+watch(isDark, () => {
+  nextTick(() => {
+    if (term) {
+      term.options.theme = getTerminalTheme()
+    }
+  })
+})
 
 onUnmounted(() => {
   if (resizeObserver && terminalContainer.value) {

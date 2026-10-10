@@ -70,9 +70,6 @@ export const tabStorageService = {
   async loadTabsState(clusterId?: string): Promise<TabsStorageState | null> {
     const key = getTabsStorageKey(clusterId)
     try {
-      if (typeof window !== 'undefined' && !(window as unknown as { NL_PORT?: number }).NL_PORT) {
-        throw new Error('Neutralino runtime not available')
-      }
       const raw = await withTimeout(storage.getData(key), STORAGE_TIMEOUT_MS)
       if (raw) {
         const parsed = JSON.parse(raw)

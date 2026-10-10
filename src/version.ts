@@ -1,2 +1,2 @@
-import packageJson from '../neutralino.config.json'
+import packageJson from '../package.json'
 export const VERSION = packageJson.version

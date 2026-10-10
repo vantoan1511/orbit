@@ -51,9 +51,6 @@ export function useSidebarState(options: UseSidebarStateOptions = {}) {
     try {
       let raw: string | null = null
       try {
-        if (typeof window !== 'undefined' && !(window as unknown as { NL_PORT?: number }).NL_PORT) {
-          throw new Error('Neutralino runtime not available')
-        }
         raw = await withTimeout(storage.getData(storageKey), DEFAULT_STORAGE_TIMEOUT_MS)
       } catch {
         // Fallback check for legacy localStorage

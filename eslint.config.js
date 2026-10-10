@@ -14,6 +14,8 @@ export default [
       '**/dist/**',
       '**/dist-ssr/**',
       '**/coverage/**',
+      '**/target/**',
+      'src-tauri/target/**',
       'bin/**',
       'build/**',
       'core/**',

@@ -42,11 +42,10 @@ Release preparation for Orbit **v${targetVersion}**.
 ## Changes
 
 - Bumps version from \`${currentVersion}\` to \`${targetVersion}\` in:
-  - \`neutralino.config.json\`
   - \`package.json\`
-  - \`core/engine/Cargo.toml\`
-  - \`core/updater/Cargo.toml\`
-- Synchronizes lockfiles (\`package-lock.json\` and \`core/Cargo.lock\`).
+  - \`src-tauri/tauri.conf.json\`
+  - \`src-tauri/Cargo.toml\`
+- Synchronizes lockfiles (\`package-lock.json\` and \`Cargo.lock\`).
 - Verified TypeScript checks via \`npm run type-check\`.
 
 ## Automated Release Process
@@ -143,22 +142,19 @@ Options:
     return JSON.stringify(pkg, null, 2) + '\n'
   })
 
-  // 2. neutralino.config.json
-  updateFile('neutralino.config.json', (content) => {
+  // 2. src-tauri/tauri.conf.json
+  updateFile('src-tauri/tauri.conf.json', (content) => {
     const config = JSON.parse(content)
     config.version = targetVersion
     return JSON.stringify(config, null, 2) + '\n'
   })
 
-  // 3. core/engine/Cargo.toml
-  updateCargoVersion('core/engine/Cargo.toml', targetVersion)
-
-  // 4. core/updater/Cargo.toml
-  updateCargoVersion('core/updater/Cargo.toml', targetVersion)
+  // 3. src-tauri/Cargo.toml
+  updateCargoVersion('src-tauri/Cargo.toml', targetVersion)
 
   console.log('\n3. Updating lock files...')
   run('npm install')
-  run('cargo check', { cwd: 'core' })
+  run('cargo check')
 
   console.log('\n4. Running typecheck...')
   run('npm run type-check')
@@ -167,7 +163,7 @@ Options:
     console.log('\n[DRY RUN] Skipping git commit, push, and PR creation.')
     console.log(`[DRY RUN] Would execute:`)
     console.log(
-      `  git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock`
+      `  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml`
     )
     console.log(`  git commit -m "${commitMsg}"`)
     console.log(`  git push origin ${branchName}`)
@@ -182,7 +178,7 @@ Options:
 
   console.log('\n5. Staging modified release files and committing...')
   run(
-    'git add package.json package-lock.json neutralino.config.json core/engine/Cargo.toml core/updater/Cargo.toml core/Cargo.lock'
+    'git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml'
   )
   run(`git commit -m "${commitMsg}"`)
 

@@ -69,6 +69,54 @@ fn get_sessions() -> &'static SessionMap {
     SESSIONS.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
 }
 
+#[cfg(target_os = "windows")]
+fn is_executable_in_path(exe: &str) -> bool {
+    if let Some(path_var) = std::env::var_os("PATH") {
+        for dir in std::env::split_paths(&path_var) {
+            let full = dir.join(exe);
+            if full.is_file() {
+                return true;
+            }
+        }
+    }
+    if let Some(pf) = std::env::var_os("ProgramFiles") {
+        let p7 = std::path::PathBuf::from(pf).join("PowerShell").join("7").join(exe);
+        if p7.is_file() {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn detect_default_shell() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if is_executable_in_path("pwsh.exe") || is_executable_in_path("pwsh") {
+            "pwsh.exe".to_string()
+        } else {
+            "powershell.exe".to_string()
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+    }
+}
+
+pub fn resolve_shell(req_shell: Option<String>, config_shell: Option<String>) -> String {
+    let default_shell = detect_default_shell();
+
+    req_shell
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            config_shell
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+        })
+        .unwrap_or(default_shell)
+}
+
 pub fn open_local_terminal(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -106,12 +154,8 @@ pub fn open_local_terminal(
             }
         };
 
-        #[cfg(target_os = "windows")]
-        let default_shell = "powershell.exe".to_string();
-        #[cfg(not(target_os = "windows"))]
-        let default_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-
-        let shell = req.shell.unwrap_or(default_shell);
+        let config_shell = crate::config::OrbitConfig::load().default_terminal_shell();
+        let shell = resolve_shell(req.shell, config_shell);
         let cmd = CommandBuilder::new(&shell);
 
         let mut child = match pair.slave.spawn_command(cmd) {
@@ -436,17 +480,16 @@ pub fn resize_terminal(data: Option<Value>) {
         };
 
         let sessions = get_sessions().read().await;
-        if let Some(session) = sessions.get(&req.session_id) {
-            if let TerminalSender::Local { master, .. } = &session.sender {
-                if let Ok(m) = master.lock() {
-                    let _ = m.resize(PtySize {
-                        rows: req.rows,
-                        cols: req.cols,
-                        pixel_width: 0,
-                        pixel_height: 0,
-                    });
-                }
-            }
+        if let Some(session) = sessions.get(&req.session_id)
+            && let TerminalSender::Local { master, .. } = &session.sender
+            && let Ok(m) = master.lock()
+        {
+            let _ = m.resize(PtySize {
+                rows: req.rows,
+                cols: req.cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            });
         }
     });
 }
@@ -465,10 +508,10 @@ pub fn close_terminal(data: Option<Value>) {
         };
 
         let mut sessions = get_sessions().write().await;
-        if let Some(mut session) = sessions.remove(&req.session_id) {
-            if let Some(cancel) = session.cancel_tx.take() {
-                let _ = cancel.send(());
-            }
+        if let Some(mut session) = sessions.remove(&req.session_id)
+            && let Some(cancel) = session.cancel_tx.take()
+        {
+            let _ = cancel.send(());
         }
     });
 }
@@ -559,5 +602,28 @@ mod tests {
         assert!(params.stdout);
         assert!(!params.stderr);
         assert!(params.tty);
+    }
+
+    #[test]
+    fn test_resolve_shell() {
+        // When request specifies shell, request shell takes precedence
+        assert_eq!(
+            resolve_shell(Some("cmd.exe".to_string()), Some("pwsh.exe".to_string())),
+            "cmd.exe"
+        );
+
+        // When request shell is empty/none, config shell is used
+        assert_eq!(
+            resolve_shell(None, Some("pwsh.exe".to_string())),
+            "pwsh.exe"
+        );
+        assert_eq!(
+            resolve_shell(Some("   ".to_string()), Some("pwsh.exe".to_string())),
+            "pwsh.exe"
+        );
+
+        // When both are None/empty, fallback to default shell
+        #[cfg(target_os = "windows")]
+        assert_eq!(resolve_shell(None, None), detect_default_shell());
     }
 }

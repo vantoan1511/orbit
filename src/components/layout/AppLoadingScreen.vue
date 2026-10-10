@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { events } from '@/services/nativeService'
+import { events, init } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
 import { Lightbulb, Rocket } from '@lucide/vue'
@@ -58,6 +58,10 @@ onMounted(() => {
     const engineReady = k8sStore.isEngineReady
 
     if (!engineReady) {
+      if (elapsed > 1500 && elapsed % 2000 < 85) {
+        void init()
+      }
+
       if (elapsed > ENGINE_TIMEOUT_MS) {
         window.clearInterval(progressInterval)
         finishTimeout = window.setTimeout(() => {

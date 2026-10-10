@@ -1,24 +1,33 @@
 [package]
-name = "orbit-engine"
+name = "orbit-app"
 version = "0.14.4"
+description = "Orbit - Kubernetes Desktop Application"
+authors = ["Toan Nguyen"]
 edition = "2024"
 
-[[bin]]
-name = "orbit-engine"
-path = "src/main.rs"
+[lib]
+name = "orbit_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
-tokio-tungstenite = "0.26"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-store = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-futures-util = "0.3"
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-log = "0.2"
 uuid = { version = "1.0", features = ["v4"] }
 urlencoding = "2.1"
-async-trait = "0.1"
+futures-util = "0.3"
 kube = { version = "0.98.0", features = ["runtime", "derive", "client", "ws"] }
 portable-pty = "0.8"
 k8s-openapi = { version = "0.24.0", features = ["latest"] }
@@ -28,13 +37,3 @@ serde_yaml = "0.9.34"
 reqwest = { version = "0.13.4", default-features = false, features = ["native-tls", "json", "blocking"] }
 semver = "1.0.28"
 
-[build-dependencies]
-winres = "0.1"
-serde_json = "1.0"
-
-[profile.release]
-opt-level = 3          # speed up compilation (3 is faster than 'z')
-lto = "thin"           # faster than full LTO, still good optimization
-codegen-units = 1      # parallelize compilation for faster builds
-strip = true           # keep symbols stripped for reasonable binary size
-panic = "abort"        # abort on panic (smaller binary)

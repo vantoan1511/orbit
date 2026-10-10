@@ -4,7 +4,7 @@ import ProfileDrawer from '@/components/layout/ProfileDrawer.vue'
 import SearchEverywhereDialog from '@/components/search/SearchEverywhereDialog.vue'
 import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
-import { app, events } from '@/services/nativeService'
+import { app, events, init } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
@@ -247,36 +247,40 @@ const handleContextMenu = (e: MouseEvent) => {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Disable default browser context menu globally for non-input elements
   window.addEventListener('contextmenu', handleContextMenu)
 
-  events.on(OrbitEvents.EngineConnected, handleEngineConnected)
-  events.on(OrbitEvents.AppSettingsUpdated, handleAppSettingsUpdated)
-  events.on(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated)
-  events.on(OrbitEvents.PodsUpdated, handlePodsUpdated)
-  events.on(OrbitEvents.DeploymentsUpdated, handleDeploymentsUpdated)
-  events.on(OrbitEvents.StatefulSetsUpdated, handleStatefulSetsUpdated)
-  events.on(OrbitEvents.DaemonSetsUpdated, handleDaemonSetsUpdated)
-  events.on(OrbitEvents.ReplicaSetsUpdated, handleReplicaSetsUpdated)
-  events.on(OrbitEvents.JobsUpdated, handleJobsUpdated)
-  events.on(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
-  events.on(OrbitEvents.NodesUpdated, handleNodesUpdated)
-  events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated)
-  events.on(OrbitEvents.IngressesUpdated, handleIngressesUpdated)
-  events.on(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated)
-  events.on(OrbitEvents.SecretsUpdated, handleSecretsUpdated)
-  events.on(OrbitEvents.EventsUpdated, handleEventsUpdated)
-  events.on(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated)
-  events.on(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated)
-  events.on(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated)
-  events.on(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated)
-  events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated)
-  events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
-  events.on(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated)
-  events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
-  events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
-  events.on(OrbitEvents.EngineTimeout, handleEngineTimeout)
+  await Promise.all([
+    events.on(OrbitEvents.EngineConnected, handleEngineConnected),
+    events.on(OrbitEvents.AppSettingsUpdated, handleAppSettingsUpdated),
+    events.on(OrbitEvents.NamespacesUpdated, handleNamespacesUpdated),
+    events.on(OrbitEvents.PodsUpdated, handlePodsUpdated),
+    events.on(OrbitEvents.DeploymentsUpdated, handleDeploymentsUpdated),
+    events.on(OrbitEvents.StatefulSetsUpdated, handleStatefulSetsUpdated),
+    events.on(OrbitEvents.DaemonSetsUpdated, handleDaemonSetsUpdated),
+    events.on(OrbitEvents.ReplicaSetsUpdated, handleReplicaSetsUpdated),
+    events.on(OrbitEvents.JobsUpdated, handleJobsUpdated),
+    events.on(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated),
+    events.on(OrbitEvents.NodesUpdated, handleNodesUpdated),
+    events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated),
+    events.on(OrbitEvents.IngressesUpdated, handleIngressesUpdated),
+    events.on(OrbitEvents.ConfigMapsUpdated, handleConfigMapsUpdated),
+    events.on(OrbitEvents.SecretsUpdated, handleSecretsUpdated),
+    events.on(OrbitEvents.EventsUpdated, handleEventsUpdated),
+    events.on(OrbitEvents.PersistentVolumesUpdated, handlePersistentVolumesUpdated),
+    events.on(OrbitEvents.PersistentVolumeClaimsUpdated, handlePersistentVolumeClaimsUpdated),
+    events.on(OrbitEvents.StorageClassesUpdated, handleStorageClassesUpdated),
+    events.on(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated),
+    events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated),
+    events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged),
+    events.on(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated),
+    events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred),
+    events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded),
+    events.on(OrbitEvents.EngineTimeout, handleEngineTimeout)
+  ])
+
+  await init()
 })
 
 onUnmounted(() => {

@@ -7,14 +7,14 @@ Orbit is a lightweight, native desktop Kubernetes dashboard.
 Technology stack:
 
 - Rust (backend)
-- Neutralinojs (desktop runtime)
+- Tauri v2 (desktop runtime)
 - Vue 3
 - Tailwindcss v4
 - PrimeVue v4
 - TypeScript
 - Vite
 
-The frontend communicates with the Rust backend exclusively through Neutralinojs IPC. Rust is responsible for all privileged operations, while Vue is responsible for presenting data and handling user interactions.
+The frontend communicates with the Rust backend exclusively through Tauri IPC (`dispatch_engine` command and event emitter). Rust is responsible for all privileged operations, while Vue is responsible for presenting data and handling user interactions.
 
 ---
 
@@ -376,7 +376,7 @@ Whenever logic requires Kubernetes knowledge or system access, it belongs in Rus
 - `app.mount('#app')` in `src/main.ts` must execute synchronously before `init()` is called.
 - `init()` must run after `app.mount('#app')`.
 - Never block `app.mount('#app')` with top-level `await` operations.
-- Rationale: `App.vue`'s `onMounted()` registers listeners for core IPC broadcast events (`engineConnected`, `clustersUpdated`, `activeClusterChanged`). If `init()` runs before `app.mount('#app')` or mounting is delayed by asynchronous promises, the backend engine connects to Neutralino's WebSocket and emits these initial handshake events before frontend listeners are mounted, causing lost clusters and spurious engine connection timeouts.
+- Rationale: `App.vue`'s `onMounted()` registers listeners for core IPC broadcast events (`engineConnected`, `clustersUpdated`, `activeClusterChanged`). If `init()` runs before `app.mount('#app')` or mounting is delayed by asynchronous promises, the backend engine emits these initial handshake events before frontend listeners are mounted, causing lost clusters and spurious engine connection timeouts.
 - Store hydration from native storage (`initTheme`, `tableFilterStore.init()`, `notificationStore.init()`) must occur asynchronously after mounting and `init()` in the background (e.g. `void Promise.allSettled(...)`).
 
 ---
@@ -469,9 +469,9 @@ Avoid:
 
 - business logic inside views
 
-- direct IPC or Neutralino calls scattered across components
+- direct IPC or native backend calls scattered across components
 
-- direct imports of `@neutralinojs/lib` in components, views, or composables (must use `@/services/nativeService` or domain services)
+- direct imports of Tauri or native system libraries in components, views, or composables (must use `@/services/nativeService` or domain services)
 
 - raw HTML inputs/buttons (`<button>`, `<input>`, `<select>`) or reinventions of controls already available in PrimeVue
 
@@ -499,17 +499,17 @@ Frontend Service (`@/services/*`, e.g., `@/services/nativeService`)
 
 ↓
 
-Neutralino IPC / Native API (`@neutralinojs/lib`)
+Tauri IPC / Native API (`@tauri-apps/*`)
 
 ↓
 
-Rust Backend
+Rust Backend (`dispatch_engine` / `EventEmitter`)
 
 ↓
 
 Kubernetes
 
-Components must never call IPC or `@neutralinojs/lib` directly. All native/OS/filesystem/IPC capabilities must be accessed via frontend services.
+Components must never call IPC or Tauri APIs directly. All native/OS/filesystem/IPC capabilities must be accessed via frontend services.
 
 ---
 
@@ -531,7 +531,7 @@ Application settings and user preferences are owned and defined by the Rust back
 
 - **Storage**: User customizations are persisted on disk strictly as key-value pairs (`{"key": value}`) in `~/.orbit/config.json`.
 - **Logs Directory**: Application logs are stored in `~/.orbit/logs/`.
-- **Backend Model (`core/engine/src/config.rs`)**:
+- **Backend Model (`src-tauri/src/config.rs`)**:
   - `Configuration`: Represents individual setting metadata (`key`, `name`, `description`, `datatype`, `defaultValue`, `value`, `isConfidential`, `cardinality`, `enable`, `createdAt`, `lastUpdatedAt`).
   - `Configuration::system_definitions()`: Canonical source of truth defining all system configurations.
   - `OrbitConfig`: Transparent map (`HashMap<String, Value>`) for `~/.orbit/config.json` persistence with legacy alias normalization.
