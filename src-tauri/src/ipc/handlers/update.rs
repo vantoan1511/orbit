@@ -91,6 +91,10 @@ pub fn check_for_updates(
     });
 }
 
+pub fn extract_target_version(data: &Option<Value>, fallback: &str) -> String {
+    get_string(data, "version").unwrap_or_else(|| fallback.to_string())
+}
+
 pub fn apply_update(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -98,9 +102,11 @@ pub fn apply_update(
 ) {
     tokio::spawn(async move {
         let url = get_string(&data, "url");
+        let current_engine = env!("CARGO_PKG_VERSION");
+        let target_version = extract_target_version(&data, current_engine);
             
         if let Some(url) = url {
-            tracing::info!(download_url = %url, "Applying update");
+            tracing::info!(download_url = %url, target_version = %target_version, "Applying update");
             let (tx, mut rx) = tokio::sync::mpsc::channel(100);
             let writer_clone = writer.clone();
             let token_clone = token.clone();
@@ -118,9 +124,8 @@ pub fn apply_update(
                 }
             });
 
-            let current_engine = env!("CARGO_PKG_VERSION");
             // Download installer directly using atomic .part staging
-            let download_res = crate::updater::UpdateManifest::download_installer(&url, current_engine, Some(tx)).await;
+            let download_res = crate::updater::UpdateManifest::download_installer(&url, &target_version, Some(tx)).await;
 
             match download_res {
                 Ok(installer_path) => {
@@ -169,4 +174,29 @@ pub fn apply_update(
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_extract_target_version_with_explicit_version() {
+        let payload = Some(json!({
+            "url": "https://example.com/Orbit_0.14.9_x64-setup.exe",
+            "version": "0.14.9"
+        }));
+        let version = extract_target_version(&payload, "0.14.8");
+        assert_eq!(version, "0.14.9");
+    }
+
+    #[test]
+    fn test_extract_target_version_fallback_to_current() {
+        let payload = Some(json!({
+            "url": "https://example.com/Orbit_0.14.9_x64-setup.exe"
+        }));
+        let version = extract_target_version(&payload, "0.14.8");
+        assert_eq!(version, "0.14.8");
+    }
 }
