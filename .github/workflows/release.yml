@@ -26,6 +26,18 @@ jobs:
         run: npm install
       - name: Build Tauri Desktop Application
         run: npm run tauri:build
+      - name: Package Update Zip
+        run: |
+          $nsis = Get-ChildItem -Path @("target/release/bundle/nsis/*_setup.exe", "src-tauri/target/release/bundle/nsis/*_setup.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $nsis) {
+            $nsis = Get-ChildItem target/release/bundle/nsis/*_setup.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $nsis) { throw "NSIS installer not found at target/release/bundle/nsis/" }
+          New-Item -ItemType Directory -Force -Path dist\update-staging | Out-Null
+          Copy-Item $nsis.FullName dist\update-staging\orbit-win_x64.exe
+          Compress-Archive -Path dist\update-staging\orbit-win_x64.exe -DestinationPath dist\orbit-update.zip -Force
+          Remove-Item -Recurse -Force dist\update-staging
+          Write-Host "Created orbit-update.zip containing orbit-win_x64.exe ($(Split-Path $nsis.FullName -Leaf))"
       - name: Get Version
         id: version
         run: |
@@ -82,3 +94,4 @@ jobs:
           files: |
             target/release/bundle/nsis/*_setup.exe
             target/release/bundle/msi/*.msi
+            dist/orbit-update.zip
