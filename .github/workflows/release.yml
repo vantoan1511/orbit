@@ -26,8 +26,18 @@ jobs:
         run: npm install
       - name: Build Tauri Desktop Application
         run: npm run tauri:build
+      - name: Get Version
+        id: version
+        run: |
+          $version = node -p "require('./package.json').version"
+          echo "VERSION=$version" >> $env:GITHUB_ENV
       - name: Package Update Zip
         run: |
+          $isLegacyBridge = node -e "const semver = require('semver'); process.exit(semver.lte(process.env.VERSION, '0.14.7') ? 0 : 1)"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Version $($env:VERSION) is greater than bridge version 0.14.7. Skipping legacy orbit-update.zip packaging."
+            exit 0
+          }
           $nsis = Get-ChildItem -Path @("target/release/bundle/nsis/*_setup.exe", "src-tauri/target/release/bundle/nsis/*_setup.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $nsis) {
             $nsis = Get-ChildItem target/release/bundle/nsis/*_setup.exe -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -38,13 +48,13 @@ jobs:
           Compress-Archive -Path dist\update-staging\orbit-win_x64.exe -DestinationPath dist\orbit-update.zip -Force
           Remove-Item -Recurse -Force dist\update-staging
           Write-Host "Created orbit-update.zip containing orbit-win_x64.exe ($(Split-Path $nsis.FullName -Leaf))"
-      - name: Get Version
-        id: version
-        run: |
-          $version = node -p "require('./package.json').version"
-          echo "VERSION=$version" >> $env:GITHUB_ENV
       - name: Update Manifest
         run: |
+          $isLegacyBridge = node -e "const semver = require('semver'); process.exit(semver.lte(process.env.VERSION, '0.14.7') ? 0 : 1)"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Version $($env:VERSION) > 0.14.7. update-manifest.json is permanently frozen at 0.14.7. Skipping manifest update."
+            exit 0
+          }
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
@@ -94,4 +104,4 @@ jobs:
           files: |
             target/release/bundle/nsis/*_setup.exe
             target/release/bundle/msi/*.msi
-            dist/orbit-update.zip
+            dist/*.zip
