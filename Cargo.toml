@@ -7,6 +7,6 @@ resolver = "2"
 [profile.release]
 opt-level = 3          # speed up compilation (3 is faster than 'z')
 lto = "thin"           # faster than full LTO, still good optimization
-codegen-units = 1      # parallelize compilation for faster builds
+codegen-units = 16     # parallelize compilation for faster builds
 strip = true           # keep symbols stripped for reasonable binary size
 panic = "abort"        # abort on panic (smaller binary)
