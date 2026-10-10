@@ -70,7 +70,13 @@ pub struct WsMessage {
     pub data: Option<Value>,
 }
 
-pub type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+pub type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>;
+
+pub enum WsWriter {
+    WebSocket(WsSink),
+    Emitter,
+}
+
 pub type WsReader = SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>;
 
 /// The Bridge wraps the WebSocket connection to Neutralino.
@@ -94,7 +100,7 @@ impl Bridge {
         let (writer, reader) = ws.split();
 
         Ok(Bridge {
-            writer: Arc::new(Mutex::new(writer)),
+            writer: Arc::new(Mutex::new(WsWriter::WebSocket(writer))),
             reader,
             token: auth.nl_token.clone(),
         })
@@ -106,17 +112,6 @@ impl Bridge {
         token: &str,
         event: &super::events::OrbitEvent,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let payload = serde_json::to_value(event)?;
-
-        let msg = WsMessage {
-            id: Some(uuid::Uuid::new_v4().to_string()),
-            method: Some("app.broadcast".to_string()),
-            access_token: Some(token.to_string()),
-            event: None,
-            data: Some(payload),
-        };
-
-        let text = serde_json::to_string(&msg)?;
         let ev_name = event.event_name();
         match event {
             super::events::OrbitEvent::ErrorOccurred { message } => {
@@ -130,8 +125,26 @@ impl Bridge {
             }
         }
 
+        if let Some(emitter) = super::emitter::get_global_emitter() {
+            emitter.emit_orbit_event(event).await.map_err(|e| Box::<dyn std::error::Error>::from(e))?;
+            return Ok(());
+        }
+
+        let payload = serde_json::to_value(event)?;
+
+        let msg = WsMessage {
+            id: Some(uuid::Uuid::new_v4().to_string()),
+            method: Some("app.broadcast".to_string()),
+            access_token: Some(token.to_string()),
+            event: None,
+            data: Some(payload),
+        };
+
+        let text = serde_json::to_string(&msg)?;
         let mut w = writer.lock().await;
-        w.send(Message::Text(text.into())).await?;
+        if let WsWriter::WebSocket(sink) = &mut *w {
+            sink.send(Message::Text(text.into())).await?;
+        }
         Ok(())
     }
 
@@ -149,7 +162,9 @@ impl Bridge {
                 }
                 Some(Ok(Message::Ping(data))) => {
                     let mut w = writer.lock().await;
-                    w.send(Message::Pong(data)).await?;
+                    if let WsWriter::WebSocket(sink) = &mut *w {
+                        sink.send(Message::Pong(data)).await?;
+                    }
                 }
                 Some(Ok(_)) => continue,
                 Some(Err(e)) => {

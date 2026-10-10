@@ -83,3 +83,14 @@ pub fn dispatch(
         }
     }
 }
+
+/// Dispatches an IPC event from the Tauri frontend to the appropriate Kubernetes handler.
+pub fn dispatch_tauri(
+    event_name: &str,
+    data: Option<Value>,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    static NATIVE_WRITER: std::sync::OnceLock<Arc<Mutex<WsWriter>>> = std::sync::OnceLock::new();
+    let writer = NATIVE_WRITER.get_or_init(|| Arc::new(Mutex::new(WsWriter::Emitter)));
+    dispatch(event_name, data, writer.clone(), String::new(), manager);
+}

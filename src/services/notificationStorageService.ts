@@ -60,9 +60,6 @@ export const notificationStorageService = {
       let raw: string | null = null
 
       try {
-        if (typeof window !== 'undefined' && !(window as unknown as { NL_PORT?: number }).NL_PORT) {
-          throw new Error('Neutralino runtime not available')
-        }
         raw = await withTimeout(storage.getData(NOTIFICATION_STORAGE_KEY), STORAGE_TIMEOUT_MS)
       } catch {
         // Native storage key not found or uninitialized runtime.

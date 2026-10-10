@@ -3,6 +3,10 @@ name = "orbit-engine"
 version = "0.14.4"
 edition = "2024"
 
+[lib]
+name = "orbit_engine"
+path = "src/lib.rs"
+
 [[bin]]
 name = "orbit-engine"
 path = "src/main.rs"

@@ -1,16 +1,12 @@
 # Developer tools' files
 .lite_workspace.lua
 
-# Neutralinojs binaries and builds
+# Desktop binaries and builds
 /bin
 /dist
 /build
 /.tmp
-
-# Neutralinojs client (minified)
-neutralino.js
-
-# Neutralinojs related files
+/src-tauri/target
 .storage
 *.log
 

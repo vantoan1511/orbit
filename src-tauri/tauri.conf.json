@@ -1,0 +1,39 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-cli/schema.json",
+  "productName": "Orbit",
+  "version": "0.14.4",
+  "identifier": "vantoan1511.orbit",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Orbit",
+        "width": 1280,
+        "height": 720,
+        "minWidth": 1280,
+        "minHeight": 720,
+        "center": true,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ]
+  },
+  "plugins": {}
+}

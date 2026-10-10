@@ -17,7 +17,9 @@ const appArch = computed(() => {
 onMounted(async () => {
   try {
     const config = await app.getConfig()
-    appVersion.value = config.version
+    if (typeof config.version === 'string') {
+      appVersion.value = config.version
+    }
   } catch (error) {
     console.error('Failed to get app version:', error)
   }

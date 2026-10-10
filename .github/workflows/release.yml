@@ -24,30 +24,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install Dependencies
         run: npm install
-      - name: Install Neutralino CLI
-        run: npm install -g @neutralinojs/neu
-      - name: Build Resources & Neutralino Wrapper
-        run: |
-          neu update
-          neu build
-      - name: Build Engine and Updater
-        run: |
-          cd core
-          cargo build --release
-          cd ..
-          New-Item -ItemType Directory -Force -Path dist\orbit\bin
-          copy core\target\release\orbit-engine.exe dist\orbit\bin\
-          copy core\target\release\orbit-apply.exe dist\orbit\bin\
-      - name: Package Installer
-        run: npm run package
-      - name: Package Update Zip
-        run: |
-          New-Item -ItemType Directory -Force -Path dist\update-staging\bin
-          copy dist\orbit\resources.neu dist\update-staging\
-          copy dist\orbit\bin\orbit-engine.exe dist\update-staging\bin\
-          copy dist\orbit\bin\orbit-apply.exe dist\update-staging\bin\
-          Compress-Archive -Path dist\update-staging\* -DestinationPath dist\orbit-update.zip
-          Remove-Item -Recurse -Force dist\update-staging
+      - name: Build Tauri Desktop Application
+        run: npm run tauri:build
       - name: Get Version
         id: version
         run: |
@@ -102,5 +80,5 @@ jobs:
           tag_name: v${{ env.VERSION }}
           generate_release_notes: true
           files: |
-            dist/Orbit-Setup-${{ env.VERSION }}.exe
-            dist/orbit-update.zip
+            target/release/bundle/nsis/*_setup.exe
+            target/release/bundle/msi/*.msi

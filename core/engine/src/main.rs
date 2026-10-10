@@ -130,9 +130,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             tokio::select! {
                 _ = ping_interval.tick() => {
                     let mut w = bridge.writer.lock().await;
-                    if let Err(e) = w.send(Message::Ping(vec![].into())).await {
-                        tracing::warn!("Ping failed (bridge dead), reconnecting: {:?}", e);
-                        break;
+                    if let ipc::bridge::WsWriter::WebSocket(sink) = &mut *w {
+                        if let Err(e) = sink.send(Message::Ping(vec![].into())).await {
+                            tracing::warn!("Ping failed (bridge dead), reconnecting: {:?}", e);
+                            break;
+                        }
                     }
                 }
                 result = Bridge::read_message(&mut bridge.reader, &bridge.writer) => {

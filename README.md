@@ -1,14 +1,14 @@
 # Orbit 🛰️
 
 <p align="center">
-  <strong>A lightweight, native Kubernetes desktop dashboard built with Rust and Neutralinojs.</strong>
+  <strong>A lightweight, native Kubernetes desktop dashboard built with Rust and Tauri.</strong>
 </p>
 
 <p align="center">
   <a href="https://github.com/vantoan1511/orbit/releases"><img src="https://img.shields.io/github/v/release/vantoan1511/orbit?style=flat-square&color=4f8cff" alt="Latest Release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-emerald?style=flat-square" alt="License"></a>
   <a href="https://www.rust-lang.org/"><img src="https://img.shields.io/badge/Backend-Rust-orange?style=flat-square&logo=rust" alt="Rust"></a>
-  <a href="https://neutralino.js.org/"><img src="https://img.shields.io/badge/Runtime-Neutralinojs-8b5cf6?style=flat-square" alt="Neutralinojs"></a>
+  <a href="https://tauri.app/"><img src="https://img.shields.io/badge/Runtime-Tauri%20v2-24c8db?style=flat-square&logo=tauri" alt="Tauri"></a>
   <a href="https://vuejs.org/"><img src="https://img.shields.io/badge/Frontend-Vue%203-emerald?style=flat-square&logo=vue.js" alt="Vue 3"></a>
   <a href="https://primevue.org/"><img src="https://img.shields.io/badge/UI-PrimeVue%20v4-blue?style=flat-square" alt="PrimeVue v4"></a>
 </p>
@@ -17,7 +17,7 @@
 
 Desktop Kubernetes management shouldn't require running a dedicated Chromium instance consuming 1–2 GB of RAM just to check a Pod status or inspect an ingress rule.
 
-**Orbit** is built for engineers who want a snappy, native-feeling desktop experience without the Electron overhead. By pairing a compiled **Rust core engine** with **Neutralinojs** (which utilizes your operating system's native webview), Orbit starts in milliseconds, sips memory, and keeps cluster operations isolated and fast.
+**Orbit** is built for engineers who want a snappy, native-feeling desktop experience without the Electron overhead. By pairing a compiled **Rust core engine** with **Tauri v2** (which utilizes your operating system's native webview), Orbit starts in milliseconds, sips memory, and keeps cluster operations isolated and fast.
 
 <p align="center">
   <img src="screenshots/screenshot.png" alt="Orbit Preview" width="850" />
@@ -30,7 +30,7 @@ Desktop Kubernetes management shouldn't require running a dedicated Chromium ins
 ## ⚡ Why Orbit?
 
 - **Compiled Rust Core**: High-throughput Kubernetes communication, streaming log parsers, and connection pools run in native Rust via `kube-rs` and `tokio`.
-- **Zero Electron Overhead**: Built on [Neutralinojs](https://neutralino.js.org/). We hook into your OS's built-in webview instead of shipping an entire redundant browser binary.
+- **Zero Electron Overhead**: Built on [Tauri](https://tauri.app/). We hook into your OS's built-in webview instead of shipping an entire redundant browser binary.
 - **Security by Isolation**: Kubeconfig credentials, certificates, and cluster tokens live exclusively within the local Rust process—never leaking into the frontend presentation layer.
 - **IDE-Grade Density**: Dark-first, noir-inspired technical design powered by PrimeVue v4 (Nora preset). Information-dense, clean, and distraction-free.
 
@@ -78,17 +78,17 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 │  - PrimeVue v4 (Nora Theme) + Tailwind CSS v4           │
 │  - View State, Monaco YAML Editor, UI Interactions      │
 └────────────────────────────┬────────────────────────────┘
-                             │ Neutralino IPC
+                             │ Tauri v2 IPC
 ┌────────────────────────────▼────────────────────────────┐
-│                     Rust Backend                        │
+│                  Rust Host & Backend                    │
+│  - `src-tauri`: Tauri v2 application host & plugins     │
 │  - `core/engine`: Kubernetes client, kubeconfig, Cache  │
-│  - `core/updater`: Lightweight auto-update engine       │
 │  - Privileged OS, Network & Filesystem operations       │
 └─────────────────────────────────────────────────────────┘
 ```
 
 - **Frontend (`src/`)**: Pure presentation layer communicating strictly across strongly typed IPC contracts.
-- **Backend (`core/engine`, `core/updater`)**: Handles all Kubernetes client logic, token resolution, and background workers.
+- **Backend (`src-tauri`, `core/engine`)**: In-process Rust engine handles all Kubernetes client logic, token resolution, and background workers.
 - **IPC Protocol**: Strongly typed request/response structs preventing runtime desynchronization and secret leakage.
 
 ---
@@ -97,7 +97,7 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 
 | Layer                     | Technology                                                                                  |
 | ------------------------- | ------------------------------------------------------------------------------------------- |
-| **Desktop Runtime**       | [Neutralinojs](https://neutralino.js.org/)                                                  |
+| **Desktop Runtime**       | [Tauri v2](https://tauri.app/)                                                              |
 | **Backend Engine**        | [Rust](https://www.rust-lang.org/) (`kube-rs`, `tokio`, `serde`)                            |
 | **Frontend Framework**    | [Vue 3](https://vuejs.org/) (Composition API, TypeScript)                                   |
 | **UI Components & Theme** | [PrimeVue v4](https://primevue.org/) (Nora Preset)                                          |
@@ -114,7 +114,7 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 ### Windows
 
 1. Head over to the [Releases](https://github.com/vantoan1511/orbit/releases) page.
-2. Grab the latest `Orbit-Setup-x.y.z.exe` installer.
+2. Grab the latest `Orbit-Setup-x.y.z.exe` installer or MSI package.
 3. Run the installer to get up and running.
 
 > _macOS and Linux builds are currently in progress._
@@ -127,7 +127,6 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 
 - [Node.js](https://nodejs.org/) (`>= 20.19.0` or `>= 22.12.0`)
 - [Rust](https://www.rust-lang.org/) (Stable toolchain)
-- [Inno Setup 6](https://jrsoftware.org/isinfo.php) (Only required if building the Windows installer executable)
 
 ### Quickstart
 
@@ -144,15 +143,9 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
    npm install
    ```
 
-3. **Fetch Neutralino binaries:**
-
+3. **Launch development mode:**
    ```bash
-   npm run neu:update
-   ```
-
-4. **Launch development mode:**
-   ```bash
-   npm run neu:run
+   npm run tauri:dev
    ```
 
 ### Available Scripts
@@ -160,9 +153,9 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 | Command              | Description                                                                      |
 | -------------------- | -------------------------------------------------------------------------------- |
 | `npm run dev`        | Starts the Vite development server                                               |
-| `npm run neu:run`    | Launches the Neutralino desktop client in development mode                       |
+| `npm run tauri:dev`  | Launches the Tauri desktop client in development mode                            |
+| `npm run tauri:build`| Builds production desktop bundle (NSIS installer and MSI)                        |
 | `npm run build`      | Type-checks and builds frontend production assets                                |
-| `npm run package`    | Compiles backend binaries, packages resources, and outputs the Windows installer |
 | `npm run type-check` | Runs `vue-tsc` to validate TypeScript across Vue components and source files     |
 | `npm run test`       | Runs unit tests using Node 24 native test runner                                 |
 | `npm run lint`       | Lints and fixes source files with ESLint                                         |
