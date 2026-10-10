@@ -82,13 +82,13 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 ┌────────────────────────────▼────────────────────────────┐
 │                  Rust Host & Backend                    │
 │  - `src-tauri`: Tauri v2 application host & plugins     │
-│  - `core/engine`: Kubernetes client, kubeconfig, Cache  │
+│  - In-process: Kubernetes client, kubeconfig, Cache     │
 │  - Privileged OS, Network & Filesystem operations       │
 └─────────────────────────────────────────────────────────┘
 ```
 
 - **Frontend (`src/`)**: Pure presentation layer communicating strictly across strongly typed IPC contracts.
-- **Backend (`src-tauri`, `core/engine`)**: In-process Rust engine handles all Kubernetes client logic, token resolution, and background workers.
+- **Backend (`src-tauri`)**: In-process Rust engine handles all Kubernetes client logic, token resolution, and background workers.
 - **IPC Protocol**: Strongly typed request/response structs preventing runtime desynchronization and secret leakage.
 
 ---

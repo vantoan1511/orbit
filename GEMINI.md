@@ -531,7 +531,7 @@ Application settings and user preferences are owned and defined by the Rust back
 
 - **Storage**: User customizations are persisted on disk strictly as key-value pairs (`{"key": value}`) in `~/.orbit/config.json`.
 - **Logs Directory**: Application logs are stored in `~/.orbit/logs/`.
-- **Backend Model (`core/engine/src/config.rs`)**:
+- **Backend Model (`src-tauri/src/config.rs`)**:
   - `Configuration`: Represents individual setting metadata (`key`, `name`, `description`, `datatype`, `defaultValue`, `value`, `isConfidential`, `cardinality`, `enable`, `createdAt`, `lastUpdatedAt`).
   - `Configuration::system_definitions()`: Canonical source of truth defining all system configurations.
   - `OrbitConfig`: Transparent map (`HashMap<String, Value>`) for `~/.orbit/config.json` persistence with legacy alias normalization.

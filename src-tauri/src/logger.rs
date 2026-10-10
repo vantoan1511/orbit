@@ -135,12 +135,27 @@ pub struct RotatingFileAppender {
 }
 
 impl RotatingFileAppender {
-    pub fn new(dir: PathBuf) -> Self {
-        let inner = Inner::new(dir).expect("Failed to initialize rotating file appender");
+    pub fn try_new(dir: PathBuf) -> io::Result<Self> {
+        let inner = Inner::new(dir)?;
         inner.cleanup();
-        Self {
+        Ok(Self {
             inner: Arc::new(Mutex::new(inner)),
-        }
+        })
+    }
+
+    pub fn new(dir: PathBuf) -> Self {
+        Self::try_new(dir).unwrap_or_else(|e| {
+            tracing::error!(error = %e, "Failed to initialize rotating file appender");
+            let fallback_dir = std::env::temp_dir();
+            let inner = Inner::new(fallback_dir).unwrap_or(Inner {
+                dir: std::path::PathBuf::new(),
+                active_date: String::new(),
+                file: None,
+            });
+            Self {
+                inner: Arc::new(Mutex::new(inner)),
+            }
+        })
     }
 }
 
@@ -181,7 +196,7 @@ pub fn init() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("Could not determine Orbit logs directory")?;
     std::fs::create_dir_all(&logs_dir)?;
 
-    let appender = RotatingFileAppender::new(logs_dir.clone());
+    let appender = RotatingFileAppender::try_new(logs_dir.clone())?;
     let writer = appender.and(io::stdout);
 
     let env_filter = EnvFilter::try_from_default_env()

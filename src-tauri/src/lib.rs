@@ -1,11 +1,17 @@
+pub mod config;
+pub mod ipc;
+pub mod kubernetes;
+pub mod logger;
+pub mod updater;
+
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tauri::{AppHandle, Manager, State, Emitter};
 use serde_json::Value;
 use async_trait::async_trait;
-use orbit_engine::kubernetes::manager::KubeManager;
-use orbit_engine::ipc::emitter::{EventEmitter, set_global_emitter};
-use orbit_engine::ipc::events::OrbitEvent;
+use crate::kubernetes::manager::KubeManager;
+use crate::ipc::emitter::{EventEmitter, set_global_emitter};
+use crate::ipc::events::OrbitEvent;
 
 pub struct AppState {
     pub kube_manager: Arc<RwLock<KubeManager>>,
@@ -28,7 +34,7 @@ async fn dispatch_engine(
     event: String,
     data: Option<Value>,
 ) -> Result<(), String> {
-    orbit_engine::ipc::handlers::dispatch_tauri(&event, data, state.kube_manager.clone());
+    crate::ipc::handlers::dispatch_tauri(&event, data, state.kube_manager.clone());
     Ok(())
 }
 
@@ -52,7 +58,7 @@ async fn broadcast_engine_ready(
 
 pub fn run() {
     // Initialize file logger
-    if let Err(e) = orbit_engine::logger::init() {
+    if let Err(e) = crate::logger::init() {
         eprintln!("Warning: Failed to initialize file logger: {}", e);
     }
 
@@ -100,7 +106,7 @@ mod tests {
             active_context_healthy: false,
             log_cancel: Vec::new(),
             port_forward_cancel: std::collections::HashMap::new(),
-            config: orbit_engine::config::OrbitConfig::load(),
+            config: crate::config::OrbitConfig::load(),
         }));
         let state = AppState { kube_manager: km };
         assert!(state.kube_manager.blocking_read().active_context.is_none());
