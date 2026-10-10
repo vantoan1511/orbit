@@ -1,5 +1,5 @@
-import { updaterService } from '@/services/updaterService'
-import type { UpdateManifest } from '@/types/events'
+import { updaterService } from '../services/updaterService.ts'
+import type { UpdateManifest } from '../types/events.ts'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -19,10 +19,10 @@ export const useUpdaterStore = defineStore('updater', () => {
   }
 
   function applyUpdate() {
-    if (!manifest.value?.url) return
+    if (!manifest.value?.url || !manifest.value?.version) return
     isDownloading.value = true
     downloadProgress.value = 0
-    updaterService.applyUpdate(manifest.value.url)
+    updaterService.applyUpdate(manifest.value.url, manifest.value.version)
   }
 
   function initListeners() {

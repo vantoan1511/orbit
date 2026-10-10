@@ -1,5 +1,5 @@
-import { OrbitEvents, type OrbitEventMap } from '@/types/events'
-import { coreEngine, events } from './nativeService'
+import { OrbitEvents, type OrbitEventMap } from '../types/events.ts'
+import { coreEngine, events } from './nativeService.ts'
 
 class UpdaterService {
   /**
@@ -12,8 +12,8 @@ class UpdaterService {
   /**
    * Start downloading and applying an update (requires restart).
    */
-  applyUpdate(url: string) {
-    coreEngine.dispatch('applyUpdate', { url })
+  applyUpdate(url: string, version: string) {
+    coreEngine.dispatch('applyUpdate', { url, version })
   }
 
   onUpdateCheckFinished(handler: (data: OrbitEventMap['updateCheckFinished']) => void) {
