@@ -88,3 +88,31 @@ test('terminalStore updates session title by id', () => {
 
   assert.equal(store.sessions[0]?.title, 'pwsh')
 })
+
+test('terminalStore.removeSession called on terminal exit removes session and closes panel if last', () => {
+  const store = useTerminalStore()
+  store.addSession({ id: 'exit-session', title: 'pwsh', type: 'local' })
+
+  assert.equal(store.sessions.length, 1)
+  assert.equal(store.isOpen, true)
+
+  // Simulates what handleTerminalClosed now does:
+  store.removeSession('exit-session')
+
+  assert.equal(store.sessions.length, 0)
+  assert.equal(store.activeSessionId, null)
+  assert.equal(store.isOpen, false)
+})
+
+test('terminalStore.removeSession called on terminal exit activates adjacent session when others exist', () => {
+  const store = useTerminalStore()
+  store.addSession({ id: 's1', title: 'pwsh', type: 'local' })
+  store.addSession({ id: 's2', title: 'pwsh 2', type: 'local' })
+
+  // s2 is active. Simulate s2 exiting:
+  store.removeSession('s2')
+
+  assert.equal(store.sessions.length, 1)
+  assert.equal(store.activeSessionId, 's1')
+  assert.equal(store.isOpen, true)
+})

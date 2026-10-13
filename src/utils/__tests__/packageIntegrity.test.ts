@@ -35,4 +35,3 @@ test('enforces canonical Tauri v2 $schema in tauri.conf.json', () => {
     'tauri.conf.json must point to official Tauri v2 schema'
   )
 })
-

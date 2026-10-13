@@ -50,9 +50,8 @@ const handleTerminalData = (payload: { sessionId: string; data: string }) => {
 }
 
 const handleTerminalClosed = (payload: { sessionId: string; exitCode?: number }) => {
-  if (payload.sessionId === props.session.id && term) {
-    const code = payload.exitCode ?? 0
-    term.writeln(`\r\n\x1b[90m[Process finished with exit code ${code}]\x1b[0m\r\n`)
+  if (payload.sessionId === props.session.id) {
+    terminalStore.removeSession(props.session.id)
   }
 }
 
