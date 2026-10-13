@@ -2,6 +2,7 @@
 import { useTheme } from '@/composables/useTheme'
 import { events } from '@/services/nativeService'
 import { terminalService } from '@/services/terminalService'
+import { useTerminalStore } from '@/stores/terminalStore'
 import { OrbitEvents } from '@/types/events'
 import type { TerminalSession } from '@/types/terminal'
 import { FitAddon } from '@xterm/addon-fit'
@@ -15,6 +16,7 @@ const props = defineProps<{
 }>()
 
 const { isDark } = useTheme()
+const terminalStore = useTerminalStore()
 
 const terminalContainer = ref<HTMLDivElement | null>(null)
 let term: Terminal | null = null
@@ -32,6 +34,12 @@ function getTerminalTheme() {
     foreground: fg,
     cursor: cursor,
     selectionBackground: 'rgba(79, 140, 255, 0.3)'
+  }
+}
+
+const handleTerminalStarted = (payload: { sessionId: string; shell: string }) => {
+  if (payload.sessionId === props.session.id) {
+    terminalStore.updateSessionTitle(props.session.id, payload.shell)
   }
 }
 
@@ -81,6 +89,7 @@ onMounted(async () => {
     terminalService.sendData(props.session.id, data)
   })
 
+  events.on(OrbitEvents.TerminalStarted, handleTerminalStarted)
   events.on(OrbitEvents.TerminalData, handleTerminalData)
   events.on(OrbitEvents.TerminalClosed, handleTerminalClosed)
 
@@ -134,6 +143,7 @@ onUnmounted(() => {
     resizeObserver = null
   }
 
+  events.off(OrbitEvents.TerminalStarted, handleTerminalStarted)
   events.off(OrbitEvents.TerminalData, handleTerminalData)
   events.off(OrbitEvents.TerminalClosed, handleTerminalClosed)
 

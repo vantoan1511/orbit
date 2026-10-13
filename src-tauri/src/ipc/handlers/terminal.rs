@@ -63,6 +63,12 @@ pub struct TerminalSession {
     pub cancel_tx: Option<tokio::sync::oneshot::Sender<()>>,
 }
 
+#[derive(Debug, Clone)]
+pub enum LocalTerminalStreamEvent {
+    Data(String),
+    Closed(Option<i32>),
+}
+
 type SessionMap = Arc<RwLock<HashMap<String, TerminalSession>>>;
 
 fn get_sessions() -> &'static SessionMap {
@@ -70,37 +76,153 @@ fn get_sessions() -> &'static SessionMap {
     SESSIONS.get_or_init(|| Arc::new(RwLock::new(HashMap::new())))
 }
 
-#[cfg(target_os = "windows")]
-fn is_executable_in_path(exe: &str) -> bool {
-    if let Some(path_var) = std::env::var_os("PATH") {
-        for dir in std::env::split_paths(&path_var) {
-            let full = dir.join(exe);
-            if full.is_file() {
-                return true;
+pub fn find_in_path(exe: &str) -> Option<std::path::PathBuf> {
+    let path_var = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&path_var) {
+        let full = dir.join(exe);
+        if full.is_file() {
+            return Some(full);
+        }
+        #[cfg(target_os = "windows")]
+        if !exe.ends_with(".exe") {
+            let with_exe = dir.join(format!("{}.exe", exe));
+            if with_exe.is_file() {
+                return Some(with_exe);
             }
         }
     }
-    if let Some(pf) = std::env::var_os("ProgramFiles") {
-        let p7 = std::path::PathBuf::from(pf).join("PowerShell").join("7").join(exe);
-        if p7.is_file() {
-            return true;
+    None
+}
+
+pub fn is_executable_in_path(exe: &str) -> bool {
+    find_in_path(exe).is_some()
+}
+
+#[cfg(target_os = "windows")]
+pub fn find_windows_pwsh() -> Option<String> {
+    // 1. Search PATH first
+    if let Some(path) = find_in_path("pwsh.exe").or_else(|| find_in_path("pwsh")) {
+        return Some(path.to_string_lossy().to_string());
+    }
+
+    // 2. Program Files candidates (64-bit and 32-bit)
+    let pf_candidates = [
+        ("ProgramFiles", "PowerShell\\7\\pwsh.exe"),
+        ("ProgramFiles", "PowerShell\\7-preview\\pwsh.exe"),
+        ("ProgramFiles(x86)", "PowerShell\\7\\pwsh.exe"),
+        ("ProgramFiles(x86)", "PowerShell\\7-preview\\pwsh.exe"),
+        ("ProgramW6432", "PowerShell\\7\\pwsh.exe"),
+    ];
+    for (env_var, rel_path) in pf_candidates {
+        if let Some(base) = std::env::var_os(env_var) {
+            let full = std::path::PathBuf::from(base).join(rel_path);
+            if full.is_file() {
+                return Some(full.to_string_lossy().to_string());
+            }
         }
     }
-    false
+
+    // 3. Local AppData candidates (User MSI install & WindowsApps execution alias)
+    if let Some(local_app_data) = std::env::var_os("LOCALAPPDATA") {
+        let base = std::path::PathBuf::from(local_app_data);
+        let user_candidates = [
+            base.join("Programs").join("PowerShell").join("7").join("pwsh.exe"),
+            base.join("Programs").join("PowerShell").join("7-preview").join("pwsh.exe"),
+            base.join("Microsoft").join("WindowsApps").join("pwsh.exe"),
+        ];
+        for candidate in user_candidates {
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().to_string());
+            }
+        }
+    }
+
+    // 4. Scoop and Chocolatey shims
+    if let Some(user_profile) = std::env::var_os("USERPROFILE") {
+        let scoop_shim = std::path::PathBuf::from(user_profile)
+            .join("scoop")
+            .join("shims")
+            .join("pwsh.exe");
+        if scoop_shim.is_file() {
+            return Some(scoop_shim.to_string_lossy().to_string());
+        }
+    }
+    if let Some(prog_data) = std::env::var_os("ProgramData") {
+        let choco_bin = std::path::PathBuf::from(prog_data)
+            .join("chocolatey")
+            .join("bin")
+            .join("pwsh.exe");
+        if choco_bin.is_file() {
+            return Some(choco_bin.to_string_lossy().to_string());
+        }
+    }
+
+    None
+}
+
+#[cfg(target_os = "windows")]
+pub fn find_windows_powershell() -> Option<String> {
+    if let Some(path) = find_in_path("powershell.exe").or_else(|| find_in_path("powershell")) {
+        return Some(path.to_string_lossy().to_string());
+    }
+    if let Some(sys_root) = std::env::var_os("SystemRoot") {
+        let full = std::path::PathBuf::from(sys_root)
+            .join("System32")
+            .join("WindowsPowerShell")
+            .join("v1.0")
+            .join("powershell.exe");
+        if full.is_file() {
+            return Some(full.to_string_lossy().to_string());
+        }
+    }
+    Some("powershell.exe".to_string())
+}
+
+#[cfg(target_os = "windows")]
+pub fn find_windows_cmd() -> Option<String> {
+    if let Some(comspec) = std::env::var_os("COMSPEC") {
+        let p = std::path::PathBuf::from(comspec);
+        if p.is_file() {
+            return Some(p.to_string_lossy().to_string());
+        }
+    }
+    if let Some(sys_root) = std::env::var_os("SystemRoot") {
+        let full = std::path::PathBuf::from(sys_root)
+            .join("System32")
+            .join("cmd.exe");
+        if full.is_file() {
+            return Some(full.to_string_lossy().to_string());
+        }
+    }
+    find_in_path("cmd.exe")
+        .map(|p| p.to_string_lossy().to_string())
+        .or_else(|| Some("cmd.exe".to_string()))
 }
 
 pub fn detect_default_shell() -> String {
     #[cfg(target_os = "windows")]
     {
-        if is_executable_in_path("pwsh.exe") || is_executable_in_path("pwsh") {
-            "pwsh.exe".to_string()
-        } else {
-            "powershell.exe".to_string()
+        if let Some(pwsh) = find_windows_pwsh() {
+            return pwsh;
         }
+        if let Some(ps) = find_windows_powershell() {
+            return ps;
+        }
+        find_windows_cmd().unwrap_or_else(|| "cmd.exe".to_string())
     }
     #[cfg(not(target_os = "windows"))]
     {
-        std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string())
+        if let Ok(shell) = std::env::var("SHELL") {
+            if !shell.trim().is_empty() && std::path::Path::new(&shell).is_file() {
+                return shell;
+            }
+        }
+        for fallback in &["/bin/zsh", "/bin/bash", "/usr/bin/zsh", "/usr/bin/bash", "/bin/sh"] {
+            if std::path::Path::new(fallback).is_file() {
+                return fallback.to_string();
+            }
+        }
+        "/bin/sh".to_string()
     }
 }
 
@@ -119,17 +241,57 @@ pub fn is_allowed_shell(shell: &str) -> bool {
 }
 
 pub fn resolve_shell(req_shell: Option<String>, config_shell: Option<String>) -> String {
-    let default_shell = detect_default_shell();
-
-    req_shell
+    let chosen = req_shell
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty() && is_allowed_shell(s))
         .or_else(|| {
             config_shell
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty() && is_allowed_shell(s))
-        })
-        .unwrap_or(default_shell)
+        });
+
+    match chosen {
+        Some(shell) => {
+            #[cfg(target_os = "windows")]
+            {
+                let path = std::path::Path::new(&shell);
+                if path.is_file() || is_executable_in_path(&shell) {
+                    return shell;
+                }
+                // Try resolving known shell names to their full paths if not directly in PATH
+                let file_name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(&shell);
+                let lower = file_name.to_ascii_lowercase();
+                if lower == "pwsh" || lower == "pwsh.exe" {
+                    if let Some(resolved) = find_windows_pwsh() {
+                        return resolved;
+                    }
+                } else if lower == "powershell" || lower == "powershell.exe" {
+                    if let Some(resolved) = find_windows_powershell() {
+                        return resolved;
+                    }
+                } else if lower == "cmd" || lower == "cmd.exe" {
+                    if let Some(resolved) = find_windows_cmd() {
+                        return resolved;
+                    }
+                } else if let Some(in_path) = find_in_path(&shell) {
+                    return in_path.to_string_lossy().to_string();
+                }
+                shell
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                if let Some(in_path) = find_in_path(&shell) {
+                    in_path.to_string_lossy().to_string()
+                } else {
+                    shell
+                }
+            }
+        }
+        None => detect_default_shell(),
+    }
 }
 
 pub fn open_local_terminal(
@@ -236,9 +398,54 @@ pub fn open_local_terminal(
             );
         }
 
-        let writer_clone = writer.clone();
-        let token_clone = token.clone();
-        let session_id_clone = req.session_id.clone();
+        let display_shell = std::path::Path::new(&shell)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or(&shell)
+            .to_string();
+
+        let _ = Bridge::send_event(
+            &writer,
+            &token,
+            &OrbitEvent::TerminalStarted {
+                session_id: req.session_id.clone(),
+                shell: display_shell,
+            },
+        ).await;
+
+        let (stream_tx, mut stream_rx) = tokio::sync::mpsc::channel::<LocalTerminalStreamEvent>(100);
+
+        let writer_for_stream = writer.clone();
+        let token_for_stream = token.clone();
+        let session_id_for_stream = req.session_id.clone();
+        tokio::spawn(async move {
+            while let Some(evt) = stream_rx.recv().await {
+                match evt {
+                    LocalTerminalStreamEvent::Data(text) => {
+                        let _ = Bridge::send_event(
+                            &writer_for_stream,
+                            &token_for_stream,
+                            &OrbitEvent::TerminalData {
+                                session_id: session_id_for_stream.clone(),
+                                data: text,
+                            },
+                        ).await;
+                    }
+                    LocalTerminalStreamEvent::Closed(exit_code) => {
+                        let _ = Bridge::send_event(
+                            &writer_for_stream,
+                            &token_for_stream,
+                            &OrbitEvent::TerminalClosed {
+                                session_id: session_id_for_stream.clone(),
+                                exit_code,
+                            },
+                        ).await;
+                        break;
+                    }
+                }
+            }
+        });
+
         let child_for_wait = child_arc.clone();
 
         // Spawn a dedicated thread for blocking PTY read operations
@@ -249,19 +456,9 @@ pub fn open_local_terminal(
                     Ok(0) => break,
                     Ok(n) => {
                         let text = String::from_utf8_lossy(&buf[..n]).to_string();
-                        let w = writer_clone.clone();
-                        let tok = token_clone.clone();
-                        let sid = session_id_clone.clone();
-                        tokio::spawn(async move {
-                            let _ = Bridge::send_event(
-                                &w,
-                                &tok,
-                                &OrbitEvent::TerminalData {
-                                    session_id: sid,
-                                    data: text,
-                                },
-                            ).await;
-                        });
+                        if stream_tx.blocking_send(LocalTerminalStreamEvent::Data(text)).is_err() {
+                            break;
+                        }
                     }
                     Err(_) => break,
                 }
@@ -272,19 +469,8 @@ pub fn open_local_terminal(
                 .ok()
                 .and_then(|mut c| c.wait().ok())
                 .map(|s| s.exit_code() as i32);
-            let w = writer_clone;
-            let tok = token_clone;
-            let sid = session_id_clone;
-            tokio::spawn(async move {
-                let _ = Bridge::send_event(
-                    &w,
-                    &tok,
-                    &OrbitEvent::TerminalClosed {
-                        session_id: sid,
-                        exit_code,
-                    },
-                ).await;
-            });
+
+            let _ = stream_tx.blocking_send(LocalTerminalStreamEvent::Closed(exit_code));
         });
     });
 }
@@ -710,6 +896,72 @@ mod tests {
             resolve_shell(Some("curl.exe".to_string()), Some("malicious.bat".to_string())),
             detect_default_shell()
         );
+    }
+
+    #[test]
+    fn test_detect_default_shell_validity() {
+        let shell = detect_default_shell();
+        assert!(!shell.trim().is_empty(), "Default shell must not be empty");
+
+        #[cfg(target_os = "windows")]
+        {
+            let p = std::path::Path::new(&shell);
+            let exists_as_file = p.is_file();
+            let in_path = is_executable_in_path(&shell);
+            assert!(
+                exists_as_file || in_path,
+                "Detected shell '{}' must either be an existing file path or resolvable in PATH",
+                shell
+            );
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let p = std::path::Path::new(&shell);
+            assert!(
+                p.exists() || is_executable_in_path(&shell),
+                "Detected shell '{}' must exist or be in PATH",
+                shell
+            );
+        }
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_resolve_shell_windows_known_shells() {
+        // cmd should resolve to an existing path or runnable binary
+        let resolved_cmd = resolve_shell(Some("cmd".to_string()), None);
+        let p = std::path::Path::new(&resolved_cmd);
+        assert!(
+            p.is_file() || is_executable_in_path(&resolved_cmd),
+            "Resolved cmd '{}' must exist or be in PATH",
+            resolved_cmd
+        );
+    }
+
+    #[tokio::test]
+    async fn test_local_terminal_stream_channel() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<LocalTerminalStreamEvent>(10);
+
+        // Spawn a plain OS thread without Tokio runtime context
+        let handle = std::thread::spawn(move || {
+            tx.blocking_send(LocalTerminalStreamEvent::Data("hello from OS thread".to_string()))
+                .expect("blocking_send must succeed from plain OS thread");
+            tx.blocking_send(LocalTerminalStreamEvent::Closed(Some(0)))
+                .expect("blocking_send must succeed from plain OS thread");
+        });
+
+        handle.join().unwrap();
+
+        match rx.recv().await {
+            Some(LocalTerminalStreamEvent::Data(msg)) => assert_eq!(msg, "hello from OS thread"),
+            other => panic!("Expected Data event, got {:?}", other),
+        }
+
+        match rx.recv().await {
+            Some(LocalTerminalStreamEvent::Closed(code)) => assert_eq!(code, Some(0)),
+            other => panic!("Expected Closed event, got {:?}", other),
+        }
     }
 }
 

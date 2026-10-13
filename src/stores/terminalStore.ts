@@ -53,6 +53,13 @@ export const useTerminalStore = defineStore('terminal', () => {
     }
   }
 
+  function updateSessionTitle(id: string, title: string) {
+    const session = sessions.value.find((s) => s.id === id)
+    if (session) {
+      session.title = title
+    }
+  }
+
   return {
     isOpen,
     sessions,
@@ -63,6 +70,7 @@ export const useTerminalStore = defineStore('terminal', () => {
     togglePanel,
     addSession,
     removeSession,
-    setActiveSession
+    setActiveSession,
+    updateSessionTitle
   }
 })

@@ -80,3 +80,11 @@ test('terminalStore removes session and switches active session correctly', () =
   assert.equal(store.activeSessionId, null)
   assert.equal(store.isOpen, false)
 })
+
+test('terminalStore updates session title by id', () => {
+  const store = useTerminalStore()
+  store.addSession({ id: 's1', title: 'Initial Title', type: 'local' })
+  store.updateSessionTitle('s1', 'pwsh')
+
+  assert.equal(store.sessions[0]?.title, 'pwsh')
+})

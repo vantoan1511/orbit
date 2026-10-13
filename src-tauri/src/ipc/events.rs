@@ -181,6 +181,12 @@ pub enum OrbitEvent {
     AppSettingsUpdated {
         settings: Vec<crate::config::Configuration>,
     },
+    #[serde(rename = "terminalStarted")]
+    #[serde(rename_all = "camelCase")]
+    TerminalStarted {
+        session_id: String,
+        shell: String,
+    },
     #[serde(rename = "terminalData")]
     #[serde(rename_all = "camelCase")]
     TerminalData {
@@ -236,8 +242,27 @@ impl OrbitEvent {
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
             OrbitEvent::PortForwardsUpdated { .. } => "portForwardsUpdated",
             OrbitEvent::AppSettingsUpdated { .. } => "appSettingsUpdated",
+            OrbitEvent::TerminalStarted { .. } => "terminalStarted",
             OrbitEvent::TerminalData { .. } => "terminalData",
             OrbitEvent::TerminalClosed { .. } => "terminalClosed",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_serialize_terminal_started_event() {
+        let evt = OrbitEvent::TerminalStarted {
+            session_id: "sess-123".to_string(),
+            shell: "pwsh".to_string(),
+        };
+        let json = serde_json::to_string(&evt).unwrap();
+        assert!(json.contains(r#""event":"terminalStarted""#));
+        assert!(json.contains(r#""sessionId":"sess-123""#));
+        assert!(json.contains(r#""shell":"pwsh""#));
+        assert_eq!(evt.event_name(), "terminalStarted");
     }
 }
