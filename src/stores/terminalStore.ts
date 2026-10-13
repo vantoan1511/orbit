@@ -60,6 +60,14 @@ export const useTerminalStore = defineStore('terminal', () => {
     }
   }
 
+  function updateSessionShell(id: string, shell: string) {
+    const session = sessions.value.find((s) => s.id === id)
+    if (session) {
+      const match = session.title.match(/\s+(\d+)$/)
+      session.title = match ? `${shell} ${match[1]}` : shell
+    }
+  }
+
   return {
     isOpen,
     sessions,
@@ -71,6 +79,7 @@ export const useTerminalStore = defineStore('terminal', () => {
     addSession,
     removeSession,
     setActiveSession,
-    updateSessionTitle
+    updateSessionTitle,
+    updateSessionShell
   }
 })

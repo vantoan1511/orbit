@@ -39,7 +39,7 @@ function getTerminalTheme() {
 
 const handleTerminalStarted = (payload: { sessionId: string; shell: string }) => {
   if (payload.sessionId === props.session.id) {
-    terminalStore.updateSessionTitle(props.session.id, payload.shell)
+    terminalStore.updateSessionShell(props.session.id, payload.shell)
   }
 }
 

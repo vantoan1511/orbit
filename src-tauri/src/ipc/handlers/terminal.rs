@@ -283,7 +283,10 @@ pub fn resolve_shell(req_shell: Option<String>, config_shell: Option<String>) ->
             }
             #[cfg(not(target_os = "windows"))]
             {
-                if let Some(in_path) = find_in_path(&shell) {
+                let path = std::path::Path::new(&shell);
+                if path.is_file() {
+                    shell
+                } else if let Some(in_path) = find_in_path(&shell) {
                     in_path.to_string_lossy().to_string()
                 } else {
                     shell
@@ -451,13 +454,19 @@ pub fn open_local_terminal(
         let child_for_wait = child_arc.clone();
         let stream_tx_for_wait = stream_tx.clone();
 
-        // Spawn a dedicated thread to wait for child process termination
+        // Spawn a dedicated thread to wait for child process termination without holding mutex indefinitely
         std::thread::spawn(move || {
-            let exit_code = child_for_wait
-                .lock()
-                .ok()
-                .and_then(|mut c| c.wait().ok())
-                .map(|s| s.exit_code() as i32);
+            let exit_code = loop {
+                match child_for_wait.lock() {
+                    Ok(mut c) => match c.try_wait() {
+                        Ok(Some(s)) => break Some(s.exit_code() as i32),
+                        Ok(None) => {}
+                        Err(_) => break None,
+                    },
+                    Err(_) => break None,
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            };
 
             // Brief pause to allow the reader thread to drain any trailing buffered output
             std::thread::sleep(std::time::Duration::from_millis(50));
@@ -1003,11 +1012,17 @@ mod tests {
         let child_wait = child_arc.clone();
         let tx_wait = tx.clone();
         let waiter_handle = std::thread::spawn(move || {
-            let exit_code = child_wait
-                .lock()
-                .ok()
-                .and_then(|mut c| c.wait().ok())
-                .map(|s| s.exit_code() as i32);
+            let exit_code = loop {
+                match child_wait.lock() {
+                    Ok(mut c) => match c.try_wait() {
+                        Ok(Some(s)) => break Some(s.exit_code() as i32),
+                        Ok(None) => {}
+                        Err(_) => break None,
+                    },
+                    Err(_) => break None,
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            };
             let _ = tx_wait.send(LocalTerminalStreamEvent::Closed(exit_code));
         });
 
@@ -1017,6 +1032,72 @@ mod tests {
 
         match evt {
             LocalTerminalStreamEvent::Closed(code) => assert_eq!(code, Some(0)),
+            other => panic!("Expected Closed, got {:?}", other),
+        }
+
+        waiter_handle.join().unwrap();
+    }
+
+    #[test]
+    fn test_pty_child_waiter_allows_concurrent_kill() {
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("openpty should succeed");
+
+        #[cfg(target_os = "windows")]
+        let mut cmd = CommandBuilder::new("cmd.exe");
+        #[cfg(target_os = "windows")]
+        cmd.args(["/c", "ping -n 5 127.0.0.1 >nul"]);
+
+        #[cfg(not(target_os = "windows"))]
+        let mut cmd = CommandBuilder::new("sh");
+        #[cfg(not(target_os = "windows"))]
+        cmd.args(["-c", "sleep 5"]);
+
+        let child = pair.slave.spawn_command(cmd).expect("spawn child");
+        let child_arc = Arc::new(std::sync::Mutex::new(child));
+
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        let child_wait = child_arc.clone();
+        let tx_wait = tx.clone();
+        let waiter_handle = std::thread::spawn(move || {
+            let exit_code = loop {
+                match child_wait.lock() {
+                    Ok(mut c) => match c.try_wait() {
+                        Ok(Some(s)) => break Some(s.exit_code() as i32),
+                        Ok(None) => {}
+                        Err(_) => break None,
+                    },
+                    Err(_) => break None,
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            };
+            let _ = tx_wait.send(LocalTerminalStreamEvent::Closed(exit_code));
+        });
+
+        // Concurrently kill the child from another thread (simulates close_terminal)
+        let child_kill = child_arc.clone();
+        let killer_handle = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            let mut c = child_kill.lock().expect("must acquire lock to kill child");
+            let _ = c.kill();
+        });
+
+        killer_handle.join().unwrap();
+
+        let evt = rx
+            .recv_timeout(std::time::Duration::from_secs(3))
+            .expect("Must receive Closed event from waiter thread within 3 seconds after killing");
+
+        match evt {
+            LocalTerminalStreamEvent::Closed(_) => {}
             other => panic!("Expected Closed, got {:?}", other),
         }
 
