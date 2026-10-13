@@ -440,6 +440,8 @@ pub fn open_local_terminal(
                                 exit_code,
                             },
                         ).await;
+                        let mut sessions = get_sessions().write().await;
+                        sessions.remove(&session_id_for_stream);
                         break;
                     }
                 }
@@ -447,6 +449,21 @@ pub fn open_local_terminal(
         });
 
         let child_for_wait = child_arc.clone();
+        let stream_tx_for_wait = stream_tx.clone();
+
+        // Spawn a dedicated thread to wait for child process termination
+        std::thread::spawn(move || {
+            let exit_code = child_for_wait
+                .lock()
+                .ok()
+                .and_then(|mut c| c.wait().ok())
+                .map(|s| s.exit_code() as i32);
+
+            // Brief pause to allow the reader thread to drain any trailing buffered output
+            std::thread::sleep(std::time::Duration::from_millis(50));
+
+            let _ = stream_tx_for_wait.blocking_send(LocalTerminalStreamEvent::Closed(exit_code));
+        });
 
         // Spawn a dedicated thread for blocking PTY read operations
         std::thread::spawn(move || {
@@ -463,14 +480,6 @@ pub fn open_local_terminal(
                     Err(_) => break,
                 }
             }
-
-            let exit_code = child_for_wait
-                .lock()
-                .ok()
-                .and_then(|mut c| c.wait().ok())
-                .map(|s| s.exit_code() as i32);
-
-            let _ = stream_tx.blocking_send(LocalTerminalStreamEvent::Closed(exit_code));
         });
     });
 }
@@ -962,6 +971,56 @@ mod tests {
             Some(LocalTerminalStreamEvent::Closed(code)) => assert_eq!(code, Some(0)),
             other => panic!("Expected Closed event, got {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_pty_child_waiter_thread_sends_closed() {
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("openpty should succeed");
+
+        #[cfg(target_os = "windows")]
+        let mut cmd = CommandBuilder::new("cmd.exe");
+        #[cfg(target_os = "windows")]
+        cmd.args(["/c", "exit 0"]);
+
+        #[cfg(not(target_os = "windows"))]
+        let mut cmd = CommandBuilder::new("sh");
+        #[cfg(not(target_os = "windows"))]
+        cmd.args(["-c", "exit 0"]);
+
+        let child = pair.slave.spawn_command(cmd).expect("spawn child");
+        let child_arc = Arc::new(std::sync::Mutex::new(child));
+
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        let child_wait = child_arc.clone();
+        let tx_wait = tx.clone();
+        let waiter_handle = std::thread::spawn(move || {
+            let exit_code = child_wait
+                .lock()
+                .ok()
+                .and_then(|mut c| c.wait().ok())
+                .map(|s| s.exit_code() as i32);
+            let _ = tx_wait.send(LocalTerminalStreamEvent::Closed(exit_code));
+        });
+
+        let evt = rx
+            .recv_timeout(std::time::Duration::from_secs(3))
+            .expect("Must receive Closed event from waiter thread within 3 seconds");
+
+        match evt {
+            LocalTerminalStreamEvent::Closed(code) => assert_eq!(code, Some(0)),
+            other => panic!("Expected Closed, got {:?}", other),
+        }
+
+        waiter_handle.join().unwrap();
     }
 }
 
