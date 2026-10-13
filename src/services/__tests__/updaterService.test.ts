@@ -33,7 +33,10 @@ test('updaterService dispatches applyUpdate with url and version', async () => {
   }
 
   try {
-    updaterService.applyUpdate('https://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit_0.14.9_x64-setup.exe', '0.14.9')
+    updaterService.applyUpdate(
+      'https://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit_0.14.9_x64-setup.exe',
+      '0.14.9'
+    )
     assert.equal(dispatchedEvent, 'applyUpdate')
     assert.deepEqual(dispatchedData, {
       url: 'https://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit_0.14.9_x64-setup.exe',

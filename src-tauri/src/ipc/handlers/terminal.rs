@@ -51,6 +51,7 @@ pub enum TerminalSender {
     Local {
         writer: Arc<std::sync::Mutex<Box<dyn Write + Send>>>,
         master: Arc<std::sync::Mutex<Box<dyn MasterPty + Send>>>,
+        child: Arc<std::sync::Mutex<Box<dyn portable_pty::Child + Send>>>,
     },
     Pod {
         stdin_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
@@ -103,16 +104,30 @@ pub fn detect_default_shell() -> String {
     }
 }
 
+pub fn is_allowed_shell(shell: &str) -> bool {
+    const ALLOWED_SHELLS: &[&str] = &[
+        "pwsh", "pwsh.exe",
+        "powershell", "powershell.exe",
+        "cmd", "cmd.exe",
+        "bash", "zsh", "sh", "fish",
+    ];
+    let file_name = std::path::Path::new(shell)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(shell);
+    ALLOWED_SHELLS.iter().any(|allowed| allowed.eq_ignore_ascii_case(file_name))
+}
+
 pub fn resolve_shell(req_shell: Option<String>, config_shell: Option<String>) -> String {
     let default_shell = detect_default_shell();
 
     req_shell
         .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
+        .filter(|s| !s.is_empty() && is_allowed_shell(s))
         .or_else(|| {
             config_shell
                 .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
+                .filter(|s| !s.is_empty() && is_allowed_shell(s))
         })
         .unwrap_or(default_shell)
 }
@@ -158,7 +173,7 @@ pub fn open_local_terminal(
         let shell = resolve_shell(req.shell, config_shell);
         let cmd = CommandBuilder::new(&shell);
 
-        let mut child = match pair.slave.spawn_command(cmd) {
+        let child = match pair.slave.spawn_command(cmd) {
             Ok(c) => c,
             Err(e) => {
                 let _ = Bridge::send_event(
@@ -171,6 +186,8 @@ pub fn open_local_terminal(
                 return;
             }
         };
+        let child_arc: Arc<std::sync::Mutex<Box<dyn portable_pty::Child + Send>>> =
+            Arc::new(std::sync::Mutex::new(child));
 
         let mut reader = match pair.master.try_clone_reader() {
             Ok(r) => r,
@@ -212,6 +229,7 @@ pub fn open_local_terminal(
                     sender: TerminalSender::Local {
                         writer: pty_writer,
                         master,
+                        child: child_arc.clone(),
                     },
                     cancel_tx: Some(cancel_tx),
                 },
@@ -221,6 +239,7 @@ pub fn open_local_terminal(
         let writer_clone = writer.clone();
         let token_clone = token.clone();
         let session_id_clone = req.session_id.clone();
+        let child_for_wait = child_arc.clone();
 
         // Spawn a dedicated thread for blocking PTY read operations
         std::thread::spawn(move || {
@@ -248,7 +267,11 @@ pub fn open_local_terminal(
                 }
             }
 
-            let exit_code = child.wait().ok().map(|s| s.exit_code() as i32);
+            let exit_code = child_for_wait
+                .lock()
+                .ok()
+                .and_then(|mut c| c.wait().ok())
+                .map(|s| s.exit_code() as i32);
             let w = writer_clone;
             let tok = token_clone;
             let sid = session_id_clone;
@@ -508,12 +531,39 @@ pub fn close_terminal(data: Option<Value>) {
         };
 
         let mut sessions = get_sessions().write().await;
-        if let Some(mut session) = sessions.remove(&req.session_id)
-            && let Some(cancel) = session.cancel_tx.take()
-        {
-            let _ = cancel.send(());
+        if let Some(mut session) = sessions.remove(&req.session_id) {
+            if let Some(cancel) = session.cancel_tx.take() {
+                let _ = cancel.send(());
+            }
+            if let TerminalSender::Local { child, .. } = &session.sender {
+                if let Ok(mut c) = child.lock() {
+                    let _ = c.kill();
+                }
+            }
         }
     });
+}
+
+/// Closes all active Pod terminal sessions (e.g. on cluster switch).
+pub async fn close_all_pod_terminals() {
+    let mut sessions = get_sessions().write().await;
+    let pod_ids: Vec<String> = sessions
+        .iter()
+        .filter_map(|(id, session)| {
+            if matches!(session.sender, TerminalSender::Pod { .. }) {
+                Some(id.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    for id in pod_ids {
+        if let Some(mut session) = sessions.remove(&id) {
+            if let Some(cancel) = session.cancel_tx.take() {
+                let _ = cancel.send(());
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -626,4 +676,40 @@ mod tests {
         #[cfg(target_os = "windows")]
         assert_eq!(resolve_shell(None, None), detect_default_shell());
     }
+
+    #[test]
+    fn test_is_allowed_shell() {
+        assert!(is_allowed_shell("pwsh"));
+        assert!(is_allowed_shell("pwsh.exe"));
+        assert!(is_allowed_shell("powershell.exe"));
+        assert!(is_allowed_shell("cmd.exe"));
+        assert!(is_allowed_shell("cmd"));
+        assert!(is_allowed_shell("/bin/bash"));
+        assert!(is_allowed_shell("/usr/bin/zsh"));
+        assert!(is_allowed_shell("/bin/sh"));
+        assert!(is_allowed_shell("fish"));
+        assert!(is_allowed_shell("C:\\Windows\\System32\\cmd.exe"));
+        assert!(is_allowed_shell("C:\\Program Files\\PowerShell\\7\\pwsh.exe"));
+
+        assert!(!is_allowed_shell("curl.exe"));
+        assert!(!is_allowed_shell("/usr/bin/curl"));
+        assert!(!is_allowed_shell("malicious.bat"));
+        assert!(!is_allowed_shell(""));
+    }
+
+    #[test]
+    fn test_resolve_shell_untrusted_fallback() {
+        // Disallowed shell in request falls back to config shell if valid
+        assert_eq!(
+            resolve_shell(Some("curl.exe".to_string()), Some("cmd.exe".to_string())),
+            "cmd.exe"
+        );
+
+        // Disallowed shell in both falls back to default detected shell
+        assert_eq!(
+            resolve_shell(Some("curl.exe".to_string()), Some("malicious.bat".to_string())),
+            detect_default_shell()
+        );
+    }
 }
+

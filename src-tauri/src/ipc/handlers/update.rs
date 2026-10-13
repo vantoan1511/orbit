@@ -106,6 +106,18 @@ pub fn apply_update(
         let target_version = extract_target_version(&data, current_engine);
             
         if let Some(url) = url {
+            if !crate::updater::is_trusted_update_url(&url) {
+                tracing::error!(download_url = %url, "Untrusted update download URL rejected");
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ErrorOccurred {
+                        message: "Untrusted update URL rejected".to_string(),
+                    },
+                ).await;
+                return;
+            }
+
             tracing::info!(download_url = %url, target_version = %target_version, "Applying update");
             let (tx, mut rx) = tokio::sync::mpsc::channel(100);
             let writer_clone = writer.clone();

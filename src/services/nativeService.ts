@@ -1,5 +1,6 @@
 import type { OrbitEventMap, OrbitEventName } from '@/types/events'
 import { withTimeout } from '../utils/async.ts'
+import { VERSION } from '../version.ts'
 
 function isTauriEnvironment(): boolean {
   return (
@@ -291,7 +292,7 @@ export async function probe(timeoutMs = 1500): Promise<boolean> {
  */
 export const app = {
   async getConfig(): Promise<{ version: string; [key: string]: unknown }> {
-    return { version: '0.14.4' }
+    return { version: VERSION }
   },
   async restartProcess(): Promise<void> {
     if (isTauriEnvironment()) {

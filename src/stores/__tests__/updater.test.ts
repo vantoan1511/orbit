@@ -50,7 +50,10 @@ test('updaterStore applyUpdate calls updaterService with both url and version', 
 
     store.applyUpdate()
 
-    assert.equal(appliedUrl, 'https://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit_0.14.9_x64-setup.exe')
+    assert.equal(
+      appliedUrl,
+      'https://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit_0.14.9_x64-setup.exe'
+    )
     assert.equal(appliedVersion, '0.14.9')
     assert.equal(store.isDownloading, true)
     assert.equal(store.downloadProgress, 0)
