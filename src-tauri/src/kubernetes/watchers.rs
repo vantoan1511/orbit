@@ -73,7 +73,7 @@ pub async fn watch_resource<K, M, F>(
         loop {
             tokio::select! {
                 res = cancel_rx.changed() => {
-                    if res.is_ok() && *cancel_rx.borrow() {
+                    if res.is_err() || *cancel_rx.borrow() {
                         tracing::info!(kind = %kind, "Stopping watcher");
                         flush_buffer(&mut buffer, &mut key_index, &writer, &ipc_token, cluster_id.clone(), &kind).await;
                         break 'outer;
@@ -182,4 +182,21 @@ mod tests {
         };
         assert_eq!(get_resource_key(&pod), "/node-1");
     }
+
+    #[tokio::test]
+    async fn test_watch_cancellation_logic() {
+        let (tx, mut rx) = tokio::sync::watch::channel(false);
+        // Initially not changed and not true
+        assert!(!*rx.borrow());
+
+        // Cancel signal sent
+        tx.send(true).unwrap();
+        assert!(rx.changed().await.is_ok());
+        assert!(*rx.borrow());
+
+        // Sender dropped -> rx.changed() returns Err
+        drop(tx);
+        assert!(rx.changed().await.is_err());
+    }
 }
+

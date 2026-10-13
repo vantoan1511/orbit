@@ -84,6 +84,9 @@ pub fn switch_cluster(
                     w_manager.watch_cancel = Some(tx);
                     drop(w_manager);
 
+                    // Cancel active pod terminals for previous cluster
+                    super::terminal::close_all_pod_terminals().await;
+
                     let _ = Bridge::send_event(
                         &writer,
                         &token,

@@ -10,6 +10,14 @@ pub struct UpdateManifest {
 
 const GITHUB_REPO: &str = "vantoan1511/orbit";
 
+/// Enforces trusted download origin for updater installers.
+/// Only permits official GitHub release asset URLs for Orbit.
+pub fn is_trusted_update_url(url: &str) -> bool {
+    const TRUSTED_PREFIX: &str = "https://github.com/vantoan1511/orbit/releases/download/";
+    url.starts_with(TRUSTED_PREFIX)
+}
+
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct GithubReleaseAsset {
     pub name: String,
@@ -560,5 +568,16 @@ mod tests {
         assert!(final_path.to_str().unwrap().ends_with("Orbit_0.15.0_setup.exe"));
         assert_eq!(part_path.parent(), final_path.parent());
     }
+
+    #[test]
+    fn test_is_trusted_update_url() {
+        assert!(is_trusted_update_url("https://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit_0.14.9_x64-setup.exe"));
+        assert!(is_trusted_update_url("https://github.com/vantoan1511/orbit/releases/download/v1.0.0/Orbit_1.0.0_setup.exe"));
+        assert!(!is_trusted_update_url("http://github.com/vantoan1511/orbit/releases/download/v0.14.9/Orbit.exe"));
+        assert!(!is_trusted_update_url("https://malicious.com/download/Orbit.exe"));
+        assert!(!is_trusted_update_url("https://github.com/evil/orbit/releases/download/v0.14.9/Orbit.exe"));
+        assert!(!is_trusted_update_url(""));
+    }
 }
+
 
