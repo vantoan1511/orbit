@@ -41,6 +41,7 @@ import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
 import { useEngineConnection } from './composables/useEngineConnection'
 import AppLayout from './components/layout/AppLayout.vue'
+import { handlePreventBrowserRefresh } from '@/utils/keyboard'
 
 useEngineConnection()
 
@@ -247,9 +248,15 @@ const handleContextMenu = (e: MouseEvent) => {
   }
 }
 
+const handleKeyDown = (e: KeyboardEvent) => {
+  handlePreventBrowserRefresh(e)
+}
+
 onMounted(async () => {
   // Disable default browser context menu globally for non-input elements
   window.addEventListener('contextmenu', handleContextMenu)
+  // Disable default browser refresh behavior (Ctrl+R, F5, Cmd+R)
+  window.addEventListener('keydown', handleKeyDown, true)
 
   await Promise.all([
     events.on(OrbitEvents.EngineConnected, handleEngineConnected),
@@ -285,6 +292,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('contextmenu', handleContextMenu)
+  window.removeEventListener('keydown', handleKeyDown, true)
 
   events.off(OrbitEvents.EngineConnected, handleEngineConnected)
   events.off(OrbitEvents.AppSettingsUpdated, handleAppSettingsUpdated)
