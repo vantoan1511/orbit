@@ -2,6 +2,7 @@
 import { useTheme } from '@/composables/useTheme'
 import { events } from '@/services/nativeService'
 import { terminalService } from '@/services/terminalService'
+import { useTerminalStore } from '@/stores/terminalStore'
 import { OrbitEvents } from '@/types/events'
 import type { TerminalSession } from '@/types/terminal'
 import { FitAddon } from '@xterm/addon-fit'
@@ -15,6 +16,7 @@ const props = defineProps<{
 }>()
 
 const { isDark } = useTheme()
+const terminalStore = useTerminalStore()
 
 const terminalContainer = ref<HTMLDivElement | null>(null)
 let term: Terminal | null = null
@@ -35,6 +37,12 @@ function getTerminalTheme() {
   }
 }
 
+const handleTerminalStarted = (payload: { sessionId: string; shell: string }) => {
+  if (payload.sessionId === props.session.id) {
+    terminalStore.updateSessionShell(props.session.id, payload.shell)
+  }
+}
+
 const handleTerminalData = (payload: { sessionId: string; data: string }) => {
   if (payload.sessionId === props.session.id && term) {
     term.write(payload.data)
@@ -42,9 +50,8 @@ const handleTerminalData = (payload: { sessionId: string; data: string }) => {
 }
 
 const handleTerminalClosed = (payload: { sessionId: string; exitCode?: number }) => {
-  if (payload.sessionId === props.session.id && term) {
-    const code = payload.exitCode ?? 0
-    term.writeln(`\r\n\x1b[90m[Process finished with exit code ${code}]\x1b[0m\r\n`)
+  if (payload.sessionId === props.session.id) {
+    terminalStore.removeSession(props.session.id)
   }
 }
 
@@ -81,6 +88,7 @@ onMounted(async () => {
     terminalService.sendData(props.session.id, data)
   })
 
+  events.on(OrbitEvents.TerminalStarted, handleTerminalStarted)
   events.on(OrbitEvents.TerminalData, handleTerminalData)
   events.on(OrbitEvents.TerminalClosed, handleTerminalClosed)
 
@@ -134,6 +142,7 @@ onUnmounted(() => {
     resizeObserver = null
   }
 
+  events.off(OrbitEvents.TerminalStarted, handleTerminalStarted)
   events.off(OrbitEvents.TerminalData, handleTerminalData)
   events.off(OrbitEvents.TerminalClosed, handleTerminalClosed)
 

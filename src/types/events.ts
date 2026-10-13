@@ -206,6 +206,10 @@ export interface OrbitEventMap {
     code?: string
     message?: string
   }
+  terminalStarted: {
+    sessionId: string
+    shell: string
+  }
   terminalData: {
     sessionId: string
     data: string
@@ -260,6 +264,7 @@ export const OrbitEvents = {
   PortForwardStarted: 'portForwardStarted',
   PortForwardStopped: 'portForwardStopped',
   PortForwardsUpdated: 'portForwardsUpdated',
+  TerminalStarted: 'terminalStarted',
   TerminalData: 'terminalData',
   TerminalClosed: 'terminalClosed'
 } as const
