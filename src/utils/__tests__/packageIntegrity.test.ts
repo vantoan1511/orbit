@@ -24,3 +24,15 @@ test('enforces non-null Content Security Policy in tauri.conf.json', () => {
   assert.match(csp, /default-src 'self'/)
   assert.match(csp, /script-src 'self'/)
 })
+
+test('enforces canonical Tauri v2 $schema in tauri.conf.json', () => {
+  const tauriConfPath = path.resolve(process.cwd(), 'src-tauri/tauri.conf.json')
+  const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf-8'))
+
+  assert.equal(
+    tauriConf.$schema,
+    'https://schema.tauri.app/config/2',
+    'tauri.conf.json must point to official Tauri v2 schema'
+  )
+})
+
