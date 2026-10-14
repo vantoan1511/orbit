@@ -94,7 +94,7 @@ impl Configuration {
                 value: None,
                 is_confidential: false,
                 cardinality: "1..1".to_string(),
-                enable: false, // Planned for future release
+                enable: true,
                 created_at: Some(created.clone()),
                 last_updated_at: None,
             },
@@ -245,6 +245,14 @@ impl OrbitConfig {
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string())
+    }
+
+    /// Returns whether launch on startup is enabled. Defaults to false.
+    pub fn launch_on_startup(&self) -> bool {
+        self.values
+            .get("launchOnStartup")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
     }
 
     /// Generates the unified `Configuration` model list sent to the frontend.
@@ -488,5 +496,26 @@ mod tests {
         // Empty string should be treated as None
         config.values.insert("defaultTerminalShell".to_string(), serde_json::json!("   "));
         assert_eq!(config.default_terminal_shell(), None);
+    }
+
+    #[test]
+    fn test_launch_on_startup_is_enabled_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let launch_cfg = defs.iter().find(|c| c.key == "launchOnStartup").expect("launchOnStartup must exist");
+        assert!(launch_cfg.enable, "launchOnStartup must be enabled");
+        assert_eq!(launch_cfg.datatype, "boolean");
+        assert_eq!(launch_cfg.default_value, Some(serde_json::json!(false)));
+    }
+
+    #[test]
+    fn test_launch_on_startup_default_and_custom() {
+        let mut config = OrbitConfig::default();
+        assert!(!config.launch_on_startup());
+
+        config.values.insert("launchOnStartup".to_string(), serde_json::json!(true));
+        assert!(config.launch_on_startup());
+
+        config.values.insert("launchOnStartup".to_string(), serde_json::json!(false));
+        assert!(!config.launch_on_startup());
     }
 }

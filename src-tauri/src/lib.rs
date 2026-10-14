@@ -1,3 +1,4 @@
+pub mod autostart;
 pub mod config;
 pub mod ipc;
 pub mod kubernetes;
@@ -37,6 +38,18 @@ async fn dispatch_engine(
     Ok(())
 }
 
+static GLOBAL_APP_HANDLE: std::sync::RwLock<Option<AppHandle>> = std::sync::RwLock::new(None);
+
+pub fn set_global_app_handle(handle: AppHandle) {
+    if let Ok(mut lock) = GLOBAL_APP_HANDLE.write() {
+        *lock = Some(handle);
+    }
+}
+
+pub fn get_global_app_handle() -> Option<AppHandle> {
+    GLOBAL_APP_HANDLE.read().ok().and_then(|lock| lock.clone())
+}
+
 pub fn run() {
     // Initialize file logger
     if let Err(e) = crate::logger::init() {
@@ -50,6 +63,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .setup(|app| {
             let handle = app.handle().clone();
+            set_global_app_handle(handle.clone());
             let emitter: Arc<dyn EventEmitter> = Arc::new(TauriEventEmitter { app: handle.clone() });
             set_global_emitter(emitter.clone());
 
@@ -63,6 +77,9 @@ pub fn run() {
                 let writer = Arc::new(tokio::sync::Mutex::new(crate::ipc::bridge::WsWriter::Emitter));
                 crate::ipc::handlers::cluster::broadcast_engine_ready(&writer, "", &km_clone).await;
             });
+
+            // Reconcile OS autostart state with saved application configuration
+            tauri::async_runtime::spawn_blocking(crate::autostart::reconcile_on_startup);
 
             Ok(())
         })

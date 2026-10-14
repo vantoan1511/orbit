@@ -1,5 +1,5 @@
 import { appSettingsService } from '@/services/appSettingsService'
-import type { Configuration, ConfigurationMap } from '@/types/settings'
+import { CONFIG_KEYS, type Configuration, type ConfigurationMap } from '@/types/settings'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
@@ -82,6 +82,24 @@ export const useSettingsStore = defineStore('settings', () => {
     }
   }
 
+  async function setLaunchOnStartup(enabled: boolean) {
+    const index = settings.value.findIndex((c) => c.key === CONFIG_KEYS.LAUNCH_ON_STARTUP)
+    if (index !== -1) {
+      const target = settings.value[index]
+      if (target) {
+        settings.value[index] = { ...target, value: enabled }
+      }
+    }
+    isSaving.value = true
+    try {
+      await appSettingsService.setLaunchOnStartup(enabled)
+    } catch (e) {
+      console.error('Failed to update launchOnStartup:', e)
+    } finally {
+      isSaving.value = false
+    }
+  }
+
   return {
     settings,
     settingsMap,
@@ -92,6 +110,7 @@ export const useSettingsStore = defineStore('settings', () => {
     getConfigValue,
     fetchSettings,
     updateConfigValue,
-    updateSettings
+    updateSettings,
+    setLaunchOnStartup
   }
 })
