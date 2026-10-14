@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { useLogHighlighting } from '@/composables/useLogHighlighting'
-import { Plus, Save, Trash2 } from '@lucide/vue'
+import { computed, reactive, ref } from 'vue'
+import type { HighlightRule, useLogHighlighting } from '@/composables/useLogHighlighting'
+import { Pencil, Plus, Save, Trash2 } from '@lucide/vue'
 import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import Dialog from 'primevue/dialog'
@@ -16,6 +17,54 @@ const visible = defineModel<boolean>('visible', { default: false })
 // Avoid unexpected mutation of prop errors by accessing refs directly
 const selectedPreset = props.highlighting.selectedPreset
 const newPresetName = props.highlighting.newPresetName
+
+// State for child Edit Highlight Rule dialog
+const isEditModalOpen = ref(false)
+const editingRuleId = ref<string | null>(null)
+const editForm = reactive({
+  pattern: '',
+  color: 'rose',
+  bold: false,
+  caseSensitive: false,
+  isRegex: false
+})
+
+const editError = computed(() => {
+  if (!editForm.pattern.trim()) {
+    return 'Pattern cannot be empty'
+  }
+  const validation = props.highlighting.validateRule(
+    editForm.pattern,
+    editForm.isRegex,
+    editForm.caseSensitive
+  )
+  return validation.valid ? null : (validation.error ?? 'Invalid regular expression')
+})
+
+const openEditModal = (rule: HighlightRule) => {
+  editingRuleId.value = rule.id
+  editForm.pattern = rule.pattern
+  editForm.color = rule.color
+  editForm.bold = rule.bold
+  editForm.caseSensitive = rule.caseSensitive
+  editForm.isRegex = rule.isRegex
+  isEditModalOpen.value = true
+}
+
+const handleSaveEdit = () => {
+  if (!editingRuleId.value || editError.value) return
+  const success = props.highlighting.updateCustomRule(editingRuleId.value, {
+    pattern: editForm.pattern.trim(),
+    color: editForm.color,
+    bold: editForm.bold,
+    caseSensitive: editForm.caseSensitive,
+    isRegex: editForm.isRegex
+  })
+  if (success) {
+    isEditModalOpen.value = false
+    editingRuleId.value = null
+  }
+}
 </script>
 
 <template>
@@ -98,7 +147,7 @@ const newPresetName = props.highlighting.newPresetName
             placeholder="Pattern..."
             size="small"
             class="text-xs flex-1"
-            :disabled="rule.isPreset"
+            :disabled="highlighting.isBuiltInRule(rule)"
             @change="highlighting.saveRules"
           />
           <Select
@@ -108,7 +157,7 @@ const newPresetName = props.highlighting.newPresetName
             optionValue="value"
             size="small"
             class="text-xs min-w-32"
-            :disabled="rule.isPreset"
+            :disabled="highlighting.isBuiltInRule(rule)"
             @change="highlighting.saveRules"
           />
           <div class="flex items-center gap-1.5 ml-1">
@@ -116,7 +165,7 @@ const newPresetName = props.highlighting.newPresetName
               v-model="rule.bold"
               :inputId="'bold-' + rule.id"
               binary
-              :disabled="rule.isPreset"
+              :disabled="highlighting.isBuiltInRule(rule)"
               @change="highlighting.saveRules"
             />
             <label
@@ -130,7 +179,7 @@ const newPresetName = props.highlighting.newPresetName
               v-model="rule.caseSensitive"
               :inputId="'cs-' + rule.id"
               binary
-              :disabled="rule.isPreset"
+              :disabled="highlighting.isBuiltInRule(rule)"
               @change="highlighting.saveRules"
             />
             <label
@@ -144,7 +193,7 @@ const newPresetName = props.highlighting.newPresetName
               v-model="rule.isRegex"
               :inputId="'rx-' + rule.id"
               binary
-              :disabled="rule.isPreset"
+              :disabled="highlighting.isBuiltInRule(rule)"
               @change="highlighting.saveRules"
             />
             <label
@@ -153,21 +202,122 @@ const newPresetName = props.highlighting.newPresetName
               >Regex</label
             >
           </div>
-          <Button
-            v-if="!rule.isPreset"
-            severity="danger"
-            variant="text"
-            size="small"
-            class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
-            @click="highlighting.deleteCustomRule(rule.id)"
-          >
-            <template #icon>
-              <Trash2 class="w-4 h-4" />
-            </template>
-          </Button>
+          <template v-if="!highlighting.isBuiltInRule(rule)">
+            <Button
+              severity="secondary"
+              variant="text"
+              size="small"
+              class="p-1! text-muted-color hover:text-primary cursor-pointer"
+              v-tooltip.top="'Edit rule'"
+              @click="openEditModal(rule)"
+            >
+              <template #icon>
+                <Pencil class="w-4 h-4" />
+              </template>
+            </Button>
+            <Button
+              severity="danger"
+              variant="text"
+              size="small"
+              class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
+              v-tooltip.top="'Delete rule'"
+              @click="highlighting.deleteCustomRule(rule.id)"
+            >
+              <template #icon>
+                <Trash2 class="w-4 h-4" />
+              </template>
+            </Button>
+          </template>
         </div>
       </div>
     </div>
+
+    <!-- Edit Rule Modal -->
+    <Dialog
+      v-model:visible="isEditModalOpen"
+      modal
+      header="Edit Highlight Rule"
+      :style="{ width: '480px', maxWidth: '92vw' }"
+    >
+      <div class="flex flex-col gap-4 py-2">
+        <!-- Pattern Input -->
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-pattern" class="text-xs font-semibold text-muted-color">Pattern</label>
+          <InputText
+            id="edit-pattern"
+            v-model="editForm.pattern"
+            placeholder="e.g. error, timeout, \b(404|500)\b"
+            size="small"
+            class="text-xs w-full"
+            :invalid="!!editError"
+          />
+          <span v-if="editError" class="text-xs text-rose-500">{{ editError }}</span>
+        </div>
+
+        <!-- Color Select -->
+        <div class="flex flex-col gap-1.5">
+          <label for="edit-color" class="text-xs font-semibold text-muted-color">Color</label>
+          <Select
+            id="edit-color"
+            v-model="editForm.color"
+            :options="highlighting.colorOptions"
+            optionLabel="label"
+            optionValue="value"
+            size="small"
+            class="text-xs w-full"
+          />
+        </div>
+
+        <!-- Flags / Options -->
+        <div class="flex items-center gap-4 pt-1">
+          <div class="flex items-center gap-1.5">
+            <Checkbox v-model="editForm.bold" inputId="edit-bold" binary />
+            <label
+              for="edit-bold"
+              class="text-xs font-medium text-muted-color cursor-pointer select-none"
+            >
+              Bold
+            </label>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <Checkbox v-model="editForm.caseSensitive" inputId="edit-cs" binary />
+            <label
+              for="edit-cs"
+              class="text-xs font-medium text-muted-color cursor-pointer select-none"
+            >
+              Case Sensitive
+            </label>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <Checkbox v-model="editForm.isRegex" inputId="edit-rx" binary />
+            <label
+              for="edit-rx"
+              class="text-xs font-medium text-muted-color cursor-pointer select-none"
+            >
+              Regex
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end items-center gap-2 w-full">
+          <Button
+            label="Cancel"
+            size="small"
+            severity="secondary"
+            variant="text"
+            @click="isEditModalOpen = false"
+          />
+          <Button
+            label="Save Changes"
+            size="small"
+            :disabled="!!editError"
+            @click="handleSaveEdit"
+          />
+        </div>
+      </template>
+    </Dialog>
 
     <!-- Dialog Footer -->
     <template #footer>
