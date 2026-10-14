@@ -9,7 +9,7 @@ import {
   type Ref
 } from 'vue'
 import { kubernetesService } from '../services/kubernetesService.ts'
-import { events } from '../services/nativeService.ts'
+import { events, filesystem, os } from '../services/nativeService.ts'
 import { OrbitEvents, TAIL_ALL_LINES } from '../types/events.ts'
 import type { VirtualScrollerMethods } from 'primevue/virtualscroller'
 
@@ -18,6 +18,12 @@ export interface LogLine {
   container: string
   text: string
   timestamp?: string
+}
+
+export interface DownloadLogsResult {
+  status: 'saved' | 'cancelled' | 'error'
+  filePath?: string
+  error?: string
 }
 
 export function useLogStream(options: {
@@ -303,19 +309,53 @@ export function useLogStream(options: {
     }
   }
 
-  const downloadLogs = () => {
+  const downloadLogs = async (): Promise<DownloadLogsResult> => {
+    if (filteredLogLines.value.length === 0) {
+      return { status: 'cancelled' }
+    }
+
     const content = filteredLogLines.value
       .map((l) => `${l.timestamp ? l.timestamp + ' ' : ''}[${l.pod}/${l.container}] ${l.text}`)
       .join('\n')
 
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `${options.selectedWorkloadName.value}-logs.txt`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    const defaultFilename = `${options.selectedWorkloadName.value || 'workload'}-logs.txt`
+
+    const savePath = await os.showSaveDialog({
+      title: 'Save Logs As',
+      defaultPath: defaultFilename,
+      filters: [
+        { name: 'Text Files', extensions: ['txt', 'log'] },
+        { name: 'All Files', extensions: ['*'] }
+      ]
+    })
+
+    if (!savePath) {
+      // In non-Tauri browser environments, showSaveDialog returns null because native dialog is unavailable.
+      // Fallback to browser download if running in a real browser window without Tauri.
+      const isBrowserOnly =
+        typeof window !== 'undefined' &&
+        typeof document !== 'undefined' &&
+        !('__TAURI_INTERNALS__' in window || '__TAURI__' in window)
+
+      if (isBrowserOnly) {
+        try {
+          await filesystem.writeTextFile(defaultFilename, content)
+          return { status: 'saved', filePath: defaultFilename }
+        } catch (err) {
+          return { status: 'error', error: String(err) }
+        }
+      }
+
+      return { status: 'cancelled' }
+    }
+
+    try {
+      await filesystem.writeTextFile(savePath, content)
+      return { status: 'saved', filePath: savePath }
+    } catch (err) {
+      console.error('Failed to save logs to file:', err)
+      return { status: 'error', error: String(err) }
+    }
   }
 
   if (getCurrentInstance()) {

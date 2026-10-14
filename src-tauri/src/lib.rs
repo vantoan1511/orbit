@@ -38,6 +38,16 @@ async fn dispatch_engine(
     Ok(())
 }
 
+#[tauri::command]
+async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    if let Some(parent) = std::path::Path::new(&path).parent() {
+        if !parent.as_os_str().is_empty() {
+            tokio::fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
+        }
+    }
+    tokio::fs::write(&path, content).await.map_err(|e| e.to_string())
+}
+
 static GLOBAL_APP_HANDLE: std::sync::RwLock<Option<AppHandle>> = std::sync::RwLock::new(None);
 
 pub fn set_global_app_handle(handle: AppHandle) {
@@ -83,7 +93,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![dispatch_engine]);
+        .invoke_handler(tauri::generate_handler![dispatch_engine, write_text_file]);
 
     if let Err(e) = builder.run(tauri::generate_context!()) {
         tracing::error!("error while running tauri application: {}", e);
@@ -92,7 +102,24 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{AppState, KubeManager, write_text_file};
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+
+    #[tokio::test]
+    async fn test_write_text_file_creates_file_and_dirs() {
+        let temp_dir = std::env::temp_dir().join(format!("orbit_test_{}", uuid::Uuid::new_v4()));
+        let file_path = temp_dir.join("subfolder").join("logs.txt");
+        let sample_content = "2026-10-14T10:00:00Z [nginx-pod/nginx] Server started";
+
+        let result = write_text_file(file_path.to_string_lossy().to_string(), sample_content.to_string()).await;
+        assert!(result.is_ok());
+
+        let read_back = std::fs::read_to_string(&file_path).unwrap();
+        assert_eq!(read_back, sample_content);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
 
     #[test]
     fn test_app_state_creation() {
@@ -110,3 +137,4 @@ mod tests {
         assert!(state.kube_manager.blocking_read().active_context.is_none());
     }
 }
+

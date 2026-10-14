@@ -47,6 +47,17 @@ export async function reconnect(): Promise<void> {
   }
 }
 
+export interface SaveDialogFilter {
+  name: string
+  extensions: string[]
+}
+
+export interface SaveDialogOptions {
+  title?: string
+  defaultPath?: string
+  filters?: SaveDialogFilter[]
+}
+
 /**
  * Safe wrapper for filesystem API
  */
@@ -54,6 +65,36 @@ export const filesystem = {
   async readDirectory(path: string): Promise<string[]> {
     const safePath = sanitizePath(path)
     return [safePath]
+  },
+
+  async writeTextFile(filePath: string, content: string): Promise<void> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        await invoke('write_text_file', { path: filePath, content })
+        return
+      } catch (e) {
+        console.error('Failed to write text file via Tauri:', e)
+        throw e
+      }
+    }
+
+    // Browser fallback
+    if (typeof document !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', filePath.split(/[/\\]/).pop() || 'download.txt')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      return
+    }
+
+    // In-memory test environment fallback
+    inMemoryStore.set(`file:${filePath}`, content)
   }
 }
 
@@ -89,6 +130,24 @@ export const os = {
     } catch (e) {
       console.warn('Dialog plugin error:', e)
       return []
+    }
+  },
+
+  async showSaveDialog(options?: SaveDialogOptions): Promise<string | null> {
+    if (!isTauriEnvironment()) {
+      return null
+    }
+    try {
+      const { save } = await import('@tauri-apps/plugin-dialog')
+      const result = await save({
+        title: options?.title,
+        defaultPath: options?.defaultPath,
+        filters: options?.filters
+      })
+      return result ?? null
+    } catch (e) {
+      console.warn('Save dialog plugin error:', e)
+      return null
     }
   },
 

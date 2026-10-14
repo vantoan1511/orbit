@@ -61,3 +61,37 @@ export const LOG_ROW_CLASSES =
  */
 export const LOG_ORIGIN_BADGE_CLASSES =
   'text-zinc-600 dark:text-zinc-400 font-semibold text-[11px] shrink-0 select-none'
+
+export interface ToastServiceLike {
+  add: (message: {
+    severity: 'success' | 'info' | 'warn' | 'error'
+    summary: string
+    detail: string
+    life?: number
+  }) => void
+}
+
+/**
+ * Dispatches appropriate PrimeVue toast notification based on DownloadLogsResult.
+ */
+export function handleDownloadLogsNotification(
+  result: { status: 'saved' | 'cancelled' | 'error'; filePath?: string; error?: string },
+  toast: ToastServiceLike
+): void {
+  if (result.status === 'saved') {
+    const filename = result.filePath?.split(/[/\\]/).pop() || result.filePath || 'logs.txt'
+    toast.add({
+      severity: 'success',
+      summary: 'Logs Saved',
+      detail: `Successfully saved logs to ${filename}`,
+      life: 3000
+    })
+  } else if (result.status === 'error') {
+    toast.add({
+      severity: 'error',
+      summary: 'Save Failed',
+      detail: result.error || 'Failed to save logs to file',
+      life: 4000
+    })
+  }
+}
