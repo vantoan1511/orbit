@@ -3,6 +3,7 @@ pub mod config;
 pub mod ipc;
 pub mod kubernetes;
 pub mod logger;
+pub mod tray;
 pub mod updater;
 
 use std::sync::Arc;
@@ -70,7 +71,16 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            crate::tray::show_main_window(app);
+        }))
         .plugin(tauri_plugin_store::Builder::new().build())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
             set_global_app_handle(handle.clone());
@@ -87,6 +97,16 @@ pub fn run() {
                 let writer = Arc::new(tokio::sync::Mutex::new(crate::ipc::bridge::WsWriter::Emitter));
                 crate::ipc::handlers::cluster::broadcast_engine_ready(&writer, "", &km_clone).await;
             });
+
+            // Set up system tray
+            if let Err(e) = crate::tray::setup_tray(&handle) {
+                tracing::warn!(error = %e, "Failed to initialize system tray");
+            }
+
+            // Show main window only if NOT launched with --hidden or --minimized
+            if !crate::tray::is_hidden_launch(std::env::args()) {
+                crate::tray::show_main_window(&handle);
+            }
 
             // Reconcile OS autostart state with saved application configuration
             tauri::async_runtime::spawn_blocking(crate::autostart::reconcile_on_startup);
