@@ -88,7 +88,7 @@ impl Configuration {
             Configuration {
                 key: "launchOnStartup".to_string(),
                 name: "Launch on Startup".to_string(),
-                description: "Automatically start Orbit when logging into the system.".to_string(),
+                description: "Automatically start Orbit minimized to the system tray when logging into the system.".to_string(),
                 datatype: "boolean".to_string(),
                 default_value: Some(serde_json::json!(false)),
                 value: None,
@@ -505,6 +505,7 @@ mod tests {
         assert!(launch_cfg.enable, "launchOnStartup must be enabled");
         assert_eq!(launch_cfg.datatype, "boolean");
         assert_eq!(launch_cfg.default_value, Some(serde_json::json!(false)));
+        assert!(launch_cfg.description.contains("minimized to the system tray"));
     }
 
     #[test]

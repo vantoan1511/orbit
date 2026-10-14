@@ -4,6 +4,16 @@ use std::path::PathBuf;
 
 pub const DEFAULT_APP_NAME: &str = "Orbit";
 
+/// Formats the Windows registry Run command line for autostart with `--hidden`.
+pub fn format_windows_run_value(app_path: &std::path::Path) -> String {
+    format!("\"{}\" --hidden", app_path.to_string_lossy())
+}
+
+/// Formats the Linux desktop entry Exec command line for autostart with `--hidden`.
+pub fn format_linux_desktop_exec(app_path: &std::path::Path) -> String {
+    format!("\"{}\" --hidden", app_path.to_string_lossy())
+}
+
 pub struct AutostartManager {
     pub app_name: String,
     pub app_path: PathBuf,
@@ -65,7 +75,7 @@ impl AutostartManager {
     pub fn enable(&self) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
-            let exe_str = format!("\"{}\"", self.app_path.to_string_lossy());
+            let exe_str = format_windows_run_value(&self.app_path);
             let status = std::process::Command::new("reg")
                 .args([
                     "add",
@@ -102,6 +112,7 @@ impl AutostartManager {
     <key>ProgramArguments</key>
     <array>
         <string>{}</string>
+        <string>--hidden</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -120,10 +131,11 @@ impl AutostartManager {
             if let Some(parent) = path.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
+            let exec_str = format_linux_desktop_exec(&self.app_path);
             let desktop_content = format!(
-                "[Desktop Entry]\nType=Application\nName={}\nExec=\"{}\"\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n",
+                "[Desktop Entry]\nType=Application\nName={}\nExec={}\nHidden=false\nNoDisplay=false\nX-GNOME-Autostart-enabled=true\n",
                 self.app_name,
-                self.app_path.to_string_lossy()
+                exec_str
             );
             std::fs::write(&path, desktop_content).map_err(|e| e.to_string())?;
             Ok(())
@@ -267,4 +279,19 @@ mod tests {
         let is_en_after = manager.is_enabled().expect("is_enabled must succeed");
         assert!(!is_en_after, "autostart should be disabled after disable()");
     }
+
+    #[test]
+    fn test_format_windows_run_value_contains_hidden() {
+        let path = PathBuf::from("C:\\fake\\orbit.exe");
+        let cmd = format_windows_run_value(&path);
+        assert_eq!(cmd, "\"C:\\fake\\orbit.exe\" --hidden");
+    }
+
+    #[test]
+    fn test_format_linux_desktop_exec_contains_hidden() {
+        let path = PathBuf::from("/usr/bin/orbit");
+        let cmd = format_linux_desktop_exec(&path);
+        assert_eq!(cmd, "\"/usr/bin/orbit\" --hidden");
+    }
 }
+
