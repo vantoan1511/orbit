@@ -10,6 +10,7 @@ import Checkbox from 'primevue/checkbox'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import ToggleSwitch from 'primevue/toggleswitch'
+import { useToast } from 'primevue/usetoast'
 import VirtualScroller from 'primevue/virtualscroller'
 import { useRouter } from 'vue-router'
 
@@ -19,12 +20,14 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   formatWorkloadContextBadge,
   recalculateVirtualScroller,
+  handleDownloadLogsNotification,
   CONSOLE_CONTAINER_CLASSES,
   LOG_ROW_CLASSES,
   LOG_ORIGIN_BADGE_CLASSES
 } from '@/utils/logsViewHelpers'
 
 const router = useRouter()
+const toast = useToast()
 const k8sStore = useKubernetesStore()
 const logsStore = useLogsStore()
 
@@ -112,6 +115,11 @@ const handleRecalculate = () => {
     isFollowing.value,
     scrollToBottom
   )
+}
+
+const handleDownloadLogs = async () => {
+  const result = await downloadLogs()
+  handleDownloadLogsNotification(result, toast)
 }
 
 watch(isFullscreen, async () => {
@@ -284,7 +292,7 @@ const LOG_ITEM_HEIGHT = 28
             class="p-1! w-7! h-7!"
             :disabled="logLines.length <= 0"
             v-tooltip.bottom="'Download Logs'"
-            @click="downloadLogs"
+            @click="handleDownloadLogs"
           />
           <Button
             severity="secondary"

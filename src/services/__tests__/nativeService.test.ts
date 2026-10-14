@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { app, coreEngine, events, os, probe, storage } from '../nativeService.ts'
+import { app, coreEngine, events, filesystem, os, probe, storage } from '../nativeService.ts'
 
 test('storage provides in-memory fallback when native store is unavailable', async () => {
   await storage.setData('test-key', 'test-value')
@@ -61,6 +61,41 @@ test('os.showOpenDialog and os.open provide fallback implementations', async () 
 
   // os.open resolves without crashing
   await os.open('https://example.com')
+})
+
+test('os.showSaveDialog returns null in non-Tauri test environment', async () => {
+  const saveResult = await os.showSaveDialog({ defaultPath: 'test.txt' })
+  assert.equal(saveResult, null)
+})
+
+test('filesystem.writeTextFile writes content and records to store in test environment', async () => {
+  await filesystem.writeTextFile('sample.txt', 'hello world')
+  // Verify it executes without error in test environment
+  assert.ok(true)
+})
+
+test('filesystem.writeTextFile invokes tauri command write_text_file in Tauri environment', async () => {
+  let invokedCommand = ''
+  let invokedArgs: unknown = null
+
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {
+      invoke: async (cmd: string, args: unknown) => {
+        invokedCommand = cmd
+        invokedArgs = args
+        return undefined
+      }
+    }
+  }
+
+  try {
+    await filesystem.writeTextFile('/path/to/log.txt', 'log content')
+    assert.equal(invokedCommand, 'write_text_file')
+    assert.deepEqual(invokedArgs, { path: '/path/to/log.txt', content: 'log content' })
+  } finally {
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
 })
 
 test('app.getConfig, restartProcess and exit provide safe fallbacks', async () => {

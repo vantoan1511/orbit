@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { ref } from 'vue'
 import { kubernetesService } from '../../services/kubernetesService.ts'
+import { filesystem, os } from '../../services/nativeService.ts'
 import { useLogStream } from '../useLogStream.ts'
 
 test('useLogStream initializes with isRefreshing false', () => {
@@ -511,4 +512,150 @@ test('scheduleFollowScroll sets programmatic scroll flag and scrolls to bottom',
 
   // Container was scrolled to bottom
   assert.equal(targetScrollTop, 3000)
+})
+
+test('useLogStream.downloadLogs returns cancelled without prompting dialog when filteredLogLines is empty', async () => {
+  const stream = useLogStream(createMockOptions())
+  let dialogCalled = false
+  const originalShowSave = os.showSaveDialog
+  os.showSaveDialog = async () => {
+    dialogCalled = true
+    return '/tmp/file.txt'
+  }
+
+  try {
+    const result = await stream.downloadLogs()
+    assert.equal(result.status, 'cancelled')
+    assert.equal(dialogCalled, false)
+  } finally {
+    os.showSaveDialog = originalShowSave
+  }
+})
+
+test('useLogStream.downloadLogs formats filtered log lines with timestamps and pod/container', async () => {
+  const stream = useLogStream(createMockOptions())
+  stream.logLines.value = [
+    {
+      pod: 'nginx-pod-1',
+      container: 'nginx-main',
+      text: 'Worker process started',
+      timestamp: '2026-10-14 10:00:00'
+    },
+    {
+      pod: 'nginx-pod-1',
+      container: 'nginx-main',
+      text: 'Configuration reloaded'
+    }
+  ]
+
+  let writtenPath = ''
+  let writtenContent = ''
+
+  const originalShowSave = os.showSaveDialog
+  const originalWriteText = filesystem.writeTextFile
+
+  os.showSaveDialog = async () => '/chosen/path/logs.txt'
+  filesystem.writeTextFile = async (path: string, content: string) => {
+    writtenPath = path
+    writtenContent = content
+  }
+
+  try {
+    const result = await stream.downloadLogs()
+    assert.equal(result.status, 'saved')
+    assert.equal(result.filePath, '/chosen/path/logs.txt')
+    assert.equal(writtenPath, '/chosen/path/logs.txt')
+    const expected =
+      '2026-10-14 10:00:00 [nginx-pod-1/nginx-main] Worker process started\n[nginx-pod-1/nginx-main] Configuration reloaded'
+    assert.equal(writtenContent, expected)
+  } finally {
+    os.showSaveDialog = originalShowSave
+    filesystem.writeTextFile = originalWriteText
+  }
+})
+
+test('useLogStream.downloadLogs respects active search query and exports only matching lines', async () => {
+  const stream = useLogStream(createMockOptions())
+  stream.logLines.value = [
+    {
+      pod: 'pod-1',
+      container: 'c1',
+      text: 'Error: database connection timeout',
+      timestamp: '2026-10-14 10:00:00'
+    },
+    {
+      pod: 'pod-1',
+      container: 'c1',
+      text: 'Info: health check passed',
+      timestamp: '2026-10-14 10:00:01'
+    }
+  ]
+
+  stream.searchQuery.value = 'error'
+
+  let writtenContent = ''
+  const originalShowSave = os.showSaveDialog
+  const originalWriteText = filesystem.writeTextFile
+
+  os.showSaveDialog = async () => '/logs.txt'
+  filesystem.writeTextFile = async (_path: string, content: string) => {
+    writtenContent = content
+  }
+
+  try {
+    const result = await stream.downloadLogs()
+    assert.equal(result.status, 'saved')
+    assert.equal(
+      writtenContent,
+      '2026-10-14 10:00:00 [pod-1/c1] Error: database connection timeout'
+    )
+  } finally {
+    os.showSaveDialog = originalShowSave
+    filesystem.writeTextFile = originalWriteText
+  }
+})
+
+test('useLogStream.downloadLogs returns cancelled when user cancels save dialog', async () => {
+  const stream = useLogStream(createMockOptions())
+  stream.logLines.value = [{ pod: 'p1', container: 'c1', text: 'Log 1' }]
+
+  let writeCalled = false
+  const originalShowSave = os.showSaveDialog
+  const originalWriteText = filesystem.writeTextFile
+
+  os.showSaveDialog = async () => null
+  filesystem.writeTextFile = async () => {
+    writeCalled = true
+  }
+
+  try {
+    const result = await stream.downloadLogs()
+    assert.equal(result.status, 'cancelled')
+    assert.equal(writeCalled, false)
+  } finally {
+    os.showSaveDialog = originalShowSave
+    filesystem.writeTextFile = originalWriteText
+  }
+})
+
+test('useLogStream.downloadLogs returns error status when filesystem write fails', async () => {
+  const stream = useLogStream(createMockOptions())
+  stream.logLines.value = [{ pod: 'p1', container: 'c1', text: 'Log 1' }]
+
+  const originalShowSave = os.showSaveDialog
+  const originalWriteText = filesystem.writeTextFile
+
+  os.showSaveDialog = async () => '/fail/path.txt'
+  filesystem.writeTextFile = async () => {
+    throw new Error('Permission denied')
+  }
+
+  try {
+    const result = await stream.downloadLogs()
+    assert.equal(result.status, 'error')
+    assert.ok(result.error?.includes('Permission denied'))
+  } finally {
+    os.showSaveDialog = originalShowSave
+    filesystem.writeTextFile = originalWriteText
+  }
 })
