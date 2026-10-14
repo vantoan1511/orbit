@@ -11,6 +11,35 @@ export interface HighlightRule {
   isPreset?: boolean
 }
 
+export interface RuleValidationResult {
+  valid: boolean
+  error?: string
+}
+
+export type HighlightRuleUpdate = Partial<Omit<HighlightRule, 'id' | 'isPreset'>>
+
+export function validateRule(
+  pattern: string,
+  isRegex: boolean,
+  caseSensitive: boolean
+): RuleValidationResult {
+  const trimmed = pattern.trim()
+  if (!trimmed) {
+    return { valid: false, error: 'Pattern cannot be empty' }
+  }
+
+  if (isRegex) {
+    try {
+      new RegExp(trimmed, caseSensitive ? '' : 'i')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Invalid regular expression'
+      return { valid: false, error: message }
+    }
+  }
+
+  return { valid: true }
+}
+
 export const PRESETS: Record<string, HighlightRule[]> = {
   standard: [
     {
@@ -287,7 +316,60 @@ export function useLogHighlighting() {
     saveRules()
   }
 
+  const isBuiltInRule = (rule: HighlightRule): boolean => {
+    return Object.values(PRESETS).some((presetList) =>
+      presetList.some((builtin) => builtin.id === rule.id)
+    )
+  }
+
+  const updateCustomRule = (id: string, updates: HighlightRuleUpdate): boolean => {
+    let targetRule: HighlightRule | undefined
+
+    if (selectedPreset.value.startsWith('custom:')) {
+      const presetName = selectedPreset.value.replace('custom:', '')
+      const presetRules = customPresets.value[presetName]
+      if (presetRules) {
+        targetRule = presetRules.find((r) => r.id === id)
+      }
+    }
+
+    if (!targetRule) {
+      targetRule = customRules.value.find((r) => r.id === id)
+    }
+
+    if (!targetRule) {
+      return false
+    }
+
+    const pattern = updates.pattern !== undefined ? updates.pattern : targetRule.pattern
+    const isRegex = updates.isRegex !== undefined ? updates.isRegex : targetRule.isRegex
+    const caseSensitive =
+      updates.caseSensitive !== undefined ? updates.caseSensitive : targetRule.caseSensitive
+
+    const validation = validateRule(pattern, isRegex, caseSensitive)
+    if (!validation.valid) {
+      return false
+    }
+
+    Object.assign(targetRule, updates)
+    saveRules()
+    return true
+  }
+
   const deleteCustomRule = (id: string) => {
+    if (selectedPreset.value.startsWith('custom:')) {
+      const presetName = selectedPreset.value.replace('custom:', '')
+      const presetRules = customPresets.value[presetName]
+      if (presetRules) {
+        const index = presetRules.findIndex((r) => r.id === id)
+        if (index !== -1) {
+          presetRules.splice(index, 1)
+          saveRules()
+          return
+        }
+      }
+    }
+
     const index = customRules.value.findIndex((r) => r.id === id)
     if (index !== -1) {
       customRules.value.splice(index, 1)
@@ -387,9 +469,12 @@ export function useLogHighlighting() {
     loadRules,
     saveRules,
     addRule,
+    updateCustomRule,
     deleteCustomRule,
     saveCustomPreset,
     deleteCustomPreset,
+    isBuiltInRule,
+    validateRule,
     getLogLevelColor
   }
 }
