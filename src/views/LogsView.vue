@@ -143,6 +143,11 @@ onUnmounted(() => {
   }
 })
 
+// Recent log lines snapshot for live highlight rules testing sandbox
+const recentLogLines = computed<string[]>(() => {
+  return logLines.value.slice(-20).map((line) => line.text)
+})
+
 // Fixed row height for VirtualScroller; must stay in sync with item padding/font.
 const LOG_ITEM_HEIGHT = 28
 </script>
@@ -413,6 +418,10 @@ const LOG_ITEM_HEIGHT = 28
     </div>
 
     <!-- Highlight Rules Config Dialog -->
-    <LogHighlightRulesDialog v-model:visible="showRulesDialog" :highlighting="logHighlighting" />
+    <LogHighlightRulesDialog
+      v-model:visible="showRulesDialog"
+      :highlighting="logHighlighting"
+      :recent-logs="recentLogLines"
+    />
   </div>
 </template>
