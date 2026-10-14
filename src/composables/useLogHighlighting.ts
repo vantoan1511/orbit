@@ -8,6 +8,7 @@ export interface HighlightRule {
   bold: boolean
   caseSensitive: boolean
   isRegex: boolean
+  enabled?: boolean
   isPreset?: boolean
 }
 
@@ -401,8 +402,123 @@ export function useLogHighlighting() {
     }
   }
 
+  const reorderRules = (fromIndex: number, toIndex: number): boolean => {
+    let list: HighlightRule[] | undefined
+
+    if (selectedPreset.value.startsWith('custom:')) {
+      const name = selectedPreset.value.replace('custom:', '')
+      list = customPresets.value[name]
+    } else {
+      list = customRules.value
+    }
+
+    if (
+      !list ||
+      fromIndex < 0 ||
+      fromIndex >= list.length ||
+      toIndex < 0 ||
+      toIndex >= list.length
+    ) {
+      return false
+    }
+
+    const [moved] = list.splice(fromIndex, 1)
+    if (!moved) return false
+    list.splice(toIndex, 0, moved)
+    saveRules()
+    return true
+  }
+
+  const toggleRule = (id: string): boolean => {
+    let targetRule: HighlightRule | undefined
+
+    if (selectedPreset.value.startsWith('custom:')) {
+      const presetName = selectedPreset.value.replace('custom:', '')
+      const presetRules = customPresets.value[presetName]
+      if (presetRules) {
+        targetRule = presetRules.find((r) => r.id === id)
+      }
+    }
+
+    if (!targetRule) {
+      targetRule = customRules.value.find((r) => r.id === id)
+    }
+
+    if (!targetRule) {
+      return false
+    }
+
+    targetRule.enabled = targetRule.enabled === false ? true : false
+    saveRules()
+    return true
+  }
+
+  const clonePreset = (sourcePresetKey: string, newPresetName: string): boolean => {
+    const trimmed = newPresetName.trim()
+    if (!trimmed) return false
+
+    let sourceRules: HighlightRule[] = []
+    if (sourcePresetKey.startsWith('custom:')) {
+      const name = sourcePresetKey.replace('custom:', '')
+      sourceRules = customPresets.value[name] || []
+    } else {
+      sourceRules = PRESETS[sourcePresetKey] || []
+    }
+
+    const cloned = sourceRules.map((rule, idx) => ({
+      ...rule,
+      id: `cp-${Date.now()}-${idx}`,
+      isPreset: true,
+      enabled: rule.enabled !== false
+    }))
+
+    customPresets.value[trimmed] = cloned
+    selectedPreset.value = `custom:${trimmed}`
+    saveRules()
+    return true
+  }
+
+  const exportRules = (): string => {
+    return JSON.stringify(activeRules.value, null, 2)
+  }
+
+  const importRules = (rules: HighlightRule[]): boolean => {
+    if (!Array.isArray(rules)) return false
+
+    const validRules: HighlightRule[] = []
+    for (const r of rules) {
+      if (!r || typeof r.pattern !== 'string') continue
+      const validation = validateRule(r.pattern, !!r.isRegex, !!r.caseSensitive)
+      if (!validation.valid) continue
+
+      validRules.push({
+        id: r.id || `imp-${Date.now()}-${validRules.length}`,
+        pattern: r.pattern.trim(),
+        color: r.color || 'rose',
+        bold: !!r.bold,
+        caseSensitive: !!r.caseSensitive,
+        isRegex: !!r.isRegex,
+        enabled: r.enabled !== false,
+        isPreset: !!r.isPreset
+      })
+    }
+
+    if (validRules.length === 0) return false
+
+    if (selectedPreset.value.startsWith('custom:')) {
+      const presetName = selectedPreset.value.replace('custom:', '')
+      customPresets.value[presetName] = validRules
+    } else {
+      customRules.value = validRules
+    }
+
+    saveRules()
+    return true
+  }
+
   const getLogLevelColor = (text: string) => {
     const matched = activeRules.value.find((rule) => {
+      if (rule.enabled === false) return false
       if (!rule.pattern) return false
       if (rule.isRegex) {
         try {
@@ -473,6 +589,11 @@ export function useLogHighlighting() {
     deleteCustomRule,
     saveCustomPreset,
     deleteCustomPreset,
+    reorderRules,
+    toggleRule,
+    clonePreset,
+    exportRules,
+    importRules,
     isBuiltInRule,
     validateRule,
     getLogLevelColor
