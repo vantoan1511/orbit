@@ -33,6 +33,7 @@ pub fn dispatch(
     match event_name {
         "getAppSettings" => settings::get_app_settings(writer, token),
         "updateAppSettings" => settings::update_app_settings(data, writer, token),
+        "setLaunchOnStartup" => settings::set_launch_on_startup(data, writer, token),
         "getClusters" => cluster::get_clusters(writer, token, manager),
         "getUserProfile" => cluster::get_user_profile(writer, token, manager),
         "switchCluster" => cluster::switch_cluster(data, writer, token, manager),
@@ -121,7 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dispatch_ping_responds_with_pong() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 

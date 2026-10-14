@@ -1,5 +1,5 @@
 import type { Configuration, ConfigurationMap } from '@/types/settings'
-import { coreEngine } from './nativeService'
+import { coreEngine } from './nativeService.ts'
 
 export const appSettingsService = {
   /**
@@ -14,5 +14,12 @@ export const appSettingsService = {
    */
   async updateAppSettings(settings: Configuration[] | ConfigurationMap): Promise<void> {
     await coreEngine.dispatch('updateAppSettings', settings)
+  },
+
+  /**
+   * Enable or disable launch on startup via dedicated backend IPC event.
+   */
+  async setLaunchOnStartup(enabled: boolean): Promise<void> {
+    await coreEngine.dispatch('setLaunchOnStartup', { enabled })
   }
 }

@@ -77,7 +77,11 @@ const handleValueChange = async (config: Configuration, newValue: unknown) => {
   if (!config.enable) return
   const isResetting =
     newValue === null || JSON.stringify(newValue) === JSON.stringify(config.defaultValue)
-  await settingsStore.updateConfigValue(config.key, newValue)
+  if (config.key === CONFIG_KEYS.LAUNCH_ON_STARTUP) {
+    await settingsStore.setLaunchOnStartup(Boolean(newValue))
+  } else {
+    await settingsStore.updateConfigValue(config.key, newValue)
+  }
   toast.add({
     severity: 'success',
     summary: isResetting ? 'Settings Reset' : 'Settings Saved',
