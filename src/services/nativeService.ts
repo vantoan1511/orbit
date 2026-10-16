@@ -98,10 +98,96 @@ export const filesystem = {
   }
 }
 
+export interface WindowService {
+  minimize(): Promise<void>
+  maximize(): Promise<void>
+  unmaximize(): Promise<void>
+  toggleMaximize(): Promise<void>
+  isMaximized(): Promise<boolean>
+  close(): Promise<void>
+  startDragging(): Promise<void>
+  __setMockWindow?: (mock: unknown) => void
+}
+
+let mockWindowInstance: {
+  minimize: () => Promise<void>
+  maximize: () => Promise<void>
+  unmaximize: () => Promise<void>
+  toggleMaximize: () => Promise<void>
+  isMaximized: () => Promise<boolean>
+  close: () => Promise<void>
+  startDragging: () => Promise<void>
+} | null = null
+
+async function getTauriWindow() {
+  if (mockWindowInstance) {
+    return mockWindowInstance
+  }
+  if (!isTauriEnvironment()) {
+    return null
+  }
+  try {
+    const { getCurrentWindow } = await import('@tauri-apps/api/window')
+    return getCurrentWindow()
+  } catch (e) {
+    console.warn('Failed to get Tauri window:', e)
+    return null
+  }
+}
+
 /**
  * Safe wrapper for window API
  */
-export const window = {}
+export const windowService: WindowService = {
+  async minimize(): Promise<void> {
+    const win = await getTauriWindow()
+    if (win) {
+      await win.minimize()
+    }
+  },
+  async maximize(): Promise<void> {
+    const win = await getTauriWindow()
+    if (win) {
+      await win.maximize()
+    }
+  },
+  async unmaximize(): Promise<void> {
+    const win = await getTauriWindow()
+    if (win) {
+      await win.unmaximize()
+    }
+  },
+  async toggleMaximize(): Promise<void> {
+    const win = await getTauriWindow()
+    if (win) {
+      await win.toggleMaximize()
+    }
+  },
+  async isMaximized(): Promise<boolean> {
+    const win = await getTauriWindow()
+    if (win) {
+      return await win.isMaximized()
+    }
+    return false
+  },
+  async close(): Promise<void> {
+    const win = await getTauriWindow()
+    if (win) {
+      await win.close()
+    }
+  },
+  async startDragging(): Promise<void> {
+    const win = await getTauriWindow()
+    if (win) {
+      await win.startDragging()
+    }
+  },
+  __setMockWindow(mock: unknown) {
+    mockWindowInstance = mock as typeof mockWindowInstance
+  }
+}
+
+export const window: WindowService = windowService
 
 /**
  * Safe wrapper for OS native capabilities (dialogs, browser URL opener)
