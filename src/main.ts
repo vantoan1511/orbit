@@ -8,7 +8,7 @@ import { createApp } from 'vue'
 import { init } from './services/nativeService'
 
 import App from './App.vue'
-import { initTheme } from './composables/useTheme'
+import { initAppearance } from './composables/useAppearance'
 import router from './router'
 import { useNotificationStore } from './stores/notificationStore'
 import { useTableFilterStore } from './stores/tableFilterStore'
@@ -47,7 +47,7 @@ init()
 
 // Hydrate persistent state asynchronously once the app is mounted and Tauri host is initialized
 void Promise.allSettled([
-  initTheme(),
+  initAppearance(),
   useTableFilterStore(pinia).init(),
   useNotificationStore(pinia).init(),
   useTabsStore(pinia).init()

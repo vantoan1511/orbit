@@ -11,6 +11,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AccentColorPicker: typeof import('./src/components/settings/appearance/AccentColorPicker.vue')['default']
     ActivePortForwardBadge: typeof import('./src/components/shared/ActivePortForwardBadge.vue')['default']
     ActivePortForwardsList: typeof import('./src/components/shared/ActivePortForwardsList.vue')['default']
     AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
@@ -126,6 +127,7 @@ declare module 'vue' {
     ServicePortsTab: typeof import('./src/components/services/ServicePortsTab.vue')['default']
     ServicesTable: typeof import('./src/components/network/ServicesTable.vue')['default']
     SettingsAboutTab: typeof import('./src/components/settings/SettingsAboutTab.vue')['default']
+    SettingsAppearanceTab: typeof import('./src/components/settings/SettingsAppearanceTab.vue')['default']
     SettingsGeneralTab: typeof import('./src/components/settings/SettingsGeneralTab.vue')['default']
     StatefulSetEditForm: typeof import('./src/components/workloads/StatefulSetEditForm.vue')['default']
     StatefulSetsTable: typeof import('./src/components/workloads/StatefulSetsTable.vue')['default']
@@ -148,8 +150,10 @@ declare module 'vue' {
     Tag: typeof import('primevue/tag')['default']
     TerminalPanel: typeof import('./src/components/terminal/TerminalPanel.vue')['default']
     TerminalTab: typeof import('./src/components/terminal/TerminalTab.vue')['default']
+    ThemeModeSelector: typeof import('./src/components/settings/appearance/ThemeModeSelector.vue')['default']
     Toast: typeof import('primevue/toast')['default']
     TopConsumers: typeof import('./src/components/dashboard/TopConsumers.vue')['default']
+    UiStyleSelector: typeof import('./src/components/settings/appearance/UiStyleSelector.vue')['default']
     UpdaterDialog: typeof import('./src/components/UpdaterDialog.vue')['default']
     UpdaterNotifications: typeof import('./src/components/UpdaterNotifications.vue')['default']
     ViewLayout: typeof import('./src/components/shared/ViewLayout.vue')['default']

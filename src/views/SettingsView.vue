@@ -4,6 +4,7 @@ import { resolveSettingsTab } from '@/utils/settingsViewHelpers'
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
+import SettingsAppearanceTab from '../components/settings/SettingsAppearanceTab.vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
 
 const route = useRoute()
@@ -53,11 +54,7 @@ watch(activeTab, (newTab) => {
         >
           Preferences
         </Tab>
-        <Tab
-          value="appearance"
-          disabled
-          class="px-3 py-2 text-xs font-semibold opacity-40 cursor-not-allowed"
-        >
+        <Tab value="appearance" class="px-3 py-2 text-xs font-semibold cursor-pointer">
           Appearance
         </Tab>
         <Tab
@@ -101,11 +98,7 @@ watch(activeTab, (newTab) => {
         </TabPanel>
 
         <TabPanel value="appearance">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            Appearance settings coming soon.
-          </div>
+          <SettingsAppearanceTab />
         </TabPanel>
 
         <TabPanel value="notifications">
