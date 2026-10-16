@@ -20,6 +20,7 @@ import AppLoadingScreen from './AppLoadingScreen.vue'
 import AppSidebar from './AppSidebar.vue'
 import AppTabBar from './tabs/AppTabBar.vue'
 import AppTabResourcePicker from './tabs/AppTabResourcePicker.vue'
+import AppTitleBar from './AppTitleBar.vue'
 import EmptyWorkspaceView from './tabs/EmptyWorkspaceView.vue'
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue'
 
@@ -124,55 +125,61 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Transition name="page" mode="out-in">
-    <AppLoadingScreen v-if="k8sStore.isAppLoading" @complete="k8sStore.setAppLoading(false)" />
-    <div
-      v-else
-      class="flex flex-col h-screen w-screen overflow-hidden text-primary font-sans bg-(--bg-app)"
-    >
-      <div class="flex-1 flex overflow-hidden">
-        <!-- Sidebar -->
-        <AppSidebar />
+  <div class="flex flex-col h-screen w-screen overflow-hidden text-primary font-sans bg-(--bg-app)">
+    <!-- Custom Borderless Window Title Bar -->
+    <AppTitleBar />
 
-        <!-- Main Content Area -->
-        <div class="flex-1 flex flex-col h-full overflow-hidden">
-          <AppHeader />
+    <Transition name="page" mode="out-in">
+      <AppLoadingScreen
+        v-if="k8sStore.isAppLoading"
+        class="flex-1! h-auto! w-full!"
+        @complete="k8sStore.setAppLoading(false)"
+      />
+      <div v-else class="flex-1 flex flex-col overflow-hidden">
+        <div class="flex-1 flex overflow-hidden">
+          <!-- Sidebar -->
+          <AppSidebar />
 
-          <!-- Top Main Tabs -->
-          <AppTabBar v-if="k8sStore.activeClusterId !== null" />
+          <!-- Main Content Area -->
+          <div class="flex-1 flex flex-col h-full overflow-hidden">
+            <AppHeader />
 
-          <main :class="getLayoutMainClass(currentLayoutMeta)">
-            <div :class="getLayoutContentPaddingClass(currentLayoutMeta)">
-              <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
-                <EmptyWorkspaceView
-                  v-if="tabsStore.tabs.length === 0 && route.path !== '/settings'"
-                  @open-picker="handleOpenEmptyPicker"
-                />
-                <OfflineClusterView
-                  v-else-if="
-                    activeCluster &&
-                    activeCluster.status !== 'healthy' &&
-                    route.path !== '/settings'
-                  "
-                />
-                <RouterView v-else v-slot="{ Component }">
-                  <transition name="page" mode="out-in">
-                    <component :is="Component" />
-                  </transition>
-                </RouterView>
-              </template>
-              <WelcomeView v-else />
-            </div>
-          </main>
-          <TerminalPanel />
+            <!-- Top Main Tabs -->
+            <AppTabBar v-if="k8sStore.activeClusterId !== null" />
+
+            <main :class="getLayoutMainClass(currentLayoutMeta)">
+              <div :class="getLayoutContentPaddingClass(currentLayoutMeta)">
+                <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
+                  <EmptyWorkspaceView
+                    v-if="tabsStore.tabs.length === 0 && route.path !== '/settings'"
+                    @open-picker="handleOpenEmptyPicker"
+                  />
+                  <OfflineClusterView
+                    v-else-if="
+                      activeCluster &&
+                      activeCluster.status !== 'healthy' &&
+                      route.path !== '/settings'
+                    "
+                  />
+                  <RouterView v-else v-slot="{ Component }">
+                    <transition name="page" mode="out-in">
+                      <component :is="Component" />
+                    </transition>
+                  </RouterView>
+                </template>
+                <WelcomeView v-else />
+              </div>
+            </main>
+            <TerminalPanel />
+          </div>
         </div>
+
+        <!-- Footer -->
+        <AppFooter />
+
+        <!-- Empty Workspace Resource Picker Popover -->
+        <AppTabResourcePicker ref="emptyPickerRef" @select-resource="handleEmptyResourceSelected" />
       </div>
-
-      <!-- Footer -->
-      <AppFooter />
-
-      <!-- Empty Workspace Resource Picker Popover -->
-      <AppTabResourcePicker ref="emptyPickerRef" @select-resource="handleEmptyResourceSelected" />
-    </div>
-  </Transition>
+    </Transition>
+  </div>
 </template>

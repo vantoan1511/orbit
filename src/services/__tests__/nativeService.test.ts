@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { app, coreEngine, events, filesystem, os, probe, storage } from '../nativeService.ts'
+import {
+  app,
+  coreEngine,
+  events,
+  filesystem,
+  os,
+  probe,
+  storage,
+  windowService
+} from '../nativeService.ts'
 
 test('storage provides in-memory fallback when native store is unavailable', async () => {
   await storage.setData('test-key', 'test-value')
@@ -186,6 +195,82 @@ test('probe returns false when engine ping rejects or times out', async () => {
     assert.equal(result, false)
   } finally {
     coreEngine.dispatch = originalDispatch
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('windowService provides safe fallbacks in non-Tauri test environment', async () => {
+  // Methods should resolve without error
+  await windowService.minimize()
+  await windowService.maximize()
+  await windowService.unmaximize()
+  await windowService.toggleMaximize()
+  await windowService.close()
+  await windowService.startDragging()
+
+  const isMax = await windowService.isMaximized()
+  assert.equal(isMax, false)
+})
+
+test('windowService delegates to getCurrentWindow in Tauri environment', async () => {
+  let invoked = ''
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {}
+  }
+
+  // Set mock window instance in windowService
+  const mockWindow = {
+    minimize: async () => {
+      invoked = 'minimize'
+    },
+    maximize: async () => {
+      invoked = 'maximize'
+    },
+    unmaximize: async () => {
+      invoked = 'unmaximize'
+    },
+    toggleMaximize: async () => {
+      invoked = 'toggleMaximize'
+    },
+    close: async () => {
+      invoked = 'close'
+    },
+    isMaximized: async () => {
+      invoked = 'isMaximized'
+      return true
+    },
+    startDragging: async () => {
+      invoked = 'startDragging'
+    }
+  }
+
+  windowService.__setMockWindow?.(mockWindow)
+
+  try {
+    await windowService.minimize()
+    assert.equal(invoked, 'minimize')
+
+    await windowService.maximize()
+    assert.equal(invoked, 'maximize')
+
+    await windowService.unmaximize()
+    assert.equal(invoked, 'unmaximize')
+
+    await windowService.toggleMaximize()
+    assert.equal(invoked, 'toggleMaximize')
+
+    await windowService.close()
+    assert.equal(invoked, 'close')
+
+    await windowService.startDragging()
+    assert.equal(invoked, 'startDragging')
+
+    const maxResult = await windowService.isMaximized()
+    assert.equal(invoked, 'isMaximized')
+    assert.equal(maxResult, true)
+  } finally {
+    windowService.__setMockWindow?.(null)
     ;(globalThis as unknown as { window?: unknown }).window = originalWindow
   }
 })
