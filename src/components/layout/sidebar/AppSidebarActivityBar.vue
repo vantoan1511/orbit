@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { useTheme } from '@/composables/useTheme'
+import { getThemeModeTooltip, useAppearance } from '@/composables/useAppearance'
 import { os } from '@/services/nativeService'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
-import { Bell, Moon, Settings, Sun, User } from '@lucide/vue'
+import { Bell, Laptop, Moon, Settings, Sun, User } from '@lucide/vue'
 import { Button } from 'primevue'
 import { useRoute, useRouter } from 'vue-router'
 import { GitHubIcon } from 'vue3-simple-icons'
@@ -32,7 +32,7 @@ const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
 const route = useRoute()
 const router = useRouter()
-const { isDark, toggleTheme } = useTheme()
+const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
 </script>
 
 <template>
@@ -100,15 +100,16 @@ const { isDark, toggleTheme } = useTheme()
 
       <!-- Theme Toggle -->
       <Button
-        v-tooltip.right="isDark ? 'Light Mode' : 'Dark Mode'"
+        v-tooltip.right="getThemeModeTooltip(themeMode, resolvedTheme)"
         variant="text"
         severity="secondary"
         class="w-10 h-10 text-muted-color hover:bg-(--bg-hover)"
-        @click="toggleTheme"
+        @click="cycleThemeMode"
       >
         <template #icon>
-          <Sun v-if="isDark" class="w-5 h-5" />
-          <Moon v-else class="w-5 h-5" />
+          <Laptop v-if="themeMode === 'system'" class="w-5 h-5" />
+          <Moon v-else-if="themeMode === 'dark'" class="w-5 h-5" />
+          <Sun v-else class="w-5 h-5" />
         </template>
       </Button>
 

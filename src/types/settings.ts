@@ -57,4 +57,8 @@ export const VALID_SETTINGS_TABS: readonly SettingsSubTab[] = [
   'about'
 ] as const
 
-export const ENABLED_SETTINGS_TABS: readonly SettingsSubTab[] = ['general', 'about'] as const
+export const ENABLED_SETTINGS_TABS: readonly SettingsSubTab[] = [
+  'general',
+  'appearance',
+  'about'
+] as const

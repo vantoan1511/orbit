@@ -247,3 +247,106 @@
   --color-ingress: #fb7185;
 }
 
+/* ===========================
+   UI Style Presets
+   =========================== */
+
+/* Glass UI */
+[data-ui-style="glass"] {
+  --bg-sidebar: rgba(255, 255, 255, 0.72);
+  --bg-panel: rgba(248, 250, 252, 0.65);
+  --bg-card: rgba(255, 255, 255, 0.65);
+  --border: rgba(0, 0, 0, 0.08);
+}
+
+[data-ui-style="glass"].my-app-dark,
+.my-app-dark[data-ui-style="glass"] {
+  --bg-sidebar: rgba(13, 16, 18, 0.72);
+  --bg-panel: rgba(11, 13, 15, 0.65);
+  --bg-card: rgba(14, 16, 18, 0.65);
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+/* Frutiger Aero */
+[data-ui-style="aero"] {
+  --bg-sidebar: rgba(255, 255, 255, 0.85);
+  --bg-panel: rgba(245, 248, 255, 0.75);
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --border: rgba(200, 215, 235, 0.6);
+  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+[data-ui-style="aero"].my-app-dark,
+.my-app-dark[data-ui-style="aero"] {
+  --bg-sidebar: rgba(15, 20, 26, 0.82);
+  --bg-panel: rgba(11, 15, 20, 0.75);
+  --bg-card: rgba(18, 24, 32, 0.78);
+  --border: rgba(255, 255, 255, 0.12);
+  --shadow-sm: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* Liquid Glass */
+[data-ui-style="liquidglass"] {
+  --bg-sidebar: rgba(255, 255, 255, 0.68);
+  --bg-panel: rgba(240, 244, 250, 0.6);
+  --bg-card: rgba(255, 255, 255, 0.58);
+  --border: rgba(255, 255, 255, 0.4);
+  --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.12);
+}
+
+[data-ui-style="liquidglass"].my-app-dark,
+.my-app-dark[data-ui-style="liquidglass"] {
+  --bg-sidebar: rgba(10, 13, 18, 0.75);
+  --bg-panel: rgba(8, 10, 14, 0.7);
+  --bg-card: rgba(15, 20, 28, 0.68);
+  --border: rgba(255, 255, 255, 0.14);
+  --shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* iOS Cupertino */
+[data-ui-style="ios"] {
+  --bg-sidebar: rgba(245, 245, 247, 0.82);
+  --bg-panel: rgba(255, 255, 255, 0.85);
+  --bg-card: rgba(255, 255, 255, 0.75);
+  --border: rgba(0, 0, 0, 0.08);
+}
+
+[data-ui-style="ios"].my-app-dark,
+.my-app-dark[data-ui-style="ios"] {
+  --bg-sidebar: rgba(28, 28, 30, 0.82);
+  --bg-panel: rgba(18, 18, 18, 0.82);
+  --bg-card: rgba(30, 30, 32, 0.75);
+  --border: rgba(255, 255, 255, 0.1);
+}
+
+/* Translucent surfaces backdrop filter */
+[data-ui-style="glass"] .bg-\(--bg-sidebar\),
+[data-ui-style="glass"] .bg-\(--bg-card\),
+[data-ui-style="glass"] .bg-\(--bg-panel\),
+[data-ui-style="aero"] .bg-\(--bg-sidebar\),
+[data-ui-style="aero"] .bg-\(--bg-card\),
+[data-ui-style="aero"] .bg-\(--bg-panel\),
+[data-ui-style="liquidglass"] .bg-\(--bg-sidebar\),
+[data-ui-style="liquidglass"] .bg-\(--bg-card\),
+[data-ui-style="liquidglass"] .bg-\(--bg-panel\),
+[data-ui-style="ios"] .bg-\(--bg-sidebar\),
+[data-ui-style="ios"] .bg-\(--bg-card\),
+[data-ui-style="ios"] .bg-\(--bg-panel\) {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+[data-ui-style="liquidglass"] .bg-\(--bg-sidebar\),
+[data-ui-style="liquidglass"] .bg-\(--bg-card\),
+[data-ui-style="liquidglass"] .bg-\(--bg-panel\) {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+[data-ui-style="ios"] .bg-\(--bg-sidebar\),
+[data-ui-style="ios"] .bg-\(--bg-card\),
+[data-ui-style="ios"] .bg-\(--bg-panel\) {
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+}
+
