@@ -38,7 +38,7 @@ const availablePct = computed(() => {
           <span class="font-mono font-bold text-primary">{{ desired }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full rounded-full bg-blue-500" style="width: 100%"></div>
+          <div class="h-full rounded-full bg-(--accent)" style="width: 100%"></div>
         </div>
       </div>
 
@@ -48,7 +48,7 @@ const availablePct = computed(() => {
           <span class="font-mono font-bold text-primary">{{ current }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full rounded-full bg-indigo-500" :style="{ width: currentPct + '%' }"></div>
+          <div class="h-full rounded-full bg-(--accent-hover)" :style="{ width: currentPct + '%' }"></div>
         </div>
       </div>
 

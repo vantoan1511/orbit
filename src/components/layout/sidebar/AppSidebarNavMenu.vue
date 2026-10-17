@@ -3,6 +3,7 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { categoryNavItems, type AppSidebarMenuItem, type CategoryId } from './navigation'
+import { getNavMenuItemClass } from './navigationStyles'
 
 const props = defineProps<{
   activeTab: CategoryId | null
@@ -40,12 +41,7 @@ const isLinkActive = (linkPath: string) => {
       >
         <a
           :href="href"
-          :class="[
-            'flex items-center gap-2.5 px-3 py-1.5 transition-colors text-sm cursor-pointer no-underline select-none my-0.5 mx-2 rounded-md',
-            isLinkActive(item.route as string)
-              ? 'bg-(--bg-active) text-(--text-primary) font-semibold'
-              : 'text-muted-color font-medium hover:bg-(--bg-hover)'
-          ]"
+          :class="getNavMenuItemClass(isLinkActive(item.route as string))"
           @click="navigate"
         >
           <component :is="item.customIcon" class="w-4 h-4 shrink-0" />

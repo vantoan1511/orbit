@@ -77,7 +77,7 @@ const disabledPct = computed(() =>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0"
+            class="w-10 h-10 rounded-lg bg-(--accent-soft) flex items-center justify-center text-(--accent) shrink-0"
           >
             <ShieldAlert class="w-5 h-5" />
           </div>
@@ -88,7 +88,7 @@ const disabledPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ auditCount }}
             </div>
-            <div class="text-[10px] text-blue-400 font-medium mt-0.5 truncate">{{ auditPct }}%</div>
+            <div class="text-[10px] text-(--accent) font-medium mt-0.5 truncate">{{ auditPct }}%</div>
           </div>
         </div>
       </template>

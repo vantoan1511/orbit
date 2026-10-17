@@ -61,9 +61,9 @@ const metrics = computed(() => {
         title: 'Mounted in Pods',
         value: String(mountedCount),
         subtext: `${mountedPct}% of total`,
-        subtextClass: 'text-blue-400 font-medium',
+        subtextClass: 'text-(--accent) font-medium',
         icon: Boxes,
-        iconClass: 'bg-blue-500/10 text-blue-400'
+        iconClass: 'bg-(--accent-soft) text-(--accent)'
       },
       {
         title: 'Orphaned',
@@ -95,9 +95,9 @@ const metrics = computed(() => {
         title: 'Mounted in Pods',
         value: String(mountedCount),
         subtext: `${mountedPct}% of total`,
-        subtextClass: 'text-blue-400 font-medium',
+        subtextClass: 'text-(--accent) font-medium',
         icon: Boxes,
-        iconClass: 'bg-blue-500/10 text-blue-400'
+        iconClass: 'bg-(--accent-soft) text-(--accent)'
       },
       {
         title: 'Orphaned',

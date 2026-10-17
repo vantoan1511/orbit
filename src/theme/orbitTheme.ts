@@ -12,52 +12,59 @@ const NoirPreset: Preset = {
       offset: '2px'
     },
     primary: {
-      50: '{zinc.50}',
-      100: '{zinc.100}',
-      200: '{zinc.200}',
-      300: '{zinc.300}',
-      400: '{zinc.400}',
-      500: '{zinc.500}',
-      600: '{zinc.600}',
-      700: '{zinc.700}',
-      800: '{zinc.800}',
-      900: '{zinc.900}',
-      950: '{zinc.950}'
+      50: '{primary.50}',
+      100: '{primary.100}',
+      200: '{primary.200}',
+      300: '{primary.300}',
+      400: '{primary.400}',
+      500: '{primary.500}',
+      600: '{primary.600}',
+      700: '{primary.700}',
+      800: '{primary.800}',
+      900: '{primary.900}',
+      950: '{primary.950}'
     },
     colorScheme: {
       light: {
         primary: {
-          color: '{zinc.950}',
+          color: '{primary.500}',
           contrastColor: '#ffffff',
           inverseColor: '#ffffff',
-          hoverColor: '{zinc.900}',
-          activeColor: '{zinc.800}'
+          hoverColor: '{primary.600}',
+          activeColor: '{primary.700}'
         },
         highlight: {
-          background: '{zinc.950}',
-          focusBackground: '{zinc.700}',
-          color: '#ffffff',
-          focusColor: '#ffffff'
+          background: 'color-mix(in srgb, {primary.color}, transparent 88%)',
+          focusBackground: 'color-mix(in srgb, {primary.color}, transparent 80%)',
+          color: '{primary.color}',
+          focusColor: '{primary.color}'
         }
       },
       dark: {
         primary: {
-          color: '{slate.50}',
+          color: '{primary.400}',
           contrastColor: '{slate.950}',
           inverseColor: '{slate.950}',
-          hoverColor: '{slate.100}',
-          activeColor: '{slate.200}'
+          hoverColor: '{primary.300}',
+          activeColor: '{primary.200}'
         },
         highlight: {
-          background: 'rgba(250, 250, 250, .16)',
-          focusBackground: 'rgba(250, 250, 250, .24)',
-          color: 'rgba(255,255,255,.87)',
-          focusColor: 'rgba(255,255,255,.87)'
+          background: 'color-mix(in srgb, {primary.color}, transparent 86%)',
+          focusBackground: 'color-mix(in srgb, {primary.color}, transparent 78%)',
+          color: '{primary.color}',
+          focusColor: '{primary.color}'
         }
       }
     }
   },
   components: {
+    card: {
+      root: {
+        background: 'var(--bg-card)',
+        borderRadius: 'var(--ui-radius-card)',
+        shadow: 'var(--ui-card-shadow, none)'
+      }
+    },
     contextmenu: {
       item: {
         focusBackground: 'transparent',
@@ -305,7 +312,7 @@ const NoirPreset: Preset = {
     },
     dialog: {
       root: {
-        borderRadius: '{content.border.radius}'
+        borderRadius: 'var(--ui-radius-card)'
       },
       header: {
         padding: '1rem 1.25rem 0.75rem 1.25rem',

@@ -117,13 +117,13 @@ const cardItems = computed(() => [
     value: totals.value.currentReplicas,
     totalValue: totals.value.desiredReplicas,
     icon: Server,
-    iconClass: 'text-blue-400 bg-blue-500/10',
+    iconClass: 'text-(--accent) bg-(--accent-soft)',
     valueClass: 'text-primary',
     type: 'progress',
     percentValue: Math.round(
       (totals.value.currentReplicas / (totals.value.desiredReplicas || 1)) * 100
     ),
-    progressClass: 'bg-blue-500',
+    progressClass: 'bg-(--accent)',
     footerText: 'desired'
   },
   {
