@@ -56,15 +56,17 @@ test('AppTitleBar component integrates centered Search Everywhere bar', () => {
   assert.ok(content.includes('Search everywhere...'), 'Search bar must render placeholder label')
 })
 
-test('AppHeader component does not retain legacy search everywhere button', () => {
+test('AppHeader component is retired and replaced by AppBreadcrumbs in AppFooter', () => {
   const headerPath = path.resolve(process.cwd(), 'src/components/layout/AppHeader.vue')
-  const content = fs.readFileSync(headerPath, 'utf-8')
+  assert.ok(!fs.existsSync(headerPath), 'AppHeader.vue must be deleted/retired')
+})
 
-  assert.ok(!content.includes('useSearchStore'), 'AppHeader must not import useSearchStore')
-  assert.ok(
-    !content.includes('Search everywhere...'),
-    'AppHeader must not retain legacy search button'
-  )
+test('AppLayout component does not mount retired AppHeader and mounts AppTabBar flush with content', () => {
+  const layoutPath = path.resolve(process.cwd(), 'src/components/layout/AppLayout.vue')
+  const content = fs.readFileSync(layoutPath, 'utf-8')
+
+  assert.ok(!content.includes('AppHeader'), 'AppLayout must not import or mount AppHeader')
+  assert.ok(content.includes('AppTabBar'), 'AppLayout must mount AppTabBar')
 })
 
 test('AppTitleBar component removes Orbit logo and brand label', () => {
