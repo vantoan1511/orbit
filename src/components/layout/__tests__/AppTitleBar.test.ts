@@ -28,11 +28,12 @@ test('AppLayout integrates AppTitleBar at root of window layout', () => {
   assert.ok(content.includes('AppTitleBar'), 'AppLayout must mount AppTitleBar')
 })
 
-test('AppTitleBar component integrates centered Search Everywhere bar', () => {
+test('AppTitleBar component integrates centered Search Everywhere bar without inline shortcut hint', () => {
   const filePath = path.resolve(process.cwd(), 'src/components/layout/AppTitleBar.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
   assert.ok(content.includes('useSearchStore'), 'AppTitleBar must import useSearchStore')
+  assert.ok(content.includes('useShortcutStore'), 'AppTitleBar must import useShortcutStore')
   assert.ok(
     content.includes('searchStore.open()'),
     'AppTitleBar must trigger searchStore.open() on click'
@@ -54,6 +55,16 @@ test('AppTitleBar component integrates centered Search Everywhere bar', () => {
     'Double click on search bar must stop propagation to prevent maximize toggle'
   )
   assert.ok(content.includes('Search everywhere...'), 'Search bar must render placeholder label')
+  assert.ok(content.includes('justify-start'), 'Search bar button must use justify-start alignment')
+  assert.ok(!content.includes('<kbd'), 'Search bar must not contain inline <kbd> shortcut badge')
+  assert.ok(
+    !content.includes('Ctrl+Shift+P'),
+    'Search bar must not hardcode legacy Ctrl+Shift+P shortcut'
+  )
+  assert.ok(
+    content.includes('v-tooltip.bottom="searchTooltip"'),
+    'Search bar must bind tooltip to dynamic searchTooltip computed property'
+  )
 })
 
 test('AppHeader component is retired and replaced by AppBreadcrumbs in AppFooter', () => {
