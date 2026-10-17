@@ -10,6 +10,7 @@ import {
   Terminal as TerminalIcon,
   X
 } from '@lucide/vue'
+import { getTerminalPanelTransitionClass } from '@/utils/terminalHelpers'
 import Button from 'primevue/button'
 import { computed, ref, watch } from 'vue'
 import TerminalTab from './TerminalTab.vue'
@@ -94,7 +95,8 @@ function handleToggleMaximize() {
 <template>
   <div
     v-if="terminalStore.isOpen"
-    class="flex flex-col bg-(--bg-app) border-t border-(--border) relative shrink-0 z-30 transition-all select-none"
+    class="flex flex-col bg-(--bg-app) border-t border-(--border) relative shrink-0 z-30 select-none"
+    :class="getTerminalPanelTransitionClass(isDragging)"
     :style="{ height: displayHeight }"
   >
     <!-- Resize Handle -->
