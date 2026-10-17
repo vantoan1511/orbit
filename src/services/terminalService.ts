@@ -4,8 +4,13 @@ export const terminalService = {
   /**
    * Request to open a local system shell terminal session.
    */
-  async openLocalTerminal(sessionId: string, shell?: string): Promise<void> {
-    await coreEngine.dispatch('openLocalTerminal', { sessionId, shell })
+  async openLocalTerminal(
+    sessionId: string,
+    shell?: string,
+    cols?: number,
+    rows?: number
+  ): Promise<void> {
+    await coreEngine.dispatch('openLocalTerminal', { sessionId, shell, cols, rows })
   },
 
   /**
@@ -15,13 +20,17 @@ export const terminalService = {
     sessionId: string,
     namespace: string,
     pod: string,
-    container?: string
+    container?: string,
+    cols?: number,
+    rows?: number
   ): Promise<void> {
     await coreEngine.dispatch('openPodTerminal', {
       sessionId,
       namespace,
       pod,
-      container
+      container,
+      cols,
+      rows
     })
   },
 

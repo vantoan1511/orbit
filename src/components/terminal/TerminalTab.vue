@@ -5,6 +5,7 @@ import { terminalService } from '@/services/terminalService'
 import { useTerminalStore } from '@/stores/terminalStore'
 import { OrbitEvents } from '@/types/events'
 import type { TerminalSession } from '@/types/terminal'
+import { shouldDispatchTerminalResize, type TerminalDimensions } from '@/utils/terminalHelpers'
 import { FitAddon } from '@xterm/addon-fit'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
@@ -22,6 +23,8 @@ const terminalContainer = ref<HTMLDivElement | null>(null)
 let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
+let resizeTimeout: ReturnType<typeof setTimeout> | null = null
+let lastDispatchedDims: TerminalDimensions | null = null
 
 function getTerminalTheme() {
   const computedStyle = getComputedStyle(document.documentElement)
@@ -55,12 +58,31 @@ const handleTerminalClosed = (payload: { sessionId: string; exitCode?: number })
   }
 }
 
-function handleResize() {
+function handleResize(immediate = false) {
   if (!fitAddon || !term || !props.isActive) return
   try {
     fitAddon.fit()
-    if (term.cols && term.rows) {
-      terminalService.resize(props.session.id, term.cols, term.rows)
+    const newDims: TerminalDimensions = { cols: term.cols, rows: term.rows }
+    if (shouldDispatchTerminalResize(newDims, lastDispatchedDims)) {
+      if (resizeTimeout) {
+        clearTimeout(resizeTimeout)
+        resizeTimeout = null
+      }
+
+      const applyResize = () => {
+        if (!term) return
+        const currentDims: TerminalDimensions = { cols: term.cols, rows: term.rows }
+        if (shouldDispatchTerminalResize(currentDims, lastDispatchedDims)) {
+          lastDispatchedDims = currentDims
+          terminalService.resize(props.session.id, currentDims.cols, currentDims.rows)
+        }
+      }
+
+      if (immediate) {
+        applyResize()
+      } else {
+        resizeTimeout = setTimeout(applyResize, 80)
+      }
     }
   } catch {
     // Ignore fit errors if container is hidden or 0x0
@@ -92,20 +114,32 @@ onMounted(async () => {
   events.on(OrbitEvents.TerminalData, handleTerminalData)
   events.on(OrbitEvents.TerminalClosed, handleTerminalClosed)
 
-  // Start the session on backend
+  const initialDims = fitAddon.proposeDimensions()
+  if (initialDims && initialDims.cols > 0 && initialDims.rows > 0) {
+    lastDispatchedDims = { cols: initialDims.cols, rows: initialDims.rows }
+  }
+
+  // Start the session on backend with measured container dimensions
   if (props.session.type === 'pod') {
     await terminalService.openPodTerminal(
       props.session.id,
       props.session.namespace || 'default',
       props.session.pod || '',
-      props.session.container
+      props.session.container,
+      initialDims?.cols,
+      initialDims?.rows
     )
   } else {
-    await terminalService.openLocalTerminal(props.session.id)
+    await terminalService.openLocalTerminal(
+      props.session.id,
+      undefined,
+      initialDims?.cols,
+      initialDims?.rows
+    )
   }
 
   await nextTick()
-  handleResize()
+  handleResize(true)
   if (props.isActive) {
     term.focus()
   }
@@ -121,7 +155,7 @@ watch(
   (active) => {
     if (active) {
       nextTick(() => {
-        handleResize()
+        handleResize(true)
         term?.focus()
       })
     }
@@ -137,6 +171,12 @@ watch(isDark, () => {
 })
 
 onUnmounted(() => {
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout)
+    resizeTimeout = null
+  }
+  lastDispatchedDims = null
+
   if (resizeObserver && terminalContainer.value) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -157,8 +197,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    ref="terminalContainer"
-    class="w-full h-full bg-(--bg-app) overflow-hidden p-2 font-mono text-xs"
-  />
+  <div class="w-full h-full bg-(--bg-app) overflow-hidden p-2 font-mono text-xs">
+    <div ref="terminalContainer" class="w-full h-full overflow-hidden" />
+  </div>
 </template>

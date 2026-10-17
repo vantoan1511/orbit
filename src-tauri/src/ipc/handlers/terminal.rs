@@ -17,6 +17,8 @@ pub struct OpenPodTerminalRequest {
     pub namespace: String,
     pub pod: String,
     pub container: Option<String>,
+    pub cols: Option<u16>,
+    pub rows: Option<u16>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -24,6 +26,8 @@ pub struct OpenPodTerminalRequest {
 pub struct OpenLocalTerminalRequest {
     pub session_id: String,
     pub shell: Option<String>,
+    pub cols: Option<u16>,
+    pub rows: Option<u16>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -61,6 +65,7 @@ pub enum TerminalSender {
 pub struct TerminalSession {
     pub sender: TerminalSender,
     pub cancel_tx: Option<tokio::sync::oneshot::Sender<()>>,
+    pub last_size: Arc<std::sync::Mutex<PtySize>>,
 }
 
 #[derive(Debug, Clone)]
@@ -314,13 +319,15 @@ pub fn open_local_terminal(
             None => return,
         };
 
-        let pty_system = native_pty_system();
-        let pair = match pty_system.openpty(PtySize {
-            rows: 24,
-            cols: 80,
+        let initial_size = PtySize {
+            rows: req.rows.unwrap_or(24),
+            cols: req.cols.unwrap_or(80),
             pixel_width: 0,
             pixel_height: 0,
-        }) {
+        };
+
+        let pty_system = native_pty_system();
+        let pair = match pty_system.openpty(initial_size) {
             Ok(p) => p,
             Err(e) => {
                 let _ = Bridge::send_event(
@@ -397,6 +404,7 @@ pub fn open_local_terminal(
                         child: child_arc.clone(),
                     },
                     cancel_tx: Some(cancel_tx),
+                    last_size: Arc::new(std::sync::Mutex::new(initial_size)),
                 },
             );
         }
@@ -559,6 +567,13 @@ pub fn open_pod_terminal(
             },
         };
 
+        let initial_size = PtySize {
+            rows: req.rows.unwrap_or(24),
+            cols: req.cols.unwrap_or(80),
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+
         let (stdin_tx, mut stdin_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
         let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel::<()>();
 
@@ -569,6 +584,7 @@ pub fn open_pod_terminal(
                 TerminalSession {
                     sender: TerminalSender::Pod { stdin_tx },
                     cancel_tx: Some(cancel_tx),
+                    last_size: Arc::new(std::sync::Mutex::new(initial_size)),
                 },
             );
         }
@@ -709,14 +725,23 @@ pub fn resize_terminal(data: Option<Value>) {
         let sessions = get_sessions().read().await;
         if let Some(session) = sessions.get(&req.session_id)
             && let TerminalSender::Local { master, .. } = &session.sender
-            && let Ok(m) = master.lock()
         {
-            let _ = m.resize(PtySize {
-                rows: req.rows,
-                cols: req.cols,
-                pixel_width: 0,
-                pixel_height: 0,
-            });
+            if let Ok(mut last) = session.last_size.lock() {
+                if last.cols == req.cols && last.rows == req.rows {
+                    return; // Skip duplicate resize to prevent redundant ConPTY reflow
+                }
+                last.cols = req.cols;
+                last.rows = req.rows;
+            }
+
+            if let Ok(m) = master.lock() {
+                let _ = m.resize(PtySize {
+                    rows: req.rows,
+                    cols: req.cols,
+                    pixel_width: 0,
+                    pixel_height: 0,
+                });
+            }
         }
     });
 }
@@ -790,6 +815,26 @@ mod tests {
         assert_eq!(req.namespace, "default");
         assert_eq!(req.pod, "web-pod-1");
         assert_eq!(req.container, Some("nginx".to_string()));
+        assert_eq!(req.cols, None);
+        assert_eq!(req.rows, None);
+    }
+
+    #[test]
+    fn test_deserialize_open_pod_terminal_request_with_dimensions() {
+        let val = json!({
+            "sessionId": "term-123",
+            "namespace": "default",
+            "pod": "web-pod-1",
+            "container": "nginx",
+            "cols": 120,
+            "rows": 35
+        });
+        let req: Result<OpenPodTerminalRequest, _> = serde_json::from_value(val);
+        assert!(req.is_ok());
+        let req = req.unwrap();
+        assert_eq!(req.session_id, "term-123");
+        assert_eq!(req.cols, Some(120));
+        assert_eq!(req.rows, Some(35));
     }
 
     #[test]
@@ -803,6 +848,24 @@ mod tests {
         let req = req.unwrap();
         assert_eq!(req.session_id, "term-local-1");
         assert_eq!(req.shell, Some("powershell.exe".to_string()));
+        assert_eq!(req.cols, None);
+        assert_eq!(req.rows, None);
+    }
+
+    #[test]
+    fn test_deserialize_open_local_terminal_request_with_dimensions() {
+        let val = json!({
+            "sessionId": "term-local-1",
+            "shell": "powershell.exe",
+            "cols": 100,
+            "rows": 30
+        });
+        let req: Result<OpenLocalTerminalRequest, _> = serde_json::from_value(val);
+        assert!(req.is_ok());
+        let req = req.unwrap();
+        assert_eq!(req.session_id, "term-local-1");
+        assert_eq!(req.cols, Some(100));
+        assert_eq!(req.rows, Some(30));
     }
 
     #[test]

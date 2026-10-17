@@ -18,7 +18,17 @@ test('terminalService dispatches openLocalTerminal with correct payload', async 
     assert.equal(dispatchedEvent, 'openLocalTerminal')
     assert.deepEqual(dispatchedData, {
       sessionId: 'session-abc',
-      shell: 'bash'
+      shell: 'bash',
+      cols: undefined,
+      rows: undefined
+    })
+
+    await terminalService.openLocalTerminal('session-abc', 'pwsh', 120, 35)
+    assert.deepEqual(dispatchedData, {
+      sessionId: 'session-abc',
+      shell: 'pwsh',
+      cols: 120,
+      rows: 35
     })
   } finally {
     coreEngine.dispatch = originalDispatch
@@ -42,7 +52,19 @@ test('terminalService dispatches openPodTerminal with correct payload', async ()
       sessionId: 'session-123',
       namespace: 'default',
       pod: 'nginx-pod',
-      container: 'nginx'
+      container: 'nginx',
+      cols: undefined,
+      rows: undefined
+    })
+
+    await terminalService.openPodTerminal('session-123', 'default', 'nginx-pod', 'nginx', 140, 42)
+    assert.deepEqual(dispatchedData, {
+      sessionId: 'session-123',
+      namespace: 'default',
+      pod: 'nginx-pod',
+      container: 'nginx',
+      cols: 140,
+      rows: 42
     })
   } finally {
     coreEngine.dispatch = originalDispatch
