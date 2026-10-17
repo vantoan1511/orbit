@@ -2,6 +2,7 @@
 import { useCluster } from '@/composables/useCluster'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useSearchStore } from '@/stores/searchStore'
+import { useShortcutStore } from '@/stores/shortcutStore'
 import { useWindowControls } from '@/composables/useWindowControls'
 import { detectCloudProvider } from '@/utils/cloudProvider'
 import { Clock, Cloud, Search } from '@lucide/vue'
@@ -12,13 +13,14 @@ import WindowControls from './WindowControls.vue'
 
 const { toggleMaximize } = useWindowControls()
 const searchStore = useSearchStore()
+const shortcutStore = useShortcutStore()
 const kubernetesStore = useKubernetesStore()
 const { activeCluster } = useCluster()
 
-const isMac =
-  typeof navigator !== 'undefined' &&
-  navigator.platform &&
-  navigator.platform.toUpperCase().indexOf('MAC') >= 0
+const searchTooltip = computed(() => {
+  const shortcut = shortcutStore.getDisplayShortcut('quickOpen')
+  return shortcut ? `Search everywhere (${shortcut})` : 'Search everywhere'
+})
 
 const kubernetesVersion = computed(() => {
   return kubernetesStore.nodes[0]?.version || 'Unknown'
@@ -110,8 +112,8 @@ const clusterTooltip = computed(() => {
         severity="secondary"
         variant="outlined"
         size="small"
-        class="group flex items-center justify-between gap-2 h-6 w-56 sm:w-64 md:w-80 px-2 text-xs text-muted-color bg-(--bg-hover)/40! dark:bg-(--bg-hover)/30! border-(--border)! hover:bg-(--bg-hover)/80! hover:border-(--border-strong)! hover:text-primary! active:bg-(--bg-active)! rounded-md font-normal cursor-pointer transition-all duration-150"
-        v-tooltip.bottom="isMac ? 'Search everywhere (⌘⇧P)' : 'Search everywhere (Ctrl+Shift+P)'"
+        class="group flex items-center justify-start gap-2 h-6 w-56 sm:w-64 md:w-80 px-2 text-xs text-muted-color bg-(--bg-hover)/40! dark:bg-(--bg-hover)/30! border-(--border)! hover:bg-(--bg-hover)/80! hover:border-(--border-strong)! hover:text-primary! active:bg-(--bg-active)! rounded-md font-normal cursor-pointer transition-all duration-150"
+        v-tooltip.bottom="searchTooltip"
         @click.stop="searchStore.open()"
         @dblclick.stop
       >
@@ -125,11 +127,6 @@ const clusterTooltip = computed(() => {
             Search everywhere...
           </span>
         </div>
-        <kbd
-          class="hidden md:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium leading-none text-muted-color bg-(--bg-card) dark:bg-(--bg-card) border border-(--border) rounded group-hover:border-(--border-strong) group-hover:text-primary transition-colors shrink-0"
-        >
-          {{ isMac ? '⌘⇧P' : 'Ctrl+Shift+P' }}
-        </kbd>
       </Button>
     </div>
 
