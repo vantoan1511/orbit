@@ -48,7 +48,10 @@ const availablePct = computed(() => {
           <span class="font-mono font-bold text-primary">{{ current }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full rounded-full bg-(--accent-hover)" :style="{ width: currentPct + '%' }"></div>
+          <div
+            class="h-full rounded-full bg-(--accent-hover)"
+            :style="{ width: currentPct + '%' }"
+          ></div>
         </div>
       </div>
 

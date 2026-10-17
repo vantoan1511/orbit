@@ -170,3 +170,59 @@ test('syncAppearanceFromSettings updates appearance from backend Configuration a
   assert.equal(accentColor.value, 'cyan')
   assert.equal(uiStyle.value, 'aero')
 })
+
+test('useAppearance provides semanticColors and updates preset and individual roles', async () => {
+  const originalSave = appearanceService.saveAppearancePreferences
+  let savedColors: unknown = null
+
+  appearanceService.saveAppearancePreferences = async (p) => {
+    savedColors = p.semanticColors
+  }
+
+  try {
+    const { semanticColors, setSemanticPreset, setSemanticColorRole } = useAppearance()
+
+    assert.ok(semanticColors.value)
+    assert.equal(semanticColors.value.preset, 'default')
+
+    await setSemanticPreset('colorblind')
+    assert.equal(semanticColors.value.preset, 'colorblind')
+    assert.equal(semanticColors.value.success, 'teal')
+    assert.equal(semanticColors.value.danger, 'crimson')
+    assert.ok(savedColors)
+
+    await setSemanticColorRole('success', 'mint')
+    assert.equal(semanticColors.value.preset, 'custom')
+    assert.equal(semanticColors.value.success, 'mint')
+  } finally {
+    appearanceService.saveAppearancePreferences = originalSave
+  }
+})
+
+test('syncAppearanceFromSettings updates semanticColors from backend Configuration', async () => {
+  const { syncAppearanceFromSettings, useAppearance } = await import('../useAppearance.ts')
+  const { semanticColors } = useAppearance()
+
+  syncAppearanceFromSettings([
+    {
+      key: 'semanticColors',
+      name: 'Semantic Colors',
+      description: '',
+      datatype: 'string',
+      value: {
+        preset: 'high-contrast',
+        success: 'forest',
+        warning: 'orange',
+        danger: 'ruby',
+        info: 'indigo'
+      },
+      isConfidential: false,
+      cardinality: '0..1',
+      enable: true
+    }
+  ])
+
+  assert.equal(semanticColors.value.preset, 'high-contrast')
+  assert.equal(semanticColors.value.success, 'forest')
+  assert.equal(semanticColors.value.danger, 'ruby')
+})

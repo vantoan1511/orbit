@@ -14,7 +14,8 @@ export const CONFIG_KEYS = {
   KEYBOARD_SHORTCUTS: 'keyboardShortcuts',
   THEME_MODE: 'themeMode',
   ACCENT_COLOR: 'accentColor',
-  UI_STYLE: 'uiStyle'
+  UI_STYLE: 'uiStyle',
+  SEMANTIC_COLORS: 'semanticColors'
 } as const
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
@@ -27,7 +28,8 @@ export const SPECIALIZED_CONFIG_KEYS: readonly string[] = [
   CONFIG_KEYS.KEYBOARD_SHORTCUTS,
   CONFIG_KEYS.THEME_MODE,
   CONFIG_KEYS.ACCENT_COLOR,
-  CONFIG_KEYS.UI_STYLE
+  CONFIG_KEYS.UI_STYLE,
+  CONFIG_KEYS.SEMANTIC_COLORS
 ] as const
 
 export function isGeneralConfigKey(key: string): boolean {

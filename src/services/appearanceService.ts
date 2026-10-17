@@ -5,11 +5,15 @@ import { CONFIG_KEYS } from '../types/settings.ts'
 import { DEFAULT_STORAGE_TIMEOUT_MS, withTimeout } from '../utils/async.ts'
 import {
   DEFAULT_APPEARANCE_PREFERENCES,
+  DEFAULT_SEMANTIC_COLORS_PREFERENCES,
   type AccentColor,
   type AppearancePreferences,
+  type SemanticColorsPreferences,
+  type SemanticPresetId,
   type ThemeMode,
   type UiStyle
 } from '../types/appearance.ts'
+import { SEMANTIC_ROLE_OPTIONS } from '../utils/appearanceConstants.ts'
 
 export const APPEARANCE_STORAGE_KEY = 'orbit_appearance_preferences'
 export const STORAGE_TIMEOUT_MS = DEFAULT_STORAGE_TIMEOUT_MS
@@ -25,6 +29,49 @@ const VALID_ACCENT_COLORS: readonly AccentColor[] = [
   'slate'
 ]
 const VALID_UI_STYLES: readonly UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios']
+const VALID_SEMANTIC_PRESETS: readonly SemanticPresetId[] = [
+  'default',
+  'colorblind',
+  'high-contrast',
+  'custom'
+]
+
+function sanitizeSemanticColors(raw: unknown): SemanticColorsPreferences {
+  if (!raw || typeof raw !== 'object') {
+    return { ...DEFAULT_SEMANTIC_COLORS_PREFERENCES }
+  }
+
+  const obj = raw as Record<string, unknown>
+  const preset: SemanticPresetId =
+    typeof obj.preset === 'string' &&
+    VALID_SEMANTIC_PRESETS.includes(obj.preset as SemanticPresetId)
+      ? (obj.preset as SemanticPresetId)
+      : DEFAULT_SEMANTIC_COLORS_PREFERENCES.preset
+
+  const validSuccess = SEMANTIC_ROLE_OPTIONS.success.map((o) => o.id)
+  const validWarning = SEMANTIC_ROLE_OPTIONS.warning.map((o) => o.id)
+  const validDanger = SEMANTIC_ROLE_OPTIONS.danger.map((o) => o.id)
+  const validInfo = SEMANTIC_ROLE_OPTIONS.info.map((o) => o.id)
+
+  const success =
+    typeof obj.success === 'string' && (validSuccess as readonly string[]).includes(obj.success)
+      ? obj.success
+      : DEFAULT_SEMANTIC_COLORS_PREFERENCES.success
+  const warning =
+    typeof obj.warning === 'string' && (validWarning as readonly string[]).includes(obj.warning)
+      ? obj.warning
+      : DEFAULT_SEMANTIC_COLORS_PREFERENCES.warning
+  const danger =
+    typeof obj.danger === 'string' && (validDanger as readonly string[]).includes(obj.danger)
+      ? obj.danger
+      : DEFAULT_SEMANTIC_COLORS_PREFERENCES.danger
+  const info =
+    typeof obj.info === 'string' && (validInfo as readonly string[]).includes(obj.info)
+      ? obj.info
+      : DEFAULT_SEMANTIC_COLORS_PREFERENCES.info
+
+  return { preset, success, warning, danger, info }
+}
 
 function sanitizePreferences(raw: unknown): AppearancePreferences {
   if (!raw || typeof raw !== 'object') {
@@ -50,7 +97,9 @@ function sanitizePreferences(raw: unknown): AppearancePreferences {
       ? (obj.uiStyle as UiStyle)
       : DEFAULT_APPEARANCE_PREFERENCES.uiStyle
 
-  return { themeMode, accentColor, uiStyle }
+  const semanticColors = sanitizeSemanticColors(obj.semanticColors)
+
+  return { themeMode, accentColor, uiStyle, semanticColors }
 }
 
 export const appearanceService = {
@@ -66,7 +115,8 @@ export const appearanceService = {
       if (
         customValues.themeMode !== undefined ||
         customValues.accentColor !== undefined ||
-        customValues.uiStyle !== undefined
+        customValues.uiStyle !== undefined ||
+        customValues.semanticColors !== undefined
       ) {
         return sanitized
       }
@@ -112,7 +162,8 @@ export const appearanceService = {
           await appSettingsService.updateAppSettings({
             [CONFIG_KEYS.THEME_MODE]: sanitized.themeMode,
             [CONFIG_KEYS.ACCENT_COLOR]: sanitized.accentColor,
-            [CONFIG_KEYS.UI_STYLE]: sanitized.uiStyle
+            [CONFIG_KEYS.UI_STYLE]: sanitized.uiStyle,
+            [CONFIG_KEYS.SEMANTIC_COLORS]: sanitized.semanticColors
           })
           return sanitized
         } catch (parseErr) {
@@ -138,7 +189,8 @@ export const appearanceService = {
       await appSettingsService.updateAppSettings({
         [CONFIG_KEYS.THEME_MODE]: sanitized.themeMode,
         [CONFIG_KEYS.ACCENT_COLOR]: sanitized.accentColor,
-        [CONFIG_KEYS.UI_STYLE]: sanitized.uiStyle
+        [CONFIG_KEYS.UI_STYLE]: sanitized.uiStyle,
+        [CONFIG_KEYS.SEMANTIC_COLORS]: sanitized.semanticColors
       })
 
       await storage.setData(APPEARANCE_STORAGE_KEY, JSON.stringify(sanitized))
@@ -164,7 +216,8 @@ export const appearanceService = {
       await appSettingsService.updateAppSettings({
         [CONFIG_KEYS.THEME_MODE]: DEFAULT_APPEARANCE_PREFERENCES.themeMode,
         [CONFIG_KEYS.ACCENT_COLOR]: DEFAULT_APPEARANCE_PREFERENCES.accentColor,
-        [CONFIG_KEYS.UI_STYLE]: DEFAULT_APPEARANCE_PREFERENCES.uiStyle
+        [CONFIG_KEYS.UI_STYLE]: DEFAULT_APPEARANCE_PREFERENCES.uiStyle,
+        [CONFIG_KEYS.SEMANTIC_COLORS]: DEFAULT_APPEARANCE_PREFERENCES.semanticColors
       })
       await storage.removeData(APPEARANCE_STORAGE_KEY)
     } catch (e) {

@@ -123,3 +123,82 @@ test('syncAppearanceToDom handles missing target element gracefully without erro
     syncAppearanceToDom(options, null)
   })
 })
+
+test('syncAppearanceToDom injects semantic CSS custom variables onto root element', () => {
+  const styleProperties: Record<string, string> = {}
+  const mockTarget = {
+    classList: {
+      toggle() {},
+      contains() {
+        return false
+      }
+    },
+    setAttribute() {},
+    style: {
+      setProperty(name: string, value: string) {
+        styleProperties[name] = value
+      },
+      getPropertyValue(name: string) {
+        return styleProperties[name] || ''
+      }
+    }
+  }
+
+  const options: AppearanceDomSyncOptions = {
+    themeMode: 'light',
+    resolvedTheme: 'light',
+    accentColor: 'blue',
+    uiStyle: 'flat'
+  }
+
+  syncAppearanceToDom(options, mockTarget as unknown as HTMLElement)
+
+  assert.ok(styleProperties['--success'], 'should set --success')
+  assert.ok(styleProperties['--success-soft'], 'should set --success-soft')
+  assert.ok(styleProperties['--warning'], 'should set --warning')
+  assert.ok(styleProperties['--warning-soft'], 'should set --warning-soft')
+  assert.ok(styleProperties['--danger'], 'should set --danger')
+  assert.ok(styleProperties['--danger-soft'], 'should set --danger-soft')
+  assert.ok(styleProperties['--info'], 'should set --info')
+  assert.ok(styleProperties['--info-soft'], 'should set --info-soft')
+})
+
+test('syncAppearanceToDom updates semantic CSS variables when custom semanticColors are passed', () => {
+  const styleProperties: Record<string, string> = {}
+  const mockTarget = {
+    classList: {
+      toggle() {},
+      contains() {
+        return false
+      }
+    },
+    setAttribute() {},
+    style: {
+      setProperty(name: string, value: string) {
+        styleProperties[name] = value
+      },
+      getPropertyValue(name: string) {
+        return styleProperties[name] || ''
+      }
+    }
+  }
+
+  const options: AppearanceDomSyncOptions = {
+    themeMode: 'light',
+    resolvedTheme: 'light',
+    accentColor: 'blue',
+    uiStyle: 'flat',
+    semanticColors: {
+      preset: 'colorblind',
+      success: 'teal',
+      warning: 'amber',
+      danger: 'crimson',
+      info: 'sky'
+    }
+  }
+
+  syncAppearanceToDom(options, mockTarget as unknown as HTMLElement)
+
+  assert.equal(styleProperties['--success'], '#0f766e')
+  assert.equal(styleProperties['--danger'], '#dc2626')
+})

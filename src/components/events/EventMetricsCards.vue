@@ -152,7 +152,9 @@ const otherPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ otherCount }}
             </div>
-            <div class="text-[10px] text-(--accent) font-medium mt-0.5 truncate">{{ otherPct }}%</div>
+            <div class="text-[10px] text-(--accent) font-medium mt-0.5 truncate">
+              {{ otherPct }}%
+            </div>
           </div>
         </div>
       </template>

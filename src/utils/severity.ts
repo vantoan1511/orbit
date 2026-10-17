@@ -5,7 +5,7 @@ import {
   KUBERNETES_POD_STATUS,
   KUBERNETES_RESOURCE_KIND,
   KUBERNETES_SERVICE_TYPE
-} from '@/constants/kubernetes'
+} from '../constants/kubernetes.ts'
 
 export type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'
 
@@ -69,14 +69,14 @@ export function getPodStatusBadgeClass(status?: string): string {
     case KUBERNETES_POD_STATUS.Running:
     case KUBERNETES_POD_STATUS.Completed:
     case KUBERNETES_POD_STATUS.Succeeded:
-      return 'bg-emerald-500'
+      return 'bg-(--success)'
     case KUBERNETES_POD_STATUS.Pending:
     case KUBERNETES_POD_STATUS.ContainerCreating:
-      return 'bg-amber-500'
+      return 'bg-(--warning)'
     case KUBERNETES_POD_STATUS.CrashLoopBackOff:
     case KUBERNETES_POD_STATUS.Error:
     case KUBERNETES_POD_STATUS.Failed:
-      return 'bg-rose-500'
+      return 'bg-(--danger)'
     default:
       return 'bg-muted-color'
   }
@@ -88,11 +88,11 @@ export function getPodStatusBadgeClass(status?: string): string {
 export function getNodeStatusBadgeClass(status?: string): string {
   switch (status) {
     case KUBERNETES_NODE_STATUS.Ready:
-      return 'bg-emerald-500'
+      return 'bg-(--success)'
     case KUBERNETES_NODE_STATUS.NotReady:
-      return 'bg-rose-500'
+      return 'bg-(--danger)'
     default:
-      return 'bg-amber-500'
+      return 'bg-(--warning)'
   }
 }
 
@@ -102,9 +102,9 @@ export function getNodeStatusBadgeClass(status?: string): string {
 export function getNamespaceStatusBadgeClass(status?: string): string {
   switch (status) {
     case KUBERNETES_NAMESPACE_STATUS.Active:
-      return 'bg-emerald-500'
+      return 'bg-(--success)'
     case KUBERNETES_NAMESPACE_STATUS.Terminating:
-      return 'bg-amber-500'
+      return 'bg-(--warning)'
     default:
       return 'bg-gray-400'
   }

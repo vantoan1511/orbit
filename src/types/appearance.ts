@@ -26,14 +26,48 @@ export interface UiStyleDefinition {
   badge?: string
 }
 
+export type SemanticColorRole = 'success' | 'warning' | 'danger' | 'info'
+
+export type SemanticPresetId = 'default' | 'colorblind' | 'high-contrast' | 'custom'
+
+export interface SemanticColorShade {
+  solid: string
+  soft: string
+}
+
+export interface SemanticColorOption {
+  id: string
+  name: string
+  light: SemanticColorShade
+  dark: SemanticColorShade
+}
+
+export interface SemanticColorsPreferences {
+  preset: SemanticPresetId
+  success: string
+  warning: string
+  danger: string
+  info: string
+}
+
+export const DEFAULT_SEMANTIC_COLORS_PREFERENCES: SemanticColorsPreferences = {
+  preset: 'default',
+  success: 'emerald',
+  warning: 'amber',
+  danger: 'rose',
+  info: 'blue'
+}
+
 export interface AppearancePreferences {
   themeMode: ThemeMode
   accentColor: AccentColor
   uiStyle: UiStyle
+  semanticColors?: SemanticColorsPreferences
 }
 
 export const DEFAULT_APPEARANCE_PREFERENCES: AppearancePreferences = {
   themeMode: 'system',
   accentColor: 'blue',
-  uiStyle: 'flat'
+  uiStyle: 'flat',
+  semanticColors: { ...DEFAULT_SEMANTIC_COLORS_PREFERENCES }
 }

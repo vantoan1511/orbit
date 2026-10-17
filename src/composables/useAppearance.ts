@@ -3,12 +3,16 @@ import { appearanceService } from '../services/appearanceService.ts'
 import { CONFIG_KEYS, type Configuration } from '../types/settings.ts'
 import {
   DEFAULT_APPEARANCE_PREFERENCES,
+  DEFAULT_SEMANTIC_COLORS_PREFERENCES,
   type AccentColor,
   type AppearancePreferences,
+  type SemanticColorRole,
+  type SemanticColorsPreferences,
+  type SemanticPresetId,
   type ThemeMode,
   type UiStyle
 } from '../types/appearance.ts'
-import { getAccentPalette } from '../utils/appearanceConstants.ts'
+import { SEMANTIC_COLOR_PRESETS } from '../utils/appearanceConstants.ts'
 import { syncAppearanceToDom } from '../utils/appearanceTheme.ts'
 
 const mediaQuery =
@@ -37,13 +41,17 @@ const isDark = computed<boolean>(() => resolvedTheme.value === 'dark')
 const themeMode = computed<ThemeMode>(() => preferences.value.themeMode)
 const accentColor = computed<AccentColor>(() => preferences.value.accentColor)
 const uiStyle = computed<UiStyle>(() => preferences.value.uiStyle)
+const semanticColors = computed<SemanticColorsPreferences>(
+  () => preferences.value.semanticColors ?? DEFAULT_SEMANTIC_COLORS_PREFERENCES
+)
 
 export function applyAppearanceToDom(): void {
   syncAppearanceToDom({
     themeMode: preferences.value.themeMode,
     resolvedTheme: resolvedTheme.value,
     accentColor: preferences.value.accentColor,
-    uiStyle: preferences.value.uiStyle
+    uiStyle: preferences.value.uiStyle,
+    semanticColors: preferences.value.semanticColors
   })
 }
 
@@ -80,6 +88,7 @@ export function syncAppearanceFromSettings(settings: Configuration[]): void {
   const themeModeConfig = settings.find((c) => c.key === CONFIG_KEYS.THEME_MODE)
   const accentColorConfig = settings.find((c) => c.key === CONFIG_KEYS.ACCENT_COLOR)
   const uiStyleConfig = settings.find((c) => c.key === CONFIG_KEYS.UI_STYLE)
+  const semanticColorsConfig = settings.find((c) => c.key === CONFIG_KEYS.SEMANTIC_COLORS)
 
   let changed = false
   const updated: AppearancePreferences = { ...preferences.value }
@@ -95,6 +104,20 @@ export function syncAppearanceFromSettings(settings: Configuration[]): void {
   if (uiStyleConfig && typeof uiStyleConfig.value === 'string') {
     updated.uiStyle = uiStyleConfig.value as UiStyle
     changed = true
+  }
+  if (semanticColorsConfig && semanticColorsConfig.value) {
+    let parsedColors = semanticColorsConfig.value
+    if (typeof parsedColors === 'string') {
+      try {
+        parsedColors = JSON.parse(parsedColors)
+      } catch {
+        // Ignore parse error
+      }
+    }
+    if (typeof parsedColors === 'object' && parsedColors !== null) {
+      updated.semanticColors = parsedColors as SemanticColorsPreferences
+      changed = true
+    }
   }
 
   if (changed) {
@@ -150,11 +173,48 @@ export function useAppearance() {
     await appearanceService.saveAppearancePreferences(preferences.value)
   }
 
+  const setSemanticColors = async (colors: SemanticColorsPreferences): Promise<void> => {
+    preferences.value = {
+      ...preferences.value,
+      semanticColors: colors
+    }
+    applyAppearanceToDom()
+    await appearanceService.saveAppearancePreferences(preferences.value)
+  }
+
+  const setSemanticPreset = async (preset: SemanticPresetId): Promise<void> => {
+    if (preset !== 'custom' && preset in SEMANTIC_COLOR_PRESETS) {
+      const presetConfig = SEMANTIC_COLOR_PRESETS[preset as Exclude<SemanticPresetId, 'custom'>]
+      const nextColors: SemanticColorsPreferences = {
+        preset,
+        success: presetConfig.success,
+        warning: presetConfig.warning,
+        danger: presetConfig.danger,
+        info: presetConfig.info
+      }
+      await setSemanticColors(nextColors)
+    } else {
+      const current = {
+        ...(preferences.value.semanticColors ?? DEFAULT_SEMANTIC_COLORS_PREFERENCES)
+      }
+      current.preset = 'custom'
+      await setSemanticColors(current)
+    }
+  }
+
+  const setSemanticColorRole = async (role: SemanticColorRole, optionId: string): Promise<void> => {
+    const current = { ...(preferences.value.semanticColors ?? DEFAULT_SEMANTIC_COLORS_PREFERENCES) }
+    current[role] = optionId
+    current.preset = 'custom'
+    await setSemanticColors(current)
+  }
+
   return {
     preferences,
     themeMode,
     accentColor,
     uiStyle,
+    semanticColors,
     resolvedTheme,
     isDark,
     systemIsDark,
@@ -162,6 +222,9 @@ export function useAppearance() {
     cycleThemeMode,
     setAccentColor,
     setUiStyle,
+    setSemanticColors,
+    setSemanticPreset,
+    setSemanticColorRole,
     initAppearance
   }
 }
