@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
 import SettingsAppearanceTab from '../components/settings/SettingsAppearanceTab.vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import SettingsPreferencesTab from '../components/settings/SettingsPreferencesTab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,11 +48,7 @@ watch(activeTab, (newTab) => {
         >
           Clusters
         </Tab>
-        <Tab
-          value="preferences"
-          disabled
-          class="px-3 py-2 text-xs font-semibold opacity-40 cursor-not-allowed"
-        >
+        <Tab value="preferences" class="px-3 py-2 text-xs font-semibold cursor-pointer">
           Preferences
         </Tab>
         <Tab value="appearance" class="px-3 py-2 text-xs font-semibold cursor-pointer">
@@ -90,11 +87,7 @@ watch(activeTab, (newTab) => {
         </TabPanel>
 
         <TabPanel value="preferences">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
-          >
-            Preferences coming soon.
-          </div>
+          <SettingsPreferencesTab />
         </TabPanel>
 
         <TabPanel value="appearance">

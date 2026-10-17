@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import HighlightedText from '@/components/shared/HighlightedText.vue'
 import { useSearchStore } from '@/stores/searchStore'
+import { useShortcutStore } from '@/stores/shortcutStore'
 import type { SearchCategory } from '@/types/search'
 import { Search, X } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -12,6 +13,7 @@ import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const searchStore = useSearchStore()
+const shortcutStore = useShortcutStore()
 
 const searchInputRef = ref<
   { $el?: HTMLInputElement; focus?: () => void; select?: () => void } | HTMLInputElement | null
@@ -46,16 +48,11 @@ function cycleCategory(reverse = false) {
 function handleKeydown(e: KeyboardEvent) {
   const isModifier = isMac ? e.metaKey : e.ctrlKey
 
-  // Ctrl+Shift+P or Cmd+Shift+P
-  if (isModifier && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
-    e.preventDefault()
-    e.stopPropagation()
-    searchStore.toggle()
-    return
-  }
-
-  // Ctrl+P or Cmd+P (Quick Open alias)
-  if (isModifier && !e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+  // Configured Quick Open shortcut or built-in Ctrl+Shift+P command palette alias
+  if (
+    shortcutStore.matchesAction(e, 'quickOpen') ||
+    (isModifier && e.shiftKey && (e.key === 'P' || e.key === 'p'))
+  ) {
     e.preventDefault()
     e.stopPropagation()
     searchStore.toggle()
