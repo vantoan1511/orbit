@@ -69,31 +69,33 @@ const items = computed(() => {
 </script>
 
 <template>
-  <header
-    class="flex items-center select-none bg-(--bg-sidebar) border-b border-(--border) px-3 py-2 text-xs shrink-0 z-20"
-  >
+  <nav aria-label="Breadcrumb" class="flex items-center min-w-0" data-testid="footer-breadcrumbs">
     <Breadcrumb
       :home="home"
       :model="items"
-      class="p-0! bg-transparent! border-none! text-xs min-w-0 flex-1 overflow-hidden"
+      class="p-0! bg-transparent! border-none! text-[11px] font-medium min-w-0 flex-1 overflow-hidden"
     >
       <template #item="{ item, props }">
         <router-link v-if="item.route" v-slot="{ href, navigate }" :to="item.route" custom>
           <a
             :href="href"
             v-bind="props.action"
-            class="flex items-center gap-1.5 hover:text-primary transition-colors"
+            class="flex items-center gap-1.5 hover:text-primary text-muted-color transition-colors text-[11px]"
             @click="navigate"
           >
-            <span v-if="item.icon" :class="item.icon" />
-            <span v-if="item.label" class="font-medium">{{ item.label }}</span>
+            <span v-if="item.icon" :class="[item.icon, 'text-[11px]']" />
+            <span v-if="item.label" class="font-medium truncate max-w-[140px] sm:max-w-[200px]">{{
+              item.label
+            }}</span>
           </a>
         </router-link>
-        <span v-else class="flex items-center gap-1.5 text-muted-color">
-          <span v-if="item.icon" :class="item.icon" />
-          <span v-if="item.label">{{ item.label }}</span>
+        <span v-else class="flex items-center gap-1.5 text-muted-color text-[11px]">
+          <span v-if="item.icon" :class="[item.icon, 'text-[11px]']" />
+          <span v-if="item.label" class="truncate max-w-[140px] sm:max-w-[200px]">{{
+            item.label
+          }}</span>
         </span>
       </template>
     </Breadcrumb>
-  </header>
+  </nav>
 </template>

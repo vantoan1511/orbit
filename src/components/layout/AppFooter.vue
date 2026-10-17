@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppBreadcrumbs from './AppBreadcrumbs.vue'
 import { useCluster } from '@/composables/useCluster'
 import { useEngineConnection } from '@/composables/useEngineConnection'
 import { useTerminalStore } from '@/stores/terminalStore'
@@ -49,9 +50,9 @@ const lastUpdatedDisplay = computed(() => {
   <footer
     class="flex items-center justify-between gap-4 select-none bg-(--bg-sidebar) border-t border-(--border) px-3 py-1 text-[11px] font-medium shrink-0 z-20"
   >
-    <!-- Left side: Breadcrumb placeholder slot -->
+    <!-- Left side: Breadcrumb slot -->
     <div class="flex items-center gap-2 min-w-0" data-testid="footer-breadcrumbs-placeholder">
-      <!-- Breadcrumb will be mounted here in future iteration -->
+      <AppBreadcrumbs />
     </div>
 
     <!-- Right side: Engine connection status & Last updated & Refresh -->

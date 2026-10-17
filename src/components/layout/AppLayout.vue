@@ -15,7 +15,6 @@ import {
   type LayoutRouteMeta
 } from '@/utils/layout'
 import AppFooter from './AppFooter.vue'
-import AppHeader from './AppHeader.vue'
 import AppLoadingScreen from './AppLoadingScreen.vue'
 import AppSidebar from './AppSidebar.vue'
 import AppTabBar from './tabs/AppTabBar.vue'
@@ -142,8 +141,6 @@ onUnmounted(() => {
 
           <!-- Main Content Area -->
           <div class="flex-1 flex flex-col h-full overflow-hidden">
-            <AppHeader />
-
             <!-- Top Main Tabs -->
             <AppTabBar v-if="k8sStore.activeClusterId !== null" />
 

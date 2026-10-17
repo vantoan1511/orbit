@@ -35,6 +35,20 @@ test('AppFooter component preserves placeholder for breadcrumb on the left', () 
   )
 })
 
+test('AppFooter component mounts AppBreadcrumbs in the left placeholder slot', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/AppFooter.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes("import AppBreadcrumbs from './AppBreadcrumbs.vue'"),
+    'AppFooter must import AppBreadcrumbs'
+  )
+  assert.ok(
+    content.includes('<AppBreadcrumbs />') || content.includes('<AppBreadcrumbs/>'),
+    'AppFooter must mount AppBreadcrumbs component'
+  )
+})
+
 test('AppFooter component preserves engine status, refresh, and terminal controls', () => {
   const filePath = path.resolve(process.cwd(), 'src/components/layout/AppFooter.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
