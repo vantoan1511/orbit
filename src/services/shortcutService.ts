@@ -28,7 +28,8 @@ export function sanitizeBindings(raw: unknown, isMac = isClientMac): ShortcutBin
   for (const def of DEFAULT_SHORTCUT_DEFINITIONS) {
     const val = record[def.id]
     if (typeof val === 'string' && val.trim().length > 0) {
-      result[def.id as ShortcutActionId] = normalizeComboString(val, isMac) || def.defaultKey
+      const fallback = isMac ? def.defaultKeyMac : def.defaultKey
+      result[def.id as ShortcutActionId] = normalizeComboString(val, isMac) || fallback
     }
   }
 

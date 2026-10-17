@@ -39,13 +39,19 @@ export const useShortcutStore = defineStore('shortcut', () => {
     const defaults = getDefaultBindingsForPlatform(isMac)
     return Object.keys(bindings.value).some((key) => {
       const actId = key as ShortcutActionId
-      return bindings.value[actId] !== defaults[actId]
+      const current = bindings.value[actId]
+      const def = defaults[actId]
+      if (!current || !def) return false
+      return normalizeComboString(current, isMac) !== normalizeComboString(def, isMac)
     })
   })
 
   function isModified(actionId: ShortcutActionId): boolean {
     const defaults = getDefaultBindingsForPlatform(isMac)
-    return bindings.value[actionId] !== defaults[actionId]
+    const current = bindings.value[actionId]
+    const def = defaults[actionId]
+    if (!current || !def) return false
+    return normalizeComboString(current, isMac) !== normalizeComboString(def, isMac)
   }
 
   function getDisplayShortcut(actionId: ShortcutActionId): string {
@@ -132,13 +138,25 @@ export const useShortcutStore = defineStore('shortcut', () => {
       ...bindings.value,
       [actionId]: defaults[actionId]
     }
+    if (listeningActionId.value === actionId) {
+      stopListening()
+    }
+    if (
+      pendingConflict.value &&
+      (pendingConflict.value.actionId === actionId ||
+        pendingConflict.value.conflictingActionId === actionId)
+    ) {
+      pendingConflict.value = null
+    }
     await shortcutService.saveBindings(bindings.value, targetIsMac)
   }
 
   async function resetAll(overrideIsMac?: boolean): Promise<void> {
     const targetIsMac = overrideIsMac ?? isMac
     const defaults = await shortcutService.resetBindings(targetIsMac)
-    bindings.value = defaults
+    bindings.value = { ...defaults }
+    stopListening()
+    pendingConflict.value = null
   }
 
   function matchesAction(

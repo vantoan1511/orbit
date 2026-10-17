@@ -65,21 +65,53 @@ async function handleResetItem(actionId: ShortcutActionId) {
     life: 2000
   })
 }
+
+async function handleResetAll() {
+  await shortcutStore.resetAll()
+  toast.add({
+    severity: 'success',
+    summary: 'Shortcuts Reset',
+    detail: 'All keyboard shortcuts have been restored to defaults.',
+    life: 2500
+  })
+}
 </script>
 
 <template>
   <div class="flex flex-col gap-5">
-    <!-- Filter Search Box -->
-    <div class="relative w-full max-w-sm">
-      <Search
-        class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-color pointer-events-none"
-      />
-      <InputText
-        v-model="searchQuery"
-        placeholder="Filter shortcuts by name, action or key..."
+    <!-- Filter Toolbar with Search and Reset All -->
+    <div class="flex items-center justify-between gap-3">
+      <div class="relative w-full max-w-sm">
+        <Search
+          class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-color pointer-events-none"
+        />
+        <InputText
+          v-model="searchQuery"
+          placeholder="Filter shortcuts by name, action or key..."
+          size="small"
+          class="w-full pl-8 text-xs bg-(--bg-card)"
+        />
+      </div>
+
+      <Button
+        type="button"
+        severity="secondary"
+        variant="text"
         size="small"
-        class="w-full pl-8 text-xs bg-(--bg-card)"
-      />
+        class="text-xs text-muted-color hover:text-primary shrink-0 transition-opacity"
+        :disabled="!shortcutStore.hasAnyCustomizations"
+        v-tooltip.top="
+          shortcutStore.hasAnyCustomizations
+            ? 'Reset all shortcuts to defaults'
+            : 'All shortcuts are currently set to defaults'
+        "
+        @click="handleResetAll"
+      >
+        <template #icon>
+          <RotateCcw class="w-3.5 h-3.5 mr-1" />
+        </template>
+        Reset All
+      </Button>
     </div>
 
     <!-- Empty State when filtering -->

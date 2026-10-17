@@ -80,8 +80,43 @@ test('shortcutStore.resetAction and resetAll restore defaults', async () => {
   assert.equal(store.bindings.quickOpen, DEFAULT_SHORTCUT_BINDINGS.quickOpen)
   assert.equal(store.bindings.openSettings, 'Ctrl+Alt+S')
 
+  // Set active listening and a conflict to ensure resetAll cleans them up
+  store.startListening('toggleSidebar')
+  assert.equal(store.isListening, true)
+  assert.equal(store.listeningActionId, 'toggleSidebar')
+
+  await store.rebind('toggleSidebar', 'Ctrl+Alt+S') // conflicts with openSettings
+  assert.ok(store.pendingConflict)
+
   await store.resetAll()
   assert.deepEqual(store.bindings, DEFAULT_SHORTCUT_BINDINGS)
+  assert.equal(store.hasAnyCustomizations, false)
+  assert.equal(store.isListening, false)
+  assert.equal(store.listeningActionId, null)
+  assert.equal(store.pendingConflict, null)
+})
+
+test('shortcutStore.hasAnyCustomizations normalizes combo strings and isModified handles case insensitivity', async () => {
+  setActivePinia(createPinia())
+  const store = useShortcutStore()
+  await store.init(false)
+
+  assert.equal(store.hasAnyCustomizations, false)
+  assert.equal(store.isModified('quickOpen'), false)
+
+  // Rebind to equivalent default key in lowercase 'ctrl+p'
+  // Should NOT count as modified because it normalizes to 'Ctrl+P'
+  await store.rebind('quickOpen', 'ctrl+p')
+  assert.equal(store.isModified('quickOpen'), false)
+  assert.equal(store.hasAnyCustomizations, false)
+
+  // Rebind to truly customized key
+  await store.rebind('quickOpen', 'Ctrl+Shift+O')
+  assert.equal(store.isModified('quickOpen'), true)
+  assert.equal(store.hasAnyCustomizations, true)
+
+  await store.resetAll()
+  assert.equal(store.isModified('quickOpen'), false)
   assert.equal(store.hasAnyCustomizations, false)
 })
 

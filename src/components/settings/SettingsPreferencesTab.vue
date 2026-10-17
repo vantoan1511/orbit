@@ -31,12 +31,17 @@ async function handleResetAll() {
       </div>
 
       <Button
-        v-if="shortcutStore.hasAnyCustomizations"
-        v-tooltip.top="'Reset all shortcuts to defaults'"
+        type="button"
+        :disabled="!shortcutStore.hasAnyCustomizations"
+        v-tooltip.top="
+          shortcutStore.hasAnyCustomizations
+            ? 'Reset all shortcuts to defaults'
+            : 'All shortcuts are currently set to defaults'
+        "
         severity="secondary"
         variant="text"
         size="small"
-        class="text-xs text-muted-color hover:text-primary shrink-0"
+        class="text-xs text-muted-color hover:text-primary shrink-0 transition-opacity"
         @click="handleResetAll"
       >
         <template #icon>
