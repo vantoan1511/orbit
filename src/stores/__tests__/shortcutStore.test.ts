@@ -135,3 +135,16 @@ test('shortcutStore.matchesAction matches keyboard events against current bindin
   const eventK = { key: 'k', ctrlKey: true }
   assert.equal(store.matchesAction(eventK, 'quickOpen'), true)
 })
+
+test('shortcutStore.syncFromConfig updates bindings from backend configuration', async () => {
+  setActivePinia(createPinia())
+  await storage.removeData(SHORTCUTS_STORAGE_KEY)
+  const store = useShortcutStore()
+  await store.init(false)
+
+  assert.equal(store.bindings.quickOpen, 'Ctrl+P')
+
+  store.syncFromConfig({ quickOpen: 'Ctrl+Shift+F' }, false)
+  assert.equal(store.bindings.quickOpen, 'Ctrl+Shift+F')
+  assert.equal(store.isModified('quickOpen'), true)
+})

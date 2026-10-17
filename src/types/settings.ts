@@ -9,10 +9,30 @@ export const CONFIG_KEYS = {
   CUSTOM_KUBECONFIG_PATHS: 'customKubeconfigPaths',
   AUTO_CHECK_UPDATES: 'autoCheckUpdates',
   LAUNCH_ON_STARTUP: 'launchOnStartup',
-  SHARE_TELEMETRY: 'shareTelemetry'
+  SHARE_TELEMETRY: 'shareTelemetry',
+  DEFAULT_TERMINAL_SHELL: 'defaultTerminalShell',
+  KEYBOARD_SHORTCUTS: 'keyboardShortcuts',
+  THEME_MODE: 'themeMode',
+  ACCENT_COLOR: 'accentColor',
+  UI_STYLE: 'uiStyle'
 } as const
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
+
+/**
+ * Configurations that are managed in specialized settings tabs
+ * (e.g. Preferences, Appearance) rather than the General form.
+ */
+export const SPECIALIZED_CONFIG_KEYS: readonly string[] = [
+  CONFIG_KEYS.KEYBOARD_SHORTCUTS,
+  CONFIG_KEYS.THEME_MODE,
+  CONFIG_KEYS.ACCENT_COLOR,
+  CONFIG_KEYS.UI_STYLE
+] as const
+
+export function isGeneralConfigKey(key: string): boolean {
+  return !(SPECIALIZED_CONFIG_KEYS as readonly string[]).includes(key)
+}
 
 export interface Configuration<T = unknown> {
   /** Unique identification key of config */

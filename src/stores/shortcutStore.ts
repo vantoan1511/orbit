@@ -170,6 +170,11 @@ export const useShortcutStore = defineStore('shortcut', () => {
     return isKeyComboMatch(event, combo, targetIsMac)
   }
 
+  function syncFromConfig(raw: unknown, overrideIsMac?: boolean): void {
+    const targetIsMac = overrideIsMac ?? isMac
+    bindings.value = shortcutService.syncFromConfig(raw, targetIsMac)
+  }
+
   return {
     bindings,
     definitions,
@@ -188,6 +193,7 @@ export const useShortcutStore = defineStore('shortcut', () => {
     cancelConflict,
     resetAction,
     resetAll,
-    matchesAction
+    matchesAction,
+    syncFromConfig
   }
 })

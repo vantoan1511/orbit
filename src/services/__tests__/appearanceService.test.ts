@@ -127,3 +127,32 @@ test('appearanceService.clearAppearancePreferences removes key from native stora
     storage.removeData = originalRemoveData
   }
 })
+
+test('appearanceService.saveAppearancePreferences dispatches updateAppSettings to configuration system', async () => {
+  const { coreEngine } = await import('../nativeService.ts')
+  const originalDispatch = coreEngine.dispatch
+  let dispatchedEvent = ''
+  let dispatchedPayload: Record<string, unknown> | null = null
+
+  coreEngine.dispatch = async (event: string, data?: unknown) => {
+    dispatchedEvent = event
+    dispatchedPayload = data as Record<string, unknown>
+  }
+
+  const prefsToSave: AppearancePreferences = {
+    themeMode: 'light',
+    accentColor: 'violet',
+    uiStyle: 'aero'
+  }
+
+  try {
+    await appearanceService.saveAppearancePreferences(prefsToSave)
+    assert.equal(dispatchedEvent, 'updateAppSettings')
+    assert.ok(dispatchedPayload)
+    assert.equal(dispatchedPayload.themeMode, 'light')
+    assert.equal(dispatchedPayload.accentColor, 'violet')
+    assert.equal(dispatchedPayload.uiStyle, 'aero')
+  } finally {
+    coreEngine.dispatch = originalDispatch
+  }
+})

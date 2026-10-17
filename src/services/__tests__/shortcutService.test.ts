@@ -61,3 +61,58 @@ test('shortcutService.resetBindings restores factory default bindings', async ()
   const fromStorage = await shortcutService.loadBindings(false)
   assert.deepEqual(fromStorage, DEFAULT_SHORTCUT_BINDINGS)
 })
+
+test('shortcutService.saveBindings dispatches updateAppSettings to configuration system', async () => {
+  const { coreEngine } = await import('../nativeService.ts')
+  const originalDispatch = coreEngine.dispatch
+  let dispatchedEvent = ''
+  let dispatchedPayload: Record<string, unknown> | null = null
+
+  coreEngine.dispatch = async (event: string, data?: unknown) => {
+    dispatchedEvent = event
+    dispatchedPayload = data as Record<string, unknown>
+  }
+
+  try {
+    const custom: ShortcutBindings = {
+      ...DEFAULT_SHORTCUT_BINDINGS,
+      quickOpen: 'Ctrl+Shift+O'
+    }
+    await shortcutService.saveBindings(custom, false)
+    assert.equal(dispatchedEvent, 'updateAppSettings')
+    assert.ok(dispatchedPayload)
+    assert.ok('keyboardShortcuts' in dispatchedPayload)
+    const shortcuts = dispatchedPayload.keyboardShortcuts as Record<string, string>
+    assert.equal(shortcuts.quickOpen, 'Ctrl+Shift+O')
+  } finally {
+    coreEngine.dispatch = originalDispatch
+  }
+})
+
+test('shortcutService.loadBindings migrates legacy storage and dispatches updateAppSettings', async () => {
+  const { coreEngine } = await import('../nativeService.ts')
+  const originalDispatch = coreEngine.dispatch
+  let dispatchedEvent = ''
+  let dispatchedPayload: Record<string, unknown> | null = null
+
+  coreEngine.dispatch = async (event: string, data?: unknown) => {
+    dispatchedEvent = event
+    dispatchedPayload = data as Record<string, unknown>
+  }
+
+  // Pre-seed legacy storage with an old shortcut
+  await storage.setData(SHORTCUTS_STORAGE_KEY, JSON.stringify({ quickOpen: 'Ctrl+Alt+P' }))
+
+  try {
+    const loaded = await shortcutService.loadBindings(false)
+    assert.equal(loaded.quickOpen, 'Ctrl+Alt+P')
+
+    // Dispatched migration to core configuration system
+    assert.equal(dispatchedEvent, 'updateAppSettings')
+    assert.ok(dispatchedPayload)
+    assert.ok('keyboardShortcuts' in dispatchedPayload)
+  } finally {
+    coreEngine.dispatch = originalDispatch
+    await storage.removeData(SHORTCUTS_STORAGE_KEY)
+  }
+})
