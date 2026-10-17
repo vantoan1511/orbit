@@ -43,7 +43,7 @@ import { useToast } from 'primevue/usetoast'
 import { onMounted, onUnmounted } from 'vue'
 import { useEngineConnection } from './composables/useEngineConnection'
 import AppLayout from './components/layout/AppLayout.vue'
-import { handlePreventBrowserRefresh } from '@/utils/keyboard'
+import { handlePreventBrowserShortcuts, handlePreventBrowserZoomWheel } from '@/utils/keyboard'
 
 useEngineConnection()
 
@@ -257,14 +257,26 @@ const handleContextMenu = (e: MouseEvent) => {
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  handlePreventBrowserRefresh(e)
+  handlePreventBrowserShortcuts(e, {
+    allowDevTools: Boolean(import.meta.env.DEV)
+  })
+}
+
+const handleWheel = (e: WheelEvent) => {
+  const target = e.target as HTMLElement | null
+  if (target?.closest?.('.monaco-editor')) {
+    return
+  }
+  handlePreventBrowserZoomWheel(e)
 }
 
 onMounted(async () => {
   // Disable default browser context menu globally for non-input elements
   window.addEventListener('contextmenu', handleContextMenu)
-  // Disable default browser refresh behavior (Ctrl+R, F5, Cmd+R)
+  // Disable default browser shortcuts (Ctrl+Shift+P, Ctrl+P, Ctrl+S, Ctrl+R, F5, etc.)
   window.addEventListener('keydown', handleKeyDown, true)
+  // Disable default browser zoom via Ctrl/Cmd + Mouse Wheel (except in Monaco editor)
+  window.addEventListener('wheel', handleWheel, { passive: false })
 
   await Promise.all([
     events.on(OrbitEvents.EngineConnected, handleEngineConnected),
@@ -301,6 +313,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('contextmenu', handleContextMenu)
   window.removeEventListener('keydown', handleKeyDown, true)
+  window.removeEventListener('wheel', handleWheel)
 
   events.off(OrbitEvents.EngineConnected, handleEngineConnected)
   events.off(OrbitEvents.AppSettingsUpdated, handleAppSettingsUpdated)
