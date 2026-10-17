@@ -2,7 +2,7 @@
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useProfileStore } from '@/stores/profileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { CONFIG_KEYS, type Configuration } from '@/types/settings'
+import { CONFIG_KEYS, isGeneralConfigKey, type Configuration } from '@/types/settings'
 import { AlertTriangle, Folder, Lock, RefreshCw, RotateCcw } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
@@ -19,6 +19,10 @@ const settingsStore = useSettingsStore()
 const toast = useToast()
 
 const isReloading = ref(false)
+
+const generalSettings = computed(() =>
+  settingsStore.settings.filter((config) => isGeneralConfigKey(config.key))
+)
 
 const logRetentionOptions = [
   { label: '5 files', value: 5 },
@@ -125,7 +129,7 @@ const formatArrayValue = (val: unknown): string => {
 
     <!-- Dynamic Configuration List -->
     <div
-      v-for="config in settingsStore.settings"
+      v-for="config in generalSettings"
       :key="config.key"
       class="flex flex-col md:flex-row gap-6 lg:gap-10"
       :class="{ 'opacity-60': !config.enable }"

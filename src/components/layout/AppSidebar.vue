@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useSidebarState } from '@/composables/useSidebarState'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppSidebarActivityBar from './sidebar/AppSidebarActivityBar.vue'
 import AppSidebarClusters from './sidebar/AppSidebarClusters.vue'
@@ -55,8 +55,24 @@ watch(
   }
 )
 
+const handleToggleSidebarEvent = () => {
+  if (isCollapsed.value) {
+    if (activeTab.value === null) {
+      activeTab.value = hasActiveCluster.value ? 'core' : 'clusters'
+    }
+    isCollapsed.value = false
+  } else {
+    handleCollapse()
+  }
+}
+
 onMounted(() => {
   void loadStoredState()
+  window.addEventListener('orbit:toggle-sidebar', handleToggleSidebarEvent)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('orbit:toggle-sidebar', handleToggleSidebarEvent)
 })
 
 const onClusterSwitched = () => {

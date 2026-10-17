@@ -6,7 +6,10 @@ import { X } from '@lucide/vue'
 import Button from 'primevue/button'
 import ContextMenu from 'primevue/contextmenu'
 import type { MenuItem } from 'primevue/menuitem'
+import { useShortcutStore } from '@/stores/shortcutStore'
 import { computed, ref } from 'vue'
+
+const shortcutStore = useShortcutStore()
 
 const props = withDefaults(
   defineProps<{
@@ -78,7 +81,7 @@ const menuItems = computed<TabMenuItem[]>(() => [
   },
   {
     label: 'Close Tab',
-    shortcut: isMac ? '⌘W' : 'Ctrl+W',
+    shortcut: shortcutStore.getDisplayShortcut('closeTab') || (isMac ? '⌘W' : 'Ctrl+W'),
     command: () => emit('close')
   },
   {

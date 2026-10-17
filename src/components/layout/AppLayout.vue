@@ -2,7 +2,9 @@
 import { useCluster } from '@/composables/useCluster.ts'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useShortcutStore } from '@/stores/shortcutStore'
 import { useTabsStore } from '@/stores/tabsStore'
+import { useTerminalStore } from '@/stores/terminalStore'
 import OfflineClusterView from '@/views/OfflineClusterView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -89,16 +91,27 @@ const handleEmptyResourceSelected = (payload: {
   void router.push(tab.route)
 }
 
-// Global shortcut: Ctrl+W / Cmd+W to close active tab
+const shortcutStore = useShortcutStore()
+const terminalStore = useTerminalStore()
+
 const handleKeyDown = (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w') {
-    const activeEl = document.activeElement as HTMLElement | null
-    if (
-      activeEl &&
-      (activeEl.tagName === 'INPUT' ||
-        activeEl.tagName === 'TEXTAREA' ||
-        activeEl.classList.contains('monaco-editor'))
-    ) {
+  const activeEl = document.activeElement as HTMLElement | null
+  const isInputActive = Boolean(
+    activeEl &&
+    (activeEl.tagName === 'INPUT' ||
+      activeEl.tagName === 'TEXTAREA' ||
+      activeEl.classList.contains('monaco-editor') ||
+      activeEl.isContentEditable)
+  )
+
+  // Don't intercept typing in inputs unless it's a window/navigation action with modifier
+  if (isInputActive && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    return
+  }
+
+  // 1. Close Active Tab
+  if (shortcutStore.matchesAction(e, 'closeTab')) {
+    if (isInputActive && (activeEl?.tagName === 'INPUT' || activeEl?.tagName === 'TEXTAREA')) {
       return
     }
     if (tabsStore.activeTabId) {
@@ -111,6 +124,60 @@ const handleKeyDown = (e: KeyboardEvent) => {
         void router.push('/')
       }
     }
+    return
+  }
+
+  // 2. Next Tab
+  if (shortcutStore.matchesAction(e, 'nextTab')) {
+    e.preventDefault()
+    const activeIndex = tabsStore.tabs.findIndex((t) => t.id === tabsStore.activeTabId)
+    if (activeIndex !== -1 && tabsStore.tabs.length > 1) {
+      const nextIndex = (activeIndex + 1) % tabsStore.tabs.length
+      const nextTab = tabsStore.tabs[nextIndex]
+      if (nextTab) {
+        tabsStore.setActiveTab(nextTab.id)
+        void router.push(nextTab.route)
+      }
+    }
+    return
+  }
+
+  // 3. Previous Tab
+  if (shortcutStore.matchesAction(e, 'prevTab')) {
+    e.preventDefault()
+    const activeIndex = tabsStore.tabs.findIndex((t) => t.id === tabsStore.activeTabId)
+    if (activeIndex !== -1 && tabsStore.tabs.length > 1) {
+      const prevIndex = (activeIndex - 1 + tabsStore.tabs.length) % tabsStore.tabs.length
+      const prevTab = tabsStore.tabs[prevIndex]
+      if (prevTab) {
+        tabsStore.setActiveTab(prevTab.id)
+        void router.push(prevTab.route)
+      }
+    }
+    return
+  }
+
+  // 4. Toggle Sidebar
+  if (shortcutStore.matchesAction(e, 'toggleSidebar')) {
+    e.preventDefault()
+    window.dispatchEvent(new CustomEvent('orbit:toggle-sidebar'))
+    return
+  }
+
+  // 5. Toggle Integrated Terminal
+  if (shortcutStore.matchesAction(e, 'toggleTerminal')) {
+    e.preventDefault()
+    terminalStore.togglePanel()
+    return
+  }
+
+  // 6. Open Settings
+  if (shortcutStore.matchesAction(e, 'openSettings')) {
+    e.preventDefault()
+    if (route.path !== '/settings') {
+      void router.push('/settings')
+    }
+    return
   }
 }
 

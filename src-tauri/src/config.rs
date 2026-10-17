@@ -121,6 +121,58 @@ impl Configuration {
                 is_confidential: false,
                 cardinality: "0..1".to_string(),
                 enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "keyboardShortcuts".to_string(),
+                name: "Keyboard Shortcuts".to_string(),
+                description: "Custom keyboard shortcut keybindings for rapid workspace navigation and actions.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({})),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "themeMode".to_string(),
+                name: "Theme Mode".to_string(),
+                description: "Application theme appearance mode (dark, light, or system).".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!("dark")),
+                value: None,
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "accentColor".to_string(),
+                name: "Accent Color".to_string(),
+                description: "Primary accent color for interactive UI elements and focus states.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!("blue")),
+                value: None,
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "uiStyle".to_string(),
+                name: "UI Style".to_string(),
+                description: "Visual design aesthetic style (flat, glass, aero, liquidglass, ios).".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!("flat")),
+                value: None,
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
                 created_at: Some(created),
                 last_updated_at: None,
             },
@@ -253,6 +305,41 @@ impl OrbitConfig {
             .get("launchOnStartup")
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
+    }
+
+    /// Returns custom keyboard shortcuts keybindings map.
+    pub fn keyboard_shortcuts(&self) -> HashMap<String, String> {
+        self.values
+            .get("keyboardShortcuts")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default()
+    }
+
+    /// Returns configured theme mode ("dark", "light", or "system"). Defaults to "dark".
+    pub fn theme_mode(&self) -> String {
+        self.values
+            .get("themeMode")
+            .and_then(|v| v.as_str())
+            .unwrap_or("dark")
+            .to_string()
+    }
+
+    /// Returns configured accent color name. Defaults to "blue".
+    pub fn accent_color(&self) -> String {
+        self.values
+            .get("accentColor")
+            .and_then(|v| v.as_str())
+            .unwrap_or("blue")
+            .to_string()
+    }
+
+    /// Returns configured UI style name. Defaults to "flat".
+    pub fn ui_style(&self) -> String {
+        self.values
+            .get("uiStyle")
+            .and_then(|v| v.as_str())
+            .unwrap_or("flat")
+            .to_string()
     }
 
     /// Generates the unified `Configuration` model list sent to the frontend.
@@ -518,5 +605,59 @@ mod tests {
 
         config.values.insert("launchOnStartup".to_string(), serde_json::json!(false));
         assert!(!config.launch_on_startup());
+    }
+
+    #[test]
+    fn test_keyboard_shortcuts_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let cfg = defs.iter().find(|c| c.key == "keyboardShortcuts").expect("keyboardShortcuts must exist");
+        assert!(cfg.enable, "keyboardShortcuts must be enabled");
+        assert_eq!(cfg.datatype, "string");
+        assert_eq!(cfg.default_value, Some(serde_json::json!({})));
+    }
+
+    #[test]
+    fn test_keyboard_shortcuts_config() {
+        let mut config = OrbitConfig::default();
+        assert!(config.keyboard_shortcuts().is_empty());
+
+        let mut map = std::collections::HashMap::new();
+        map.insert("quickOpen".to_string(), "Ctrl+K".to_string());
+        config.values.insert("keyboardShortcuts".to_string(), serde_json::json!(map));
+
+        let shortcuts = config.keyboard_shortcuts();
+        assert_eq!(shortcuts.get("quickOpen"), Some(&"Ctrl+K".to_string()));
+    }
+
+    #[test]
+    fn test_appearance_configs_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let theme_cfg = defs.iter().find(|c| c.key == "themeMode").expect("themeMode must exist");
+        assert!(theme_cfg.enable);
+        assert_eq!(theme_cfg.default_value, Some(serde_json::json!("dark")));
+
+        let accent_cfg = defs.iter().find(|c| c.key == "accentColor").expect("accentColor must exist");
+        assert!(accent_cfg.enable);
+        assert_eq!(accent_cfg.default_value, Some(serde_json::json!("blue")));
+
+        let style_cfg = defs.iter().find(|c| c.key == "uiStyle").expect("uiStyle must exist");
+        assert!(style_cfg.enable);
+        assert_eq!(style_cfg.default_value, Some(serde_json::json!("flat")));
+    }
+
+    #[test]
+    fn test_appearance_configs_defaults_and_custom() {
+        let mut config = OrbitConfig::default();
+        assert_eq!(config.theme_mode(), "dark");
+        assert_eq!(config.accent_color(), "blue");
+        assert_eq!(config.ui_style(), "flat");
+
+        config.values.insert("themeMode".to_string(), serde_json::json!("light"));
+        config.values.insert("accentColor".to_string(), serde_json::json!("emerald"));
+        config.values.insert("uiStyle".to_string(), serde_json::json!("glass"));
+
+        assert_eq!(config.theme_mode(), "light");
+        assert_eq!(config.accent_color(), "emerald");
+        assert_eq!(config.ui_style(), "glass");
     }
 }

@@ -9,6 +9,8 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useShortcutStore } from '@/stores/shortcutStore'
+import { syncAppearanceFromSettings } from '@/composables/useAppearance'
 import { OrbitEvents } from '@/types/events'
 import type {
   ClusterInfo,
@@ -32,7 +34,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import type { UserProfileInfo } from '@/types/profile'
-import type { Configuration } from '@/types/settings'
+import { CONFIG_KEYS, type Configuration } from '@/types/settings'
 import ConfirmDialog from 'primevue/confirmdialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
@@ -49,6 +51,7 @@ const k8sStore = useKubernetesStore()
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
 const settingsStore = useSettingsStore()
+const shortcutStore = useShortcutStore()
 const toast = useToast()
 const confirm = useConfirm()
 
@@ -70,6 +73,11 @@ const handleEngineConnected = (payload: { status: 'ready' | 'error'; message: st
 
 const handleAppSettingsUpdated = (payload: { settings: Configuration[] }) => {
   settingsStore.setSettings(payload.settings)
+  syncAppearanceFromSettings(payload.settings)
+  const shortcutConfig = payload.settings.find((c) => c.key === CONFIG_KEYS.KEYBOARD_SHORTCUTS)
+  if (shortcutConfig && shortcutConfig.value !== undefined) {
+    shortcutStore.syncFromConfig(shortcutConfig.value)
+  }
 }
 
 const handleUserProfileUpdated = (payload: { profile: UserProfileInfo }) => {

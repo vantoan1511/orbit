@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { appearanceService } from '../services/appearanceService.ts'
+import { CONFIG_KEYS, type Configuration } from '../types/settings.ts'
 import {
   DEFAULT_APPEARANCE_PREFERENCES,
   type AccentColor,
@@ -86,6 +87,36 @@ export async function initAppearance(): Promise<void> {
     applyAppearanceToDom()
   } catch (e) {
     console.warn('Failed to initialize appearance preferences:', e)
+  }
+}
+
+/**
+ * Synchronize appearance preferences from Configuration items received via backend IPC.
+ */
+export function syncAppearanceFromSettings(settings: Configuration[]): void {
+  const themeModeConfig = settings.find((c) => c.key === CONFIG_KEYS.THEME_MODE)
+  const accentColorConfig = settings.find((c) => c.key === CONFIG_KEYS.ACCENT_COLOR)
+  const uiStyleConfig = settings.find((c) => c.key === CONFIG_KEYS.UI_STYLE)
+
+  let changed = false
+  const updated: AppearancePreferences = { ...preferences.value }
+
+  if (themeModeConfig && typeof themeModeConfig.value === 'string') {
+    updated.themeMode = themeModeConfig.value as ThemeMode
+    changed = true
+  }
+  if (accentColorConfig && typeof accentColorConfig.value === 'string') {
+    updated.accentColor = accentColorConfig.value as AccentColor
+    changed = true
+  }
+  if (uiStyleConfig && typeof uiStyleConfig.value === 'string') {
+    updated.uiStyle = uiStyleConfig.value as UiStyle
+    changed = true
+  }
+
+  if (changed) {
+    preferences.value = updated
+    applyAppearanceToDom()
   }
 }
 

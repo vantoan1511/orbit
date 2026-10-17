@@ -128,3 +128,45 @@ test('useTheme backward compatibility delegates to useAppearance', async () => {
   await toggleTheme()
   assert.equal(isDark.value, !initial)
 })
+
+test('syncAppearanceFromSettings updates appearance from backend Configuration array', async () => {
+  const { syncAppearanceFromSettings, useAppearance } = await import('../useAppearance.ts')
+  const { themeMode, accentColor, uiStyle } = useAppearance()
+
+  syncAppearanceFromSettings([
+    {
+      key: 'themeMode',
+      name: 'Theme Mode',
+      description: '',
+      datatype: 'string',
+      value: 'light',
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    },
+    {
+      key: 'accentColor',
+      name: 'Accent Color',
+      description: '',
+      datatype: 'string',
+      value: 'cyan',
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    },
+    {
+      key: 'uiStyle',
+      name: 'UI Style',
+      description: '',
+      datatype: 'string',
+      value: 'aero',
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    }
+  ])
+
+  assert.equal(themeMode.value, 'light')
+  assert.equal(accentColor.value, 'cyan')
+  assert.equal(uiStyle.value, 'aero')
+})
