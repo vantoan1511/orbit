@@ -66,3 +66,45 @@ test('AppHeader component does not retain legacy search everywhere button', () =
     'AppHeader must not retain legacy search button'
   )
 })
+
+test('AppTitleBar component removes Orbit logo and brand label', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/AppTitleBar.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(!content.includes('src="/logo.png"'), 'AppTitleBar must remove static Orbit logo image')
+  assert.ok(!content.includes('>Orbit</span>'), 'AppTitleBar must remove static Orbit brand text')
+})
+
+test('AppTitleBar component integrates active cluster info and health status', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/AppTitleBar.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(content.includes('useCluster'), 'AppTitleBar must import useCluster')
+  assert.ok(content.includes('useKubernetesStore'), 'AppTitleBar must import useKubernetesStore')
+  assert.ok(content.includes('activeCluster'), 'AppTitleBar must bind activeCluster')
+  assert.ok(content.includes('activeCluster.name'), 'AppTitleBar must render activeCluster.name')
+  assert.ok(
+    content.includes('No active cluster'),
+    'AppTitleBar must render fallback when activeCluster is null'
+  )
+  assert.ok(
+    content.includes('clusterTooltip'),
+    'AppTitleBar must provide rich hover tooltip with cluster metadata'
+  )
+  assert.ok(
+    content.includes('KubernetesIcon'),
+    'AppTitleBar must import KubernetesIcon for responsive metadata'
+  )
+  assert.ok(
+    content.includes('hidden xl:flex'),
+    'AppTitleBar must render responsive inline metadata on wide screens'
+  )
+  assert.ok(
+    content.includes('@dblclick.stop'),
+    'AppTitleBar cluster info element must stop double click propagation'
+  )
+  assert.ok(
+    content.includes('pointer-events-auto'),
+    'AppTitleBar cluster info element must enable pointer events for tooltips'
+  )
+})
