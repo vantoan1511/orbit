@@ -27,6 +27,9 @@ test('AppLayout keyboard matching triggers toggleSidebar and toggleTerminal', ()
   assert.equal(isKeyComboMatch(eventTerminal, 'Ctrl+`', false), true)
 })
 
+import fs from 'node:fs'
+import path from 'node:path'
+
 test('SearchEverywhereDialog keyboard matching triggers quickOpen', () => {
   const eventQuickOpen = { key: 'p', ctrlKey: true }
   assert.equal(isKeyComboMatch(eventQuickOpen, 'Ctrl+P', false), true)
@@ -34,4 +37,21 @@ test('SearchEverywhereDialog keyboard matching triggers quickOpen', () => {
   const eventCustomQuickOpen = { key: 'k', ctrlKey: true }
   assert.equal(isKeyComboMatch(eventCustomQuickOpen, 'Ctrl+K', false), true)
   assert.equal(isKeyComboMatch(eventQuickOpen, 'Ctrl+K', false), false)
+})
+
+test('SearchEverywhereDialog does not hardcode Ctrl+Shift+P alias and strictly uses shortcutStore', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/search/SearchEverywhereDialog.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes("shortcutStore.matchesAction(e, 'quickOpen')"),
+    'SearchEverywhereDialog must match quickOpen action'
+  )
+  assert.ok(
+    !content.includes('e.shiftKey && (e.key ==='),
+    'SearchEverywhereDialog must not hardcode Shift+P shortcut alias'
+  )
+
+  const eventCtrlShiftP = { key: 'p', ctrlKey: true, shiftKey: true }
+  assert.equal(isKeyComboMatch(eventCtrlShiftP, 'Ctrl+P', false), false)
 })

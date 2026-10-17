@@ -21,11 +21,6 @@ const searchInputRef = ref<
 const resultItemRefs = ref<HTMLElement[]>([])
 const scrollContainerRef = ref<HTMLElement | null>(null)
 
-const isMac =
-  typeof navigator !== 'undefined' &&
-  navigator.platform &&
-  navigator.platform.toUpperCase().indexOf('MAC') >= 0
-
 const categories: Array<{ id: SearchCategory; label: string }> = [
   { id: 'all', label: 'All' },
   { id: 'resources', label: 'Resources' },
@@ -46,13 +41,8 @@ function cycleCategory(reverse = false) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  const isModifier = isMac ? e.metaKey : e.ctrlKey
-
-  // Configured Quick Open shortcut or built-in Ctrl+Shift+P command palette alias
-  if (
-    shortcutStore.matchesAction(e, 'quickOpen') ||
-    (isModifier && e.shiftKey && (e.key === 'P' || e.key === 'p'))
-  ) {
+  // Configured Quick Open shortcut
+  if (shortcutStore.matchesAction(e, 'quickOpen')) {
     e.preventDefault()
     e.stopPropagation()
     searchStore.toggle()
