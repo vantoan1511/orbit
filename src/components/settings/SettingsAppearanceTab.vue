@@ -87,20 +87,7 @@ const handleReset = async () => {
       </div>
     </div>
 
-    <!-- Section 2: Accent Color -->
-    <div class="flex flex-col md:flex-row gap-6 lg:gap-10">
-      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
-        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Accent Color</h4>
-        <p class="text-[11px] text-muted-color">
-          Select your preferred accent hue for active controls, badges, and focus rings.
-        </p>
-      </div>
-      <div class="w-full md:w-2/3 xl:w-3/4">
-        <AccentColorPicker />
-      </div>
-    </div>
-
-    <!-- Section 3: UI Style -->
+    <!-- Section 2: UI Style -->
     <div class="flex flex-col md:flex-row gap-6 lg:gap-10">
       <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
         <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">
@@ -113,6 +100,19 @@ const handleReset = async () => {
       </div>
       <div class="w-full md:w-2/3 xl:w-3/4">
         <UiStyleSelector />
+      </div>
+    </div>
+
+    <!-- Section 3: Accent Color -->
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10">
+      <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
+        <h4 class="text-xs font-semibold text-primary uppercase tracking-wider">Accent Color</h4>
+        <p class="text-[11px] text-muted-color">
+          Select your preferred accent hue for active controls, badges, and focus rings.
+        </p>
+      </div>
+      <div class="w-full md:w-2/3 xl:w-3/4">
+        <AccentColorPicker />
       </div>
     </div>
 
