@@ -30,6 +30,7 @@ pub fn update_app_settings(
         tracing::debug!("Updating application settings");
         if let Some(data) = data {
             let mut current_config = OrbitConfig::load();
+            let prev_autostart = current_config.launch_on_startup();
 
             // Support either unified Vec<Configuration> or direct HashMap<String, Value>
             let update_result = if let Ok(configs) = serde_json::from_value::<Vec<Configuration>>(data.clone()) {
@@ -59,15 +60,17 @@ pub fn update_app_settings(
                     }
 
                     let autostart_enabled = current_config.launch_on_startup();
-                    let _ = tokio::task::spawn_blocking(move || {
-                        if let Ok(manager) = crate::autostart::AutostartManager::new(crate::autostart::DEFAULT_APP_NAME) {
-                            let _ = if autostart_enabled {
-                                manager.enable()
-                            } else {
-                                manager.disable()
-                            };
-                        }
-                    }).await;
+                    if prev_autostart != autostart_enabled {
+                        let _ = tokio::task::spawn_blocking(move || {
+                            if let Ok(manager) = crate::autostart::AutostartManager::new(crate::autostart::DEFAULT_APP_NAME) {
+                                let _ = if autostart_enabled {
+                                    manager.enable()
+                                } else {
+                                    manager.disable()
+                                };
+                            }
+                        }).await;
+                    }
 
                     let settings = OrbitConfig::load().get_configurations();
                     let _ = Bridge::send_event(
@@ -178,6 +181,29 @@ mod tests {
                 let _ = manager.disable();
             }
         }).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_app_settings_emits_app_settings_updated() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let payload = Some(serde_json::json!({ "themeMode": "light" }));
+
+        update_app_settings(payload, writer, "token".to_string());
+
+        let mut found = false;
+        for _ in 0..40 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            let emitted = mock_emitter.get_emitted_events().await;
+            if emitted.iter().any(|(name, _)| name == "appSettingsUpdated") {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "appSettingsUpdated event must be emitted");
     }
 }
 

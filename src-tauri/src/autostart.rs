@@ -4,6 +4,19 @@ use std::path::PathBuf;
 
 pub const DEFAULT_APP_NAME: &str = "Orbit";
 
+/// Windows creation flag to suppress console window creation when running console binaries from a GUI subsystem process.
+#[cfg(target_os = "windows")]
+pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// Creates a new `std::process::Command` for `reg.exe` with `CREATE_NO_WINDOW` configured on Windows.
+#[cfg(target_os = "windows")]
+pub fn new_reg_command() -> std::process::Command {
+    use std::os::windows::process::CommandExt;
+    let mut cmd = std::process::Command::new("reg");
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
 /// Formats the Windows registry Run command line for autostart with `--hidden`.
 pub fn format_windows_run_value(app_path: &std::path::Path) -> String {
     format!("\"{}\" --hidden", app_path.to_string_lossy())
@@ -41,7 +54,7 @@ impl AutostartManager {
     pub fn is_enabled(&self) -> Result<bool, String> {
         #[cfg(target_os = "windows")]
         {
-            let output = std::process::Command::new("reg")
+            let output = new_reg_command()
                 .args([
                     "query",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -76,7 +89,7 @@ impl AutostartManager {
         #[cfg(target_os = "windows")]
         {
             let exe_str = format_windows_run_value(&self.app_path);
-            let status = std::process::Command::new("reg")
+            let status = new_reg_command()
                 .args([
                     "add",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -151,7 +164,7 @@ impl AutostartManager {
     pub fn disable(&self) -> Result<(), String> {
         #[cfg(target_os = "windows")]
         {
-            let _ = std::process::Command::new("reg")
+            let _ = new_reg_command()
                 .args([
                     "delete",
                     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -292,6 +305,13 @@ mod tests {
         let path = PathBuf::from("/usr/bin/orbit");
         let cmd = format_linux_desktop_exec(&path);
         assert_eq!(cmd, "\"/usr/bin/orbit\" --hidden");
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn test_windows_reg_command_creation_flags() {
+        let cmd = new_reg_command();
+        assert_eq!(cmd.get_program(), "reg");
     }
 }
 

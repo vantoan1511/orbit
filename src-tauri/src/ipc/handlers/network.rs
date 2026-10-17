@@ -11,6 +11,21 @@ use crate::kubernetes::port_forward::{
 };
 use super::utils::get_string;
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+#[cfg(windows)]
+fn new_hidden_command(program: &str) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(program);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+#[cfg(not(windows))]
+fn new_hidden_command(program: &str) -> tokio::process::Command {
+    tokio::process::Command::new(program)
+}
+
 pub fn get_services(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -220,7 +235,7 @@ pub fn start_port_forward(
             let _ = join_handle.await;
         }
 
-        let mut cmd = tokio::process::Command::new("kubectl");
+        let mut cmd = new_hidden_command("kubectl");
         if !kubeconfig_paths.is_empty() {
             let separator = if cfg!(windows) { ";" } else { ":" };
             cmd.env("KUBECONFIG", kubeconfig_paths.join(separator));
@@ -446,7 +461,7 @@ async fn kill_port_forward_child(child: &mut tokio::process::Child, forward_id: 
     #[cfg(windows)]
     {
         if let Some(pid) = child.id() {
-            let _ = tokio::process::Command::new("taskkill")
+            let _ = new_hidden_command("taskkill")
                 .args(["/F", "/T", "/PID", &pid.to_string()])
                 .output()
                 .await;
@@ -482,7 +497,7 @@ async fn kill_orphaned_port_forward_processes(local_ports: &[u16]) {
 #[cfg(windows)]
 async fn kill_process_on_port(port: u16) -> bool {
     // netstat -ano lists all TCP connections with their PIDs.
-    let Ok(output) = tokio::process::Command::new("netstat")
+    let Ok(output) = new_hidden_command("netstat")
         .args(["-ano"])
         .output()
         .await
@@ -514,7 +529,7 @@ async fn kill_process_on_port(port: u16) -> bool {
             continue;
         };
         // Confirm the process is kubectl before killing.
-        let Ok(check) = tokio::process::Command::new("tasklist")
+        let Ok(check) = new_hidden_command("tasklist")
             .args(["/FI", &format!("PID eq {}", pid), "/NH", "/FO", "CSV"])
             .output()
             .await
@@ -524,7 +539,7 @@ async fn kill_process_on_port(port: u16) -> bool {
         let check_out = String::from_utf8_lossy(&check.stdout).to_ascii_lowercase();
         if check_out.contains("kubectl") {
             tracing::info!(pid = pid, port = port, "Killing orphaned kubectl port-forward process");
-            let _ = tokio::process::Command::new("taskkill")
+            let _ = new_hidden_command("taskkill")
                 .args(["/F", "/T", "/PID", &pid.to_string()])
                 .output()
                 .await;
@@ -758,6 +773,13 @@ mod tests {
             "Non-kubectl process should NOT have been killed"
         );
         drop(listener);
+    }
+
+    #[test]
+    fn test_new_hidden_command_creates_command() {
+        let cmd = new_hidden_command("kubectl");
+        #[cfg(windows)]
+        assert_eq!(cmd.as_std().get_program(), "kubectl");
     }
 }
 
