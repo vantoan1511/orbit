@@ -41,13 +41,11 @@ async function handleResetAll() {
         severity="secondary"
         variant="text"
         size="small"
-        class="text-xs text-muted-color hover:text-primary shrink-0 transition-opacity"
+        class="text-xs text-muted-color hover:text-primary shrink-0 transition-opacity flex items-center gap-1.5"
         @click="handleResetAll"
       >
-        <template #icon>
-          <RotateCcw class="w-3.5 h-3.5 mr-1" />
-        </template>
-        Reset All Shortcuts
+        <RotateCcw class="w-3.5 h-3.5" />
+        <span>Reset All Shortcuts</span>
       </Button>
     </div>
 

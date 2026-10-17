@@ -98,7 +98,7 @@ async function handleResetAll() {
         severity="secondary"
         variant="text"
         size="small"
-        class="text-xs text-muted-color hover:text-primary shrink-0 transition-opacity"
+        class="text-xs text-muted-color hover:text-primary shrink-0 transition-opacity flex items-center gap-1.5"
         :disabled="!shortcutStore.hasAnyCustomizations"
         v-tooltip.top="
           shortcutStore.hasAnyCustomizations
@@ -107,10 +107,8 @@ async function handleResetAll() {
         "
         @click="handleResetAll"
       >
-        <template #icon>
-          <RotateCcw class="w-3.5 h-3.5 mr-1" />
-        </template>
-        Reset All
+        <RotateCcw class="w-3.5 h-3.5" />
+        <span>Reset All</span>
       </Button>
     </div>
 
