@@ -8,6 +8,7 @@ import { Button } from 'primevue'
 import { useRoute, useRouter } from 'vue-router'
 import { GitHubIcon } from 'vue3-simple-icons'
 import { categories, type CategoryId, type SidebarCategory } from './navigation'
+import { getActivityBarItemClass, getActivityBarIndicatorClass } from './navigationStyles'
 
 const props = withDefaults(
   defineProps<{
@@ -52,20 +53,14 @@ const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
         v-tooltip.right="
           isCategoryDisabled(cat) ? `${cat.name} (Requires active cluster)` : cat.name
         "
-        :class="['inline-flex', isCategoryDisabled(cat) && 'cursor-not-allowed']"
+        :class="['relative inline-flex items-center justify-center', isCategoryDisabled(cat) && 'cursor-not-allowed']"
       >
+        <span :class="getActivityBarIndicatorClass(activeTab === cat.id)" />
         <Button
           variant="text"
           severity="secondary"
           :disabled="isCategoryDisabled(cat)"
-          :class="[
-            'w-10 h-10',
-            activeTab === cat.id
-              ? 'bg-(--bg-active) text-(--text-primary)'
-              : isCategoryDisabled(cat)
-                ? 'opacity-40 text-muted-color/50'
-                : 'text-muted-color hover:bg-(--bg-hover)'
-          ]"
+          :class="getActivityBarItemClass(activeTab === cat.id, isCategoryDisabled(cat))"
           @click="!isCategoryDisabled(cat) && emit('toggleCategory', cat)"
         >
           <template #icon>

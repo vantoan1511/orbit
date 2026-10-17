@@ -226,7 +226,7 @@ onMounted(() => {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-blue-400 bg-blue-500/10"
+                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-(--accent) bg-(--accent-soft)"
               >
                 <Shield class="w-5 h-5" />
               </div>
@@ -234,7 +234,7 @@ onMounted(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   System
                 </div>
-                <div class="text-2xl font-bold mt-1 text-blue-400 truncate">{{ systemCount }}</div>
+                <div class="text-2xl font-bold mt-1 text-(--accent) truncate">{{ systemCount }}</div>
               </div>
             </div>
             <div class="w-14 h-14 shrink-0 relative" v-if="systemChartData">

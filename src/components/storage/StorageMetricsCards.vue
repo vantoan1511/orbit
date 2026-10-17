@@ -77,9 +77,9 @@ const metrics = computed(() => {
       title: 'Claims (PVCs)',
       value: totalPVCs.toString(),
       subtext: 'Bound to volumes',
-      subtextClass: 'text-blue-400 font-medium',
+      subtextClass: 'text-(--accent) font-medium',
       icon: FileSpreadsheet,
-      iconClass: 'bg-blue-500/10 text-blue-400'
+      iconClass: 'bg-(--accent-soft) text-(--accent)'
     },
     {
       title: 'Storage Classes',

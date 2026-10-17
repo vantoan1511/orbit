@@ -9,6 +9,7 @@ import {
   type UiStyle
 } from '../types/appearance.ts'
 import { getAccentPalette } from '../utils/appearanceConstants.ts'
+import { syncAppearanceToDom } from '../utils/appearanceTheme.ts'
 
 const mediaQuery =
   typeof window !== 'undefined' && window.matchMedia
@@ -38,30 +39,12 @@ const accentColor = computed<AccentColor>(() => preferences.value.accentColor)
 const uiStyle = computed<UiStyle>(() => preferences.value.uiStyle)
 
 export function applyAppearanceToDom(): void {
-  if (typeof document === 'undefined') return
-  const html = document.documentElement
-
-  const currentDark = isDark.value
-  const currentResolved = resolvedTheme.value
-  const currentMode = preferences.value.themeMode
-  const currentAccent = preferences.value.accentColor
-  const currentStyle = preferences.value.uiStyle
-
-  // Theme & dark mode class
-  html.classList.toggle('my-app-dark', currentDark)
-  html.setAttribute('data-theme', currentResolved)
-  html.setAttribute('data-theme-mode', currentMode)
-  html.setAttribute('data-accent', currentAccent)
-  html.setAttribute('data-ui-style', currentStyle)
-
-  // CSS variables for dynamic accents
-  const palette = getAccentPalette(currentAccent, currentDark)
-  html.style.setProperty('--accent', palette.accent)
-  html.style.setProperty('--accent-hover', palette.hover)
-  html.style.setProperty('--accent-active', palette.active)
-  html.style.setProperty('--accent-soft', palette.soft)
-  html.style.setProperty('--selection', palette.selection)
-  html.style.setProperty('--input-focus', palette.accent)
+  syncAppearanceToDom({
+    themeMode: preferences.value.themeMode,
+    resolvedTheme: resolvedTheme.value,
+    accentColor: preferences.value.accentColor,
+    uiStyle: preferences.value.uiStyle
+  })
 }
 
 // Apply initial appearance upon module evaluation

@@ -6,7 +6,8 @@ import {
   getAccentPalette,
   formatThemeModeLabel,
   formatUiStyleLabel,
-  isTranslucentStyle
+  isTranslucentStyle,
+  getUiStyleTokens
 } from '../appearanceConstants.ts'
 import type { AccentColor, UiStyle } from '../../types/appearance.ts'
 
@@ -71,3 +72,30 @@ test('isTranslucentStyle identifies non-flat styles', () => {
   assert.equal(isTranslucentStyle('liquidglass'), true)
   assert.equal(isTranslucentStyle('ios'), true)
 })
+
+test('getUiStyleTokens returns distinct radii, sheens, and shadows for all 5 styles', () => {
+  const styles: UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios']
+
+  for (const style of styles) {
+    const lightTokens = getUiStyleTokens(style, false)
+    const darkTokens = getUiStyleTokens(style, true)
+    assert.ok(lightTokens.radiusCard, `${style} light must have radiusCard`)
+    assert.ok(darkTokens.radiusCard, `${style} dark must have radiusCard`)
+    assert.ok(lightTokens.radiusControl, `${style} light must have radiusControl`)
+  }
+
+  // Verify key differentiators
+  const flat = getUiStyleTokens('flat', false)
+  const ios = getUiStyleTokens('ios', false)
+  const aero = getUiStyleTokens('aero', false)
+  const liquid = getUiStyleTokens('liquidglass', false)
+
+  assert.equal(flat.radiusCard, '0.5rem')
+  assert.equal(ios.radiusCard, '1rem')
+  assert.equal(ios.radiusControl, '0.625rem')
+  assert.ok(aero.cardSheen.includes('linear-gradient'))
+  assert.ok(aero.cardShadow.includes('inset 0 1px'))
+  assert.ok(liquid.cardShadow.includes('inset'))
+  assert.ok(liquid.backdropBlur.includes('saturate'))
+})
+

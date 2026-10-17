@@ -47,7 +47,7 @@ const METRIC_CONFIGS: Record<
     sortKey: 'cpuPct',
     getValue: (p) => p.cpu || '0m',
     getPct: (p) => Math.min(Math.max(Number((p.cpuPct || 0).toFixed(2)), 0), 100),
-    color: 'bg-blue-500'
+    color: 'bg-(--accent)'
   },
   memory: {
     sortKey: 'memoryPct',
