@@ -9,7 +9,10 @@ import {
 test('getActivityBarItemClass returns accent styling when active', () => {
   const activeClass = getActivityBarItemClass(true, false)
   assert.ok(activeClass.includes('text-(--accent)'), 'active item must use accent text')
-  assert.ok(activeClass.includes('bg-(--accent-soft)'), 'active item must use accent soft background')
+  assert.ok(
+    activeClass.includes('bg-(--accent-soft)'),
+    'active item must use accent soft background'
+  )
 
   const inactiveClass = getActivityBarItemClass(false, false)
   assert.ok(inactiveClass.includes('text-muted-color'), 'inactive item must use muted text')
@@ -31,9 +34,15 @@ test('getActivityBarIndicatorClass returns active indicator bar when active', ()
 test('getNavMenuItemClass returns accent styling when active', () => {
   const activeClass = getNavMenuItemClass(true)
   assert.ok(activeClass.includes('text-(--accent)'), 'active nav link must use accent text')
-  assert.ok(activeClass.includes('bg-(--accent-soft)'), 'active nav link must use accent soft background')
+  assert.ok(
+    activeClass.includes('bg-(--accent-soft)'),
+    'active nav link must use accent soft background'
+  )
 
   const inactiveClass = getNavMenuItemClass(false)
   assert.ok(inactiveClass.includes('text-muted-color'), 'inactive nav link must use muted text')
-  assert.ok(!inactiveClass.includes('text-(--accent)'), 'inactive nav link must not use accent text')
+  assert.ok(
+    !inactiveClass.includes('text-(--accent)'),
+    'inactive nav link must not use accent text'
+  )
 })

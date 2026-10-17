@@ -120,6 +120,8 @@ declare module 'vue' {
     SearchEverywhereDialog: typeof import('./src/components/search/SearchEverywhereDialog.vue')['default']
     SecretEditForm: typeof import('./src/components/config/SecretEditForm.vue')['default']
     SelectButton: typeof import('primevue/selectbutton')['default']
+    SemanticColorPicker: typeof import('./src/components/settings/appearance/SemanticColorPicker.vue')['default']
+    SemanticPreviewCard: typeof import('./src/components/settings/appearance/SemanticPreviewCard.vue')['default']
     ServiceDetailsDrawer: typeof import('./src/components/services/ServiceDetailsDrawer.vue')['default']
     ServiceEditForm: typeof import('./src/components/network/ServiceEditForm.vue')['default']
     ServiceEndpointsTab: typeof import('./src/components/services/ServiceEndpointsTab.vue')['default']

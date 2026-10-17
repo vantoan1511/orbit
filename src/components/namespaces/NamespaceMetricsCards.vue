@@ -234,7 +234,9 @@ onMounted(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   System
                 </div>
-                <div class="text-2xl font-bold mt-1 text-(--accent) truncate">{{ systemCount }}</div>
+                <div class="text-2xl font-bold mt-1 text-(--accent) truncate">
+                  {{ systemCount }}
+                </div>
               </div>
             </div>
             <div class="w-14 h-14 shrink-0 relative" v-if="systemChartData">

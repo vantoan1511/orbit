@@ -173,6 +173,25 @@ impl Configuration {
                 is_confidential: false,
                 cardinality: "1..1".to_string(),
                 enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "semanticColors".to_string(),
+                name: "Semantic Colors".to_string(),
+                description: "Custom semantic status colors for Success, Warning, Danger, and Info.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({
+                    "preset": "default",
+                    "success": "emerald",
+                    "warning": "amber",
+                    "danger": "rose",
+                    "info": "blue"
+                })),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
                 created_at: Some(created),
                 last_updated_at: None,
             },
@@ -340,6 +359,22 @@ impl OrbitConfig {
             .and_then(|v| v.as_str())
             .unwrap_or("flat")
             .to_string()
+    }
+
+    /// Returns configured semantic colors. Defaults to default preset.
+    pub fn semantic_colors(&self) -> serde_json::Value {
+        self.values
+            .get("semanticColors")
+            .cloned()
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "preset": "default",
+                    "success": "emerald",
+                    "warning": "amber",
+                    "danger": "rose",
+                    "info": "blue"
+                })
+            })
     }
 
     /// Generates the unified `Configuration` model list sent to the frontend.
@@ -643,6 +678,19 @@ mod tests {
         let style_cfg = defs.iter().find(|c| c.key == "uiStyle").expect("uiStyle must exist");
         assert!(style_cfg.enable);
         assert_eq!(style_cfg.default_value, Some(serde_json::json!("flat")));
+
+        let semantic_cfg = defs.iter().find(|c| c.key == "semanticColors").expect("semanticColors must exist");
+        assert!(semantic_cfg.enable);
+        assert_eq!(
+            semantic_cfg.default_value,
+            Some(serde_json::json!({
+                "preset": "default",
+                "success": "emerald",
+                "warning": "amber",
+                "danger": "rose",
+                "info": "blue"
+            }))
+        );
     }
 
     #[test]
@@ -651,13 +699,37 @@ mod tests {
         assert_eq!(config.theme_mode(), "dark");
         assert_eq!(config.accent_color(), "blue");
         assert_eq!(config.ui_style(), "flat");
+        assert_eq!(
+            config.semantic_colors(),
+            serde_json::json!({
+                "preset": "default",
+                "success": "emerald",
+                "warning": "amber",
+                "danger": "rose",
+                "info": "blue"
+            })
+        );
 
         config.values.insert("themeMode".to_string(), serde_json::json!("light"));
         config.values.insert("accentColor".to_string(), serde_json::json!("emerald"));
         config.values.insert("uiStyle".to_string(), serde_json::json!("glass"));
+        config.values.insert(
+            "semanticColors".to_string(),
+            serde_json::json!({
+                "preset": "colorblind",
+                "success": "teal",
+                "warning": "amber",
+                "danger": "crimson",
+                "info": "sky"
+            }),
+        );
 
         assert_eq!(config.theme_mode(), "light");
         assert_eq!(config.accent_color(), "emerald");
         assert_eq!(config.ui_style(), "glass");
+        assert_eq!(
+            config.semantic_colors()["preset"],
+            "colorblind"
+        );
     }
 }

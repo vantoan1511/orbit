@@ -1,12 +1,22 @@
 import { updatePrimaryPalette } from '@primeuix/themes'
-import type { AccentColor, ThemeMode, UiStyle } from '../types/appearance.ts'
-import { getAccentPalette, getPrimeVuePaletteForAccent } from './appearanceConstants.ts'
+import type {
+  AccentColor,
+  SemanticColorsPreferences,
+  ThemeMode,
+  UiStyle
+} from '../types/appearance.ts'
+import {
+  getAccentPalette,
+  getPrimeVuePaletteForAccent,
+  resolveSemanticPalette
+} from './appearanceConstants.ts'
 
 export interface AppearanceDomSyncOptions {
   themeMode: ThemeMode
   resolvedTheme: 'dark' | 'light'
   accentColor: AccentColor
   uiStyle: UiStyle
+  semanticColors?: SemanticColorsPreferences
 }
 
 /**
@@ -44,6 +54,17 @@ export function syncAppearanceToDom(
   root.style.setProperty('--accent-soft', palette.soft)
   root.style.setProperty('--selection', palette.selection)
   root.style.setProperty('--input-focus', palette.accent)
+
+  // Semantic status CSS variables
+  const semanticPalette = resolveSemanticPalette(options.semanticColors, isDark)
+  root.style.setProperty('--success', semanticPalette.success.solid)
+  root.style.setProperty('--success-soft', semanticPalette.success.soft)
+  root.style.setProperty('--warning', semanticPalette.warning.solid)
+  root.style.setProperty('--warning-soft', semanticPalette.warning.soft)
+  root.style.setProperty('--danger', semanticPalette.danger.solid)
+  root.style.setProperty('--danger-soft', semanticPalette.danger.soft)
+  root.style.setProperty('--info', semanticPalette.info.solid)
+  root.style.setProperty('--info-soft', semanticPalette.info.soft)
 
   // PrimeVue primary palette sync & CSS variables
   const pvPalette = getPrimeVuePaletteForAccent(options.accentColor)

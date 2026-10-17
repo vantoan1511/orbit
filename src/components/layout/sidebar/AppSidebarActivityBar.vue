@@ -53,7 +53,10 @@ const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
         v-tooltip.right="
           isCategoryDisabled(cat) ? `${cat.name} (Requires active cluster)` : cat.name
         "
-        :class="['relative inline-flex items-center justify-center', isCategoryDisabled(cat) && 'cursor-not-allowed']"
+        :class="[
+          'relative inline-flex items-center justify-center',
+          isCategoryDisabled(cat) && 'cursor-not-allowed'
+        ]"
       >
         <span :class="getActivityBarIndicatorClass(activeTab === cat.id)" />
         <Button

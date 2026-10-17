@@ -5,6 +5,7 @@ import { THEME_STORAGE_KEY } from '../themeService.ts'
 import { storage } from '../nativeService.ts'
 import {
   DEFAULT_APPEARANCE_PREFERENCES,
+  DEFAULT_SEMANTIC_COLORS_PREFERENCES,
   type AppearancePreferences
 } from '../../types/appearance.ts'
 
@@ -29,7 +30,8 @@ test('appearanceService.loadAppearancePreferences loads saved preferences', asyn
   const customPrefs: AppearancePreferences = {
     themeMode: 'dark',
     accentColor: 'emerald',
-    uiStyle: 'glass'
+    uiStyle: 'glass',
+    semanticColors: { ...DEFAULT_SEMANTIC_COLORS_PREFERENCES }
   }
 
   storage.getData = async (key: string) => {
@@ -98,7 +100,8 @@ test('appearanceService.saveAppearancePreferences persists preferences and syncs
   const prefsToSave: AppearancePreferences = {
     themeMode: 'light',
     accentColor: 'violet',
-    uiStyle: 'aero'
+    uiStyle: 'aero',
+    semanticColors: { ...DEFAULT_SEMANTIC_COLORS_PREFERENCES }
   }
 
   try {
@@ -152,6 +155,71 @@ test('appearanceService.saveAppearancePreferences dispatches updateAppSettings t
     assert.equal(dispatchedPayload.themeMode, 'light')
     assert.equal(dispatchedPayload.accentColor, 'violet')
     assert.equal(dispatchedPayload.uiStyle, 'aero')
+  } finally {
+    coreEngine.dispatch = originalDispatch
+  }
+})
+
+test('appearanceService.loadAppearancePreferences sanitizes corrupted semanticColors values', async () => {
+  const originalGetData = storage.getData
+
+  storage.getData = async (key: string) => {
+    if (key === APPEARANCE_STORAGE_KEY) {
+      return JSON.stringify({
+        themeMode: 'dark',
+        accentColor: 'blue',
+        uiStyle: 'flat',
+        semanticColors: {
+          preset: 'invalid_preset',
+          success: 'non_existent_color',
+          warning: 123
+        }
+      })
+    }
+    throw new Error('Not found')
+  }
+
+  try {
+    const prefs = await appearanceService.loadAppearancePreferences()
+    assert.ok(prefs.semanticColors)
+    assert.equal(prefs.semanticColors.preset, 'default')
+    assert.equal(prefs.semanticColors.success, 'emerald')
+    assert.equal(prefs.semanticColors.warning, 'amber')
+    assert.equal(prefs.semanticColors.danger, 'rose')
+    assert.equal(prefs.semanticColors.info, 'blue')
+  } finally {
+    storage.getData = originalGetData
+  }
+})
+
+test('appearanceService.saveAppearancePreferences dispatches semanticColors to config system', async () => {
+  const { coreEngine } = await import('../nativeService.ts')
+  const originalDispatch = coreEngine.dispatch
+  let dispatchedPayload: Record<string, unknown> | null = null
+
+  coreEngine.dispatch = async (event: string, data?: unknown) => {
+    if (event === 'updateAppSettings') {
+      dispatchedPayload = data as Record<string, unknown>
+    }
+  }
+
+  const prefsToSave: AppearancePreferences = {
+    themeMode: 'light',
+    accentColor: 'violet',
+    uiStyle: 'aero',
+    semanticColors: {
+      preset: 'colorblind',
+      success: 'teal',
+      warning: 'amber',
+      danger: 'crimson',
+      info: 'sky'
+    }
+  }
+
+  try {
+    await appearanceService.saveAppearancePreferences(prefsToSave)
+    assert.ok(dispatchedPayload)
+    assert.deepEqual(dispatchedPayload.semanticColors, prefsToSave.semanticColors)
   } finally {
     coreEngine.dispatch = originalDispatch
   }

@@ -88,7 +88,9 @@ const disabledPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ auditCount }}
             </div>
-            <div class="text-[10px] text-(--accent) font-medium mt-0.5 truncate">{{ auditPct }}%</div>
+            <div class="text-[10px] text-(--accent) font-medium mt-0.5 truncate">
+              {{ auditPct }}%
+            </div>
           </div>
         </div>
       </template>

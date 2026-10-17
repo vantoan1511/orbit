@@ -3,6 +3,11 @@ import type {
   AccentColor,
   AccentColorDefinition,
   AccentColorPalette,
+  SemanticColorOption,
+  SemanticColorRole,
+  SemanticColorShade,
+  SemanticColorsPreferences,
+  SemanticPresetId,
   ThemeMode,
   UiStyle,
   UiStyleDefinition
@@ -310,4 +315,173 @@ export function getUiStyleTokens(style: UiStyle, isDark: boolean): UiStyleTokens
   }
 }
 
+export const SEMANTIC_ROLE_OPTIONS: Record<SemanticColorRole, readonly SemanticColorOption[]> = {
+  success: [
+    {
+      id: 'emerald',
+      name: 'Emerald (Standard)',
+      light: { solid: '#28a745', soft: 'rgba(40, 167, 69, 0.12)' },
+      dark: { solid: '#46d16e', soft: 'rgba(70, 209, 110, 0.14)' }
+    },
+    {
+      id: 'forest',
+      name: 'Forest Green',
+      light: { solid: '#15803d', soft: 'rgba(21, 128, 61, 0.12)' },
+      dark: { solid: '#22c55e', soft: 'rgba(34, 197, 94, 0.14)' }
+    },
+    {
+      id: 'mint',
+      name: 'Fresh Mint',
+      light: { solid: '#059669', soft: 'rgba(5, 150, 105, 0.12)' },
+      dark: { solid: '#10b981', soft: 'rgba(16, 185, 129, 0.14)' }
+    },
+    {
+      id: 'teal',
+      name: 'Deep Teal',
+      light: { solid: '#0f766e', soft: 'rgba(15, 118, 110, 0.12)' },
+      dark: { solid: '#14b8a6', soft: 'rgba(20, 184, 166, 0.14)' }
+    }
+  ],
+  warning: [
+    {
+      id: 'amber',
+      name: 'Amber (Standard)',
+      light: { solid: '#f4a100', soft: 'rgba(244, 161, 0, 0.12)' },
+      dark: { solid: '#ffc54d', soft: 'rgba(255, 197, 77, 0.14)' }
+    },
+    {
+      id: 'orange',
+      name: 'Vivid Orange',
+      light: { solid: '#ea580c', soft: 'rgba(234, 88, 12, 0.12)' },
+      dark: { solid: '#fb923c', soft: 'rgba(251, 146, 60, 0.14)' }
+    },
+    {
+      id: 'yellow',
+      name: 'Bright Yellow',
+      light: { solid: '#ca8a04', soft: 'rgba(202, 138, 4, 0.12)' },
+      dark: { solid: '#facc15', soft: 'rgba(250, 204, 21, 0.14)' }
+    },
+    {
+      id: 'bronze',
+      name: 'Warm Bronze',
+      light: { solid: '#b45309', soft: 'rgba(180, 83, 9, 0.12)' },
+      dark: { solid: '#f59e0b', soft: 'rgba(245, 158, 11, 0.14)' }
+    }
+  ],
+  danger: [
+    {
+      id: 'rose',
+      name: 'Rose (Standard)',
+      light: { solid: '#d64545', soft: 'rgba(214, 69, 69, 0.12)' },
+      dark: { solid: '#ff6b6b', soft: 'rgba(255, 107, 107, 0.14)' }
+    },
+    {
+      id: 'crimson',
+      name: 'Crimson Red',
+      light: { solid: '#dc2626', soft: 'rgba(220, 38, 38, 0.12)' },
+      dark: { solid: '#f87171', soft: 'rgba(248, 113, 113, 0.14)' }
+    },
+    {
+      id: 'ruby',
+      name: 'Vibrant Ruby',
+      light: { solid: '#e11d48', soft: 'rgba(225, 29, 72, 0.12)' },
+      dark: { solid: '#fb7185', soft: 'rgba(251, 113, 133, 0.14)' }
+    },
+    {
+      id: 'coral',
+      name: 'Deep Coral',
+      light: { solid: '#be123c', soft: 'rgba(190, 18, 60, 0.12)' },
+      dark: { solid: '#f43f5e', soft: 'rgba(244, 63, 94, 0.14)' }
+    }
+  ],
+  info: [
+    {
+      id: 'blue',
+      name: 'Orbit Blue (Standard)',
+      light: { solid: '#3d8bff', soft: 'rgba(61, 139, 255, 0.12)' },
+      dark: { solid: '#6aa8ff', soft: 'rgba(106, 168, 255, 0.14)' }
+    },
+    {
+      id: 'cyan',
+      name: 'Electric Cyan',
+      light: { solid: '#0891b2', soft: 'rgba(8, 145, 178, 0.12)' },
+      dark: { solid: '#22d3ee', soft: 'rgba(34, 211, 238, 0.14)' }
+    },
+    {
+      id: 'sky',
+      name: 'Sky Blue',
+      light: { solid: '#0284c7', soft: 'rgba(2, 132, 199, 0.12)' },
+      dark: { solid: '#38bdf8', soft: 'rgba(56, 189, 248, 0.14)' }
+    },
+    {
+      id: 'indigo',
+      name: 'Deep Indigo',
+      light: { solid: '#4f46e5', soft: 'rgba(79, 70, 229, 0.12)' },
+      dark: { solid: '#818cf8', soft: 'rgba(129, 140, 248, 0.14)' }
+    }
+  ]
+} as const
 
+export const SEMANTIC_COLOR_PRESETS: Record<
+  Exclude<SemanticPresetId, 'custom'>,
+  Omit<SemanticColorsPreferences, 'preset'>
+> = {
+  default: {
+    success: 'emerald',
+    warning: 'amber',
+    danger: 'rose',
+    info: 'blue'
+  },
+  colorblind: {
+    success: 'teal',
+    warning: 'amber',
+    danger: 'crimson',
+    info: 'sky'
+  },
+  'high-contrast': {
+    success: 'forest',
+    warning: 'orange',
+    danger: 'ruby',
+    info: 'indigo'
+  }
+} as const
+
+export interface ResolvedSemanticPalette {
+  success: SemanticColorShade
+  warning: SemanticColorShade
+  danger: SemanticColorShade
+  info: SemanticColorShade
+}
+
+function resolveRoleShade(
+  role: SemanticColorRole,
+  optionId: string | undefined,
+  isDark: boolean
+): SemanticColorShade {
+  const options = SEMANTIC_ROLE_OPTIONS[role]
+  const matched = options.find((opt) => opt.id === optionId) ?? options[0]!
+  return isDark ? matched.dark : matched.light
+}
+
+export function resolveSemanticPalette(
+  preferences?: Partial<SemanticColorsPreferences>,
+  isDark: boolean = false
+): ResolvedSemanticPalette {
+  const presetId = preferences?.preset ?? 'default'
+  const presetConfig =
+    presetId !== 'custom' && presetId in SEMANTIC_COLOR_PRESETS
+      ? SEMANTIC_COLOR_PRESETS[presetId as Exclude<SemanticPresetId, 'custom'>]
+      : SEMANTIC_COLOR_PRESETS.default
+
+  const successId = preferences?.success ?? presetConfig.success
+  const warningId = preferences?.warning ?? presetConfig.warning
+  const dangerId = preferences?.danger ?? presetConfig.danger
+  const infoId = preferences?.info ?? presetConfig.info
+
+  return {
+    success: resolveRoleShade('success', successId, isDark),
+    warning: resolveRoleShade('warning', warningId, isDark),
+    danger: resolveRoleShade('danger', dangerId, isDark),
+    info: resolveRoleShade('info', infoId, isDark)
+  }
+}

@@ -22,18 +22,18 @@ const statusColor = computed(() => {
     case KUBERNETES_VOLUME_STATUS.Bound:
     case KUBERNETES_VOLUME_STATUS.Available:
     case KUBERNETES_POD_STATUS.Succeeded:
-      return 'emerald'
+      return 'success'
     case KUBERNETES_POD_STATUS.Pending:
     case KUBERNETES_WORKLOAD_STATUS.Progressing:
     case KUBERNETES_VOLUME_STATUS.Released:
     case KUBERNETES_POD_STATUS.ContainerCreating:
     case KUBERNETES_EVENT_TYPE.Warning:
-      return 'amber'
+      return 'warning'
     case KUBERNETES_POD_STATUS.Failed:
     case KUBERNETES_POD_STATUS.CrashLoopBackOff:
     case KUBERNETES_POD_STATUS.Terminating:
     case KUBERNETES_POD_STATUS.Error:
-      return 'rose'
+      return 'danger'
     default:
       return 'gray'
   }
@@ -41,12 +41,12 @@ const statusColor = computed(() => {
 
 const dotClass = computed(() => {
   switch (statusColor.value) {
-    case 'emerald':
-      return 'bg-emerald-500'
-    case 'amber':
-      return 'bg-amber-500'
-    case 'rose':
-      return 'bg-rose-500'
+    case 'success':
+      return 'bg-(--success)'
+    case 'warning':
+      return 'bg-(--warning)'
+    case 'danger':
+      return 'bg-(--danger)'
     default:
       return 'bg-gray-400'
   }
@@ -54,12 +54,12 @@ const dotClass = computed(() => {
 
 const textClass = computed(() => {
   switch (statusColor.value) {
-    case 'emerald':
-      return 'text-emerald-500'
-    case 'amber':
-      return 'text-amber-500'
-    case 'rose':
-      return 'text-rose-500'
+    case 'success':
+      return 'text-(--success)'
+    case 'warning':
+      return 'text-(--warning)'
+    case 'danger':
+      return 'text-(--danger)'
     default:
       return 'text-gray-400'
   }
