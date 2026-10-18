@@ -15,6 +15,11 @@ test('enforces borderless decorations in tauri.conf.json', () => {
     false,
     'Main window must have decorations: false for borderless style'
   )
+  assert.equal(
+    mainWindow.dragDropEnabled,
+    false,
+    'Main window must have dragDropEnabled: false to enable HTML5 webview drag-and-drop'
+  )
 })
 
 test('enforces required core:window permissions in capabilities/default.json', () => {

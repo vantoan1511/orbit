@@ -5,9 +5,9 @@
  * - Inactive: recessed bg-(--bg-sidebar)/70, text-muted-color, hover:bg-(--bg-hover)/60, hover:text-primary,
  *   and structural bottom border border-b-(--border).
  */
-export function getTabContainerClass(isActive: boolean): string {
-  const base =
-    'group relative flex items-center gap-2 h-8 px-3 border-r border-(--border) text-xs cursor-pointer select-none transition-all duration-150 shrink-0 max-w-52 min-w-28'
+export function getTabContainerClass(isActive: boolean, isDragging = false): string {
+  const cursorClass = isDragging ? 'cursor-grabbing' : 'cursor-pointer'
+  const base = `group relative flex items-center gap-2 h-8 px-3 border-r border-(--border) text-xs ${cursorClass} select-none transition-all duration-150 shrink-0 max-w-52 min-w-28`
 
   if (isActive) {
     return `${base} bg-(--bg-card) text-primary font-medium border-t border-t-transparent border-b border-b-(--bg-card)`

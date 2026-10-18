@@ -123,3 +123,58 @@ test('useTabDragDrop manages drag state transitions and invokes onReorder', () =
   assert.equal(dnd.draggedIndex.value, null)
   assert.equal(dnd.draggedTabId.value, null)
 })
+
+test('handleDrop computes drop index from clientX midpoint fallback when dropPosition is null', () => {
+  let reorderCall: { from: number; to: number } | null = null
+
+  const dnd = useTabDragDrop({
+    onReorder: (from, to) => {
+      reorderCall = { from, to }
+    }
+  })
+
+  // Start dragging tab 0
+  dnd.handleDragStart(0, 'tab-0', { dataTransfer: null } as unknown as DragEvent)
+
+  // Spurious dragleave occurred so dropPosition and dropTargetIndex are null
+  assert.equal(dnd.dropPosition.value, null)
+
+  // Target tab index 2 is at left=200, width=100. clientX=280 (> midpoint 250 -> 'after')
+  const mockTargetElement = {
+    getBoundingClientRect: () => ({ left: 200, width: 100 })
+  }
+  const dropEvent = {
+    clientX: 280,
+    currentTarget: mockTargetElement,
+    preventDefault: () => {}
+  } as unknown as DragEvent
+
+  dnd.handleDrop(2, dropEvent)
+
+  // Moving 0 to after 2 -> index 2
+  assert.deepEqual(reorderCall, { from: 0, to: 2 })
+  assert.equal(dnd.draggedIndex.value, null)
+})
+
+test('handleContainerDrop moves dragged tab to the last position', () => {
+  let reorderCall: { from: number; to: number } | null = null
+
+  const dnd = useTabDragDrop({
+    totalTabs: () => 4,
+    onReorder: (from, to) => {
+      reorderCall = { from, to }
+    }
+  })
+
+  dnd.handleDragStart(0, 'tab-0', { dataTransfer: null } as unknown as DragEvent)
+
+  const containerDropEvent = {
+    preventDefault: () => {}
+  } as unknown as DragEvent
+
+  dnd.handleContainerDrop(containerDropEvent)
+
+  // Total tabs is 4 (indices 0, 1, 2, 3). Dropping onto container moves to index 3.
+  assert.deepEqual(reorderCall, { from: 0, to: 3 })
+  assert.equal(dnd.draggedIndex.value, null)
+})
