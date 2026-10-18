@@ -61,19 +61,34 @@ pub fn get_global_app_handle() -> Option<AppHandle> {
     GLOBAL_APP_HANDLE.read().ok().and_then(|lock| lock.clone())
 }
 
+/// Returns whether the single-instance plugin should be registered.
+/// In development mode, the single-instance guard is skipped to prevent clashes with a running production instance.
+pub fn should_register_single_instance() -> bool {
+    !crate::config::OrbitConfig::is_dev_mode()
+}
+
 pub fn run() {
     // Initialize file logger
     if let Err(e) = crate::logger::init() {
         eprintln!("Warning: Failed to initialize file logger: {}", e);
     }
 
-    let builder = tauri::Builder::default()
+    // In dev mode the compiled-in app identifier matches the production bundle identifier
+    // (vantoan1511.orbit), so tauri-plugin-single-instance's Windows mutex / macOS socket
+    // would prevent a dev instance from starting alongside a running production build.
+    // We therefore only register the single-instance guard when running in production mode.
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        .plugin(tauri_plugin_process::init());
+
+    if should_register_single_instance() {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             crate::tray::show_main_window(app);
-        }))
+        }));
+    }
+
+    let builder = builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -106,6 +121,13 @@ pub fn run() {
             // Show main window only if NOT launched with --hidden or --minimized
             if !crate::tray::is_hidden_launch(std::env::args()) {
                 crate::tray::show_main_window(&handle);
+            }
+
+            // If running in development mode, ensure window title reflects dev mode even if not launched with dev config overlay
+            if crate::config::OrbitConfig::is_dev_mode() {
+                if let Some(window) = handle.get_webview_window("main") {
+                    let _ = window.set_title("Orbit [Dev]");
+                }
             }
 
             // Reconcile OS autostart state with saved application configuration
@@ -156,5 +178,31 @@ mod tests {
         let state = AppState { kube_manager: km };
         assert!(state.kube_manager.blocking_read().active_context.is_none());
     }
+
+    #[test]
+    fn test_should_register_single_instance_in_dev_vs_prod() {
+        let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
+
+        // 1. In dev mode: single instance plugin must be skipped
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "1");
+        }
+        assert!(!super::should_register_single_instance());
+
+        // 2. In prod mode: single instance plugin must be registered
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "0");
+        }
+        assert!(super::should_register_single_instance());
+
+        // Restore env
+        unsafe {
+            match original_orbit_dev {
+                Some(val) => std::env::set_var("ORBIT_DEV", val),
+                None => std::env::remove_var("ORBIT_DEV"),
+            }
+        }
+    }
 }
+
 
