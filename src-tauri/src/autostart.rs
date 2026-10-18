@@ -4,6 +4,15 @@ use std::path::PathBuf;
 
 pub const DEFAULT_APP_NAME: &str = "Orbit";
 
+/// Returns the autostart registration key name ("Orbit Dev" in dev mode, "Orbit" in production).
+pub fn default_app_name() -> &'static str {
+    if crate::config::OrbitConfig::is_dev_mode() {
+        "Orbit Dev"
+    } else {
+        "Orbit"
+    }
+}
+
 /// Windows creation flag to suppress console window creation when running console binaries from a GUI subsystem process.
 #[cfg(target_os = "windows")]
 pub const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -33,6 +42,11 @@ pub struct AutostartManager {
 }
 
 impl AutostartManager {
+    /// Creates a new AutostartManager using the environment-appropriate default application name.
+    pub fn new_default() -> Result<Self, String> {
+        Self::new(default_app_name())
+    }
+
     /// Creates a new AutostartManager resolving the current running executable path.
     pub fn new(app_name: &str) -> Result<Self, String> {
         let current_exe = std::env::current_exe().map_err(|e| e.to_string())?;
@@ -225,7 +239,7 @@ impl AutostartManager {
 pub fn reconcile_on_startup() {
     let config = crate::config::OrbitConfig::load();
     let should_autostart = config.launch_on_startup();
-    match AutostartManager::new(DEFAULT_APP_NAME) {
+    match AutostartManager::new_default() {
         Ok(manager) => match manager.is_enabled() {
             Ok(is_enabled) => {
                 if should_autostart && !is_enabled {
@@ -313,5 +327,31 @@ mod tests {
         let cmd = new_reg_command();
         assert_eq!(cmd.get_program(), "reg");
     }
+
+    #[test]
+    fn test_autostart_default_app_name_dev_vs_prod() {
+        let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
+
+        // 1. Dev mode
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "1");
+        }
+        assert_eq!(default_app_name(), "Orbit Dev");
+
+        // 2. Prod mode
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "0");
+        }
+        assert_eq!(default_app_name(), "Orbit");
+
+        // Restore env
+        unsafe {
+            match original_orbit_dev {
+                Some(val) => std::env::set_var("ORBIT_DEV", val),
+                None => std::env::remove_var("ORBIT_DEV"),
+            }
+        }
+    }
 }
+
 

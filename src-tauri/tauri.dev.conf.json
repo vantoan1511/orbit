@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Orbit Dev",
+  "identifier": "vantoan1511.orbit.dev",
+  "app": {
+    "windows": [
+      {
+        "title": "Orbit [Dev]"
+      }
+    ]
+  }
+}

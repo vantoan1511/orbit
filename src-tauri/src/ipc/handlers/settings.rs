@@ -62,7 +62,7 @@ pub fn update_app_settings(
                     let autostart_enabled = current_config.launch_on_startup();
                     if prev_autostart != autostart_enabled {
                         let _ = tokio::task::spawn_blocking(move || {
-                            if let Ok(manager) = crate::autostart::AutostartManager::new(crate::autostart::DEFAULT_APP_NAME) {
+                            if let Ok(manager) = crate::autostart::AutostartManager::new_default() {
                                 let _ = if autostart_enabled {
                                     manager.enable()
                                 } else {
@@ -122,7 +122,7 @@ pub fn set_launch_on_startup(
         }
 
         let _ = tokio::task::spawn_blocking(move || {
-            match crate::autostart::AutostartManager::new(crate::autostart::DEFAULT_APP_NAME) {
+            match crate::autostart::AutostartManager::new_default() {
                 Ok(manager) => {
                     let res = if enabled {
                         manager.enable()

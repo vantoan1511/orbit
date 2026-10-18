@@ -207,11 +207,36 @@ pub struct OrbitConfig {
 }
 
 impl OrbitConfig {
-    /// Returns the path to the Orbit configuration directory (`~/.orbit`).
+    /// Determines whether Orbit is running in development mode.
+    /// Checked via `ORBIT_DEV` environment variable (if "1", "true", or "dev" -> dev mode; if "0" or "false" -> prod mode)
+    /// falling back to debug assertion compilation flags `cfg!(debug_assertions)`.
+    pub fn is_dev_mode() -> bool {
+        if let Ok(val) = std::env::var("ORBIT_DEV") {
+            let normalized = val.trim().to_lowercase();
+            if normalized == "1" || normalized == "true" || normalized == "dev" {
+                return true;
+            }
+            if normalized == "0" || normalized == "false" || normalized == "prod" {
+                return false;
+            }
+        }
+        cfg!(debug_assertions)
+    }
+
+    /// Returns the directory name for Orbit's user configuration (`.orbit-dev` vs `.orbit`).
+    pub fn config_dir_name() -> &'static str {
+        if Self::is_dev_mode() {
+            ".orbit-dev"
+        } else {
+            ".orbit"
+        }
+    }
+
+    /// Returns the path to the Orbit configuration directory (`~/.orbit` or `~/.orbit-dev`).
     pub fn config_dir() -> Option<PathBuf> {
         let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
         let mut path = PathBuf::from(home);
-        path.push(".orbit");
+        path.push(Self::config_dir_name());
         Some(path)
     }
 
@@ -732,4 +757,51 @@ mod tests {
             "colorblind"
         );
     }
+
+    #[test]
+    fn test_orbit_config_dev_mode_directory_resolution() {
+        // Save current env state
+        let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
+
+        // 1. Explicit Dev mode via ORBIT_DEV=1
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "1");
+        }
+        assert!(OrbitConfig::is_dev_mode());
+        assert_eq!(OrbitConfig::config_dir_name(), ".orbit-dev");
+        let dev_dir = OrbitConfig::config_dir().expect("config_dir should be resolved");
+        assert!(
+            dev_dir.ends_with(".orbit-dev"),
+            "dev config_dir should end with .orbit-dev, got {:?}",
+            dev_dir
+        );
+        let dev_logs = OrbitConfig::logs_dir().expect("logs_dir should be resolved");
+        assert!(
+            dev_logs.ends_with(".orbit-dev\\logs") || dev_logs.ends_with(".orbit-dev/logs"),
+            "dev logs_dir should end with .orbit-dev/logs, got {:?}",
+            dev_logs
+        );
+
+        // 2. Explicit Prod mode via ORBIT_DEV=0
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "0");
+        }
+        assert!(!OrbitConfig::is_dev_mode());
+        assert_eq!(OrbitConfig::config_dir_name(), ".orbit");
+        let prod_dir = OrbitConfig::config_dir().expect("config_dir should be resolved");
+        assert!(
+            prod_dir.ends_with(".orbit"),
+            "prod config_dir should end with .orbit, got {:?}",
+            prod_dir
+        );
+
+        // Restore env
+        unsafe {
+            match original_orbit_dev {
+                Some(val) => std::env::set_var("ORBIT_DEV", val),
+                None => std::env::remove_var("ORBIT_DEV"),
+            }
+        }
+    }
 }
+
