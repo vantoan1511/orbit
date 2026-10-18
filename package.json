@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
     "release": "node scripts/release.js",
     "build": "run-p type-check \"build-only {@}\" --",

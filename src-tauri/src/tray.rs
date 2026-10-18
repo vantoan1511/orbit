@@ -9,6 +9,24 @@ use tauri::{
 pub const TRAY_MENU_OPEN: &str = "open";
 pub const TRAY_MENU_QUIT: &str = "quit";
 
+/// Returns the system tray tooltip text based on development mode.
+pub fn tray_tooltip_label() -> &'static str {
+    if crate::config::OrbitConfig::is_dev_mode() {
+        "Orbit [Dev]"
+    } else {
+        "Orbit"
+    }
+}
+
+/// Returns the system tray "Open Orbit" menu item label based on development mode.
+pub fn tray_open_item_label() -> &'static str {
+    if crate::config::OrbitConfig::is_dev_mode() {
+        "Open Orbit [Dev]"
+    } else {
+        "Open Orbit"
+    }
+}
+
 /// Detects if Orbit was launched in the background (e.g. at OS startup) via `--hidden` or `--minimized`.
 pub fn is_hidden_launch<I, S>(args: I) -> bool
 where
@@ -32,7 +50,7 @@ pub fn show_main_window(app: &AppHandle) {
 
 /// Sets up the Orbit system tray icon, context menu, and click event handlers.
 pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open_item = MenuItemBuilder::with_id(TRAY_MENU_OPEN, "Open Orbit").build(app)?;
+    let open_item = MenuItemBuilder::with_id(TRAY_MENU_OPEN, tray_open_item_label()).build(app)?;
     let quit_item = MenuItemBuilder::with_id(TRAY_MENU_QUIT, "Quit Orbit").build(app)?;
     let menu = MenuBuilder::new(app)
         .item(&open_item)
@@ -41,7 +59,7 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
         .build()?;
 
     let mut builder = TrayIconBuilder::new()
-        .tooltip("Orbit")
+        .tooltip(tray_tooltip_label())
         .menu(&menu)
         .show_menu_on_left_click(false);
 
@@ -107,4 +125,32 @@ mod tests {
         let args: Vec<&str> = vec![];
         assert!(!is_hidden_launch(args));
     }
+
+    #[test]
+    fn test_tray_title_and_tooltip_labels() {
+        let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
+
+        // 1. Dev mode
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "1");
+        }
+        assert_eq!(tray_tooltip_label(), "Orbit [Dev]");
+        assert_eq!(tray_open_item_label(), "Open Orbit [Dev]");
+
+        // 2. Prod mode
+        unsafe {
+            std::env::set_var("ORBIT_DEV", "0");
+        }
+        assert_eq!(tray_tooltip_label(), "Orbit");
+        assert_eq!(tray_open_item_label(), "Open Orbit");
+
+        // Restore env
+        unsafe {
+            match original_orbit_dev {
+                Some(val) => std::env::set_var("ORBIT_DEV", val),
+                None => std::env::remove_var("ORBIT_DEV"),
+            }
+        }
+    }
 }
+

@@ -16,6 +16,7 @@ const searchStore = useSearchStore()
 const shortcutStore = useShortcutStore()
 const kubernetesStore = useKubernetesStore()
 const { activeCluster } = useCluster()
+const isDev = import.meta.env.DEV
 
 const searchTooltip = computed(() => {
   const shortcut = shortcutStore.getDisplayShortcut('quickOpen')
@@ -101,6 +102,13 @@ const clusterTooltip = computed(() => {
       <span v-else class="font-semibold text-muted-color text-xs tracking-tight">
         No active cluster
       </span>
+
+      <!-- Development mode indicator -->
+      <span
+        v-if="isDev"
+        class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 select-none cursor-help"
+        v-tooltip.bottom="'Orbit Development Instance (config: ~/.orbit-dev)'"
+      >DEV</span>
     </div>
 
     <!-- Center: Search Everywhere Trigger (Centered to Screen/Window) -->
