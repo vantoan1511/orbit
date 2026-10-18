@@ -135,6 +135,7 @@ const copyYaml = async () => {
 
 <template>
   <BaseResourceDrawer
+    data-component="node-details-drawer"
     v-model:active-tab="activeTab"
     :visible="visible"
     :has-resource="!!node"

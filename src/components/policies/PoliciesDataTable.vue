@@ -62,6 +62,7 @@ const getStatusSeverity = (status: string) => {
 
 <template>
   <GenericResourceTable
+    data-component="policies-data-table"
     :data="filteredPolicies"
     :initialColumns="columns"
     :hideStatusFilter="true"
@@ -82,7 +83,7 @@ const getStatusSeverity = (status: string) => {
     <!-- Custom Name -->
     <template #name="{ data }">
       <span
-        class="font-mono text-violet-400 hover:text-violet-300 transition-colors truncate"
+        class="font-mono text-(--accent) hover:underline transition-colors truncate"
         :title="data.name"
       >
         {{ data.name }}
@@ -127,7 +128,7 @@ const getStatusSeverity = (status: string) => {
         <template #body="{ data }">
           <span
             class="font-mono font-bold"
-            :class="data.violations > 0 ? 'text-red-400' : 'text-primary'"
+            :class="data.violations > 0 ? 'text-(--danger)' : 'text-primary'"
           >
             {{ data.violations }}
           </span>

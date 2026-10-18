@@ -121,14 +121,14 @@ const unknownChartData = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div data-component="pod-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
     <!-- Card 1: Total Pods -->
     <Card class="flex flex-col justify-between">
       <template #content>
         <div class="flex flex-col justify-between h-full">
           <div class="flex items-center gap-4">
             <div
-              class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
+              class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--color-pod) bg-(--accent-soft)"
             >
               <Box class="w-5 h-5" />
             </div>
@@ -148,7 +148,7 @@ const unknownChartData = computed(() => {
             </div>
             <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
-                class="h-full rounded-full bg-violet-500"
+                class="h-full rounded-full bg-(--color-pod)"
                 :style="{ width: (totalPods / maxPods) * 100 + '%' }"
               ></div>
             </div>
@@ -164,7 +164,7 @@ const unknownChartData = computed(() => {
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-4 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--success) bg-(--success-soft)"
               >
                 <CheckCircle2 class="w-5 h-5" />
               </div>
@@ -172,7 +172,7 @@ const unknownChartData = computed(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Running
                 </div>
-                <div class="text-2xl font-bold mt-1 text-emerald-500 truncate">
+                <div class="text-2xl font-bold mt-1 text-(--success) truncate">
                   {{ runningCount }}
                 </div>
               </div>
@@ -200,7 +200,7 @@ const unknownChartData = computed(() => {
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-4 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--warning) bg-(--warning-soft)"
               >
                 <Loader2 class="w-5 h-5 animate-spin" />
               </div>
@@ -208,7 +208,7 @@ const unknownChartData = computed(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Pending
                 </div>
-                <div class="text-2xl font-bold mt-1 text-amber-500 truncate">
+                <div class="text-2xl font-bold mt-1 text-(--warning) truncate">
                   {{ pendingCount }}
                 </div>
               </div>
@@ -236,7 +236,7 @@ const unknownChartData = computed(() => {
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-4 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--danger) bg-(--danger-soft)"
               >
                 <AlertTriangle class="w-5 h-5" />
               </div>
@@ -244,7 +244,7 @@ const unknownChartData = computed(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Failed
                 </div>
-                <div class="text-2xl font-bold mt-1 text-rose-500 truncate">
+                <div class="text-2xl font-bold mt-1 text-(--danger) truncate">
                   {{ failedCount }}
                 </div>
               </div>
@@ -258,7 +258,7 @@ const unknownChartData = computed(() => {
               />
             </div>
           </div>
-          <div class="mt-4 text-[10px] text-rose-500 font-medium truncate">
+          <div class="mt-4 text-[10px] text-(--danger) font-medium truncate">
             Requires operator intervention
           </div>
         </div>
@@ -272,7 +272,7 @@ const unknownChartData = computed(() => {
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-4 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-gray-400 bg-gray-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--text-muted) bg-(--bg-hover)"
               >
                 <HelpCircle class="w-5 h-5" />
               </div>
@@ -280,7 +280,7 @@ const unknownChartData = computed(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Unknown
                 </div>
-                <div class="text-2xl font-bold mt-1 text-gray-400 truncate">
+                <div class="text-2xl font-bold mt-1 text-(--text-muted) truncate">
                   {{ unknownCount }}
                 </div>
               </div>

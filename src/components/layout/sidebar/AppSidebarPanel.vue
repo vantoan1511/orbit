@@ -50,6 +50,7 @@ const startResize = (e: MouseEvent) => {
 <template>
   <div
     v-if="activeTab"
+    data-component="sidebar-panel"
     ref="panelRef"
     :style="{ width: `${panelWidth}px` }"
     class="relative flex flex-col h-full overflow-hidden border-r border-(--border) bg-(--bg-sidebar) select-none shrink-0"
@@ -66,7 +67,7 @@ const startResize = (e: MouseEvent) => {
 
     <!-- Resize Handle -->
     <div
-      class="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-primary/40 active:bg-primary transition-colors z-20 -mr-0.5"
+      class="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-(--accent)/40 active:bg-(--accent) transition-colors z-20 -mr-0.5"
       @mousedown="startResize"
     />
   </div>

@@ -22,9 +22,12 @@ import type {
   RawWorkloadResource,
   WorkloadInfo
 } from '@/types/kubernetes'
+import {
+  getPodStatusBadgeClass,
+  getWorkloadKindSeverity,
+  getWorkloadStatusBadgeClass
+} from '@/utils/severity'
 import { sortEventsDesc } from '@/utils/events'
-import { getPodStatusBadgeClass, getWorkloadKindSeverity } from '@/utils/severity'
-import { Activity, FileCode, Layers, Terminal } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
@@ -74,17 +77,7 @@ const workloadStatus = computed(() => {
   return KUBERNETES_WORKLOAD_STATUS.Running
 })
 
-const STATUS_BADGE_CLASSES: Record<string, string> = {
-  [KUBERNETES_WORKLOAD_STATUS.Running]: 'bg-emerald-500',
-  [KUBERNETES_JOB_STATUS.Succeeded]: 'bg-emerald-500',
-  [KUBERNETES_JOB_STATUS.Active]: 'bg-emerald-500',
-  [KUBERNETES_WORKLOAD_STATUS.Progressing]: 'bg-amber-500',
-  [KUBERNETES_POD_STATUS.Pending]: 'bg-amber-500',
-  [KUBERNETES_WORKLOAD_STATUS.Failed]: 'bg-rose-500',
-  [KUBERNETES_POD_STATUS.CrashLoopBackOff]: 'bg-rose-500'
-}
-
-const getStatusBadgeClass = (status: string) => STATUS_BADGE_CLASSES[status] ?? 'bg-emerald-500'
+const getStatusBadgeClass = (status: string) => getWorkloadStatusBadgeClass(status)
 
 const workloadNamespace = computed(() => props.workload?.namespace ?? '')
 const workloadName = computed(() => props.workload?.name ?? '')
@@ -322,6 +315,7 @@ const copyYaml = async () => {
 
 <template>
   <BaseResourceDrawer
+    data-component="workload-details-drawer"
     v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.workload"
@@ -339,7 +333,7 @@ const copyYaml = async () => {
         size="small"
         variant="outlined"
         class="text-xs flex items-center gap-1.5"
-        title="View Logs"
+        v-tooltip="'View Logs'"
         @click="viewLogs"
       >
         <Terminal class="w-3.5 h-3.5" />
@@ -351,7 +345,7 @@ const copyYaml = async () => {
         size="small"
         variant="outlined"
         class="text-xs flex items-center gap-1.5"
-        title="Edit YAML"
+        v-tooltip="'Edit YAML'"
         @click="editYaml"
       >
         <FileCode class="w-3.5 h-3.5" />

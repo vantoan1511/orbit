@@ -38,6 +38,7 @@ const fetchReplicaSets = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="replicasets-table"
     :data="k8sStore.replicaSets"
     :initialColumns="columns"
     :statuses="statuses"

@@ -154,6 +154,7 @@ declare module 'vue' {
     TabPanels: typeof import('primevue/tabpanels')['default']
     Tabs: typeof import('primevue/tabs')['default']
     Tag: typeof import('primevue/tag')['default']
+    Terminal: typeof import('primevue/terminal')['default']
     TerminalPanel: typeof import('./src/components/terminal/TerminalPanel.vue')['default']
     TerminalTab: typeof import('./src/components/terminal/TerminalTab.vue')['default']
     ThemeModeSelector: typeof import('./src/components/settings/appearance/ThemeModeSelector.vue')['default']

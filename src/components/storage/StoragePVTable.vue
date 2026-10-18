@@ -62,6 +62,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="storage-pv-table"
     :data="filteredPVs"
     :initialColumns="columns"
     :statuses="statuses"
@@ -88,8 +89,8 @@ const handleRefresh = async () => {
         </span>
         <AlertCircle
           v-if="data.status === KUBERNETES_VOLUME_STATUS.Failed"
-          class="w-3.5 h-3.5 text-rose-400"
-          :title="data.reason"
+          v-tooltip.top="data.reason"
+          class="w-3.5 h-3.5 text-(--danger)"
         />
       </div>
     </template>

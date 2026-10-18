@@ -175,6 +175,7 @@ const saveImages = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="deployments-table"
     :data="deployments"
     :initialColumns="columns"
     :statuses="statuses"
@@ -237,7 +238,7 @@ const saveImages = async () => {
           <span
             class="font-mono"
             :class="
-              data.available === data.replicas.desired ? 'text-emerald-500' : 'text-amber-500'
+              data.available === data.replicas.desired ? 'text-(--success)' : 'text-(--warning)'
             "
           >
             {{ data.available }}

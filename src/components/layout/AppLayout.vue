@@ -191,7 +191,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-screen w-screen overflow-hidden text-primary font-sans bg-(--bg-app)">
+  <div data-component="app-layout" class="flex flex-col h-screen w-screen overflow-hidden text-primary font-sans bg-(--bg-app)">
     <!-- Custom Borderless Window Title Bar -->
     <AppTitleBar />
 

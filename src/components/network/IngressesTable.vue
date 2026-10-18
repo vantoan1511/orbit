@@ -24,6 +24,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="ingresses-table"
     :data="k8sStore.ingresses"
     :initialColumns="columns"
     :hideStatusFilter="true"
@@ -47,7 +48,7 @@ const handleRefresh = async () => {
       <!-- Hosts Column -->
       <Column v-if="visibleCols['hosts']" field="hosts" header="Hosts" sortable class="p-3">
         <template #body="{ data }">
-          <span class="font-mono text-xs text-violet-400 whitespace-pre-line">{{
+          <span class="font-mono text-xs text-(--accent) whitespace-pre-line">{{
             data.hosts
           }}</span>
         </template>

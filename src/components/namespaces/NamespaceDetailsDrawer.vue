@@ -123,17 +123,18 @@ watch(
 const getStatusTextClass = (status: string) => {
   switch (status) {
     case KUBERNETES_NAMESPACE_STATUS.Active:
-      return 'text-emerald-400'
+      return 'text-(--success)'
     case KUBERNETES_NAMESPACE_STATUS.Terminating:
-      return 'text-amber-400'
+      return 'text-(--warning)'
     default:
-      return 'text-gray-400'
+      return 'text-(--text-muted)'
   }
 }
 </script>
 
 <template>
   <BaseResourceDrawer
+    data-component="namespace-details-drawer"
     v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.namespace"
@@ -143,7 +144,7 @@ const getStatusTextClass = (status: string) => {
       props.namespace?.status === KUBERNETES_NAMESPACE_STATUS.Active ? 'success' : 'warn'
     "
     :status-badge-class="
-      props.namespace ? getNamespaceStatusBadgeClass(props.namespace.status) : 'bg-gray-400'
+      props.namespace ? getNamespaceStatusBadgeClass(props.namespace.status) : 'bg-muted-color'
     "
     :show-yaml-tab="false"
     @update:visible="emit('update:visible', $event)"
@@ -250,7 +251,7 @@ const getStatusTextClass = (status: string) => {
             <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2">
               <div class="flex justify-between items-center text-xs">
                 <span class="text-muted-color font-semibold">CPU Usage</span>
-                <span class="font-mono font-bold text-violet-400">
+                <span class="font-mono font-bold text-(--accent)">
                   {{ props.namespace.cpuUsage }} ({{ props.namespace.cpuPercent }}%)
                 </span>
               </div>
@@ -268,7 +269,7 @@ const getStatusTextClass = (status: string) => {
             <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2">
               <div class="flex justify-between items-center text-xs">
                 <span class="text-muted-color font-semibold">Memory Usage</span>
-                <span class="font-mono font-bold text-blue-400">
+                <span class="font-mono font-bold text-(--color-service)">
                   {{ props.namespace.memoryUsage }} ({{ props.namespace.memoryPercent }}%)
                 </span>
               </div>
@@ -306,7 +307,7 @@ const getStatusTextClass = (status: string) => {
             </div>
             <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
               <div
-                class="h-full bg-violet-500 rounded-full transition-all duration-500"
+                class="h-full bg-(--accent) rounded-full transition-all duration-500"
                 :style="{
                   width: `${Math.min(100, props.namespace.resourceQuota.cpuPercent)}%`
                 }"
@@ -331,7 +332,7 @@ const getStatusTextClass = (status: string) => {
             </div>
             <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
               <div
-                class="h-full bg-blue-500 rounded-full transition-all duration-500"
+                class="h-full bg-(--color-service) rounded-full transition-all duration-500"
                 :style="{
                   width: `${Math.min(100, props.namespace.resourceQuota.memoryPercent)}%`
                 }"

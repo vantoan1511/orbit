@@ -88,14 +88,14 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+  <div data-component="namespace-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
     <!-- Card 1: Total Namespaces -->
     <Card>
       <template #content>
         <div class="flex flex-col gap-3">
           <div class="flex items-center gap-3">
             <div
-              class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-violet-400 bg-violet-500/10"
+              class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--accent) bg-(--accent-soft)"
             >
               <FolderOpen class="w-5 h-5" />
             </div>
@@ -120,7 +120,7 @@ onMounted(() => {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-emerald-400 bg-emerald-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--success) bg-(--success-soft)"
               >
                 <CheckCircle2 class="w-5 h-5" />
               </div>
@@ -128,7 +128,7 @@ onMounted(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Active
                 </div>
-                <div class="text-2xl font-bold mt-1 text-emerald-500 truncate">
+                <div class="text-2xl font-bold mt-1 text-(--success) truncate">
                   {{ activeCount }}
                 </div>
               </div>
@@ -156,7 +156,7 @@ onMounted(() => {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-amber-400 bg-amber-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--warning) bg-(--warning-soft)"
               >
                 <Loader2 class="w-5 h-5 animate-spin" />
               </div>
@@ -164,7 +164,7 @@ onMounted(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Terminating
                 </div>
-                <div class="text-2xl font-bold mt-1 text-amber-500 truncate">
+                <div class="text-2xl font-bold mt-1 text-(--warning) truncate">
                   {{ terminatingCount }}
                 </div>
               </div>
@@ -194,7 +194,7 @@ onMounted(() => {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-rose-400 bg-rose-500/10"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--danger) bg-(--danger-soft)"
               >
                 <XCircle class="w-5 h-5" />
               </div>
@@ -202,7 +202,7 @@ onMounted(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Failed
                 </div>
-                <div class="text-2xl font-bold mt-1 text-rose-500 truncate">{{ failedCount }}</div>
+                <div class="text-2xl font-bold mt-1 text-(--danger) truncate">{{ failedCount }}</div>
               </div>
             </div>
             <div class="w-14 h-14 shrink-0 relative" v-if="failedChartData">
@@ -226,7 +226,7 @@ onMounted(() => {
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div
-                class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-(--accent) bg-(--accent-soft)"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 text-(--accent) bg-(--accent-soft)"
               >
                 <Shield class="w-5 h-5" />
               </div>

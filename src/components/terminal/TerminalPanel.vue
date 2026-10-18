@@ -95,6 +95,7 @@ function handleToggleMaximize() {
 <template>
   <div
     v-if="terminalStore.isOpen"
+    data-component="terminal-panel"
     class="flex flex-col bg-(--bg-app) border-t border-(--border) relative shrink-0 z-30 select-none"
     :class="getTerminalPanelTransitionClass(isDragging)"
     :style="{ height: displayHeight }"

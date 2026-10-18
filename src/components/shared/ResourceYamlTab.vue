@@ -14,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="h-full flex flex-col space-y-3">
+  <div data-component="resource-yaml-tab" class="h-full flex flex-col space-y-3">
     <div class="flex items-center justify-between">
       <span class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
         Live Kubernetes Manifest
@@ -32,9 +32,9 @@ const emit = defineEmits<{
     </div>
 
     <div
-      class="flex-1 min-h-64 bg-zinc-950 rounded-lg border border-zinc-800 p-4 overflow-auto font-mono text-[10px] text-zinc-300 leading-relaxed"
+      class="flex-1 min-h-64 bg-(--bg-card) rounded-[var(--ui-radius-card)] border border-(--border) p-4 overflow-auto font-mono text-[10px] text-primary leading-relaxed"
     >
-      <div v-if="isYamlLoading" class="text-zinc-500 italic py-4 text-center">
+      <div v-if="isYamlLoading" class="text-muted-color italic py-4 text-center">
         Loading live YAML manifest...
       </div>
       <pre v-else>{{ displayedYaml }}</pre>

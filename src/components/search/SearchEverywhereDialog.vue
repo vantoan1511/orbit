@@ -189,6 +189,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
 
 <template>
   <Dialog
+    data-component="search-everywhere-dialog"
     v-model:visible="searchStore.isOpen"
     modal
     dismissableMask
@@ -202,7 +203,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
       mask: { class: 'bg-black/50 backdrop-blur-[2px]' },
       content: {
         class:
-          'p-0 overflow-hidden rounded-lg border border-(--border) bg-(--bg-card) shadow-(--shadow)'
+          'p-0 overflow-hidden rounded-[var(--ui-radius-card)] border border-(--border) bg-(--bg-card) shadow-(--shadow)'
       }
     }"
   >

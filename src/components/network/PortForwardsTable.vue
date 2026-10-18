@@ -166,6 +166,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="port-forwards-table"
     :data="filteredPortForwards"
     :dataKey="'id'"
     :initialColumns="columns"

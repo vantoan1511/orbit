@@ -345,13 +345,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <AppLayout />
-  <Toast />
-  <ConfirmDialog />
-  <DynamicDialog />
-  <UpdaterNotifications />
-  <UpdaterDialog />
-  <NotificationDrawer />
-  <ProfileDrawer />
-  <SearchEverywhereDialog />
+  <div data-component="app-root" class="h-full w-full">
+    <AppLayout />
+    <Toast />
+    <ConfirmDialog />
+    <DynamicDialog />
+    <UpdaterNotifications />
+    <UpdaterDialog />
+    <NotificationDrawer />
+    <ProfileDrawer />
+    <SearchEverywhereDialog />
+  </div>
 </template>

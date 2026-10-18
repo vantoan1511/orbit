@@ -6,9 +6,9 @@ const { isRefreshing, refreshCluster } = useCluster()
 </script>
 
 <template>
-  <div class="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
-    <div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-full mb-6">
-      <ServerOff class="w-12 h-12 text-rose-500" />
+  <div data-component="offline-cluster-view" class="flex flex-col items-center justify-center min-h-[60vh] text-center p-6">
+    <div class="p-4 bg-(--danger-soft) border border-(--danger)/20 rounded-full mb-6">
+      <ServerOff class="w-12 h-12 text-(--danger)" />
     </div>
 
     <h2 class="text-2xl font-bold text-primary mb-2 tracking-tight">Cluster is Offline</h2>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAppearance } from '@/composables/useAppearance'
 import { useTheme } from '@/composables/useTheme'
 import { events } from '@/services/nativeService'
 import { terminalService } from '@/services/terminalService'
@@ -17,6 +18,7 @@ const props = defineProps<{
 }>()
 
 const { isDark } = useTheme()
+const { accentColor } = useAppearance()
 const terminalStore = useTerminalStore()
 
 const terminalContainer = ref<HTMLDivElement | null>(null)
@@ -31,12 +33,13 @@ function getTerminalTheme() {
   const bg = computedStyle.getPropertyValue('--bg-app').trim() || '#0b0d0f'
   const fg = computedStyle.getPropertyValue('--text-primary').trim() || '#ececed'
   const cursor = computedStyle.getPropertyValue('--accent').trim() || '#4f8cff'
+  const selection = computedStyle.getPropertyValue('--selection').trim() || 'rgba(79, 140, 255, 0.3)'
 
   return {
     background: bg,
     foreground: fg,
     cursor: cursor,
-    selectionBackground: 'rgba(79, 140, 255, 0.3)'
+    selectionBackground: selection
   }
 }
 
@@ -162,7 +165,7 @@ watch(
   }
 )
 
-watch(isDark, () => {
+watch([isDark, accentColor], () => {
   nextTick(() => {
     if (term) {
       term.options.theme = getTerminalTheme()
@@ -197,7 +200,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="w-full h-full bg-(--bg-app) overflow-hidden p-2 font-mono text-xs">
+  <div data-component="terminal-tab" class="w-full h-full bg-(--bg-app) overflow-hidden p-2 font-mono text-xs">
     <div ref="terminalContainer" class="w-full h-full overflow-hidden" />
   </div>
 </template>

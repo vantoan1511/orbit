@@ -135,13 +135,14 @@ const copyYaml = async () => {
 
 <template>
   <BaseResourceDrawer
+    data-component="service-details-drawer"
     v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.service"
     :title="props.service?.name ?? ''"
     :kind="props.service?.type ?? ''"
     :kind-severity="props.service ? getServiceTypeSeverity(props.service.type) : 'info'"
-    status-badge-class="bg-emerald-500"
+    status-badge-class="bg-(--success)"
     :namespace="props.service?.namespace"
     :age="props.service?.age"
     @update:visible="emit('update:visible', $event)"

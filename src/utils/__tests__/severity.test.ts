@@ -3,12 +3,16 @@ import test from 'node:test'
 import {
   getPodStatusBadgeClass,
   getNodeStatusBadgeClass,
-  getNamespaceStatusBadgeClass
+  getNamespaceStatusBadgeClass,
+  getWorkloadStatusBadgeClass,
+  getPolicyStatusBadgeClass
 } from '../severity.ts'
 import {
   KUBERNETES_NODE_STATUS,
   KUBERNETES_POD_STATUS,
-  KUBERNETES_NAMESPACE_STATUS
+  KUBERNETES_NAMESPACE_STATUS,
+  KUBERNETES_WORKLOAD_STATUS,
+  KUBERNETES_JOB_STATUS
 } from '../../constants/kubernetes.ts'
 
 test('getPodStatusBadgeClass returns semantic CSS variable classes', () => {
@@ -35,5 +39,22 @@ test('getNodeStatusBadgeClass and getNamespaceStatusBadgeClass return semantic C
     getNamespaceStatusBadgeClass(KUBERNETES_NAMESPACE_STATUS.Terminating),
     'bg-(--warning)'
   )
-  assert.equal(getNamespaceStatusBadgeClass('Unknown'), 'bg-gray-400')
+  assert.equal(getNamespaceStatusBadgeClass('Unknown'), 'bg-muted-color')
 })
+
+test('getWorkloadStatusBadgeClass and getPolicyStatusBadgeClass return semantic CSS variable classes', () => {
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Running), 'bg-(--success)')
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_JOB_STATUS.Succeeded), 'bg-(--success)')
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_JOB_STATUS.Active), 'bg-(--success)')
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Progressing), 'bg-(--warning)')
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_POD_STATUS.Pending), 'bg-(--warning)')
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Failed), 'bg-(--danger)')
+  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_POD_STATUS.CrashLoopBackOff), 'bg-(--danger)')
+  assert.equal(getWorkloadStatusBadgeClass('Unknown'), 'bg-muted-color')
+
+  assert.equal(getPolicyStatusBadgeClass('Enforced'), 'bg-(--success)')
+  assert.equal(getPolicyStatusBadgeClass('Audit'), 'bg-(--info)')
+  assert.equal(getPolicyStatusBadgeClass('Disabled'), 'bg-muted-color')
+  assert.equal(getPolicyStatusBadgeClass(undefined), 'bg-muted-color')
+})
+

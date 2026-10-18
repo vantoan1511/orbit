@@ -55,13 +55,13 @@ const pressures = computed(() => [
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div data-component="node-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
     <!-- Total Nodes -->
     <Card class="flex flex-col justify-between">
       <template #content>
         <div class="flex items-center gap-5">
           <div
-            class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-node/10 text-node"
+            class="w-12 h-12 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 bg-node/10 text-node"
           >
             <Server class="w-6 h-6" />
           </div>
@@ -75,7 +75,7 @@ const pressures = computed(() => [
             </div>
           </div>
         </div>
-        <div class="mt-4 text-xs text-emerald-500 font-medium">
+        <div class="mt-4 text-xs text-(--success) font-medium">
           {{ readyNodes }} Online ({{ onlinePct }}%)
         </div>
       </template>
@@ -86,7 +86,7 @@ const pressures = computed(() => [
       <template #content>
         <div class="flex items-center gap-5">
           <div
-            class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-blue-500/10 text-blue-400"
+            class="w-12 h-12 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 bg-(--accent-soft) text-(--accent)"
           >
             <Cpu class="w-6 h-6" />
           </div>
@@ -103,7 +103,7 @@ const pressures = computed(() => [
           </div>
           <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
-              class="h-full rounded-full bg-blue-500"
+              class="h-full rounded-full bg-(--accent)"
               :style="{ width: cpuMetrics.pct + '%' }"
             ></div>
           </div>
@@ -116,7 +116,7 @@ const pressures = computed(() => [
       <template #content>
         <div class="flex items-center gap-5">
           <div
-            class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-indigo-500/10 text-indigo-400"
+            class="w-12 h-12 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 bg-(--accent-soft) text-(--color-node)"
           >
             <Database class="w-6 h-6" />
           </div>
@@ -133,7 +133,7 @@ const pressures = computed(() => [
           </div>
           <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
-              class="h-full rounded-full bg-indigo-500"
+              class="h-full rounded-full bg-(--color-node)"
               :style="{ width: memMetrics.pct + '%' }"
             ></div>
           </div>
@@ -146,7 +146,7 @@ const pressures = computed(() => [
       <template #content>
         <div class="flex items-center gap-5">
           <div
-            class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-sky-500/10 text-sky-400"
+            class="w-12 h-12 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 bg-(--accent-soft) text-(--color-pod)"
           >
             <Box class="w-6 h-6" />
           </div>
@@ -166,7 +166,7 @@ const pressures = computed(() => [
           </div>
           <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
             <div
-              class="h-full rounded-full bg-sky-500"
+              class="h-full rounded-full bg-(--color-pod)"
               :style="{ width: podMetrics.pct + '%' }"
             ></div>
           </div>
@@ -179,9 +179,9 @@ const pressures = computed(() => [
       <template #content>
         <div class="flex items-center gap-5">
           <div
-            class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+            class="w-12 h-12 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0"
             :class="
-              allReady ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+              allReady ? 'bg-(--success-soft) text-(--success)' : 'bg-(--warning-soft) text-(--warning)'
             "
           >
             <Activity class="w-6 h-6" />
@@ -192,7 +192,7 @@ const pressures = computed(() => [
             </div>
             <div
               class="text-2xl font-bold mt-1"
-              :class="allReady ? 'text-emerald-500' : 'text-amber-500'"
+              :class="allReady ? 'text-(--success)' : 'text-(--warning)'"
             >
               {{ allReady ? 'Normal' : 'Warning' }}
             </div>
@@ -203,7 +203,7 @@ const pressures = computed(() => [
             <span v-for="p in pressures" :key="p.name" class="flex items-center gap-1">
               <span
                 class="w-1.5 h-1.5 rounded-full"
-                :class="p.ok ? 'bg-emerald-500' : 'bg-amber-500'"
+                :class="p.ok ? 'bg-(--success)' : 'bg-(--warning)'"
               ></span>
               {{ p.name }}
             </span>

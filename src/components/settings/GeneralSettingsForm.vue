@@ -118,7 +118,7 @@ const formatArrayValue = (val: unknown): string => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-10">
+  <div data-component="general-settings-form" class="flex flex-col gap-10">
     <!-- Header info -->
     <div>
       <h3 class="text-base font-semibold text-primary">General Settings</h3>
@@ -322,7 +322,7 @@ const formatArrayValue = (val: unknown): string => {
         <p class="text-[11px] text-muted-color">Irreversible actions and configuration resets.</p>
       </div>
       <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-3">
-        <div class="bg-rose-500/5 p-4 rounded-lg flex flex-col gap-3 max-w-lg">
+        <div class="bg-(--danger-soft) p-4 rounded-[var(--ui-radius-card)] flex flex-col gap-3 max-w-lg">
           <span class="text-xs text-muted-color">
             These operations immediately wipe local caches and restore application defaults.
           </span>

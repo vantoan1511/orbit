@@ -106,11 +106,11 @@ const cardItems = computed(() => [
     value: totals.value.total,
     totalValue: null,
     icon: Boxes,
-    iconClass: 'text-violet-400 bg-violet-500/10',
+    iconClass: 'text-(--color-deployment) bg-(--accent-soft)',
     valueClass: 'text-primary',
     type: 'simple',
     footerText: 'All controllers active',
-    footerClass: 'text-emerald-500'
+    footerClass: 'text-(--success)'
   },
   {
     title: 'Replicas',
@@ -131,13 +131,13 @@ const cardItems = computed(() => [
     value: totals.value.upToDateReplicas,
     totalValue: totals.value.currentReplicas,
     icon: TrendingUp,
-    iconClass: 'text-cyan-400 bg-cyan-500/10',
+    iconClass: 'text-(--accent) bg-(--accent-soft)',
     valueClass: 'text-primary',
     type: 'progress',
     percentValue: Math.round(
       (totals.value.upToDateReplicas / (totals.value.currentReplicas || 1)) * 100
     ),
-    progressClass: 'bg-cyan-500',
+    progressClass: 'bg-(--accent)',
     footerText: 'synchronized'
   },
   {
@@ -145,12 +145,12 @@ const cardItems = computed(() => [
     value: totals.value.running,
     totalValue: null,
     icon: CheckCircle2,
-    iconClass: 'text-emerald-400 bg-emerald-500/10',
-    valueClass: 'text-emerald-500',
+    iconClass: 'text-(--success) bg-(--success-soft)',
+    valueClass: 'text-(--success)',
     type: 'chart',
     chartData: availableChartData.value,
     percentValue: Math.round((totals.value.running / (totals.value.total || 1)) * 100),
-    percentColorClass: 'text-emerald-500',
+    percentColorClass: 'text-(--success)',
     footerText: `${totals.value.running} of ${totals.value.total} deployments healthy`,
     footerClass: 'text-muted-color'
   },
@@ -159,12 +159,12 @@ const cardItems = computed(() => [
     value: totals.value.progressing,
     totalValue: null,
     icon: TrendingUp,
-    iconClass: 'text-amber-400 bg-amber-500/10',
-    valueClass: 'text-amber-500',
+    iconClass: 'text-(--warning) bg-(--warning-soft)',
+    valueClass: 'text-(--warning)',
     type: 'chart',
     chartData: progressingChartData.value,
     percentValue: Math.round((totals.value.progressing / (totals.value.total || 1)) * 100),
-    percentColorClass: 'text-amber-500',
+    percentColorClass: 'text-(--warning)',
     footerText: `${totals.value.progressing} deployment rolling out`,
     footerClass: 'text-muted-color'
   },
@@ -173,26 +173,26 @@ const cardItems = computed(() => [
     value: totals.value.failed,
     totalValue: null,
     icon: AlertTriangle,
-    iconClass: 'text-rose-400 bg-rose-500/10',
-    valueClass: 'text-rose-500',
+    iconClass: 'text-(--danger) bg-(--danger-soft)',
+    valueClass: 'text-(--danger)',
     type: 'chart',
     chartData: failedChartData.value,
     percentValue: Math.round((totals.value.failed / (totals.value.total || 1)) * 100),
-    percentColorClass: 'text-rose-500',
+    percentColorClass: 'text-(--danger)',
     footerText: 'Requires operator attention',
-    footerClass: 'text-rose-500'
+    footerClass: 'text-(--danger)'
   }
 ])
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
+  <div data-component="workload-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
     <Card v-for="(card, index) in cardItems" :key="index">
       <template #content>
         <div class="flex items-center gap-4">
           <div
             :class="[
-              'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+              'w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0',
               card.iconClass
             ]"
           >

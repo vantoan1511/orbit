@@ -48,6 +48,7 @@ const lastUpdatedDisplay = computed(() => {
 
 <template>
   <footer
+    data-component="app-footer"
     class="flex items-center justify-between gap-4 select-none bg-(--bg-sidebar) border-t border-(--border) px-3 py-1 text-[11px] font-medium shrink-0 z-20"
   >
     <!-- Left side: Breadcrumb slot -->

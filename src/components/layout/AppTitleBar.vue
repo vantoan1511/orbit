@@ -49,6 +49,7 @@ const clusterTooltip = computed(() => {
 
 <template>
   <header
+    data-component="app-titlebar"
     class="relative flex items-center justify-between h-8 w-full shrink-0 select-none bg-(--bg-sidebar) border-b border-(--border) text-xs z-30"
     data-tauri-drag-region
     @dblclick="toggleMaximize"
@@ -106,7 +107,7 @@ const clusterTooltip = computed(() => {
       <!-- Development mode indicator -->
       <span
         v-if="isDev"
-        class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0 select-none cursor-help"
+        class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-(--warning-soft) text-(--warning) border border-(--warning)/30 shrink-0 select-none cursor-help"
         v-tooltip.bottom="'Orbit Development Instance (config: ~/.orbit-dev)'"
       >DEV</span>
     </div>
@@ -120,7 +121,7 @@ const clusterTooltip = computed(() => {
         severity="secondary"
         variant="outlined"
         size="small"
-        class="group flex items-center justify-start gap-2 h-6 w-56 sm:w-64 md:w-80 px-2 text-xs text-muted-color bg-(--bg-hover)/40! dark:bg-(--bg-hover)/30! border-(--border)! hover:bg-(--bg-hover)/80! hover:border-(--border-strong)! hover:text-primary! active:bg-(--bg-active)! rounded-md font-normal cursor-pointer transition-all duration-150"
+        class="group flex items-center justify-start gap-2 h-6 w-56 sm:w-64 md:w-80 px-2 text-xs text-muted-color bg-(--bg-hover)/40! dark:bg-(--bg-hover)/30! border-(--border)! hover:bg-(--bg-hover)/80! hover:border-(--border-strong)! hover:text-primary! active:bg-(--bg-active)! rounded-[var(--ui-radius-control)] font-normal cursor-pointer transition-all duration-150"
         v-tooltip.bottom="searchTooltip"
         @click.stop="searchStore.open()"
         @dblclick.stop

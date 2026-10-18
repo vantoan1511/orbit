@@ -118,6 +118,7 @@ const handleMiddleClick = () => {
 
 <template>
   <div
+    data-component="app-tab-item"
     :class="[getTabContainerClass(isActive, isDragging), isDragging && 'opacity-40']"
     draggable="true"
     @click="emit('select')"

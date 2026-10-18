@@ -98,6 +98,7 @@ const handleResourceSelected = (payload: {
 
 <template>
   <div
+    data-component="app-tabbar"
     class="flex items-center select-none bg-(--bg-sidebar) h-8 text-xs shrink-0 z-10 w-full overflow-hidden border-b border-(--border)"
   >
     <!-- Scrollable Tab Items Strip -->

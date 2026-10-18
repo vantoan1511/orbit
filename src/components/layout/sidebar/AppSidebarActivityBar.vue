@@ -38,6 +38,7 @@ const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
 
 <template>
   <div
+    data-component="activity-bar"
     class="w-14 flex flex-col items-center py-3 border-r border-(--border) bg-(--bg-sidebar) shrink-0 select-none"
   >
     <!-- Orbit Brand Logo -->
@@ -126,7 +127,7 @@ const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
         </Button>
         <span
           v-if="notificationStore.unreadCount > 0"
-          class="absolute top-2 right-2 w-2 h-2 rounded-full bg-rose-500 pointer-events-none"
+          class="absolute top-2 right-2 w-2 h-2 rounded-full bg-(--danger) pointer-events-none"
         />
       </div>
 

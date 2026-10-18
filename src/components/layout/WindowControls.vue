@@ -13,6 +13,7 @@ const { isMaximized, minimize, toggleMaximize, close } = useWindowControls()
 
 <template>
   <div
+    data-component="window-controls"
     class="flex items-center select-none shrink-0 z-30"
     role="toolbar"
     aria-label="Window controls"

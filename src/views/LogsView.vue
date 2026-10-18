@@ -149,6 +149,7 @@ const LOG_ITEM_HEIGHT = 28
 
 <template>
   <div
+    data-component="logs-view"
     class="flex flex-col gap-2.5 h-full min-h-0 flex-1 overflow-hidden"
     :class="{ 'fixed inset-0 z-50 bg-(--bg-app) p-4 h-screen': isFullscreen }"
   >
@@ -173,7 +174,7 @@ const LOG_ITEM_HEIGHT = 28
 
     <!-- Controls Bar -->
     <div
-      class="bg-(--bg-card) border border-(--border) rounded-lg p-3 flex flex-col gap-2.5 shrink-0"
+      class="bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-card)] p-3 flex flex-col gap-2.5 shrink-0"
     >
       <!-- Row 1: Context Selection & Actions -->
       <div class="flex items-center justify-between gap-4 flex-wrap">

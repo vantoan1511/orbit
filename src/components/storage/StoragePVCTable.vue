@@ -35,6 +35,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="storage-pvc-table"
     :data="k8sStore.persistentVolumeClaims"
     :initialColumns="columns"
     :statuses="statuses"

@@ -48,13 +48,13 @@ const namespacesCount = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div data-component="service-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
     <!-- Card 1: Total Services -->
     <Card>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--bg-hover) flex items-center justify-center text-muted-color shrink-0"
           >
             <Network class="w-5 h-5" />
           </div>
@@ -78,7 +78,7 @@ const namespacesCount = computed(() => {
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--success-soft) flex items-center justify-center text-(--success) shrink-0"
           >
             <Circle class="w-5 h-5" />
           </div>
@@ -89,7 +89,7 @@ const namespacesCount = computed(() => {
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ clusterIPCount }}
             </div>
-            <div class="text-[10px] text-emerald-400 font-medium mt-0.5 truncate">
+            <div class="text-[10px] text-(--success) font-medium mt-0.5 truncate">
               {{ clusterIPPct }}
             </div>
           </div>
@@ -102,7 +102,7 @@ const namespacesCount = computed(() => {
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-(--accent-soft) flex items-center justify-center text-(--accent) shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--accent-soft) flex items-center justify-center text-(--accent) shrink-0"
           >
             <Cpu class="w-5 h-5" />
           </div>
@@ -126,7 +126,7 @@ const namespacesCount = computed(() => {
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-400 shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--accent-soft) flex items-center justify-center text-(--color-service) shrink-0"
           >
             <Cloud class="w-5 h-5" />
           </div>
@@ -137,7 +137,7 @@ const namespacesCount = computed(() => {
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ loadBalancerCount }}
             </div>
-            <div class="text-[10px] text-violet-400 font-medium mt-0.5 truncate">
+            <div class="text-[10px] text-(--color-service) font-medium mt-0.5 truncate">
               {{ loadBalancerPct }}
             </div>
           </div>
@@ -150,7 +150,7 @@ const namespacesCount = computed(() => {
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-400 shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--warning-soft) flex items-center justify-center text-(--warning) shrink-0"
           >
             <Globe class="w-5 h-5" />
           </div>
@@ -161,7 +161,7 @@ const namespacesCount = computed(() => {
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ externalNameCount }}
             </div>
-            <div class="text-[10px] text-amber-400 font-medium mt-0.5 truncate">
+            <div class="text-[10px] text-(--warning) font-medium mt-0.5 truncate">
               {{ externalNamePct }}
             </div>
           </div>

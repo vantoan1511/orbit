@@ -22,6 +22,7 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
 
 <template>
   <GenericResourceTable
+    data-component="pods-data-table"
     :data="k8sStore.pods"
     :initialColumns="columns"
     :statuses="statuses"
@@ -81,7 +82,7 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
               v-if="typeof data.cpuPct === 'number' && data.cpu && data.cpu !== '-'"
             >
               <div
-                class="h-full rounded-full bg-violet-500"
+                class="h-full rounded-full bg-(--accent)"
                 :style="{ width: Math.min(data.cpuPct || 0, 100) + '%' }"
               ></div>
             </div>
@@ -106,7 +107,7 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
               v-if="typeof data.memoryPct === 'number' && data.memory && data.memory !== '-'"
             >
               <div
-                class="h-full rounded-full bg-blue-500"
+                class="h-full rounded-full bg-(--color-node)"
                 :style="{ width: Math.min(data.memoryPct || 0, 100) + '%' }"
               ></div>
             </div>

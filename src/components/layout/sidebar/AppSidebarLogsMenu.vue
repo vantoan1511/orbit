@@ -230,7 +230,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
 </script>
 
 <template>
-  <div class="flex-1 overflow-hidden flex flex-col text-sm select-none">
+  <div data-component="sidebar-logs-menu" class="flex-1 overflow-hidden flex flex-col text-sm select-none">
     <div v-if="k8sStore.activeClusterId !== null" class="flex flex-col h-full min-h-0">
       <Accordion
         :value="activeAccordion"
@@ -294,7 +294,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                       "
                       class="w-3.5 h-3.5 shrink-0 text-muted-color"
                     />
-                    <Folder class="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                    <Folder class="w-3.5 h-3.5 shrink-0 text-(--warning)" />
                     <span class="truncate" v-html="highlightMatch(ns.name, searchQuery)"></span>
                     <span class="ml-auto text-xs text-muted-color"
                       >({{ ns.workloads.length }})</span

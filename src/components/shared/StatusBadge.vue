@@ -48,7 +48,7 @@ const dotClass = computed(() => {
     case 'danger':
       return 'bg-(--danger)'
     default:
-      return 'bg-gray-400'
+      return 'bg-(--text-muted)'
   }
 })
 
@@ -61,13 +61,13 @@ const textClass = computed(() => {
     case 'danger':
       return 'text-(--danger)'
     default:
-      return 'text-gray-400'
+      return 'text-(--text-muted)'
   }
 })
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5">
+  <div data-component="status-badge" class="flex items-center gap-1.5">
     <span class="w-1.5 h-1.5 rounded-full" :class="dotClass"></span>
     <span class="font-medium" :class="textClass">
       {{ props.status }}
