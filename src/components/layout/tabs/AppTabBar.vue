@@ -22,8 +22,11 @@ const {
   handleDragOver,
   handleDragLeave,
   handleDrop,
+  handleContainerDragOver,
+  handleContainerDrop,
   handleDragEnd
 } = useTabDragDrop({
+  totalTabs: () => tabsStore.tabs.length,
   onReorder: (from, to) => tabsStore.reorderTabs(from, to)
 })
 
@@ -102,6 +105,8 @@ const handleResourceSelected = (payload: {
       ref="tabsContainerRef"
       class="flex items-center flex-1 h-full overflow-x-auto overflow-y-hidden no-scrollbar"
       @wheel="handleWheel"
+      @dragover="handleContainerDragOver"
+      @drop="handleContainerDrop"
     >
       <AppTabItem
         v-for="(tab, index) in tabsStore.tabs"

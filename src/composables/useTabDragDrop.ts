@@ -23,6 +23,7 @@ export function calculateDropIndex(
 }
 
 export interface TabDragDropOptions {
+  totalTabs?: () => number
   onReorder: (fromIndex: number, toIndex: number) => void
 }
 
@@ -37,6 +38,8 @@ export interface UseTabDragDropReturn {
   handleDragOver: (index: number, event: DragEvent) => void
   handleDragLeave: (index: number, event: DragEvent) => void
   handleDrop: (index: number, event: DragEvent) => void
+  handleContainerDragOver: (event: DragEvent) => void
+  handleContainerDrop: (event: DragEvent) => void
   handleDragEnd: () => void
 }
 
@@ -99,13 +102,54 @@ export function useTabDragDrop(options: TabDragDropOptions): UseTabDragDropRetur
 
   function handleDrop(index: number, event: DragEvent): void {
     event.preventDefault()
-    if (draggedIndex.value === null || dropPosition.value === null) {
+    if (draggedIndex.value === null) {
       handleDragEnd()
       return
     }
 
-    const toIndex = calculateDropIndex(draggedIndex.value, index, dropPosition.value)
+    let finalDropPosition = dropPosition.value
+    if (!finalDropPosition) {
+      const currentTarget = event.currentTarget as HTMLElement | null
+      if (currentTarget) {
+        const rect = currentTarget.getBoundingClientRect()
+        const midpoint = rect.left + rect.width / 2
+        finalDropPosition = event.clientX < midpoint ? 'before' : 'after'
+      }
+    }
+
+    if (!finalDropPosition) {
+      handleDragEnd()
+      return
+    }
+
+    const toIndex = calculateDropIndex(draggedIndex.value, index, finalDropPosition)
     const fromIndex = draggedIndex.value
+
+    handleDragEnd()
+
+    if (toIndex !== fromIndex) {
+      options.onReorder(fromIndex, toIndex)
+    }
+  }
+
+  function handleContainerDragOver(event: DragEvent): void {
+    if (draggedIndex.value === null) return
+    event.preventDefault()
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move'
+    }
+  }
+
+  function handleContainerDrop(event: DragEvent): void {
+    event.preventDefault()
+    if (draggedIndex.value === null) {
+      handleDragEnd()
+      return
+    }
+
+    const fromIndex = draggedIndex.value
+    const total = options.totalTabs ? options.totalTabs() : 0
+    const toIndex = total > 0 ? total - 1 : 0
 
     handleDragEnd()
 
@@ -132,6 +176,8 @@ export function useTabDragDrop(options: TabDragDropOptions): UseTabDragDropRetur
     handleDragOver,
     handleDragLeave,
     handleDrop,
+    handleContainerDragOver,
+    handleContainerDrop,
     handleDragEnd
   }
 }

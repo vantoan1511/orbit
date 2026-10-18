@@ -118,7 +118,7 @@ const handleMiddleClick = () => {
 
 <template>
   <div
-    :class="[getTabContainerClass(isActive), isDragging && 'opacity-40']"
+    :class="[getTabContainerClass(isActive, isDragging), isDragging && 'opacity-40']"
     draggable="true"
     @click="emit('select')"
     @mousedown.middle.prevent="handleMiddleClick"

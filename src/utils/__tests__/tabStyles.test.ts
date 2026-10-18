@@ -29,6 +29,13 @@ test('getTabContainerClass returns inactive tab styling', () => {
   assert.equal(inactiveClass.includes('border-b-(--border)'), true)
 })
 
+test('getTabContainerClass applies cursor-grabbing when isDragging is true', () => {
+  assert.equal(getTabContainerClass(true, true).includes('cursor-grabbing'), true)
+  assert.equal(getTabContainerClass(true, true).includes('cursor-pointer'), false)
+  assert.equal(getTabContainerClass(true, false).includes('cursor-pointer'), true)
+  assert.equal(getTabContainerClass(false, false).includes('cursor-pointer'), true)
+})
+
 test('getTabCloseButtonClass returns visible opacity on active tab', () => {
   const activeBtnClass = getTabCloseButtonClass(true)
 
