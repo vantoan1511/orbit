@@ -145,4 +145,3 @@ export function getPolicyStatusBadgeClass(status?: string): string {
       return 'bg-muted-color'
   }
 }
-

@@ -31,7 +31,9 @@ const availablePct = computed(() => {
     <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
       Replicas Status
     </h3>
-    <div class="bg-(--bg-hover)/50 border border-(--border) rounded-[var(--ui-radius-card)] p-4 space-y-4">
+    <div
+      class="bg-(--bg-hover)/50 border border-(--border) rounded-[var(--ui-radius-card)] p-4 space-y-4"
+    >
       <div>
         <div class="flex justify-between text-xs mb-1">
           <span class="text-muted-color font-medium">Desired Replicas</span>
@@ -71,7 +73,10 @@ const availablePct = computed(() => {
           <span class="font-mono font-bold text-primary">{{ available }}</span>
         </div>
         <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
-          <div class="h-full rounded-full bg-(--accent)" :style="{ width: availablePct + '%' }"></div>
+          <div
+            class="h-full rounded-full bg-(--accent)"
+            :style="{ width: availablePct + '%' }"
+          ></div>
         </div>
       </div>
     </div>

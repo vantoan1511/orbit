@@ -43,7 +43,10 @@ const otherPct = computed(() =>
 </script>
 
 <template>
-  <div data-component="event-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div
+    data-component="event-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  >
     <!-- Card 1: Total Events -->
     <Card>
       <template #content>
@@ -130,7 +133,9 @@ const otherPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ errorCount }}
             </div>
-            <div class="text-[10px] text-(--danger) font-medium mt-0.5 truncate">{{ errorPct }}%</div>
+            <div class="text-[10px] text-(--danger) font-medium mt-0.5 truncate">
+              {{ errorPct }}%
+            </div>
           </div>
         </div>
       </template>

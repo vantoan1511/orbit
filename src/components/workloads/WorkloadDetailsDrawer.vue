@@ -7,12 +7,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { OrbitEvents } from '@/types/events'
-import {
-  KUBERNETES_JOB_STATUS,
-  KUBERNETES_POD_STATUS,
-  KUBERNETES_RESOURCE_KIND,
-  KUBERNETES_WORKLOAD_STATUS
-} from '@/constants/kubernetes'
+import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import type {
   CronJobInfo,
   DaemonSetReplicas,

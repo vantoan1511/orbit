@@ -48,4 +48,3 @@ test('BaseResourceDrawer and specialized drawers use semantic status classes and
     'PodDetailsDrawer must have data-component="pod-details-drawer"'
   )
 })
-

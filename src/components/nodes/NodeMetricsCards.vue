@@ -55,7 +55,10 @@ const pressures = computed(() => [
 </script>
 
 <template>
-  <div data-component="node-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div
+    data-component="node-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  >
     <!-- Total Nodes -->
     <Card class="flex flex-col justify-between">
       <template #content>
@@ -181,7 +184,9 @@ const pressures = computed(() => [
           <div
             class="w-12 h-12 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0"
             :class="
-              allReady ? 'bg-(--success-soft) text-(--success)' : 'bg-(--warning-soft) text-(--warning)'
+              allReady
+                ? 'bg-(--success-soft) text-(--success)'
+                : 'bg-(--warning-soft) text-(--warning)'
             "
           >
             <Activity class="w-6 h-6" />

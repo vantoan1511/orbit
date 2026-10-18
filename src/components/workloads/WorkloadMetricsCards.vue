@@ -186,7 +186,10 @@ const cardItems = computed(() => [
 </script>
 
 <template>
-  <div data-component="workload-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
+  <div
+    data-component="workload-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6"
+  >
     <Card v-for="(card, index) in cardItems" :key="index">
       <template #content>
         <div class="flex items-center gap-4">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useAppearance } from '@/composables/useAppearance'
 import { useTheme } from '@/composables/useTheme'
 import type { TooltipItem } from 'chart.js'
 import Chart from 'primevue/chart'
@@ -7,6 +8,7 @@ import { computed } from 'vue'
 
 const store = useKubernetesStore()
 const { isDark } = useTheme()
+const { accentColor } = useAppearance()
 
 const totalCpu = computed(() => {
   return store.nodes.reduce((acc, node) => acc + parseFloat(node.cpuTotal || '0'), 0)
@@ -49,6 +51,7 @@ function getCssVariable(name: string, fallback: string): string {
 }
 
 const cpuChartData = computed(() => {
+  void accentColor.value
   const fallbackCpu = isDark.value ? '#6aa8ff' : '#4f8cff'
   const cpuColor = getCssVariable('--accent', fallbackCpu)
   const trackColor = isDark.value ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'
@@ -188,7 +191,9 @@ const metrics = computed(() => [
           </div>
 
           <!-- Capacity Breakdown Well -->
-          <div class="grid grid-cols-3 gap-2 bg-(--bg-hover)/40 rounded-[var(--ui-radius-control)] p-3 mt-4 text-center">
+          <div
+            class="grid grid-cols-3 gap-2 bg-(--bg-hover)/40 rounded-[var(--ui-radius-control)] p-3 mt-4 text-center"
+          >
             <div class="flex flex-col items-center">
               <div class="flex items-center gap-1.5 text-[11px] text-muted-color font-medium">
                 <span class="w-2 h-2 rounded-full" :class="metric.dotClass"></span>

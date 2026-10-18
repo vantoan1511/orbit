@@ -230,7 +230,10 @@ const selectRecentLog = (log: RecentLogInfo) => {
 </script>
 
 <template>
-  <div data-component="sidebar-logs-menu" class="flex-1 overflow-hidden flex flex-col text-sm select-none">
+  <div
+    data-component="sidebar-logs-menu"
+    class="flex-1 overflow-hidden flex flex-col text-sm select-none"
+  >
     <div v-if="k8sStore.activeClusterId !== null" class="flex flex-col h-full min-h-0">
       <Accordion
         :value="activeAccordion"

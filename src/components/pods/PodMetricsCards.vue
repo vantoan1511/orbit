@@ -121,7 +121,10 @@ const unknownChartData = computed(() => {
 </script>
 
 <template>
-  <div data-component="pod-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div
+    data-component="pod-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  >
     <!-- Card 1: Total Pods -->
     <Card class="flex flex-col justify-between">
       <template #content>

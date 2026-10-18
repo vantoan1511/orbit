@@ -88,7 +88,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div data-component="namespace-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+  <div
+    data-component="namespace-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+  >
     <!-- Card 1: Total Namespaces -->
     <Card>
       <template #content>
@@ -202,7 +205,9 @@ onMounted(() => {
                 <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
                   Failed
                 </div>
-                <div class="text-2xl font-bold mt-1 text-(--danger) truncate">{{ failedCount }}</div>
+                <div class="text-2xl font-bold mt-1 text-(--danger) truncate">
+                  {{ failedCount }}
+                </div>
               </div>
             </div>
             <div class="w-14 h-14 shrink-0 relative" v-if="failedChartData">

@@ -109,7 +109,8 @@ const clusterTooltip = computed(() => {
         v-if="isDev"
         class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase bg-(--warning-soft) text-(--warning) border border-(--warning)/30 shrink-0 select-none cursor-help"
         v-tooltip.bottom="'Orbit Development Instance (config: ~/.orbit-dev)'"
-      >DEV</span>
+        >DEV</span
+      >
     </div>
 
     <!-- Center: Search Everywhere Trigger (Centered to Screen/Window) -->

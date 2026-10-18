@@ -90,7 +90,7 @@ const ADAPTED_COMPONENTS = [
   'src/components/settings/appearance/AccentColorPicker.vue',
   'src/components/settings/appearance/SemanticColorPicker.vue',
   'src/components/settings/appearance/SemanticPreviewCard.vue',
-  'src/components/settings/GeneralSettingsForm.vue',
+  'src/components/settings/GeneralSettingsForm.vue'
 ]
 
 test('verifies zero hardcoded semantic colors exist across adapted components and views', () => {
@@ -139,7 +139,7 @@ test('verifies all domain tables have data-component attribute', () => {
     'src/components/storage/StorageClassesTable.vue',
     'src/components/storage/StoragePVTable.vue',
     'src/components/storage/StoragePVCTable.vue',
-    'src/components/policies/PoliciesDataTable.vue',
+    'src/components/policies/PoliciesDataTable.vue'
   ]
 
   for (const file of tableFiles) {
@@ -161,7 +161,7 @@ test('verifies all resource drawers have data-component attribute', () => {
     'src/components/nodes/NodeDetailsDrawer.vue',
     'src/components/network/IngressDetailsDrawer.vue',
     'src/components/services/ServiceDetailsDrawer.vue',
-    'src/components/pods/PodDetailsDrawer.vue',
+    'src/components/pods/PodDetailsDrawer.vue'
   ]
 
   for (const file of drawerFiles) {

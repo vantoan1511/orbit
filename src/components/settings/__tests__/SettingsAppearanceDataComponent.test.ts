@@ -7,11 +7,23 @@ test('Settings components contain data-component attributes', () => {
   const settingsFiles = [
     { file: 'src/views/SettingsView.vue', tag: 'settings-view' },
     { file: 'src/components/settings/SettingsAppearanceTab.vue', tag: 'settings-appearance-tab' },
-    { file: 'src/components/settings/appearance/ThemeModeSelector.vue', tag: 'theme-mode-selector' },
+    {
+      file: 'src/components/settings/appearance/ThemeModeSelector.vue',
+      tag: 'theme-mode-selector'
+    },
     { file: 'src/components/settings/appearance/UiStyleSelector.vue', tag: 'ui-style-selector' },
-    { file: 'src/components/settings/appearance/AccentColorPicker.vue', tag: 'accent-color-picker' },
-    { file: 'src/components/settings/appearance/SemanticColorPicker.vue', tag: 'semantic-color-picker' },
-    { file: 'src/components/settings/appearance/SemanticPreviewCard.vue', tag: 'semantic-preview-card' },
+    {
+      file: 'src/components/settings/appearance/AccentColorPicker.vue',
+      tag: 'accent-color-picker'
+    },
+    {
+      file: 'src/components/settings/appearance/SemanticColorPicker.vue',
+      tag: 'semantic-color-picker'
+    },
+    {
+      file: 'src/components/settings/appearance/SemanticPreviewCard.vue',
+      tag: 'semantic-preview-card'
+    }
   ]
 
   for (const { file, tag } of settingsFiles) {

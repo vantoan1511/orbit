@@ -20,7 +20,7 @@ test('Domain data tables contain unique data-component attributes', () => {
     { file: 'src/components/storage/StorageClassesTable.vue', tag: 'storage-classes-table' },
     { file: 'src/components/storage/StoragePVTable.vue', tag: 'storage-pv-table' },
     { file: 'src/components/storage/StoragePVCTable.vue', tag: 'storage-pvc-table' },
-    { file: 'src/components/policies/PoliciesDataTable.vue', tag: 'policies-data-table' },
+    { file: 'src/components/policies/PoliciesDataTable.vue', tag: 'policies-data-table' }
   ]
 
   for (const { file, tag } of tableFiles) {

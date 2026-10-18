@@ -46,7 +46,10 @@ test('getWorkloadStatusBadgeClass and getPolicyStatusBadgeClass return semantic 
   assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Running), 'bg-(--success)')
   assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_JOB_STATUS.Succeeded), 'bg-(--success)')
   assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_JOB_STATUS.Active), 'bg-(--success)')
-  assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Progressing), 'bg-(--warning)')
+  assert.equal(
+    getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Progressing),
+    'bg-(--warning)'
+  )
   assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_POD_STATUS.Pending), 'bg-(--warning)')
   assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_WORKLOAD_STATUS.Failed), 'bg-(--danger)')
   assert.equal(getWorkloadStatusBadgeClass(KUBERNETES_POD_STATUS.CrashLoopBackOff), 'bg-(--danger)')
@@ -57,4 +60,3 @@ test('getWorkloadStatusBadgeClass and getPolicyStatusBadgeClass return semantic 
   assert.equal(getPolicyStatusBadgeClass('Disabled'), 'bg-muted-color')
   assert.equal(getPolicyStatusBadgeClass(undefined), 'bg-muted-color')
 })
-

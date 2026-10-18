@@ -11,10 +11,7 @@ test('AppTitleBar template includes data-component and uses semantic token class
     content.includes('data-component="app-titlebar"'),
     'AppTitleBar must have data-component="app-titlebar"'
   )
-  assert.ok(
-    content.includes('bg-(--warning-soft)'),
-    'DEV badge must use bg-(--warning-soft)'
-  )
+  assert.ok(content.includes('bg-(--warning-soft)'), 'DEV badge must use bg-(--warning-soft)')
   assert.ok(
     !content.includes('bg-amber-500/15'),
     'AppTitleBar must not contain hardcoded bg-amber-500/15'

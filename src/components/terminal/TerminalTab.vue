@@ -33,7 +33,8 @@ function getTerminalTheme() {
   const bg = computedStyle.getPropertyValue('--bg-app').trim() || '#0b0d0f'
   const fg = computedStyle.getPropertyValue('--text-primary').trim() || '#ececed'
   const cursor = computedStyle.getPropertyValue('--accent').trim() || '#4f8cff'
-  const selection = computedStyle.getPropertyValue('--selection').trim() || 'rgba(79, 140, 255, 0.3)'
+  const selection =
+    computedStyle.getPropertyValue('--selection').trim() || 'rgba(79, 140, 255, 0.3)'
 
   return {
     background: bg,
@@ -200,7 +201,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div data-component="terminal-tab" class="w-full h-full bg-(--bg-app) overflow-hidden p-2 font-mono text-xs">
+  <div
+    data-component="terminal-tab"
+    class="w-full h-full bg-(--bg-app) overflow-hidden p-2 font-mono text-xs"
+  >
     <div ref="terminalContainer" class="w-full h-full overflow-hidden" />
   </div>
 </template>

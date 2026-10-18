@@ -19,10 +19,7 @@ test('ResourceYamlTab adapts to theme tokens and drops hardcoded zinc colors', (
     !content.includes('border-zinc-800'),
     'ResourceYamlTab must not contain hardcoded border-zinc-800'
   )
-  assert.ok(
-    content.includes('bg-(--bg-card)'),
-    'ResourceYamlTab must use bg-(--bg-card)'
-  )
+  assert.ok(content.includes('bg-(--bg-card)'), 'ResourceYamlTab must use bg-(--bg-card)')
 })
 
 test('SearchEverywhereDialog uses dynamic radius and has data-component', () => {

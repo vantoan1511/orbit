@@ -11,18 +11,12 @@ test('PodMetricsCards uses semantic tokens and avoids hardcoded palette colors',
     content.includes('data-component="pod-metrics-cards"'),
     'PodMetricsCards must have data-component="pod-metrics-cards"'
   )
-  assert.ok(
-    content.includes('text-(--success)'),
-    'PodMetricsCards must use text-(--success)'
-  )
+  assert.ok(content.includes('text-(--success)'), 'PodMetricsCards must use text-(--success)')
   assert.ok(
     !content.includes('text-emerald-500'),
     'PodMetricsCards must not contain text-emerald-500'
   )
-  assert.ok(
-    !content.includes('bg-rose-500/10'),
-    'PodMetricsCards must not contain bg-rose-500/10'
-  )
+  assert.ok(!content.includes('bg-rose-500/10'), 'PodMetricsCards must not contain bg-rose-500/10')
 })
 
 test('All metric card components have designated data-component attributes', () => {
@@ -35,7 +29,7 @@ test('All metric card components have designated data-component attributes', () 
     { file: 'src/components/storage/StorageMetricsCards.vue', tag: 'storage-metrics-cards' },
     { file: 'src/components/policies/PoliciesMetricsCards.vue', tag: 'policies-metrics-cards' },
     { file: 'src/components/config/ConfigMetricsCards.vue', tag: 'config-metrics-cards' },
-    { file: 'src/components/events/EventMetricsCards.vue', tag: 'event-metrics-cards' },
+    { file: 'src/components/events/EventMetricsCards.vue', tag: 'event-metrics-cards' }
   ]
 
   for (const { file, tag } of metricsFiles) {

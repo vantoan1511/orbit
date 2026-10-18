@@ -113,7 +113,10 @@ const metrics = computed(() => {
 </script>
 
 <template>
-  <div data-component="config-metrics-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div
+    data-component="config-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+  >
     <Card v-for="metric in metrics" :key="metric.title">
       <template #content>
         <div class="flex items-center gap-4">
