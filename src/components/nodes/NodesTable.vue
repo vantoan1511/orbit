@@ -35,6 +35,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="nodes-table"
     :kind="KUBERNETES_RESOURCE_KIND.Node"
     :data="k8sStore.nodes"
     :initialColumns="columns"
@@ -90,7 +91,7 @@ const handleRefresh = async () => {
             </div>
             <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
-                class="h-full bg-blue-500 rounded-full"
+                class="h-full bg-(--accent) rounded-full"
                 :style="{ width: Math.min(data.cpuPct || 0, 100) + '%' }"
               ></div>
             </div>
@@ -118,7 +119,7 @@ const handleRefresh = async () => {
             </div>
             <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
-                class="h-full bg-indigo-500 rounded-full"
+                class="h-full bg-(--color-node) rounded-full"
                 :style="{ width: Math.min(data.memPct || 0, 100) + '%' }"
               ></div>
             </div>
@@ -146,7 +147,7 @@ const handleRefresh = async () => {
             </div>
             <div class="w-full h-1.5 rounded-full bg-(--bg-hover) overflow-hidden">
               <div
-                class="h-full bg-sky-500 rounded-full"
+                class="h-full bg-(--color-pod) rounded-full"
                 :style="{ width: (data.podsCount / data.podsLimit) * 100 + '%' }"
               ></div>
             </div>

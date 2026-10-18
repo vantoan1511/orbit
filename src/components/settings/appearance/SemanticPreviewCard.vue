@@ -3,7 +3,10 @@ import { Info } from '@lucide/vue'
 </script>
 
 <template>
-  <div class="p-4 rounded-lg bg-(--bg-hover)/40 border border-(--border) flex flex-col gap-3">
+  <div
+    data-component="semantic-preview-card"
+    class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 border border-(--border) flex flex-col gap-3"
+  >
     <div class="flex items-center justify-between gap-2">
       <span class="text-xs font-semibold text-primary uppercase tracking-wider">
         Live Status Preview
@@ -37,7 +40,9 @@ import { Info } from '@lucide/vue'
     </div>
 
     <!-- Sample Alert Banner Pill -->
-    <div class="flex items-center gap-2 p-2 rounded bg-(--info-soft) text-xs text-(--info)">
+    <div
+      class="flex items-center gap-2 p-2 rounded-[var(--ui-radius-control)] bg-(--info-soft) text-xs text-(--info)"
+    >
       <Info class="w-3.5 h-3.5 shrink-0 text-(--info)" />
       <span class="text-[11px] font-medium leading-none">
         Sample notification banner reacting in real time to semantic theme colors.

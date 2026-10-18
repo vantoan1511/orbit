@@ -161,6 +161,7 @@ const viewPodLogs = (containerName?: string) => {
 
 <template>
   <BaseResourceDrawer
+    data-component="pod-details-drawer"
     v-model:active-tab="activeTab"
     :visible="visible"
     :has-resource="!!pod"

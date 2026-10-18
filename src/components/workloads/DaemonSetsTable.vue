@@ -40,6 +40,7 @@ const fetchDaemonSets = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="daemonsets-table"
     :data="k8sStore.daemonSets"
     :initialColumns="columns"
     :statuses="statuses"
@@ -64,14 +65,14 @@ const fetchDaemonSets = async () => {
       <!-- Ready Column -->
       <Column v-if="visibleCols['ready']" header="Ready" class="p-3">
         <template #body="{ data }">
-          <span class="font-mono text-emerald-500">{{ data.replicas.ready }}</span>
+          <span class="font-mono text-(--success)">{{ data.replicas.ready }}</span>
         </template>
       </Column>
 
       <!-- Available Column -->
       <Column v-if="visibleCols['available']" header="Available" class="p-3">
         <template #body="{ data }">
-          <span class="font-mono text-emerald-400">{{ data.replicas.available }}</span>
+          <span class="font-mono text-(--success)">{{ data.replicas.available }}</span>
         </template>
       </Column>
 

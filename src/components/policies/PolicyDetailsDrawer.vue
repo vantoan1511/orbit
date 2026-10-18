@@ -6,6 +6,7 @@ import Button from 'primevue/button'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { resolveEditTargetParams } from '@/utils/workloadActions'
+import { getPolicyStatusBadgeClass } from '@/utils/severity'
 
 const props = defineProps<{
   visible: boolean
@@ -33,12 +34,6 @@ const getStatusSeverity = (status: string) => {
   }
 }
 
-const getPolicyBadgeClass = (status: string) => {
-  if (status === 'Enforced') return 'bg-emerald-500'
-  if (status === 'Audit') return 'bg-blue-500'
-  return 'bg-gray-500'
-}
-
 const handleEdit = () => {
   if (!props.policy) return
   const target = resolveEditTargetParams(props.policy, 'Policy')
@@ -55,13 +50,14 @@ const handleEdit = () => {
 
 <template>
   <BaseResourceDrawer
+    data-component="policy-details-drawer"
     v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.policy"
     :title="props.policy?.name ?? ''"
     :kind="props.policy?.status ?? ''"
     :kind-severity="props.policy ? getStatusSeverity(props.policy.status) : 'secondary'"
-    :status-badge-class="props.policy ? getPolicyBadgeClass(props.policy.status) : 'bg-gray-500'"
+    :status-badge-class="getPolicyStatusBadgeClass(props.policy?.status)"
     @update:visible="emit('update:visible', $event)"
   >
     <template #actions>
@@ -141,7 +137,7 @@ const handleEdit = () => {
               <span class="text-muted-color font-semibold">Violations (7d)</span>
               <span
                 class="col-span-2 font-mono font-bold"
-                :class="props.policy.violations > 0 ? 'text-rose-400' : 'text-primary'"
+                :class="props.policy.violations > 0 ? 'text-(--danger)' : 'text-primary'"
               >
                 {{ props.policy.violations }}
               </span>
@@ -161,9 +157,9 @@ const handleEdit = () => {
     <template #yaml>
       <div
         v-if="props.policy"
-        class="flex-1 min-h-64 border border-(--border) rounded-xl bg-zinc-950 p-4 overflow-y-auto"
+        class="flex-1 min-h-64 border border-(--border) rounded-[var(--ui-radius-card)] bg-(--bg-card) p-4 overflow-y-auto"
       >
-        <pre class="font-mono text-[10px] text-zinc-300 leading-relaxed">{{
+        <pre class="font-mono text-[10px] text-primary leading-relaxed">{{
           props.policy.rules
         }}</pre>
       </div>

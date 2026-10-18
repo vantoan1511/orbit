@@ -21,20 +21,20 @@ const statusRecord: Record<
   unknown: {
     text: 'Unknown',
     icon: HelpCircle,
-    iconClass: 'text-slate-400',
-    bgClass: 'bg-slate-500/10'
+    iconClass: 'text-(--text-muted)',
+    bgClass: 'bg-(--bg-hover)'
   },
   degraded: {
     text: 'Degraded',
     icon: AlertTriangle,
-    iconClass: 'text-amber-500',
-    bgClass: 'bg-amber-500/10'
+    iconClass: 'text-(--warning)',
+    bgClass: 'bg-(--warning-soft)'
   },
   healthy: {
     text: 'Healthy',
     icon: CheckCircle2,
-    iconClass: 'text-emerald-500',
-    bgClass: 'bg-emerald-500/10'
+    iconClass: 'text-(--success)',
+    bgClass: 'bg-(--success-soft)'
   }
 }
 
@@ -73,8 +73,8 @@ const cards = computed(() => [
     value: kubernetesVersion.value,
     subtext: 'Active Version',
     icon: KubernetesIcon,
-    iconBgClass: 'bg-sky-500/10',
-    iconClass: 'text-sky-500',
+    iconBgClass: 'bg-(--accent-soft)',
+    iconClass: 'text-(--accent)',
     valueClass: 'text-primary'
   },
   {
@@ -83,8 +83,8 @@ const cards = computed(() => [
     valueExtra: `/ ${totalNodesCount.value}`,
     subtext: `${readyNodesCount.value} Ready`,
     icon: Server,
-    iconBgClass: 'bg-violet-500/10',
-    iconClass: 'text-violet-400',
+    iconBgClass: 'bg-(--accent-soft)',
+    iconClass: 'text-(--color-node)',
     valueClass: 'text-primary'
   },
   {
@@ -92,15 +92,18 @@ const cards = computed(() => [
     value: namespacesCount.value,
     subtext: 'Active Namespaces',
     icon: LayoutGrid,
-    iconBgClass: 'bg-amber-500/10',
-    iconClass: 'text-amber-400',
+    iconBgClass: 'bg-(--warning-soft)',
+    iconClass: 'text-(--warning)',
     valueClass: 'text-primary'
   }
 ])
 </script>
 
 <template>
-  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+  <div
+    data-component="dashboard-status-summary"
+    class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"
+  >
     <StatusCard v-for="card in cards" :key="card.label" v-bind="card" />
   </div>
 </template>

@@ -126,18 +126,11 @@ test('AppTitleBar component integrates dev mode badge with tooltip', () => {
   const filePath = path.resolve(process.cwd(), 'src/components/layout/AppTitleBar.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
-  assert.ok(
-    content.includes('import.meta.env.DEV'),
-    'AppTitleBar must check import.meta.env.DEV'
-  )
-  assert.ok(
-    content.includes('>DEV</span>'),
-    'AppTitleBar must render DEV badge text'
-  )
+  assert.ok(content.includes('import.meta.env.DEV'), 'AppTitleBar must check import.meta.env.DEV')
+  assert.match(content, />DEV\s*<\/span\s*>/, 'AppTitleBar must render DEV badge text')
   assert.ok(
     content.includes('v-tooltip.bottom="\'Orbit Development Instance (config: ~/.orbit-dev)\'"') ||
       content.includes('v-tooltip.bottom="'),
     'AppTitleBar must provide dev tooltip on badge'
   )
 })
-

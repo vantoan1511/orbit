@@ -35,13 +35,13 @@ const themeOptions: ThemeOption[] = [
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+  <div data-component="theme-mode-selector" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
     <div
       v-for="opt in themeOptions"
       :key="opt.id"
       role="button"
       tabindex="0"
-      class="group relative flex flex-col text-left p-3.5 rounded-lg border transition-all cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-(--accent)"
+      class="group relative flex flex-col text-left p-3.5 rounded-[var(--ui-radius-card)] border transition-all cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-(--accent)"
       :class="[
         themeMode === opt.id
           ? 'border-(--accent) bg-(--bg-card) ring-1 ring-(--accent)'
@@ -53,7 +53,7 @@ const themeOptions: ThemeOption[] = [
       <!-- Header row with Icon and Selection Check -->
       <div class="flex items-center justify-between mb-2">
         <div
-          class="w-8 h-8 rounded-md flex items-center justify-center transition-colors"
+          class="w-8 h-8 rounded-[var(--ui-radius-control)] flex items-center justify-center transition-colors"
           :class="[
             themeMode === opt.id
               ? 'bg-(--accent)/15 text-(--accent)'

@@ -59,7 +59,7 @@ const getSwatchHex = (role: SemanticColorRole, optionId: string): string => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <div data-component="semantic-color-picker" class="flex flex-col gap-6">
     <!-- Presets bar -->
     <div class="flex flex-col gap-2">
       <div class="flex items-center justify-between">
@@ -96,7 +96,7 @@ const getSwatchHex = (role: SemanticColorRole, optionId: string): string => {
       <div
         v-for="(meta, role) in roleLabels"
         :key="role"
-        class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-lg bg-(--bg-hover)/20 border border-(--border)"
+        class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/20 border border-(--border)"
       >
         <div class="flex flex-col gap-0.5 min-w-[140px]">
           <span class="text-xs font-semibold text-primary">{{ meta.title }}</span>

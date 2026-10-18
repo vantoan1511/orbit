@@ -69,24 +69,32 @@ test('recalculateVirtualScroller handles null or missing vs instance gracefully'
   assert.equal(scrollCalled, 0)
 })
 
-test('CONSOLE_CONTAINER_CLASSES contains both light and dark theme background and text tokens', async () => {
+test('CONSOLE_CONTAINER_CLASSES adapts to appearance tokens and dynamic radius', async () => {
   const { CONSOLE_CONTAINER_CLASSES } = await import('../../utils/logsViewHelpers.ts')
   assert.equal(CONSOLE_CONTAINER_CLASSES.includes('bg-(--bg-card)'), true)
-  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('dark:bg-[#090d16]'), true)
-  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('text-zinc-800'), true)
-  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('dark:text-zinc-200'), true)
+  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('rounded-[var(--ui-radius-card)]'), true)
+  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('text-primary'), true)
+  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('dark:bg-[#090d16]'), false)
+  assert.equal(CONSOLE_CONTAINER_CLASSES.includes('text-zinc-800'), false)
 })
 
-test('LOG_ROW_CLASSES contains light hover and dark hover classes', async () => {
+test('LOG_ROW_CLASSES uses semantic hover token', async () => {
   const { LOG_ROW_CLASSES } = await import('../../utils/logsViewHelpers.ts')
-  assert.equal(LOG_ROW_CLASSES.includes('hover:bg-zinc-100'), true)
-  assert.equal(LOG_ROW_CLASSES.includes('dark:hover:bg-white/5'), true)
+  assert.equal(LOG_ROW_CLASSES.includes('hover:bg-(--bg-hover)'), true)
+  assert.equal(LOG_ROW_CLASSES.includes('hover:bg-zinc-100'), false)
 })
 
-test('LOG_ORIGIN_BADGE_CLASSES contains readable badge text colors for both themes', async () => {
+test('LOG_ORIGIN_BADGE_CLASSES uses semantic text-muted-color token', async () => {
   const { LOG_ORIGIN_BADGE_CLASSES } = await import('../../utils/logsViewHelpers.ts')
-  assert.equal(LOG_ORIGIN_BADGE_CLASSES.includes('text-zinc-600'), true)
-  assert.equal(LOG_ORIGIN_BADGE_CLASSES.includes('dark:text-zinc-400'), true)
+  assert.equal(LOG_ORIGIN_BADGE_CLASSES.includes('text-muted-color'), true)
+  assert.equal(LOG_ORIGIN_BADGE_CLASSES.includes('text-zinc-600'), false)
+})
+
+test('LogsView component contains data-component attribute', async () => {
+  const fs = await import('node:fs')
+  const path = await import('node:path')
+  const logsViewContent = fs.readFileSync(path.resolve('src/views/LogsView.vue'), 'utf-8')
+  assert.equal(logsViewContent.includes('data-component="logs-view"'), true)
 })
 
 test('useLogHighlighting getLogLevelColor returns dual-theme classes for gray rule', async () => {

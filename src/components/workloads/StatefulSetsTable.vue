@@ -38,6 +38,7 @@ const fetchStatefulSets = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="statefulsets-table"
     :data="k8sStore.statefulSets"
     :initialColumns="columns"
     :statuses="statuses"

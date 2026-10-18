@@ -47,6 +47,7 @@ const fetchCronJobs = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="cronjobs-table"
     :data="filteredCronJobs"
     :initialColumns="columns"
     :hideStatusFilter="true"

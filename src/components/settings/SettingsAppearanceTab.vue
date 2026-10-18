@@ -48,7 +48,7 @@ const handleReset = async () => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-10">
+  <div data-component="settings-appearance-tab" class="flex flex-col gap-10">
     <!-- Header row with Title and Reset Action -->
     <div class="flex items-start justify-between gap-4">
       <div>
@@ -59,18 +59,16 @@ const handleReset = async () => {
       </div>
 
       <Button
-        v-if="isModified()"
         v-tooltip.top="'Reset to defaults'"
         severity="secondary"
         variant="text"
         size="small"
-        class="text-xs text-muted-color hover:text-primary shrink-0"
+        :disabled="!isModified()"
+        class="flex items-center gap-1.5 text-xs text-muted-color hover:text-primary shrink-0"
         @click="handleReset"
       >
-        <template #icon>
-          <RotateCcw class="w-3.5 h-3.5 mr-1" />
-        </template>
-        Reset
+        <RotateCcw class="w-3.5 h-3.5" />
+        <span>Reset</span>
       </Button>
     </div>
 

@@ -25,13 +25,16 @@ const disabledPct = computed(() =>
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+  <div
+    data-component="policies-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  >
     <!-- Card 1: Total Policies -->
     <Card>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-(--bg-hover) flex items-center justify-center text-muted-color shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--bg-hover) flex items-center justify-center text-muted-color shrink-0"
           >
             <FileText class="w-5 h-5" />
           </div>
@@ -53,7 +56,7 @@ const disabledPct = computed(() =>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-400 shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--success-soft) flex items-center justify-center text-(--success) shrink-0"
           >
             <Shield class="w-5 h-5" />
           </div>
@@ -64,7 +67,7 @@ const disabledPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ enforcedCount }}
             </div>
-            <div class="text-[10px] text-emerald-400 font-medium mt-0.5 truncate">
+            <div class="text-[10px] text-(--success) font-medium mt-0.5 truncate">
               {{ enforcedPct }}%
             </div>
           </div>
@@ -77,7 +80,7 @@ const disabledPct = computed(() =>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-(--accent-soft) flex items-center justify-center text-(--accent) shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--accent-soft) flex items-center justify-center text-(--accent) shrink-0"
           >
             <ShieldAlert class="w-5 h-5" />
           </div>
@@ -101,7 +104,7 @@ const disabledPct = computed(() =>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-gray-500/10 flex items-center justify-center text-gray-400 shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--bg-hover) flex items-center justify-center text-(--text-muted) shrink-0"
           >
             <ShieldOff class="w-5 h-5" />
           </div>
@@ -112,7 +115,7 @@ const disabledPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ disabledCount }}
             </div>
-            <div class="text-[10px] text-gray-400 font-medium mt-0.5 truncate">
+            <div class="text-[10px] text-(--text-muted) font-medium mt-0.5 truncate">
               {{ disabledPct }}%
             </div>
           </div>
@@ -125,7 +128,7 @@ const disabledPct = computed(() =>
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-400 shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--danger-soft) flex items-center justify-center text-(--danger) shrink-0"
           >
             <AlertTriangle class="w-5 h-5" />
           </div>
@@ -136,7 +139,7 @@ const disabledPct = computed(() =>
             <div class="text-2xl font-bold text-primary font-mono mt-0.5">
               {{ violationsCount }}
             </div>
-            <div class="text-[10px] text-red-400 font-medium mt-0.5 truncate">Last 7 days</div>
+            <div class="text-[10px] text-(--danger) font-medium mt-0.5 truncate">Last 7 days</div>
           </div>
         </div>
       </template>

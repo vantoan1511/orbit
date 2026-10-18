@@ -26,6 +26,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="storage-classes-table"
     :data="k8sStore.storageClasses"
     :initialColumns="columns"
     :hideNamespaceFilter="true"

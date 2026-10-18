@@ -61,17 +61,17 @@ const metrics = computed(() => {
       title: 'Used Capacity',
       value: formatCapacity(usedCapGiB),
       subtext: `${usedPct}% of cluster total`,
-      subtextClass: 'text-violet-400 font-medium',
+      subtextClass: 'text-(--accent) font-medium',
       icon: HardDrive,
-      iconClass: 'bg-violet-500/10 text-violet-400'
+      iconClass: 'bg-(--accent-soft) text-(--accent)'
     },
     {
       title: 'Available Capacity',
       value: formatCapacity(availableCapGiB),
       subtext: `${availablePct}% remaining`,
-      subtextClass: 'text-emerald-400 font-medium',
+      subtextClass: 'text-(--success) font-medium',
       icon: HardDrive,
-      iconClass: 'bg-emerald-500/10 text-emerald-400'
+      iconClass: 'bg-(--success-soft) text-(--success)'
     },
     {
       title: 'Claims (PVCs)',
@@ -86,19 +86,22 @@ const metrics = computed(() => {
       value: totalStorageClasses.toString(),
       subtext: 'Provisioners configured',
       icon: Layers,
-      iconClass: 'bg-amber-500/10 text-amber-400'
+      iconClass: 'bg-(--warning-soft) text-(--warning)'
     }
   ]
 })
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+  <div
+    data-component="storage-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+  >
     <Card v-for="metric in metrics" :key="metric.title">
       <template #content>
         <div class="flex items-center gap-3">
           <div
-            class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+            class="w-9 h-9 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0"
             :class="metric.iconClass"
           >
             <component :is="metric.icon" class="w-4.5 h-4.5" />

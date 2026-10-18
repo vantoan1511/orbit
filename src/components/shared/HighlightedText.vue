@@ -70,11 +70,11 @@ const segments = computed<TextSegment[]>(() => {
 </script>
 
 <template>
-  <span>
+  <span data-component="highlighted-text">
     <template v-for="(segment, idx) in segments" :key="idx">
       <mark
         v-if="segment.isMatch"
-        class="bg-amber-500/30 text-inherit font-bold rounded-sm px-0.5"
+        class="bg-(--accent-soft) text-(--accent) font-bold rounded-sm px-0.5"
         >{{ segment.text }}</mark
       >
       <template v-else>{{ segment.text }}</template>

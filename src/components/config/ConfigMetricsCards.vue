@@ -53,9 +53,9 @@ const metrics = computed(() => {
         title: 'Total Size',
         value: formattedTotalSize,
         subtext: 'Total memory footprint',
-        subtextClass: 'text-emerald-400 font-medium',
+        subtextClass: 'text-(--success) font-medium',
         icon: Activity,
-        iconClass: 'bg-emerald-500/10 text-emerald-400'
+        iconClass: 'bg-(--success-soft) text-(--success)'
       },
       {
         title: 'Mounted in Pods',
@@ -69,9 +69,9 @@ const metrics = computed(() => {
         title: 'Orphaned',
         value: String(orphanedCount),
         subtext: 'Not referenced',
-        subtextClass: 'text-amber-400 font-medium',
+        subtextClass: 'text-(--warning) font-medium',
         icon: FileWarning,
-        iconClass: 'bg-amber-500/10 text-amber-400'
+        iconClass: 'bg-(--warning-soft) text-(--warning)'
       }
     ]
   } else {
@@ -87,9 +87,9 @@ const metrics = computed(() => {
         title: 'Total Size',
         value: formattedTotalSize,
         subtext: 'Total memory footprint',
-        subtextClass: 'text-emerald-400 font-medium',
+        subtextClass: 'text-(--success) font-medium',
         icon: Activity,
-        iconClass: 'bg-emerald-500/10 text-emerald-400'
+        iconClass: 'bg-(--success-soft) text-(--success)'
       },
       {
         title: 'Mounted in Pods',
@@ -103,9 +103,9 @@ const metrics = computed(() => {
         title: 'Orphaned',
         value: String(orphanedCount),
         subtext: 'Not referenced',
-        subtextClass: 'text-rose-400 font-medium',
+        subtextClass: 'text-(--danger) font-medium',
         icon: ShieldAlert,
-        iconClass: 'bg-rose-500/10 text-rose-400'
+        iconClass: 'bg-(--danger-soft) text-(--danger)'
       }
     ]
   }
@@ -113,12 +113,15 @@ const metrics = computed(() => {
 </script>
 
 <template>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div
+    data-component="config-metrics-cards"
+    class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+  >
     <Card v-for="metric in metrics" :key="metric.title">
       <template #content>
         <div class="flex items-center gap-4">
           <div
-            class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+            class="w-10 h-10 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0"
             :class="metric.iconClass"
           >
             <component :is="metric.icon" class="w-5 h-5" />

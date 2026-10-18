@@ -8,13 +8,16 @@ const { uiStyle, setUiStyle } = useAppearance()
 </script>
 
 <template>
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+  <div
+    data-component="ui-style-selector"
+    class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"
+  >
     <div
       v-for="style in UI_STYLE_DEFINITIONS"
       :key="style.id"
       role="button"
       tabindex="0"
-      class="group relative flex flex-col p-3.5 rounded-lg border transition-all cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-(--accent)"
+      class="group relative flex flex-col p-3.5 rounded-[var(--ui-radius-card)] border transition-all cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-(--accent)"
       :class="[
         uiStyle === style.id
           ? 'border-(--accent) bg-(--bg-card) ring-1 ring-(--accent)'

@@ -14,7 +14,7 @@ const getSwatchHex = (colorId: AccentColor): string => {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-3">
+  <div data-component="accent-color-picker" class="flex flex-wrap items-center gap-3">
     <div
       v-for="color in ACCENT_COLOR_DEFINITIONS"
       :key="color.id"

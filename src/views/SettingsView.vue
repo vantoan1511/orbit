@@ -36,7 +36,7 @@ watch(activeTab, (newTab) => {
 </script>
 
 <template>
-  <ViewLayout title="Settings">
+  <ViewLayout data-component="settings-view" title="Settings">
     <!-- Tabs Navigation -->
     <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
       <TabList class="bg-transparent! border-b! border-(--border)! px-1 shrink-0">
@@ -80,7 +80,7 @@ watch(activeTab, (newTab) => {
         <!-- Placeholder Tabs -->
         <TabPanel value="clusters">
           <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
           >
             Clusters settings coming soon.
           </div>
@@ -96,7 +96,7 @@ watch(activeTab, (newTab) => {
 
         <TabPanel value="notifications">
           <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
           >
             Notifications settings coming soon.
           </div>
@@ -104,7 +104,7 @@ watch(activeTab, (newTab) => {
 
         <TabPanel value="proxy">
           <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
           >
             Proxy settings coming soon.
           </div>

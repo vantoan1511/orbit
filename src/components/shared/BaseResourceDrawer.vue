@@ -26,7 +26,7 @@ const props = withDefaults(
     title: '',
     kind: '',
     kindSeverity: 'info',
-    statusBadgeClass: 'bg-emerald-500',
+    statusBadgeClass: 'bg-(--success)',
     namespace: undefined,
     age: undefined,
     showYamlTab: true
@@ -42,6 +42,7 @@ const emit = defineEmits<{
 
 <template>
   <Drawer
+    data-component="resource-drawer"
     :visible="props.visible"
     position="right"
     class="w-160! bg-(--bg-card)! border-l! border-(--border)!"

@@ -41,6 +41,7 @@ const fetchJobs = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="jobs-table"
     :data="k8sStore.jobs"
     :initialColumns="columns"
     :statuses="statuses"

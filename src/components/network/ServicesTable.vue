@@ -41,6 +41,7 @@ const handleRefresh = async () => {
 
 <template>
   <GenericResourceTable
+    data-component="services-table"
     :data="filteredServices"
     :initialColumns="columns"
     :hideStatusFilter="true"

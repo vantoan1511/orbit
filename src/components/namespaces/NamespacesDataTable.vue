@@ -148,6 +148,7 @@ const MAX_VISIBLE_LABELS = 2
 
 <template>
   <GenericResourceTable
+    data-component="namespaces-data-table"
     :data="filteredNamespaces"
     :initialColumns="columns"
     :statuses="statuses"

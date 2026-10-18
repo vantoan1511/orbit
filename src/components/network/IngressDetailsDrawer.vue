@@ -191,13 +191,14 @@ const copyYaml = async () => {
 
 <template>
   <BaseResourceDrawer
+    data-component="ingress-details-drawer"
     v-model:active-tab="activeTab"
     :visible="props.visible"
     :has-resource="!!props.ingress"
     :title="props.ingress?.name ?? ''"
     :kind="KUBERNETES_RESOURCE_KIND.Ingress"
     kind-severity="info"
-    status-badge-class="bg-emerald-500"
+    status-badge-class="bg-(--success)"
     :namespace="props.ingress?.namespace"
     :age="props.ingress?.age"
     @update:visible="emit('update:visible', $event)"
