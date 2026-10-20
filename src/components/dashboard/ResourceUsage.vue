@@ -50,11 +50,26 @@ function getCssVariable(name: string, fallback: string): string {
   return fallback
 }
 
-const cpuChartData = computed(() => {
+const cachedAccentColor = computed(() => {
+  void isDark.value
   void accentColor.value
   const fallbackCpu = isDark.value ? '#6aa8ff' : '#4f8cff'
-  const cpuColor = getCssVariable('--accent', fallbackCpu)
-  const trackColor = isDark.value ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'
+  return getCssVariable('--accent', fallbackCpu)
+})
+
+const cachedNodeColor = computed(() => {
+  void isDark.value
+  const fallbackMem = isDark.value ? '#a78bfa' : '#8e6bff'
+  return getCssVariable('--color-node', fallbackMem)
+})
+
+const cachedTrackColor = computed(() => {
+  return isDark.value ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'
+})
+
+const cpuChartData = computed(() => {
+  const cpuColor = cachedAccentColor.value
+  const trackColor = cachedTrackColor.value
   const hasData = totalCpu.value > 0
 
   return {
@@ -74,9 +89,8 @@ const cpuChartData = computed(() => {
 })
 
 const memChartData = computed(() => {
-  const fallbackMem = isDark.value ? '#a78bfa' : '#8e6bff'
-  const memColor = getCssVariable('--color-node', fallbackMem)
-  const trackColor = isDark.value ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'
+  const memColor = cachedNodeColor.value
+  const trackColor = cachedTrackColor.value
   const hasData = totalMem.value > 0
 
   return {

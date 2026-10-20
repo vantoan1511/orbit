@@ -11,30 +11,25 @@ import Column from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, watchEffect } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
+import { computeDeploymentRestarts } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
 const loading = ref(false)
 
-const REPLICA_SET_PREFIX = 'ReplicaSet/'
+const deploymentRestartsMap = shallowRef(new Map<string, number>())
+let prevRestartFingerprint = ''
 
-const deploymentRestartsMap = computed(() => {
-  const map = new Map<string, number>()
-  for (const pod of k8sStore.pods) {
-    const restarts = pod.restarts
-    if (restarts == null || restarts === 0 || !pod.controlledBy || !pod.namespace) continue
-    if (pod.controlledBy.startsWith(REPLICA_SET_PREFIX)) {
-      const rsName = pod.controlledBy.slice(REPLICA_SET_PREFIX.length)
-      const lastDash = rsName.lastIndexOf('-')
-      if (lastDash > 0) {
-        const depName = rsName.slice(0, lastDash)
-        const key = `${pod.namespace}/${depName}`
-        map.set(key, (map.get(key) ?? 0) + restarts)
-      }
-    }
+watchEffect(() => {
+  const fingerprint = k8sStore.pods
+    .filter((p) => p.restarts && p.controlledBy?.startsWith('ReplicaSet/'))
+    .map((p) => `${p.namespace}/${p.name}:${p.restarts}`)
+    .join('|')
+  if (fingerprint !== prevRestartFingerprint) {
+    prevRestartFingerprint = fingerprint
+    deploymentRestartsMap.value = computeDeploymentRestarts(k8sStore.pods)
   }
-  return map
 })
 
 const deployments = computed(() => {
