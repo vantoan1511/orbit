@@ -659,3 +659,21 @@ test('useLogStream.downloadLogs returns error status when filesystem write fails
     filesystem.writeTextFile = originalWriteText
   }
 })
+
+test('logLines stays capped at maxLogLines after burst of single lines', () => {
+  const stream = useLogStream(createMockOptions())
+
+  for (let i = 0; i < 3000; i++) {
+    stream.handleLogLine({
+      pod: 'burst-pod',
+      container: 'burst-container',
+      line: `burst line ${i}`
+    })
+  }
+
+  assert.ok(
+    stream.logLines.value.length <= stream.maxLogLines + 100,
+    `logLines should be capped at maxLogLines + 100, got ${stream.logLines.value.length}`
+  )
+  assert.equal(stream.logLines.value[stream.logLines.value.length - 1].text, 'burst line 2999')
+})

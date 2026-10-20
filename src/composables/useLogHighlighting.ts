@@ -1,6 +1,22 @@
 import { ref, computed } from 'vue'
 import { storage } from '../services/nativeService.ts'
 
+const ruleRegexCache = new Map<string, RegExp>()
+
+function getCachedRegex(ruleId: string, pattern: string, flags: string): RegExp {
+  const key = `${ruleId}:${flags}:${pattern}`
+  let cached = ruleRegexCache.get(key)
+  if (!cached) {
+    cached = new RegExp(pattern, flags)
+    ruleRegexCache.set(key, cached)
+  }
+  return cached
+}
+
+export function clearRegexCacheForTesting() {
+  ruleRegexCache.clear()
+}
+
 export interface HighlightRule {
   id: string
   pattern: string
@@ -287,14 +303,17 @@ export function useLogHighlighting() {
       } else {
         customRules.value = []
       }
+      ruleRegexCache.clear()
     } catch {
       selectedPreset.value = 'standard'
       customRules.value = []
       customPresets.value = {}
+      ruleRegexCache.clear()
     }
   }
 
   const saveRules = async () => {
+    ruleRegexCache.clear()
     try {
       await storage.setData('orbit_log_highlight_preset', selectedPreset.value)
       await storage.setData('orbit_log_highlight_rules', JSON.stringify(customRules.value))
@@ -407,7 +426,7 @@ export function useLogHighlighting() {
       if (rule.isRegex) {
         try {
           const flags = rule.caseSensitive ? '' : 'i'
-          const regex = new RegExp(rule.pattern, flags)
+          const regex = getCachedRegex(rule.id, rule.pattern, flags)
           return regex.test(text)
         } catch {
           return false

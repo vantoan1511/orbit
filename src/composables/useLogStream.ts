@@ -1,5 +1,6 @@
 import {
   ref,
+  shallowRef,
   computed,
   watch,
   onMounted,
@@ -35,7 +36,8 @@ export function useLogStream(options: {
   tailLines: Ref<number>
   onMountedCallback?: () => Promise<void>
 }) {
-  const logLines = ref<LogLine[]>([])
+  const logLines = shallowRef<LogLine[]>([])
+  let internalBuffer: LogLine[] = []
   const maxLogLines = 2000
   // Maximum lines retained in All mode to prevent unbounded memory growth.
   const maxLogLinesAll = 100_000
@@ -51,6 +53,7 @@ export function useLogStream(options: {
   let refreshTimeout: ReturnType<typeof setTimeout> | null = null
 
   const startStreaming = async () => {
+    internalBuffer = []
     logLines.value = []
     await kubernetesService.stopLogs()
 
@@ -208,31 +211,34 @@ export function useLogStream(options: {
     }
   }
 
+  const syncInternalBuffer = () => {
+    if (internalBuffer.length === 0 && logLines.value.length > 0) {
+      internalBuffer = [...logLines.value]
+    }
+  }
+
+  const flushBuffer = () => {
+    const isAll = options.tailLines.value === TAIL_ALL_LINES
+    const cap = isAll ? maxLogLinesAll : maxLogLines
+    if (internalBuffer.length > cap + 100) {
+      internalBuffer = internalBuffer.slice(-cap)
+    }
+    logLines.value = internalBuffer.slice()
+  }
+
   const handleLogLine = (data: { pod: string; container: string; line: string }) => {
     if (isPaused.value) return
+    syncInternalBuffer()
 
     const { text, timestamp } = parseLogLine(data.line)
-    const nextLines = [
-      ...logLines.value,
-      {
-        pod: data.pod,
-        container: data.container,
-        text,
-        timestamp
-      }
-    ]
+    internalBuffer.push({
+      pod: data.pod,
+      container: data.container,
+      text,
+      timestamp
+    })
 
-    if (options.tailLines.value === TAIL_ALL_LINES) {
-      if (nextLines.length > maxLogLinesAll) {
-        logLines.value = nextLines.slice(-maxLogLinesAll)
-      } else {
-        logLines.value = nextLines
-      }
-    } else if (nextLines.length > maxLogLines + 100) {
-      logLines.value = nextLines.slice(-maxLogLines)
-    } else {
-      logLines.value = nextLines
-    }
+    flushBuffer()
 
     if (isFollowing.value) {
       scheduleFollowScroll()
@@ -241,30 +247,19 @@ export function useLogStream(options: {
 
   const handleLogLinesChunk = (data: { pod: string; container: string; lines: string[] }) => {
     if (isPaused.value || !data.lines || data.lines.length === 0) return
+    syncInternalBuffer()
 
-    const parsedLines: LogLine[] = data.lines.map((rawLine) => {
+    for (const rawLine of data.lines) {
       const { text, timestamp } = parseLogLine(rawLine)
-      return {
+      internalBuffer.push({
         pod: data.pod,
         container: data.container,
         text,
         timestamp
-      }
-    })
-
-    const nextLines = [...logLines.value, ...parsedLines]
-
-    if (options.tailLines.value === TAIL_ALL_LINES) {
-      if (nextLines.length > maxLogLinesAll) {
-        logLines.value = nextLines.slice(-maxLogLinesAll)
-      } else {
-        logLines.value = nextLines
-      }
-    } else if (nextLines.length > maxLogLines + 100) {
-      logLines.value = nextLines.slice(-maxLogLines)
-    } else {
-      logLines.value = nextLines
+      })
     }
+
+    flushBuffer()
 
     if (isFollowing.value) {
       scheduleFollowScroll()
@@ -273,21 +268,22 @@ export function useLogStream(options: {
 
   const filteredLogLines = computed(() => {
     if (!searchQuery.value) return logLines.value
-
-    return logLines.value.filter((line) => {
-      if (isRegex.value) {
-        try {
-          const regex = new RegExp(searchQuery.value, 'i')
-          return regex.test(line.text)
-        } catch {
-          return false
-        }
+    let regex: RegExp | null = null
+    if (isRegex.value) {
+      try {
+        regex = new RegExp(searchQuery.value, 'i')
+      } catch {
+        return logLines.value
       }
-      return line.text.toLowerCase().includes(searchQuery.value.toLowerCase())
+    }
+    const lower = searchQuery.value.toLowerCase()
+    return logLines.value.filter((line) => {
+      return regex ? regex.test(line.text) : line.text.toLowerCase().includes(lower)
     })
   })
 
   const clearLogs = () => {
+    internalBuffer = []
     logLines.value = []
   }
 

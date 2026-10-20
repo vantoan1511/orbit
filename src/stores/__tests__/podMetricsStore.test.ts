@@ -3,6 +3,8 @@ import test, { beforeEach } from 'node:test'
 import { createPinia, setActivePinia } from 'pinia'
 import { type NodeInfo, type PodInfo } from '../../types/kubernetes.ts'
 import { useKubernetesStore } from '../kubernetesStore.ts'
+import { events as nativeEvents } from '../../services/nativeService.ts'
+import { OrbitEvents } from '../../types/events.ts'
 
 beforeEach(() => {
   setActivePinia(createPinia())
@@ -116,4 +118,76 @@ test('setPods keeps cpuPct and memoryPct undefined when node is missing or unres
   assert.equal(storedPod.cpu, '250m')
   assert.equal(storedPod.cpuPct, undefined)
   assert.equal(storedPod.memoryPct, undefined)
+})
+
+test('onPodMetricsUpdated only re-enriches pods present in the metrics payload', async () => {
+  const store = useKubernetesStore()
+  store.setActiveClusterId('test-cluster')
+
+  const initialList: PodInfo[] = Array.from({ length: 10 }, (_, i) => ({
+    ...createSamplePod(`pod-${i}`, 'default', 'node-1'),
+    cpuCores: 0.1,
+    memoryBytes: 10485760
+  }))
+
+  store.setPods(initialList)
+  const podsBefore = [...store.pods]
+
+  // Send metrics for only pod-0 and pod-1
+  await nativeEvents.dispatch(OrbitEvents.PodMetricsUpdated, {
+    cluster_id: 'test-cluster',
+    metrics: [
+      {
+        name: 'pod-0',
+        namespace: 'default',
+        cpu: '200m',
+        memory: '20Mi',
+        cpuCores: 0.2,
+        memoryBytes: 20971520
+      },
+      {
+        name: 'pod-1',
+        namespace: 'default',
+        cpu: '300m',
+        memory: '30Mi',
+        cpuCores: 0.3,
+        memoryBytes: 31457280
+      }
+    ]
+  })
+
+  // Only pod-0 and pod-1 should be new object instances
+  assert.notEqual(store.pods[0], podsBefore[0], 'pod-0 should be re-enriched')
+  assert.notEqual(store.pods[1], podsBefore[1], 'pod-1 should be re-enriched')
+
+  for (let i = 2; i < 10; i++) {
+    assert.equal(
+      Object.is(store.pods[i], podsBefore[i]),
+      true,
+      `pod-${i} reference must remain identical`
+    )
+  }
+})
+
+test('setNodes skips pod re-enrichment when node cpu/mem values are unchanged', () => {
+  const store = useKubernetesStore()
+  const node = createSampleNode('node-1', '12', '16')
+  store.setNodes([node])
+
+  const pods: PodInfo[] = [
+    createSamplePod('pod-0', 'default', 'node-1'),
+    createSamplePod('pod-1', 'default', 'node-1')
+  ]
+  store.setPods(pods)
+
+  const podsReferenceBefore = store.pods
+
+  // Call setNodes with equivalent node info
+  store.setNodes([{ ...node }])
+
+  assert.equal(
+    store.pods,
+    podsReferenceBefore,
+    'pods array reference must remain identical when node metrics have not changed'
+  )
 })

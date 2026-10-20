@@ -220,11 +220,17 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobsLoading.value = false
   }
 
+  let prevNodeMetricsHash = ''
+
   function setNodes(newNodes: NodeInfo[]) {
+    const newHash = newNodes.map((n) => `${n.name}:${n.cpuUsed}:${n.memUsed}`).join('|')
     nodes.value = newNodes
     nodesLoading.value = false
-    if (pods.value.length > 0) {
+    if (pods.value.length > 0 && newHash !== prevNodeMetricsHash) {
+      prevNodeMetricsHash = newHash
       pods.value = pods.value.map((p) => enrichPodWithMetrics(p, newNodes))
+    } else {
+      prevNodeMetricsHash = newHash
     }
   }
 
@@ -346,6 +352,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const logsStore = useLogsStore()
     void logsStore.setClusterId(id)
     podMetricsMap.clear()
+    prevNodeMetricsHash = ''
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
     pods.value = []
@@ -673,16 +680,30 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     if (payload.cluster_id && payload.cluster_id !== activeClusterId.value) {
       return
     }
+    const changedKeys = new Set<string>()
     for (const m of payload.metrics) {
-      podMetricsMap.set(`${m.namespace}/${m.name}`, {
+      const key = `${m.namespace}/${m.name}`
+      podMetricsMap.set(key, {
         cpu: m.cpu,
         memory: m.memory,
         cpuCores: m.cpuCores,
         memoryBytes: m.memoryBytes
       })
+      changedKeys.add(key)
     }
-    if (pods.value.length > 0) {
-      pods.value = pods.value.map((p) => enrichPodWithMetrics(p))
+    if (pods.value.length === 0 || changedKeys.size === 0) return
+
+    let changed = false
+    const currentPods = pods.value
+    const newPods = currentPods.map((p) => {
+      const key = `${p.namespace}/${p.name}`
+      if (!changedKeys.has(key)) return p
+      changed = true
+      return enrichPodWithMetrics(p)
+    })
+
+    if (changed) {
+      pods.value = newPods
     }
   }
 

@@ -1,18 +1,13 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { PodInfo } from '@/types/kubernetes'
+import {
+  getTopConsumers,
+  METRIC_CONFIGS,
+  type MetricType,
+  type ConsumerItem
+} from '@/utils/workloadMetrics'
 import { ArrowRight } from '@lucide/vue'
-import { computed, ref } from 'vue'
-
-type MetricType = 'cpu' | 'memory' | 'restarts'
-
-interface ConsumerItem {
-  pod: string
-  namespace: string
-  value: string
-  pct: number
-  color: string
-}
+import { computed, ref, shallowRef, watchEffect } from 'vue'
 
 interface SelectOption {
   label: string
@@ -34,51 +29,24 @@ const METRIC_LABELS: Record<MetricType, string> = {
   restarts: 'Restarts'
 }
 
-const METRIC_CONFIGS: Record<
-  MetricType,
-  {
-    sortKey: keyof PodInfo
-    getValue: (p: PodInfo) => string
-    getPct: (p: PodInfo) => number
-    color: string
-  }
-> = {
-  cpu: {
-    sortKey: 'cpuPct',
-    getValue: (p) => p.cpu || '0m',
-    getPct: (p) => Math.min(Math.max(Number((p.cpuPct || 0).toFixed(2)), 0), 100),
-    color: 'bg-(--accent)'
-  },
-  memory: {
-    sortKey: 'memoryPct',
-    getValue: (p) => p.memory || '0Mi',
-    getPct: (p) => Math.min(Math.max(Number((p.memoryPct || 0).toFixed(2)), 0), 100),
-    color: 'bg-violet-500'
-  },
-  restarts: {
-    sortKey: 'restarts',
-    getValue: (p) => String(p.restarts || 0),
-    getPct: () => 0,
-    color: 'bg-amber-500'
-  }
-}
-
 const metricHeaderLabel = computed(() => METRIC_LABELS[activeTab.value] ?? '')
 
-const consumers = computed<ConsumerItem[]>(() => {
+const consumers = shallowRef<ConsumerItem[]>([])
+let prevMetricFingerprint = ''
+
+watchEffect(() => {
   const config = METRIC_CONFIGS[activeTab.value]
-  if (!config) return []
+  if (!config) return
 
-  const pods = [...kubernetesStore.pods]
-  pods.sort((a, b) => ((b[config.sortKey] as number) || 0) - ((a[config.sortKey] as number) || 0))
+  const fingerprint =
+    activeTab.value +
+    ':' +
+    kubernetesStore.pods.map((p) => `${p.namespace}/${p.name}:${p[config.sortKey] ?? 0}`).join('|')
 
-  return pods.slice(0, 5).map((p) => ({
-    pod: p.name,
-    namespace: p.namespace,
-    value: config.getValue(p),
-    pct: config.getPct(p),
-    color: config.color
-  }))
+  if (fingerprint !== prevMetricFingerprint) {
+    prevMetricFingerprint = fingerprint
+    consumers.value = getTopConsumers(kubernetesStore.pods, activeTab.value)
+  }
 })
 </script>
 
