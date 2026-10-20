@@ -9,6 +9,22 @@ use tauri::{
 pub const TRAY_MENU_OPEN: &str = "open";
 pub const TRAY_MENU_QUIT: &str = "quit";
 
+/// Action to perform when the user requests closing the main application window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowCloseAction {
+    HideToTray,
+    ExitApplication,
+}
+
+/// Determines whether to hide the window to the tray or exit the application based on the close-to-tray setting.
+pub fn determine_window_close_action(close_to_tray_enabled: bool) -> WindowCloseAction {
+    if close_to_tray_enabled {
+        WindowCloseAction::HideToTray
+    } else {
+        WindowCloseAction::ExitApplication
+    }
+}
+
 /// Returns the system tray tooltip text based on development mode.
 pub fn tray_tooltip_label() -> &'static str {
     if crate::config::OrbitConfig::is_dev_mode() {
@@ -151,6 +167,12 @@ mod tests {
                 None => std::env::remove_var("ORBIT_DEV"),
             }
         }
+    }
+
+    #[test]
+    fn test_determine_window_close_action() {
+        assert_eq!(determine_window_close_action(true), WindowCloseAction::HideToTray);
+        assert_eq!(determine_window_close_action(false), WindowCloseAction::ExitApplication);
     }
 }
 

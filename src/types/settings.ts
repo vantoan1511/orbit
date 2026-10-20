@@ -9,6 +9,7 @@ export const CONFIG_KEYS = {
   CUSTOM_KUBECONFIG_PATHS: 'customKubeconfigPaths',
   AUTO_CHECK_UPDATES: 'autoCheckUpdates',
   LAUNCH_ON_STARTUP: 'launchOnStartup',
+  CLOSE_TO_TRAY: 'closeToTray',
   SHARE_TELEMETRY: 'shareTelemetry',
   DEFAULT_TERMINAL_SHELL: 'defaultTerminalShell',
   KEYBOARD_SHORTCUTS: 'keyboardShortcuts',
