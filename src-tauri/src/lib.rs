@@ -92,8 +92,16 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                let close_to_tray = crate::config::OrbitConfig::load().close_to_tray();
+                match crate::tray::determine_window_close_action(close_to_tray) {
+                    crate::tray::WindowCloseAction::HideToTray => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    crate::tray::WindowCloseAction::ExitApplication => {
+                        window.app_handle().exit(0);
+                    }
+                }
             }
         })
         .setup(|app| {

@@ -99,6 +99,19 @@ impl Configuration {
                 last_updated_at: None,
             },
             Configuration {
+                key: "closeToTray".to_string(),
+                name: "Close to System Tray".to_string(),
+                description: "Keep Orbit running in the system tray when closing the window.".to_string(),
+                datatype: "boolean".to_string(),
+                default_value: Some(serde_json::json!(true)),
+                value: None,
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
                 key: "shareTelemetry".to_string(),
                 name: "Share Telemetry".to_string(),
                 description: "Anonymous crash reporting and usage telemetry to improve stability.".to_string(),
@@ -349,6 +362,14 @@ impl OrbitConfig {
             .get("launchOnStartup")
             .and_then(|v| v.as_bool())
             .unwrap_or(false)
+    }
+
+    /// Returns whether close to system tray is enabled. Defaults to true.
+    pub fn close_to_tray(&self) -> bool {
+        self.values
+            .get("closeToTray")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true)
     }
 
     /// Returns custom keyboard shortcuts keybindings map.
@@ -665,6 +686,28 @@ mod tests {
 
         config.values.insert("launchOnStartup".to_string(), serde_json::json!(false));
         assert!(!config.launch_on_startup());
+    }
+
+    #[test]
+    fn test_close_to_tray_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let close_cfg = defs.iter().find(|c| c.key == "closeToTray").expect("closeToTray must exist");
+        assert!(close_cfg.enable, "closeToTray must be enabled");
+        assert_eq!(close_cfg.datatype, "boolean");
+        assert_eq!(close_cfg.default_value, Some(serde_json::json!(true)));
+        assert!(close_cfg.description.contains("system tray"));
+    }
+
+    #[test]
+    fn test_close_to_tray_default_and_custom() {
+        let mut config = OrbitConfig::default();
+        assert!(config.close_to_tray());
+
+        config.values.insert("closeToTray".to_string(), serde_json::json!(false));
+        assert!(!config.close_to_tray());
+
+        config.values.insert("closeToTray".to_string(), serde_json::json!(true));
+        assert!(config.close_to_tray());
     }
 
     #[test]

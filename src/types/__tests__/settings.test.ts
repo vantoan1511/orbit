@@ -7,6 +7,7 @@ test('CONFIG_KEYS defines all well-known configuration keys', () => {
   assert.equal(CONFIG_KEYS.CUSTOM_KUBECONFIG_PATHS, 'customKubeconfigPaths')
   assert.equal(CONFIG_KEYS.AUTO_CHECK_UPDATES, 'autoCheckUpdates')
   assert.equal(CONFIG_KEYS.LAUNCH_ON_STARTUP, 'launchOnStartup')
+  assert.equal(CONFIG_KEYS.CLOSE_TO_TRAY, 'closeToTray')
   assert.equal(CONFIG_KEYS.SHARE_TELEMETRY, 'shareTelemetry')
   assert.equal(CONFIG_KEYS.DEFAULT_TERMINAL_SHELL, 'defaultTerminalShell')
   assert.equal(CONFIG_KEYS.KEYBOARD_SHORTCUTS, 'keyboardShortcuts')
@@ -25,6 +26,8 @@ test('isGeneralConfigKey filters out specialized keys', async () => {
 
   assert.equal(isGeneralConfigKey('maxLogFiles'), true)
   assert.equal(isGeneralConfigKey('customKubeconfigPaths'), true)
+  assert.equal(isGeneralConfigKey('launchOnStartup'), true)
+  assert.equal(isGeneralConfigKey('closeToTray'), true)
   assert.equal(isGeneralConfigKey('defaultTerminalShell'), true)
   assert.equal(isGeneralConfigKey('keyboardShortcuts'), false)
   assert.equal(isGeneralConfigKey('themeMode'), false)
