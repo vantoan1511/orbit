@@ -134,3 +134,17 @@ test('AppTitleBar component integrates dev mode badge with tooltip', () => {
     'AppTitleBar must provide dev tooltip on badge'
   )
 })
+
+test('AppTitleBar component renders cluster alias and custom color dot', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/AppTitleBar.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('activeCluster.alias') || content.includes('getClusterDisplayName'),
+    'AppTitleBar must support displaying activeCluster alias'
+  )
+  assert.ok(
+    content.includes('activeCluster.color'),
+    'AppTitleBar must support custom environment color on indicator dot'
+  )
+})

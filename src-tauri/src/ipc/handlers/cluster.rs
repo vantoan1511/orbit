@@ -206,6 +206,72 @@ pub fn add_cluster(
     });
 }
 
+pub fn update_cluster_metadata(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let cluster_id = get_string(&data, "id");
+        if let Some(id) = cluster_id {
+            tracing::info!(cluster_id = %id, "Updating cluster metadata");
+            let mut w_manager = manager.write().await;
+
+            let alias = get_string(&data, "alias");
+            let color = get_string(&data, "color");
+            let description = get_string(&data, "description");
+            let tags = data
+                .as_ref()
+                .and_then(|d| d.get("tags"))
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|t| t.as_str().map(|s| s.trim().to_string()))
+                        .filter(|s| !s.is_empty())
+                        .collect::<Vec<String>>()
+                })
+                .unwrap_or_default();
+
+            let customization = crate::kubernetes::models::ClusterCustomization {
+                alias,
+                tags,
+                color,
+                description,
+            };
+
+            w_manager.config.set_cluster_customization(&id, customization);
+            if let Err(e) = w_manager.config.save() {
+                tracing::error!(error = %e, "Failed to save cluster metadata to config");
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ErrorOccurred {
+                        message: format!("Failed to save cluster metadata: {}", e),
+                    },
+                ).await;
+                return;
+            }
+
+            let clusters = w_manager.get_clusters();
+            let settings = w_manager.config.get_configurations();
+            drop(w_manager);
+
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ClustersUpdated { clusters },
+            ).await;
+
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::AppSettingsUpdated { settings },
+            ).await;
+        }
+    });
+}
+
 pub async fn restart_watchers(
     writer: &Arc<Mutex<WsWriter>>,
     token: &str,
@@ -307,6 +373,37 @@ mod tests {
         assert!(event_names.contains(&"engineConnected".to_string()));
         assert!(event_names.contains(&"clustersUpdated".to_string()));
         assert!(event_names.contains(&"activeClusterChanged".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_update_cluster_metadata_updates_config_and_emits_event() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+
+        let payload = serde_json::json!({
+            "id": "test-ctx",
+            "alias": "Dev Cluster",
+            "tags": ["dev", "k8s"],
+            "color": "#10b981",
+            "description": "Local dev test"
+        });
+
+        update_cluster_metadata(Some(payload), writer, "token-123".to_string(), manager.clone());
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        let r_manager = manager.read().await;
+        let map = r_manager.config.cluster_customizations();
+        assert_eq!(map.get("test-ctx").and_then(|c| c.alias.as_deref()), Some("Dev Cluster"));
+        assert_eq!(map.get("test-ctx").and_then(|c| c.color.as_deref()), Some("#10b981"));
+
+        let emitted = mock_emitter.get_emitted_events().await;
+        let event_names: Vec<String> = emitted.iter().map(|(name, _)| name.clone()).collect();
+        assert!(event_names.contains(&"clustersUpdated".to_string()));
     }
 }
 

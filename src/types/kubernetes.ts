@@ -80,10 +80,24 @@ export interface PodInfo {
   events?: PodEvent[]
 }
 
+export interface ClusterCustomization {
+  alias?: string
+  tags?: string[]
+  color?: string
+  description?: string
+}
+
+export type ClusterCustomizationMap = Record<string, ClusterCustomization>
+
 export interface ClusterInfo {
   id: string
   name: string
   status: KubernetesClusterStatus | string
+  alias?: string
+  tags?: string[]
+  color?: string
+  description?: string
+  serverUrl?: string
 }
 
 export interface Replicas {

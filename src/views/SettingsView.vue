@@ -5,6 +5,7 @@ import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
 import SettingsAppearanceTab from '../components/settings/SettingsAppearanceTab.vue'
+import SettingsClustersTab from '../components/settings/SettingsClustersTab.vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
 import SettingsPreferencesTab from '../components/settings/SettingsPreferencesTab.vue'
 
@@ -41,11 +42,7 @@ watch(activeTab, (newTab) => {
     <Tabs v-model:value="activeTab" class="flex-1 flex flex-col min-h-0">
       <TabList class="bg-transparent! border-b! border-(--border)! px-1 shrink-0">
         <Tab value="general" class="px-3 py-2 text-xs font-semibold cursor-pointer">General</Tab>
-        <Tab
-          value="clusters"
-          disabled
-          class="px-3 py-2 text-xs font-semibold opacity-40 cursor-not-allowed"
-        >
+        <Tab value="clusters" class="px-3 py-2 text-xs font-semibold cursor-pointer">
           Clusters
         </Tab>
         <Tab value="preferences" class="px-3 py-2 text-xs font-semibold cursor-pointer">
@@ -77,13 +74,9 @@ watch(activeTab, (newTab) => {
           <SettingsGeneralTab />
         </TabPanel>
 
-        <!-- Placeholder Tabs -->
+        <!-- Clusters Tab -->
         <TabPanel value="clusters">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-          >
-            Clusters settings coming soon.
-          </div>
+          <SettingsClustersTab />
         </TabPanel>
 
         <TabPanel value="preferences">

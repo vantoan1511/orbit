@@ -38,6 +38,7 @@ pub fn dispatch(
         "getUserProfile" => cluster::get_user_profile(writer, token, manager),
         "switchCluster" => cluster::switch_cluster(data, writer, token, manager),
         "addCluster" => cluster::add_cluster(data, writer, token, manager),
+        "updateClusterMetadata" => cluster::update_cluster_metadata(data, writer, token, manager),
         "getNamespaces" => system::get_namespaces(writer, token, manager),
         "getPods" => workloads::get_pods(data, writer, token, manager),
         "getDeployments" => workloads::get_deployments(data, writer, token, manager),

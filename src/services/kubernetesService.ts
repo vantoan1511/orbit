@@ -157,6 +157,19 @@ export const kubernetesService = {
   },
 
   /**
+   * Update custom metadata (alias, tags, color, description) for a cluster context
+   */
+  async updateClusterMetadata(params: {
+    id: string
+    alias?: string | null
+    tags?: string[]
+    color?: string | null
+    description?: string | null
+  }): Promise<void> {
+    await coreEngine.dispatch('updateClusterMetadata', params)
+  },
+
+  /**
    * Start streaming logs for a pod or workload container
    */
   async streamLogs(params: {

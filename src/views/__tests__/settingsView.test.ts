@@ -21,8 +21,11 @@ test('resolveSettingsTab resolves "preferences" when query is "preferences"', ()
   assert.equal(resolveSettingsTab('preferences'), 'preferences')
 })
 
+test('resolveSettingsTab resolves "clusters" when query is "clusters"', () => {
+  assert.equal(resolveSettingsTab('clusters'), 'clusters')
+})
+
 test('resolveSettingsTab falls back to "general" when query is an unknown or disabled tab', () => {
-  assert.equal(resolveSettingsTab('clusters'), 'general')
   assert.equal(resolveSettingsTab('notifications'), 'general')
   assert.equal(resolveSettingsTab('proxy'), 'general')
   assert.equal(resolveSettingsTab('invalid-tab'), 'general')
@@ -41,6 +44,6 @@ test('VALID_SETTINGS_TABS contains all 7 expected tabs', () => {
   ])
 })
 
-test('ENABLED_SETTINGS_TABS contains implemented general, preferences, appearance, and about tabs', () => {
-  assert.deepEqual(ENABLED_SETTINGS_TABS, ['general', 'preferences', 'appearance', 'about'])
+test('ENABLED_SETTINGS_TABS contains implemented general, clusters, preferences, appearance, and about tabs', () => {
+  assert.deepEqual(ENABLED_SETTINGS_TABS, ['general', 'clusters', 'preferences', 'appearance', 'about'])
 })

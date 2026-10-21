@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import test from 'node:test'
+
+test('AppSidebarClusters component exists and defines data-component="sidebar-clusters"', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/sidebar/AppSidebarClusters.vue')
+  assert.ok(fs.existsSync(filePath), 'AppSidebarClusters.vue must exist')
+
+  const content = fs.readFileSync(filePath, 'utf-8')
+  assert.ok(
+    content.includes('data-component="sidebar-clusters"'),
+    'AppSidebarClusters must define data-component="sidebar-clusters"'
+  )
+})
+
+test('AppSidebarClusters imports clusterHelpers and ClusterEditModal', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/sidebar/AppSidebarClusters.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('clusterHelpers') ||
+      (content.includes('filterClusters') && content.includes('getClusterDisplayName')),
+    'AppSidebarClusters must import helper functions from clusterHelpers'
+  )
+  assert.ok(
+    content.includes('ClusterEditModal'),
+    'AppSidebarClusters must integrate ClusterEditModal'
+  )
+})
+
+test('AppSidebarClusters contains search input, tag quick-filters, and manage clusters action', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/sidebar/AppSidebarClusters.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(content.includes('searchQuery'), 'AppSidebarClusters must have searchQuery state')
+  assert.ok(content.includes('selectedTag'), 'AppSidebarClusters must have selectedTag filter state')
+  assert.ok(content.includes('InputText'), 'AppSidebarClusters must use PrimeVue InputText for search')
+  assert.ok(content.includes('/settings?tab=clusters'), 'AppSidebarClusters must have link to /settings?tab=clusters')
+})

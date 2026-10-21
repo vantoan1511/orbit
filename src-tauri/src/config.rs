@@ -205,6 +205,19 @@ impl Configuration {
                 is_confidential: false,
                 cardinality: "0..1".to_string(),
                 enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "clusterCustomizations".to_string(),
+                name: "Cluster Customizations".to_string(),
+                description: "User-defined custom cluster metadata such as aliases, labels, tags, and colors.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({})),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
                 created_at: Some(created),
                 last_updated_at: None,
             },
@@ -421,6 +434,41 @@ impl OrbitConfig {
                     "info": "blue"
                 })
             })
+    }
+
+    /// Returns configured cluster customizations map.
+    pub fn cluster_customizations(&self) -> crate::kubernetes::models::ClusterCustomizationMap {
+        self.values
+            .get("clusterCustomizations")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default()
+    }
+
+    /// Updates or removes cluster customization for a specific cluster ID.
+    pub fn set_cluster_customization(
+        &mut self,
+        id: &str,
+        customization: crate::kubernetes::models::ClusterCustomization,
+    ) {
+        let mut map = self.cluster_customizations();
+        if customization.alias.as_deref().unwrap_or("").trim().is_empty()
+            && customization.tags.is_empty()
+            && customization.color.as_deref().unwrap_or("").trim().is_empty()
+            && customization.description.as_deref().unwrap_or("").trim().is_empty()
+        {
+            map.remove(id);
+        } else {
+            let sanitized = crate::kubernetes::models::ClusterCustomization {
+                alias: customization.alias.filter(|s| !s.trim().is_empty()),
+                tags: customization.tags.into_iter().filter(|s| !s.trim().is_empty()).collect(),
+                color: customization.color.filter(|s| !s.trim().is_empty()),
+                description: customization.description.filter(|s| !s.trim().is_empty()),
+            };
+            map.insert(id.to_string(), sanitized);
+        }
+        if let Ok(v) = serde_json::to_value(map) {
+            self.values.insert("clusterCustomizations".to_string(), v);
+        }
     }
 
     /// Generates the unified `Configuration` model list sent to the frontend.
@@ -845,6 +893,40 @@ mod tests {
                 None => std::env::remove_var("ORBIT_DEV"),
             }
         }
+    }
+
+    #[test]
+    fn test_cluster_customizations_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "clusterCustomizations")
+            .expect("clusterCustomizations must exist");
+        assert_eq!(cfg.datatype, "string");
+        assert_eq!(cfg.cardinality, "0..1");
+    }
+
+    #[test]
+    fn test_cluster_customization_get_and_set() {
+        use crate::kubernetes::models::ClusterCustomization;
+        let mut config = OrbitConfig::default();
+        assert!(config.cluster_customizations().is_empty());
+
+        let customization = ClusterCustomization {
+            alias: Some("Production EKS".to_string()),
+            tags: vec!["prod".to_string(), "aws".to_string()],
+            color: Some("#ef4444".to_string()),
+            description: Some("Main payment cluster".to_string()),
+        };
+
+        config.set_cluster_customization("ctx-1", customization.clone());
+        let map = config.cluster_customizations();
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get("ctx-1"), Some(&customization));
+
+        // Test clearing customization when empty
+        config.set_cluster_customization("ctx-1", ClusterCustomization::default());
+        assert!(config.cluster_customizations().is_empty());
     }
 }
 

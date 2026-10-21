@@ -37,8 +37,9 @@ const cloudProvider = computed(() => {
 
 const clusterTooltip = computed(() => {
   if (!activeCluster.value) return 'No active cluster'
+  const displayName = activeCluster.value.alias || activeCluster.value.name
   const parts = [
-    `${activeCluster.value.name} (${activeCluster.value.status || 'unknown'})`,
+    `${displayName} (${activeCluster.value.status || 'unknown'})`,
     `K8S: ${kubernetesVersion.value}`,
     `Cloud: ${cloudProvider.value.provider} / ${cloudProvider.value.platform}`,
     `Uptime: ${clusterUptime.value}`
@@ -60,20 +61,23 @@ const clusterTooltip = computed(() => {
         <div class="flex items-center gap-1.5 cursor-default" v-tooltip.bottom="clusterTooltip">
           <!-- Status dot -->
           <span
-            class="w-2 h-2 rounded-full shrink-0"
-            :class="
-              activeCluster.status === 'healthy'
-                ? 'bg-(--success)'
-                : activeCluster.status === 'warning'
-                  ? 'bg-(--warning)'
-                  : 'bg-(--danger)'
-            "
+            class="w-2 h-2 rounded-full shrink-0 shadow-xs"
+            :style="activeCluster.color ? { backgroundColor: activeCluster.color } : undefined"
+            :class="[
+              !activeCluster.color && (
+                activeCluster.status === 'healthy'
+                  ? 'bg-(--success)'
+                  : activeCluster.status === 'warning'
+                    ? 'bg-(--warning)'
+                    : 'bg-(--danger)'
+              )
+            ]"
           />
           <!-- Cluster name -->
           <span
             class="font-semibold text-xs text-primary tracking-tight truncate max-w-[160px] sm:max-w-[200px] md:max-w-[240px]"
           >
-            {{ activeCluster.name }}
+            {{ activeCluster.alias || activeCluster.name }}
           </span>
         </div>
 
