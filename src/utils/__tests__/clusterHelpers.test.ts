@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { ClusterInfo } from '../../types/kubernetes.ts'
-import {
-  filterClusters,
-  getAllClusterTags,
-  getClusterDisplayName
-} from '../clusterHelpers.ts'
+import { filterClusters, getAllClusterTags, getClusterDisplayName } from '../clusterHelpers.ts'
 
 const sampleClusters: ClusterInfo[] = [
   {
@@ -40,7 +36,10 @@ test('getClusterDisplayName returns alias when defined', () => {
 
 test('getClusterDisplayName falls back to name when alias is undefined or empty', () => {
   assert.equal(getClusterDisplayName(sampleClusters[2]), 'minikube')
-  assert.equal(getClusterDisplayName({ id: '1', name: 'my-ctx', status: 'healthy', alias: '' }), 'my-ctx')
+  assert.equal(
+    getClusterDisplayName({ id: '1', name: 'my-ctx', status: 'healthy', alias: '' }),
+    'my-ctx'
+  )
   assert.equal(getClusterDisplayName(null), '')
   assert.equal(getClusterDisplayName(undefined), '')
 })

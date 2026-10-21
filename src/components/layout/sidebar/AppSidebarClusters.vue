@@ -16,7 +16,7 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const k8sStore = useKubernetesStore()
-const { activeCluster, isRefreshing, handleAddCluster } = useCluster()
+const { activeCluster, handleAddCluster } = useCluster()
 
 const searchQuery = ref('')
 const selectedTag = ref<string | null>(null)
@@ -61,7 +61,10 @@ const clearFilters = () => {
   <div data-component="sidebar-clusters" class="flex-1 overflow-hidden p-3 flex flex-col gap-2.5">
     <!-- Top Search Bar -->
     <div v-if="k8sStore.clusters.length > 0" class="relative shrink-0">
-      <Search :size="13" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none" />
+      <Search
+        :size="13"
+        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none"
+      />
       <InputText
         v-model="searchQuery"
         placeholder="Filter clusters or tags..."
@@ -125,15 +128,20 @@ const clearFilters = () => {
               class="w-2.5 h-2.5 rounded-full shrink-0 shadow-xs"
               :style="cluster.color ? { backgroundColor: cluster.color } : undefined"
               :class="[
-                !cluster.color && (
-                  k8sStore.activeClusterId === cluster.id
+                !cluster.color &&
+                  (k8sStore.activeClusterId === cluster.id
                     ? activeCluster?.status === 'healthy'
                       ? 'bg-(--success)'
-                      : 'bg-(--danger)'
-                    : 'bg-muted-color/40'
-                )
+                      : activeCluster?.status === 'warning'
+                        ? 'bg-(--warning)'
+                        : 'bg-(--danger)'
+                    : 'bg-muted-color/40')
               ]"
-              v-tooltip.top="cluster.color ? `Environment indicator (${cluster.status})` : `Status: ${cluster.status}`"
+              v-tooltip.top="
+                cluster.color
+                  ? `Environment indicator (${cluster.status})`
+                  : `Status: ${cluster.status}`
+              "
             />
 
             <!-- Friendly Display Name / Alias -->
@@ -169,13 +177,19 @@ const clearFilters = () => {
 
         <!-- Raw Context Subtitle (shown when alias is defined) -->
         <div v-if="cluster.alias && cluster.alias !== cluster.name" class="pl-4.5 truncate">
-          <span class="font-mono text-[10px] text-muted-color truncate block" :title="cluster.name">
+          <span
+            class="font-mono text-[10px] text-muted-color truncate block"
+            v-tooltip.top="cluster.name"
+          >
             {{ cluster.name }}
           </span>
         </div>
 
         <!-- Tag Chips -->
-        <div v-if="cluster.tags && cluster.tags.length > 0" class="pl-4.5 flex flex-wrap gap-1 pt-0.5">
+        <div
+          v-if="cluster.tags && cluster.tags.length > 0"
+          class="pl-4.5 flex flex-wrap gap-1 pt-0.5"
+        >
           <span
             v-for="tag in cluster.tags"
             :key="tag"
@@ -187,7 +201,10 @@ const clearFilters = () => {
       </div>
 
       <!-- Empty state: No clusters configured -->
-      <div v-if="k8sStore.clusters.length === 0" class="text-xs text-muted-color px-2 py-4 text-center">
+      <div
+        v-if="k8sStore.clusters.length === 0"
+        class="text-xs text-muted-color px-2 py-4 text-center"
+      >
         No clusters added yet
       </div>
 
@@ -211,7 +228,13 @@ const clearFilters = () => {
 
     <!-- Bottom Actions Toolbar -->
     <div class="mt-auto shrink-0 flex flex-col gap-1.5 pt-2 border-t border-(--border)">
-      <Button fluid severity="contrast" size="small" class="h-8 text-xs font-semibold flex items-center justify-center gap-1.5" @click="handleAddCluster">
+      <Button
+        fluid
+        severity="contrast"
+        size="small"
+        class="h-8 text-xs font-semibold flex items-center justify-center gap-1.5"
+        @click="handleAddCluster"
+      >
         <Plus :size="14" />
         <span>Add cluster</span>
       </Button>
@@ -230,9 +253,6 @@ const clearFilters = () => {
     </div>
 
     <!-- Cluster Edit Modal -->
-    <ClusterEditModal
-      v-model:visible="editModalVisible"
-      :cluster="clusterToEdit"
-    />
+    <ClusterEditModal v-model:visible="editModalVisible" :cluster="clusterToEdit" />
   </div>
 </template>

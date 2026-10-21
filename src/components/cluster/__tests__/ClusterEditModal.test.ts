@@ -20,11 +20,23 @@ test('ClusterEditModal uses PrimeVue controls and delegates to kubernetesService
 
   assert.ok(content.includes('primevue'), 'ClusterEditModal must import from primevue')
   assert.ok(content.includes('Dialog'), 'ClusterEditModal must use PrimeVue Dialog')
-  assert.ok(content.includes('InputText'), 'ClusterEditModal must use PrimeVue InputText for alias and tags')
-  assert.ok(content.includes('Textarea'), 'ClusterEditModal must use PrimeVue Textarea for description')
-  assert.ok(content.includes('kubernetesService.updateClusterMetadata'), 'ClusterEditModal must call kubernetesService.updateClusterMetadata')
+  assert.ok(
+    content.includes('InputText'),
+    'ClusterEditModal must use PrimeVue InputText for alias and tags'
+  )
+  assert.ok(
+    content.includes('Textarea'),
+    'ClusterEditModal must use PrimeVue Textarea for description'
+  )
+  assert.ok(
+    content.includes('kubernetesService.updateClusterMetadata'),
+    'ClusterEditModal must call kubernetesService.updateClusterMetadata'
+  )
   assert.ok(content.includes('v-tooltip'), 'ClusterEditModal must use PrimeVue v-tooltip directive')
-  assert.ok(!content.includes(['@neutralinojs', 'lib'].join('/')), 'ClusterEditModal must never import native runtime library directly')
+  assert.ok(
+    !content.includes(['@neutralinojs', 'lib'].join('/')),
+    'ClusterEditModal must never import native runtime library directly'
+  )
 })
 
 test('ClusterEditModal defines environment color swatches and tag management', () => {
@@ -35,5 +47,8 @@ test('ClusterEditModal defines environment color swatches and tag management', (
   assert.ok(content.includes('#10b981'), 'ClusterEditModal must include emerald/dev preset swatch')
   assert.ok(content.includes('addTag'), 'ClusterEditModal must support adding tags')
   assert.ok(content.includes('removeTag'), 'ClusterEditModal must support removing tags')
-  assert.ok(content.includes('handleReset'), 'ClusterEditModal must support resetting metadata to default')
+  assert.ok(
+    content.includes('handleReset'),
+    'ClusterEditModal must support resetting metadata to default'
+  )
 })

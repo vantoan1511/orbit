@@ -5,6 +5,7 @@ import { useSearchStore } from '@/stores/searchStore'
 import { useShortcutStore } from '@/stores/shortcutStore'
 import { useWindowControls } from '@/composables/useWindowControls'
 import { detectCloudProvider } from '@/utils/cloudProvider'
+import { getClusterDisplayName } from '@/utils/clusterHelpers'
 import { Clock, Cloud, Search } from '@lucide/vue'
 import Button from 'primevue/button'
 import { computed } from 'vue'
@@ -37,7 +38,7 @@ const cloudProvider = computed(() => {
 
 const clusterTooltip = computed(() => {
   if (!activeCluster.value) return 'No active cluster'
-  const displayName = activeCluster.value.alias || activeCluster.value.name
+  const displayName = getClusterDisplayName(activeCluster.value)
   const parts = [
     `${displayName} (${activeCluster.value.status || 'unknown'})`,
     `K8S: ${kubernetesVersion.value}`,
@@ -64,20 +65,19 @@ const clusterTooltip = computed(() => {
             class="w-2 h-2 rounded-full shrink-0 shadow-xs"
             :style="activeCluster.color ? { backgroundColor: activeCluster.color } : undefined"
             :class="[
-              !activeCluster.color && (
-                activeCluster.status === 'healthy'
+              !activeCluster.color &&
+                (activeCluster.status === 'healthy'
                   ? 'bg-(--success)'
                   : activeCluster.status === 'warning'
                     ? 'bg-(--warning)'
-                    : 'bg-(--danger)'
-              )
+                    : 'bg-(--danger)')
             ]"
           />
           <!-- Cluster name -->
           <span
             class="font-semibold text-xs text-primary tracking-tight truncate max-w-[160px] sm:max-w-[200px] md:max-w-[240px]"
           >
-            {{ activeCluster.alias || activeCluster.name }}
+            {{ getClusterDisplayName(activeCluster) }}
           </span>
         </div>
 

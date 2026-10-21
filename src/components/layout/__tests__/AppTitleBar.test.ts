@@ -95,7 +95,10 @@ test('AppTitleBar component integrates active cluster info and health status', (
   assert.ok(content.includes('useCluster'), 'AppTitleBar must import useCluster')
   assert.ok(content.includes('useKubernetesStore'), 'AppTitleBar must import useKubernetesStore')
   assert.ok(content.includes('activeCluster'), 'AppTitleBar must bind activeCluster')
-  assert.ok(content.includes('activeCluster.name'), 'AppTitleBar must render activeCluster.name')
+  assert.ok(
+    content.includes('activeCluster.name') || content.includes('getClusterDisplayName'),
+    'AppTitleBar must render activeCluster name or display name'
+  )
   assert.ok(
     content.includes('No active cluster'),
     'AppTitleBar must render fallback when activeCluster is null'
@@ -140,8 +143,8 @@ test('AppTitleBar component renders cluster alias and custom color dot', () => {
   const content = fs.readFileSync(filePath, 'utf-8')
 
   assert.ok(
-    content.includes('activeCluster.alias') || content.includes('getClusterDisplayName'),
-    'AppTitleBar must support displaying activeCluster alias'
+    content.includes('getClusterDisplayName'),
+    'AppTitleBar must display activeCluster alias via getClusterDisplayName'
   )
   assert.ok(
     content.includes('activeCluster.color'),

@@ -62,14 +62,12 @@ impl KubeManager {
                     "offline".to_string()
                 };
 
-                let mut server_url = None;
-                if let Some(ref context_data) = ctx.context {
-                    if let Some(named_cl) = config.clusters.iter().find(|cl| cl.name == context_data.cluster) {
-                        if let Some(ref cl) = named_cl.cluster {
-                            server_url = cl.server.clone();
-                        }
-                    }
-                }
+                let server_url = ctx
+                    .context
+                    .as_ref()
+                    .and_then(|c| config.clusters.iter().find(|cl| cl.name == c.cluster))
+                    .and_then(|cl| cl.cluster.as_ref())
+                    .and_then(|cl| cl.server.clone());
 
                 let custom = customizations.get(&ctx.name);
 

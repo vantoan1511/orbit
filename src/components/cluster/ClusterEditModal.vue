@@ -62,7 +62,10 @@ const addTag = () => {
   if (!raw) return
 
   // Split on commas if multiple entered
-  const tokens = raw.split(',').map((t) => t.trim().replace(/^#+/, '')).filter(Boolean)
+  const tokens = raw
+    .split(',')
+    .map((t) => t.trim().replace(/^#+/, ''))
+    .filter(Boolean)
   for (const token of tokens) {
     if (!tags.value.includes(token)) {
       tags.value.push(token)
@@ -147,7 +150,10 @@ const handleSave = async () => {
       root: { class: 'rounded-xl overflow-hidden' },
       header: { class: 'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar)/60' },
       content: { class: 'p-5 flex flex-col gap-5' },
-      footer: { class: 'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar)/40 flex items-center justify-between' }
+      footer: {
+        class:
+          'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar)/40 flex items-center justify-between'
+      }
     }"
     @update:visible="emit('update:visible', $event)"
   >
@@ -163,13 +169,19 @@ const handleSave = async () => {
       <div class="rounded-lg p-3 bg-(--bg-hover)/40 flex flex-col gap-1 select-text">
         <div class="flex items-center justify-between text-xs">
           <span class="text-muted-color font-medium">Context Name:</span>
-          <span class="font-mono font-semibold text-primary truncate max-w-[280px]" :title="cluster.name">
+          <span
+            class="font-mono font-semibold text-primary truncate max-w-[280px]"
+            v-tooltip.top="cluster.name"
+          >
             {{ cluster.name }}
           </span>
         </div>
         <div v-if="cluster.serverUrl" class="flex items-center justify-between text-xs">
           <span class="text-muted-color font-medium">Server API:</span>
-          <span class="font-mono text-[11px] text-muted-color truncate max-w-[280px]" :title="cluster.serverUrl">
+          <span
+            class="font-mono text-[11px] text-muted-color truncate max-w-[280px]"
+            v-tooltip.top="cluster.serverUrl"
+          >
             {{ cluster.serverUrl }}
           </span>
         </div>
@@ -194,9 +206,7 @@ const handleSave = async () => {
 
       <!-- Environment Color Indicator -->
       <div class="flex flex-col gap-2">
-        <label class="text-xs font-semibold text-primary">
-          Environment Color Indicator
-        </label>
+        <label class="text-xs font-semibold text-primary"> Environment Color Indicator </label>
         <div class="flex items-center gap-2 flex-wrap">
           <Button
             v-for="preset in COLOR_PRESETS"
@@ -206,12 +216,18 @@ const handleSave = async () => {
             :style="{ backgroundColor: preset.hex }"
             :class="[
               'w-6 h-6 rounded-full p-0! flex items-center justify-center transition-all cursor-pointer border border-transparent shadow-none',
-              selectedColor === preset.hex ? 'ring-2 ring-primary ring-offset-2 scale-110' : 'hover:scale-105 opacity-80 hover:opacity-100'
+              selectedColor === preset.hex
+                ? 'ring-2 ring-primary ring-offset-2 scale-110'
+                : 'hover:scale-105 opacity-80 hover:opacity-100'
             ]"
             @click="selectColor(preset.hex)"
           >
             <template #icon>
-              <Check v-if="selectedColor === preset.hex" :size="12" class="text-white drop-shadow" />
+              <Check
+                v-if="selectedColor === preset.hex"
+                :size="12"
+                class="text-white drop-shadow"
+              />
             </template>
           </Button>
           <Button
@@ -234,7 +250,10 @@ const handleSave = async () => {
         </label>
         <div class="flex items-center gap-2">
           <div class="relative flex-1">
-            <TagIcon :size="13" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none" />
+            <TagIcon
+              :size="13"
+              class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none"
+            />
             <InputText
               id="cluster-tag-input"
               v-model="newTagInput"

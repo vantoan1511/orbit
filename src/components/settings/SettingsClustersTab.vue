@@ -10,12 +10,13 @@ import { Button, Column, DataTable, InputText } from 'primevue'
 import { computed, ref } from 'vue'
 
 const k8sStore = useKubernetesStore()
-const { activeCluster, isRefreshing, handleAddCluster } = useCluster()
+const { activeCluster, handleAddCluster } = useCluster()
 
 const searchQuery = ref('')
 const selectedTag = ref<string | null>(null)
 const editModalVisible = ref(false)
 const selectedCluster = ref<ClusterInfo | null>(null)
+const switchingClusterId = ref<string | null>(null)
 
 const allTags = computed(() => getAllClusterTags(k8sStore.clusters))
 
@@ -25,7 +26,12 @@ const filteredClusters = computed(() =>
 
 const handleSwitchCluster = async (clusterId: string) => {
   if (k8sStore.activeClusterId === clusterId) return
-  await kubernetesService.switchCluster(clusterId)
+  switchingClusterId.value = clusterId
+  try {
+    await kubernetesService.switchCluster(clusterId)
+  } finally {
+    switchingClusterId.value = null
+  }
 }
 
 const openEditModal = (cluster: ClusterInfo) => {
@@ -68,7 +74,10 @@ const toggleTag = (tag: string) => {
     <!-- Toolbar: Search & Tag Filter -->
     <div class="flex items-center justify-between gap-3 flex-wrap">
       <div class="relative w-64">
-        <Search :size="13" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none" />
+        <Search
+          :size="13"
+          class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none"
+        />
         <InputText
           v-model="searchQuery"
           placeholder="Filter by name, context, tag..."
@@ -119,13 +128,22 @@ const toggleTag = (tag: string) => {
         class="text-xs"
         :pt="{
           headerRow: { class: 'bg-surface-100 dark:bg-surface-900 border-b border-(--border)' },
-          row: { class: 'hover:bg-(--bg-hover) transition-colors border-b border-(--border)/60 last:border-b-0' }
+          row: {
+            class:
+              'hover:bg-(--bg-hover) transition-colors border-b border-(--border)/60 last:border-b-0'
+          }
         }"
       >
         <template #empty>
-          <div class="p-8 text-center text-muted-color flex flex-col items-center justify-center gap-2">
+          <div
+            class="p-8 text-center text-muted-color flex flex-col items-center justify-center gap-2"
+          >
             <Server :size="24" class="text-muted-color/60" />
-            <span>{{ k8sStore.clusters.length === 0 ? 'No clusters discovered. Add a kubeconfig file to get started.' : 'No clusters match the search filters.' }}</span>
+            <span>{{
+              k8sStore.clusters.length === 0
+                ? 'No clusters discovered. Add a kubeconfig file to get started.'
+                : 'No clusters match the search filters.'
+            }}</span>
           </div>
         </template>
 
@@ -137,15 +155,18 @@ const toggleTag = (tag: string) => {
                 class="w-2.5 h-2.5 rounded-full shrink-0"
                 :style="data.color ? { backgroundColor: data.color } : undefined"
                 :class="[
-                  !data.color && (
-                    k8sStore.activeClusterId === data.id
+                  !data.color &&
+                    (k8sStore.activeClusterId === data.id
                       ? activeCluster?.status === 'healthy'
                         ? 'bg-(--success)'
-                        : 'bg-(--danger)'
-                      : 'bg-muted-color/40'
-                  )
+                        : activeCluster?.status === 'warning'
+                          ? 'bg-(--warning)'
+                          : 'bg-(--danger)'
+                      : 'bg-muted-color/40')
                 ]"
-                v-tooltip.top="data.color ? `Custom indicator (${data.status})` : `Status: ${data.status}`"
+                v-tooltip.top="
+                  data.color ? `Custom indicator (${data.status})` : `Status: ${data.status}`
+                "
               />
               <span class="capitalize text-xs font-medium text-muted-color">
                 {{ data.status }}
@@ -169,7 +190,11 @@ const toggleTag = (tag: string) => {
                   Active
                 </span>
               </div>
-              <span v-if="data.alias && data.alias !== data.name" class="font-mono text-[11px] text-muted-color truncate" :title="data.name">
+              <span
+                v-if="data.alias && data.alias !== data.name"
+                class="font-mono text-[11px] text-muted-color truncate"
+                v-tooltip.top="data.name"
+              >
                 {{ data.name }}
               </span>
             </div>
@@ -179,7 +204,10 @@ const toggleTag = (tag: string) => {
         <!-- Server API URL Column -->
         <Column header="Server API">
           <template #body="{ data }">
-            <span class="font-mono text-[11px] text-muted-color truncate max-w-[220px] block" :title="data.serverUrl || 'Default API Server'">
+            <span
+              class="font-mono text-[11px] text-muted-color truncate max-w-[220px] block"
+              v-tooltip.top="data.serverUrl || 'Default API Server'"
+            >
               {{ data.serverUrl || 'Default API Server' }}
             </span>
           </template>
@@ -211,7 +239,7 @@ const toggleTag = (tag: string) => {
                 variant="outlined"
                 severity="secondary"
                 class="h-7 text-xs px-2.5"
-                :loading="isRefreshing && k8sStore.activeClusterId === data.id"
+                :loading="switchingClusterId === data.id"
                 @click="handleSwitchCluster(data.id)"
               >
                 Switch
@@ -243,9 +271,6 @@ const toggleTag = (tag: string) => {
     </div>
 
     <!-- Cluster Edit Modal -->
-    <ClusterEditModal
-      v-model:visible="editModalVisible"
-      :cluster="selectedCluster"
-    />
+    <ClusterEditModal v-model:visible="editModalVisible" :cluster="selectedCluster" />
   </div>
 </template>

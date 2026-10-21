@@ -20,10 +20,33 @@ test('SettingsClustersTab uses PrimeVue DataTable, search filtering, and Cluster
 
   assert.ok(content.includes('DataTable'), 'SettingsClustersTab must use PrimeVue DataTable')
   assert.ok(content.includes('Column'), 'SettingsClustersTab must use PrimeVue Column')
-  assert.ok(content.includes('InputText'), 'SettingsClustersTab must use PrimeVue InputText for search')
-  assert.ok(content.includes('ClusterEditModal'), 'SettingsClustersTab must integrate ClusterEditModal')
-  assert.ok(content.includes('getClusterDisplayName'), 'SettingsClustersTab must use getClusterDisplayName')
+  assert.ok(
+    content.includes('InputText'),
+    'SettingsClustersTab must use PrimeVue InputText for search'
+  )
+  assert.ok(
+    content.includes('ClusterEditModal'),
+    'SettingsClustersTab must integrate ClusterEditModal'
+  )
+  assert.ok(
+    content.includes('getClusterDisplayName'),
+    'SettingsClustersTab must use getClusterDisplayName'
+  )
   assert.ok(content.includes('filterClusters'), 'SettingsClustersTab must use filterClusters')
-  assert.ok(content.includes('handleAddCluster'), 'SettingsClustersTab must support adding cluster via handleAddCluster')
-  assert.ok(!content.includes(['@neutralinojs', 'lib'].join('/')), 'SettingsClustersTab must not directly import native runtime')
+  assert.ok(
+    content.includes('handleAddCluster'),
+    'SettingsClustersTab must support adding cluster via handleAddCluster'
+  )
+  assert.ok(
+    content.includes('switchingClusterId'),
+    'SettingsClustersTab must manage switchingClusterId state for loading indicator'
+  )
+  assert.ok(
+    content.includes('v-tooltip'),
+    'SettingsClustersTab must use PrimeVue v-tooltip directive'
+  )
+  assert.ok(
+    !content.includes(['@neutralinojs', 'lib'].join('/')),
+    'SettingsClustersTab must not directly import native runtime'
+  )
 })

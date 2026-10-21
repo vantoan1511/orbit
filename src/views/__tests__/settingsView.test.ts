@@ -45,5 +45,11 @@ test('VALID_SETTINGS_TABS contains all 7 expected tabs', () => {
 })
 
 test('ENABLED_SETTINGS_TABS contains implemented general, clusters, preferences, appearance, and about tabs', () => {
-  assert.deepEqual(ENABLED_SETTINGS_TABS, ['general', 'clusters', 'preferences', 'appearance', 'about'])
+  assert.deepEqual(ENABLED_SETTINGS_TABS, [
+    'general',
+    'clusters',
+    'preferences',
+    'appearance',
+    'about'
+  ])
 })

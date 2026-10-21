@@ -4,7 +4,10 @@ import path from 'node:path'
 import test from 'node:test'
 
 test('AppSidebarClusters component exists and defines data-component="sidebar-clusters"', () => {
-  const filePath = path.resolve(process.cwd(), 'src/components/layout/sidebar/AppSidebarClusters.vue')
+  const filePath = path.resolve(
+    process.cwd(),
+    'src/components/layout/sidebar/AppSidebarClusters.vue'
+  )
   assert.ok(fs.existsSync(filePath), 'AppSidebarClusters.vue must exist')
 
   const content = fs.readFileSync(filePath, 'utf-8')
@@ -15,7 +18,10 @@ test('AppSidebarClusters component exists and defines data-component="sidebar-cl
 })
 
 test('AppSidebarClusters imports clusterHelpers and ClusterEditModal', () => {
-  const filePath = path.resolve(process.cwd(), 'src/components/layout/sidebar/AppSidebarClusters.vue')
+  const filePath = path.resolve(
+    process.cwd(),
+    'src/components/layout/sidebar/AppSidebarClusters.vue'
+  )
   const content = fs.readFileSync(filePath, 'utf-8')
 
   assert.ok(
@@ -30,11 +36,31 @@ test('AppSidebarClusters imports clusterHelpers and ClusterEditModal', () => {
 })
 
 test('AppSidebarClusters contains search input, tag quick-filters, and manage clusters action', () => {
-  const filePath = path.resolve(process.cwd(), 'src/components/layout/sidebar/AppSidebarClusters.vue')
+  const filePath = path.resolve(
+    process.cwd(),
+    'src/components/layout/sidebar/AppSidebarClusters.vue'
+  )
   const content = fs.readFileSync(filePath, 'utf-8')
 
   assert.ok(content.includes('searchQuery'), 'AppSidebarClusters must have searchQuery state')
-  assert.ok(content.includes('selectedTag'), 'AppSidebarClusters must have selectedTag filter state')
-  assert.ok(content.includes('InputText'), 'AppSidebarClusters must use PrimeVue InputText for search')
-  assert.ok(content.includes('/settings?tab=clusters'), 'AppSidebarClusters must have link to /settings?tab=clusters')
+  assert.ok(
+    content.includes('selectedTag'),
+    'AppSidebarClusters must have selectedTag filter state'
+  )
+  assert.ok(
+    content.includes('InputText'),
+    'AppSidebarClusters must use PrimeVue InputText for search'
+  )
+  assert.ok(
+    content.includes('/settings?tab=clusters'),
+    'AppSidebarClusters must have link to /settings?tab=clusters'
+  )
+  assert.ok(
+    content.includes('v-tooltip'),
+    'AppSidebarClusters must use PrimeVue v-tooltip directive'
+  )
+  assert.ok(
+    !content.includes('isRefreshing'),
+    'AppSidebarClusters must not keep unused isRefreshing variable'
+  )
 })
