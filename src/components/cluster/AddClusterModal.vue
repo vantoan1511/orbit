@@ -16,7 +16,6 @@ import {
 import { useToast } from 'primevue'
 import {
   AlertCircle,
-  Check,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -24,18 +23,19 @@ import {
   Globe,
   Plus,
   Server,
-  Tag as TagIcon,
   Trash2,
-  Upload,
-  X
+  Upload
 } from '@lucide/vue'
+import ClusterCustomizationFields from '@/components/cluster/ClusterCustomizationFields.vue'
 import { kubernetesService } from '@/services/kubernetesService'
 import { filesystem, os } from '@/services/nativeService'
-import type {
-  AddClusterCustomization,
-  AddClusterPayload,
-  DiscoveredContextInfo,
-  ManualEndpointConfig
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import {
+  AUTH_TYPE_OPTIONS,
+  type AddClusterCustomization,
+  type AddClusterPayload,
+  type DiscoveredContextInfo,
+  type ManualEndpointConfig
 } from '@/types/cluster'
 import {
   buildKubeconfigFromEndpoint,
@@ -53,6 +53,8 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const k8sStore = useKubernetesStore()
+const existingClusterNames = computed(() => new Set(k8sStore.clusters.map((c) => c.name)))
 
 const activeTab = ref<'file' | 'paste' | 'manual'>('file')
 const isSubmitting = ref(false)
@@ -69,62 +71,8 @@ const pastedYaml = ref('')
 const yamlParseError = ref<string | null>(null)
 
 // Tab 3: Manual Endpoint
-const manualConfig = ref<ManualEndpointConfig>({
-  contextName: '',
-  clusterName: '',
-  serverUrl: '',
-  authType: 'token',
-  token: '',
-  clientCertData: '',
-  clientKeyData: '',
-  username: '',
-  password: '',
-  insecureSkipTlsVerify: false,
-  caCertData: ''
-})
-
-const AUTH_TYPE_OPTIONS: Array<{
-  label: string
-  value: 'token' | 'certificate' | 'basic' | 'none'
-}> = [
-  { label: 'Bearer Token', value: 'token' },
-  { label: 'Client Certificate & Key', value: 'certificate' },
-  { label: 'Basic Authentication', value: 'basic' },
-  { label: 'None / Anonymous', value: 'none' }
-]
-
-// Preview Contexts
-const discoveredContexts = ref<DiscoveredContextInfo[]>([])
-const selectedContexts = ref<string[]>([])
-
-// Customization Section
-const showCustomization = ref(false)
-const alias = ref('')
-const selectedColor = ref<string | null>(null)
-const tags = ref<string[]>([])
-const newTagInput = ref('')
-const description = ref('')
-
-const COLOR_PRESETS = [
-  { label: 'Red (Production)', hex: '#ef4444' },
-  { label: 'Orange', hex: '#f97316' },
-  { label: 'Amber (Staging)', hex: '#f59e0b' },
-  { label: 'Emerald (Dev)', hex: '#10b981' },
-  { label: 'Cyan (Test)', hex: '#06b6d4' },
-  { label: 'Blue', hex: '#3b82f6' },
-  { label: 'Purple', hex: '#8b5cf6' },
-  { label: 'Slate (Neutral)', hex: '#64748b' }
-] as const
-
-// Reset state
-function resetModalState(): void {
-  activeTab.value = 'file'
-  selectedFilePath.value = ''
-  selectedFileSize.value = null
-  fileRawContent.value = ''
-  pastedYaml.value = ''
-  yamlParseError.value = null
-  manualConfig.value = {
+function createDefaultManualConfig(): ManualEndpointConfig {
+  return {
     contextName: '',
     clusterName: '',
     serverUrl: '',
@@ -137,14 +85,35 @@ function resetModalState(): void {
     insecureSkipTlsVerify: false,
     caCertData: ''
   }
+}
+
+const manualConfig = ref<ManualEndpointConfig>(createDefaultManualConfig())
+
+// Preview Contexts
+const discoveredContexts = ref<DiscoveredContextInfo[]>([])
+const selectedContexts = ref<string[]>([])
+
+// Customization Section
+const showCustomization = ref(false)
+const alias = ref('')
+const selectedColor = ref<string | null>(null)
+const tags = ref<string[]>([])
+
+// Reset state
+function resetModalState(): void {
+  activeTab.value = 'file'
+  selectedFilePath.value = ''
+  selectedFileSize.value = null
+  fileRawContent.value = ''
+  pastedYaml.value = ''
+  yamlParseError.value = null
+  manualConfig.value = createDefaultManualConfig()
   discoveredContexts.value = []
   selectedContexts.value = []
   showCustomization.value = false
   alias.value = ''
   selectedColor.value = null
   tags.value = []
-  newTagInput.value = ''
-  description.value = ''
   switchContext.value = true
   isSubmitting.value = false
 }
@@ -160,8 +129,10 @@ watch(
 
 function updateDiscoveredContexts(contexts: DiscoveredContextInfo[]): void {
   discoveredContexts.value = contexts
-  // By default, select all discovered contexts
-  selectedContexts.value = contexts.map((c) => c.name)
+  // By default, exclude contexts that already exist in Orbit
+  selectedContexts.value = contexts
+    .filter((c) => !existingClusterNames.value.has(c.name))
+    .map((c) => c.name)
 }
 
 // File Selection Handler
@@ -286,24 +257,15 @@ watch(
 // Active tab switch handling
 watch(activeTab, (tab) => {
   if (tab === 'file') {
-    if (fileRawContent.value) {
-      updateDiscoveredContexts(parseKubeconfigYaml(fileRawContent.value))
-    } else {
-      updateDiscoveredContexts([])
-    }
+    updateDiscoveredContexts(fileRawContent.value ? parseKubeconfigYaml(fileRawContent.value) : [])
   } else if (tab === 'paste') {
-    if (pastedYaml.value) {
-      updateDiscoveredContexts(parseKubeconfigYaml(pastedYaml.value))
-    } else {
-      updateDiscoveredContexts([])
-    }
+    updateDiscoveredContexts(pastedYaml.value ? parseKubeconfigYaml(pastedYaml.value) : [])
   } else if (tab === 'manual') {
-    if (manualConfig.value.clusterName.trim() && manualConfig.value.serverUrl.trim()) {
+    const { clusterName, serverUrl, contextName } = manualConfig.value
+    if (clusterName.trim() && serverUrl.trim()) {
       const generated = buildKubeconfigFromEndpoint({
         ...manualConfig.value,
-        contextName:
-          manualConfig.value.contextName.trim() ||
-          `${manualConfig.value.clusterName.trim()}-context`
+        contextName: contextName.trim() || `${clusterName.trim()}-context`
       })
       updateDiscoveredContexts(parseKubeconfigYaml(generated))
     } else {
@@ -336,41 +298,6 @@ function toggleContextSelection(name: string): void {
   }
 }
 
-// Tag Management
-function addTag(): void {
-  const raw = newTagInput.value.trim().toLowerCase()
-  if (!raw) return
-  const tokens = raw
-    .split(',')
-    .map((t) => t.trim().replace(/^#+/, ''))
-    .filter(Boolean)
-  for (const token of tokens) {
-    if (!tags.value.includes(token)) {
-      tags.value.push(token)
-    }
-  }
-  newTagInput.value = ''
-}
-
-function handleTagKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Enter' || e.key === ',') {
-    e.preventDefault()
-    addTag()
-  }
-}
-
-function removeTag(tagToRemove: string): void {
-  tags.value = tags.value.filter((t) => t !== tagToRemove)
-}
-
-function selectColor(hex: string): void {
-  if (selectedColor.value === hex) {
-    selectedColor.value = null
-  } else {
-    selectedColor.value = hex
-  }
-}
-
 // Submission
 const canSubmit = computed(() => {
   return selectedContexts.value.length > 0 && !isSubmitting.value
@@ -388,11 +315,10 @@ async function handleAddClusterSubmit(): Promise<void> {
     } else if (activeTab.value === 'paste') {
       payloadContent = pastedYaml.value
     } else if (activeTab.value === 'manual') {
+      const { clusterName, contextName } = manualConfig.value
       payloadContent = buildKubeconfigFromEndpoint({
         ...manualConfig.value,
-        contextName:
-          manualConfig.value.contextName.trim() ||
-          `${manualConfig.value.clusterName.trim()}-context`
+        contextName: contextName.trim() || `${clusterName.trim()}-context`
       })
     }
 
@@ -403,7 +329,6 @@ async function handleAddClusterSubmit(): Promise<void> {
     if (alias.value.trim()) metadata.alias = alias.value.trim()
     if (selectedColor.value) metadata.color = selectedColor.value
     if (tags.value.length > 0) metadata.tags = [...tags.value]
-    if (description.value.trim()) metadata.description = description.value.trim()
 
     const payload: AddClusterPayload = {
       kubeconfigContent: filteredContent,
@@ -782,6 +707,12 @@ function handleClose(): void {
                   >
                     Current
                   </span>
+                  <span
+                    v-if="existingClusterNames.has(ctx.name)"
+                    class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                  >
+                    Already in Orbit
+                  </span>
                 </div>
                 <div class="flex items-center gap-2 text-[11px] text-muted-color truncate">
                   <span class="truncate">{{ ctx.serverUrl || 'No server URL' }}</span>
@@ -804,9 +735,10 @@ function handleClose(): void {
 
       <!-- Cluster Customization Section -->
       <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
-        <button
-          type="button"
-          class="w-full px-4 py-3 flex items-center justify-between text-left text-xs font-medium text-primary hover:bg-(--bg-hover)/40 transition-colors cursor-pointer select-none"
+        <Button
+          variant="text"
+          severity="secondary"
+          class="w-full! px-4! py-3! flex! items-center! justify-between! text-left! text-xs! font-medium! text-primary! hover:bg-(--bg-hover)/40! transition-colors! cursor-pointer! select-none! rounded-none! border-none!"
           @click="showCustomization = !showCustomization"
         >
           <div class="flex items-center gap-2">
@@ -816,83 +748,17 @@ function handleClose(): void {
             />
             <span>Cluster Customization (Optional)</span>
           </div>
-          <span class="text-[11px] text-muted-color">Display name, environment color & tags</span>
-        </button>
+          <span class="text-[11px] text-muted-color font-normal"
+            >Display name, environment color & tags</span
+          >
+        </Button>
 
-        <div
-          v-if="showCustomization"
-          class="p-4 pt-1 border-t border-(--border) flex flex-col gap-4 text-xs"
-        >
-          <!-- Friendly Alias -->
-          <div class="flex flex-col gap-1.5">
-            <label class="font-medium text-primary">Display Name / Alias</label>
-            <InputText
-              v-model="alias"
-              placeholder="e.g. Staging US-West"
-              size="small"
-              class="w-full text-xs"
-            />
-          </div>
-
-          <!-- Color Preset Swatches -->
-          <div class="flex flex-col gap-1.5">
-            <label class="font-medium text-primary">Environment Color</label>
-            <div class="flex items-center gap-2 flex-wrap">
-              <button
-                v-for="preset in COLOR_PRESETS"
-                :key="preset.hex"
-                v-tooltip.top="preset.label"
-                type="button"
-                class="w-6 h-6 rounded-full border border-(--border) flex items-center justify-center transition-transform hover:scale-110 cursor-pointer"
-                :style="{ backgroundColor: preset.hex }"
-                @click="selectColor(preset.hex)"
-              >
-                <Check v-if="selectedColor === preset.hex" class="w-3.5 h-3.5 text-white" />
-              </button>
-              <Button
-                v-if="selectedColor"
-                v-tooltip.top="'Clear Color'"
-                size="small"
-                variant="text"
-                severity="secondary"
-                class="p-0 text-[11px] text-muted-color hover:text-primary ml-1"
-                @click="selectedColor = null"
-              >
-                Clear
-              </Button>
-            </div>
-          </div>
-
-          <!-- Tags -->
-          <div class="flex flex-col gap-1.5">
-            <label class="font-medium text-primary">Tags</label>
-            <div
-              class="flex flex-wrap items-center gap-1.5 min-h-7 p-1.5 border border-(--border) rounded-lg bg-(--bg-app)"
-            >
-              <span
-                v-for="t in tags"
-                :key="t"
-                class="px-2 py-0.5 rounded bg-(--bg-hover) text-primary text-[11px] flex items-center gap-1 border border-(--border)"
-              >
-                <TagIcon class="w-2.5 h-2.5 text-muted-color" />
-                <span>{{ t }}</span>
-                <button
-                  type="button"
-                  class="text-muted-color hover:text-(--danger) cursor-pointer"
-                  @click="removeTag(t)"
-                >
-                  <X class="w-3 h-3" />
-                </button>
-              </span>
-              <InputText
-                v-model="newTagInput"
-                placeholder="+ Add tag (Enter)..."
-                size="small"
-                class="flex-1 min-w-24 text-[11px] p-0 border-none bg-transparent shadow-none focus:outline-none"
-                @keydown="handleTagKeydown"
-              />
-            </div>
-          </div>
+        <div v-if="showCustomization" class="p-4 pt-1 border-t border-(--border)">
+          <ClusterCustomizationFields
+            v-model:alias="alias"
+            v-model:color="selectedColor"
+            v-model:tags="tags"
+          />
         </div>
       </div>
     </div>

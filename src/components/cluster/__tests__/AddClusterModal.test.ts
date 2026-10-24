@@ -14,7 +14,22 @@ test('AddClusterModal component file exists and defines data-component="add-clus
   )
 })
 
-test('AddClusterModal uses PrimeVue controls and delegates to kubernetesService.addCluster', () => {
+test('AddClusterModal file size is under 800 lines and contains zero raw button elements', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/cluster/AddClusterModal.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+  const lines = content.split('\n')
+
+  assert.ok(
+    lines.length < 800,
+    `AddClusterModal.vue line count must be < 800 lines (current: ${lines.length})`
+  )
+  assert.ok(
+    !content.includes('<button'),
+    'AddClusterModal must not contain raw HTML <button> elements; use PrimeVue <Button>'
+  )
+})
+
+test('AddClusterModal uses PrimeVue controls, composes ClusterCustomizationFields, and delegates to kubernetesService.addCluster', () => {
   const filePath = path.resolve(process.cwd(), 'src/components/cluster/AddClusterModal.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
@@ -24,6 +39,10 @@ test('AddClusterModal uses PrimeVue controls and delegates to kubernetesService.
   assert.ok(content.includes('InputText'), 'AddClusterModal must use PrimeVue InputText')
   assert.ok(content.includes('Checkbox'), 'AddClusterModal must use PrimeVue Checkbox')
   assert.ok(content.includes('Button'), 'AddClusterModal must use PrimeVue Button')
+  assert.ok(
+    content.includes('ClusterCustomizationFields'),
+    'AddClusterModal must compose ClusterCustomizationFields'
+  )
   assert.ok(
     content.includes('kubernetesService.addCluster'),
     'AddClusterModal must call kubernetesService.addCluster'
@@ -39,7 +58,7 @@ test('AddClusterModal uses PrimeVue controls and delegates to kubernetesService.
   )
 })
 
-test('AddClusterModal defines 3 input methods, preview table, color presets, and tags', () => {
+test('AddClusterModal defines 3 input methods, collision feedback badge, and context selection', () => {
   const filePath = path.resolve(process.cwd(), 'src/components/cluster/AddClusterModal.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
@@ -48,11 +67,11 @@ test('AddClusterModal defines 3 input methods, preview table, color presets, and
   assert.ok(content.includes('paste'), 'AddClusterModal must include paste YAML tab')
   assert.ok(content.includes('manual'), 'AddClusterModal must include manual endpoint tab')
 
-  // Color presets & tags
-  assert.ok(content.includes('#ef4444'), 'AddClusterModal must include red/prod preset swatch')
-  assert.ok(content.includes('#10b981'), 'AddClusterModal must include emerald/dev preset swatch')
-  assert.ok(content.includes('addTag'), 'AddClusterModal must support adding tags')
-  assert.ok(content.includes('removeTag'), 'AddClusterModal must support removing tags')
+  // Duplicate collision badge feedback
+  assert.ok(
+    content.includes('Already in Orbit'),
+    'AddClusterModal must display "Already in Orbit" feedback for existing clusters'
+  )
 
   // Context selection & auto-switch
   assert.ok(content.includes('switchContext'), 'AddClusterModal must support auto-switch context')

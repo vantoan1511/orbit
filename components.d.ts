@@ -35,6 +35,7 @@ declare module 'vue' {
     Card: typeof import('primevue/card')['default']
     CloneDeploymentDialog: typeof import('./src/components/shared/CloneDeploymentDialog.vue')['default']
     CloneIngressDialog: typeof import('./src/components/shared/CloneIngressDialog.vue')['default']
+    ClusterCustomizationFields: typeof import('./src/components/cluster/ClusterCustomizationFields.vue')['default']
     ClusterEditModal: typeof import('./src/components/cluster/ClusterEditModal.vue')['default']
     Column: typeof import('primevue/column')['default']
     ConfigDataTable: typeof import('./src/components/config/ConfigDataTable.vue')['default']

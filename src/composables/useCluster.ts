@@ -1,4 +1,5 @@
 import { computed, ref } from 'vue'
+import { getActivePinia } from 'pinia'
 import { useKubernetesStore } from '../stores/kubernetesStore.ts'
 
 const isAddClusterModalVisible = ref(false)
@@ -20,32 +21,26 @@ export function useCluster() {
     openAddClusterModal()
   }
 
+  const getStore = () => (getActivePinia() ? useKubernetesStore() : null)
+
   const activeCluster = computed(() => {
-    try {
-      const k8sStore = useKubernetesStore()
-      return k8sStore.clusters.find((c) => c.id === k8sStore.activeClusterId) || null
-    } catch {
-      return null
-    }
+    const store = getStore()
+    return store?.clusters.find((c) => c.id === store.activeClusterId) ?? null
   })
 
   const lastUpdatedAt = computed(() => {
-    try {
-      const k8sStore = useKubernetesStore()
-      return k8sStore.lastUpdatedAt
-    } catch {
-      return null
-    }
+    const store = getStore()
+    return store?.lastUpdatedAt ?? null
   })
 
   const refreshCluster = async (): Promise<void> => {
     if (isRefreshing.value) return
     isRefreshing.value = true
     try {
-      const k8sStore = useKubernetesStore()
-      await k8sStore.loadInitialData()
-    } catch (error) {
-      console.error('Failed to refresh cluster data:', error)
+      const store = getStore()
+      if (store) {
+        await store.loadInitialData()
+      }
     } finally {
       isRefreshing.value = false
     }

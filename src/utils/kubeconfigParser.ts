@@ -1,5 +1,6 @@
 import * as yaml from 'yaml'
 import type { DiscoveredContextInfo, ManualEndpointConfig } from '@/types/cluster'
+import { encodeBase64 } from './text.ts'
 
 interface RawKubeContext {
   name: string
@@ -182,6 +183,32 @@ export function filterKubeconfigContexts(yamlContent: string, selectedContexts: 
 }
 
 /**
+ * Normalizes a Kubernetes API server URL by prepending 'https://' if the protocol scheme is omitted.
+ */
+export function normalizeServerUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed
+  }
+  return `https://${trimmed}`
+}
+
+/**
+ * Normalizes certificate/key data by encoding raw PEM content to base64.
+ * Returns existing base64 strings unchanged.
+ */
+export function normalizeCertData(data: string | undefined): string | undefined {
+  if (!data) return undefined
+  const trimmed = data.trim()
+  if (!trimmed) return undefined
+  if (trimmed.startsWith('-----BEGIN ')) {
+    return encodeBase64(trimmed)
+  }
+  return trimmed
+}
+
+/**
  * Constructs a valid Kubeconfig YAML string from manual API endpoint configuration parameters.
  */
 export function buildKubeconfigFromEndpoint(config: ManualEndpointConfig): string {
@@ -190,13 +217,14 @@ export function buildKubeconfigFromEndpoint(config: ManualEndpointConfig): strin
   const userName = `${clusterName}-user`
 
   const clusterConfig: NonNullable<RawKubeCluster['cluster']> = {
-    server: config.serverUrl.trim()
+    server: normalizeServerUrl(config.serverUrl)
   }
 
+  const normalizedCa = normalizeCertData(config.caCertData)
   if (config.insecureSkipTlsVerify) {
     clusterConfig['insecure-skip-tls-verify'] = true
-  } else if (config.caCertData?.trim()) {
-    clusterConfig['certificate-authority-data'] = config.caCertData.trim()
+  } else if (normalizedCa) {
+    clusterConfig['certificate-authority-data'] = normalizedCa
   }
 
   const userConfig: NonNullable<RawKubeUser['user']> = {}
@@ -204,11 +232,13 @@ export function buildKubeconfigFromEndpoint(config: ManualEndpointConfig): strin
   if (config.authType === 'token' && config.token) {
     userConfig.token = config.token.trim()
   } else if (config.authType === 'certificate') {
-    if (config.clientCertData?.trim()) {
-      userConfig['client-certificate-data'] = config.clientCertData.trim()
+    const clientCert = normalizeCertData(config.clientCertData)
+    const clientKey = normalizeCertData(config.clientKeyData)
+    if (clientCert) {
+      userConfig['client-certificate-data'] = clientCert
     }
-    if (config.clientKeyData?.trim()) {
-      userConfig['client-key-data'] = config.clientKeyData.trim()
+    if (clientKey) {
+      userConfig['client-key-data'] = clientKey
     }
   } else if (config.authType === 'basic') {
     if (config.username?.trim()) {

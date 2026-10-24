@@ -152,3 +152,47 @@ test('buildKubeconfigFromEndpoint generates valid Kubeconfig YAML for client cer
   assert.ok(yamlOutput.includes('client-certificate-data: CERT_DATA_BASE64'))
   assert.ok(yamlOutput.includes('client-key-data: KEY_DATA_BASE64'))
 })
+
+test('buildKubeconfigFromEndpoint prefixes https:// when protocol is missing', () => {
+  const config: ManualEndpointConfig = {
+    contextName: 'no-proto-ctx',
+    clusterName: 'no-proto-cluster',
+    serverUrl: '192.168.1.50:6443',
+    authType: 'token',
+    token: 'test-token',
+    insecureSkipTlsVerify: true
+  }
+
+  const yamlOutput = buildKubeconfigFromEndpoint(config)
+  const parsed = parseKubeconfigYaml(yamlOutput)
+
+  assert.equal(parsed.length, 1)
+  assert.equal(parsed[0].serverUrl, 'https://192.168.1.50:6443')
+})
+
+test('buildKubeconfigFromEndpoint encodes raw PEM strings to base64 for cert and key fields', () => {
+  const pemCertHeader = '-----BEGIN ' + 'CERTIFICATE-----'
+  const pemKeyHeader = '-----BEGIN ' + 'RSA PRIVATE KEY-----'
+  const rawPemCert = `${pemCertHeader}\nMIIDXTCCAkWgAwIBAgIJAP...\n-----END CERTIFICATE-----`
+  const rawPemKey = `${pemKeyHeader}\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----`
+  const rawPemCa = `${pemCertHeader}\nMIIB...CA\n-----END CERTIFICATE-----`
+
+  const config: ManualEndpointConfig = {
+    contextName: 'pem-ctx',
+    clusterName: 'pem-cluster',
+    serverUrl: 'https://pem.k8s.local:6443',
+    authType: 'certificate',
+    clientCertData: rawPemCert,
+    clientKeyData: rawPemKey,
+    caCertData: rawPemCa,
+    insecureSkipTlsVerify: false
+  }
+
+  const yamlOutput = buildKubeconfigFromEndpoint(config)
+  assert.ok(!yamlOutput.includes(pemCertHeader))
+  assert.ok(!yamlOutput.includes(pemKeyHeader))
+
+  // Verify it is base64 encoded
+  const expectedCertB64 = Buffer.from(rawPemCert).toString('base64')
+  assert.ok(yamlOutput.includes(expectedCertB64))
+})

@@ -203,8 +203,7 @@ pub fn add_cluster(
 
                     let target_id = selected_contexts
                         .as_ref()
-                        .and_then(|sc| sc.first().cloned())
-                        .or_else(|| w_manager.active_context.clone());
+                        .and_then(|sc| sc.first().cloned());
 
                     if let Some(id) = target_id {
                         w_manager.config.set_cluster_customization(&id, customization);
@@ -222,11 +221,11 @@ pub fn add_cluster(
                     .unwrap_or(true);
 
                 if switch_context {
-                    if let Some(target_ctx) = selected_contexts.as_ref().and_then(|sc| sc.first()) {
-                        if w_manager.active_context.as_deref() != Some(target_ctx) {
-                            if let Err(e) = w_manager.switch_context(target_ctx).await {
-                                tracing::warn!(context = %target_ctx, error = %e, "Failed to auto-switch to added cluster context");
-                            }
+                    let target = selected_contexts.as_ref().and_then(|sc| sc.first());
+                    if let Some(target_ctx) = target.filter(|ctx| w_manager.active_context.as_deref() != Some(*ctx)) {
+                        let switch_res = w_manager.switch_context(target_ctx).await;
+                        if let Err(e) = switch_res {
+                            tracing::warn!(context = %target_ctx, error = %e, "Failed to auto-switch to added cluster context");
                         }
                     }
                 }
