@@ -266,6 +266,33 @@ impl KubeManager {
         
         Ok(())
     }
+
+    /// Validates raw kubeconfig YAML content, persists it to ~/.orbit/kubeconfigs/,
+    /// merges its contexts into the active manager, and registers it in persistent config.
+    pub async fn add_kubeconfig_content(&mut self, content: &str) -> Result<String, String> {
+        // Validate YAML syntax and Kubeconfig schema
+        Kubeconfig::from_yaml(content)
+            .map_err(|e| format!("Invalid kubeconfig content: {}", e))?;
+
+        let config_dir = OrbitConfig::config_dir()
+            .ok_or_else(|| "Could not determine user config directory".to_string())?;
+        let kubeconfigs_dir = config_dir.join("kubeconfigs");
+        if !kubeconfigs_dir.exists() {
+            std::fs::create_dir_all(&kubeconfigs_dir)
+                .map_err(|e| format!("Failed to create kubeconfigs directory: {}", e))?;
+        }
+
+        let file_name = format!("orbit_cluster_{}.yaml", uuid::Uuid::new_v4());
+        let file_path = kubeconfigs_dir.join(file_name);
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        std::fs::write(&file_path, content)
+            .map_err(|e| format!("Failed to write kubeconfig file: {}", e))?;
+
+        self.add_kubeconfig_file(&file_path_str).await?;
+
+        Ok(file_path_str)
+    }
 }
 
 #[cfg(test)]
@@ -348,6 +375,55 @@ users:
         assert_eq!(enriched[0].server_url, Some("https://127.0.0.1:6443".to_string()));
 
         let _ = std::fs::remove_file(file_path);
+    }
+
+    #[tokio::test]
+    async fn test_add_kubeconfig_content_creates_managed_file_and_merges() {
+        let _guard = crate::config::TestConfigDirGuard::new("managed_kubeconfig");
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::load(),
+        };
+
+        let sample_yaml = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.0.1:6443
+  name: pasted-cluster
+contexts:
+- context:
+    cluster: pasted-cluster
+    user: pasted-user
+  name: pasted-context
+current-context: pasted-context
+kind: Config
+preferences: {}
+users:
+- name: pasted-user
+  user: {}
+"#;
+
+        let result = manager.add_kubeconfig_content(sample_yaml).await;
+        assert!(result.is_ok(), "add_kubeconfig_content should succeed: {:?}", result.err());
+        let saved_path = result.unwrap();
+        assert!(std::path::Path::new(&saved_path).exists());
+        assert!(saved_path.contains("kubeconfigs"));
+
+        let clusters = manager.get_clusters();
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].name, "pasted-context");
+        assert_eq!(clusters[0].server_url, Some("https://10.0.0.1:6443".to_string()));
+
+        // Check it was added to customKubeconfigPaths
+        let persisted_paths = manager.config.custom_kubeconfig_paths();
+        assert!(persisted_paths.iter().any(|p| p.contains("orbit_cluster_")));
     }
 
     #[test]

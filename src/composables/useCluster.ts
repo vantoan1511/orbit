@@ -1,45 +1,46 @@
-import { kubernetesService } from '@/services/kubernetesService'
-import { os } from '@/services/nativeService'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { useToast } from 'primevue'
 import { computed, ref } from 'vue'
+import { getActivePinia } from 'pinia'
+import { useKubernetesStore } from '../stores/kubernetesStore.ts'
+
+const isAddClusterModalVisible = ref(false)
+
+export function openAddClusterModal(): void {
+  isAddClusterModalVisible.value = true
+}
+
+export function closeAddClusterModal(): void {
+  isAddClusterModalVisible.value = false
+}
+
+export { isAddClusterModalVisible }
 
 export function useCluster() {
-  const k8sStore = useKubernetesStore()
-  const toast = useToast()
-
   const isRefreshing = ref(false)
 
-  const handleAddCluster = async () => {
-    try {
-      const selectedFiles = await os.showOpenDialog('Select Kubeconfig File')
-      if (selectedFiles?.[0]) {
-        await kubernetesService.addCluster(selectedFiles[0])
-      }
-    } catch (error) {
-      console.error('Failed to add cluster:', error)
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to add cluster.',
-        life: 3000
-      })
-    }
+  const handleAddCluster = (): void => {
+    openAddClusterModal()
   }
 
+  const getStore = () => (getActivePinia() ? useKubernetesStore() : null)
+
   const activeCluster = computed(() => {
-    return k8sStore.clusters.find((c) => c.id === k8sStore.activeClusterId) || null
+    const store = getStore()
+    return store?.clusters.find((c) => c.id === store.activeClusterId) ?? null
   })
 
-  const lastUpdatedAt = computed(() => k8sStore.lastUpdatedAt)
+  const lastUpdatedAt = computed(() => {
+    const store = getStore()
+    return store?.lastUpdatedAt ?? null
+  })
 
-  const refreshCluster = async () => {
+  const refreshCluster = async (): Promise<void> => {
     if (isRefreshing.value) return
     isRefreshing.value = true
     try {
-      await k8sStore.loadInitialData()
-    } catch (error) {
-      console.error('Failed to refresh cluster data:', error)
+      const store = getStore()
+      if (store) {
+        await store.loadInitialData()
+      }
     } finally {
       isRefreshing.value = false
     }
@@ -48,6 +49,9 @@ export function useCluster() {
   return {
     activeCluster,
     isRefreshing,
+    isAddClusterModalVisible,
+    openAddClusterModal,
+    closeAddClusterModal,
     handleAddCluster,
     refreshCluster,
     lastUpdatedAt

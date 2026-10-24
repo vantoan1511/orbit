@@ -83,6 +83,37 @@ test('filesystem.writeTextFile writes content and records to store in test envir
   assert.ok(true)
 })
 
+test('filesystem.readTextFile reads content from in-memory store in test environment', async () => {
+  await filesystem.writeTextFile('test_read.txt', 'content to read')
+  const content = await filesystem.readTextFile('test_read.txt')
+  assert.equal(content, 'content to read')
+})
+
+test('filesystem.readTextFile invokes tauri command read_text_file in Tauri environment', async () => {
+  let invokedCommand = ''
+  let invokedArgs: unknown = null
+
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {
+      invoke: async (cmd: string, args: unknown) => {
+        invokedCommand = cmd
+        invokedArgs = args
+        return 'tauri file content'
+      }
+    }
+  }
+
+  try {
+    const res = await filesystem.readTextFile('/path/to/k8s.yaml')
+    assert.equal(invokedCommand, 'read_text_file')
+    assert.deepEqual(invokedArgs, { path: '/path/to/k8s.yaml' })
+    assert.equal(res, 'tauri file content')
+  } finally {
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
 test('filesystem.writeTextFile invokes tauri command write_text_file in Tauri environment', async () => {
   let invokedCommand = ''
   let invokedArgs: unknown = null

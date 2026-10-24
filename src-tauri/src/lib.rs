@@ -40,6 +40,11 @@ async fn dispatch_engine(
 }
 
 #[tauri::command]
+async fn read_text_file(path: String) -> Result<String, String> {
+    tokio::fs::read_to_string(&path).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 async fn write_text_file(path: String, content: String) -> Result<(), String> {
     if let Some(parent) = std::path::Path::new(&path).parent() {
         if !parent.as_os_str().is_empty() {
@@ -143,7 +148,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![dispatch_engine, write_text_file]);
+        .invoke_handler(tauri::generate_handler![dispatch_engine, write_text_file, read_text_file]);
 
     if let Err(e) = builder.run(tauri::generate_context!()) {
         tracing::error!("error while running tauri application: {}", e);
@@ -167,6 +172,22 @@ mod tests {
 
         let read_back = std::fs::read_to_string(&file_path).unwrap();
         assert_eq!(read_back, sample_content);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[tokio::test]
+    async fn test_read_text_file_reads_existing_file() {
+        let temp_dir = std::env::temp_dir().join(format!("orbit_test_read_{}", uuid::Uuid::new_v4()));
+        let file_path = temp_dir.join("test.txt");
+        let sample_content = "apiVersion: v1\nkind: Config";
+
+        let result = write_text_file(file_path.to_string_lossy().to_string(), sample_content.to_string()).await;
+        assert!(result.is_ok());
+
+        let read_back = super::read_text_file(file_path.to_string_lossy().to_string()).await;
+        assert!(read_back.is_ok());
+        assert_eq!(read_back.unwrap(), sample_content);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

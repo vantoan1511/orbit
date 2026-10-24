@@ -1,4 +1,5 @@
 import type { KubernetesResource } from '@/types/kubernetes'
+import type { AddClusterPayload } from '@/types/cluster'
 import { coreEngine } from './nativeService.ts'
 
 export const kubernetesService = {
@@ -150,10 +151,11 @@ export const kubernetesService = {
   },
 
   /**
-   * Add a new cluster kubeconfig file path
+   * Add a new cluster kubeconfig file path or payload
    */
-  async addCluster(filePath: string): Promise<void> {
-    await coreEngine.dispatch('addCluster', { filePath })
+  async addCluster(payload: string | AddClusterPayload): Promise<void> {
+    const data = typeof payload === 'string' ? { filePath: payload } : payload
+    await coreEngine.dispatch('addCluster', data)
   },
 
   /**
