@@ -32,8 +32,8 @@ pub fn dispatch(
     tracing::debug!(event = %event_name, "Dispatching UI event");
     match event_name {
         "getAppSettings" => settings::get_app_settings(writer, token),
-        "updateAppSettings" => settings::update_app_settings(data, writer, token),
-        "setLaunchOnStartup" => settings::set_launch_on_startup(data, writer, token),
+        "updateAppSettings" => settings::update_app_settings(data, writer, token, manager),
+        "setLaunchOnStartup" => settings::set_launch_on_startup(data, writer, token, manager),
         "getClusters" => cluster::get_clusters(writer, token, manager),
         "getUserProfile" => cluster::get_user_profile(writer, token, manager),
         "switchCluster" => cluster::switch_cluster(data, writer, token, manager),

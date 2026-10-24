@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use serde_json::Value;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use crate::config::{Configuration, OrbitConfig};
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
+use crate::kubernetes::manager::KubeManager;
 
 pub fn get_app_settings(
     writer: Arc<Mutex<WsWriter>>,
@@ -25,6 +26,7 @@ pub fn update_app_settings(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
     token: String,
+    manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
         tracing::debug!("Updating application settings");
@@ -72,7 +74,11 @@ pub fn update_app_settings(
                         }).await;
                     }
 
-                    let settings = OrbitConfig::load().get_configurations();
+                    let mut w_manager = manager.write().await;
+                    w_manager.config = current_config.clone();
+                    drop(w_manager);
+
+                    let settings = current_config.get_configurations();
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
@@ -98,6 +104,7 @@ pub fn set_launch_on_startup(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
     token: String,
+    manager: Arc<RwLock<KubeManager>>,
 ) {
     tokio::spawn(async move {
         tracing::debug!("Setting launch on startup");
@@ -139,7 +146,11 @@ pub fn set_launch_on_startup(
             }
         }).await;
 
-        let settings = OrbitConfig::load().get_configurations();
+        let mut w_manager = manager.write().await;
+        w_manager.config = current_config.clone();
+        drop(w_manager);
+
+        let settings = current_config.get_configurations();
         let _ = Bridge::send_event(
             &writer,
             &token,
@@ -156,13 +167,15 @@ mod tests {
     #[tokio::test]
     async fn test_set_launch_on_startup_emits_app_settings_updated() {
         let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_on_startup");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
         let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
         let payload = Some(serde_json::json!({ "enabled": true }));
 
-        set_launch_on_startup(payload, writer, "token".to_string());
+        set_launch_on_startup(payload, writer, "token".to_string(), manager);
 
         let mut found = false;
         for _ in 0..40 {
@@ -186,13 +199,15 @@ mod tests {
     #[tokio::test]
     async fn test_update_app_settings_emits_app_settings_updated() {
         let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("update_app_settings");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
         let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
         let payload = Some(serde_json::json!({ "themeMode": "light" }));
 
-        update_app_settings(payload, writer, "token".to_string());
+        update_app_settings(payload, writer, "token".to_string(), manager);
 
         let mut found = false;
         for _ in 0..40 {
@@ -204,6 +219,30 @@ mod tests {
             }
         }
         assert!(found, "appSettingsUpdated event must be emitted");
+    }
+
+    #[tokio::test]
+    async fn test_update_app_settings_syncs_manager_config() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("sync_manager_config");
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let payload = Some(serde_json::json!({ "themeMode": "light" }));
+
+        update_app_settings(payload, writer, "token".to_string(), manager.clone());
+
+        let mut found = false;
+        for _ in 0..40 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            if manager.read().await.config.theme_mode() == "light" {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "manager.config must be updated in memory");
     }
 }
 

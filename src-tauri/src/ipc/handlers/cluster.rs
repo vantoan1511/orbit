@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::{Mutex, RwLock};
+use crate::config::OrbitConfig;
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::manager::KubeManager;
@@ -216,7 +217,6 @@ pub fn update_cluster_metadata(
         let cluster_id = get_string(&data, "id");
         if let Some(id) = cluster_id {
             tracing::info!(cluster_id = %id, "Updating cluster metadata");
-            let mut w_manager = manager.write().await;
 
             let alias = get_string(&data, "alias");
             let color = get_string(&data, "color");
@@ -240,8 +240,9 @@ pub fn update_cluster_metadata(
                 description,
             };
 
-            w_manager.config.set_cluster_customization(&id, customization);
-            if let Err(e) = w_manager.config.save() {
+            let mut current_config = OrbitConfig::load();
+            current_config.set_cluster_customization(&id, customization);
+            if let Err(e) = current_config.save() {
                 tracing::error!(error = %e, "Failed to save cluster metadata to config");
                 let _ = Bridge::send_event(
                     &writer,
@@ -253,8 +254,10 @@ pub fn update_cluster_metadata(
                 return;
             }
 
+            let mut w_manager = manager.write().await;
+            w_manager.config = current_config.clone();
             let clusters = w_manager.get_clusters();
-            let settings = w_manager.config.get_configurations();
+            let settings = current_config.get_configurations();
             drop(w_manager);
 
             let _ = Bridge::send_event(
@@ -378,6 +381,7 @@ mod tests {
     #[tokio::test]
     async fn test_update_cluster_metadata_updates_config_and_emits_event() {
         let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let _config_guard = crate::config::TestConfigDirGuard::new("cluster_metadata");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
@@ -404,6 +408,56 @@ mod tests {
         let emitted = mock_emitter.get_emitted_events().await;
         let event_names: Vec<String> = emitted.iter().map(|(name, _)| name.clone()).collect();
         assert!(event_names.contains(&"clustersUpdated".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_update_cluster_metadata_preserves_existing_settings() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let _config_guard = crate::config::TestConfigDirGuard::new("preserve_settings");
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        // Pre-save custom setting to disk (e.g. themeMode = "system")
+        let mut initial_config = OrbitConfig::default();
+        initial_config.values.insert("themeMode".to_string(), serde_json::json!("system"));
+        initial_config.save().expect("initial config should save");
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        // Simulate manager having a stale config before reload
+        {
+            let mut w = manager.write().await;
+            w.config = OrbitConfig::default(); // default has themeMode = "dark"
+        }
+
+        let payload = serde_json::json!({
+            "id": "ctx-preserved",
+            "alias": "Preserved Cluster",
+        });
+
+        update_cluster_metadata(Some(payload), writer, "token-456".to_string(), manager.clone());
+
+        let mut found = false;
+        for _ in 0..40 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            let emitted = mock_emitter.get_emitted_events().await;
+            if let Some((_, payload)) = emitted.iter().find(|(name, _)| name == "appSettingsUpdated") {
+                if let Some(settings) = payload.get("settings").and_then(|s| s.as_array()) {
+                    if settings.iter().any(|c| c.get("key") == Some(&serde_json::json!("themeMode")) && c.get("value") == Some(&serde_json::json!("system"))) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(found, "AppSettingsUpdated must preserve themeMode 'system'");
+
+        let r_manager = manager.read().await;
+        assert_eq!(r_manager.config.theme_mode(), "system");
+        assert_eq!(
+            r_manager.config.cluster_customizations().get("ctx-preserved").and_then(|c| c.alias.as_deref()),
+            Some("Preserved Cluster")
+        );
     }
 }
 

@@ -260,6 +260,9 @@ impl OrbitConfig {
 
     /// Returns the path to the Orbit configuration directory (`~/.orbit` or `~/.orbit-dev`).
     pub fn config_dir() -> Option<PathBuf> {
+        if let Some(custom) = std::env::var_os("ORBIT_CONFIG_DIR") {
+            return Some(PathBuf::from(custom));
+        }
         let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
         let mut path = PathBuf::from(home);
         path.push(Self::config_dir_name());
@@ -555,6 +558,41 @@ impl OrbitConfig {
             self.save()?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+pub struct TestConfigDirGuard {
+    pub temp_dir: PathBuf,
+    original_env: Option<std::ffi::OsString>,
+}
+
+#[cfg(test)]
+impl TestConfigDirGuard {
+    pub fn new(test_name: &str) -> Self {
+        let temp_dir = std::env::temp_dir().join(format!("orbit_{}_{}", test_name, uuid::Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+        let original_env = std::env::var_os("ORBIT_CONFIG_DIR");
+        unsafe {
+            std::env::set_var("ORBIT_CONFIG_DIR", &temp_dir);
+        }
+        Self {
+            temp_dir,
+            original_env,
+        }
+    }
+}
+
+#[cfg(test)]
+impl Drop for TestConfigDirGuard {
+    fn drop(&mut self) {
+        unsafe {
+            match &self.original_env {
+                Some(val) => std::env::set_var("ORBIT_CONFIG_DIR", val),
+                None => std::env::remove_var("ORBIT_CONFIG_DIR"),
+            }
+        }
+        let _ = std::fs::remove_dir_all(&self.temp_dir);
     }
 }
 
@@ -891,6 +929,26 @@ mod tests {
             match original_orbit_dev {
                 Some(val) => std::env::set_var("ORBIT_DEV", val),
                 None => std::env::remove_var("ORBIT_DEV"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_orbit_config_dir_respects_custom_env_override() {
+        let original_custom = std::env::var_os("ORBIT_CONFIG_DIR");
+        let test_custom_path = PathBuf::from("/custom/test/orbit_config_path");
+
+        unsafe {
+            std::env::set_var("ORBIT_CONFIG_DIR", &test_custom_path);
+        }
+
+        let resolved = OrbitConfig::config_dir();
+        assert_eq!(resolved, Some(test_custom_path));
+
+        unsafe {
+            match original_custom {
+                Some(val) => std::env::set_var("ORBIT_CONFIG_DIR", val),
+                None => std::env::remove_var("ORBIT_CONFIG_DIR"),
             }
         }
     }
