@@ -5,8 +5,8 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ClusterInfo } from '@/types/kubernetes'
 import { filterClusters, getAllClusterTags, getClusterDisplayName } from '@/utils/clusterHelpers'
-import { Check, Pencil, Plus, Search, Server, X } from '@lucide/vue'
-import { Button, Column, DataTable, InputText } from 'primevue'
+import { Check, Pencil, Plus, Server } from '@lucide/vue'
+import { Button, Column, DataTable, IconField, InputIcon, InputText } from 'primevue'
 import { computed, ref } from 'vue'
 
 const k8sStore = useKubernetesStore()
@@ -73,29 +73,23 @@ const toggleTag = (tag: string) => {
 
     <!-- Toolbar: Search & Tag Filter -->
     <div class="flex items-center justify-between gap-3 flex-wrap">
-      <div class="relative w-64">
-        <Search
-          :size="13"
-          class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none"
-        />
-        <InputText
-          v-model="searchQuery"
-          placeholder="Filter by name, context, tag..."
-          class="w-full text-xs h-8 pl-8! pr-7! bg-(--bg-card) border-(--border)"
-          size="small"
-        />
-        <Button
-          v-if="searchQuery"
-          variant="text"
-          severity="secondary"
-          size="small"
-          class="w-5! h-5! p-0! absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-color hover:text-primary"
-          @click="searchQuery = ''"
-        >
-          <template #icon>
-            <X :size="12" />
-          </template>
-        </Button>
+      <div class="w-64">
+        <IconField class="w-full">
+          <InputIcon class="pi pi-search text-xs text-muted-color" />
+          <InputText
+            v-model="searchQuery"
+            placeholder="Filter by name, context, tag..."
+            class="w-full text-xs h-8 bg-(--bg-card) border-(--border)"
+            size="small"
+          />
+          <InputIcon
+            v-if="searchQuery"
+            class="pi pi-times text-xs cursor-pointer text-muted-color hover:text-primary transition-colors"
+            v-tooltip.top="'Clear filter'"
+            aria-label="Clear filter"
+            @click="searchQuery = ''"
+          />
+        </IconField>
       </div>
 
       <!-- Tag Filters -->

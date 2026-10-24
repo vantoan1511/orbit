@@ -5,8 +5,8 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import type { ClusterInfo } from '@/types/kubernetes'
 import { filterClusters, getAllClusterTags, getClusterDisplayName } from '@/utils/clusterHelpers'
-import { Check, Pencil, Plus, Search, Settings2, X } from '@lucide/vue'
-import { Button, InputText } from 'primevue'
+import { Check, Pencil, Plus, Settings2 } from '@lucide/vue'
+import { Button, IconField, InputIcon, InputText } from 'primevue'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -60,29 +60,23 @@ const clearFilters = () => {
 <template>
   <div data-component="sidebar-clusters" class="flex-1 overflow-hidden p-3 flex flex-col gap-2.5">
     <!-- Top Search Bar -->
-    <div v-if="k8sStore.clusters.length > 0" class="relative shrink-0">
-      <Search
-        :size="13"
-        class="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-color pointer-events-none"
-      />
-      <InputText
-        v-model="searchQuery"
-        placeholder="Filter clusters or tags..."
-        class="w-full text-xs h-7.5 pl-8! pr-7! bg-(--bg-hover)/40! border-(--border)!"
-        size="small"
-      />
-      <Button
-        v-if="searchQuery"
-        variant="text"
-        severity="secondary"
-        size="small"
-        class="w-5! h-5! p-0! absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-color hover:text-primary"
-        @click="searchQuery = ''"
-      >
-        <template #icon>
-          <X :size="12" />
-        </template>
-      </Button>
+    <div v-if="k8sStore.clusters.length > 0" class="shrink-0">
+      <IconField class="w-full">
+        <InputIcon class="pi pi-search text-xs text-muted-color" />
+        <InputText
+          v-model="searchQuery"
+          placeholder="Filter clusters or tags..."
+          class="w-full text-xs h-8 bg-(--bg-hover)/40! border-(--border)!"
+          size="small"
+        />
+        <InputIcon
+          v-if="searchQuery"
+          class="pi pi-times text-xs cursor-pointer text-muted-color hover:text-primary transition-colors"
+          v-tooltip.top="'Clear filter'"
+          aria-label="Clear filter"
+          @click="searchQuery = ''"
+        />
+      </IconField>
     </div>
 
     <!-- Quick Filter Tag Pills -->

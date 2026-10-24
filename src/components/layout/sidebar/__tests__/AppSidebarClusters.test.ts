@@ -64,3 +64,26 @@ test('AppSidebarClusters contains search input, tag quick-filters, and manage cl
     'AppSidebarClusters must not keep unused isRefreshing variable'
   )
 })
+
+test('AppSidebarClusters uses PrimeVue IconField and InputIcon for search filter bar', () => {
+  const filePath = path.resolve(
+    process.cwd(),
+    'src/components/layout/sidebar/AppSidebarClusters.vue'
+  )
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(content.includes('IconField'), 'AppSidebarClusters must use PrimeVue IconField')
+  assert.ok(content.includes('InputIcon'), 'AppSidebarClusters must use PrimeVue InputIcon')
+  assert.ok(
+    content.includes('pi pi-search'),
+    'AppSidebarClusters must use pi pi-search for search icon'
+  )
+  assert.ok(
+    content.includes('pi pi-times'),
+    'AppSidebarClusters must use pi pi-times for clear filter button'
+  )
+  assert.ok(
+    !content.includes('class="w-5! h-5! p-0! absolute right-1.5'),
+    'AppSidebarClusters must not use manual absolute positioning for clear button'
+  )
+})

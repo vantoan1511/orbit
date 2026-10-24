@@ -50,3 +50,23 @@ test('SettingsClustersTab uses PrimeVue DataTable, search filtering, and Cluster
     'SettingsClustersTab must not directly import native runtime'
   )
 })
+
+test('SettingsClustersTab uses PrimeVue IconField and InputIcon for search filter bar', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/settings/SettingsClustersTab.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(content.includes('IconField'), 'SettingsClustersTab must use PrimeVue IconField')
+  assert.ok(content.includes('InputIcon'), 'SettingsClustersTab must use PrimeVue InputIcon')
+  assert.ok(
+    content.includes('pi pi-search'),
+    'SettingsClustersTab must use pi pi-search for search icon'
+  )
+  assert.ok(
+    content.includes('pi pi-times'),
+    'SettingsClustersTab must use pi pi-times for clear filter button'
+  )
+  assert.ok(
+    !content.includes('class="w-5! h-5! p-0! absolute right-1.5'),
+    'SettingsClustersTab must not use manual absolute positioning for clear button'
+  )
+})
