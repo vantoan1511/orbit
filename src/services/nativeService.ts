@@ -95,6 +95,25 @@ export const filesystem = {
 
     // In-memory test environment fallback
     inMemoryStore.set(`file:${filePath}`, content)
+  },
+
+  async readTextFile(filePath: string): Promise<string> {
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        return await invoke<string>('read_text_file', { path: filePath })
+      } catch (e) {
+        console.error('Failed to read text file via Tauri:', e)
+        throw e
+      }
+    }
+
+    // In-memory test environment fallback
+    const content = inMemoryStore.get(`file:${filePath}`)
+    if (content !== undefined) {
+      return content
+    }
+    throw new Error(`File not found: ${filePath}`)
   }
 }
 

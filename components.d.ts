@@ -14,6 +14,7 @@ declare module 'vue' {
     AccentColorPicker: typeof import('./src/components/settings/appearance/AccentColorPicker.vue')['default']
     ActivePortForwardBadge: typeof import('./src/components/shared/ActivePortForwardBadge.vue')['default']
     ActivePortForwardsList: typeof import('./src/components/shared/ActivePortForwardsList.vue')['default']
+    AddClusterModal: typeof import('./src/components/cluster/AddClusterModal.vue')['default']
     AlertsEvents: typeof import('./src/components/dashboard/AlertsEvents.vue')['default']
     AppBreadcrumbs: typeof import('./src/components/layout/AppBreadcrumbs.vue')['default']
     AppFooter: typeof import('./src/components/layout/AppFooter.vue')['default']

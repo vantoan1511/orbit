@@ -2,6 +2,7 @@
 import NotificationDrawer from '@/components/layout/NotificationDrawer.vue'
 import ProfileDrawer from '@/components/layout/ProfileDrawer.vue'
 import SearchEverywhereDialog from '@/components/search/SearchEverywhereDialog.vue'
+import AddClusterModal from '@/components/cluster/AddClusterModal.vue'
 import UpdaterDialog from '@/components/UpdaterDialog.vue'
 import UpdaterNotifications from '@/components/UpdaterNotifications.vue'
 import { app, events, init } from '@/services/nativeService'
@@ -11,6 +12,7 @@ import { useProfileStore } from '@/stores/profileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useShortcutStore } from '@/stores/shortcutStore'
 import { syncAppearanceFromSettings } from '@/composables/useAppearance'
+import { isAddClusterModalVisible } from '@/composables/useCluster'
 import { OrbitEvents } from '@/types/events'
 import type {
   ClusterInfo,
@@ -355,5 +357,6 @@ onUnmounted(() => {
     <NotificationDrawer />
     <ProfileDrawer />
     <SearchEverywhereDialog />
+    <AddClusterModal v-model:visible="isAddClusterModalVisible" />
   </div>
 </template>

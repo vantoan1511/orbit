@@ -143,65 +143,146 @@ pub fn add_cluster(
 ) {
     tokio::spawn(async move {
         let file_path = get_string(&data, "filePath");
+        let kubeconfig_content = get_string(&data, "kubeconfigContent");
 
-        if let Some(path) = file_path {
-            tracing::info!(file_path = %path, "Adding cluster kubeconfig");
-            let mut w_manager = manager.write().await;
-            match w_manager.add_kubeconfig_file(&path).await {
-                Ok(()) => {
-                    tracing::info!(file_path = %path, "Cluster added successfully");
-                    let clusters = w_manager.get_clusters();
-                    let active_cluster_id = w_manager.active_context.clone();
-                    let client = w_manager.active_client.clone();
+        if file_path.is_none() && kubeconfig_content.is_none() {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "No kubeconfig file path or content provided".to_string(),
+                },
+            ).await;
+            return;
+        }
 
-                    if let Some(cancel) = w_manager.watch_cancel.take() {
-                        let _ = cancel.send(true);
-                    }
-                    for cancel in w_manager.log_cancel.drain(..) {
-                        let _ = cancel.send(());
-                    }
-                    let (tx, rx) = tokio::sync::watch::channel(false);
-                    w_manager.watch_cancel = Some(tx);
-                    drop(w_manager);
+        let mut w_manager = manager.write().await;
+        let add_result = if let Some(ref content) = kubeconfig_content {
+            tracing::info!("Adding cluster from kubeconfig content");
+            w_manager.add_kubeconfig_content(content).await.map(|_| ())
+        } else if let Some(ref path) = file_path {
+            tracing::info!(file_path = %path, "Adding cluster from kubeconfig file");
+            w_manager.add_kubeconfig_file(path).await
+        } else {
+            Ok(())
+        };
 
-                    let _ = Bridge::send_event(
-                        &writer,
-                        &token,
-                        &OrbitEvent::ClustersUpdated { clusters },
-                    ).await;
+        match add_result {
+            Ok(()) => {
+                let selected_contexts = data
+                    .as_ref()
+                    .and_then(|d| d.get("selectedContexts"))
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                            .collect::<Vec<String>>()
+                    });
 
-                    let _ = Bridge::send_event(
-                        &writer,
-                        &token,
-                        &OrbitEvent::ActiveClusterChanged { active_cluster_id: active_cluster_id.clone() },
-                    ).await;
+                // Apply optional metadata customization
+                if let Some(meta_val) = data.as_ref().and_then(|d| d.get("metadata")) {
+                    let alias = meta_val.get("alias").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let color = meta_val.get("color").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let description = meta_val.get("description").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let tags = meta_val.get("tags")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|t| t.as_str().map(|s| s.trim().to_string()))
+                                .filter(|s| !s.is_empty())
+                                .collect::<Vec<String>>()
+                        })
+                        .unwrap_or_default();
 
-                    // Spawn watchers and metrics poller for the new cluster.
-                    if let Some(ref client) = client {
-                        spawn_watchers(client, writer.clone(), token.clone(), rx.clone(), active_cluster_id.clone());
-                    }
+                    let customization = crate::kubernetes::models::ClusterCustomization {
+                        alias,
+                        tags,
+                        color,
+                        description,
+                    };
 
-                    // Stop previous active forwards and restore persisted forwards for the new cluster
-                    network::stop_all_active_port_forwards(&manager).await;
-                    if let Some(ref id) = active_cluster_id {
-                        network::restore_cluster_port_forwards(
-                            writer.clone(),
-                            token.clone(),
-                            manager.clone(),
-                            id.clone(),
-                        );
+                    let target_id = selected_contexts
+                        .as_ref()
+                        .and_then(|sc| sc.first().cloned())
+                        .or_else(|| w_manager.active_context.clone());
+
+                    if let Some(id) = target_id {
+                        w_manager.config.set_cluster_customization(&id, customization);
+                        if let Err(e) = w_manager.config.save() {
+                            tracing::warn!(error = %e, "Failed to save cluster metadata during add_cluster");
+                        }
                     }
                 }
-                Err(e) => {
-                    tracing::error!(file_path = %path, error = %e, "Failed to add cluster");
-                    let _ = Bridge::send_event(
-                        &writer,
-                        &token,
-                        &OrbitEvent::ErrorOccurred {
-                            message: format!("Failed to add cluster: {}", e),
-                        },
-                    ).await;
+
+                // Handle auto-switch context
+                let switch_context = data
+                    .as_ref()
+                    .and_then(|d| d.get("switchContext"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+
+                if switch_context {
+                    if let Some(target_ctx) = selected_contexts.as_ref().and_then(|sc| sc.first()) {
+                        if w_manager.active_context.as_deref() != Some(target_ctx) {
+                            if let Err(e) = w_manager.switch_context(target_ctx).await {
+                                tracing::warn!(context = %target_ctx, error = %e, "Failed to auto-switch to added cluster context");
+                            }
+                        }
+                    }
                 }
+
+                tracing::info!("Cluster added successfully");
+                let clusters = w_manager.get_clusters();
+                let active_cluster_id = w_manager.active_context.clone();
+                let client = w_manager.active_client.clone();
+
+                if let Some(cancel) = w_manager.watch_cancel.take() {
+                    let _ = cancel.send(true);
+                }
+                for cancel in w_manager.log_cancel.drain(..) {
+                    let _ = cancel.send(());
+                }
+                let (tx, rx) = tokio::sync::watch::channel(false);
+                w_manager.watch_cancel = Some(tx);
+                drop(w_manager);
+
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ClustersUpdated { clusters },
+                ).await;
+
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ActiveClusterChanged { active_cluster_id: active_cluster_id.clone() },
+                ).await;
+
+                // Spawn watchers and metrics poller for the new cluster.
+                if let Some(ref client) = client {
+                    spawn_watchers(client, writer.clone(), token.clone(), rx.clone(), active_cluster_id.clone());
+                }
+
+                // Stop previous active forwards and restore persisted forwards for the new cluster
+                network::stop_all_active_port_forwards(&manager).await;
+                if let Some(ref id) = active_cluster_id {
+                    network::restore_cluster_port_forwards(
+                        writer.clone(),
+                        token.clone(),
+                        manager.clone(),
+                        id.clone(),
+                    );
+                }
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to add cluster");
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ErrorOccurred {
+                        message: format!("Failed to add cluster: {}", e),
+                    },
+                ).await;
             }
         }
     });
