@@ -23,7 +23,7 @@ defineProps<{
         :key="idx"
         class="font-mono text-xs text-primary flex items-center gap-2.5 py-1"
       >
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+        <span class="w-1.5 h-1.5 rounded-full bg-(--success) shrink-0"></span>
         <span class="truncate">{{ ep }}</span>
       </div>
     </div>

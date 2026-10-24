@@ -21,30 +21,30 @@ const podHealth = computed(() => {
     running: {
       count: runningCount,
       pct: Math.round((runningCount / total) * 100),
-      color: 'bg-emerald-500',
-      text: 'text-emerald-500',
-      dot: 'bg-emerald-500'
+      color: 'bg-(--success)',
+      text: 'text-(--success)',
+      dot: 'bg-(--success)'
     },
     pending: {
       count: pendingCount,
       pct: Math.round((pendingCount / total) * 100),
-      color: 'bg-amber-500',
-      text: 'text-amber-500',
-      dot: 'bg-amber-500'
+      color: 'bg-(--warning)',
+      text: 'text-(--warning)',
+      dot: 'bg-(--warning)'
     },
     failed: {
       count: failedCount,
       pct: Math.round((failedCount / total) * 100),
-      color: 'bg-rose-500',
-      text: 'text-rose-500',
-      dot: 'bg-rose-500'
+      color: 'bg-(--danger)',
+      text: 'text-(--danger)',
+      dot: 'bg-(--danger)'
     },
     crashLoop: {
       count: crashLoopCount,
       pct: Math.round((crashLoopCount / total) * 100),
-      color: 'bg-red-600',
-      text: 'text-red-600',
-      dot: 'bg-red-600'
+      color: 'bg-(--danger)',
+      text: 'text-(--danger)',
+      dot: 'bg-(--danger)'
     }
   }
 })
@@ -62,23 +62,23 @@ const nodeHealth = computed(() => {
     ready: {
       count: readyCount,
       pct: Math.round((readyCount / total) * 100),
-      color: 'bg-emerald-500',
-      text: 'text-emerald-500',
-      dot: 'bg-emerald-500'
+      color: 'bg-(--success)',
+      text: 'text-(--success)',
+      dot: 'bg-(--success)'
     },
     notReady: {
       count: notReadyCount,
       pct: Math.round((notReadyCount / total) * 100),
-      color: 'bg-rose-500',
-      text: 'text-rose-500',
-      dot: 'bg-rose-500'
+      color: 'bg-(--danger)',
+      text: 'text-(--danger)',
+      dot: 'bg-(--danger)'
     },
     cordoned: {
       count: cordonedCount,
       pct: Math.round((cordonedCount / total) * 100),
-      color: 'bg-sky-500',
-      text: 'text-sky-500',
-      dot: 'bg-sky-500'
+      color: 'bg-(--accent)',
+      text: 'text-(--accent)',
+      dot: 'bg-(--accent)'
     }
   }
 })

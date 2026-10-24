@@ -65,7 +65,7 @@ const items = computed(() => {
       title: 'CronJobs',
       count: store.cronJobs.length,
       icon: Clock,
-      iconColor: 'text-rose-500 bg-rose-500/10',
+      iconColor: 'text-(--danger) bg-(--danger-soft)',
       statusLabel: KUBERNETES_NAMESPACE_STATUS.Active,
       statusVal: store.cronJobs.reduce((acc, c) => acc + c.active, 0),
       statusSeverity: 'warn'

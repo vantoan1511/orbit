@@ -29,6 +29,12 @@
   --font-ui: "Inter", "Manrope", system-ui, -apple-system, sans-serif;
   --font-mono:
     "Geist Mono", "JetBrains Mono", "Cascadia Code", "Fira Code", monospace;
+
+  /* Dynamic Border Radius mapped to UI Style Engine */
+  --radius-lg: var(--ui-radius-card);
+  --radius-xl: var(--ui-radius-card);
+  --radius-md: var(--ui-radius-control);
+  --radius-sm: var(--ui-radius-control);
 }
 
 @layer base {
@@ -376,21 +382,56 @@
   --ui-backdrop-blur: blur(24px) saturate(190%);
 }
 
+/* Universal utility radius mapping fallbacks */
+.rounded-lg,
+.rounded-xl {
+  border-radius: var(--ui-radius-card);
+}
+
+.rounded-md,
+.rounded-sm {
+  border-radius: var(--ui-radius-control);
+}
+
 /* Card & Surface Styling with UI Style Presets */
 .bg-\(--bg-card\),
 .p-card,
 .p-dialog,
+.p-drawer,
 .p-popover {
   border-radius: var(--ui-radius-card);
   box-shadow: var(--ui-card-shadow, none);
   transition: border-radius 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Dynamic control radius for PrimeVue form controls, inputs, and tags */
+.p-button,
+.p-inputtext,
+.p-textarea,
+.p-select,
+.p-tag,
+.p-inputnumber input {
+  border-radius: var(--ui-radius-control);
+}
+
+/* Specular sheen overlay on cards, dialogs, drawers, and popovers */
 [data-ui-style="aero"] .bg-\(--bg-card\),
 [data-ui-style="aero"] .p-card,
+[data-ui-style="aero"] .p-dialog,
+[data-ui-style="aero"] .p-drawer,
+[data-ui-style="aero"] .p-popover,
 [data-ui-style="liquidglass"] .bg-\(--bg-card\),
-[data-ui-style="liquidglass"] .p-card {
+[data-ui-style="liquidglass"] .p-card,
+[data-ui-style="liquidglass"] .p-dialog,
+[data-ui-style="liquidglass"] .p-drawer,
+[data-ui-style="liquidglass"] .p-popover {
   background-image: var(--ui-card-sheen);
+}
+
+/* Frutiger Aero glossy button sheen */
+[data-ui-style="aero"] .p-button:not(.p-button-text):not(.p-button-link) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(0, 0, 0, 0.1) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 /* Translucent surfaces backdrop filter */
@@ -399,12 +440,14 @@
 [data-ui-style="glass"] .bg-\(--bg-panel\),
 [data-ui-style="glass"] .p-card,
 [data-ui-style="glass"] .p-dialog,
+[data-ui-style="glass"] .p-drawer,
 [data-ui-style="glass"] .p-popover,
 [data-ui-style="aero"] .bg-\(--bg-sidebar\),
 [data-ui-style="aero"] .bg-\(--bg-card\),
 [data-ui-style="aero"] .bg-\(--bg-panel\),
 [data-ui-style="aero"] .p-card,
 [data-ui-style="aero"] .p-dialog,
+[data-ui-style="aero"] .p-drawer,
 [data-ui-style="aero"] .p-popover {
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -415,6 +458,7 @@
 [data-ui-style="liquidglass"] .bg-\(--bg-panel\),
 [data-ui-style="liquidglass"] .p-card,
 [data-ui-style="liquidglass"] .p-dialog,
+[data-ui-style="liquidglass"] .p-drawer,
 [data-ui-style="liquidglass"] .p-popover {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -425,9 +469,22 @@
 [data-ui-style="ios"] .bg-\(--bg-panel\),
 [data-ui-style="ios"] .p-card,
 [data-ui-style="ios"] .p-dialog,
+[data-ui-style="ios"] .p-drawer,
 [data-ui-style="ios"] .p-popover {
   backdrop-filter: blur(24px) saturate(190%);
   -webkit-backdrop-filter: blur(24px) saturate(190%);
 }
+
+/* Subtle ambient background glow for translucent styles to make backdrop-blur pop */
+[data-ui-style="glass"] [data-component="app-layout"],
+[data-ui-style="liquidglass"] [data-component="app-layout"],
+[data-ui-style="aero"] [data-component="app-layout"],
+[data-ui-style="ios"] [data-component="app-layout"] {
+  background-image:
+    radial-gradient(at 15% 15%, var(--accent-soft) 0px, transparent 40%),
+    radial-gradient(at 85% 85%, var(--accent-soft) 0px, transparent 45%);
+  background-attachment: fixed;
+}
+
 
 

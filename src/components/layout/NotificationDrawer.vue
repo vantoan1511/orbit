@@ -63,14 +63,14 @@ const getSeverityIcon = (severity: NotificationSeverity) => {
 const getSeverityColorClass = (severity: NotificationSeverity) => {
   switch (severity) {
     case 'success':
-      return 'text-emerald-500 bg-emerald-500/10'
+      return 'text-(--success) bg-(--success-soft)'
     case 'error':
-      return 'text-rose-500 bg-rose-500/10'
+      return 'text-(--danger) bg-(--danger-soft)'
     case 'warn':
-      return 'text-amber-500 bg-amber-500/10'
+      return 'text-(--warning) bg-(--warning-soft)'
     case 'info':
     default:
-      return 'text-sky-400 bg-sky-500/10'
+      return 'text-(--accent) bg-(--accent-soft)'
   }
 }
 
@@ -184,8 +184,8 @@ const formatRelativeTime = (timestamp: number): string => {
                     <div class="flex items-center gap-1.5 min-w-0">
                       <span
                         v-if="!item.read"
-                        class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
-                        title="Unread"
+                        class="w-1.5 h-1.5 rounded-full bg-(--danger) shrink-0"
+                        aria-label="Unread"
                       ></span>
                       <span class="text-xs font-bold text-primary truncate">
                         {{ item.title }}
@@ -201,18 +201,18 @@ const formatRelativeTime = (timestamp: number): string => {
                         rounded
                         size="small"
                         class="w-5! h-5! p-0! text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
-                        :class="{ 'opacity-100! text-emerald-500!': copiedMap[item.id] }"
-                        :title="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
+                        :class="{ 'opacity-100! text-(--success)!': copiedMap[item.id] }"
+                        v-tooltip="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
                         @click.stop="copyNotification(item)"
                       >
-                        <Check v-if="copiedMap[item.id]" class="w-3 h-3 text-emerald-500" />
+                        <Check v-if="copiedMap[item.id]" class="w-3 h-3 text-(--success)" />
                         <Copy v-else class="w-3 h-3" />
                       </Button>
                       <Button
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5! h-5! p-0! text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
+                        class="w-5! h-5! p-0! text-muted-color hover:text-(--danger) opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
                         @click.stop="notificationStore.removeNotification(item.id)"
                       >
                         <X class="w-3 h-3" />
@@ -234,7 +234,7 @@ const formatRelativeTime = (timestamp: number): string => {
               v-if="filteredNotifications.length === 0"
               class="flex flex-col items-center justify-center p-12 text-center text-muted-color"
             >
-              <Check class="w-10 h-10 mb-3 opacity-40 text-emerald-500" />
+              <Check class="w-10 h-10 mb-3 opacity-40 text-(--success)" />
               <p class="text-sm font-semibold text-primary">All caught up!</p>
               <p class="text-xs mt-1">You have no unread notifications.</p>
             </div>
@@ -260,8 +260,8 @@ const formatRelativeTime = (timestamp: number): string => {
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-1.5 min-w-0">
                       <span
-                        class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"
-                        title="Unread"
+                        class="w-1.5 h-1.5 rounded-full bg-(--danger) shrink-0"
+                        aria-label="Unread"
                       ></span>
                       <span class="text-xs font-bold text-primary truncate">
                         {{ item.title }}
@@ -277,11 +277,11 @@ const formatRelativeTime = (timestamp: number): string => {
                         rounded
                         size="small"
                         class="w-5! h-5! p-0! text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
-                        :class="{ 'opacity-100! text-emerald-500!': copiedMap[item.id] }"
-                        :title="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
+                        :class="{ 'opacity-100! text-(--success)!': copiedMap[item.id] }"
+                        v-tooltip="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
                         @click.stop="copyNotification(item)"
                       >
-                        <Check v-if="copiedMap[item.id]" class="w-3 h-3 text-emerald-500" />
+                        <Check v-if="copiedMap[item.id]" class="w-3 h-3 text-(--success)" />
                         <Copy v-else class="w-3 h-3" />
                       </Button>
                       <Button

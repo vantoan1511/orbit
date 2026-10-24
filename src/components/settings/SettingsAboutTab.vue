@@ -88,7 +88,7 @@ onMounted(async () => {
           <div v-if="!updaterStore.isChecking && updaterStore.manifest" class="text-xs">
             <span
               v-if="updaterStore.hasUpdate"
-              class="text-emerald-500 font-medium flex items-center gap-1"
+              class="text-(--success) font-medium flex items-center gap-1"
             >
               <CheckCircle2 class="w-4 h-4" /> Update Available
             </span>

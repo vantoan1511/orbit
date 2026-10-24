@@ -33,19 +33,19 @@ const EVENT_ICONS = {
 } as const
 
 const EVENT_ICON_CLASSES: Record<string, string> = {
-  pod: 'text-sky-500 bg-sky-500/10',
-  node: 'text-emerald-500 bg-emerald-500/10',
-  secret: 'text-amber-500 bg-amber-500/10',
-  configmap: 'text-blue-500 bg-blue-500/10',
-  persistentvolume: 'text-indigo-500 bg-indigo-500/10',
-  persistentvolumeclaim: 'text-purple-500 bg-purple-500/10',
-  job: 'text-teal-500 bg-teal-500/10',
-  cronjob: 'text-teal-500 bg-teal-500/10',
-  deployment: 'text-sky-500 bg-sky-500/10',
-  statefulset: 'text-sky-500 bg-sky-500/10',
-  daemonset: 'text-sky-500 bg-sky-500/10',
-  service: 'text-emerald-500 bg-emerald-500/10',
-  ingress: 'text-emerald-500 bg-emerald-500/10'
+  pod: 'text-pod bg-(--accent-soft)',
+  node: 'text-node bg-(--success-soft)',
+  secret: 'text-secret bg-(--warning-soft)',
+  configmap: 'text-configmap bg-(--accent-soft)',
+  persistentvolume: 'text-primary bg-(--bg-hover)',
+  persistentvolumeclaim: 'text-primary bg-(--bg-hover)',
+  job: 'text-job bg-(--success-soft)',
+  cronjob: 'text-job bg-(--success-soft)',
+  deployment: 'text-deployment bg-(--accent-soft)',
+  statefulset: 'text-statefulset bg-(--accent-soft)',
+  daemonset: 'text-daemonset bg-(--accent-soft)',
+  service: 'text-service bg-(--success-soft)',
+  ingress: 'text-ingress bg-(--success-soft)'
 }
 
 function getEventIcon(kind?: string) {
@@ -53,7 +53,7 @@ function getEventIcon(kind?: string) {
 }
 
 function getEventIconClass(kind?: string) {
-  return EVENT_ICON_CLASSES[kind?.toLowerCase() || ''] || 'text-gray-400 bg-gray-500/10'
+  return EVENT_ICON_CLASSES[kind?.toLowerCase() || ''] || 'text-muted-color bg-(--bg-hover)'
 }
 
 const warnings = computed<EventListItem[]>(() => {
@@ -63,7 +63,7 @@ const warnings = computed<EventListItem[]>(() => {
     .map((e) => ({
       uid: e.uid,
       icon: AlertTriangle,
-      iconClass: 'text-rose-500 bg-rose-500/10',
+      iconClass: 'text-(--danger) bg-(--danger-soft)',
       label: e.reason || KUBERNETES_EVENT_TYPE.Warning,
       message: e.message || '',
       time: e.lastSeen || e.firstSeen || e.time || 'unknown'

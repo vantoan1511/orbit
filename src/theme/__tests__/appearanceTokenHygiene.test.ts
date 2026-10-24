@@ -12,7 +12,12 @@ const FORBIDDEN_CLASSES = [
   'bg-zinc-950',
   'text-emerald-500',
   'text-rose-500',
-  'text-amber-500'
+  'text-amber-500',
+  'bg-gray-400',
+  'bg-gray-500',
+  'text-gray-400',
+  'text-slate-50',
+  'text-slate-950'
 ]
 
 const ADAPTED_COMPONENTS = [
@@ -35,6 +40,9 @@ const ADAPTED_COMPONENTS = [
   'src/components/shared/BaseResourceDrawer.vue',
   'src/components/workloads/WorkloadDetailsDrawer.vue',
   'src/components/policies/PolicyDetailsDrawer.vue',
+  'src/components/events/EventDetailsDrawer.vue',
+  'src/components/config/ConfigDetailsDrawer.vue',
+  'src/components/layout/NotificationDrawer.vue',
   'src/components/shared/ResourceYamlTab.vue',
   'src/components/search/SearchEverywhereDialog.vue',
   'src/components/namespaces/NamespaceDetailsDrawer.vue',
@@ -42,6 +50,30 @@ const ADAPTED_COMPONENTS = [
   'src/components/network/IngressDetailsDrawer.vue',
   'src/components/services/ServiceDetailsDrawer.vue',
   'src/components/pods/PodDetailsDrawer.vue',
+
+  // Dashboard & Pod/Service details
+  'src/components/dashboard/AlertsEvents.vue',
+  'src/components/dashboard/HealthOverview.vue',
+  'src/components/dashboard/WorkloadSummaries.vue',
+  'src/components/pods/PodContainersTab.vue',
+  'src/components/services/ServiceEndpointsTab.vue',
+  'src/components/workloads/WorkloadEventsTab.vue',
+  'src/components/storage/StorageClassesSidebar.vue',
+
+  // Workload Edit Forms
+  'src/components/workloads/DeploymentEditForm.vue',
+  'src/components/workloads/DaemonSetEditForm.vue',
+  'src/components/workloads/StatefulSetEditForm.vue',
+  'src/components/workloads/ReplicaSetEditForm.vue',
+  'src/components/workloads/JobEditForm.vue',
+  'src/components/workloads/PodEditForm.vue',
+  'src/components/workloads/CreateCronJobDialog.vue',
+
+  // Shared Editors
+  'src/components/shared/ContainerEnvEditor.vue',
+  'src/components/shared/ContainerPortsEditor.vue',
+  'src/components/shared/KeyValueEditor.vue',
+  'src/components/shared/StringListEditor.vue',
 
   // Shared Badges & Metric Cards
   'src/components/shared/StatusBadge.vue',
@@ -85,6 +117,8 @@ const ADAPTED_COMPONENTS = [
   // Settings
   'src/views/SettingsView.vue',
   'src/components/settings/SettingsAppearanceTab.vue',
+  'src/components/settings/SettingsAboutTab.vue',
+  'src/components/settings/preferences/ShortcutConflictModal.vue',
   'src/components/settings/appearance/ThemeModeSelector.vue',
   'src/components/settings/appearance/UiStyleSelector.vue',
   'src/components/settings/appearance/AccentColorPicker.vue',

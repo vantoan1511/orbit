@@ -53,7 +53,7 @@ function handleCancel() {
     @hide="handleCancel"
   >
     <div class="flex items-start gap-3 py-2">
-      <div class="p-2 rounded-full bg-amber-500/10 text-amber-500 shrink-0">
+      <div class="p-2 rounded-full bg-(--warning-soft) text-(--warning) shrink-0">
         <AlertTriangle class="w-5 h-5" />
       </div>
       <div class="flex flex-col gap-1.5 text-xs">

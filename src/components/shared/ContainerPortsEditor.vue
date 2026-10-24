@@ -109,7 +109,7 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         variant="text"
         severity="danger"
         size="small"
-        class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
+        class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
         @click="removePort(idx)"
       >
         <template #icon>

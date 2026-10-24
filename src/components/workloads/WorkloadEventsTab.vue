@@ -23,7 +23,7 @@ const sortedEvents = computed(() => sortEventsDesc(props.events))
       <div v-for="(ev, idx) in sortedEvents" :key="ev.uid || idx" class="relative">
         <span
           class="absolute -left-5.25 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-(--bg-card)"
-          :class="ev.type === 'Warning' ? 'bg-rose-500' : 'bg-emerald-500'"
+          :class="ev.type === 'Warning' ? 'bg-(--danger)' : 'bg-(--success)'"
         ></span>
         <div class="flex items-center gap-2">
           <span class="text-xs font-semibold text-primary">{{ ev.reason }}</span>
