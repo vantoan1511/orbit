@@ -82,12 +82,12 @@ function removeTag(tagToRemove: string): void {
   <div class="flex flex-col gap-4 text-xs" data-component="cluster-customization-fields">
     <!-- Friendly Alias -->
     <div class="flex flex-col gap-1.5">
-      <label class="font-medium text-primary">Display Name / Alias</label>
+      <label class="text-xs font-medium text-muted-color">Display Name / Alias</label>
       <InputText
         :model-value="alias"
         placeholder="e.g. Staging US-West"
         size="small"
-        class="w-full text-xs"
+        class="w-full text-xs rounded-[var(--ui-radius-control)]"
         @update:model-value="updateAlias"
       />
       <span class="text-[11px] text-muted-color">
@@ -97,7 +97,7 @@ function removeTag(tagToRemove: string): void {
 
     <!-- Color Preset Swatches -->
     <div class="flex flex-col gap-1.5">
-      <label class="font-medium text-primary">Environment Color</label>
+      <label class="text-xs font-medium text-muted-color">Environment Color</label>
       <div class="flex items-center gap-2 flex-wrap">
         <Button
           v-for="preset in COLOR_PRESETS"
@@ -123,7 +123,7 @@ function removeTag(tagToRemove: string): void {
           size="small"
           variant="text"
           severity="secondary"
-          class="p-0 text-[11px] text-muted-color hover:text-primary ml-1 h-6"
+          class="p-0 text-[11px] text-muted-color hover:text-(--text-primary) ml-1 h-6 rounded-[var(--ui-radius-control)]"
           @click="clearColor"
         >
           Clear
@@ -133,14 +133,14 @@ function removeTag(tagToRemove: string): void {
 
     <!-- Tags -->
     <div class="flex flex-col gap-1.5">
-      <label class="font-medium text-primary">Tags</label>
+      <label class="text-xs font-medium text-muted-color">Tags</label>
       <div
-        class="flex flex-wrap items-center gap-1.5 min-h-7 p-1.5 border border-(--border) rounded-lg bg-(--bg-app)"
+        class="flex flex-wrap items-center gap-1.5 min-h-7 p-1.5 border border-(--border) rounded-[var(--ui-radius-control)] bg-(--bg-app)/60"
       >
         <span
           v-for="t in tags"
           :key="t"
-          class="px-2 py-0.5 rounded bg-(--bg-hover) text-primary text-[11px] flex items-center gap-1 border border-(--border)"
+          class="px-2 py-0.5 rounded-[var(--ui-radius-control)] bg-(--bg-hover) text-(--text-primary) text-[11px] flex items-center gap-1 border border-(--border)"
         >
           <TagIcon class="w-2.5 h-2.5 text-muted-color" />
           <span>{{ t }}</span>
@@ -170,13 +170,13 @@ function removeTag(tagToRemove: string): void {
 
     <!-- Optional Description -->
     <div v-if="showDescription" class="flex flex-col gap-1.5">
-      <label class="font-medium text-primary">Description</label>
+      <label class="text-xs font-medium text-muted-color">Description</label>
       <Textarea
         :model-value="description"
         placeholder="Optional notes or details regarding this cluster..."
         rows="2"
         auto-resize
-        class="w-full text-xs"
+        class="w-full text-xs rounded-[var(--ui-radius-control)]"
         @update:model-value="emit('update:description', $event ?? '')"
       />
     </div>

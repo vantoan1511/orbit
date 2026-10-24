@@ -43,3 +43,23 @@ test('ClusterCustomizationFields uses PrimeVue controls and zero raw button elem
     'ClusterCustomizationFields must contain zero raw <button> elements'
   )
 })
+
+test('ClusterCustomizationFields enforces label styling, token hygiene, and dynamic control radius', () => {
+  const filePath = path.resolve(
+    process.cwd(),
+    'src/components/cluster/ClusterCustomizationFields.vue'
+  )
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  // Field labels and text must not use text-primary utility class (maps to bright primary color)
+  assert.ok(
+    !/(?<![(-])text-primary\b/.test(content),
+    'ClusterCustomizationFields must not use text-primary utility class on field labels'
+  )
+
+  // Dynamic control radius
+  assert.ok(
+    content.includes('var(--ui-radius-control)'),
+    'ClusterCustomizationFields must use dynamic var(--ui-radius-control)'
+  )
+})
