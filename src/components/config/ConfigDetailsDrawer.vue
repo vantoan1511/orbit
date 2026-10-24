@@ -95,7 +95,7 @@ ${Object.entries(res.data)
         : ''
     "
     :kind-severity="props.resource ? (isSecret(props.resource) ? 'danger' : 'info') : 'info'"
-    status-badge-class="bg-emerald-500"
+    status-badge-class="bg-(--success)"
     :namespace="props.resource?.namespace"
     :age="props.resource?.age"
     @update:visible="emit('update:visible', $event)"

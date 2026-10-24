@@ -34,11 +34,11 @@ const isRunning = (status: string) => {
               class="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse"
               :class="
                 isRunning(c.status)
-                  ? 'bg-emerald-500 ring-4 ring-emerald-500/20'
-                  : 'bg-rose-500 ring-4 ring-rose-500/20'
+                  ? 'bg-(--success) ring-4 ring-(--success)/20'
+                  : 'bg-(--danger) ring-4 ring-(--danger)/20'
               "
             ></span>
-            <span class="text-xs font-bold text-primary font-mono truncate" :title="c.name">
+            <span class="text-xs font-bold text-primary font-mono truncate" v-tooltip="c.name">
               {{ c.name }}
             </span>
             <Tag
@@ -53,7 +53,7 @@ const isRunning = (status: string) => {
             size="small"
             variant="outlined"
             class="text-xs shrink-0 flex items-center gap-1.5"
-            title="View Container Logs"
+            v-tooltip.top="'View Container Logs'"
             @click="emit('view-logs', c.name)"
           >
             <Terminal class="w-3.5 h-3.5" />

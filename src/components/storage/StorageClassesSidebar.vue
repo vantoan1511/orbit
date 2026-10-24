@@ -195,25 +195,25 @@ watch(scCapacityData, updateChart, { immediate: true })
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Bound
           </div>
-          <div class="text-lg font-bold text-emerald-500 mt-0.5">{{ statusCounts.Bound }}</div>
+          <div class="text-lg font-bold text-(--success) mt-0.5">{{ statusCounts.Bound }}</div>
         </div>
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Available
           </div>
-          <div class="text-lg font-bold text-blue-500 mt-0.5">{{ statusCounts.Available }}</div>
+          <div class="text-lg font-bold text-(--accent) mt-0.5">{{ statusCounts.Available }}</div>
         </div>
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Released
           </div>
-          <div class="text-lg font-bold text-amber-500 mt-0.5">{{ statusCounts.Released }}</div>
+          <div class="text-lg font-bold text-(--warning) mt-0.5">{{ statusCounts.Released }}</div>
         </div>
         <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Failed
           </div>
-          <div class="text-lg font-bold text-rose-500 mt-0.5">{{ statusCounts.Failed }}</div>
+          <div class="text-lg font-bold text-(--danger) mt-0.5">{{ statusCounts.Failed }}</div>
         </div>
       </div>
     </div>

@@ -33,7 +33,6 @@ import { useKubernetesStore } from '@/stores/kubernetesStore'
 import {
   AUTH_TYPE_OPTIONS,
   type AddClusterCustomization,
-  type AddClusterPayload,
   type DiscoveredContextInfo,
   type ManualEndpointConfig
 } from '@/types/cluster'
@@ -71,21 +70,19 @@ const pastedYaml = ref('')
 const yamlParseError = ref<string | null>(null)
 
 // Tab 3: Manual Endpoint
-function createDefaultManualConfig(): ManualEndpointConfig {
-  return {
-    contextName: '',
-    clusterName: '',
-    serverUrl: '',
-    authType: 'token',
-    token: '',
-    clientCertData: '',
-    clientKeyData: '',
-    username: '',
-    password: '',
-    insecureSkipTlsVerify: false,
-    caCertData: ''
-  }
-}
+const createDefaultManualConfig = (): ManualEndpointConfig => ({
+  contextName: '',
+  clusterName: '',
+  serverUrl: '',
+  authType: 'token',
+  token: '',
+  clientCertData: '',
+  clientKeyData: '',
+  username: '',
+  password: '',
+  insecureSkipTlsVerify: false,
+  caCertData: ''
+})
 
 const manualConfig = ref<ManualEndpointConfig>(createDefaultManualConfig())
 
@@ -280,27 +277,20 @@ watch(activeTab, (tab) => {
 })
 
 // Context selection controls
-const isAllSelected = computed(() => {
-  return (
+const isAllSelected = computed(
+  () =>
     discoveredContexts.value.length > 0 &&
     selectedContexts.value.length === discoveredContexts.value.length
-  )
-})
+)
 
 function toggleSelectAll(): void {
-  if (isAllSelected.value) {
-    selectedContexts.value = []
-  } else {
-    selectedContexts.value = discoveredContexts.value.map((c) => c.name)
-  }
+  selectedContexts.value = isAllSelected.value ? [] : discoveredContexts.value.map((c) => c.name)
 }
 
 function toggleContextSelection(name: string): void {
-  if (selectedContexts.value.includes(name)) {
-    selectedContexts.value = selectedContexts.value.filter((n) => n !== name)
-  } else {
-    selectedContexts.value.push(name)
-  }
+  selectedContexts.value = selectedContexts.value.includes(name)
+    ? selectedContexts.value.filter((n) => n !== name)
+    : [...selectedContexts.value, name]
 }
 
 // Submission
@@ -335,14 +325,12 @@ async function handleAddClusterSubmit(): Promise<void> {
     if (selectedColor.value) metadata.color = selectedColor.value
     if (tags.value.length > 0) metadata.tags = [...tags.value]
 
-    const payload: AddClusterPayload = {
+    await kubernetesService.addCluster({
       kubeconfigContent: filteredContent,
       selectedContexts: [...selectedContexts.value],
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
       switchContext: switchContext.value
-    }
-
-    await kubernetesService.addCluster(payload)
+    })
 
     toast.add({
       severity: 'success',
@@ -366,9 +354,7 @@ async function handleAddClusterSubmit(): Promise<void> {
   }
 }
 
-function handleClose(): void {
-  emit('update:visible', false)
-}
+const handleClose = (): void => emit('update:visible', false)
 </script>
 
 <template>
@@ -396,13 +382,6 @@ function handleClose(): void {
           'w-7 h-7 p-0 text-muted-color hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
       }
     }"
-    :close-button-props="{
-      severity: 'secondary',
-      variant: 'text',
-      rounded: true,
-      class:
-        'w-7 h-7 p-0 text-muted-color hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
-    }"
     @update:visible="emit('update:visible', $event)"
   >
     <template #header>
@@ -418,7 +397,6 @@ function handleClose(): void {
         </div>
       </div>
     </template>
-
     <div class="flex flex-col gap-6">
       <!-- Input Mode Tabs -->
       <Tabs v-model:value="activeTab" class="w-full">
@@ -448,7 +426,6 @@ function handleClose(): void {
             <span>Manual Endpoint</span>
           </Tab>
         </TabList>
-
         <TabPanels class="pt-4 p-0">
           <!-- Tab 1: Kubeconfig File -->
           <TabPanel value="file">
@@ -498,7 +475,6 @@ function handleClose(): void {
               </div>
             </div>
           </TabPanel>
-
           <!-- Tab 2: Paste YAML -->
           <TabPanel value="paste">
             <div class="flex flex-col gap-2">
@@ -529,7 +505,6 @@ function handleClose(): void {
               </div>
             </div>
           </TabPanel>
-
           <!-- Tab 3: Manual Endpoint -->
           <TabPanel value="manual">
             <div class="flex flex-col gap-4 text-xs">
@@ -755,7 +730,6 @@ function handleClose(): void {
           </div>
         </div>
       </div>
-
       <!-- Cluster Customization Section -->
       <div
         class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card)"
@@ -777,7 +751,6 @@ function handleClose(): void {
             >Display name, environment color & tags</span
           >
         </Button>
-
         <div v-if="showCustomization" class="p-4 pt-1 border-t border-(--border)">
           <ClusterCustomizationFields
             v-model:alias="alias"
@@ -787,7 +760,6 @@ function handleClose(): void {
         </div>
       </div>
     </div>
-
     <!-- Footer Actions -->
     <template #footer>
       <div class="flex items-center gap-2">

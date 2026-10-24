@@ -46,9 +46,9 @@ type: ${e.type}
 }
 
 const getEventBadgeClass = (type: string) => {
-  if (type === KUBERNETES_EVENT_TYPE.Normal) return 'bg-emerald-500'
-  if (type === KUBERNETES_EVENT_TYPE.Warning) return 'bg-amber-500'
-  return 'bg-rose-500'
+  if (type === KUBERNETES_EVENT_TYPE.Normal) return 'bg-(--success)'
+  if (type === KUBERNETES_EVENT_TYPE.Warning) return 'bg-(--warning)'
+  return 'bg-(--danger)'
 }
 </script>
 
@@ -60,7 +60,7 @@ const getEventBadgeClass = (type: string) => {
     :title="props.event?.reason ?? ''"
     :kind="props.event?.type ?? ''"
     :kind-severity="props.event ? getEventTypeSeverity(props.event.type) : 'info'"
-    :status-badge-class="props.event ? getEventBadgeClass(props.event.type) : 'bg-emerald-500'"
+    :status-badge-class="props.event ? getEventBadgeClass(props.event.type) : 'bg-(--success)'"
     @update:visible="emit('update:visible', $event)"
   >
     <template #metadata>
@@ -151,9 +151,9 @@ const getEventBadgeClass = (type: string) => {
     <template #yaml>
       <div
         v-if="props.event"
-        class="flex-1 min-h-64 border border-(--border) rounded-xl bg-zinc-950 p-4 overflow-y-auto"
+        class="flex-1 min-h-64 border border-(--border) rounded-xl bg-(--bg-card) p-4 overflow-y-auto"
       >
-        <pre class="font-mono text-[10px] text-zinc-300 leading-relaxed">{{
+        <pre class="font-mono text-[10px] text-primary leading-relaxed">{{
           generateYaml(props.event)
         }}</pre>
       </div>

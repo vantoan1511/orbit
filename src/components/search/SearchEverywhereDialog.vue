@@ -255,7 +255,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
           class="flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors text-xs font-medium cursor-pointer select-none"
           :class="[
             searchStore.activeCategory === cat.id
-              ? 'bg-primary text-slate-50 dark:text-slate-950 shadow-xs font-semibold'
+              ? 'bg-primary text-[var(--p-primary-contrast-color)] shadow-xs font-semibold'
               : 'text-muted-color hover:text-primary hover:bg-(--bg-hover)'
           ]"
           @click="searchStore.setCategory(cat.id)"
@@ -265,7 +265,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
             class="text-[10px] px-1.5 py-0.5 rounded-full font-mono font-semibold"
             :class="[
               searchStore.activeCategory === cat.id
-                ? 'bg-white/20 text-slate-50 dark:bg-black/15 dark:text-slate-950'
+                ? 'bg-current/15 text-[var(--p-primary-contrast-color)]'
                 : 'bg-(--bg-hover) text-muted-color'
             ]"
           >

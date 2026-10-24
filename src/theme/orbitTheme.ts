@@ -5,6 +5,31 @@ import type { Preset } from '@primeuix/themes/types'
 
 const NoirPreset: Preset = {
   semantic: {
+    borderRadius: {
+      none: '0',
+      xs: 'var(--ui-radius-control)',
+      sm: 'var(--ui-radius-control)',
+      md: 'var(--ui-radius-control)',
+      lg: 'var(--ui-radius-card)',
+      xl: 'var(--ui-radius-card)'
+    },
+    formField: {
+      borderRadius: 'var(--ui-radius-control)'
+    },
+    content: {
+      borderRadius: 'var(--ui-radius-card)'
+    },
+    overlay: {
+      select: {
+        borderRadius: 'var(--ui-radius-control)'
+      },
+      popover: {
+        borderRadius: 'var(--ui-radius-card)'
+      },
+      modal: {
+        borderRadius: 'var(--ui-radius-card)'
+      }
+    },
     focusRing: {
       width: '2px',
       style: 'dashed',
@@ -63,6 +88,31 @@ const NoirPreset: Preset = {
         background: 'var(--bg-card)',
         borderRadius: 'var(--ui-radius-card)',
         shadow: 'var(--ui-card-shadow, none)'
+      }
+    },
+    button: {
+      root: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    select: {
+      root: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    inputtext: {
+      root: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    textarea: {
+      root: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    popover: {
+      root: {
+        borderRadius: 'var(--ui-radius-card)'
       }
     },
     contextmenu: {
@@ -366,7 +416,7 @@ const NoirPreset: Preset = {
         fontSize: '0.625rem',
         fontWeight: '600',
         padding: '0.125rem 0.375rem',
-        borderRadius: '{content.border.radius}',
+        borderRadius: 'var(--ui-radius-control)',
         gap: '0.25rem'
       },
       colorScheme: {
