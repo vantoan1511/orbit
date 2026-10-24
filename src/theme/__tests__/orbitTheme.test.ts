@@ -96,3 +96,42 @@ test('Noir preset components connect surfaces and radii to custom properties', (
   assert.ok(tag, 'tag component config must exist')
   assert.equal(tag.root.borderRadius, 'var(--ui-radius-control)')
 })
+
+test('Noir preset semantic tokens map border colors to CSS custom properties', () => {
+  const semantic = Noir.semantic as Record<string, unknown>
+  assert.ok(semantic, 'semantic tokens must exist')
+
+  const content = semantic.content as Record<string, string>
+  assert.equal(content.borderColor, 'var(--border)')
+
+  const formField = semantic.formField as Record<string, string>
+  assert.equal(formField.borderColor, 'var(--input-border, var(--border))')
+  assert.equal(formField.hoverBorderColor, 'var(--border-strong)')
+  assert.equal(formField.focusBorderColor, '{primary.color}')
+
+  const overlay = semantic.overlay as Record<string, Record<string, string>>
+  assert.equal(overlay.select.borderColor, 'var(--border)')
+  assert.equal(overlay.popover.borderColor, 'var(--border)')
+  assert.equal(overlay.modal.borderColor, 'var(--border)')
+})
+
+test('Noir preset components connect border colors to custom properties', () => {
+  const components = Noir.components as Record<string, unknown>
+  assert.ok(components, 'components must exist')
+
+  const card = components.card as Record<string, Record<string, string>>
+  assert.equal(card?.root?.borderColor, 'var(--border)')
+
+  const datatable = components.datatable as Record<string, Record<string, string>>
+  assert.equal(datatable?.headerCell?.borderColor, 'var(--border)')
+  assert.equal(datatable?.bodyCell?.borderColor, 'var(--border)')
+
+  const dialog = components.dialog as Record<string, Record<string, string>>
+  assert.equal(dialog?.root?.borderColor, 'var(--border)')
+
+  const popover = components.popover as Record<string, Record<string, string>>
+  assert.equal(popover?.root?.borderColor, 'var(--border)')
+
+  const drawer = components.drawer as Record<string, Record<string, string>>
+  assert.equal(drawer?.root?.borderColor, 'var(--border)')
+})

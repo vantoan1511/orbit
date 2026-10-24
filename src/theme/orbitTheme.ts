@@ -3,6 +3,15 @@ import { definePreset } from '@primeuix/themes'
 import Nora from '@primeuix/themes/nora'
 import type { Preset } from '@primeuix/themes/types'
 
+declare module '@primeuix/themes/types/card' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace CardTokenSections {
+    interface Root {
+      borderColor?: string
+    }
+  }
+}
+
 const NoirPreset: Preset = {
   semantic: {
     borderRadius: {
@@ -14,20 +23,27 @@ const NoirPreset: Preset = {
       xl: 'var(--ui-radius-card)'
     },
     formField: {
-      borderRadius: 'var(--ui-radius-control)'
+      borderRadius: 'var(--ui-radius-control)',
+      borderColor: 'var(--input-border, var(--border))',
+      hoverBorderColor: 'var(--border-strong)',
+      focusBorderColor: '{primary.color}'
     },
     content: {
-      borderRadius: 'var(--ui-radius-card)'
+      borderRadius: 'var(--ui-radius-card)',
+      borderColor: 'var(--border)'
     },
     overlay: {
       select: {
-        borderRadius: 'var(--ui-radius-control)'
+        borderRadius: 'var(--ui-radius-control)',
+        borderColor: 'var(--border)'
       },
       popover: {
-        borderRadius: 'var(--ui-radius-card)'
+        borderRadius: 'var(--ui-radius-card)',
+        borderColor: 'var(--border)'
       },
       modal: {
-        borderRadius: 'var(--ui-radius-card)'
+        borderRadius: 'var(--ui-radius-card)',
+        borderColor: 'var(--border)'
       }
     },
     focusRing: {
@@ -51,6 +67,25 @@ const NoirPreset: Preset = {
     },
     colorScheme: {
       light: {
+        content: {
+          borderColor: 'var(--border)'
+        },
+        formField: {
+          borderColor: 'var(--input-border, var(--border))',
+          hoverBorderColor: 'var(--border-strong)',
+          focusBorderColor: '{primary.color}'
+        },
+        overlay: {
+          select: {
+            borderColor: 'var(--border)'
+          },
+          popover: {
+            borderColor: 'var(--border)'
+          },
+          modal: {
+            borderColor: 'var(--border)'
+          }
+        },
         primary: {
           color: '{primary.500}',
           contrastColor: '#ffffff',
@@ -66,6 +101,25 @@ const NoirPreset: Preset = {
         }
       },
       dark: {
+        content: {
+          borderColor: 'var(--border)'
+        },
+        formField: {
+          borderColor: 'var(--input-border, var(--border))',
+          hoverBorderColor: 'var(--border-strong)',
+          focusBorderColor: '{primary.color}'
+        },
+        overlay: {
+          select: {
+            borderColor: 'var(--border)'
+          },
+          popover: {
+            borderColor: 'var(--border)'
+          },
+          modal: {
+            borderColor: 'var(--border)'
+          }
+        },
         primary: {
           color: '{primary.400}',
           contrastColor: '{slate.950}',
@@ -86,6 +140,7 @@ const NoirPreset: Preset = {
     card: {
       root: {
         background: 'var(--bg-card)',
+        borderColor: 'var(--border)',
         borderRadius: 'var(--ui-radius-card)',
         shadow: 'var(--ui-card-shadow, none)'
       }
@@ -112,7 +167,13 @@ const NoirPreset: Preset = {
     },
     popover: {
       root: {
+        borderColor: 'var(--border)',
         borderRadius: 'var(--ui-radius-card)'
+      }
+    },
+    drawer: {
+      root: {
+        borderColor: 'var(--border)'
       }
     },
     contextmenu: {
@@ -132,59 +193,59 @@ const NoirPreset: Preset = {
         borderColor: 'transparent'
       },
       headerCell: {
-        borderColor: '{surface.200}',
+        borderColor: 'var(--border)',
         color: '{text.muted.color}'
       },
       bodyCell: {
-        borderColor: '{surface.100}'
+        borderColor: 'var(--border)'
       },
       row: {
         hoverBackground: '{surface.100}'
       },
       paginatorBottom: {
-        borderColor: '{surface.200}',
+        borderColor: 'var(--border)',
         borderWidth: '1px 0 0 0'
       },
       colorScheme: {
         light: {
           root: {
-            borderColor: '{surface.200}'
+            borderColor: 'var(--border)'
           },
           headerCell: {
             background: '{surface.100}',
             hoverBackground: '{surface.200}',
-            borderColor: '{surface.200}',
+            borderColor: 'var(--border)',
             color: '{surface.600}'
           },
           bodyCell: {
-            borderColor: '{surface.100}'
+            borderColor: 'var(--border)'
           },
           row: {
             hoverBackground: '{surface.100}'
           },
           paginatorBottom: {
-            borderColor: '{surface.200}',
+            borderColor: 'var(--border)',
             borderWidth: '1px 0 0 0'
           }
         },
         dark: {
           root: {
-            borderColor: '{surface.800}'
+            borderColor: 'var(--border)'
           },
           headerCell: {
             background: '{surface.900}',
             hoverBackground: '{surface.800}',
-            borderColor: '{surface.800}',
+            borderColor: 'var(--border)',
             color: '{surface.400}'
           },
           bodyCell: {
-            borderColor: '{surface.900}'
+            borderColor: 'var(--border)'
           },
           row: {
             hoverBackground: '{surface.800}'
           },
           paginatorBottom: {
-            borderColor: '{surface.800}',
+            borderColor: 'var(--border)',
             borderWidth: '1px 0 0 0'
           }
         }
@@ -362,6 +423,7 @@ const NoirPreset: Preset = {
     },
     dialog: {
       root: {
+        borderColor: 'var(--border)',
         borderRadius: 'var(--ui-radius-card)'
       },
       header: {
@@ -383,7 +445,7 @@ const NoirPreset: Preset = {
         light: {
           root: {
             background: '{surface.0}',
-            borderColor: '{surface.200}',
+            borderColor: 'var(--border)',
             color: '{surface.900}',
             shadow: '{overlay.popover.shadow}'
           }
@@ -391,7 +453,7 @@ const NoirPreset: Preset = {
         dark: {
           root: {
             background: '{surface.900}',
-            borderColor: '{surface.800}',
+            borderColor: 'var(--border)',
             color: '{surface.50}',
             shadow: '{overlay.popover.shadow}'
           }
