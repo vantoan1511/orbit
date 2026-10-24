@@ -11,9 +11,9 @@ import {
   TabPanel,
   TabPanels,
   Tabs,
-  Textarea
+  Textarea,
+  useToast
 } from 'primevue'
-import { useToast } from 'primevue'
 import {
   AlertCircle,
   ChevronDown,
@@ -98,6 +98,11 @@ const showCustomization = ref(false)
 const alias = ref('')
 const selectedColor = ref<string | null>(null)
 const tags = ref<string[]>([])
+
+const getTabClass = (tab: 'file' | 'paste' | 'manual'): string =>
+  activeTab.value === tab
+    ? 'border-(--accent)! text-(--text-primary)! font-medium'
+    : 'border-transparent! text-muted-color hover:text-(--text-primary) hover:border-(--border)'
 
 // Reset state
 function resetModalState(): void {
@@ -376,23 +381,27 @@ function handleClose(): void {
     class="w-full max-w-2xl border border-(--border) bg-(--bg-card) text-(--text-primary) shadow-[var(--ui-card-shadow,none)] rounded-[var(--ui-radius-card)] overflow-hidden"
     :pt="{
       root: { class: 'p-0 overflow-hidden' },
+      mask: { class: 'bg-black/60 backdrop-blur-xs' },
       header: {
         class:
-          'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar)/60 flex items-center justify-between'
+          'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar) flex items-center justify-between'
       },
-      content: { class: 'p-5 max-h-[75vh] overflow-y-auto flex flex-col gap-6' },
+      content: { class: 'p-5 max-h-[75vh] overflow-y-auto flex flex-col gap-6 bg-(--bg-card)' },
       footer: {
         class:
-          'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar)/40 flex items-center justify-between'
+          'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar) flex items-center justify-between'
       },
       closeButton: {
         class:
-          'rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+          'w-7 h-7 p-0 text-muted-color hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
       }
     }"
     :close-button-props="{
+      severity: 'secondary',
+      variant: 'text',
+      rounded: true,
       class:
-        'rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+        'w-7 h-7 p-0 text-muted-color hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
     }"
     @update:visible="emit('update:visible', $event)"
   >
@@ -413,24 +422,27 @@ function handleClose(): void {
     <div class="flex flex-col gap-6">
       <!-- Input Mode Tabs -->
       <Tabs v-model:value="activeTab" class="w-full">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-1 flex gap-4 shrink-0">
+        <TabList class="bg-transparent! border-b! border-(--border)! px-1 flex gap-2 shrink-0">
           <Tab
             value="file"
-            class="py-2 px-2.5 text-xs font-medium cursor-pointer flex items-center gap-2 text-muted-color hover:text-(--text-primary) border-b-2 border-transparent transition-colors"
+            class="bg-transparent! py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none!"
+            :class="getTabClass('file')"
           >
             <FolderOpen class="w-3.5 h-3.5" />
             <span>Kubeconfig File</span>
           </Tab>
           <Tab
             value="paste"
-            class="py-2 px-2.5 text-xs font-medium cursor-pointer flex items-center gap-2 text-muted-color hover:text-(--text-primary) border-b-2 border-transparent transition-colors"
+            class="bg-transparent! py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none!"
+            :class="getTabClass('paste')"
           >
             <FileText class="w-3.5 h-3.5" />
             <span>Paste YAML</span>
           </Tab>
           <Tab
             value="manual"
-            class="py-2 px-2.5 text-xs font-medium cursor-pointer flex items-center gap-2 text-muted-color hover:text-(--text-primary) border-b-2 border-transparent transition-colors"
+            class="bg-transparent! py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none!"
+            :class="getTabClass('manual')"
           >
             <Globe class="w-3.5 h-3.5" />
             <span>Manual Endpoint</span>
@@ -682,7 +694,7 @@ function handleClose(): void {
 
         <div
           v-if="discoveredContexts.length === 0"
-          class="border border-(--border) rounded-[var(--ui-radius-card)] p-6 bg-(--bg-hover)/20 text-center flex flex-col items-center justify-center gap-1.5 text-muted-color"
+          class="border border-(--border) rounded-[var(--ui-radius-card)] p-6 bg-(--bg-hover)/40 text-center flex flex-col items-center justify-center gap-1.5 text-muted-color"
         >
           <Server class="w-5 h-5 opacity-40" />
           <p class="text-xs">No contexts discovered yet</p>
