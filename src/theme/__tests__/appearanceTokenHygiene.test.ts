@@ -127,6 +127,19 @@ const ADAPTED_COMPONENTS = [
   'src/components/settings/GeneralSettingsForm.vue'
 ]
 
+function collectVueFiles(dir: string): string[] {
+  const results: string[] = []
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name)
+    if (entry.isDirectory()) {
+      results.push(...collectVueFiles(fullPath))
+    } else if (entry.isFile() && entry.name.endsWith('.vue')) {
+      results.push(fullPath)
+    }
+  }
+  return results
+}
+
 test('verifies zero hardcoded semantic colors exist across adapted components and views', () => {
   const violations: Array<{ file: string; forbidden: string; line: number }> = []
 
@@ -206,4 +219,102 @@ test('verifies all resource drawers have data-component attribute', () => {
       `${file} must have a data-component attribute`
     )
   }
+})
+
+test('base.css defines all core design tokens across all 5 UI styles (flat, glass, aero, liquidglass, ios)', () => {
+  const baseCssPath = path.resolve(process.cwd(), 'src/assets/base.css')
+  const content = fs.readFileSync(baseCssPath, 'utf-8')
+
+  const requiredTokens = [
+    '--ui-radius-control',
+    '--ui-radius-card',
+    '--ui-control-bg',
+    '--ui-card-bg',
+    '--border',
+    '--ui-glass-blur',
+    '--ui-sheen-highlight'
+  ]
+
+  for (const token of requiredTokens) {
+    assert.ok(content.includes(`${token}:`), `base.css must define ${token}`)
+  }
+
+  for (const style of ['flat', 'glass', 'aero', 'liquidglass', 'ios']) {
+    assert.ok(
+      content.includes(`[data-ui-style='${style}']`) ||
+        content.includes(`[data-ui-style="${style}"]`),
+      `base.css must define [data-ui-style="${style}"] preset rules`
+    )
+  }
+})
+
+test('Stylesheets and Vue components contain zero ad-hoc .p-* CSS overrides or !important declarations', () => {
+  const cssFiles = [
+    path.resolve(process.cwd(), 'src/assets/base.css'),
+    path.resolve(process.cwd(), 'src/assets/main.css')
+  ]
+  const vueFiles = collectVueFiles(path.resolve(process.cwd(), 'src'))
+  const violations: string[] = []
+
+  const pClassOverrideRegex =
+    /\.p-(?:button|dialog|select|datatable|card|drawer|popover|inputtext|textarea|tag|inputnumber|tooltip)\b/
+
+  for (const filePath of [...cssFiles, ...vueFiles]) {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/')
+    const lines = content.split(/\r?\n/)
+
+    lines.forEach((line, idx) => {
+      if (pClassOverrideRegex.test(line)) {
+        violations.push(`${relPath}:${idx + 1}: ad-hoc PrimeVue class selector -> ${line.trim()}`)
+      }
+      if (line.includes('!important')) {
+        violations.push(`${relPath}:${idx + 1}: !important declaration -> ${line.trim()}`)
+      }
+    })
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Found ad-hoc PrimeVue CSS overrides or !important declarations:\n${violations.join('\n')}`
+  )
+})
+
+test('Vue views and components use design-token-aligned corner radius utilities and zero ! important class modifiers', () => {
+  const vueFiles = collectVueFiles(path.resolve(process.cwd(), 'src'))
+  const violations: string[] = []
+
+  const hardcodedRadiusRegex = /\brounded-(?:sm|md|lg|xl|2xl|3xl)\b/
+  const importantModifierRegex = /(?:^|\s|'|")!(?:[a-z]+-)|(?:[a-z0-9\])%-]+)!(?=\s|'|"$)/
+
+  for (const filePath of vueFiles) {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/')
+    const lines = content.split(/\r?\n/)
+
+    lines.forEach((line, idx) => {
+      const radiusMatch = line.match(hardcodedRadiusRegex)
+      if (radiusMatch) {
+        violations.push(
+          `${relPath}:${idx + 1}: hardcoded radius "${radiusMatch[0]}" -> ${line.trim()}`
+        )
+      }
+      if (
+        (line.includes('class') || line.includes("'") || line.includes('"')) &&
+        !line.includes('Copied!') &&
+        !line.includes('INVALID_SERVICE_NAME!') &&
+        !line.includes('item.route!') &&
+        importantModifierRegex.test(line)
+      ) {
+        violations.push(`${relPath}:${idx + 1}: important modifier (!) -> ${line.trim()}`)
+      }
+    })
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Found hardcoded corner-radius classes or ! modifiers in Vue files:\n${violations.slice(0, 30).join('\n')}${violations.length > 30 ? `\n...and ${violations.length - 30} more` : ''}`
+  )
 })

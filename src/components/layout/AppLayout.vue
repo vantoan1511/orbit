@@ -201,7 +201,7 @@ onUnmounted(() => {
     <Transition name="page" mode="out-in">
       <AppLoadingScreen
         v-if="k8sStore.isAppLoading"
-        class="flex-1! h-auto! w-full!"
+        class="flex-1 h-auto w-full"
         @complete="k8sStore.setAppLoading(false)"
       />
       <div v-else class="flex-1 flex flex-col overflow-hidden">

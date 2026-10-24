@@ -16,7 +16,7 @@ defineProps<{
 
     <div
       v-if="service.endpointsList.length > 0"
-      class="bg-(--bg-hover)/40 rounded-xl p-4 space-y-2"
+      class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 space-y-2"
     >
       <div
         v-for="(ep, idx) in service.endpointsList"
@@ -28,7 +28,10 @@ defineProps<{
       </div>
     </div>
 
-    <div v-else class="bg-(--bg-hover)/20 rounded-xl p-4 text-xs text-muted-color italic">
+    <div
+      v-else
+      class="bg-(--bg-hover)/20 rounded-[var(--ui-radius-card)] p-4 text-xs text-muted-color italic"
+    >
       No active endpoints detected for this service (ExternalName or selectorless service).
     </div>
   </div>

@@ -33,7 +33,7 @@ const quickStartSteps = [
     <!-- Header / Branding -->
     <div class="flex items-center gap-3.5">
       <div
-        class="w-9 h-9 rounded-lg bg-(--bg-card) border border-(--border) flex items-center justify-center shrink-0"
+        class="w-9 h-9 rounded-[var(--ui-radius-card)] bg-(--bg-card) border border-(--border) flex items-center justify-center shrink-0"
       >
         <img src="/logo.png" alt="Orbit" class="w-5 h-5 object-contain" />
       </div>
@@ -68,7 +68,7 @@ const quickStartSteps = [
 
         <!-- Tip / Note -->
         <div
-          class="p-3.5 rounded-lg bg-(--bg-hover)/30 text-xs text-muted-color flex flex-col gap-1.5"
+          class="p-3.5 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 text-xs text-muted-color flex flex-col gap-1.5"
         >
           <span class="font-medium text-primary">Already configured?</span>
           <span class="leading-relaxed">
@@ -84,7 +84,7 @@ const quickStartSteps = [
           <div
             v-for="item in quickStartSteps"
             :key="item.step"
-            class="p-3.5 rounded-lg bg-(--bg-hover)/20 hover:bg-(--bg-hover)/40 transition-colors flex flex-col gap-2"
+            class="p-3.5 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/20 hover:bg-(--bg-hover)/40 transition-colors flex flex-col gap-2"
           >
             <div class="flex items-center gap-2">
               <component :is="item.icon" class="w-4 h-4 shrink-0 text-primary" />

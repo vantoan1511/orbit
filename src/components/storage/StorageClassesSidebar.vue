@@ -120,7 +120,9 @@ watch(scCapacityData, updateChart, { immediate: true })
 <template>
   <div class="flex flex-col gap-6">
     <!-- Storage Classes Mini List -->
-    <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm">
+    <div
+      class="bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-card)] p-5 shadow-sm"
+    >
       <div
         class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
@@ -132,7 +134,7 @@ watch(scCapacityData, updateChart, { immediate: true })
         <div
           v-for="sc in storageClasses"
           :key="sc.name"
-          class="flex items-center justify-between p-2.5 rounded-lg border border-(--border) bg-(--bg-hover)/10 hover:bg-(--bg-hover)/30 transition-colors"
+          class="flex items-center justify-between p-2.5 rounded-[var(--ui-radius-card)] border border-(--border) bg-(--bg-hover)/10 hover:bg-(--bg-hover)/30 transition-colors"
         >
           <div class="min-w-0">
             <div class="text-xs font-semibold text-primary font-mono truncate">
@@ -153,7 +155,9 @@ watch(scCapacityData, updateChart, { immediate: true })
     </div>
 
     <!-- Capacity by StorageClass Donut -->
-    <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm">
+    <div
+      class="bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-card)] p-5 shadow-sm"
+    >
       <div
         class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
@@ -182,7 +186,9 @@ watch(scCapacityData, updateChart, { immediate: true })
     </div>
 
     <!-- Volume Status Grid -->
-    <div class="bg-(--bg-card) border border-(--border) rounded-xl p-5 shadow-sm">
+    <div
+      class="bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-card)] p-5 shadow-sm"
+    >
       <div
         class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
@@ -191,25 +197,33 @@ watch(scCapacityData, updateChart, { immediate: true })
       </div>
 
       <div class="grid grid-cols-2 gap-3 text-center">
-        <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
+        <div
+          class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-[var(--ui-radius-card)]"
+        >
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Bound
           </div>
           <div class="text-lg font-bold text-(--success) mt-0.5">{{ statusCounts.Bound }}</div>
         </div>
-        <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
+        <div
+          class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-[var(--ui-radius-card)]"
+        >
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Available
           </div>
           <div class="text-lg font-bold text-(--accent) mt-0.5">{{ statusCounts.Available }}</div>
         </div>
-        <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
+        <div
+          class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-[var(--ui-radius-card)]"
+        >
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Released
           </div>
           <div class="text-lg font-bold text-(--warning) mt-0.5">{{ statusCounts.Released }}</div>
         </div>
-        <div class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-lg">
+        <div
+          class="border border-(--border) bg-(--bg-hover)/10 p-2.5 rounded-[var(--ui-radius-card)]"
+        >
           <div class="text-[10px] text-muted-color font-semibold uppercase tracking-wider">
             Failed
           </div>

@@ -101,10 +101,10 @@ const toggleTag = (tag: string) => {
           size="small"
           variant="text"
           :class="[
-            'text-[11px]! font-medium h-6! px-2! rounded-full! transition-colors',
+            'text-[11px] font-medium h-6 px-2 rounded-full transition-colors',
             selectedTag === tag
-              ? 'bg-(--accent)! text-white!'
-              : 'bg-(--bg-hover)/60! text-muted-color hover:text-primary hover:bg-(--bg-hover)!'
+              ? 'bg-(--accent) text-white'
+              : 'bg-(--bg-hover)/60 text-muted-color hover:text-primary hover:bg-(--bg-hover)'
           ]"
           @click="toggleTag(tag)"
         >
@@ -114,7 +114,9 @@ const toggleTag = (tag: string) => {
     </div>
 
     <!-- Clusters DataTable (Flat single-container layout) -->
-    <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
+    <div
+      class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card)"
+    >
       <DataTable
         :value="filteredClusters"
         data-key="id"
@@ -251,7 +253,7 @@ const toggleTag = (tag: string) => {
                 variant="text"
                 severity="secondary"
                 v-tooltip.top="'Edit cluster details'"
-                class="w-7! h-7! p-0!"
+                class="w-7 h-7 p-0"
                 @click="openEditModal(data)"
               >
                 <template #icon>

@@ -31,7 +31,7 @@ test('Noir preset primary maps to dynamic primary palette rather than hardcoded 
   assert.equal(focusRing.color, '{primary.color}')
 })
 
-test('Noir preset semantic tokens map border radii to custom properties', () => {
+test('Noir preset semantic tokens map border radii, backgrounds, and borders to centralized CSS variables', () => {
   const semantic = Noir.semantic as Record<string, unknown>
   assert.ok(semantic, 'semantic tokens must exist')
 
@@ -46,92 +46,130 @@ test('Noir preset semantic tokens map border radii to custom properties', () => 
 
   const formField = semantic.formField as Record<string, string>
   assert.ok(formField, 'formField must exist')
+  assert.equal(formField.background, 'var(--ui-control-bg)')
   assert.equal(formField.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(formField.borderColor, 'var(--input-border, var(--border))')
+  assert.equal(formField.hoverBorderColor, 'var(--border-strong)')
+  assert.equal(formField.focusBorderColor, '{primary.color}')
 
   const content = semantic.content as Record<string, string>
   assert.ok(content, 'content must exist')
+  assert.equal(content.background, 'var(--ui-card-bg)')
+  assert.equal(content.hoverBackground, 'var(--bg-hover)')
   assert.equal(content.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(content.borderColor, 'var(--border)')
 
   const overlay = semantic.overlay as Record<string, Record<string, string>>
   assert.ok(overlay, 'overlay must exist')
+  assert.equal(overlay.select.background, 'var(--ui-card-bg)')
   assert.equal(overlay.select.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(overlay.select.borderColor, 'var(--border)')
+  assert.equal(overlay.popover.background, 'var(--ui-card-bg)')
   assert.equal(overlay.popover.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(overlay.popover.borderColor, 'var(--border)')
+  assert.equal(overlay.modal.background, 'var(--ui-card-bg)')
   assert.equal(overlay.modal.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(overlay.modal.borderColor, 'var(--border)')
+
+  const colorScheme = semantic.colorScheme as Record<string, Record<string, unknown>>
+  for (const mode of ['light', 'dark']) {
+    const scheme = colorScheme[mode] as Record<string, Record<string, unknown>>
+    assert.ok(scheme, `colorScheme.${mode} should exist`)
+    assert.equal(
+      (scheme.formField as Record<string, string>)?.background,
+      'var(--ui-control-bg)',
+      `colorScheme.${mode}.formField.background must map to var(--ui-control-bg)`
+    )
+    assert.equal(
+      (scheme.content as Record<string, string>)?.background,
+      'var(--ui-card-bg)',
+      `colorScheme.${mode}.content.background must map to var(--ui-card-bg)`
+    )
+    const schemeOverlay = scheme.overlay as Record<string, Record<string, string>>
+    assert.equal(schemeOverlay?.select?.background, 'var(--ui-card-bg)')
+    assert.equal(schemeOverlay?.popover?.background, 'var(--ui-card-bg)')
+    assert.equal(schemeOverlay?.modal?.background, 'var(--ui-card-bg)')
+  }
 })
 
-test('Noir preset components connect surfaces and radii to custom properties', () => {
+test('Noir preset components connect surfaces, radii, borders, glass blur, and sheen highlight to centralized CSS variables', () => {
   const components = Noir.components as Record<string, unknown>
   assert.ok(components, 'components must exist')
 
   const card = components.card as Record<string, Record<string, string>> | undefined
   assert.ok(card, 'card component config must exist')
-  assert.equal(card.root.background, 'var(--bg-card)')
+  assert.equal(card.root.background, 'var(--ui-card-bg)')
+  assert.equal(card.root.borderColor, 'var(--border)')
   assert.equal(card.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(card.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(card.root.sheenHighlight, 'var(--ui-sheen-highlight)')
+
+  const datatable = components.datatable as Record<string, Record<string, string>>
+  assert.ok(datatable, 'datatable component config must exist')
+  assert.equal(datatable.root?.borderColor, 'var(--border)')
+  assert.equal(datatable.headerCell?.borderColor, 'var(--border)')
+  assert.equal(datatable.bodyCell?.borderColor, 'var(--border)')
+  assert.equal(datatable.row?.background, 'var(--ui-card-bg)')
+  assert.equal(datatable.row?.hoverBackground, 'var(--bg-hover)')
 
   const dialog = components.dialog as Record<string, Record<string, string>>
   assert.ok(dialog, 'dialog component config must exist')
+  assert.equal(dialog.root.background, 'var(--ui-card-bg)')
+  assert.equal(dialog.root.borderColor, 'var(--border)')
   assert.equal(dialog.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(dialog.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(dialog.root.sheenHighlight, 'var(--ui-sheen-highlight)')
+
+  const drawer = components.drawer as Record<string, Record<string, string>>
+  assert.ok(drawer, 'drawer component config must exist')
+  assert.equal(drawer.root.background, 'var(--ui-card-bg)')
+  assert.equal(drawer.root.borderColor, 'var(--border)')
+  assert.equal(drawer.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(drawer.root.sheenHighlight, 'var(--ui-sheen-highlight)')
 
   const popover = components.popover as Record<string, Record<string, string>>
   assert.ok(popover, 'popover component config must exist')
+  assert.equal(popover.root.background, 'var(--ui-card-bg)')
+  assert.equal(popover.root.borderColor, 'var(--border)')
   assert.equal(popover.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(popover.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(popover.root.sheenHighlight, 'var(--ui-sheen-highlight)')
 
   const button = components.button as Record<string, Record<string, string>>
   assert.ok(button, 'button component config must exist')
   assert.equal(button.root.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(button.root.sheenHighlight, 'var(--ui-sheen-highlight)')
 
   const select = components.select as Record<string, Record<string, string>>
   assert.ok(select, 'select component config must exist')
+  assert.equal(select.root.background, 'var(--ui-control-bg)')
   assert.equal(select.root.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(select.overlay.background, 'var(--ui-card-bg)')
+  assert.equal(select.overlay.borderColor, 'var(--border)')
+  assert.equal(select.overlay.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(select.overlay.backdropBlur, 'var(--ui-glass-blur)')
 
   const inputtext = components.inputtext as Record<string, Record<string, string>>
   assert.ok(inputtext, 'inputtext component config must exist')
+  assert.equal(inputtext.root.background, 'var(--ui-control-bg)')
   assert.equal(inputtext.root.borderRadius, 'var(--ui-radius-control)')
 
   const textarea = components.textarea as Record<string, Record<string, string>>
   assert.ok(textarea, 'textarea component config must exist')
+  assert.equal(textarea.root.background, 'var(--ui-control-bg)')
   assert.equal(textarea.root.borderRadius, 'var(--ui-radius-control)')
 
   const tag = components.tag as Record<string, Record<string, string>>
   assert.ok(tag, 'tag component config must exist')
   assert.equal(tag.root.borderRadius, 'var(--ui-radius-control)')
-})
 
-test('Noir preset semantic tokens map border colors to CSS custom properties', () => {
-  const semantic = Noir.semantic as Record<string, unknown>
-  assert.ok(semantic, 'semantic tokens must exist')
+  const toast = components.toast as Record<string, Record<string, string>>
+  assert.ok(toast, 'toast component config must exist')
+  assert.equal(toast.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(toast.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(toast.root.sheenHighlight, 'var(--ui-sheen-highlight)')
 
-  const content = semantic.content as Record<string, string>
-  assert.equal(content.borderColor, 'var(--border)')
-
-  const formField = semantic.formField as Record<string, string>
-  assert.equal(formField.borderColor, 'var(--input-border, var(--border))')
-  assert.equal(formField.hoverBorderColor, 'var(--border-strong)')
-  assert.equal(formField.focusBorderColor, '{primary.color}')
-
-  const overlay = semantic.overlay as Record<string, Record<string, string>>
-  assert.equal(overlay.select.borderColor, 'var(--border)')
-  assert.equal(overlay.popover.borderColor, 'var(--border)')
-  assert.equal(overlay.modal.borderColor, 'var(--border)')
-})
-
-test('Noir preset components connect border colors to custom properties', () => {
-  const components = Noir.components as Record<string, unknown>
-  assert.ok(components, 'components must exist')
-
-  const card = components.card as Record<string, Record<string, string>>
-  assert.equal(card?.root?.borderColor, 'var(--border)')
-
-  const datatable = components.datatable as Record<string, Record<string, string>>
-  assert.equal(datatable?.headerCell?.borderColor, 'var(--border)')
-  assert.equal(datatable?.bodyCell?.borderColor, 'var(--border)')
-
-  const dialog = components.dialog as Record<string, Record<string, string>>
-  assert.equal(dialog?.root?.borderColor, 'var(--border)')
-
-  const popover = components.popover as Record<string, Record<string, string>>
-  assert.equal(popover?.root?.borderColor, 'var(--border)')
-
-  const drawer = components.drawer as Record<string, Record<string, string>>
-  assert.equal(drawer?.root?.borderColor, 'var(--border)')
+  const tooltip = components.tooltip as Record<string, Record<string, string>>
+  assert.ok(tooltip, 'tooltip component config must exist')
+  assert.equal(tooltip.root.borderRadius, 'var(--ui-radius-control)')
 })

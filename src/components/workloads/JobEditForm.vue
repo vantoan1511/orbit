@@ -441,7 +441,9 @@ const handleFieldChange = () => {
                 </div>
               </div>
 
-              <div class="flex items-center justify-between p-4 rounded-lg bg-(--bg-hover)/30">
+              <div
+                class="flex items-center justify-between p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
+              >
                 <div class="flex flex-col gap-0.5">
                   <span class="text-xs font-medium text-primary">Suspend Job</span>
                   <span class="text-[11px] text-muted-color">
@@ -502,7 +504,7 @@ const handleFieldChange = () => {
 
               <div
                 v-if="completionMode === KUBERNETES_JOB_COMPLETION_MODE.Indexed"
-                class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-lg bg-(--bg-hover)/20"
+                class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/20"
               >
                 <div class="flex flex-col gap-1.5">
                   <label class="text-xs font-medium text-muted-color">
@@ -579,7 +581,9 @@ const handleFieldChange = () => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="jobLabels"
                   title="Job Labels"
@@ -587,7 +591,9 @@ const handleFieldChange = () => {
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="jobAnnotations"
                   title="Job Annotations"
@@ -609,7 +615,9 @@ const handleFieldChange = () => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podLabels"
                   title="Pod Labels"
@@ -617,7 +625,9 @@ const handleFieldChange = () => {
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podAnnotations"
                   title="Pod Annotations"
@@ -715,7 +725,7 @@ const handleFieldChange = () => {
             </div>
             <div class="md:col-span-8 flex flex-col gap-3">
               <div
-                class="flex items-center justify-between p-3.5 rounded-lg bg-(--bg-hover)/30 text-xs"
+                class="flex items-center justify-between p-3.5 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 text-xs"
               >
                 <div>
                   <div class="font-medium text-primary">Host Network</div>
@@ -727,7 +737,7 @@ const handleFieldChange = () => {
               </div>
 
               <div
-                class="flex items-center justify-between p-3.5 rounded-lg bg-(--bg-hover)/30 text-xs"
+                class="flex items-center justify-between p-3.5 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 text-xs"
               >
                 <div>
                   <div class="font-medium text-primary">Host PID</div>
@@ -739,7 +749,7 @@ const handleFieldChange = () => {
               </div>
 
               <div
-                class="flex items-center justify-between p-3.5 rounded-lg bg-(--bg-hover)/30 text-xs"
+                class="flex items-center justify-between p-3.5 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 text-xs"
               >
                 <div>
                   <div class="font-medium text-primary">Host IPC</div>
@@ -763,7 +773,9 @@ const handleFieldChange = () => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-3">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="nodeSelector"
                   title="Node Selector Labels"
@@ -902,7 +914,9 @@ const handleFieldChange = () => {
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-4">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.command"
                     title="Commands"
@@ -911,7 +925,9 @@ const handleFieldChange = () => {
                     @update:model-value="handleFieldChange"
                   />
                 </div>
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.args"
                     title="Arguments"
@@ -934,7 +950,9 @@ const handleFieldChange = () => {
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <ContainerEnvEditor
                     v-model="currentContainer.environments"
                     :namespace="jobNamespace"
@@ -955,7 +973,7 @@ const handleFieldChange = () => {
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+                <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30">
                   <ContainerPortsEditor
                     v-model="currentContainer.ports"
                     @update:model-value="handleFieldChange"

@@ -45,7 +45,7 @@ const emit = defineEmits<{
     data-component="resource-drawer"
     :visible="props.visible"
     position="right"
-    class="w-160! bg-(--bg-card)! border-l! border-(--border)!"
+    class="w-160 bg-(--bg-card) border-l border-(--border)"
     :dismissable="true"
     @update:visible="emit('update:visible', $event)"
   >
@@ -108,8 +108,8 @@ const emit = defineEmits<{
     <!-- Main Content Body -->
     <div v-if="props.hasResource" class="flex flex-col h-full">
       <Tabs v-model:value="activeTab" class="flex flex-col flex-1 min-h-0">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-2">
-          <Tab value="overview" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+        <TabList class="bg-transparent border-b border-(--border) px-2">
+          <Tab value="overview" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
             <Server class="w-3.5 h-3.5" />
             <span>Overview</span>
           </Tab>
@@ -119,14 +119,14 @@ const emit = defineEmits<{
           <Tab
             v-if="props.showYamlTab"
             value="yaml"
-            class="text-xs! flex items-center gap-1.5 py-2.5 px-3"
+            class="text-xs flex items-center gap-1.5 py-2.5 px-3"
           >
             <FileCode class="w-3.5 h-3.5" />
             <span>YAML</span>
           </Tab>
         </TabList>
 
-        <TabPanels class="flex-1 overflow-y-auto p-6! bg-transparent!">
+        <TabPanels class="flex-1 overflow-y-auto p-6 bg-transparent">
           <TabPanel value="overview">
             <slot name="overview">
               <slot></slot>

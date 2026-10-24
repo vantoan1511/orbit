@@ -199,11 +199,11 @@ const viewPodLogs = (containerName?: string) => {
 
     <!-- Extra Tabs -->
     <template #extra-tabs>
-      <Tab value="containers" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="containers" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Shield class="w-3.5 h-3.5" />
         <span>Containers ({{ pod?.containers?.length || 0 }})</span>
       </Tab>
-      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="events" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Activity class="w-3.5 h-3.5" />
         <span>Events ({{ podEvents.length }})</span>
       </Tab>

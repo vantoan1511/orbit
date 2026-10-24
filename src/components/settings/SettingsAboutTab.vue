@@ -38,7 +38,7 @@ onMounted(async () => {
       <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-6">
         <div class="flex items-center gap-4">
           <div
-            class="w-12 h-12 bg-(--bg-hover)/60 rounded-xl flex items-center justify-center border border-(--border)"
+            class="w-12 h-12 bg-(--bg-hover)/60 rounded-[var(--ui-radius-card)] flex items-center justify-center border border-(--border)"
           >
             <!-- Orbit Logo -->
             <Compass class="w-6 h-6 text-primary" />
@@ -115,7 +115,7 @@ onMounted(async () => {
         <!-- Show apply actions if ready but not applied -->
         <div
           v-if="!updaterStore.isDownloading && updaterStore.hasUpdate"
-          class="p-4 bg-(--info-soft) rounded-lg flex items-start gap-3 border border-(--info-soft)"
+          class="p-4 bg-(--info-soft) rounded-[var(--ui-radius-card)] flex items-start gap-3 border border-(--info-soft)"
         >
           <Info class="w-4 h-4 text-(--info) mt-0.5 shrink-0" />
           <div class="flex flex-col gap-2">

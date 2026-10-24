@@ -350,12 +350,12 @@ const copyYaml = async () => {
 
     <!-- Extra Tabs -->
     <template #extra-tabs>
-      <Tab value="pods" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="pods" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Layers class="w-3.5 h-3.5" />
         <span>Pods ({{ workloadPods.length }})</span>
       </Tab>
 
-      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="events" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Activity class="w-3.5 h-3.5" />
         <span>Events ({{ workloadEvents.length }})</span>
       </Tab>

@@ -74,7 +74,7 @@ const segments = computed<TextSegment[]>(() => {
     <template v-for="(segment, idx) in segments" :key="idx">
       <mark
         v-if="segment.isMatch"
-        class="bg-(--accent-soft) text-(--accent) font-bold rounded-sm px-0.5"
+        class="bg-(--accent-soft) text-(--accent) font-bold rounded-[var(--ui-radius-control)] px-0.5"
         >{{ segment.text }}</mark
       >
       <template v-else>{{ segment.text }}</template>

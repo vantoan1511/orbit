@@ -10,7 +10,7 @@ const emit = defineEmits<{
 <template>
   <div class="flex flex-col items-center justify-center min-h-[60vh] select-none text-center px-4">
     <div
-      class="flex items-center justify-center w-16 h-16 rounded-2xl bg-(--bg-card) border border-(--border) mb-4 text-muted-color shadow-sm"
+      class="flex items-center justify-center w-16 h-16 rounded-[var(--ui-radius-card)] bg-(--bg-card) border border-(--border) mb-4 text-muted-color shadow-sm"
     >
       <Boxes class="w-8 h-8 text-muted-color/80" />
     </div>
@@ -24,7 +24,7 @@ const emit = defineEmits<{
       <Button
         severity="primary"
         size="small"
-        class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md shadow-xs cursor-pointer"
+        class="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-[var(--ui-radius-control)] shadow-xs cursor-pointer"
         v-tooltip.bottom="'Open resource picker'"
         @click="emit('open-picker', $event)"
       >

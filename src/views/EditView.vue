@@ -235,7 +235,7 @@ watch(
   <div class="flex flex-col h-[calc(100vh-8rem)]">
     <!-- Control Bar (Tone Shift) -->
     <div
-      class="flex items-center justify-between px-4 py-3 rounded-lg bg-(--bg-hover)/40 shrink-0 mb-6"
+      class="flex items-center justify-between px-4 py-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 shrink-0 mb-6"
     >
       <div class="flex items-center gap-3">
         <Button
@@ -346,10 +346,14 @@ watch(
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor v-model="formValues.labels" title="Labels" add-label="Add Label" />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="formValues.annotations"
                   title="Annotations"

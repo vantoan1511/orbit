@@ -39,7 +39,7 @@ defineProps<{
           :key="item.uid || index"
           class="py-3 flex items-start gap-3.5 first:pt-0 last:pb-0"
         >
-          <div class="p-2 rounded-lg mt-0.5 shrink-0" :class="item.iconClass">
+          <div class="p-2 rounded-[var(--ui-radius-card)] mt-0.5 shrink-0" :class="item.iconClass">
             <component :is="item.icon" class="w-4 h-4" />
           </div>
           <div class="flex-1 min-w-0">

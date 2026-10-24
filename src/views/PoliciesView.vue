@@ -26,7 +26,7 @@ const tabs: ResourceTab[] = [
     <!-- Other Tabs (Placeholder logic) -->
     <template #tab-network>
       <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
       >
         Network Policies specific view coming soon.
       </div>
@@ -34,7 +34,7 @@ const tabs: ResourceTab[] = [
 
     <template #tab-pod-security>
       <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
       >
         Pod Security specific view coming soon.
       </div>
@@ -42,7 +42,7 @@ const tabs: ResourceTab[] = [
 
     <template #tab-resource>
       <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
       >
         Resource Policies specific view coming soon.
       </div>
@@ -50,7 +50,7 @@ const tabs: ResourceTab[] = [
 
     <template #tab-rbac>
       <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
       >
         RBAC specific view coming soon.
       </div>
@@ -58,7 +58,7 @@ const tabs: ResourceTab[] = [
 
     <template #tab-admission>
       <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-xl border-dashed"
+        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
       >
         Admission Policies specific view coming soon.
       </div>

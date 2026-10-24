@@ -110,7 +110,7 @@ const formatRelativeTime = (timestamp: number): string => {
             size="small"
             variant="text"
             severity="secondary"
-            class="text-xs font-medium h-7! px-2!"
+            class="text-xs font-medium h-7 px-2"
             :disabled="notificationStore.unreadCount === 0"
             @click="notificationStore.markAllAsRead"
           >
@@ -122,7 +122,7 @@ const formatRelativeTime = (timestamp: number): string => {
             size="small"
             variant="text"
             severity="danger"
-            class="text-xs font-medium h-7! px-2!"
+            class="text-xs font-medium h-7 px-2"
             :disabled="notificationStore.notifications.length === 0"
             @click="notificationStore.clearAll"
           >
@@ -164,7 +164,7 @@ const formatRelativeTime = (timestamp: number): string => {
               <div
                 v-for="item in filteredNotifications"
                 :key="item.id"
-                class="group relative flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer select-none"
+                class="group relative flex items-start gap-3 p-3 rounded-[var(--ui-radius-card)] transition-colors cursor-pointer select-none"
                 :class="[
                   item.read ? 'hover:bg-(--bg-hover)' : 'bg-(--bg-hover)/60 hover:bg-(--bg-hover)'
                 ]"
@@ -200,8 +200,8 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5! h-5! p-0! text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
-                        :class="{ 'opacity-100! text-(--success)!': copiedMap[item.id] }"
+                        class="w-5 h-5 p-0 text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex items-center justify-center"
+                        :class="{ 'opacity-100 text-(--success)': copiedMap[item.id] }"
                         v-tooltip="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
                         @click.stop="copyNotification(item)"
                       >
@@ -212,7 +212,7 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5! h-5! p-0! text-muted-color hover:text-(--danger) opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
+                        class="w-5 h-5 p-0 text-muted-color hover:text-(--danger) opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex items-center justify-center"
                         @click.stop="notificationStore.removeNotification(item.id)"
                       >
                         <X class="w-3 h-3" />
@@ -244,7 +244,7 @@ const formatRelativeTime = (timestamp: number): string => {
               <div
                 v-for="item in filteredNotifications"
                 :key="item.id"
-                class="group relative flex items-start gap-3 p-3 rounded-lg transition-colors cursor-pointer select-none bg-(--bg-hover)/60 hover:bg-(--bg-hover)"
+                class="group relative flex items-start gap-3 p-3 rounded-[var(--ui-radius-card)] transition-colors cursor-pointer select-none bg-(--bg-hover)/60 hover:bg-(--bg-hover)"
                 @click="notificationStore.markAsRead(item.id)"
               >
                 <!-- Severity Icon Badge -->
@@ -276,8 +276,8 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5! h-5! p-0! text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
-                        :class="{ 'opacity-100! text-(--success)!': copiedMap[item.id] }"
+                        class="w-5 h-5 p-0 text-muted-color hover:text-primary opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex items-center justify-center"
+                        :class="{ 'opacity-100 text-(--success)': copiedMap[item.id] }"
                         v-tooltip="copiedMap[item.id] ? 'Copied' : 'Copy to clipboard'"
                         @click.stop="copyNotification(item)"
                       >
@@ -288,7 +288,7 @@ const formatRelativeTime = (timestamp: number): string => {
                         variant="text"
                         rounded
                         size="small"
-                        class="w-5! h-5! p-0! text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex! items-center! justify-center!"
+                        class="w-5 h-5 p-0 text-muted-color hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex items-center justify-center"
                         @click.stop="notificationStore.removeNotification(item.id)"
                       >
                         <X class="w-3 h-3" />

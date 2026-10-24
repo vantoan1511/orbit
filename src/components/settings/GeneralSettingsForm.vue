@@ -167,7 +167,7 @@ const formatArrayValue = (val: unknown): string => {
               severity="secondary"
               variant="text"
               rounded
-              class="w-7 h-7 p-0! shrink-0"
+              class="w-7 h-7 p-0 shrink-0"
               :disabled="!config.enable || settingsStore.isSaving"
               @click="handleReset(config)"
             >
@@ -209,7 +209,7 @@ const formatArrayValue = (val: unknown): string => {
             severity="secondary"
             variant="text"
             rounded
-            class="w-7 h-7 p-0! shrink-0"
+            class="w-7 h-7 p-0 shrink-0"
             :disabled="!config.enable || settingsStore.isSaving"
             @click="handleReset(config)"
           >
@@ -242,7 +242,7 @@ const formatArrayValue = (val: unknown): string => {
               severity="secondary"
               variant="text"
               rounded
-              class="w-7 h-7 p-0! shrink-0 self-center"
+              class="w-7 h-7 p-0 shrink-0 self-center"
               :disabled="!config.enable || settingsStore.isSaving"
               @click="handleReset(config)"
             >
@@ -277,7 +277,7 @@ const formatArrayValue = (val: unknown): string => {
               severity="secondary"
               variant="text"
               rounded
-              class="w-7 h-7 p-0! shrink-0"
+              class="w-7 h-7 p-0 shrink-0"
               :disabled="!config.enable || settingsStore.isSaving"
               @click="handleReset(config)"
             >
@@ -301,7 +301,7 @@ const formatArrayValue = (val: unknown): string => {
             severity="secondary"
             variant="text"
             rounded
-            class="w-7 h-7 p-0! shrink-0"
+            class="w-7 h-7 p-0 shrink-0"
             :disabled="!config.enable || settingsStore.isSaving"
             @click="handleReset(config)"
           >

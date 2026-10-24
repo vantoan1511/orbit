@@ -123,7 +123,7 @@ defineExpose({
         <div
           v-for="item in filteredResources"
           :key="item.key"
-          class="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-(--bg-hover) text-xs cursor-pointer transition-colors group"
+          class="flex items-center justify-between px-2.5 py-1.5 rounded-[var(--ui-radius-control)] hover:bg-(--bg-hover) text-xs cursor-pointer transition-colors group"
           @click="handleSelect(item)"
         >
           <div class="flex items-center gap-2 min-w-0">

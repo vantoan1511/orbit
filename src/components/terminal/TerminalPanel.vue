@@ -139,7 +139,7 @@ function handleToggleMaximize() {
           <Button
             variant="text"
             size="small"
-            class="w-4! h-4! p-0! shrink-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)! transition-opacity"
+            class="w-4 h-4 p-0 shrink-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover) transition-opacity"
             :class="
               session.id === terminalStore.activeSessionId
                 ? 'opacity-100'
@@ -158,7 +158,7 @@ function handleToggleMaximize() {
         <Button
           variant="text"
           size="small"
-          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover) shrink-0 ml-1"
+          class="w-7 h-7 p-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover) shrink-0 ml-1"
           v-tooltip.top="'New Terminal'"
           @click="handleNewLocalTerminal"
         >
@@ -173,7 +173,7 @@ function handleToggleMaximize() {
         <Button
           variant="text"
           size="small"
-          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
+          class="w-7 h-7 p-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
           v-tooltip.top="isMaximized ? 'Restore Terminal' : 'Maximize Terminal'"
           @click="handleToggleMaximize"
         >
@@ -185,7 +185,7 @@ function handleToggleMaximize() {
         <Button
           variant="text"
           size="small"
-          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
+          class="w-7 h-7 p-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
           v-tooltip.top="'Minimize Panel'"
           @click="terminalStore.closePanel()"
         >
@@ -196,7 +196,7 @@ function handleToggleMaximize() {
         <Button
           variant="text"
           size="small"
-          class="w-7! h-7! p-0! rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
+          class="w-7 h-7 p-0 rounded-none text-muted-color hover:text-primary hover:bg-(--bg-hover)"
           v-tooltip.top="'Close Terminal'"
           @click="terminalStore.closePanel()"
         >

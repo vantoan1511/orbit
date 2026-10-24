@@ -102,7 +102,7 @@ ${Object.entries(res.data)
   >
     <!-- Extra Tabs -->
     <template #extra-tabs>
-      <Tab value="data" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="data" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Shield class="w-3.5 h-3.5" />
         <span>Data</span>
       </Tab>
@@ -114,7 +114,9 @@ ${Object.entries(res.data)
         <!-- General Section -->
         <div>
           <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">General</h3>
-          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+          <div
+            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-3 text-xs font-ui"
+          >
             <div class="grid grid-cols-3">
               <div class="text-xs text-muted-color font-medium">Namespace</div>
               <div class="col-span-2 text-xs text-primary font-mono">
@@ -154,7 +156,9 @@ ${Object.entries(res.data)
         <!-- Details Section -->
         <div>
           <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider mb-3">Details</h3>
-          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+          <div
+            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-3 text-xs font-ui"
+          >
             <div class="grid grid-cols-3">
               <div class="text-xs text-muted-color font-medium">Data Keys</div>
               <div class="col-span-2 text-xs text-primary">
@@ -194,11 +198,11 @@ ${Object.entries(res.data)
               <span class="text-[10px]">&rarr;</span>
             </a>
           </div>
-          <div class="bg-(--bg-hover)/40 rounded-xl p-3 flex flex-col gap-2">
+          <div class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3 flex flex-col gap-2">
             <div
               v-for="pod in props.resource.usedBy"
               :key="pod.name"
-              class="flex items-center justify-between p-2.5 rounded-lg bg-(--bg-card)"
+              class="flex items-center justify-between p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-card)"
             >
               <div class="flex items-center gap-2">
                 <TagIcon class="w-3.5 h-3.5 text-violet-400" />
@@ -230,7 +234,7 @@ ${Object.entries(res.data)
           <div
             v-for="(value, key) in props.resource?.data || {}"
             :key="key"
-            class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-2"
+            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-2"
           >
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold font-mono text-violet-400">{{ key }}</span>
@@ -240,7 +244,7 @@ ${Object.entries(res.data)
                 severity="secondary"
                 variant="text"
                 size="small"
-                class="p-1! h-auto!"
+                class="p-1 h-auto"
                 title="Toggle visibility"
                 @click="toggleRevealKey(key)"
               >
@@ -250,7 +254,7 @@ ${Object.entries(res.data)
             </div>
 
             <pre
-              class="text-xs font-mono p-3 rounded-lg bg-(--bg-card) overflow-x-auto whitespace-pre-wrap break-all select-all text-primary"
+              class="text-xs font-mono p-3 rounded-[var(--ui-radius-card)] bg-(--bg-card) overflow-x-auto whitespace-pre-wrap break-all select-all text-primary"
               >{{
                 props.resource && isSecret(props.resource)
                   ? revealedKeys[key]
@@ -267,7 +271,7 @@ ${Object.entries(res.data)
     <template #yaml>
       <pre
         v-if="props.resource"
-        class="text-xs font-mono p-4 rounded-xl bg-(--bg-card) text-primary overflow-x-auto whitespace-pre select-all"
+        class="text-xs font-mono p-4 rounded-[var(--ui-radius-card)] bg-(--bg-card) text-primary overflow-x-auto whitespace-pre select-all"
         >{{ generateYaml(props.resource) }}</pre>
     </template>
   </BaseResourceDrawer>

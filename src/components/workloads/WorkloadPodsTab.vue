@@ -4,6 +4,7 @@ import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import { getPodStatusBadgeClass as defaultGetStatusBadgeClass } from '@/utils/severity'
 import { Info, Terminal } from '@lucide/vue'
 import Button from 'primevue/button'
+import vTooltip from 'primevue/tooltip'
 
 withDefaults(
   defineProps<{
@@ -30,7 +31,7 @@ const emit = defineEmits<{
         <div
           v-for="pod in pods"
           :key="pod.name"
-          class="flex items-center justify-between p-3.5 bg-(--bg-hover)/40 rounded-xl hover:bg-(--bg-hover)/60 transition-colors"
+          class="flex items-center justify-between p-3.5 bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] hover:bg-(--bg-hover)/60 transition-colors"
         >
           <div class="flex items-center gap-3 min-w-0">
             <span
@@ -39,8 +40,8 @@ const emit = defineEmits<{
             ></span>
             <div class="min-w-0">
               <span
+                v-tooltip.top="pod.name"
                 class="text-xs font-semibold text-primary font-mono truncate block"
-                :title="pod.name"
               >
                 {{ pod.name }}
               </span>
@@ -54,14 +55,17 @@ const emit = defineEmits<{
           </div>
 
           <Button
+            v-tooltip.top="'View Logs'"
             severity="secondary"
             size="small"
             variant="text"
+            aria-label="View Logs"
             class="text-xs shrink-0"
-            title="View Logs"
             @click="emit('view-pod-logs', pod.name)"
           >
-            <Terminal class="w-3.5 h-3.5" />
+            <template #icon>
+              <Terminal class="w-3.5 h-3.5" />
+            </template>
           </Button>
         </div>
       </template>

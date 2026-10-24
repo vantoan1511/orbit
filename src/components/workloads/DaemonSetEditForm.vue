@@ -344,7 +344,7 @@ const emitUpdate = () => {
               <!-- Rolling Update Configuration -->
               <div
                 v-if="strategyType === KUBERNETES_DAEMONSET_UPDATE_STRATEGY.RollingUpdate"
-                class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-lg bg-(--bg-hover)/30"
+                class="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
               >
                 <div class="flex flex-col gap-1.5">
                   <label class="text-xs font-medium text-muted-color">Max Unavailable</label>
@@ -456,7 +456,9 @@ const emitUpdate = () => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="daemonSetLabels"
                   title="DaemonSet Labels"
@@ -464,7 +466,9 @@ const emitUpdate = () => {
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="daemonSetAnnotations"
                   title="DaemonSet Annotations"
@@ -486,7 +490,9 @@ const emitUpdate = () => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podLabels"
                   title="Pod Template Labels"
@@ -494,7 +500,9 @@ const emitUpdate = () => {
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podAnnotations"
                   title="Pod Template Annotations"
@@ -575,7 +583,9 @@ const emitUpdate = () => {
             </div>
             <div class="md:col-span-8 flex flex-col gap-4">
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div class="flex items-center justify-between p-3 rounded-lg bg-(--bg-hover)/30">
+                <div
+                  class="flex items-center justify-between p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
+                >
                   <div class="flex flex-col">
                     <span class="text-xs font-medium text-primary">Host Network</span>
                     <span class="text-[11px] text-muted-color">Use node network namespace</span>
@@ -583,7 +593,9 @@ const emitUpdate = () => {
                   <ToggleSwitch v-model="hostNetwork" @change="handleFieldChange" />
                 </div>
 
-                <div class="flex items-center justify-between p-3 rounded-lg bg-(--bg-hover)/30">
+                <div
+                  class="flex items-center justify-between p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
+                >
                   <div class="flex flex-col">
                     <span class="text-xs font-medium text-primary">Host PID</span>
                     <span class="text-[11px] text-muted-color">Use node process namespace</span>
@@ -591,7 +603,9 @@ const emitUpdate = () => {
                   <ToggleSwitch v-model="hostPID" @change="handleFieldChange" />
                 </div>
 
-                <div class="flex items-center justify-between p-3 rounded-lg bg-(--bg-hover)/30">
+                <div
+                  class="flex items-center justify-between p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
+                >
                   <div class="flex flex-col">
                     <span class="text-xs font-medium text-primary">Host IPC</span>
                     <span class="text-[11px] text-muted-color">Use node IPC namespace</span>
@@ -625,7 +639,9 @@ const emitUpdate = () => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-3">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="nodeSelector"
                   title="Node Selector Labels"
@@ -763,7 +779,9 @@ const emitUpdate = () => {
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-4">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.command"
                     title="Command"
@@ -773,7 +791,9 @@ const emitUpdate = () => {
                   />
                 </div>
 
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.args"
                     title="Args"
@@ -796,7 +816,9 @@ const emitUpdate = () => {
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <ContainerEnvEditor
                     v-model="currentContainer.environments"
                     :namespace="daemonSetNamespace"
@@ -817,7 +839,7 @@ const emitUpdate = () => {
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+                <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30">
                   <ContainerPortsEditor
                     v-model="currentContainer.ports"
                     @update:model-value="handleFieldChange"

@@ -486,7 +486,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="statefulSetLabels"
                   title="StatefulSet Labels"
@@ -494,7 +496,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="statefulSetAnnotations"
                   title="StatefulSet Annotations"
@@ -516,7 +520,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podLabels"
                   title="Pod Template Labels"
@@ -524,7 +530,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podAnnotations"
                   title="Pod Template Annotations"
@@ -604,7 +612,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-3">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+              <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30">
                 <KeyValueEditor
                   v-model="nodeSelector"
                   title="Node Selector"
@@ -739,7 +747,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-4">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.command"
                     title="Command"
@@ -749,7 +759,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   />
                 </div>
 
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.args"
                     title="Args"
@@ -772,7 +784,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <ContainerEnvEditor
                     v-model="currentContainer.environments"
                     :namespace="statefulSetNamespace"
@@ -793,7 +807,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+                <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30">
                   <ContainerPortsEditor
                     v-model="currentContainer.ports"
                     @update:model-value="handleFieldChange"
@@ -819,7 +833,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             <div class="md:col-span-8 flex flex-col gap-4">
               <div
                 v-if="formattedVolumeClaims.length === 0"
-                class="p-6 rounded-lg bg-(--bg-hover)/20 flex items-center justify-center text-xs text-muted-color"
+                class="p-6 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/20 flex items-center justify-center text-xs text-muted-color"
               >
                 No Volume Claim Templates defined for this StatefulSet.
               </div>
@@ -827,7 +841,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <div
                   v-for="(pvc, idx) in formattedVolumeClaims"
                   :key="'pvc-' + idx"
-                  class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3 border border-(--border)/40"
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3 border border-(--border)/40"
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -858,7 +872,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               <!-- PVC Retention Policy -->
               <div
                 v-if="pvcRetentionPolicy"
-                class="p-4 rounded-lg bg-(--bg-hover)/20 flex flex-col gap-2 text-xs mt-2"
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/20 flex flex-col gap-2 text-xs mt-2"
               >
                 <span class="font-semibold text-muted-color uppercase tracking-wider text-[11px]">
                   PVC Retention Policy

@@ -20,7 +20,7 @@ defineProps<{
       <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-3">
         General Configuration
       </h3>
-      <div class="bg-(--bg-hover)/40 rounded-xl p-4 text-xs space-y-4">
+      <div class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 text-xs space-y-4">
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1">
             <span class="text-muted-color font-medium">Namespace</span>

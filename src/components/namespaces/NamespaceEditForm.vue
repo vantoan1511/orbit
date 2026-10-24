@@ -145,7 +145,7 @@ const handleFieldChange = () => {
         </p>
       </div>
       <div class="md:col-span-8 flex flex-col gap-6">
-        <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+        <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3">
           <StringListEditor
             v-model="finalizers"
             title="Finalizers"
@@ -168,7 +168,7 @@ const handleFieldChange = () => {
         </p>
       </div>
       <div class="md:col-span-8 flex flex-col gap-6">
-        <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+        <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3">
           <KeyValueEditor
             v-model="labels"
             title="Namespace Labels"
@@ -176,7 +176,7 @@ const handleFieldChange = () => {
             @update:model-value="handleFieldChange"
           />
         </div>
-        <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+        <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3">
           <KeyValueEditor
             v-model="annotations"
             title="Namespace Annotations"

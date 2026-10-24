@@ -91,7 +91,7 @@ const updateItem = (index: number, val: string) => {
           variant="text"
           severity="danger"
           size="small"
-          class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
+          class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
           @click="removeItem(idx)"
         >
           <template #icon>

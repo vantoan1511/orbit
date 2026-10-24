@@ -164,7 +164,7 @@ const isIndeterminate = computed(() => {
     <!-- Bulk Actions Toolbar -->
     <div
       v-if="selection && selection.length > 0"
-      class="flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-lg px-3 py-2 min-h-[42px]"
+      class="flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-[var(--ui-radius-card)] px-3 py-2 min-h-[42px]"
     >
       <div class="flex items-center gap-3">
         <span class="text-xs font-semibold text-primary"> {{ selection.length }} selected </span>
@@ -173,7 +173,7 @@ const isIndeterminate = computed(() => {
           severity="secondary"
           variant="text"
           size="small"
-          class="p-1! h-6! w-6!"
+          class="p-1 h-6 w-6"
           @click="selection = []"
         >
           <template #icon>
@@ -234,7 +234,7 @@ const isIndeterminate = computed(() => {
             severity="secondary"
             variant="text"
             size="small"
-            class="p-1! w-7! h-7!"
+            class="p-1 w-7 h-7"
             @click="emit('refresh')"
             :loading="loading"
           >
@@ -248,14 +248,14 @@ const isIndeterminate = computed(() => {
             severity="secondary"
             variant="text"
             size="small"
-            class="p-1! w-7! h-7!"
+            class="p-1 w-7 h-7"
             @click="toggleConfig"
           >
             <template #icon>
               <Settings2 class="w-4 h-4 text-muted-color" />
             </template>
           </Button>
-          <Popover ref="configPopover" :pt="{ content: 'p-0!' }">
+          <Popover ref="configPopover" :pt="{ content: 'p-0' }">
             <div class="flex flex-col min-w-52 text-primary">
               <div
                 class="flex items-center gap-2 px-3 py-2 border-b border-(--border) hover:bg-(--bg-hover) cursor-pointer"
@@ -302,7 +302,9 @@ const isIndeterminate = computed(() => {
     </div>
 
     <!-- Table Container -->
-    <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
+    <div
+      class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card)"
+    >
       <!-- Loading Skeleton or Data Table -->
       <slot name="loading" v-if="loading">
         <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />

@@ -1,18 +1,100 @@
 import { definePreset } from '@primeuix/themes'
-
 import Nora from '@primeuix/themes/nora'
-import type { Preset } from '@primeuix/themes/types'
 
 declare module '@primeuix/themes/types/card' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace CardTokenSections {
     interface Root {
       borderColor?: string
+      backdropBlur?: string
+      sheenHighlight?: string
     }
   }
 }
 
-const NoirPreset: Preset = {
+declare module '@primeuix/themes/types/datatable' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace DataTableTokenSections {
+    interface Root {
+      borderColor?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/button' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace ButtonTokenSections {
+    interface Root {
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/dialog' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace DialogTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/drawer' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace DrawerTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/popover' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace PopoverTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/select' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace SelectTokenSections {
+    interface Overlay {
+      backdropBlur?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/toast' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace ToastTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+export const Noir = definePreset(Nora, {
+  primitive: {
+    primary: {
+      50: '#eef4ff',
+      100: '#d9e6ff',
+      200: '#bcd4ff',
+      300: '#8eb8ff',
+      400: '#6aa8ff',
+      500: '#4f8cff',
+      600: '#3c78e8',
+      700: '#2d62cc',
+      800: '#284fa5',
+      900: '#254482',
+      950: '#1a2b50'
+    }
+  },
   semantic: {
     borderRadius: {
       none: '0',
@@ -21,36 +103,6 @@ const NoirPreset: Preset = {
       md: 'var(--ui-radius-control)',
       lg: 'var(--ui-radius-card)',
       xl: 'var(--ui-radius-card)'
-    },
-    formField: {
-      borderRadius: 'var(--ui-radius-control)',
-      borderColor: 'var(--input-border, var(--border))',
-      hoverBorderColor: 'var(--border-strong)',
-      focusBorderColor: '{primary.color}'
-    },
-    content: {
-      borderRadius: 'var(--ui-radius-card)',
-      borderColor: 'var(--border)'
-    },
-    overlay: {
-      select: {
-        borderRadius: 'var(--ui-radius-control)',
-        borderColor: 'var(--border)'
-      },
-      popover: {
-        borderRadius: 'var(--ui-radius-card)',
-        borderColor: 'var(--border)'
-      },
-      modal: {
-        borderRadius: 'var(--ui-radius-card)',
-        borderColor: 'var(--border)'
-      }
-    },
-    focusRing: {
-      width: '2px',
-      style: 'dashed',
-      color: '{primary.color}',
-      offset: '2px'
     },
     primary: {
       50: '{primary.50}',
@@ -65,73 +117,158 @@ const NoirPreset: Preset = {
       900: '{primary.900}',
       950: '{primary.950}'
     },
+    focusRing: {
+      width: '2px',
+      style: 'solid',
+      color: '{primary.color}',
+      offset: '2px'
+    },
+    formField: {
+      paddingX: '0.625rem',
+      paddingY: '0.375rem',
+      background: 'var(--ui-control-bg)',
+      borderRadius: 'var(--ui-radius-control)',
+      borderColor: 'var(--input-border, var(--border))',
+      hoverBorderColor: 'var(--border-strong)',
+      focusBorderColor: '{primary.color}',
+      focusRing: {
+        width: '0',
+        style: 'none',
+        color: 'transparent',
+        offset: '0'
+      }
+    },
+    content: {
+      background: 'var(--ui-card-bg)',
+      hoverBackground: 'var(--bg-hover)',
+      borderRadius: 'var(--ui-radius-card)',
+      borderColor: 'var(--border)'
+    },
+    overlay: {
+      select: {
+        background: 'var(--ui-card-bg)',
+        borderRadius: 'var(--ui-radius-control)',
+        borderColor: 'var(--border)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))'
+      },
+      popover: {
+        background: 'var(--ui-card-bg)',
+        borderRadius: 'var(--ui-radius-card)',
+        borderColor: 'var(--border)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))'
+      },
+      modal: {
+        background: 'var(--ui-card-bg)',
+        borderRadius: 'var(--ui-radius-card)',
+        borderColor: 'var(--border)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))'
+      }
+    },
     colorScheme: {
       light: {
-        content: {
-          borderColor: 'var(--border)'
-        },
-        formField: {
-          borderColor: 'var(--input-border, var(--border))',
-          hoverBorderColor: 'var(--border-strong)',
-          focusBorderColor: '{primary.color}'
-        },
-        overlay: {
-          select: {
-            borderColor: 'var(--border)'
-          },
-          popover: {
-            borderColor: 'var(--border)'
-          },
-          modal: {
-            borderColor: 'var(--border)'
-          }
-        },
         primary: {
           color: '{primary.500}',
           contrastColor: '#ffffff',
-          inverseColor: '#ffffff',
           hoverColor: '{primary.600}',
           activeColor: '{primary.700}'
         },
         highlight: {
-          background: 'color-mix(in srgb, {primary.color}, transparent 88%)',
-          focusBackground: 'color-mix(in srgb, {primary.color}, transparent 80%)',
-          color: '{primary.color}',
-          focusColor: '{primary.color}'
-        }
-      },
-      dark: {
+          background: '{primary.500}',
+          focusBackground: '{primary.600}',
+          color: '#ffffff',
+          focusColor: '#ffffff'
+        },
+        surface: {
+          0: '#ffffff',
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
+          950: '#020617'
+        },
         content: {
+          background: 'var(--ui-card-bg)',
+          hoverBackground: 'var(--bg-hover)',
           borderColor: 'var(--border)'
         },
         formField: {
+          background: 'var(--ui-control-bg)',
           borderColor: 'var(--input-border, var(--border))',
           hoverBorderColor: 'var(--border-strong)',
           focusBorderColor: '{primary.color}'
         },
         overlay: {
           select: {
+            background: 'var(--ui-card-bg)',
             borderColor: 'var(--border)'
           },
           popover: {
+            background: 'var(--ui-card-bg)',
             borderColor: 'var(--border)'
           },
           modal: {
+            background: 'var(--ui-card-bg)',
             borderColor: 'var(--border)'
           }
-        },
+        }
+      },
+      dark: {
         primary: {
           color: '{primary.400}',
-          contrastColor: '{slate.950}',
-          inverseColor: '{slate.950}',
+          contrastColor: '{surface.950}',
           hoverColor: '{primary.300}',
           activeColor: '{primary.200}'
         },
         highlight: {
-          background: 'color-mix(in srgb, {primary.color}, transparent 86%)',
-          focusBackground: 'color-mix(in srgb, {primary.color}, transparent 78%)',
-          color: '{primary.color}',
-          focusColor: '{primary.color}'
+          background: '{primary.400}',
+          focusBackground: '{primary.300}',
+          color: '{surface.950}',
+          focusColor: '{surface.950}'
+        },
+        surface: {
+          0: '#ffffff',
+          50: '#f4f4f5',
+          100: '#e4e4e7',
+          200: '#d4d4d8',
+          300: '#a1a1aa',
+          400: '#71717a',
+          500: '#52525b',
+          600: '#3f3f46',
+          700: '#27272a',
+          800: '#18181b',
+          900: '#0e1012',
+          950: '#0b0d0f'
+        },
+        content: {
+          background: 'var(--ui-card-bg)',
+          hoverBackground: 'var(--bg-hover)',
+          borderColor: 'var(--border)'
+        },
+        formField: {
+          background: 'var(--ui-control-bg)',
+          borderColor: 'var(--input-border, var(--border))',
+          hoverBorderColor: 'var(--border-strong)',
+          focusBorderColor: '{primary.color}'
+        },
+        overlay: {
+          select: {
+            background: 'var(--ui-card-bg)',
+            borderColor: 'var(--border)'
+          },
+          popover: {
+            background: 'var(--ui-card-bg)',
+            borderColor: 'var(--border)'
+          },
+          modal: {
+            background: 'var(--ui-card-bg)',
+            borderColor: 'var(--border)'
+          }
         }
       }
     }
@@ -139,72 +276,43 @@ const NoirPreset: Preset = {
   components: {
     card: {
       root: {
-        background: 'var(--bg-card)',
+        background: 'var(--ui-card-bg)',
         borderColor: 'var(--border)',
         borderRadius: 'var(--ui-radius-card)',
-        shadow: 'var(--ui-card-shadow, none)'
-      }
-    },
-    button: {
-      root: {
-        borderRadius: 'var(--ui-radius-control)'
-      }
-    },
-    select: {
-      root: {
-        borderRadius: 'var(--ui-radius-control)'
-      }
-    },
-    inputtext: {
-      root: {
-        borderRadius: 'var(--ui-radius-control)'
-      }
-    },
-    textarea: {
-      root: {
-        borderRadius: 'var(--ui-radius-control)'
-      }
-    },
-    popover: {
-      root: {
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)'
-      }
-    },
-    drawer: {
-      root: {
-        borderColor: 'var(--border)'
-      }
-    },
-    contextmenu: {
-      item: {
-        focusBackground: 'transparent',
-        activeBackground: 'transparent'
-      }
-    },
-    menu: {
-      item: {
-        focusBackground: 'transparent'
+        shadow: 'var(--ui-card-shadow, none)',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
+      },
+      body: {
+        padding: '1.25rem',
+        gap: '0.75rem'
+      },
+      caption: {
+        gap: '0.25rem'
+      },
+      title: {
+        fontSize: '0.875rem',
+        fontWeight: '600'
+      },
+      subtitle: {
+        color: '{text.muted.color}'
       }
     },
     datatable: {
-      header: {
-        background: 'transparent',
-        borderColor: 'transparent'
+      root: {
+        borderColor: 'var(--border)'
       },
       headerCell: {
-        borderColor: 'var(--border)',
-        color: '{text.muted.color}'
+        padding: '0.625rem 0.75rem',
+        borderColor: 'var(--border)'
       },
       bodyCell: {
+        padding: '0.5rem 0.75rem',
         borderColor: 'var(--border)'
       },
       row: {
-        hoverBackground: '{surface.100}'
-      },
-      paginatorBottom: {
-        borderColor: 'var(--border)',
-        borderWidth: '1px 0 0 0'
+        background: 'var(--ui-card-bg)',
+        hoverBackground: 'var(--bg-hover)'
       },
       colorScheme: {
         light: {
@@ -214,18 +322,15 @@ const NoirPreset: Preset = {
           headerCell: {
             background: '{surface.100}',
             hoverBackground: '{surface.200}',
-            borderColor: 'var(--border)',
-            color: '{surface.600}'
-          },
-          bodyCell: {
+            color: '{text.muted.color}',
             borderColor: 'var(--border)'
           },
           row: {
-            hoverBackground: '{surface.100}'
+            background: 'var(--ui-card-bg)',
+            hoverBackground: 'var(--bg-hover)'
           },
-          paginatorBottom: {
-            borderColor: 'var(--border)',
-            borderWidth: '1px 0 0 0'
+          bodyCell: {
+            borderColor: 'var(--border)'
           }
         },
         dark: {
@@ -235,308 +340,262 @@ const NoirPreset: Preset = {
           headerCell: {
             background: '{surface.900}',
             hoverBackground: '{surface.800}',
-            borderColor: 'var(--border)',
-            color: '{surface.400}'
-          },
-          bodyCell: {
+            color: '{text.muted.color}',
             borderColor: 'var(--border)'
           },
           row: {
-            hoverBackground: '{surface.800}'
+            background: 'var(--ui-card-bg)',
+            hoverBackground: 'var(--bg-hover)'
           },
-          paginatorBottom: {
+          bodyCell: {
+            borderColor: 'var(--border)'
+          }
+        }
+      }
+    },
+    button: {
+      root: {
+        paddingX: '0.75rem',
+        paddingY: '0.375rem',
+        borderRadius: 'var(--ui-radius-control)',
+        sheenHighlight: 'var(--ui-sheen-highlight)',
+        sm: {
+          fontSize: '0.75rem',
+          paddingX: '0.625rem',
+          paddingY: '0.25rem'
+        }
+      },
+      colorScheme: {
+        light: {
+          root: {
+            secondary: {
+              background: 'var(--ui-control-bg)',
+              hoverBackground: 'var(--bg-hover)',
+              activeBackground: 'var(--bg-active)',
+              borderColor: 'var(--border)',
+              hoverBorderColor: 'var(--border-strong)',
+              activeBorderColor: 'var(--border-strong)',
+              color: '{text.color}'
+            }
+          }
+        },
+        dark: {
+          root: {
+            secondary: {
+              background: 'var(--ui-control-bg)',
+              hoverBackground: 'var(--bg-hover)',
+              activeBackground: 'var(--bg-active)',
+              borderColor: 'var(--border)',
+              hoverBorderColor: 'var(--border-strong)',
+              activeBorderColor: 'var(--border-strong)',
+              color: '{text.color}'
+            }
+          }
+        }
+      }
+    },
+    select: {
+      root: {
+        background: 'var(--ui-control-bg)',
+        paddingX: '0.625rem',
+        paddingY: '0.375rem',
+        borderColor: 'var(--input-border, var(--border))',
+        borderRadius: 'var(--ui-radius-control)',
+        sm: {
+          fontSize: '0.75rem',
+          paddingX: '0.5rem',
+          paddingY: '0.25rem'
+        }
+      },
+      overlay: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        borderRadius: 'var(--ui-radius-control)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))',
+        backdropBlur: 'var(--ui-glass-blur)'
+      },
+      option: {
+        padding: '0.375rem 0.625rem',
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    inputtext: {
+      root: {
+        background: 'var(--ui-control-bg)',
+        paddingX: '0.625rem',
+        paddingY: '0.375rem',
+        borderColor: 'var(--input-border, var(--border))',
+        borderRadius: 'var(--ui-radius-control)',
+        sm: {
+          fontSize: '0.75rem',
+          paddingX: '0.5rem',
+          paddingY: '0.25rem'
+        }
+      }
+    },
+    textarea: {
+      root: {
+        background: 'var(--ui-control-bg)',
+        paddingX: '0.625rem',
+        paddingY: '0.375rem',
+        borderColor: 'var(--input-border, var(--border))',
+        borderRadius: 'var(--ui-radius-control)',
+        sm: {
+          fontSize: '0.75rem',
+          paddingX: '0.5rem',
+          paddingY: '0.25rem'
+        }
+      }
+    },
+    inputnumber: {
+      button: {
+        background: 'var(--ui-control-bg)',
+        borderColor: 'var(--input-border, var(--border))',
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    multiselect: {
+      root: {
+        background: 'var(--ui-control-bg)',
+        borderColor: 'var(--input-border, var(--border))',
+        borderRadius: 'var(--ui-radius-control)'
+      },
+      overlay: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        borderRadius: 'var(--ui-radius-control)'
+      },
+      option: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    checkbox: {
+      root: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    popover: {
+      root: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        borderRadius: 'var(--ui-radius-card)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
+      }
+    },
+    drawer: {
+      root: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
+      }
+    },
+    contextmenu: {
+      root: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        borderRadius: 'var(--ui-radius-card)'
+      },
+      item: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    menu: {
+      root: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        borderRadius: 'var(--ui-radius-card)'
+      },
+      item: {
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    tabs: {
+      tab: {
+        padding: '0.5rem 0.875rem',
+        fontWeight: '500',
+        borderColor: 'var(--border)'
+      },
+      tablist: {
+        background: 'transparent',
+        borderColor: 'var(--border)'
+      },
+      tabpanel: {
+        background: 'transparent',
+        padding: '0.75rem 0'
+      }
+    },
+    paginator: {
+      root: {
+        padding: '0.375rem 0.75rem',
+        borderRadius: 'var(--ui-radius-card)'
+      },
+      navButton: {
+        width: '1.75rem',
+        height: '1.75rem',
+        borderRadius: 'var(--ui-radius-control)'
+      }
+    },
+    dialog: {
+      root: {
+        background: 'var(--ui-card-bg)',
+        borderColor: 'var(--border)',
+        borderRadius: 'var(--ui-radius-card)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
+      },
+      header: {
+        padding: '1rem 1.25rem'
+      },
+      content: {
+        padding: '0 1.25rem 1.25rem 1.25rem'
+      },
+      footer: {
+        padding: '0 1.25rem 1rem 1.25rem'
+      },
+      colorScheme: {
+        light: {
+          root: {
+            background: 'var(--ui-card-bg)',
             borderColor: 'var(--border)',
-            borderWidth: '1px 0 0 0'
+            color: '{text.color}'
+          }
+        },
+        dark: {
+          root: {
+            background: 'var(--ui-card-bg)',
+            borderColor: 'var(--border)',
+            color: '{text.color}'
           }
         }
       }
     },
     toast: {
       root: {
-        borderWidth: '1px',
-        borderRadius: '{content.border.radius}'
-      },
-      icon: {
-        size: '1rem'
-      },
-      content: {
-        padding: '0.75rem 1rem',
-        gap: '0.75rem'
-      },
-      text: {
-        gap: '0.25rem'
-      },
-      summary: {
-        fontWeight: '600',
-        fontSize: '0.875rem'
-      },
-      detail: {
-        fontWeight: '400',
-        fontSize: '0.75rem'
-      },
-      closeButton: {
-        width: '1.5rem',
-        height: '1.5rem',
-        borderRadius: '{content.border.radius}'
-      },
-      closeIcon: {
-        size: '0.875rem'
-      },
-      colorScheme: {
-        light: {
-          info: {
-            background: '{surface.0}',
-            borderColor: '{surface.200}',
-            color: '{blue.600}',
-            detailColor: '{surface.600}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.100}',
-              focusRing: { color: '{surface.600}', shadow: 'none' }
-            }
-          },
-          success: {
-            background: '{surface.0}',
-            borderColor: '{surface.200}',
-            color: '{green.600}',
-            detailColor: '{surface.600}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.100}',
-              focusRing: { color: '{surface.600}', shadow: 'none' }
-            }
-          },
-          warn: {
-            background: '{surface.0}',
-            borderColor: '{surface.200}',
-            color: '{yellow.600}',
-            detailColor: '{surface.600}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.100}',
-              focusRing: { color: '{surface.600}', shadow: 'none' }
-            }
-          },
-          error: {
-            background: '{surface.0}',
-            borderColor: '{surface.200}',
-            color: '{red.600}',
-            detailColor: '{surface.600}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.100}',
-              focusRing: { color: '{surface.600}', shadow: 'none' }
-            }
-          },
-          secondary: {
-            background: '{surface.0}',
-            borderColor: '{surface.200}',
-            color: '{surface.600}',
-            detailColor: '{surface.500}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.100}',
-              focusRing: { color: '{surface.600}', shadow: 'none' }
-            }
-          },
-          contrast: {
-            background: '{surface.900}',
-            borderColor: '{surface.900}',
-            color: '{surface.50}',
-            detailColor: '{surface.300}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.800}',
-              focusRing: { color: '{surface.50}', shadow: 'none' }
-            }
-          }
-        },
-        dark: {
-          info: {
-            background: '{surface.900}',
-            borderColor: '{surface.800}',
-            color: '{blue.400}',
-            detailColor: '{surface.400}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.800}',
-              focusRing: { color: '{surface.400}', shadow: 'none' }
-            }
-          },
-          success: {
-            background: '{surface.900}',
-            borderColor: '{surface.800}',
-            color: '{green.400}',
-            detailColor: '{surface.400}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.800}',
-              focusRing: { color: '{surface.400}', shadow: 'none' }
-            }
-          },
-          warn: {
-            background: '{surface.900}',
-            borderColor: '{surface.800}',
-            color: '{yellow.400}',
-            detailColor: '{surface.400}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.800}',
-              focusRing: { color: '{surface.400}', shadow: 'none' }
-            }
-          },
-          error: {
-            background: '{surface.900}',
-            borderColor: '{surface.800}',
-            color: '{red.400}',
-            detailColor: '{surface.400}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.800}',
-              focusRing: { color: '{surface.400}', shadow: 'none' }
-            }
-          },
-          secondary: {
-            background: '{surface.900}',
-            borderColor: '{surface.800}',
-            color: '{surface.400}',
-            detailColor: '{surface.500}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.800}',
-              focusRing: { color: '{surface.400}', shadow: 'none' }
-            }
-          },
-          contrast: {
-            background: '{surface.0}',
-            borderColor: '{surface.0}',
-            color: '{surface.950}',
-            detailColor: '{surface.600}',
-            shadow: '{overlay.popover.shadow}',
-            closeButton: {
-              hoverBackground: '{surface.100}',
-              focusRing: { color: '{surface.950}', shadow: 'none' }
-            }
-          }
-        }
-      }
-    },
-    dialog: {
-      root: {
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)'
-      },
-      header: {
-        padding: '1rem 1.25rem 0.75rem 1.25rem',
-        gap: '0.5rem'
-      },
-      title: {
-        fontSize: '1rem',
-        fontWeight: '700'
-      },
-      content: {
-        padding: '0 1.25rem 1rem 1.25rem'
-      },
-      footer: {
-        padding: '0.75rem 1.25rem 1.25rem 1.25rem',
-        gap: '0.5rem'
-      },
-      colorScheme: {
-        light: {
-          root: {
-            background: '{surface.0}',
-            borderColor: 'var(--border)',
-            color: '{surface.900}',
-            shadow: '{overlay.popover.shadow}'
-          }
-        },
-        dark: {
-          root: {
-            background: '{surface.900}',
-            borderColor: 'var(--border)',
-            color: '{surface.50}',
-            shadow: '{overlay.popover.shadow}'
-          }
-        }
-      }
-    },
-    confirmdialog: {
-      icon: {
-        size: '1.25rem'
-      },
-      content: {
-        gap: '0.75rem'
+        borderRadius: 'var(--ui-radius-card)',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
       }
     },
     tooltip: {
       root: {
-        padding: '0.25rem 0.5rem'
+        padding: '0.25rem 0.5rem',
+        borderRadius: 'var(--ui-radius-control)'
       }
     },
     tag: {
       root: {
-        fontSize: '0.625rem',
+        fontSize: '0.75rem',
         fontWeight: '600',
-        padding: '0.125rem 0.375rem',
-        borderRadius: 'var(--ui-radius-control)',
-        gap: '0.25rem'
-      },
-      colorScheme: {
-        light: {
-          secondary: {
-            background: '{surface.100}',
-            color: '{surface.700}'
-          },
-          info: {
-            background: 'rgba(79, 140, 255, 0.12)',
-            color: '#2563eb'
-          },
-          success: {
-            background: 'rgba(40, 167, 69, 0.12)',
-            color: '#16a34a'
-          },
-          warn: {
-            background: 'rgba(244, 161, 0, 0.12)',
-            color: '#d97706'
-          },
-          danger: {
-            background: 'rgba(214, 69, 69, 0.12)',
-            color: '#dc2626'
-          },
-          contrast: {
-            background: '{surface.950}',
-            color: '{surface.0}'
-          }
-        },
-        dark: {
-          secondary: {
-            background: '{surface.800}',
-            color: '{surface.300}'
-          },
-          info: {
-            background: 'rgba(106, 168, 255, 0.14)',
-            color: '#60a5fa'
-          },
-          success: {
-            background: 'rgba(16, 185, 129, 0.14)',
-            color: '#34d399'
-          },
-          warn: {
-            background: 'rgba(245, 158, 11, 0.14)',
-            color: '#fbbf24'
-          },
-          danger: {
-            background: 'rgba(244, 63, 94, 0.14)',
-            color: '#f87171'
-          },
-          contrast: {
-            background: '{surface.0}',
-            color: '{surface.950}'
-          }
-        }
+        padding: '0.125rem 0.5rem',
+        borderRadius: 'var(--ui-radius-control)'
       }
     }
   }
-}
+})
 
-export const Noir = definePreset(Nora, NoirPreset)
+export const NoirPreset = Noir

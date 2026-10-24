@@ -138,7 +138,7 @@ const handleResourceSelected = (payload: {
           variant="text"
           rounded
           size="small"
-          class="w-6! h-6! p-0! text-muted-color hover:text-primary hover:bg-(--bg-hover)! cursor-pointer"
+          class="w-6 h-6 p-0 text-muted-color hover:text-primary hover:bg-(--bg-hover) cursor-pointer"
           :aria-label="'New Tab'"
           v-tooltip.bottom="'New Tab'"
           @click="handleNewTabClick"

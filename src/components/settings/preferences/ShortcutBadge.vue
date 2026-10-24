@@ -72,7 +72,7 @@ onUnmounted(() => {
       type="button"
       variant="text"
       size="small"
-      class="group relative inline-flex items-center justify-center font-mono text-xs px-2.5 py-1 rounded-md transition-all duration-150 border cursor-pointer select-none"
+      class="group relative inline-flex items-center justify-center font-mono text-xs px-2.5 py-1 rounded-[var(--ui-radius-control)] transition-all duration-150 border cursor-pointer select-none"
       :class="[
         isCurrentListening
           ? 'bg-(--accent)/15 border-(--accent) text-(--accent) ring-2 ring-(--accent)/20 animate-pulse'

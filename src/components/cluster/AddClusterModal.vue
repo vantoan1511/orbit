@@ -98,8 +98,8 @@ const tags = ref<string[]>([])
 
 const getTabClass = (tab: 'file' | 'paste' | 'manual'): string =>
   activeTab.value === tab
-    ? 'border-(--accent)! text-(--text-primary)! font-medium'
-    : 'border-transparent! text-muted-color hover:text-(--text-primary) hover:border-(--border)'
+    ? 'border-(--accent) text-(--text-primary) font-medium'
+    : 'border-transparent text-muted-color hover:text-(--text-primary) hover:border-(--border)'
 
 // Reset state
 function resetModalState(): void {
@@ -400,10 +400,10 @@ const handleClose = (): void => emit('update:visible', false)
     <div class="flex flex-col gap-6">
       <!-- Input Mode Tabs -->
       <Tabs v-model:value="activeTab" class="w-full">
-        <TabList class="bg-transparent! border-b! border-(--border)! px-1 flex gap-2 shrink-0">
+        <TabList class="bg-transparent border-b border-(--border) px-1 flex gap-2 shrink-0">
           <Tab
             value="file"
-            class="bg-transparent! py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none!"
+            class="bg-transparent py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none"
             :class="getTabClass('file')"
           >
             <FolderOpen class="w-3.5 h-3.5" />
@@ -411,7 +411,7 @@ const handleClose = (): void => emit('update:visible', false)
           </Tab>
           <Tab
             value="paste"
-            class="bg-transparent! py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none!"
+            class="bg-transparent py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none"
             :class="getTabClass('paste')"
           >
             <FileText class="w-3.5 h-3.5" />
@@ -419,7 +419,7 @@ const handleClose = (): void => emit('update:visible', false)
           </Tab>
           <Tab
             value="manual"
-            class="bg-transparent! py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none!"
+            class="bg-transparent py-2 px-3 text-xs cursor-pointer flex items-center gap-2 border-b-2 transition-all rounded-none"
             :class="getTabClass('manual')"
           >
             <Globe class="w-3.5 h-3.5" />
@@ -737,7 +737,7 @@ const handleClose = (): void => emit('update:visible', false)
         <Button
           variant="text"
           severity="secondary"
-          class="w-full! px-4! py-3! flex! items-center! justify-between! text-left! text-xs! font-medium! text-(--text-primary)! hover:bg-(--bg-hover)/40! transition-colors! cursor-pointer! select-none! rounded-none! border-none!"
+          class="w-full px-4 py-3 flex items-center justify-between text-left text-xs font-medium text-(--text-primary) hover:bg-(--bg-hover)/40 transition-colors cursor-pointer select-none rounded-none border-none"
           @click="showCustomization = !showCustomization"
         >
           <div class="flex items-center gap-2">

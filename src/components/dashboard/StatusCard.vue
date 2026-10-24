@@ -19,7 +19,7 @@ defineProps<{
     <template #content>
       <div class="flex items-center gap-5">
         <div
-          class="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+          class="w-12 h-12 rounded-[var(--ui-radius-card)] flex items-center justify-center shrink-0"
           :class="iconBgClass"
         >
           <component :is="icon" class="w-6 h-6" :class="iconClass" />
