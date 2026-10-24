@@ -96,7 +96,7 @@ const handleSave = async () => {
     :draggable="false"
     class="w-full max-w-lg border border-(--border) bg-(--bg-card) text-primary shadow-[var(--shadow)]"
     :pt="{
-      root: { class: 'rounded-xl overflow-hidden' },
+      root: { class: 'rounded-[var(--ui-radius-card)] overflow-hidden' },
       header: { class: 'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar)/60' },
       content: { class: 'p-5 flex flex-col gap-5' },
       footer: {
@@ -115,7 +115,9 @@ const handleSave = async () => {
 
     <div v-if="cluster" class="flex flex-col gap-5">
       <!-- Cluster Context Information Header (Zonal Background) -->
-      <div class="rounded-lg p-3 bg-(--bg-hover)/40 flex flex-col gap-1 select-text">
+      <div
+        class="rounded-[var(--ui-radius-card)] p-3 bg-(--bg-hover)/40 flex flex-col gap-1 select-text"
+      >
         <div class="flex items-center justify-between text-xs">
           <span class="text-muted-color font-medium">Context Name:</span>
           <span

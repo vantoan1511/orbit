@@ -650,7 +650,7 @@ const removeTlsRow = (index: number) => {
               <div
                 v-for="(group, gIdx) in ruleGroups"
                 :key="group.id"
-                class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-4"
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-4"
               >
                 <!-- Group Header: Host input + Remove Host Group -->
                 <div class="flex items-start justify-between gap-3 border-b border-(--border) pb-3">
@@ -679,7 +679,7 @@ const removeTlsRow = (index: number) => {
                     variant="text"
                     severity="danger"
                     size="small"
-                    class="p-1! text-muted-color hover:text-(--danger) cursor-pointer mt-5"
+                    class="p-1 text-muted-color hover:text-(--danger) cursor-pointer mt-5"
                     aria-label="Remove Host Group"
                     @click="removeRuleGroup(gIdx)"
                   >
@@ -701,7 +701,7 @@ const removeTlsRow = (index: number) => {
                       size="small"
                       variant="text"
                       label="Add Path"
-                      class="text-[11px] py-1! px-2!"
+                      class="text-[11px] py-1 px-2"
                       @click="addPathToGroup(gIdx)"
                     >
                       <template #icon>
@@ -717,7 +717,7 @@ const removeTlsRow = (index: number) => {
                   <div
                     v-for="(path, pIdx) in group.paths"
                     :key="path.id"
-                    class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start p-3 rounded-lg bg-(--bg-hover)/40"
+                    class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40"
                   >
                     <div class="sm:col-span-3 flex flex-col gap-1">
                       <label class="text-[11px] font-medium text-muted-color">Path</label>
@@ -793,7 +793,7 @@ const removeTlsRow = (index: number) => {
                         variant="text"
                         severity="danger"
                         size="small"
-                        class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
+                        class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
                         aria-label="Remove Path"
                         @click="removePathFromGroup(gIdx, pIdx)"
                       >
@@ -856,7 +856,7 @@ const removeTlsRow = (index: number) => {
                     variant="text"
                     severity="danger"
                     size="small"
-                    class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
+                    class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
                     aria-label="Remove TLS"
                     @click="removeTlsRow(idx)"
                   >
@@ -911,7 +911,9 @@ const removeTlsRow = (index: number) => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="labels"
                   title="Labels"
@@ -919,7 +921,9 @@ const removeTlsRow = (index: number) => {
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="annotations"
                   title="Annotations"

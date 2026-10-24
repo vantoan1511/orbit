@@ -197,7 +197,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
     lazy
     :showHeader="false"
     position="top"
-    class="search-everywhere-modal !border-none"
+    class="search-everywhere-modal border-none"
     :style="{ width: '640px', maxWidth: '94vw', marginTop: '10vh' }"
     :pt="{
       mask: { class: 'bg-black/50 backdrop-blur-[2px]' },
@@ -229,7 +229,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
           severity="secondary"
           size="small"
           rounded
-          class="w-6! h-6! p-0! text-muted-color hover:text-primary"
+          class="w-6 h-6 p-0 text-muted-color hover:text-primary"
           v-tooltip.top="'Clear search'"
           aria-label="Clear search"
           @click="clearSearch"
@@ -252,7 +252,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
           :key="cat.id"
           type="button"
           unstyled
-          class="flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-colors text-xs font-medium cursor-pointer select-none"
+          class="flex items-center gap-1.5 px-2.5 py-1 rounded-[var(--ui-radius-control)] transition-colors text-xs font-medium cursor-pointer select-none"
           :class="[
             searchStore.activeCategory === cat.id
               ? 'bg-primary text-[var(--p-primary-contrast-color)] shadow-xs font-semibold'
@@ -311,7 +311,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
           <!-- Result Row -->
           <div
             :ref="(el) => setResultItemRef(el, idx)"
-            class="flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer transition-colors group select-none"
+            class="flex items-center gap-3 px-3 py-2 rounded-[var(--ui-radius-control)] cursor-pointer transition-colors group select-none"
             :class="[
               idx === searchStore.selectedIndex
                 ? 'bg-(--bg-hover) text-primary font-medium'
@@ -322,7 +322,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
           >
             <!-- Kind / Category Icon -->
             <div
-              class="w-7 h-7 rounded-md flex items-center justify-center shrink-0 bg-(--bg-hover)/50 group-hover:bg-(--bg-hover) transition-colors"
+              class="w-7 h-7 rounded-[var(--ui-radius-control)] flex items-center justify-center shrink-0 bg-(--bg-hover)/50 group-hover:bg-(--bg-hover) transition-colors"
             >
               <component
                 :is="item.icon"

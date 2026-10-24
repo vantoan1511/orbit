@@ -26,7 +26,7 @@ const isRunning = (status: string) => {
       <div
         v-for="c in containers"
         :key="c.name"
-        class="p-4 bg-(--bg-card) border border-(--border) rounded-xl space-y-3 hover:bg-(--bg-hover)/30 transition-colors"
+        class="p-4 bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-card)] space-y-3 hover:bg-(--bg-hover)/30 transition-colors"
       >
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2.5 min-w-0">

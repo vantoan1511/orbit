@@ -16,7 +16,7 @@ defineProps<{
 
     <div
       v-if="service.portsList.length > 0"
-      class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) text-xs"
+      class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card) text-xs"
     >
       <table class="w-full text-left border-collapse">
         <thead>
@@ -50,7 +50,10 @@ defineProps<{
       </table>
     </div>
 
-    <div v-else class="bg-(--bg-hover)/20 rounded-xl p-4 text-xs text-muted-color italic">
+    <div
+      v-else
+      class="bg-(--bg-hover)/20 rounded-[var(--ui-radius-card)] p-4 text-xs text-muted-color italic"
+    >
       No ports configured for this service.
     </div>
   </div>

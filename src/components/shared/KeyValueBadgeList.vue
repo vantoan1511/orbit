@@ -41,7 +41,7 @@ withDefaults(
       <div
         v-for="(val, key) in items"
         :key="key"
-        class="p-2 rounded-lg bg-(--bg-hover)/40 text-[10px] font-mono text-muted-color flex justify-between gap-4"
+        class="p-2 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 text-[10px] font-mono text-muted-color flex justify-between gap-4"
       >
         <span class="text-muted-color truncate shrink-0">{{ key }}</span>
         <span class="truncate text-right">{{ val }}</span>

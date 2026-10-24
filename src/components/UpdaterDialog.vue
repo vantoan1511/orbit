@@ -132,9 +132,9 @@ const openUrl = async (url?: string) => {
   >
     <div class="flex flex-col gap-4">
       <!-- Version Info Banner -->
-      <div class="flex items-center gap-3.5 bg-(--bg-hover)/40 rounded-lg p-3">
+      <div class="flex items-center gap-3.5 bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3">
         <div
-          class="w-10 h-10 bg-(--bg-card) rounded-lg flex items-center justify-center border border-(--border) shrink-0"
+          class="w-10 h-10 bg-(--bg-card) rounded-[var(--ui-radius-card)] flex items-center justify-center border border-(--border) shrink-0"
         >
           <Gift class="w-5 h-5 text-primary" />
         </div>
@@ -157,7 +157,7 @@ const openUrl = async (url?: string) => {
           Release Notes
         </h4>
         <div
-          class="bg-(--bg-hover)/40 rounded-lg p-3 max-h-56 overflow-y-auto text-xs flex flex-col gap-1.5"
+          class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3 max-h-56 overflow-y-auto text-xs flex flex-col gap-1.5"
         >
           <template v-if="parsedNotes.length > 0">
             <div v-for="(block, index) in parsedNotes" :key="index" :class="block.class">

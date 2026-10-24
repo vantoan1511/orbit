@@ -82,7 +82,7 @@ const handleSaveEdit = () => {
 
       <!-- Preset Bar (borderless well) -->
       <div
-        class="bg-(--bg-hover)/40 rounded-lg p-3 flex flex-wrap items-center justify-between gap-4"
+        class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3 flex flex-wrap items-center justify-between gap-4"
       >
         <div class="flex items-center gap-3">
           <label class="text-xs font-semibold text-muted-color">Rule Preset:</label>
@@ -102,7 +102,7 @@ const handleSaveEdit = () => {
             severity="danger"
             variant="text"
             size="small"
-            class="w-8! h-8! p-0! shrink-0"
+            class="w-8 h-8 p-0 shrink-0"
             v-tooltip="'Delete this custom preset'"
             @click="highlighting.deleteCustomPreset"
           >
@@ -207,7 +207,7 @@ const handleSaveEdit = () => {
               severity="secondary"
               variant="text"
               size="small"
-              class="p-1! text-muted-color hover:text-primary cursor-pointer"
+              class="p-1 text-muted-color hover:text-primary cursor-pointer"
               v-tooltip.top="'Edit rule'"
               @click="openEditModal(rule)"
             >
@@ -219,7 +219,7 @@ const handleSaveEdit = () => {
               severity="danger"
               variant="text"
               size="small"
-              class="p-1! text-muted-color hover:text-rose-500 cursor-pointer"
+              class="p-1 text-muted-color hover:text-rose-500 cursor-pointer"
               v-tooltip.top="'Delete rule'"
               @click="highlighting.deleteCustomRule(rule.id)"
             >

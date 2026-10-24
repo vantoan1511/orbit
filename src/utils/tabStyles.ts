@@ -23,7 +23,7 @@ export function getTabContainerClass(isActive: boolean, isDragging = false): str
  */
 export function getTabCloseButtonClass(isActive: boolean): string {
   const base =
-    'w-4! h-4! p-0! shrink-0 hover:bg-(--bg-hover)! text-muted-color hover:text-primary transition-opacity'
+    'w-4 h-4 p-0 shrink-0 hover:bg-(--bg-hover) text-muted-color hover:text-primary transition-opacity'
 
   if (isActive) {
     return `${base} opacity-100`

@@ -126,7 +126,7 @@ const clusterTooltip = computed(() => {
         severity="secondary"
         variant="outlined"
         size="small"
-        class="group flex items-center justify-start gap-2 h-6 w-56 sm:w-64 md:w-80 px-2 text-xs text-muted-color bg-(--bg-hover)/40! dark:bg-(--bg-hover)/30! border-(--border)! hover:bg-(--bg-hover)/80! hover:border-(--border-strong)! hover:text-primary! active:bg-(--bg-active)! rounded-[var(--ui-radius-control)] font-normal cursor-pointer transition-all duration-150"
+        class="group flex items-center justify-start gap-2 h-6 w-56 sm:w-64 md:w-80 px-2 text-xs text-muted-color bg-(--bg-hover)/40 dark:bg-(--bg-hover)/30 border-(--border) hover:bg-(--bg-hover)/80 hover:border-(--border-strong) hover:text-primary active:bg-(--bg-active) rounded-[var(--ui-radius-control)] font-normal cursor-pointer transition-all duration-150"
         v-tooltip.bottom="searchTooltip"
         @click.stop="searchStore.open()"
         @dblclick.stop

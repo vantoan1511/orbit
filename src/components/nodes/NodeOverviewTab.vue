@@ -33,7 +33,7 @@ const getTaintEffectSeverity = (effect: string) => {
     <!-- Resource Metrics Grid -->
     <div class="grid grid-cols-3 gap-3">
       <!-- CPU -->
-      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
+      <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40">
         <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           CPU Requests
         </div>
@@ -52,7 +52,7 @@ const getTaintEffectSeverity = (effect: string) => {
       </div>
 
       <!-- Memory -->
-      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
+      <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40">
         <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           Memory Requests
         </div>
@@ -71,7 +71,7 @@ const getTaintEffectSeverity = (effect: string) => {
       </div>
 
       <!-- Pods -->
-      <div class="p-4 rounded-xl bg-(--bg-hover)/40">
+      <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40">
         <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-color mb-1.5">
           Allocated Pods
         </div>
@@ -95,7 +95,9 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Node Attributes
       </div>
-      <div class="grid grid-cols-2 gap-4 p-4 rounded-xl bg-(--bg-hover)/40 text-xs">
+      <div
+        class="grid grid-cols-2 gap-4 p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 text-xs"
+      >
         <div>
           <span class="text-muted-color">Role: </span>
           <span class="font-semibold text-primary uppercase font-mono">{{ node.role }}</span>
@@ -160,7 +162,9 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         System Information
       </div>
-      <div class="grid grid-cols-2 gap-4 p-4 rounded-xl bg-(--bg-hover)/40 text-xs">
+      <div
+        class="grid grid-cols-2 gap-4 p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 text-xs"
+      >
         <div>
           <span class="text-muted-color">OS Image: </span>
           <span class="font-medium text-primary font-mono">{{ node.nodeInfo.osImage || '-' }}</span>
@@ -221,7 +225,9 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Capacity & Allocatable
       </div>
-      <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) text-xs">
+      <div
+        class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card) text-xs"
+      >
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
@@ -268,7 +274,9 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Conditions ({{ node.conditions.length }})
       </div>
-      <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card) text-xs">
+      <div
+        class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card) text-xs"
+      >
         <table class="w-full text-left border-collapse">
           <thead>
             <tr
@@ -313,11 +321,11 @@ const getTaintEffectSeverity = (effect: string) => {
       <div class="text-xs font-semibold text-muted-color uppercase tracking-wider mb-3">
         Taints ({{ node.taints.length }})
       </div>
-      <div class="bg-(--bg-hover)/40 rounded-xl p-3 flex flex-col gap-2">
+      <div class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3 flex flex-col gap-2">
         <div
           v-for="(taint, idx) in node.taints"
           :key="idx"
-          class="flex items-center justify-between p-2.5 rounded-lg bg-(--bg-hover)/60 text-xs font-mono"
+          class="flex items-center justify-between p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/60 text-xs font-mono"
         >
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-primary font-semibold">{{ taint.key }}</span>

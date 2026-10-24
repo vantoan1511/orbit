@@ -36,7 +36,7 @@ const getColumnWidth = (index: number, total: number) => {
         <Skeleton
           :width="c === 2 ? '70%' : '85%'"
           height="1.25rem"
-          class="bg-(--bg-hover)/40 rounded-md"
+          class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-control)]"
         />
       </div>
     </div>

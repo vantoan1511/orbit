@@ -432,7 +432,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podLabels"
                   title="Pod Labels"
@@ -440,7 +442,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="podAnnotations"
                   title="Pod Annotations"
@@ -517,7 +521,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-3">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+              <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30">
                 <KeyValueEditor
                   v-model="nodeSelector"
                   title="Node Selector"
@@ -652,7 +656,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-4">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.command"
                     title="Command"
@@ -662,7 +668,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   />
                 </div>
 
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <StringListEditor
                     v-model="currentContainer.args"
                     title="Args"
@@ -685,7 +693,9 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+                <div
+                  class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+                >
                   <ContainerEnvEditor
                     v-model="currentContainer.environments"
                     :namespace="podNamespace"
@@ -706,7 +716,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 </p>
               </div>
               <div class="md:col-span-8 flex flex-col gap-3">
-                <div class="p-4 rounded-lg bg-(--bg-hover)/30">
+                <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30">
                   <ContainerPortsEditor
                     v-model="currentContainer.ports"
                     @update:model-value="handleFieldChange"

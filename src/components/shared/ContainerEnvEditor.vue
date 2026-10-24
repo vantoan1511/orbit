@@ -319,7 +319,7 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
         variant="text"
         severity="danger"
         size="small"
-        class="p-1! shrink-0 text-muted-color hover:text-(--danger) cursor-pointer"
+        class="p-1 shrink-0 text-muted-color hover:text-(--danger) cursor-pointer"
         @click="removeEnv(idx)"
       >
         <template #icon>

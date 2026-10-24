@@ -238,7 +238,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
       <Accordion
         :value="activeAccordion"
         multiple
-        class="flex-1 flex flex-col min-h-0 !gap-0"
+        class="flex-1 flex flex-col min-h-0 gap-0"
         :dt="{
           panel: { border: { width: '0', color: 'transparent' }, borderRadius: '0' },
           header: {
@@ -256,11 +256,11 @@ const selectRecentLog = (log: RecentLogInfo) => {
         <!-- Explorer Accordion -->
         <AccordionPanel
           value="0"
-          class="!border-none !rounded-none flex flex-col min-h-0 transition-[flex]"
+          class="border-none rounded-none flex flex-col min-h-0 transition-[flex]"
           :class="[activeAccordion.includes('0') ? 'flex-1' : 'shrink-0']"
         >
           <AccordionHeader
-            class="h-8 py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color hover:text-primary flex items-center justify-between shrink-0 !rounded-none border border-transparent hover:border-(--border) cursor-pointer !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent"
+            class="h-8 py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color hover:text-primary flex items-center justify-between shrink-0 rounded-none border border-transparent hover:border-(--border) cursor-pointer bg-transparent hover:bg-transparent focus:bg-transparent active:bg-transparent"
           >
             <span>Explorer</span>
           </AccordionHeader>
@@ -288,7 +288,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                 <div v-for="ns in treeData" :key="`ns:${ns.name}`" class="flex flex-col">
                   <!-- Namespace Row -->
                   <div
-                    class="flex items-center gap-1.5 px-3 py-0.5 border border-transparent hover:border-(--border) cursor-pointer text-sm font-medium text-primary rounded-sm"
+                    class="flex items-center gap-1.5 px-3 py-0.5 border border-transparent hover:border-(--border) cursor-pointer text-sm font-medium text-primary rounded-[var(--ui-radius-control)]"
                     @click="toggleNode(`ns:${ns.name}`)"
                   >
                     <component
@@ -316,7 +316,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                         isCurrentLogActive(ns.name, workload.name, workload.kind)
                           ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
                           : 'text-muted-color hover:text-primary hover:border-(--border)',
-                        'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-sm'
+                        'flex items-center gap-1.5 px-3 py-0.5 cursor-pointer text-sm border border-transparent rounded-[var(--ui-radius-control)]'
                       ]"
                       @click="selectLogTarget(ns.name, workload.name, workload.kind)"
                     >
@@ -340,12 +340,12 @@ const selectRecentLog = (log: RecentLogInfo) => {
         <!-- Recent Accordion -->
         <AccordionPanel
           value="1"
-          class="!border-none !rounded-none flex flex-col min-h-0 border-t border-(--border) transition-[flex]"
+          class="border-none rounded-none flex flex-col min-h-0 border-t border-(--border) transition-[flex]"
           :class="[activeAccordion.includes('1') ? 'flex-1' : 'shrink-0']"
         >
           <AccordionHeader
             as="div"
-            class="h-8 py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color hover:text-primary flex justify-between items-center shrink-0 !rounded-none border border-transparent hover:border-(--border) cursor-pointer !bg-transparent hover:!bg-transparent focus:!bg-transparent active:!bg-transparent"
+            class="h-8 py-1.5 px-3 text-xs font-semibold uppercase tracking-wider text-muted-color hover:text-primary flex justify-between items-center shrink-0 rounded-none border border-transparent hover:border-(--border) cursor-pointer bg-transparent hover:bg-transparent focus:bg-transparent active:bg-transparent"
           >
             <div class="flex items-center justify-between flex-1 mr-2">
               <span>Recent</span>
@@ -355,7 +355,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                 severity="secondary"
                 variant="text"
                 size="small"
-                class="w-5! h-5! p-0! shrink-0 text-muted-color hover:text-primary"
+                class="w-5 h-5 p-0 shrink-0 text-muted-color hover:text-primary"
                 aria-label="Clear recent logs"
                 @click.stop="logsStore.clearRecentLogs()"
               >
@@ -385,7 +385,7 @@ const selectRecentLog = (log: RecentLogInfo) => {
                     isCurrentLogActive(log.namespace, log.workloadName, log.workloadKind)
                       ? 'bg-primary-50 dark:bg-primary-950/40 text-primary font-semibold border-primary/30'
                       : 'text-muted-color hover:text-primary hover:border-(--border)',
-                    'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group border border-transparent rounded-sm'
+                    'flex items-center gap-2 px-3 py-0.5 cursor-pointer text-sm group border border-transparent rounded-[var(--ui-radius-control)]'
                   ]"
                   @click="selectRecentLog(log)"
                 >

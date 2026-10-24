@@ -46,7 +46,7 @@ const stopPortForward = async (id: string) => {
       <div
         v-for="pf in portForwards"
         :key="pf.id"
-        class="flex items-center justify-between gap-3 p-3 rounded-lg bg-(--success-soft) text-xs"
+        class="flex items-center justify-between gap-3 p-3 rounded-[var(--ui-radius-card)] bg-(--success-soft) text-xs"
       >
         <div class="flex items-center gap-2.5 font-mono">
           <Cable class="w-4 h-4 text-(--success) shrink-0" />

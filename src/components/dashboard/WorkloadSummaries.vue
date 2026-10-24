@@ -79,7 +79,7 @@ const items = computed(() => {
     <Card v-for="item in items" :key="item.title">
       <template #title>
         <div class="flex items-center justify-between mb-4">
-          <div class="p-2 rounded-lg" :class="item.iconColor">
+          <div class="p-2 rounded-[var(--ui-radius-card)]" :class="item.iconColor">
             <component :is="item.icon" class="w-5 h-5" />
           </div>
         </div>

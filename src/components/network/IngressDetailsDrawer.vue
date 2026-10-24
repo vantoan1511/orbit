@@ -216,11 +216,11 @@ const copyYaml = async () => {
 
     <!-- Extra Tabs -->
     <template #extra-tabs>
-      <Tab value="rules" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="rules" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Network class="w-3.5 h-3.5" />
         <span>Rules ({{ props.ingress?.rulesSummary.length || 0 }})</span>
       </Tab>
-      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="events" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Activity class="w-3.5 h-3.5" />
         <span>Events ({{ ingressEvents.length }})</span>
       </Tab>
@@ -232,7 +232,9 @@ const copyYaml = async () => {
         <!-- General Info Grid -->
         <div>
           <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">General</h3>
-          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+          <div
+            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-3 text-xs font-ui"
+          >
             <div class="grid grid-cols-3">
               <span class="text-muted-color font-semibold">Namespace</span>
               <span class="col-span-2 font-mono text-primary">{{ props.ingress.namespace }}</span>
@@ -286,7 +288,7 @@ const copyYaml = async () => {
             <div
               v-for="(r, idx) in parsedRules"
               :key="idx"
-              class="p-3 rounded-xl bg-(--bg-hover)/40 text-xs font-mono flex items-center justify-between gap-2"
+              class="p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 text-xs font-mono flex items-center justify-between gap-2"
             >
               <div class="flex items-center gap-2 truncate">
                 <span class="text-violet-400 font-semibold truncate">{{ r.host }}</span>
@@ -317,7 +319,7 @@ const copyYaml = async () => {
         </h3>
         <div
           v-if="parsedRules.length > 0"
-          class="border border-(--border) rounded-xl overflow-hidden bg-(--bg-hover)/10 text-xs"
+          class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-hover)/10 text-xs"
         >
           <table class="w-full text-left border-collapse">
             <thead>

@@ -565,7 +565,9 @@ const removePort = (index: number) => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-3">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="selectorList"
                   title="Selector Labels"
@@ -616,7 +618,7 @@ const removePort = (index: number) => {
               <div
                 v-for="(portItem, pIdx) in portsList"
                 :key="portItem.id"
-                class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-4"
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-4"
               >
                 <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-start">
                   <!-- Name -->
@@ -701,7 +703,7 @@ const removePort = (index: number) => {
                       variant="text"
                       severity="danger"
                       size="small"
-                      class="p-1! text-muted-color hover:text-(--danger) cursor-pointer"
+                      class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
                       aria-label="Remove Port"
                       @click="removePort(pIdx)"
                     >
@@ -775,7 +777,9 @@ const removePort = (index: number) => {
               </p>
             </div>
             <div class="md:col-span-8 flex flex-col gap-6">
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="labels"
                   title="Service Labels"
@@ -783,7 +787,9 @@ const removePort = (index: number) => {
                   @update:model-value="handleFieldChange"
                 />
               </div>
-              <div class="p-4 rounded-lg bg-(--bg-hover)/30 flex flex-col gap-3">
+              <div
+                class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
+              >
                 <KeyValueEditor
                   v-model="annotations"
                   title="Service Annotations"

@@ -106,7 +106,7 @@ function removeTag(tagToRemove: string): void {
           type="button"
           :style="{ backgroundColor: preset.hex }"
           :class="[
-            'w-6 h-6 rounded-full p-0! flex items-center justify-center transition-all cursor-pointer border border-transparent shadow-none',
+            'w-6 h-6 rounded-full p-0 flex items-center justify-center transition-all cursor-pointer border border-transparent shadow-none',
             color === preset.hex
               ? 'ring-2 ring-primary ring-offset-2 scale-110'
               : 'hover:scale-105 opacity-80 hover:opacity-100'
@@ -149,7 +149,7 @@ function removeTag(tagToRemove: string): void {
             variant="text"
             severity="secondary"
             size="small"
-            class="w-3.5 h-3.5 p-0! text-muted-color hover:text-(--danger) cursor-pointer flex items-center justify-center border-none shadow-none bg-transparent"
+            class="w-3.5 h-3.5 p-0 text-muted-color hover:text-(--danger) cursor-pointer flex items-center justify-center border-none shadow-none bg-transparent"
             @click="removeTag(t)"
           >
             <template #icon>

@@ -81,7 +81,10 @@ const getEventBadgeClass = (type: string) => {
     <template #overview>
       <div v-if="props.event" class="space-y-6">
         <!-- Event Message -->
-        <div v-if="props.event.message" class="bg-(--bg-hover)/40 rounded-xl p-4">
+        <div
+          v-if="props.event.message"
+          class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4"
+        >
           <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1.5">
             Message
           </div>
@@ -95,7 +98,9 @@ const getEventBadgeClass = (type: string) => {
           <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">
             Event Properties
           </h3>
-          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+          <div
+            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-3 text-xs font-ui"
+          >
             <div class="grid grid-cols-3">
               <span class="text-muted-color font-semibold">Namespace</span>
               <span class="col-span-2 font-mono text-primary">{{ props.event.namespace }}</span>
@@ -151,7 +156,7 @@ const getEventBadgeClass = (type: string) => {
     <template #yaml>
       <div
         v-if="props.event"
-        class="flex-1 min-h-64 border border-(--border) rounded-xl bg-(--bg-card) p-4 overflow-y-auto"
+        class="flex-1 min-h-64 border border-(--border) rounded-[var(--ui-radius-card)] bg-(--bg-card) p-4 overflow-y-auto"
       >
         <pre class="font-mono text-[10px] text-primary leading-relaxed">{{
           generateYaml(props.event)

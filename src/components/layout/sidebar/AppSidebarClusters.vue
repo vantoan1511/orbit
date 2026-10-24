@@ -66,7 +66,7 @@ const clearFilters = () => {
         <InputText
           v-model="searchQuery"
           placeholder="Filter clusters or tags..."
-          class="w-full text-xs h-8 bg-(--bg-hover)/40! border-(--border)!"
+          class="w-full text-xs h-8 bg-(--bg-hover)/40 border-(--border)"
           size="small"
         />
         <InputIcon
@@ -90,10 +90,10 @@ const clearFilters = () => {
         size="small"
         variant="text"
         :class="[
-          'text-[10px]! font-medium h-5! px-1.5! rounded-full! transition-colors shrink-0',
+          'text-[10px] font-medium h-5 px-1.5 rounded-full transition-colors shrink-0',
           selectedTag === tag
-            ? 'bg-(--accent)! text-white!'
-            : 'bg-(--bg-hover)/60! text-muted-color hover:text-primary hover:bg-(--bg-hover)!'
+            ? 'bg-(--accent) text-white'
+            : 'bg-(--bg-hover)/60 text-muted-color hover:text-primary hover:bg-(--bg-hover)'
         ]"
         @click="toggleTag(tag)"
       >
@@ -106,7 +106,7 @@ const clearFilters = () => {
       <div
         v-for="cluster in filteredClusters"
         :key="cluster.id"
-        class="group relative flex flex-col gap-1 p-2 rounded-lg border transition-all cursor-pointer select-none"
+        class="group relative flex flex-col gap-1 p-2 rounded-[var(--ui-radius-card)] border transition-all cursor-pointer select-none"
         :class="[
           k8sStore.activeClusterId === cluster.id
             ? 'border-(--accent)/40 bg-(--accent-soft)'
@@ -159,7 +159,7 @@ const clearFilters = () => {
               severity="secondary"
               size="small"
               v-tooltip.top="'Edit cluster metadata'"
-              class="w-5! h-5! p-0! opacity-0 group-hover:opacity-100 transition-opacity text-muted-color hover:text-primary"
+              class="w-5 h-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-color hover:text-primary"
               @click.stop="openEditModal(cluster, $event)"
             >
               <template #icon>
@@ -212,7 +212,7 @@ const clearFilters = () => {
           variant="text"
           severity="secondary"
           size="small"
-          class="text-xs text-(--accent) hover:underline p-0!"
+          class="text-xs text-(--accent) hover:underline p-0"
           @click="clearFilters"
         >
           Clear filters

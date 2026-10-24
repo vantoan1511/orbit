@@ -73,9 +73,13 @@ const getAuthTypeSeverity = (authType: string) => {
 
     <div class="flex flex-col h-full overflow-y-auto p-6 space-y-6">
       <!-- Active Identity Card -->
-      <div class="p-4 rounded-xl bg-(--bg-sidebar)/60 border border-(--border) space-y-4">
+      <div
+        class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-sidebar)/60 border border-(--border) space-y-4"
+      >
         <div class="flex items-center gap-3">
-          <div class="p-2.5 rounded-lg bg-(--bg-card) border border-(--border) text-primary">
+          <div
+            class="p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-card) border border-(--border) text-primary"
+          >
             <UserCheck :size="20" />
           </div>
           <div class="flex-1 min-w-0">
@@ -146,7 +150,7 @@ const getAuthTypeSeverity = (authType: string) => {
           <div
             v-for="path in profileStore.profile.kubeconfigPaths"
             :key="path"
-            class="flex items-center gap-2 p-2.5 rounded-lg bg-(--bg-sidebar)/40 border border-(--border) text-xs font-mono text-muted-color truncate"
+            class="flex items-center gap-2 p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-sidebar)/40 border border-(--border) text-xs font-mono text-muted-color truncate"
           >
             <FileText :size="14" class="shrink-0 text-muted-color" />
             <span class="truncate">{{ path }}</span>

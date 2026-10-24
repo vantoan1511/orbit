@@ -328,7 +328,7 @@ const handleCreate = async () => {
         variant="text"
         severity="secondary"
         size="small"
-        class="text-xs p-0! font-semibold text-muted-color flex items-center gap-1.5 hover:text-primary"
+        class="text-xs p-0 font-semibold text-muted-color flex items-center gap-1.5 hover:text-primary"
         @click="showAdvanced = !showAdvanced"
       >
         <ChevronUp v-if="showAdvanced" class="w-3.5 h-3.5" />
@@ -342,7 +342,10 @@ const handleCreate = async () => {
     </div>
 
     <!-- Collapsible Advanced Section -->
-    <div v-if="showAdvanced" class="flex flex-col gap-3.5 p-3 rounded-lg bg-(--bg-hover)/30">
+    <div
+      v-if="showAdvanced"
+      class="flex flex-col gap-3.5 p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
+    >
       <!-- Container Name -->
       <div class="flex flex-col gap-1.5">
         <label for="create-pod-container-name" class="text-xs font-semibold text-muted-color">

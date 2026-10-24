@@ -74,7 +74,7 @@ const lastUpdatedDisplay = computed(() => {
           size="small"
           @click="retryNow"
           v-tooltip.top="'Retry connection immediately'"
-          class="p-0.5! w-5! h-5! text-(--warning)"
+          class="p-0.5 w-5 h-5 text-(--warning)"
         >
           <template #icon>
             <RotateCcw :size="10" />
@@ -94,7 +94,7 @@ const lastUpdatedDisplay = computed(() => {
           severity="danger"
           @click="restartApp"
           v-tooltip.top="'Restart application process to re-establish runtime engine link'"
-          class="h-5! px-2! text-[10px]!"
+          class="h-5 px-2 text-[10px]"
         >
           Restart app
         </Button>
@@ -110,7 +110,7 @@ const lastUpdatedDisplay = computed(() => {
           :loading="isRefreshing"
           :disabled="activeCluster === null"
           @click="refreshCluster"
-          class="p-1! w-6! h-6!"
+          class="p-1 w-6 h-6"
         >
           <template #icon>
             <RefreshCwIcon :size="12" />
@@ -125,7 +125,7 @@ const lastUpdatedDisplay = computed(() => {
         size="small"
         v-tooltip.top="'Toggle Terminal'"
         @click="terminalStore.togglePanel()"
-        class="p-1! w-6! h-6!"
+        class="p-1 w-6 h-6"
       >
         <template #icon>
           <TerminalIcon :size="12" />

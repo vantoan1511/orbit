@@ -73,7 +73,7 @@ const items = computed(() => {
     <Breadcrumb
       :home="home"
       :model="items"
-      class="p-0! bg-transparent! border-none! text-[11px] font-medium min-w-0 flex-1 overflow-hidden"
+      class="p-0 bg-transparent border-none text-[11px] font-medium min-w-0 flex-1 overflow-hidden"
     >
       <template #item="{ item, props }">
         <router-link v-if="item.route" v-slot="{ href, navigate }" :to="item.route" custom>

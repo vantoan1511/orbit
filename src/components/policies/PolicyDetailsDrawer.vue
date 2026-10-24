@@ -94,7 +94,10 @@ const handleEdit = () => {
     <template #overview>
       <div v-if="props.policy" class="space-y-6">
         <!-- Description -->
-        <div v-if="props.policy.description" class="bg-(--bg-hover)/40 rounded-xl p-4">
+        <div
+          v-if="props.policy.description"
+          class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4"
+        >
           <div class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-1.5">
             Description
           </div>
@@ -108,7 +111,9 @@ const handleEdit = () => {
           <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">
             Policy Properties
           </h3>
-          <div class="bg-(--bg-hover)/40 rounded-xl p-4 flex flex-col gap-3 text-xs font-ui">
+          <div
+            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-3 text-xs font-ui"
+          >
             <div class="grid grid-cols-3">
               <span class="text-muted-color font-semibold">Name</span>
               <span class="col-span-2 font-mono text-primary">{{ props.policy.name }}</span>

@@ -26,7 +26,7 @@ export function getActivityBarIndicatorClass(isActive: boolean): string {
  */
 export function getNavMenuItemClass(isActive: boolean): string {
   const base =
-    'flex items-center gap-2.5 px-3 py-1.5 transition-colors text-sm cursor-pointer no-underline select-none my-0.5 mx-2 rounded-md'
+    'flex items-center gap-2.5 px-3 py-1.5 transition-colors text-sm cursor-pointer no-underline select-none my-0.5 mx-2 rounded-[var(--ui-radius-control)]'
 
   if (isActive) {
     return `${base} bg-(--accent-soft) text-(--accent) font-semibold`

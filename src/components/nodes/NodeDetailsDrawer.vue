@@ -155,7 +155,7 @@ const copyYaml = async () => {
 
     <!-- Extra Tabs -->
     <template #extra-tabs>
-      <Tab value="events" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="events" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Activity class="w-3.5 h-3.5" />
         <span>Events ({{ nodeEvents.length }})</span>
       </Tab>

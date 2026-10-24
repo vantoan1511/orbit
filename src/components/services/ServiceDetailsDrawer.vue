@@ -149,11 +149,11 @@ const copyYaml = async () => {
   >
     <!-- Extra Tabs -->
     <template #extra-tabs>
-      <Tab value="endpoints" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="endpoints" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Shield class="w-3.5 h-3.5" />
         <span>Endpoints ({{ props.service?.endpointsList?.length || 0 }})</span>
       </Tab>
-      <Tab value="ports" class="text-xs! flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="ports" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
         <Activity class="w-3.5 h-3.5" />
         <span>Ports ({{ props.service?.portsList?.length || 0 }})</span>
       </Tab>

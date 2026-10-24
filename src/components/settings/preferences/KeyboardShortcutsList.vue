@@ -115,7 +115,7 @@ async function handleResetAll() {
     <!-- Empty State when filtering -->
     <div
       v-if="groupedDefinitions.size === 0"
-      class="p-6 text-center text-xs text-muted-color rounded-lg bg-(--bg-hover)/30"
+      class="p-6 text-center text-xs text-muted-color rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30"
     >
       No keyboard shortcuts match "{{ searchQuery }}".
     </div>
@@ -131,7 +131,7 @@ async function handleResetAll() {
           {{ cat }}
         </span>
 
-        <div class="flex flex-col rounded-lg bg-(--bg-card) overflow-hidden">
+        <div class="flex flex-col rounded-[var(--ui-radius-card)] bg-(--bg-card) overflow-hidden">
           <div
             v-for="(def, idx) in items"
             :key="def.id"
