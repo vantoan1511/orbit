@@ -77,3 +77,40 @@ test('AddClusterModal defines 3 input methods, collision feedback badge, and con
   assert.ok(content.includes('switchContext'), 'AddClusterModal must support auto-switch context')
   assert.ok(content.includes('selectedContexts'), 'AddClusterModal must track selected contexts')
 })
+
+test('AddClusterModal enforces token hygiene, dynamic UI styling, and canonical underline tabs', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/cluster/AddClusterModal.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  // Zero occurrences of text-primary utility class for generic labels/text (avoids electric blue)
+  assert.ok(
+    !/(?<![(-])text-primary\b/.test(content),
+    'AddClusterModal must not apply text-primary utility class to generic labels or text'
+  )
+
+  // Dynamic UI style tokens
+  assert.ok(
+    content.includes('var(--ui-radius-card)'),
+    'AddClusterModal must use dynamic var(--ui-radius-card)'
+  )
+  assert.ok(
+    content.includes('var(--ui-radius-control)'),
+    'AddClusterModal must use dynamic var(--ui-radius-control)'
+  )
+
+  // Token hygiene: No raw amber palette colors; use semantic warning tokens
+  assert.ok(
+    !content.includes('amber-500'),
+    'AddClusterModal must not hardcode raw amber-500 palette colors'
+  )
+  assert.ok(
+    content.includes('var(--warning)') || content.includes('--warning'),
+    'AddClusterModal must use semantic warning tokens'
+  )
+
+  // Canonical underline tabs (border-b on TabList without container borders)
+  assert.ok(
+    content.includes('border-b'),
+    'AddClusterModal TabList must use underline styling (border-b)'
+  )
+})

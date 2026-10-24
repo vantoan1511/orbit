@@ -373,29 +373,38 @@ function handleClose(): void {
     dismissable-mask
     :closable="!isSubmitting"
     data-component="add-cluster-modal"
-    class="w-full max-w-2xl bg-(--bg-card) border border-(--border) shadow-lg rounded-xl overflow-hidden"
+    class="w-full max-w-2xl border border-(--border) bg-(--bg-card) text-(--text-primary) shadow-[var(--ui-card-shadow,none)] rounded-[var(--ui-radius-card)] overflow-hidden"
     :pt="{
       root: { class: 'p-0 overflow-hidden' },
       header: {
-        class: 'px-6 pt-5 pb-3 border-b border-(--border) flex items-center justify-between'
+        class:
+          'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar)/60 flex items-center justify-between'
       },
-      content: { class: 'p-6 max-h-[75vh] overflow-y-auto flex flex-col gap-6' },
+      content: { class: 'p-5 max-h-[75vh] overflow-y-auto flex flex-col gap-6' },
       footer: {
         class:
-          'px-6 py-4 border-t border-(--border) bg-(--bg-app)/50 flex items-center justify-between'
+          'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar)/40 flex items-center justify-between'
+      },
+      closeButton: {
+        class:
+          'rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
       }
+    }"
+    :close-button-props="{
+      class:
+        'rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
     }"
     @update:visible="emit('update:visible', $event)"
   >
     <template #header>
       <div class="flex items-center gap-3">
         <div
-          class="w-8 h-8 rounded-lg bg-(--accent-soft) text-(--accent) flex items-center justify-center"
+          class="w-8 h-8 rounded-[var(--ui-radius-control)] bg-(--accent-soft) text-(--accent) flex items-center justify-center"
         >
           <Server class="w-4 h-4" />
         </div>
         <div>
-          <h3 class="text-base font-semibold text-primary">Add Kubernetes Cluster</h3>
+          <h3 class="text-base font-semibold text-(--text-primary)">Add Kubernetes Cluster</h3>
           <p class="text-xs text-muted-color">Connect to a local or remote Kubernetes cluster</p>
         </div>
       </div>
@@ -404,24 +413,24 @@ function handleClose(): void {
     <div class="flex flex-col gap-6">
       <!-- Input Mode Tabs -->
       <Tabs v-model:value="activeTab" class="w-full">
-        <TabList class="bg-(--bg-hover)/30 border border-(--border) rounded-lg p-1 flex gap-1">
+        <TabList class="bg-transparent! border-b! border-(--border)! px-1 flex gap-4 shrink-0">
           <Tab
             value="file"
-            class="flex-1 py-1.5 text-xs font-medium cursor-pointer rounded-md flex items-center justify-center gap-2"
+            class="py-2 px-2.5 text-xs font-medium cursor-pointer flex items-center gap-2 text-muted-color hover:text-(--text-primary) border-b-2 border-transparent transition-colors"
           >
             <FolderOpen class="w-3.5 h-3.5" />
             <span>Kubeconfig File</span>
           </Tab>
           <Tab
             value="paste"
-            class="flex-1 py-1.5 text-xs font-medium cursor-pointer rounded-md flex items-center justify-center gap-2"
+            class="py-2 px-2.5 text-xs font-medium cursor-pointer flex items-center gap-2 text-muted-color hover:text-(--text-primary) border-b-2 border-transparent transition-colors"
           >
             <FileText class="w-3.5 h-3.5" />
             <span>Paste YAML</span>
           </Tab>
           <Tab
             value="manual"
-            class="flex-1 py-1.5 text-xs font-medium cursor-pointer rounded-md flex items-center justify-center gap-2"
+            class="py-2 px-2.5 text-xs font-medium cursor-pointer flex items-center gap-2 text-muted-color hover:text-(--text-primary) border-b-2 border-transparent transition-colors"
           >
             <Globe class="w-3.5 h-3.5" />
             <span>Manual Endpoint</span>
@@ -432,7 +441,7 @@ function handleClose(): void {
           <!-- Tab 1: Kubeconfig File -->
           <TabPanel value="file">
             <div
-              class="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center cursor-pointer"
+              class="border-2 border-dashed rounded-[var(--ui-radius-card)] p-6 flex flex-col items-center justify-center gap-3 transition-colors text-center cursor-pointer"
               :class="[
                 isDraggingOver
                   ? 'border-(--accent) bg-(--accent-soft)'
@@ -444,12 +453,12 @@ function handleClose(): void {
               @click="handleBrowseFile"
             >
               <div
-                class="w-10 h-10 rounded-full bg-(--bg-hover) flex items-center justify-center text-muted-color"
+                class="w-10 h-10 rounded-[var(--ui-radius-control)] bg-(--bg-hover) flex items-center justify-center text-muted-color"
               >
                 <Upload class="w-5 h-5" />
               </div>
               <div class="flex flex-col gap-1">
-                <p class="text-xs font-medium text-primary">
+                <p class="text-xs font-medium text-(--text-primary)">
                   Drag and drop your kubeconfig file here, or click to browse
                 </p>
                 <p class="text-[11px] text-muted-color">
@@ -459,7 +468,7 @@ function handleClose(): void {
               <Button
                 size="small"
                 severity="secondary"
-                class="flex items-center gap-1.5 text-xs mt-1"
+                class="flex items-center gap-1.5 text-xs mt-1 rounded-[var(--ui-radius-control)]"
                 @click.stop="handleBrowseFile"
               >
                 <FolderOpen class="w-3.5 h-3.5" />
@@ -468,7 +477,7 @@ function handleClose(): void {
 
               <div
                 v-if="selectedFilePath"
-                class="mt-2 px-3 py-1.5 bg-(--bg-card) border border-(--border) rounded text-xs text-primary flex items-center gap-2 max-w-full truncate"
+                class="mt-2 px-3 py-1.5 bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-control)] text-xs text-(--text-primary) flex items-center gap-2 max-w-full truncate"
               >
                 <span class="font-medium truncate">{{ selectedFilePath }}</span>
                 <span v-if="selectedFileSize" class="text-muted-color text-[11px]"
@@ -489,7 +498,7 @@ function handleClose(): void {
                   size="small"
                   variant="text"
                   severity="secondary"
-                  class="p-1 h-6 text-xs flex items-center gap-1 text-muted-color hover:text-primary"
+                  class="p-1 h-6 text-xs flex items-center gap-1 text-muted-color hover:text-(--text-primary) rounded-[var(--ui-radius-control)]"
                   @click="pastedYaml = ''"
                 >
                   <Trash2 class="w-3 h-3" />
@@ -500,7 +509,7 @@ function handleClose(): void {
                 v-model="pastedYaml"
                 rows="8"
                 placeholder="apiVersion: v1&#10;kind: Config&#10;clusters: ...&#10;contexts: ..."
-                class="w-full font-mono text-xs leading-relaxed border-(--border) rounded-lg p-3 bg-(--bg-app)"
+                class="w-full font-mono text-xs leading-relaxed border-(--border) rounded-[var(--ui-radius-control)] p-3 bg-(--bg-app)/60"
               />
               <div v-if="yamlParseError" class="flex items-center gap-1.5 text-xs text-(--danger)">
                 <AlertCircle class="w-3.5 h-3.5 shrink-0" />
@@ -514,18 +523,18 @@ function handleClose(): void {
             <div class="flex flex-col gap-4 text-xs">
               <div class="grid grid-cols-2 gap-3">
                 <div class="flex flex-col gap-1.5">
-                  <label class="font-medium text-primary"
+                  <label class="text-xs font-medium text-muted-color"
                     >Cluster Name <span class="text-(--danger)">*</span></label
                   >
                   <InputText
                     v-model="manualConfig.clusterName"
                     placeholder="e.g. k8s-production"
                     size="small"
-                    class="w-full text-xs"
+                    class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
                 <div class="flex flex-col gap-1.5">
-                  <label class="font-medium text-primary">Context Name</label>
+                  <label class="text-xs font-medium text-muted-color">Context Name</label>
                   <InputText
                     v-model="manualConfig.contextName"
                     :placeholder="
@@ -534,103 +543,103 @@ function handleClose(): void {
                         : 'e.g. prod-admin'
                     "
                     size="small"
-                    class="w-full text-xs"
+                    class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="font-medium text-primary"
+                <label class="text-xs font-medium text-muted-color"
                   >API Server URL <span class="text-(--danger)">*</span></label
                 >
                 <InputText
                   v-model="manualConfig.serverUrl"
                   placeholder="https://192.168.1.100:6443 or https://k8s.example.com:6443"
                   size="small"
-                  class="w-full text-xs font-mono"
+                  class="w-full text-xs font-mono rounded-[var(--ui-radius-control)]"
                 />
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="font-medium text-primary">Authentication Method</label>
+                <label class="text-xs font-medium text-muted-color">Authentication Method</label>
                 <Select
                   v-model="manualConfig.authType"
                   :options="AUTH_TYPE_OPTIONS"
                   option-label="label"
                   option-value="value"
                   size="small"
-                  class="w-full text-xs"
+                  class="w-full text-xs rounded-[var(--ui-radius-control)]"
                 />
               </div>
 
               <!-- Auth Type Specific Inputs -->
               <div v-if="manualConfig.authType === 'token'" class="flex flex-col gap-1.5">
-                <label class="font-medium text-primary"
+                <label class="text-xs font-medium text-muted-color"
                   >Bearer Token <span class="text-(--danger)">*</span></label
                 >
                 <Textarea
                   v-model="manualConfig.token"
                   rows="3"
                   placeholder="Paste service account bearer token here"
-                  class="w-full font-mono text-xs border-(--border) rounded-lg p-2.5 bg-(--bg-app)"
+                  class="w-full font-mono text-xs border-(--border) rounded-[var(--ui-radius-control)] p-2.5 bg-(--bg-app)/60"
                 />
               </div>
 
               <div v-else-if="manualConfig.authType === 'certificate'" class="flex flex-col gap-3">
                 <div class="flex flex-col gap-1.5">
-                  <label class="font-medium text-primary"
+                  <label class="text-xs font-medium text-muted-color"
                     >Client Certificate Data (Base64) <span class="text-(--danger)">*</span></label
                   >
                   <Textarea
                     v-model="manualConfig.clientCertData"
                     rows="2"
                     placeholder="LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t..."
-                    class="w-full font-mono text-xs border-(--border) rounded-lg p-2.5 bg-(--bg-app)"
+                    class="w-full font-mono text-xs border-(--border) rounded-[var(--ui-radius-control)] p-2.5 bg-(--bg-app)/60"
                   />
                 </div>
                 <div class="flex flex-col gap-1.5">
-                  <label class="font-medium text-primary"
+                  <label class="text-xs font-medium text-muted-color"
                     >Client Key Data (Base64) <span class="text-(--danger)">*</span></label
                   >
                   <Textarea
                     v-model="manualConfig.clientKeyData"
                     rows="2"
                     placeholder="LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQ..."
-                    class="w-full font-mono text-xs border-(--border) rounded-lg p-2.5 bg-(--bg-app)"
+                    class="w-full font-mono text-xs border-(--border) rounded-[var(--ui-radius-control)] p-2.5 bg-(--bg-app)/60"
                   />
                 </div>
               </div>
 
               <div v-else-if="manualConfig.authType === 'basic'" class="grid grid-cols-2 gap-3">
                 <div class="flex flex-col gap-1.5">
-                  <label class="font-medium text-primary">Username</label>
+                  <label class="text-xs font-medium text-muted-color">Username</label>
                   <InputText
                     v-model="manualConfig.username"
                     placeholder="admin"
                     size="small"
-                    class="w-full text-xs"
+                    class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
                 <div class="flex flex-col gap-1.5">
-                  <label class="font-medium text-primary">Password</label>
+                  <label class="text-xs font-medium text-muted-color">Password</label>
                   <InputText
                     v-model="manualConfig.password"
                     type="password"
                     size="small"
-                    class="w-full text-xs"
+                    class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
               </div>
 
               <div class="flex flex-col gap-1.5">
-                <label class="font-medium text-primary"
+                <label class="text-xs font-medium text-muted-color"
                   >Certificate Authority Data (Optional Base64)</label
                 >
                 <Textarea
                   v-model="manualConfig.caCertData"
                   rows="2"
                   placeholder="Leave empty if using Skip TLS verification or system trust root"
-                  class="w-full font-mono text-xs border-(--border) rounded-lg p-2.5 bg-(--bg-app)"
+                  class="w-full font-mono text-xs border-(--border) rounded-[var(--ui-radius-control)] p-2.5 bg-(--bg-app)/60"
                 />
               </div>
 
@@ -649,12 +658,12 @@ function handleClose(): void {
       <div class="flex flex-col gap-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold text-primary uppercase tracking-wider">
+            <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
               Discovered Contexts
             </span>
             <span
               v-if="discoveredContexts.length > 0"
-              class="px-1.5 py-0.5 text-[10px] font-semibold rounded bg-(--bg-hover) text-muted-color"
+              class="px-1.5 py-0.5 text-[10px] font-semibold rounded-[var(--ui-radius-control)] bg-(--bg-hover) text-muted-color"
             >
               {{ discoveredContexts.length }} found
             </span>
@@ -664,7 +673,7 @@ function handleClose(): void {
             size="small"
             variant="text"
             severity="secondary"
-            class="text-xs p-0 h-auto text-(--accent) hover:underline"
+            class="text-xs p-0 h-auto text-(--accent) hover:underline rounded-[var(--ui-radius-control)]"
             @click="toggleSelectAll"
           >
             {{ isAllSelected ? 'Deselect All' : 'Select All' }}
@@ -673,7 +682,7 @@ function handleClose(): void {
 
         <div
           v-if="discoveredContexts.length === 0"
-          class="border border-(--border) rounded-lg p-6 bg-(--bg-hover)/20 text-center flex flex-col items-center justify-center gap-1.5 text-muted-color"
+          class="border border-(--border) rounded-[var(--ui-radius-card)] p-6 bg-(--bg-hover)/20 text-center flex flex-col items-center justify-center gap-1.5 text-muted-color"
         >
           <Server class="w-5 h-5 opacity-40" />
           <p class="text-xs">No contexts discovered yet</p>
@@ -684,7 +693,7 @@ function handleClose(): void {
 
         <div
           v-else
-          class="border border-(--border) rounded-lg divide-y divide-(--border) overflow-hidden bg-(--bg-card)"
+          class="border border-(--border) rounded-[var(--ui-radius-card)] divide-y divide-(--border) overflow-hidden bg-(--bg-card)"
         >
           <div
             v-for="ctx in discoveredContexts"
@@ -700,16 +709,18 @@ function handleClose(): void {
               />
               <div class="flex flex-col min-w-0">
                 <div class="flex items-center gap-2">
-                  <span class="text-xs font-medium text-primary truncate">{{ ctx.name }}</span>
+                  <span class="text-xs font-medium text-(--text-primary) truncate">{{
+                    ctx.name
+                  }}</span>
                   <span
                     v-if="ctx.isCurrentContext"
-                    class="px-1.5 py-0.2 text-[10px] font-medium rounded bg-(--accent-soft) text-(--accent)"
+                    class="px-1.5 py-0.2 text-[10px] font-medium rounded-[var(--ui-radius-control)] bg-(--accent-soft) text-(--accent)"
                   >
                     Current
                   </span>
                   <span
                     v-if="existingClusterNames.has(ctx.name)"
-                    class="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                    class="px-1.5 py-0.5 text-[10px] font-medium rounded-[var(--ui-radius-control)] bg-[var(--warning-soft)] text-[var(--warning)] border border-[var(--warning)]/20"
                   >
                     Already in Orbit
                   </span>
@@ -724,7 +735,7 @@ function handleClose(): void {
 
             <div class="shrink-0">
               <span
-                class="px-2 py-0.5 text-[10px] font-semibold rounded bg-(--bg-hover) text-muted-color border border-(--border)"
+                class="px-2 py-0.5 text-[10px] font-semibold rounded-[var(--ui-radius-control)] bg-(--bg-hover) text-muted-color border border-(--border)"
               >
                 {{ ctx.authType }}
               </span>
@@ -734,11 +745,13 @@ function handleClose(): void {
       </div>
 
       <!-- Cluster Customization Section -->
-      <div class="border border-(--border) rounded-lg overflow-hidden bg-(--bg-card)">
+      <div
+        class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card)"
+      >
         <Button
           variant="text"
           severity="secondary"
-          class="w-full! px-4! py-3! flex! items-center! justify-between! text-left! text-xs! font-medium! text-primary! hover:bg-(--bg-hover)/40! transition-colors! cursor-pointer! select-none! rounded-none! border-none!"
+          class="w-full! px-4! py-3! flex! items-center! justify-between! text-left! text-xs! font-medium! text-(--text-primary)! hover:bg-(--bg-hover)/40! transition-colors! cursor-pointer! select-none! rounded-none! border-none!"
           @click="showCustomization = !showCustomization"
         >
           <div class="flex items-center gap-2">
@@ -778,6 +791,7 @@ function handleClose(): void {
           severity="secondary"
           variant="text"
           size="small"
+          class="rounded-[var(--ui-radius-control)]"
           :disabled="isSubmitting"
           @click="handleClose"
         />
@@ -786,7 +800,7 @@ function handleClose(): void {
           size="small"
           :loading="isSubmitting"
           :disabled="!canSubmit"
-          class="flex items-center gap-1.5 px-4"
+          class="flex items-center gap-1.5 px-4 rounded-[var(--ui-radius-control)]"
           @click="handleAddClusterSubmit"
         >
           <Plus class="w-3.5 h-3.5" />
