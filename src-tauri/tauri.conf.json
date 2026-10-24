@@ -36,7 +36,28 @@
       "icons/128x128.png",
       "icons/icon.ico",
       "icons/icon.png"
-    ]
+    ],
+    "licenseFile": "../LICENSE",
+    "windows": {
+      "nsis": {
+        "template": "windows/nsis/installer.nsi",
+        "headerImage": "windows/nsis/header.bmp",
+        "sidebarImage": "windows/nsis/sidebar.bmp",
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "installMode": "both",
+        "languages": [
+          "English",
+          "Vietnamese"
+        ],
+        "displayLanguageSelector": true,
+        "compression": "lzma",
+        "customLanguageFiles": {
+          "English": "windows/nsis/languages/English.custom.nsh",
+          "Vietnamese": "windows/nsis/languages/Vietnamese.custom.nsh"
+        }
+      }
+    }
   },
   "plugins": {}
 }
