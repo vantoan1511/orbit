@@ -85,13 +85,13 @@ function validateLanguageFile(filePath: string, langMacro: string) {
   assert.ok(fs.existsSync(filePath), `Language file must exist: ${filePath}`)
   const buf = fs.readFileSync(filePath)
 
-  // Validate UTF-8 BOM
+  // Validate UTF-8 without BOM (Tauri bundler automatically adds a BOM on copy; having a BOM in source causes duplicate BOM and makensis failure)
   assert.ok(
-    buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf,
-    `File must start with UTF-8 BOM (0xEF, 0xBB, 0xBF): ${filePath}`
+    !(buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf),
+    `File must NOT start with UTF-8 BOM to prevent duplicate BOM when bundled by Tauri: ${filePath}`
   )
 
-  const content = buf.subarray(3).toString('utf-8')
+  const content = buf.toString('utf-8')
   for (const key of REQUIRED_LANG_KEYS) {
     const pattern = new RegExp(`LangString\\s+${key}\\s+\\$\{${langMacro}\}`)
     assert.match(
@@ -102,7 +102,7 @@ function validateLanguageFile(filePath: string, langMacro: string) {
   }
 }
 
-test('NSIS localization files (English and Vietnamese with UTF-8 BOM)', () => {
+test('NSIS localization files (English and Vietnamese UTF-8 without duplicate BOM)', () => {
   validateLanguageFile(EN_LANG_PATH, 'LANG_ENGLISH')
   validateLanguageFile(VI_LANG_PATH, 'LANG_VIETNAMESE')
 })
