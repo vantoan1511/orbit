@@ -55,5 +55,8 @@ __screenshots__/
 
 /target/
 target/
-GEMINI.md
-/.agents
+/.agents/handoffs
+/.agents/logs
+/.agents/PRPs
+/.agents/reviews
+/.agents/scripts/__pycache__

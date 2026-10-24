@@ -1,0 +1,10 @@
+{
+  "project_name": "orbit",
+  "preset": "universal",
+  "commands": {
+    "type_check": "npm run type-check",
+    "lint": "npm run lint",
+    "test": "npm test",
+    "build": "npm run build"
+  }
+}

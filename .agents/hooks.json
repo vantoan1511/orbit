@@ -1,0 +1,18 @@
+{
+  "memory-logger": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python .agents/scripts/memory_logger.py --hook"
+      }
+    ]
+  },
+  "shift-left-advisor": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "python .agents/scripts/shift_left_hook.py"
+      }
+    ]
+  }
+}
