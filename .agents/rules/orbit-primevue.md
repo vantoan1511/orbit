@@ -129,6 +129,33 @@ When using Lucide or custom icons inside PrimeVue `<Button>` components:
 3. **Persistent Action Visibility**:
    - For reset/restore actions in settings and toolbars, prefer `:disabled="!isModified"` over `v-if="isModified"` to avoid layout shift and clarify available capabilities.
 
+## Strict Design Token & Styling Guardrails (ZERO-TOLERANCE)
+
+### 1. Banned: Ad-hoc `.p-*` CSS Selectors
+- **NEVER** write ad-hoc CSS classes or scoped overrides targeting PrimeVue internals (e.g., `.p-button`, `.p-dialog`, `.p-datatable`, `.p-tooltip`, `.p-select`).
+- If a component needs styling, map it to PrimeVue tokens in `src/theme/orbitTheme.ts` via `definePreset` referencing central CSS variables.
+- All styles must naturally adapt across the 5 runtime styles (`flat`, `glass`, `aero`, `liquidglass`, `ios`) via system tokens.
+
+### 2. Banned: Tailwind Important Modifiers (`!`)
+- **NEVER** use Tailwind important modifiers (e.g. `!bg-...`, `!p-...`, `!border-...`) to force styles over PrimeVue.
+- PrimeVue v4 uses CSS layers (`cssLayer.order: 'theme, base, primevue, utilities'`). Tailwind utilities already have natural cascade priority over PrimeVue defaults. If an override fails, check token mapping—never brute-force with `!`.
+
+### 3. Banned: Hardcoded Corner Radii in Components
+- **NEVER** hardcode static Tailwind corner radii on cards, panels, modals, inputs, or buttons:
+  - ❌ `rounded-lg`, `rounded-xl`, `rounded-2xl`
+  - ❌ `rounded-sm`, `rounded-md`
+- **ALWAYS** use the dynamic design tokens:
+  - Containers, cards, drawers, modals: `rounded-[var(--ui-radius-card)]`
+  - Controls, buttons, badges, inputs: `rounded-[var(--ui-radius-control)]`
+  - Pill badges / circular avatars: `rounded-full` (allowed only for true circular shapes)
+
+### 4. Mandatory Pre-Flight Token Hygiene Test
+Before completing any UI task or committing changes, you **MUST** run:
+```bash
+node --experimental-strip-types --test "src/theme/__tests__/appearanceTokenHygiene.test.ts"
+```
+If this test fails due to forbidden `.p-*` selectors, missing tokens, or hardcoded radii, you must fix the code immediately before proceeding.
+
 ## Verification
 
 After changing a PrimeVue component:
