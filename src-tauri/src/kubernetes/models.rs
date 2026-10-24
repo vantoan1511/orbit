@@ -45,11 +45,37 @@ pub struct PodInfo {
     pub containers: Vec<PodContainer>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterCustomization {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+pub type ClusterCustomizationMap = std::collections::HashMap<String, ClusterCustomization>;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct ClusterInfo {
     pub id: String,
     pub name: String,
     pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -48,6 +48,8 @@ impl KubeManager {
 
     pub fn get_clusters(&self) -> Vec<ClusterInfo> {
         let mut clusters = Vec::new();
+        let customizations = self.config.cluster_customizations();
+
         if let Some(ref config) = self.kubeconfig {
             for ctx in &config.contexts {
                 let status = if Some(&ctx.name) == self.active_context.as_ref() {
@@ -59,10 +61,25 @@ impl KubeManager {
                 } else {
                     "offline".to_string()
                 };
+
+                let server_url = ctx
+                    .context
+                    .as_ref()
+                    .and_then(|c| config.clusters.iter().find(|cl| cl.name == c.cluster))
+                    .and_then(|cl| cl.cluster.as_ref())
+                    .and_then(|cl| cl.server.clone());
+
+                let custom = customizations.get(&ctx.name);
+
                 clusters.push(ClusterInfo {
                     id: ctx.name.clone(),
                     name: ctx.name.clone(),
                     status,
+                    alias: custom.and_then(|c| c.alias.clone()),
+                    tags: custom.map(|c| c.tags.clone()).unwrap_or_default(),
+                    color: custom.and_then(|c| c.color.clone()),
+                    description: custom.and_then(|c| c.description.clone()),
+                    server_url,
                 });
             }
         }
@@ -314,6 +331,21 @@ users:
         let clusters = manager.get_clusters();
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].name, "test-context");
+        assert_eq!(clusters[0].server_url, Some("https://127.0.0.1:6443".to_string()));
+
+        // Verify custom metadata enrichment
+        manager.config.set_cluster_customization("test-context", crate::kubernetes::models::ClusterCustomization {
+            alias: Some("My Friendly Cluster".to_string()),
+            tags: vec!["production".to_string()],
+            color: Some("#ef4444".to_string()),
+            description: Some("Production node".to_string()),
+        });
+        let enriched = manager.get_clusters();
+        assert_eq!(enriched[0].alias, Some("My Friendly Cluster".to_string()));
+        assert_eq!(enriched[0].tags, vec!["production".to_string()]);
+        assert_eq!(enriched[0].color, Some("#ef4444".to_string()));
+        assert_eq!(enriched[0].description, Some("Production node".to_string()));
+        assert_eq!(enriched[0].server_url, Some("https://127.0.0.1:6443".to_string()));
 
         let _ = std::fs::remove_file(file_path);
     }

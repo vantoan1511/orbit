@@ -95,7 +95,10 @@ test('AppTitleBar component integrates active cluster info and health status', (
   assert.ok(content.includes('useCluster'), 'AppTitleBar must import useCluster')
   assert.ok(content.includes('useKubernetesStore'), 'AppTitleBar must import useKubernetesStore')
   assert.ok(content.includes('activeCluster'), 'AppTitleBar must bind activeCluster')
-  assert.ok(content.includes('activeCluster.name'), 'AppTitleBar must render activeCluster.name')
+  assert.ok(
+    content.includes('activeCluster.name') || content.includes('getClusterDisplayName'),
+    'AppTitleBar must render activeCluster name or display name'
+  )
   assert.ok(
     content.includes('No active cluster'),
     'AppTitleBar must render fallback when activeCluster is null'
@@ -132,5 +135,19 @@ test('AppTitleBar component integrates dev mode badge with tooltip', () => {
     content.includes('v-tooltip.bottom="\'Orbit Development Instance (config: ~/.orbit-dev)\'"') ||
       content.includes('v-tooltip.bottom="'),
     'AppTitleBar must provide dev tooltip on badge'
+  )
+})
+
+test('AppTitleBar component renders cluster alias and custom color dot', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/AppTitleBar.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('getClusterDisplayName'),
+    'AppTitleBar must display activeCluster alias via getClusterDisplayName'
+  )
+  assert.ok(
+    content.includes('activeCluster.color'),
+    'AppTitleBar must support custom environment color on indicator dot'
   )
 })

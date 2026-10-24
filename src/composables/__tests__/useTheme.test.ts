@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { themeService } from '../../services/themeService.ts'
+import { appearanceService } from '../../services/appearanceService.ts'
 import { useTheme, initTheme } from '../useTheme.ts'
 
 test('useTheme toggles theme and calls themeService.saveTheme', async () => {
@@ -23,6 +24,7 @@ test('useTheme toggles theme and calls themeService.saveTheme', async () => {
 })
 
 test('initTheme applies loaded theme from themeService', async () => {
+  await appearanceService.clearAppearancePreferences()
   const originalLoad = themeService.loadTheme
   themeService.loadTheme = async () => 'dark'
 
@@ -32,5 +34,6 @@ test('initTheme applies loaded theme from themeService', async () => {
     assert.equal(isDark.value, true)
   } finally {
     themeService.loadTheme = originalLoad
+    await appearanceService.clearAppearancePreferences()
   }
 })

@@ -16,7 +16,8 @@ export const CONFIG_KEYS = {
   THEME_MODE: 'themeMode',
   ACCENT_COLOR: 'accentColor',
   UI_STYLE: 'uiStyle',
-  SEMANTIC_COLORS: 'semanticColors'
+  SEMANTIC_COLORS: 'semanticColors',
+  CLUSTER_CUSTOMIZATIONS: 'clusterCustomizations'
 } as const
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
@@ -30,7 +31,8 @@ export const SPECIALIZED_CONFIG_KEYS: readonly string[] = [
   CONFIG_KEYS.THEME_MODE,
   CONFIG_KEYS.ACCENT_COLOR,
   CONFIG_KEYS.UI_STYLE,
-  CONFIG_KEYS.SEMANTIC_COLORS
+  CONFIG_KEYS.SEMANTIC_COLORS,
+  CONFIG_KEYS.CLUSTER_CUSTOMIZATIONS
 ] as const
 
 export function isGeneralConfigKey(key: string): boolean {
@@ -82,6 +84,7 @@ export const VALID_SETTINGS_TABS: readonly SettingsSubTab[] = [
 
 export const ENABLED_SETTINGS_TABS: readonly SettingsSubTab[] = [
   'general',
+  'clusters',
   'preferences',
   'appearance',
   'about'

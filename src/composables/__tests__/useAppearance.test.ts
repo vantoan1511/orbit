@@ -8,7 +8,14 @@ import {
   getThemeModeIcon
 } from '../useAppearance.ts'
 import { useTheme } from '../useTheme.ts'
-import type { AppearancePreferences } from '../../types/appearance.ts'
+import {
+  DEFAULT_APPEARANCE_PREFERENCES,
+  type AppearancePreferences
+} from '../../types/appearance.ts'
+
+test('DEFAULT_APPEARANCE_PREFERENCES themeMode defaults to dark', () => {
+  assert.equal(DEFAULT_APPEARANCE_PREFERENCES.themeMode, 'dark')
+})
 
 test('useAppearance initializes and updates themeMode', async () => {
   const originalSave = appearanceService.saveAppearancePreferences

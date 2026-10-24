@@ -66,7 +66,7 @@ export interface AppearancePreferences {
 }
 
 export const DEFAULT_APPEARANCE_PREFERENCES: AppearancePreferences = {
-  themeMode: 'system',
+  themeMode: 'dark',
   accentColor: 'blue',
   uiStyle: 'flat',
   semanticColors: { ...DEFAULT_SEMANTIC_COLORS_PREFERENCES }
