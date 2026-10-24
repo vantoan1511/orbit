@@ -136,6 +136,11 @@ pub fn run() {
                 crate::tray::show_main_window(&handle);
             }
 
+            // Ensure window decorations are disabled in all environments
+            if let Some(window) = handle.get_webview_window("main") {
+                let _ = window.set_decorations(false);
+            }
+
             // If running in development mode, ensure window title reflects dev mode even if not launched with dev config overlay
             if crate::config::OrbitConfig::is_dev_mode() {
                 if let Some(window) = handle.get_webview_window("main") {

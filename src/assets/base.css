@@ -92,6 +92,14 @@
   --border: #d5d9e1;
   --border-strong: #c7cdd7;
 
+  /* PrimeVue Border Token Bridge */
+  --p-content-border-color: var(--border);
+  --p-form-field-border-color: var(--input-border, var(--border));
+  --p-datatable-border-color: var(--border);
+  --p-dialog-border-color: var(--border);
+  --p-popover-border-color: var(--border);
+  --p-drawer-border-color: var(--border);
+
   /* ===========================
      Text
      =========================== */
@@ -179,6 +187,14 @@
 
   --border: #212427;
   --border-strong: #2a2d31;
+
+  /* PrimeVue Border Token Bridge */
+  --p-content-border-color: var(--border);
+  --p-form-field-border-color: var(--input-border, var(--border));
+  --p-datatable-border-color: var(--border);
+  --p-dialog-border-color: var(--border);
+  --p-popover-border-color: var(--border);
+  --p-drawer-border-color: var(--border);
 
   /* ===========================
      Text
@@ -394,6 +410,10 @@
 }
 
 /* Card & Surface Styling with UI Style Presets */
+.p-card {
+  border: 1px solid var(--border);
+}
+
 .bg-\(--bg-card\),
 .p-card,
 .p-dialog,
@@ -402,6 +422,23 @@
   border-radius: var(--ui-radius-card);
   box-shadow: var(--ui-card-shadow, none);
   transition: border-radius 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Translucent Surface Specular Border Sheen */
+[data-ui-style="glass"] .p-card,
+[data-ui-style="glass"] .p-dialog,
+[data-ui-style="glass"] .p-drawer,
+[data-ui-style="glass"] .p-popover,
+[data-ui-style="liquidglass"] .p-card,
+[data-ui-style="liquidglass"] .p-dialog,
+[data-ui-style="liquidglass"] .p-drawer,
+[data-ui-style="liquidglass"] .p-popover,
+[data-ui-style="aero"] .p-card,
+[data-ui-style="aero"] .p-dialog,
+[data-ui-style="aero"] .p-drawer,
+[data-ui-style="aero"] .p-popover {
+  border: 1px solid var(--border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), var(--ui-card-shadow, none);
 }
 
 /* Dynamic control radius for PrimeVue form controls, inputs, and tags */
