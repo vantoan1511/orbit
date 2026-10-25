@@ -32,6 +32,14 @@ jobs:
         run: npm ci
       - name: Build Tauri Desktop Application
         run: npm run tauri:build
+      - name: Verify Installer Elevation (Legacy Client Backward-Compatibility)
+        run: |
+          $nsis = Get-ChildItem -Path @("target/release/bundle/nsis/*setup.exe", "src-tauri/target/release/bundle/nsis/*setup.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $nsis) {
+            $nsis = Get-ChildItem target/release/bundle/nsis/*setup.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $nsis) { throw "NSIS installer not found for elevation verification" }
+          node --experimental-strip-types scripts/verify-installer-elevation.ts $nsis.FullName
       - name: Get Version
         id: version
         run: |

@@ -13,6 +13,8 @@ const INSTALLER_NSI_PATH = path.join(NSIS_DIR, 'installer.nsi')
 const EN_LANG_PATH = path.join(NSIS_DIR, 'languages', 'English.custom.nsh')
 const VI_LANG_PATH = path.join(NSIS_DIR, 'languages', 'Vietnamese.custom.nsh')
 
+import { ELEVATION_FREE_INSTALL_MODES } from '../scripts/lib/installerManifest.ts'
+
 test('NSIS installer configuration in tauri.conf.json', () => {
   assert.ok(fs.existsSync(TAURI_CONF_PATH), 'tauri.conf.json must exist')
   const config = JSON.parse(fs.readFileSync(TAURI_CONF_PATH, 'utf-8'))
@@ -28,7 +30,12 @@ test('NSIS installer configuration in tauri.conf.json', () => {
   assert.equal(nsis.sidebarImage, 'windows/nsis/sidebar.bmp')
   assert.equal(nsis.installerIcon, 'icons/icon.ico')
   assert.equal(nsis.uninstallerIcon, 'icons/icon.ico')
-  assert.equal(nsis.installMode, 'both')
+  // Legacy CreateProcess clients (<= 0.17.0) cannot handle UAC elevation prompts (error 740).
+  // The installer must be configured with an elevation-free install mode ('currentUser').
+  assert.ok(
+    ELEVATION_FREE_INSTALL_MODES.includes(nsis.installMode),
+    `installMode must be one of [${ELEVATION_FREE_INSTALL_MODES.join(', ')}], got '${nsis.installMode}'`
+  )
   assert.deepEqual(nsis.languages, ['English', 'Vietnamese'])
   assert.equal(nsis.displayLanguageSelector, true)
   assert.equal(nsis.compression, 'lzma')
@@ -36,6 +43,16 @@ test('NSIS installer configuration in tauri.conf.json', () => {
     English: 'windows/nsis/languages/English.custom.nsh',
     Vietnamese: 'windows/nsis/languages/Vietnamese.custom.nsh'
   })
+})
+
+test('installMode never requires elevation for CreateProcess-launched updates', () => {
+  const config = JSON.parse(fs.readFileSync(TAURI_CONF_PATH, 'utf-8'))
+  const installMode = config.bundle?.windows?.nsis?.installMode
+  const forbiddenModes = ['both', 'perMachine']
+  assert.ok(
+    !forbiddenModes.includes(installMode),
+    `installMode '${installMode}' is forbidden because it requires elevation or triggers highestAvailable requestedExecutionLevel in NSIS MultiUser`
+  )
 })
 
 function validateBmp(filePath: string, expectedWidth: number, expectedHeight: number) {

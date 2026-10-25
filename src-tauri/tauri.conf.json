@@ -45,7 +45,7 @@
         "sidebarImage": "windows/nsis/sidebar.bmp",
         "installerIcon": "icons/icon.ico",
         "uninstallerIcon": "icons/icon.ico",
-        "installMode": "both",
+        "installMode": "currentUser",
         "languages": [
           "English",
           "Vietnamese"
