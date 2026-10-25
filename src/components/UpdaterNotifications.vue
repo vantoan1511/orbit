@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
+import { formatUpdateInstallErrorMessage } from '@/utils/updateInstallMessages'
 import { Download, RefreshCw } from '@lucide/vue'
 import { app } from '@/services/nativeService'
 import Button from 'primevue/button'
@@ -47,6 +48,21 @@ watch(
           app.exit()
         }
       }, 1000)
+    }
+  }
+)
+
+watch(
+  () => updaterStore.installError,
+  (error) => {
+    if (error) {
+      const isDenied = error.code === 'elevationDenied'
+      toast.add({
+        severity: isDenied ? 'warn' : 'error',
+        summary: isDenied ? 'Update Cancelled' : 'Update Failed',
+        detail: formatUpdateInstallErrorMessage(error),
+        life: 5000
+      })
     }
   }
 )

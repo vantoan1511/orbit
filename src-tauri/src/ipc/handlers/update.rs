@@ -2,8 +2,45 @@ use std::sync::Arc;
 use serde_json::Value;
 use tokio::sync::Mutex;
 use crate::ipc::bridge::{Bridge, WsWriter};
-use crate::ipc::events::OrbitEvent;
+use crate::ipc::events::{OrbitEvent, UpdateInstallFailureCode};
+use crate::updater::installer_launcher::{InstallerLaunchError, InstallerLauncher, ShellInstallerLauncher};
 use super::utils::get_string;
+
+#[derive(Debug)]
+pub enum LaunchOutcome {
+    Proceed,
+    Abort(OrbitEvent),
+}
+
+impl PartialEq for LaunchOutcome {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LaunchOutcome::Proceed, LaunchOutcome::Proceed) => true,
+            _ => false,
+        }
+    }
+}
+
+pub const MSG_ELEVATION_DENIED: &str = "Update cancelled — administrator permission was not granted";
+pub const UPDATE_READY_GRACE_PERIOD_MS: u64 = 500;
+
+pub fn resolve_launch_outcome(res: Result<(), InstallerLaunchError>) -> LaunchOutcome {
+    match res {
+        Ok(()) => LaunchOutcome::Proceed,
+        Err(InstallerLaunchError::ElevationDenied) => {
+            LaunchOutcome::Abort(OrbitEvent::UpdateInstallFailed {
+                code: UpdateInstallFailureCode::ElevationDenied,
+                message: MSG_ELEVATION_DENIED.to_string(),
+            })
+        }
+        Err(InstallerLaunchError::Failed { detail, .. }) => {
+            LaunchOutcome::Abort(OrbitEvent::UpdateInstallFailed {
+                code: UpdateInstallFailureCode::LaunchFailed,
+                message: format!("Failed to launch installer: {}", detail),
+            })
+        }
+    }
+}
 
 pub fn check_for_updates(
     data: Option<Value>,
@@ -100,6 +137,15 @@ pub fn apply_update(
     writer: Arc<Mutex<WsWriter>>,
     token: String,
 ) {
+    apply_update_with_launcher(data, writer, token, Arc::new(ShellInstallerLauncher));
+}
+
+pub fn apply_update_with_launcher(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    launcher: Arc<dyn InstallerLauncher>,
+) {
     tokio::spawn(async move {
         let url = get_string(&data, "url");
         let current_engine = env!("CARGO_PKG_VERSION");
@@ -143,33 +189,34 @@ pub fn apply_update(
                 Ok(installer_path) => {
                     tracing::info!(installer_path = ?installer_path, "Installer downloaded, launching setup");
 
-                    let _ = Bridge::send_event(
-                        &writer,
-                        &token,
-                        &OrbitEvent::UpdateReady {
-                            component: "app".to_string(),
-                        },
-                    ).await;
+                    let launch_res = tokio::task::spawn_blocking(move || {
+                        launcher.launch(&installer_path)
+                    })
+                    .await
+                    .unwrap_or_else(|e| {
+                        Err(InstallerLaunchError::Failed {
+                            os_code: None,
+                            detail: format!("Task join error: {}", e),
+                        })
+                    });
 
-                    // On Windows, launch the installer GUI directly
-                    let spawn_res = std::process::Command::new(&installer_path).spawn();
-
-                    match spawn_res {
-                        Ok(_) => {
-                            tracing::info!("Installer spawned successfully; exiting Orbit for upgrade");
-                            // Give websocket bridge time to send UpdateReady event before exit
-                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                            std::process::exit(0);
-                        }
-                        Err(e) => {
-                            tracing::error!(error = ?e, "Failed to spawn installer");
+                    match resolve_launch_outcome(launch_res) {
+                        LaunchOutcome::Proceed => {
+                            tracing::info!("Installer spawned successfully; notifying and exiting Orbit for upgrade");
                             let _ = Bridge::send_event(
                                 &writer,
                                 &token,
-                                &OrbitEvent::ErrorOccurred {
-                                    message: format!("Failed to launch installer: {}", e),
+                                &OrbitEvent::UpdateReady {
+                                    component: "app".to_string(),
                                 },
                             ).await;
+                            // Give websocket bridge time to send UpdateReady event before exit
+                            tokio::time::sleep(std::time::Duration::from_millis(UPDATE_READY_GRACE_PERIOD_MS)).await;
+                            std::process::exit(0);
+                        }
+                        LaunchOutcome::Abort(event) => {
+                            tracing::warn!(?event, "Installer launch failed or aborted");
+                            let _ = Bridge::send_event(&writer, &token, &event).await;
                         }
                     }
                 }
@@ -210,5 +257,57 @@ mod tests {
         }));
         let version = extract_target_version(&payload, "0.14.8");
         assert_eq!(version, "0.14.8");
+    }
+
+    struct FakeLauncher {
+        result: std::sync::Mutex<Result<(), InstallerLaunchError>>,
+    }
+
+    impl InstallerLauncher for FakeLauncher {
+        fn launch(&self, _path: &std::path::Path) -> Result<(), InstallerLaunchError> {
+            self.result.lock().unwrap().clone()
+        }
+    }
+
+    #[test]
+    fn test_launch_outcome_ok_proceeds() {
+        let outcome = resolve_launch_outcome(Ok(()));
+        assert_eq!(outcome, LaunchOutcome::Proceed);
+    }
+
+    #[test]
+    fn test_launch_outcome_elevation_denied() {
+        let outcome = resolve_launch_outcome(Err(InstallerLaunchError::ElevationDenied));
+        match outcome {
+            LaunchOutcome::Abort(OrbitEvent::UpdateInstallFailed { code, message }) => {
+                assert_eq!(code, UpdateInstallFailureCode::ElevationDenied);
+                assert!(message.to_lowercase().contains("administrator permission"));
+            }
+            other => panic!("Expected Abort(UpdateInstallFailed), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_launch_outcome_failed_includes_detail() {
+        let outcome = resolve_launch_outcome(Err(InstallerLaunchError::Failed {
+            os_code: Some(740),
+            detail: "The requested operation requires elevation.".to_string(),
+        }));
+        match outcome {
+            LaunchOutcome::Abort(OrbitEvent::UpdateInstallFailed { code, message }) => {
+                assert_eq!(code, UpdateInstallFailureCode::LaunchFailed);
+                assert!(message.contains("The requested operation requires elevation."));
+            }
+            other => panic!("Expected Abort(UpdateInstallFailed), got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_fake_launcher_injection_seam() {
+        let fake = FakeLauncher {
+            result: std::sync::Mutex::new(Err(InstallerLaunchError::ElevationDenied)),
+        };
+        let res = fake.launch(std::path::Path::new("dummy.exe"));
+        assert_eq!(res, Err(InstallerLaunchError::ElevationDenied));
     }
 }

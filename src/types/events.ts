@@ -37,6 +37,8 @@ export interface UpdateManifest {
   release_notes?: string
 }
 
+export type UpdateInstallFailureCode = 'elevationDenied' | 'launchFailed'
+
 export type KubernetesResourceInfo =
   | ServiceInfo
   | IngressInfo
@@ -180,6 +182,10 @@ export interface OrbitEventMap {
   updateReady: {
     component: string
   }
+  updateInstallFailed: {
+    code: UpdateInstallFailureCode
+    message: string
+  }
   commandSucceeded: {
     message: string
   }
@@ -259,6 +265,7 @@ export const OrbitEvents = {
   UpdateCheckFinished: 'updateCheckFinished',
   UpdateDownloadProgress: 'updateDownloadProgress',
   UpdateReady: 'updateReady',
+  UpdateInstallFailed: 'updateInstallFailed',
   CommandSucceeded: 'commandSucceeded',
   ResourceRawData: 'resourceRawData',
   PortForwardStarted: 'portForwardStarted',

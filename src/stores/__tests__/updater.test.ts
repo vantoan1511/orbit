@@ -61,3 +61,46 @@ test('updaterStore applyUpdate calls updaterService with both url and version', 
     updaterService.applyUpdate = originalApply
   }
 })
+
+test('updaterStore resets download state and records error on updateInstallFailed', () => {
+  let failureHandler:
+    ((data: { code: 'elevationDenied' | 'launchFailed'; message: string }) => void) | null = null
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const originalOnFailed = (updaterService as any).onUpdateInstallFailed
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(updaterService as any).onUpdateInstallFailed = (handler: any) => {
+    failureHandler = handler
+    return () => {}
+  }
+
+  try {
+    const store = useUpdaterStore()
+    store.initListeners()
+    store.isDownloading = true
+    store.downloadProgress = 50
+    store.updateReady = 'app'
+
+    assert(failureHandler !== null, 'failureHandler should be registered')
+    failureHandler({ code: 'elevationDenied', message: 'Permission denied' })
+
+    assert.equal(store.isDownloading, false)
+    assert.equal(store.downloadProgress, 0)
+    assert.equal(store.updateReady, null)
+    assert.deepEqual(store.installError, { code: 'elevationDenied', message: 'Permission denied' })
+  } finally {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(updaterService as any).onUpdateInstallFailed = originalOnFailed
+  }
+})
+
+test('updaterStore applyUpdate clears previous installError', () => {
+  const store = useUpdaterStore()
+  store.installError = { code: 'elevationDenied', message: 'old error' }
+  store.manifest = {
+    version: '0.15.0',
+    url: 'https://example.com/installer.exe'
+  }
+  store.applyUpdate()
+  assert.equal(store.installError, null)
+})

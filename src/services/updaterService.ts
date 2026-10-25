@@ -27,6 +27,10 @@ class UpdaterService {
   onUpdateReady(handler: (data: OrbitEventMap['updateReady']) => void) {
     return events.on(OrbitEvents.UpdateReady, handler)
   }
+
+  onUpdateInstallFailed(handler: (data: OrbitEventMap['updateInstallFailed']) => void) {
+    return events.on(OrbitEvents.UpdateInstallFailed, handler)
+  }
 }
 
 export const updaterService = new UpdaterService()
