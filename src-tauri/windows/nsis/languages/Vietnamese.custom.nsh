@@ -37,3 +37,4 @@ LangString taskStartMenuShortcut ${LANG_VIETNAMESE} "Tạo lối tắt trong &St
 LangString tasksGroupStartup ${LANG_VIETNAMESE} "Khởi động hệ thống:"
 LangString taskLaunchOnStartup ${LANG_VIETNAMESE} "&Tự động khởi chạy Orbit khi Windows khởi động"
 LangString purgeOrbitConfigData ${LANG_VIETNAMESE} "Xóa toàn bộ cấu hình cụm và bộ nhớ đệm (~/.orbit)"
+LangString perMachineInstallDetected ${LANG_VIETNAMESE} "Phát hiện một bản cài đặt toàn hệ thống (All Users) trước đó của ${PRODUCTNAME} trong Program Files.$\n$\nBản cập nhật này sẽ được cài đặt cho tài khoản người dùng hiện tại tại %LOCALAPPDATA%\${PRODUCTNAME}. Bạn có thể gỡ bỏ bản cài đặt toàn hệ thống cũ trong Cài đặt Windows > Ứng dụng đã cài đặt."

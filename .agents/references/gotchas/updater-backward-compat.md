@@ -70,8 +70,11 @@ In v0.17.2, Orbit configured `bundle.windows.nsis.installMode = "currentUser"`. 
 - **asInvoker Invariant**: The NSIS installer MUST retain `requestedExecutionLevel asInvoker` (`installMode: "currentUser"`) as long as any supported in-field client launches updates via `CreateProcessW`. Re-evaluating `installMode: both` is strictly deferred until a future major milestone where ≥ 0.17.1 is the enforced minimum baseline for all active clients.
 - **Automated CI Elevation Guard**: `.github/workflows/release.yml` executes `node --experimental-strip-types scripts/verify-installer-elevation.ts <path-to-*setup.exe>` after bundling. The build fails immediately if the installer PE manifest does not specify `asInvoker`.
 
-#### Per-Machine Install Caveat
-Users who previously chose an "All Users" (`perMachine` / `%ProgramFiles%\Orbit`) installation during v0.17.0/v0.17.1 will have new updates installed to `%LOCALAPPDATA%\Orbit`. If an existing per-machine installation remains, the user may have two copies until the Program Files version is uninstalled.
+#### Per-Machine Install Caveat & Detection Notice
+Users who previously chose an "All Users" (`perMachine` / `%ProgramFiles%\Orbit`) installation during v0.17.0/v0.17.1 will have new updates installed to `%LOCALAPPDATA%\Orbit`.
+- **Interactive Notice**: In interactive installer runs (when not silent, passive, or automated update mode), the installer checks `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Orbit\UninstallString`. If a system-wide installation exists, it displays an informational dialog (`$(perMachineInstallDetected)`) advising the user that the app will install per-user and they can safely uninstall the old system-wide version via Windows Settings.
+- **Unattended Mode Bypass**: In automated updater runs (`$UpdateMode = 1` or `$Silent = 1` / `$PassiveMode = 1`), the notice is automatically bypassed to prevent blocking background or automated installations.
+- **Release Note Recommendation**: Release notes for versions migrating to per-user should explicitly notify users who originally installed Orbit for "All Users" to uninstall the legacy Program Files installation from Windows Settings > Installed Apps.
 
 ## Rules & Takeaways
 

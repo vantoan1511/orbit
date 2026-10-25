@@ -96,17 +96,20 @@ const VERIFY_SCRIPT_PATH = path.resolve(
   '../scripts/verify-installer-elevation.ts'
 )
 
+function createDummyExe(manifestXml: string): Buffer {
+  return Buffer.concat([
+    Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
+    Buffer.from(manifestXml, 'utf-8'),
+    Buffer.from([0x00, 0x00])
+  ])
+}
+
 test('verify script exits zero for asInvoker fixture', () => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-installer-test-'))
   const fixturePath = path.join(tmpDir, 'orbit_setup_asInvoker.exe')
   try {
     const manifest = `<assembly><requestedPrivileges><requestedExecutionLevel level="asInvoker"/></requestedPrivileges></assembly>`
-    const dummyExe = Buffer.concat([
-      Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
-      Buffer.from(manifest, 'utf-8'),
-      Buffer.from([0x00, 0x00])
-    ])
-    fs.writeFileSync(fixturePath, dummyExe)
+    fs.writeFileSync(fixturePath, createDummyExe(manifest))
 
     const result = spawnSync(
       process.execPath,
@@ -129,12 +132,7 @@ test('verify script exits non-zero for highestAvailable fixture', () => {
   const fixturePath = path.join(tmpDir, 'orbit_setup_highestAvailable.exe')
   try {
     const manifest = `<assembly><requestedPrivileges><requestedExecutionLevel level="highestAvailable"/></requestedPrivileges></assembly>`
-    const dummyExe = Buffer.concat([
-      Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
-      Buffer.from(manifest, 'utf-8'),
-      Buffer.from([0x00, 0x00])
-    ])
-    fs.writeFileSync(fixturePath, dummyExe)
+    fs.writeFileSync(fixturePath, createDummyExe(manifest))
 
     const result = spawnSync(
       process.execPath,
@@ -155,5 +153,52 @@ test('verify script exits non-zero for highestAvailable fixture', () => {
     )
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+})
+
+test('verify script properly handles paths containing spaces without failing open', () => {
+  const baseTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit spaces test-'))
+  const spacedDir = path.join(baseTmpDir, 'sub directory with spaces')
+  fs.mkdirSync(spacedDir, { recursive: true })
+
+  try {
+    const asInvokerPath = path.join(spacedDir, 'orbit setup spaced asInvoker.exe')
+    const highestPath = path.join(spacedDir, 'orbit setup spaced highest.exe')
+
+    fs.writeFileSync(
+      asInvokerPath,
+      createDummyExe(
+        '<assembly><requestedPrivileges><requestedExecutionLevel level="asInvoker"/></requestedPrivileges></assembly>'
+      )
+    )
+    fs.writeFileSync(
+      highestPath,
+      createDummyExe(
+        '<assembly><requestedPrivileges><requestedExecutionLevel level="highestAvailable"/></requestedPrivileges></assembly>'
+      )
+    )
+
+    // asInvoker in spaced path should pass
+    const passResult = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', VERIFY_SCRIPT_PATH, asInvokerPath],
+      { encoding: 'utf-8' }
+    )
+    assert.equal(
+      passResult.status,
+      0,
+      `Expected exit code 0 for spaced asInvoker path. Stderr: ${passResult.stderr}`
+    )
+
+    // highestAvailable in spaced path must fail (no fail-open)
+    const failResult = spawnSync(
+      process.execPath,
+      ['--experimental-strip-types', VERIFY_SCRIPT_PATH, highestPath],
+      { encoding: 'utf-8' }
+    )
+    assert.notEqual(failResult.status, 0, 'Expected non-zero exit code for spaced highestAvailable')
+    assert.match(failResult.stderr, /highestAvailable/)
+  } finally {
+    fs.rmSync(baseTmpDir, { recursive: true, force: true })
   }
 })

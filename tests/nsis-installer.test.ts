@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { ELEVATION_FREE_INSTALL_MODES } from '../scripts/lib/installerManifest.ts'
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..')
 const TAURI_CONF_PATH = path.join(ROOT_DIR, 'src-tauri', 'tauri.conf.json')
@@ -12,8 +13,6 @@ const SIDEBAR_BMP_PATH = path.join(NSIS_DIR, 'sidebar.bmp')
 const INSTALLER_NSI_PATH = path.join(NSIS_DIR, 'installer.nsi')
 const EN_LANG_PATH = path.join(NSIS_DIR, 'languages', 'English.custom.nsh')
 const VI_LANG_PATH = path.join(NSIS_DIR, 'languages', 'Vietnamese.custom.nsh')
-
-import { ELEVATION_FREE_INSTALL_MODES } from '../scripts/lib/installerManifest.ts'
 
 test('NSIS installer configuration in tauri.conf.json', () => {
   assert.ok(fs.existsSync(TAURI_CONF_PATH), 'tauri.conf.json must exist')
@@ -43,16 +42,6 @@ test('NSIS installer configuration in tauri.conf.json', () => {
     English: 'windows/nsis/languages/English.custom.nsh',
     Vietnamese: 'windows/nsis/languages/Vietnamese.custom.nsh'
   })
-})
-
-test('installMode never requires elevation for CreateProcess-launched updates', () => {
-  const config = JSON.parse(fs.readFileSync(TAURI_CONF_PATH, 'utf-8'))
-  const installMode = config.bundle?.windows?.nsis?.installMode
-  const forbiddenModes = ['both', 'perMachine']
-  assert.ok(
-    !forbiddenModes.includes(installMode),
-    `installMode '${installMode}' is forbidden because it requires elevation or triggers highestAvailable requestedExecutionLevel in NSIS MultiUser`
-  )
 })
 
 function validateBmp(filePath: string, expectedWidth: number, expectedHeight: number) {
@@ -95,7 +84,8 @@ const REQUIRED_LANG_KEYS = [
   'taskStartMenuShortcut',
   'tasksGroupStartup',
   'taskLaunchOnStartup',
-  'purgeOrbitConfigData'
+  'purgeOrbitConfigData',
+  'perMachineInstallDetected'
 ]
 
 function validateLanguageFile(filePath: string, langMacro: string) {
@@ -145,4 +135,18 @@ test('Extended NSIS template (installer.nsi)', () => {
 
   // Check purge logic for ~/.orbit
   assert.match(content, /RmDir\s+\/r\s+"\$PROFILE\\\.orbit"/)
+})
+
+test('per-machine installation detection notice for currentUser install mode', () => {
+  const content = fs.readFileSync(INSTALLER_NSI_PATH, 'utf-8')
+  assert.match(
+    content,
+    /ReadRegStr\s+\$0\s+HKLM\s+"\$\{UNINSTKEY\}"\s+"UninstallString"/,
+    'installer.nsi must check HKLM UNINSTKEY UninstallString for existing per-machine installation'
+  )
+  assert.match(
+    content,
+    /MessageBox\s+MB_ICONINFORMATION\s+"\$\(perMachineInstallDetected\)"/,
+    'installer.nsi must show informational notice if per-machine installation is detected'
+  )
 })
