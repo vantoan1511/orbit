@@ -230,6 +230,7 @@ test('base.css defines all core design tokens across all 5 UI styles (flat, glas
     '--ui-radius-card',
     '--ui-control-bg',
     '--ui-card-bg',
+    '--ui-overlay-bg',
     '--border',
     '--ui-glass-blur',
     '--ui-sheen-highlight'
