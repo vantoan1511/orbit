@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum UpdateInstallFailureCode {
+    ElevationDenied,
+    LaunchFailed,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ResourceUpdate {
     pub action: String,
@@ -151,6 +158,11 @@ pub enum OrbitEvent {
     UpdateReady {
         component: String,
     },
+    #[serde(rename = "updateInstallFailed")]
+    UpdateInstallFailed {
+        code: UpdateInstallFailureCode,
+        message: String,
+    },
     #[serde(rename = "resourceRawData")]
     ResourceRawData {
         kind: String,
@@ -237,6 +249,7 @@ impl OrbitEvent {
             OrbitEvent::CommandSucceeded { .. } => "commandSucceeded",
             OrbitEvent::UpdateDownloadProgress { .. } => "updateDownloadProgress",
             OrbitEvent::UpdateReady { .. } => "updateReady",
+            OrbitEvent::UpdateInstallFailed { .. } => "updateInstallFailed",
             OrbitEvent::ResourceRawData { .. } => "resourceRawData",
             OrbitEvent::PortForwardStarted { .. } => "portForwardStarted",
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
@@ -264,5 +277,18 @@ mod tests {
         assert!(json.contains(r#""sessionId":"sess-123""#));
         assert!(json.contains(r#""shell":"pwsh""#));
         assert_eq!(evt.event_name(), "terminalStarted");
+    }
+
+    #[test]
+    fn test_update_install_failed_serialization() {
+        let evt = OrbitEvent::UpdateInstallFailed {
+            code: UpdateInstallFailureCode::ElevationDenied,
+            message: "Administrator permission was not granted".to_string(),
+        };
+        let json = serde_json::to_string(&evt).unwrap();
+        assert!(json.contains(r#""event":"updateInstallFailed""#));
+        assert!(json.contains(r#""code":"elevationDenied""#));
+        assert!(json.contains(r#""message":"Administrator permission was not granted""#));
+        assert_eq!(evt.event_name(), "updateInstallFailed");
     }
 }

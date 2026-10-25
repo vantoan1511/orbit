@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+pub mod installer_launcher;
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UpdateManifest {
     pub version: String,

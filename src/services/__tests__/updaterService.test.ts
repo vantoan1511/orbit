@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { coreEngine } from '../nativeService.ts'
+import { coreEngine, events } from '../nativeService.ts'
 import { updaterService } from '../updaterService.ts'
 
 test('updaterService dispatches checkForUpdates with empty payload', async () => {
@@ -44,5 +44,21 @@ test('updaterService dispatches applyUpdate with url and version', async () => {
     })
   } finally {
     coreEngine.dispatch = originalDispatch
+  }
+})
+
+test('updaterService onUpdateInstallFailed registers with OrbitEvents.UpdateInstallFailed', async () => {
+  let registeredEvent = ''
+  const originalOn = events.on
+  events.on = (event: string) => {
+    registeredEvent = event
+    return () => {}
+  }
+
+  try {
+    updaterService.onUpdateInstallFailed(() => {})
+    assert.equal(registeredEvent, 'updateInstallFailed')
+  } finally {
+    events.on = originalOn
   }
 })

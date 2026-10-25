@@ -1,5 +1,5 @@
 import { updaterService } from '../services/updaterService.ts'
-import type { UpdateManifest } from '../types/events.ts'
+import type { OrbitEventMap, UpdateManifest } from '../types/events.ts'
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
@@ -11,7 +11,9 @@ export const useUpdaterStore = defineStore('updater', () => {
   const isDownloading = ref(false)
   const downloadProgress = ref(0)
   const updateReady = ref<string | null>(null) // 'app'
+  const installError = ref<OrbitEventMap['updateInstallFailed'] | null>(null)
   const showUpdateDialog = ref(false)
+  let listenersInitialized = false
 
   function checkForUpdates() {
     isChecking.value = true
@@ -20,12 +22,16 @@ export const useUpdaterStore = defineStore('updater', () => {
 
   function applyUpdate() {
     if (!manifest.value?.url || !manifest.value?.version) return
+    installError.value = null
     isDownloading.value = true
     downloadProgress.value = 0
     updaterService.applyUpdate(manifest.value.url, manifest.value.version)
   }
 
   function initListeners() {
+    if (listenersInitialized) return
+    listenersInitialized = true
+
     updaterService.onUpdateCheckFinished((data) => {
       isChecking.value = false
       hasUpdate.value = data.has_update
@@ -45,6 +51,13 @@ export const useUpdaterStore = defineStore('updater', () => {
       downloadProgress.value = 100
       updateReady.value = data.component
     })
+
+    updaterService.onUpdateInstallFailed((data) => {
+      isDownloading.value = false
+      downloadProgress.value = 0
+      updateReady.value = null
+      installError.value = data
+    })
   }
 
   return {
@@ -54,6 +67,7 @@ export const useUpdaterStore = defineStore('updater', () => {
     isDownloading,
     downloadProgress,
     updateReady,
+    installError,
     showUpdateDialog,
     checkForUpdates,
     applyUpdate,
