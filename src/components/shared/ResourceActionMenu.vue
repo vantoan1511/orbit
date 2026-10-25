@@ -39,7 +39,7 @@ const MenuItemButton = (props: { item: MenuItem; menuProps: any }) => {
     {
       ...props.menuProps?.action,
       class: [
-        'flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-inherit bg-transparent rounded-[var(--ui-radius-control)] cursor-pointer select-none outline-none border-none',
+        'flex items-center gap-2 px-3 py-2 w-full text-left text-xs font-medium text-inherit bg-transparent rounded-[var(--ui-radius-control)] cursor-pointer select-none outline-none border-none',
         props.item.class
       ]
     },

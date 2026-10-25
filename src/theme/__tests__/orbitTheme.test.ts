@@ -185,7 +185,7 @@ test('Noir preset contextmenu and menu map root surfaces and item focus states t
   assert.equal(contextmenu.root.sheenHighlight, 'var(--ui-sheen-highlight)')
   assert.equal(contextmenu.item.focusBackground, 'var(--bg-hover)')
   assert.equal(contextmenu.item.borderRadius, 'var(--ui-radius-control)')
-  assert.equal(contextmenu.item.color, '{text.muted.color}')
+  assert.equal(contextmenu.item.color, '{text.color}')
   assert.equal(contextmenu.item.focusColor, '{text.color}')
 
   const menu = components.menu as Record<string, Record<string, string>>
@@ -197,6 +197,6 @@ test('Noir preset contextmenu and menu map root surfaces and item focus states t
   assert.equal(menu.root.sheenHighlight, 'var(--ui-sheen-highlight)')
   assert.equal(menu.item.focusBackground, 'var(--bg-hover)')
   assert.equal(menu.item.borderRadius, 'var(--ui-radius-control)')
-  assert.equal(menu.item.color, '{text.muted.color}')
+  assert.equal(menu.item.color, '{text.color}')
   assert.equal(menu.item.focusColor, '{text.color}')
 })

@@ -525,7 +525,7 @@ export const Noir = definePreset(Nora, {
       item: {
         focusBackground: 'var(--bg-hover)',
         borderRadius: 'var(--ui-radius-control)',
-        color: '{text.muted.color}',
+        color: '{text.color}',
         focusColor: '{text.color}'
       }
     },
@@ -541,7 +541,7 @@ export const Noir = definePreset(Nora, {
       item: {
         focusBackground: 'var(--bg-hover)',
         borderRadius: 'var(--ui-radius-control)',
-        color: '{text.muted.color}',
+        color: '{text.color}',
         focusColor: '{text.color}'
       }
     },
