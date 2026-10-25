@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
+import { ELEVATION_FREE_INSTALL_MODES } from '../scripts/lib/installerManifest.ts'
 
 const ROOT_DIR = path.resolve(import.meta.dirname, '..')
 const TAURI_CONF_PATH = path.join(ROOT_DIR, 'src-tauri', 'tauri.conf.json')
@@ -28,7 +29,12 @@ test('NSIS installer configuration in tauri.conf.json', () => {
   assert.equal(nsis.sidebarImage, 'windows/nsis/sidebar.bmp')
   assert.equal(nsis.installerIcon, 'icons/icon.ico')
   assert.equal(nsis.uninstallerIcon, 'icons/icon.ico')
-  assert.equal(nsis.installMode, 'both')
+  // Legacy CreateProcess clients (<= 0.17.0) cannot handle UAC elevation prompts (error 740).
+  // The installer must be configured with an elevation-free install mode ('currentUser').
+  assert.ok(
+    ELEVATION_FREE_INSTALL_MODES.includes(nsis.installMode),
+    `installMode must be one of [${ELEVATION_FREE_INSTALL_MODES.join(', ')}], got '${nsis.installMode}'`
+  )
   assert.deepEqual(nsis.languages, ['English', 'Vietnamese'])
   assert.equal(nsis.displayLanguageSelector, true)
   assert.equal(nsis.compression, 'lzma')
@@ -78,7 +84,8 @@ const REQUIRED_LANG_KEYS = [
   'taskStartMenuShortcut',
   'tasksGroupStartup',
   'taskLaunchOnStartup',
-  'purgeOrbitConfigData'
+  'purgeOrbitConfigData',
+  'perMachineInstallDetected'
 ]
 
 function validateLanguageFile(filePath: string, langMacro: string) {
@@ -128,4 +135,18 @@ test('Extended NSIS template (installer.nsi)', () => {
 
   // Check purge logic for ~/.orbit
   assert.match(content, /RmDir\s+\/r\s+"\$PROFILE\\\.orbit"/)
+})
+
+test('per-machine installation detection notice for currentUser install mode', () => {
+  const content = fs.readFileSync(INSTALLER_NSI_PATH, 'utf-8')
+  assert.match(
+    content,
+    /ReadRegStr\s+\$0\s+HKLM\s+"\$\{UNINSTKEY\}"\s+"UninstallString"/,
+    'installer.nsi must check HKLM UNINSTKEY UninstallString for existing per-machine installation'
+  )
+  assert.match(
+    content,
+    /MessageBox\s+MB_ICONINFORMATION\s+"\$\(perMachineInstallDetected\)"/,
+    'installer.nsi must show informational notice if per-machine installation is detected'
+  )
 })

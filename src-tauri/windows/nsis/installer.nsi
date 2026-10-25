@@ -639,6 +639,19 @@ Function .onInit
     !insertmacro MULTIUSER_INIT
   !endif
 
+  !if "${INSTALLMODE}" == "currentUser"
+  ${If} ${Silent}
+  ${OrIf} $PassiveMode = 1
+  ${OrIf} $UpdateMode = 1
+    ; Bypass in unattended modes
+  ${Else}
+    ReadRegStr $0 HKLM "${UNINSTKEY}" "UninstallString"
+    ${If} $0 != ""
+      MessageBox MB_ICONINFORMATION "$(perMachineInstallDetected)"
+    ${EndIf}
+  ${EndIf}
+  !endif
+
   ; Abort downgrades if they are disabled, in the modes that skip the reinstall page choice:
   ; silent, passive and update
   !if "${ALLOWDOWNGRADES}" == "false"

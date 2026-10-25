@@ -58,8 +58,23 @@ Failed to launch installer: The requested operation requires elevation. (os erro
    - Other codes are classified as `LaunchFailed` with detailed OS error messages.
    - On error, emit `OrbitEvent::UpdateInstallFailed` so the frontend UI can notify the user without closing Orbit or leaving the updater locked in downloading state.
 
-### Affected Client Workaround
-Clients on versions affected by the elevation issue (such as 0.16.3) cannot self-elevate via in-app update to 0.17.0. Those users must download the installer executable directly from GitHub Releases and run it manually once. Subsequent updates will use the fixed `ShellExecuteExW` launcher.
+### Legacy Client Backward-Compatibility (≤ 0.17.0 Clients & CreateProcess)
+
+#### Root Cause
+Clients on versions ≤ 0.17.0 (including 0.16.3 and 0.17.0) launch installers using `CreateProcessW`. Because `CreateProcessW` cannot trigger UAC elevation, any installer with `requestedExecutionLevel highestAvailable` or `requireAdministrator` triggers an immediate OS error 740 on admin user accounts. While v0.17.1 introduced `ShellExecuteExW` to support elevation, that fix cannot reach existing clients in the field because they run the old launcher code to apply the update. Furthermore, NSIS's `MultiUser.nsh` hardcodes `RequestExecutionLevel highest` when `installMode: both` is selected, making an elevation-free `both` installer impossible.
+
+#### Permanent Fix (v0.17.2+)
+In v0.17.2, Orbit configured `bundle.windows.nsis.installMode = "currentUser"`. In this mode, NSIS outputs `RequestExecutionLevel user`, embedding `<requestedExecutionLevel level="asInvoker" uiAccess="false"/>` into the executable manifest. This ensures the installer runs without requiring elevation tokens, allowing legacy `CreateProcessW` clients (≤ 0.17.0) to update successfully with zero manual intervention and no UAC dialog.
+
+#### Invariant & CI Guard
+- **asInvoker Invariant**: The NSIS installer MUST retain `requestedExecutionLevel asInvoker` (`installMode: "currentUser"`) as long as any supported in-field client launches updates via `CreateProcessW`. Re-evaluating `installMode: both` is strictly deferred until a future major milestone where ≥ 0.17.1 is the enforced minimum baseline for all active clients.
+- **Automated CI Elevation Guard**: `.github/workflows/release.yml` executes `node --experimental-strip-types scripts/verify-installer-elevation.ts <path-to-*setup.exe>` after bundling. The build fails immediately if the installer PE manifest does not specify `asInvoker`.
+
+#### Per-Machine Install Caveat & Detection Notice
+Users who previously chose an "All Users" (`perMachine` / `%ProgramFiles%\Orbit`) installation during v0.17.0/v0.17.1 will have new updates installed to `%LOCALAPPDATA%\Orbit`.
+- **Interactive Notice**: In interactive installer runs (when not silent, passive, or automated update mode), the installer checks `HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall\Orbit\UninstallString`. If a system-wide installation exists, it displays an informational dialog (`$(perMachineInstallDetected)`) advising the user that the app will install per-user and they can safely uninstall the old system-wide version via Windows Settings.
+- **Unattended Mode Bypass**: In automated updater runs (`$UpdateMode = 1` or `$Silent = 1` / `$PassiveMode = 1`), the notice is automatically bypassed to prevent blocking background or automated installations.
+- **Release Note Recommendation**: Release notes for versions migrating to per-user should explicitly notify users who originally installed Orbit for "All Users" to uninstall the legacy Program Files installation from Windows Settings > Installed Apps.
 
 ## Rules & Takeaways
 

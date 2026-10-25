@@ -51,4 +51,33 @@ describe('Update Manifest and Release Packaging Contracts', () => {
       'release.yml must handle zip asset upload safely'
     )
   })
+
+  it('release.yml uses Node 22 and shared NSIS installer discovery step', () => {
+    const workflowPath = path.resolve('.github/workflows/release.yml')
+    assert.ok(fs.existsSync(workflowPath), '.github/workflows/release.yml must exist')
+
+    const content = fs.readFileSync(workflowPath, 'utf8')
+
+    assert.match(
+      content,
+      /node-version:\s*['"]22['"]/,
+      'release.yml must use Node 22 for native support of experimental-strip-types'
+    )
+    assert.ok(
+      content.includes('Find NSIS Installer'),
+      'release.yml must include shared "Find NSIS Installer" step'
+    )
+    assert.ok(
+      content.includes('NSIS_INSTALLER_PATH='),
+      'release.yml must export NSIS_INSTALLER_PATH'
+    )
+    assert.ok(
+      content.includes('scripts/verify-installer-elevation.ts $env:NSIS_INSTALLER_PATH'),
+      'Verify Installer Elevation must consume $env:NSIS_INSTALLER_PATH'
+    )
+    assert.ok(
+      content.includes('Copy-Item $env:NSIS_INSTALLER_PATH'),
+      'Package Update Zip must consume $env:NSIS_INSTALLER_PATH without duplicate discovery'
+    )
+  })
 })

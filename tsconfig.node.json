@@ -6,7 +6,9 @@
     "vitest.config.*",
     "cypress.config.*",
     "playwright.config.*",
-    "eslint.config.*"
+    "eslint.config.*",
+    "scripts/**/*.ts",
+    "tests/**/*.ts"
   ],
   "compilerOptions": {
     "resolveJsonModule": true,
@@ -22,6 +24,7 @@
 
     // Disable emitting output during `vue-tsc --build`, which is used for type-checking only.
     "noEmit": true,
+    "allowImportingTsExtensions": true,
 
     // `vue-tsc --build` produces a .tsbuildinfo file for incremental type-checking.
     // Specified here to keep it out of the root directory.
