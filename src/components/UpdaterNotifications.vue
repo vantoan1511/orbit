@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
-import { formatUpdateInstallErrorMessage } from '@/utils/updateInstallMessages'
+import {
+  RESTART_DIALOG_MESSAGE,
+  formatUpdateInstallErrorMessage
+} from '@/utils/updateInstallMessages'
 import { Download, RefreshCw } from '@lucide/vue'
 import { app } from '@/services/nativeService'
 import Button from 'primevue/button'
@@ -102,9 +105,7 @@ watch(
   >
     <div class="flex items-center gap-3">
       <RefreshCw class="w-4 h-4 text-primary shrink-0 animate-spin" />
-      <span class="text-xs text-secondary leading-relaxed"
-        >Orbit has been successfully updated. Restarting in {{ countdown }} seconds...</span
-      >
+      <span class="text-xs text-secondary leading-relaxed">{{ RESTART_DIALOG_MESSAGE }}</span>
     </div>
   </Dialog>
 </template>

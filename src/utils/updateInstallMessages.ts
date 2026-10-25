@@ -1,5 +1,7 @@
 import type { UpdateInstallFailureCode } from '../types/events.ts'
 
+export const RESTART_DIALOG_MESSAGE = 'Restarting Orbit to apply updates...'
+
 export const UPDATE_INSTALL_MESSAGES: Record<UpdateInstallFailureCode, string> = {
   elevationDenied: 'Update cancelled — administrator permission was not granted',
   launchFailed: 'Failed to launch installer'

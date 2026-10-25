@@ -69,6 +69,7 @@ impl InstallerLauncher for ShellInstallerLauncher {
 
 pub const ERROR_ACCESS_DENIED: u32 = 5;
 pub const ERROR_CANCELLED: u32 = 1223;
+pub const UNKNOWN_SHELL_FAILURE_DETAIL: &str = "Unknown Windows Shell execution failure";
 
 pub const ELEVATION_DENIED_CODES: [u32; 2] = [ERROR_CANCELLED, ERROR_ACCESS_DENIED];
 
@@ -76,7 +77,11 @@ pub fn classify_launch_error(os_code: u32) -> InstallerLaunchError {
     if ELEVATION_DENIED_CODES.contains(&os_code) {
         InstallerLaunchError::ElevationDenied
     } else {
-        let detail = std::io::Error::from_raw_os_error(os_code as i32).to_string();
+        let detail = if os_code == 0 {
+            UNKNOWN_SHELL_FAILURE_DETAIL.to_string()
+        } else {
+            std::io::Error::from_raw_os_error(os_code as i32).to_string()
+        };
         InstallerLaunchError::Failed {
             os_code: Some(os_code),
             detail,
@@ -121,6 +126,18 @@ mod tests {
                 assert!(!detail.is_empty());
             }
             _ => panic!("Expected Failed variant for 2, got {:?}", err),
+        }
+    }
+
+    #[test]
+    fn test_classify_zero_code_uses_fallback_detail() {
+        let err = classify_launch_error(0);
+        match err {
+            InstallerLaunchError::Failed { os_code, detail } => {
+                assert_eq!(os_code, Some(0));
+                assert_eq!(detail, UNKNOWN_SHELL_FAILURE_DETAIL);
+            }
+            _ => panic!("Expected Failed variant for 0, got {:?}", err),
         }
     }
 

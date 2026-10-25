@@ -104,3 +104,48 @@ test('updaterStore applyUpdate clears previous installError', () => {
   store.applyUpdate()
   assert.equal(store.installError, null)
 })
+
+test('updaterStore initListeners registers listeners only once', () => {
+  let checkFinishedCount = 0
+  let downloadProgressCount = 0
+  let readyCount = 0
+  let failedCount = 0
+
+  const origCheck = updaterService.onUpdateCheckFinished
+  const origProgress = updaterService.onUpdateDownloadProgress
+  const origReady = updaterService.onUpdateReady
+  const origFailed = updaterService.onUpdateInstallFailed
+
+  updaterService.onUpdateCheckFinished = () => {
+    checkFinishedCount++
+    return () => {}
+  }
+  updaterService.onUpdateDownloadProgress = () => {
+    downloadProgressCount++
+    return () => {}
+  }
+  updaterService.onUpdateReady = () => {
+    readyCount++
+    return () => {}
+  }
+  updaterService.onUpdateInstallFailed = () => {
+    failedCount++
+    return () => {}
+  }
+
+  try {
+    const store = useUpdaterStore()
+    store.initListeners()
+    store.initListeners()
+
+    assert.equal(checkFinishedCount, 1)
+    assert.equal(downloadProgressCount, 1)
+    assert.equal(readyCount, 1)
+    assert.equal(failedCount, 1)
+  } finally {
+    updaterService.onUpdateCheckFinished = origCheck
+    updaterService.onUpdateDownloadProgress = origProgress
+    updaterService.onUpdateReady = origReady
+    updaterService.onUpdateInstallFailed = origFailed
+  }
+})

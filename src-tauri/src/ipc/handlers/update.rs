@@ -12,15 +12,6 @@ pub enum LaunchOutcome {
     Abort(OrbitEvent),
 }
 
-impl PartialEq for LaunchOutcome {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (LaunchOutcome::Proceed, LaunchOutcome::Proceed) => true,
-            _ => false,
-        }
-    }
-}
-
 pub const MSG_ELEVATION_DENIED: &str = "Update cancelled — administrator permission was not granted";
 pub const UPDATE_READY_GRACE_PERIOD_MS: u64 = 500;
 
@@ -272,7 +263,7 @@ mod tests {
     #[test]
     fn test_launch_outcome_ok_proceeds() {
         let outcome = resolve_launch_outcome(Ok(()));
-        assert_eq!(outcome, LaunchOutcome::Proceed);
+        assert!(matches!(outcome, LaunchOutcome::Proceed));
     }
 
     #[test]

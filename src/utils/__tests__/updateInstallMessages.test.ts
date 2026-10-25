@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  RESTART_DIALOG_MESSAGE,
   UPDATE_INSTALL_MESSAGES,
   formatUpdateInstallErrorMessage
 } from '../updateInstallMessages.ts'
@@ -37,4 +38,11 @@ test('formatUpdateInstallErrorMessage uses payload message for launchFailed if p
     message: 'Failed to launch installer: Access denied'
   })
   assert.equal(msg, 'Failed to launch installer: Access denied')
+})
+
+test('RESTART_DIALOG_MESSAGE does not mention seconds or countdown numbers', () => {
+  assert.equal(typeof RESTART_DIALOG_MESSAGE, 'string')
+  assert.ok(RESTART_DIALOG_MESSAGE.length > 0)
+  assert.equal(/\d+/.test(RESTART_DIALOG_MESSAGE), false)
+  assert.equal(/seconds?/i.test(RESTART_DIALOG_MESSAGE), false)
 })

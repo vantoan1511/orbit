@@ -13,6 +13,7 @@ export const useUpdaterStore = defineStore('updater', () => {
   const updateReady = ref<string | null>(null) // 'app'
   const installError = ref<OrbitEventMap['updateInstallFailed'] | null>(null)
   const showUpdateDialog = ref(false)
+  let listenersInitialized = false
 
   function checkForUpdates() {
     isChecking.value = true
@@ -28,6 +29,9 @@ export const useUpdaterStore = defineStore('updater', () => {
   }
 
   function initListeners() {
+    if (listenersInitialized) return
+    listenersInitialized = true
+
     updaterService.onUpdateCheckFinished((data) => {
       isChecking.value = false
       hasUpdate.value = data.has_update
