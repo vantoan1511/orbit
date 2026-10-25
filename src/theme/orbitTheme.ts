@@ -79,6 +79,26 @@ declare module '@primeuix/themes/types/toast' {
   }
 }
 
+declare module '@primeuix/themes/types/contextmenu' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace ContextMenuTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/menu' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace MenuTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
 export const Noir = definePreset(Nora, {
   primitive: {
     primary: {
@@ -495,22 +515,34 @@ export const Noir = definePreset(Nora, {
     },
     contextmenu: {
       root: {
-        background: 'var(--ui-card-bg)',
+        background: 'var(--ui-overlay-bg)',
         borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)'
+        borderRadius: 'var(--ui-radius-card)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
       },
       item: {
-        borderRadius: 'var(--ui-radius-control)'
+        focusBackground: 'var(--bg-hover)',
+        borderRadius: 'var(--ui-radius-control)',
+        color: '{text.muted.color}',
+        focusColor: '{text.color}'
       }
     },
     menu: {
       root: {
-        background: 'var(--ui-card-bg)',
+        background: 'var(--ui-overlay-bg)',
         borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)'
+        borderRadius: 'var(--ui-radius-card)',
+        shadow: 'var(--ui-card-shadow, var(--shadow))',
+        backdropBlur: 'var(--ui-glass-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
       },
       item: {
-        borderRadius: 'var(--ui-radius-control)'
+        focusBackground: 'var(--bg-hover)',
+        borderRadius: 'var(--ui-radius-control)',
+        color: '{text.muted.color}',
+        focusColor: '{text.color}'
       }
     },
     tabs: {

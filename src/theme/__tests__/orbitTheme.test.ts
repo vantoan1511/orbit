@@ -173,3 +173,30 @@ test('Noir preset components connect surfaces, radii, borders, glass blur, and s
   assert.ok(tooltip, 'tooltip component config must exist')
   assert.equal(tooltip.root.borderRadius, 'var(--ui-radius-control)')
 })
+
+test('Noir preset contextmenu and menu map root surfaces and item focus states to centralized tokens', () => {
+  const components = Noir.components as Record<string, unknown>
+  const contextmenu = components.contextmenu as Record<string, Record<string, string>>
+  assert.ok(contextmenu, 'contextmenu config must exist')
+  assert.equal(contextmenu.root.background, 'var(--ui-overlay-bg)')
+  assert.equal(contextmenu.root.borderColor, 'var(--border)')
+  assert.equal(contextmenu.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(contextmenu.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(contextmenu.root.sheenHighlight, 'var(--ui-sheen-highlight)')
+  assert.equal(contextmenu.item.focusBackground, 'var(--bg-hover)')
+  assert.equal(contextmenu.item.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(contextmenu.item.color, '{text.muted.color}')
+  assert.equal(contextmenu.item.focusColor, '{text.color}')
+
+  const menu = components.menu as Record<string, Record<string, string>>
+  assert.ok(menu, 'menu config must exist')
+  assert.equal(menu.root.background, 'var(--ui-overlay-bg)')
+  assert.equal(menu.root.borderColor, 'var(--border)')
+  assert.equal(menu.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(menu.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(menu.root.sheenHighlight, 'var(--ui-sheen-highlight)')
+  assert.equal(menu.item.focusBackground, 'var(--bg-hover)')
+  assert.equal(menu.item.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(menu.item.color, '{text.muted.color}')
+  assert.equal(menu.item.focusColor, '{text.color}')
+})

@@ -170,7 +170,7 @@ const handleMiddleClick = () => {
     <ContextMenu
       ref="contextMenuRef"
       :model="menuItems"
-      class="min-w-48 bg-(--bg-card) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-xl text-xs select-none"
+      class="min-w-48 bg-(--ui-overlay-bg) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-xl text-xs select-none"
     >
       <template #item="{ item, props: menuProps }">
         <div v-if="item.separator" class="h-px bg-(--border) my-1 mx-1" />
@@ -178,10 +178,10 @@ const handleMiddleClick = () => {
           v-else
           v-bind="menuProps.action"
           :class="[
-            'flex items-center justify-between w-full h-7 px-2.5 rounded-[var(--ui-radius-control)] text-xs font-medium transition-colors select-none no-underline',
+            'flex items-center justify-between w-full h-7 px-2.5 rounded-[var(--ui-radius-control)] text-xs font-medium text-inherit bg-transparent select-none no-underline',
             item.disabled
               ? 'opacity-40 cursor-not-allowed pointer-events-none text-muted-color'
-              : 'text-muted-color hover:text-primary hover:bg-(--bg-hover) cursor-pointer'
+              : 'cursor-pointer'
           ]"
         >
           <span>{{ item.label }}</span>

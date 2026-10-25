@@ -39,12 +39,14 @@ const MenuItemButton = (props: { item: MenuItem; menuProps: any }) => {
     {
       ...props.menuProps?.action,
       class: [
-        'flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-muted-color hover:text-primary hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] transition-colors cursor-pointer select-none',
+        'flex items-center gap-2 px-3 py-2 w-full text-left text-xs text-inherit bg-transparent rounded-[var(--ui-radius-control)] cursor-pointer select-none outline-none border-none',
         props.item.class
       ]
     },
     [
-      props.item.icon ? h('i', { class: [props.item.icon, 'w-4 h-4 shrink-0'] }) : null,
+      props.item.icon
+        ? h('i', { class: [props.item.icon, 'w-4 h-4 shrink-0 text-inherit'] })
+        : null,
       h('span', props.item.label)
     ]
   )
@@ -56,7 +58,7 @@ const MenuItemButton = (props: { item: MenuItem; menuProps: any }) => {
     ref="menuRef"
     :model="menuModel"
     popup
-    class="min-w-44 bg-(--bg-card) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-lg"
+    class="min-w-44 bg-(--ui-overlay-bg) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-lg"
   >
     <template #item="{ item, props: menuProps }">
       <MenuItemButton :item="item" :menuProps="menuProps" />
@@ -66,7 +68,7 @@ const MenuItemButton = (props: { item: MenuItem; menuProps: any }) => {
   <ContextMenu
     ref="contextMenuRef"
     :model="menuModel"
-    class="min-w-44 bg-(--bg-card) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-lg"
+    class="min-w-44 bg-(--ui-overlay-bg) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-lg"
   >
     <template #item="{ item, props: menuProps }">
       <MenuItemButton :item="item" :menuProps="menuProps" />
