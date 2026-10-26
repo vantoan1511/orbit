@@ -94,15 +94,9 @@ const handleSave = async () => {
     :visible="visible"
     modal
     :draggable="false"
-    class="w-full max-w-lg border border-(--border) bg-(--bg-card) text-primary shadow-[var(--shadow)]"
+    class="w-full max-w-lg"
     :pt="{
-      root: { class: 'rounded-[var(--ui-radius-card)] overflow-hidden' },
-      header: { class: 'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar)/60' },
-      content: { class: 'p-5 flex flex-col gap-5' },
-      footer: {
-        class:
-          'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar)/40 flex items-center justify-between'
-      }
+      footer: { class: 'justify-between' }
     }"
     @update:visible="emit('update:visible', $event)"
   >

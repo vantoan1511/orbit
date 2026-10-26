@@ -36,6 +36,32 @@ app.use(PrimeVue, {
         order: 'theme, base, primevue, utilities'
       }
     }
+  },
+  pt: {
+    dialog: {
+      root: {
+        class:
+          'bg-(--ui-dialog-bg) border border-(--border) shadow-[var(--ui-card-shadow,var(--shadow))] rounded-[var(--ui-radius-card)] overflow-hidden'
+      },
+      mask: {
+        class: 'bg-(--ui-mask-bg) backdrop-blur-(--ui-mask-blur) transition-all duration-200'
+      },
+      header: {
+        class:
+          'border-b border-(--border)/60 px-5 py-3.5 bg-transparent text-primary flex items-center justify-between'
+      },
+      content: {
+        class: 'p-5 bg-transparent text-primary'
+      },
+      footer: {
+        class:
+          'border-t border-(--border)/60 px-5 py-3 bg-transparent flex items-center justify-end gap-2'
+      },
+      closeButton: {
+        class:
+          'w-7 h-7 p-0 text-muted-color hover:text-primary hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+      }
+    }
   }
 })
 app.use(ToastService)

@@ -114,3 +114,17 @@ test('AddClusterModal enforces token hygiene, dynamic UI styling, and canonical 
     'AddClusterModal TabList must use underline styling (border-b)'
   )
 })
+
+test('AddClusterModal inherits global dialog surface and contains zero hardcoded modal backgrounds', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/cluster/AddClusterModal.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    !content.includes('bg-(--bg-sidebar)'),
+    'AddClusterModal must not hardcode bg-(--bg-sidebar) for header/footer'
+  )
+  assert.ok(
+    !content.includes('bg-black/60'),
+    'AddClusterModal must not hardcode bg-black/60 on mask'
+  )
+})

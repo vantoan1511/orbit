@@ -67,7 +67,7 @@ test('Noir preset semantic tokens map border radii, backgrounds, and borders to 
   assert.equal(overlay.popover.background, 'var(--ui-card-bg)')
   assert.equal(overlay.popover.borderRadius, 'var(--ui-radius-card)')
   assert.equal(overlay.popover.borderColor, 'var(--border)')
-  assert.equal(overlay.modal.background, 'var(--ui-card-bg)')
+  assert.equal(overlay.modal.background, 'var(--ui-dialog-bg)')
   assert.equal(overlay.modal.borderRadius, 'var(--ui-radius-card)')
   assert.equal(overlay.modal.borderColor, 'var(--border)')
 
@@ -75,6 +75,11 @@ test('Noir preset semantic tokens map border radii, backgrounds, and borders to 
   for (const mode of ['light', 'dark']) {
     const scheme = colorScheme[mode] as Record<string, Record<string, unknown>>
     assert.ok(scheme, `colorScheme.${mode} should exist`)
+    assert.equal(
+      (scheme.mask as Record<string, string>)?.background,
+      'var(--ui-mask-bg)',
+      `colorScheme.${mode}.mask.background must map to var(--ui-mask-bg)`
+    )
     assert.equal(
       (scheme.formField as Record<string, string>)?.background,
       'var(--ui-control-bg)',
@@ -88,7 +93,7 @@ test('Noir preset semantic tokens map border radii, backgrounds, and borders to 
     const schemeOverlay = scheme.overlay as Record<string, Record<string, string>>
     assert.equal(schemeOverlay?.select?.background, 'var(--ui-card-bg)')
     assert.equal(schemeOverlay?.popover?.background, 'var(--ui-card-bg)')
-    assert.equal(schemeOverlay?.modal?.background, 'var(--ui-card-bg)')
+    assert.equal(schemeOverlay?.modal?.background, 'var(--ui-dialog-bg)')
   }
 })
 
@@ -114,10 +119,10 @@ test('Noir preset components connect surfaces, radii, borders, glass blur, and s
 
   const dialog = components.dialog as Record<string, Record<string, string>>
   assert.ok(dialog, 'dialog component config must exist')
-  assert.equal(dialog.root.background, 'var(--ui-card-bg)')
+  assert.equal(dialog.root.background, 'var(--ui-dialog-bg)')
   assert.equal(dialog.root.borderColor, 'var(--border)')
   assert.equal(dialog.root.borderRadius, 'var(--ui-radius-card)')
-  assert.equal(dialog.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(dialog.root.backdropBlur, 'var(--ui-dialog-blur)')
   assert.equal(dialog.root.sheenHighlight, 'var(--ui-sheen-highlight)')
 
   const drawer = components.drawer as Record<string, Record<string, string>>

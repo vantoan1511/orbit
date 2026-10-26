@@ -178,7 +178,7 @@ export const Noir = definePreset(Nora, {
         shadow: 'var(--ui-card-shadow, var(--shadow))'
       },
       modal: {
-        background: 'var(--ui-card-bg)',
+        background: 'var(--ui-dialog-bg)',
         borderRadius: 'var(--ui-radius-card)',
         borderColor: 'var(--border)',
         shadow: 'var(--ui-card-shadow, var(--shadow))'
@@ -186,6 +186,9 @@ export const Noir = definePreset(Nora, {
     },
     colorScheme: {
       light: {
+        mask: {
+          background: 'var(--ui-mask-bg)'
+        },
         primary: {
           color: '{primary.500}',
           contrastColor: '#ffffff',
@@ -233,12 +236,15 @@ export const Noir = definePreset(Nora, {
             borderColor: 'var(--border)'
           },
           modal: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-dialog-bg)',
             borderColor: 'var(--border)'
           }
         }
       },
       dark: {
+        mask: {
+          background: 'var(--ui-mask-bg)'
+        },
         primary: {
           color: '{primary.400}',
           contrastColor: '{surface.950}',
@@ -286,7 +292,7 @@ export const Noir = definePreset(Nora, {
             borderColor: 'var(--border)'
           },
           modal: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-dialog-bg)',
             borderColor: 'var(--border)'
           }
         }
@@ -573,11 +579,11 @@ export const Noir = definePreset(Nora, {
     },
     dialog: {
       root: {
-        background: 'var(--ui-card-bg)',
+        background: 'var(--ui-dialog-bg)',
         borderColor: 'var(--border)',
         borderRadius: 'var(--ui-radius-card)',
         shadow: 'var(--ui-card-shadow, var(--shadow))',
-        backdropBlur: 'var(--ui-glass-blur)',
+        backdropBlur: 'var(--ui-dialog-blur)',
         sheenHighlight: 'var(--ui-sheen-highlight)'
       },
       header: {
@@ -592,14 +598,14 @@ export const Noir = definePreset(Nora, {
       colorScheme: {
         light: {
           root: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-dialog-bg)',
             borderColor: 'var(--border)',
             color: '{text.color}'
           }
         },
         dark: {
           root: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-dialog-bg)',
             borderColor: 'var(--border)',
             color: '{text.color}'
           }

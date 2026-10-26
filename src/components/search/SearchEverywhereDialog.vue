@@ -200,16 +200,15 @@ function shouldShowCategoryHeader(idx: number): boolean {
     class="search-everywhere-modal border-none"
     :style="{ width: '640px', maxWidth: '94vw', marginTop: '10vh' }"
     :pt="{
-      mask: { class: 'bg-black/50 backdrop-blur-[2px]' },
       content: {
         class:
-          'p-0 overflow-hidden rounded-[var(--ui-radius-card)] border border-(--border) bg-(--bg-card) shadow-(--shadow)'
+          'p-0 overflow-hidden rounded-[var(--ui-radius-card)] border border-(--border) bg-(--ui-dialog-bg) shadow-[var(--ui-card-shadow,var(--shadow))]'
       }
     }"
   >
     <div class="flex flex-col select-none text-sm">
       <!-- Search Input Bar -->
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-(--border) bg-(--bg-card)">
+      <div class="flex items-center gap-3 px-4 py-3 border-b border-(--border) bg-transparent">
         <Search
           class="w-4 h-4 shrink-0 transition-colors"
           :class="searchStore.searchQuery ? 'text-primary' : 'text-muted-color'"
@@ -245,7 +244,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
 
       <!-- Category Filter Pills -->
       <div
-        class="flex items-center gap-1.5 px-3 py-1.5 border-b border-(--border) bg-(--bg-hover)/30 text-xs overflow-x-auto"
+        class="flex items-center gap-1.5 px-3 py-1.5 border-b border-(--border) bg-(--bg-hover)/20 text-xs overflow-x-auto"
       >
         <Button
           v-for="cat in categories"
@@ -373,7 +372,7 @@ function shouldShowCategoryHeader(idx: number): boolean {
 
       <!-- Footer Keyboard Shortcut Bar -->
       <div
-        class="flex items-center justify-between px-3.5 py-2 border-t border-(--border) bg-(--bg-card) text-[11px] text-muted-color select-none"
+        class="flex items-center justify-between px-3.5 py-2 border-t border-(--border) bg-transparent text-[11px] text-muted-color select-none"
       >
         <div class="flex items-center gap-3">
           <span class="flex items-center gap-1">

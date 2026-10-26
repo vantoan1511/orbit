@@ -47,3 +47,13 @@ test('ClusterEditModal delegates customization and supports metadata reset', () 
     'ClusterEditModal must support resetting metadata to default'
   )
 })
+
+test('ClusterEditModal inherits global dialog surface and contains zero hardcoded modal backgrounds', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/cluster/ClusterEditModal.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    !content.includes('bg-(--bg-sidebar)'),
+    'ClusterEditModal must not hardcode bg-(--bg-sidebar) for header/footer'
+  )
+})
