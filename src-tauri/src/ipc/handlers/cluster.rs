@@ -363,8 +363,10 @@ pub async fn restart_watchers(
     active_cluster_id: Option<String>,
 ) {
     let mut w_manager = manager.write().await;
-    if let Some(cancel) = w_manager.watch_cancel.take() {
-        let _ = cancel.send(true);
+    if let Some(cancel) = w_manager.watch_cancel.take()
+        && let Err(e) = cancel.send(true)
+    {
+        tracing::debug!(error = %e, "Previous watcher cancel sender had no receivers");
     }
     let (tx, rx) = tokio::sync::watch::channel(false);
     w_manager.watch_cancel = Some(tx);
@@ -377,6 +379,25 @@ pub async fn restart_watchers(
         rx,
         active_cluster_id,
     );
+}
+
+pub fn restart_active_watchers(
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let (client, active_cluster_id) = {
+            let r_manager = manager.read().await;
+            (r_manager.active_client.clone(), r_manager.active_context.clone())
+        };
+
+        if let Some(client) = client {
+            restart_watchers(&writer, &token, &manager, &client, active_cluster_id).await;
+        } else {
+            tracing::warn!("Cannot restart watchers: no active cluster client");
+        }
+    });
 }
 
 pub async fn broadcast_engine_ready(
@@ -538,6 +559,28 @@ mod tests {
             r_manager.config.cluster_customizations().get("ctx-preserved").and_then(|c| c.alias.as_deref()),
             Some("Preserved Cluster")
         );
+    }
+
+    #[tokio::test]
+    async fn restart_watchers_replaces_cancel_sender() {
+        let (old_tx, mut old_rx) = tokio::sync::watch::channel(false);
+        let mut km = KubeManager::new().await;
+        km.watch_cancel = Some(old_tx);
+        let manager = Arc::new(RwLock::new(km));
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let config = kube::Config::new("http://127.0.0.1:1".parse().unwrap());
+        let client = kube::Client::try_from(config).unwrap();
+
+        restart_watchers(&writer, "token", &manager, &client, Some("test-ctx".into())).await;
+
+        // Old receiver must have been cancelled (saw true)
+        assert!(old_rx.changed().await.is_ok());
+        assert!(*old_rx.borrow());
+
+        // Manager must now hold a new watch_cancel sender
+        let r_km = manager.read().await;
+        assert!(r_km.watch_cancel.is_some());
     }
 }
 

@@ -151,6 +151,14 @@ export const kubernetesService = {
   },
 
   /**
+   * Restart watchers and poller for the currently active cluster without
+   * tearing down terminals or port-forwards.
+   */
+  async restartWatchers(): Promise<void> {
+    await coreEngine.dispatch('restartWatchers', {})
+  },
+
+  /**
    * Add a new cluster kubeconfig file path or payload
    */
   async addCluster(payload: string | AddClusterPayload): Promise<void> {

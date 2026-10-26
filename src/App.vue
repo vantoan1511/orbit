@@ -13,7 +13,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useShortcutStore } from '@/stores/shortcutStore'
 import { syncAppearanceFromSettings } from '@/composables/useAppearance'
 import { isAddClusterModalVisible } from '@/composables/useCluster'
-import { OrbitEvents, type WatcherConnectionState } from '@/types/events'
+import { OrbitEvents, type OrbitEventMap } from '@/types/events'
 import type {
   ClusterInfo,
   ConfigMapInfo,
@@ -170,11 +170,7 @@ const handleActiveClusterChanged = (payload: { active_cluster_id: string | null 
   k8sStore.setActiveClusterId(payload.active_cluster_id)
 }
 
-const handleWatcherConnectionChanged = (payload: {
-  clusterId: string | null
-  state: WatcherConnectionState
-  failingWatchers: number
-}) => {
+const handleWatcherConnectionChanged = (payload: OrbitEventMap['watcherConnectionChanged']) => {
   k8sStore.setWatcherConnectionState(payload.clusterId, payload.state)
 }
 

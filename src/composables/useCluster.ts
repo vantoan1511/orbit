@@ -49,9 +49,8 @@ export function useCluster() {
 
   const reconnectActiveCluster = async (): Promise<void> => {
     const store = getStore()
-    const clusterId = store?.activeClusterId
-    if (clusterId) {
-      await kubernetesService.switchCluster(clusterId)
+    if (store?.activeClusterId) {
+      await kubernetesService.restartWatchers()
     }
   }
 

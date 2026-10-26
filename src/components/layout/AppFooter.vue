@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppBreadcrumbs from './AppBreadcrumbs.vue'
+import FooterStatusAction from './FooterStatusAction.vue'
 import { useCluster } from '@/composables/useCluster'
 import { useEngineConnection } from '@/composables/useEngineConnection'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -103,15 +104,12 @@ const lastUpdatedDisplay = computed(() => {
       >
         <AlertCircle :size="12" class="text-(--danger)" />
         <span>Engine disconnected</span>
-        <Button
-          size="small"
+        <FooterStatusAction
+          label="Restart app"
           severity="danger"
+          tooltip="Restart application process to re-establish runtime engine link"
           @click="restartApp"
-          v-tooltip.top="'Restart application process to re-establish runtime engine link'"
-          class="h-5 px-2 text-[10px]"
-        >
-          Restart app
-        </Button>
+        />
       </div>
 
       <!-- Cluster watcher connection state (degraded: warning, suspended: danger + Reconnect) -->
@@ -131,17 +129,17 @@ const lastUpdatedDisplay = computed(() => {
         >
           <AlertCircle :size="12" class="text-(--danger)" />
           <span>Cluster disconnected</span>
-          <Button
-            size="small"
+          <FooterStatusAction
+            label="Reconnect"
             severity="danger"
-            @click="handleReconnectCluster"
+            tooltip="Restart watchers and re-establish connection to cluster"
             :loading="isReconnectingCluster"
-            v-tooltip.top="'Restart watchers and re-establish connection to cluster'"
-            class="h-5 px-2 text-[10px] flex items-center gap-1"
+            @click="handleReconnectCluster"
           >
-            <RotateCcw :size="10" />
-            <span>Reconnect</span>
-          </Button>
+            <template #icon>
+              <RotateCcw :size="10" />
+            </template>
+          </FooterStatusAction>
         </div>
       </template>
 

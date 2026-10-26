@@ -13,6 +13,7 @@ pub mod events;
 pub mod policies;
 pub mod watchers;
 pub mod watch_health;
+pub mod watch_error;
 pub mod metrics;
 pub mod logs;
 pub mod delete;

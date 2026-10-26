@@ -57,19 +57,43 @@ test('activeCluster and lastUpdatedAt evaluate cleanly with active Pinia', () =>
   assert.equal(activeCluster.value?.name, 'Alpha Cluster')
 })
 
-test('reconnectActiveCluster dispatches switchCluster with active cluster id', async () => {
+test('reconnectActiveCluster dispatches restartWatchers and never switchCluster', async () => {
   const store = useKubernetesStore()
   store.setActiveClusterId('cluster-xyz')
-  let switchedId: string | null = null
+  let restartCalled = false
+  let switchCalled = false
+  const origRestart = kubernetesService.restartWatchers
   const origSwitch = kubernetesService.switchCluster
-  kubernetesService.switchCluster = async (id: string) => {
-    switchedId = id
+  kubernetesService.restartWatchers = async () => {
+    restartCalled = true
+  }
+  kubernetesService.switchCluster = async () => {
+    switchCalled = true
   }
   try {
     const { reconnectActiveCluster } = useCluster()
     await reconnectActiveCluster()
-    assert.equal(switchedId, 'cluster-xyz')
+    assert.equal(restartCalled, true)
+    assert.equal(switchCalled, false)
   } finally {
+    kubernetesService.restartWatchers = origRestart
     kubernetesService.switchCluster = origSwitch
+  }
+})
+
+test('reconnectActiveCluster does nothing without active cluster', async () => {
+  const store = useKubernetesStore()
+  store.setActiveClusterId(null)
+  let restartCalled = false
+  const origRestart = kubernetesService.restartWatchers
+  kubernetesService.restartWatchers = async () => {
+    restartCalled = true
+  }
+  try {
+    const { reconnectActiveCluster } = useCluster()
+    await reconnectActiveCluster()
+    assert.equal(restartCalled, false)
+  } finally {
+    kubernetesService.restartWatchers = origRestart
   }
 })

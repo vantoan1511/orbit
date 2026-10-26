@@ -362,9 +362,9 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setActiveClusterId(id: string | null) {
+    watcherConnectionState.value = 'connected'
     if (activeClusterId.value === id) return
     activeClusterId.value = id
-    watcherConnectionState.value = 'connected'
     // Sync active cluster and reset transient table selection state when switching clusters
     const tableFilterStore = useTableFilterStore()
     tableFilterStore.setActiveClusterId(id)

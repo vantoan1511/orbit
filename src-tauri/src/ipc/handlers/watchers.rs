@@ -1,9 +1,8 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use crate::ipc::bridge::{Bridge, WsWriter};
-use crate::ipc::events::OrbitEvent;
+use crate::ipc::bridge::WsWriter;
 use crate::kubernetes::watch_health::{WatcherHealthTracker, WATCHER_GIVE_UP_AFTER};
-use crate::kubernetes::watchers::WatcherContext;
+use crate::kubernetes::watchers::{ConnectionReporter, WatcherContext};
 
 const GIVE_UP_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
 
@@ -19,9 +18,11 @@ pub fn derive_cancel_channel(
         tokio::spawn(async move {
             while parent_rx.changed().await.is_ok() {
                 if *parent_rx.borrow() {
-                    let _ = child_tx_clone.send(true);
                     break;
                 }
+            }
+            if let Err(e) = child_tx_clone.send(true) {
+                tracing::debug!(error = %e, "Failed to propagate cancel to child channel");
             }
         });
     }
@@ -39,11 +40,20 @@ pub fn spawn_watchers(
 ) {
     let (child_tx, child_rx) = derive_cancel_channel(rx);
     let tracker = WatcherHealthTracker::new(WATCHER_GIVE_UP_AFTER, child_tx);
+    let reporter = ConnectionReporter::new(
+        writer.clone(),
+        token.clone(),
+        cluster_id.clone(),
+    );
+
+    // Initial Connected emission (AC-2, H1 backend)
+    let initial_reporter = reporter.clone();
+    tokio::spawn(async move {
+        initial_reporter.report(crate::ipc::events::WatcherConnectionState::Connected, 0).await;
+    });
 
     let ticker_tracker = tracker.clone();
-    let ticker_writer = writer.clone();
-    let ticker_token = token.clone();
-    let ticker_cluster_id = cluster_id.clone();
+    let ticker_reporter = reporter.clone();
     let mut ticker_rx = child_rx.clone();
 
     tokio::spawn(async move {
@@ -58,14 +68,7 @@ pub fn spawn_watchers(
                 }
                 _ = interval.tick() => {
                     if let Some(state) = ticker_tracker.check_give_up(std::time::Instant::now()) {
-                        let event = OrbitEvent::WatcherConnectionChanged {
-                            cluster_id: ticker_cluster_id.clone(),
-                            state,
-                            failing_watchers: ticker_tracker.failing_count(),
-                        };
-                        if let Err(e) = Bridge::send_event(&ticker_writer, &ticker_token, &event).await {
-                            tracing::debug!(error = %e, "Failed to emit suspended state event");
-                        }
+                        ticker_reporter.report(state, ticker_tracker.failing_count()).await;
                         break;
                     }
                 }
@@ -75,9 +78,7 @@ pub fn spawn_watchers(
 
     let make_ctx = |rx: tokio::sync::watch::Receiver<bool>| WatcherContext {
         client: client.clone(),
-        writer: writer.clone(),
-        ipc_token: token.clone(),
-        cluster_id: cluster_id.clone(),
+        reporter: reporter.clone(),
         tracker: tracker.clone(),
         cancel_rx: rx,
     };
@@ -135,14 +136,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_parent_sender_drop_cancels_child_channel() {
+        let (parent_tx, parent_rx) = tokio::sync::watch::channel(false);
+        let (_child_tx, child_rx) = derive_cancel_channel(parent_rx);
+        assert!(!*child_rx.borrow());
+
+        drop(parent_tx);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        assert!(*child_rx.borrow());
+    }
+
+    #[tokio::test]
     async fn test_tracker_suspend_cancels_child() {
         let (_parent_tx, parent_rx) = tokio::sync::watch::channel(false);
         let (child_tx, child_rx) = derive_cancel_channel(parent_rx);
         let tracker = WatcherHealthTracker::new(std::time::Duration::from_secs(1), child_tx);
         let t0 = std::time::Instant::now();
-        tracker.record_failure("test-watcher", t0);
+        tracker.record_failure("test-watcher", crate::kubernetes::watch_error::WatcherFailureClass::Unreachable, t0);
         let res = tracker.check_give_up(t0 + std::time::Duration::from_secs(1));
         assert!(res.is_some());
         assert!(*child_rx.borrow());
+    }
+
+    #[tokio::test]
+    async fn test_spawn_watchers_emits_initial_connected() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mock_emitter = Arc::new(crate::ipc::emitter::MockEventEmitter::new());
+        crate::ipc::emitter::set_global_emitter(mock_emitter.clone());
+
+        let mut config = kube::Config::new("http://127.0.0.1:1".parse().unwrap());
+        config.connect_timeout = Some(std::time::Duration::from_millis(50));
+        let client = kube::Client::try_from(config).unwrap();
+
+        let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+
+        spawn_watchers(
+            &client,
+            writer,
+            "test-token".into(),
+            cancel_rx,
+            Some("cluster-1".into()),
+        );
+
+        // Allow initial emission to run
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let cancel_res = cancel_tx.send(true);
+        assert!(cancel_res.is_ok());
+
+        let emitted = mock_emitter.get_emitted_events().await;
+        assert!(!emitted.is_empty(), "Expected at least one emitted event");
+        let (name, payload) = &emitted[0];
+        assert_eq!(name, "watcherConnectionChanged");
+        assert_eq!(payload["clusterId"], "cluster-1");
+        assert_eq!(payload["state"], "connected");
+        assert_eq!(payload["failingWatchers"], 0);
     }
 }
