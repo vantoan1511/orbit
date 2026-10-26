@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import { getActivePinia } from 'pinia'
+import { kubernetesService } from '../services/kubernetesService.ts'
 import { useKubernetesStore } from '../stores/kubernetesStore.ts'
 
 const isAddClusterModalVisible = ref(false)
@@ -46,6 +47,14 @@ export function useCluster() {
     }
   }
 
+  const reconnectActiveCluster = async (): Promise<void> => {
+    const store = getStore()
+    const clusterId = store?.activeClusterId
+    if (clusterId) {
+      await kubernetesService.switchCluster(clusterId)
+    }
+  }
+
   return {
     activeCluster,
     isRefreshing,
@@ -54,6 +63,7 @@ export function useCluster() {
     closeAddClusterModal,
     handleAddCluster,
     refreshCluster,
+    reconnectActiveCluster,
     lastUpdatedAt
   }
 }

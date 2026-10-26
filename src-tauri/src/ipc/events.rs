@@ -7,6 +7,14 @@ pub enum UpdateInstallFailureCode {
     LaunchFailed,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum WatcherConnectionState {
+    Connected,
+    Degraded,
+    Suspended,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ResourceUpdate {
     pub action: String,
@@ -211,6 +219,13 @@ pub enum OrbitEvent {
         session_id: String,
         exit_code: Option<i32>,
     },
+    #[serde(rename = "watcherConnectionChanged")]
+    #[serde(rename_all = "camelCase")]
+    WatcherConnectionChanged {
+        cluster_id: Option<String>,
+        state: WatcherConnectionState,
+        failing_watchers: usize,
+    },
 }
 
 impl OrbitEvent {
@@ -258,6 +273,7 @@ impl OrbitEvent {
             OrbitEvent::TerminalStarted { .. } => "terminalStarted",
             OrbitEvent::TerminalData { .. } => "terminalData",
             OrbitEvent::TerminalClosed { .. } => "terminalClosed",
+            OrbitEvent::WatcherConnectionChanged { .. } => "watcherConnectionChanged",
         }
     }
 }
@@ -290,5 +306,20 @@ mod tests {
         assert!(json.contains(r#""code":"elevationDenied""#));
         assert!(json.contains(r#""message":"Administrator permission was not granted""#));
         assert_eq!(evt.event_name(), "updateInstallFailed");
+    }
+
+    #[test]
+    fn test_watcher_connection_changed_serialization() {
+        let evt = OrbitEvent::WatcherConnectionChanged {
+            cluster_id: Some("ctx-a".to_string()),
+            state: WatcherConnectionState::Degraded,
+            failing_watchers: 3,
+        };
+        let json = serde_json::to_string(&evt).unwrap();
+        assert!(json.contains(r#""event":"watcherConnectionChanged""#));
+        assert!(json.contains(r#""clusterId":"ctx-a""#));
+        assert!(json.contains(r#""state":"degraded""#));
+        assert!(json.contains(r#""failingWatchers":3"#));
+        assert_eq!(evt.event_name(), "watcherConnectionChanged");
     }
 }

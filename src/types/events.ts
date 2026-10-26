@@ -39,6 +39,8 @@ export interface UpdateManifest {
 
 export type UpdateInstallFailureCode = 'elevationDenied' | 'launchFailed'
 
+export type WatcherConnectionState = 'connected' | 'degraded' | 'suspended'
+
 export type KubernetesResourceInfo =
   | ServiceInfo
   | IngressInfo
@@ -224,6 +226,11 @@ export interface OrbitEventMap {
     sessionId: string
     exitCode?: number
   }
+  watcherConnectionChanged: {
+    clusterId: string | null
+    state: WatcherConnectionState
+    failingWatchers: number
+  }
 }
 
 /** Sentinel value for the tailLines IPC field meaning "fetch all log lines". */
@@ -273,7 +280,8 @@ export const OrbitEvents = {
   PortForwardsUpdated: 'portForwardsUpdated',
   TerminalStarted: 'terminalStarted',
   TerminalData: 'terminalData',
-  TerminalClosed: 'terminalClosed'
+  TerminalClosed: 'terminalClosed',
+  WatcherConnectionChanged: 'watcherConnectionChanged'
 } as const
 
 export type OrbitEventName = keyof OrbitEventMap

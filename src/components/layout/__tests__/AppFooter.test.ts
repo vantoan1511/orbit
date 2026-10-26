@@ -71,3 +71,17 @@ test('AppFooter component preserves engine status, refresh, and terminal control
     'AppFooter must retain terminal panel toggle button'
   )
 })
+
+test('AppFooter component renders watcher connection indicators and reconnect action', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/layout/AppFooter.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('watcherConnectionState'),
+    'AppFooter must check watcherConnectionState'
+  )
+  assert.ok(content.includes('suspended'), 'AppFooter must handle suspended state')
+  assert.ok(content.includes('Reconnect'), 'AppFooter must render Reconnect action button')
+  assert.ok(content.includes('v-tooltip'), 'AppFooter must use v-tooltip for hints')
+  assert.ok(!content.includes('title='), 'AppFooter must never use raw title= attributes')
+})

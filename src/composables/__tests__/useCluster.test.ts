@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test, { beforeEach } from 'node:test'
 import { createPinia, setActivePinia } from 'pinia'
 import { useKubernetesStore } from '../../stores/kubernetesStore.ts'
+import { kubernetesService } from '../../services/kubernetesService.ts'
 import {
   isAddClusterModalVisible,
   openAddClusterModal,
@@ -54,4 +55,21 @@ test('activeCluster and lastUpdatedAt evaluate cleanly with active Pinia', () =>
   assert.ok(activeCluster.value)
   assert.equal(activeCluster.value?.id, 'cluster-alpha')
   assert.equal(activeCluster.value?.name, 'Alpha Cluster')
+})
+
+test('reconnectActiveCluster dispatches switchCluster with active cluster id', async () => {
+  const store = useKubernetesStore()
+  store.setActiveClusterId('cluster-xyz')
+  let switchedId: string | null = null
+  const origSwitch = kubernetesService.switchCluster
+  kubernetesService.switchCluster = async (id: string) => {
+    switchedId = id
+  }
+  try {
+    const { reconnectActiveCluster } = useCluster()
+    await reconnectActiveCluster()
+    assert.equal(switchedId, 'cluster-xyz')
+  } finally {
+    kubernetesService.switchCluster = origSwitch
+  }
 })
