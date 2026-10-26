@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import AppBreadcrumbs from './AppBreadcrumbs.vue'
+import FooterStatusAction from './FooterStatusAction.vue'
 import { useCluster } from '@/composables/useCluster'
 import { useEngineConnection } from '@/composables/useEngineConnection'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTerminalStore } from '@/stores/terminalStore'
 import {
   AlertCircle,
@@ -13,9 +15,22 @@ import {
 import Button from 'primevue/button'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 
+const k8sStore = useKubernetesStore()
 const terminalStore = useTerminalStore()
-const { activeCluster, isRefreshing, refreshCluster, lastUpdatedAt } = useCluster()
+const { activeCluster, isRefreshing, refreshCluster, reconnectActiveCluster, lastUpdatedAt } =
+  useCluster()
 const { isReconnecting, isFailed, retryNow, restartApp } = useEngineConnection()
+
+const isReconnectingCluster = ref(false)
+const handleReconnectCluster = async () => {
+  if (isReconnectingCluster.value) return
+  isReconnectingCluster.value = true
+  try {
+    await reconnectActiveCluster()
+  } finally {
+    isReconnectingCluster.value = false
+  }
+}
 
 const now = ref(Date.now())
 let nowTimer: number | undefined
@@ -89,16 +104,44 @@ const lastUpdatedDisplay = computed(() => {
       >
         <AlertCircle :size="12" class="text-(--danger)" />
         <span>Engine disconnected</span>
-        <Button
-          size="small"
+        <FooterStatusAction
+          label="Restart app"
           severity="danger"
+          tooltip="Restart application process to re-establish runtime engine link"
           @click="restartApp"
-          v-tooltip.top="'Restart application process to re-establish runtime engine link'"
-          class="h-5 px-2 text-[10px]"
-        >
-          Restart app
-        </Button>
+        />
       </div>
+
+      <!-- Cluster watcher connection state (degraded: warning, suspended: danger + Reconnect) -->
+      <template v-if="!isReconnecting && !isFailed && activeCluster">
+        <div
+          v-if="k8sStore.watcherConnectionState === 'degraded'"
+          class="flex items-center gap-1.5 text-[11px] text-(--warning) font-medium"
+          v-tooltip.top="'Cluster unreachable. Background watchers are backing off and retrying...'"
+        >
+          <Loader2 :size="12" class="animate-spin text-(--warning)" />
+          <span>Cluster unreachable, retrying…</span>
+        </div>
+
+        <div
+          v-else-if="k8sStore.watcherConnectionState === 'suspended'"
+          class="flex items-center gap-1.5 text-[11px] text-(--danger) font-medium"
+        >
+          <AlertCircle :size="12" class="text-(--danger)" />
+          <span>Cluster disconnected</span>
+          <FooterStatusAction
+            label="Reconnect"
+            severity="danger"
+            tooltip="Restart watchers and re-establish connection to cluster"
+            :loading="isReconnectingCluster"
+            @click="handleReconnectCluster"
+          >
+            <template #icon>
+              <RotateCcw :size="10" />
+            </template>
+          </FooterStatusAction>
+        </div>
+      </template>
 
       <!-- Last updated & Refresh -->
       <template v-if="activeCluster">

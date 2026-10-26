@@ -2,7 +2,11 @@ import { kubernetesService } from '../services/kubernetesService.ts'
 import { events as nativeEvents } from '../services/nativeService.ts'
 import { useLogsStore } from './logsStore.ts'
 import { useTableFilterStore } from './tableFilterStore.ts'
-import { OrbitEvents, type KubernetesResourceInfo } from '../types/events.ts'
+import {
+  OrbitEvents,
+  type KubernetesResourceInfo,
+  type WatcherConnectionState
+} from '../types/events.ts'
 import { formatCpuCores, formatDecimal, formatMemoryMiB } from '../utils/metrics.ts'
 import {
   KUBERNETES_RESOURCE_KIND,
@@ -53,6 +57,7 @@ export {
 export const useKubernetesStore = defineStore('kubernetes', () => {
   const isEngineReady = ref(false)
   const isAppLoading = ref(true)
+  const watcherConnectionState = ref<WatcherConnectionState>('connected')
   const pods = shallowRef<PodInfo[]>([])
   const deployments = shallowRef<DeploymentInfo[]>([])
   const statefulSets = shallowRef<StatefulSetInfo[]>([])
@@ -179,6 +184,20 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setEngineReady(ready: boolean) {
     isEngineReady.value = ready
+    if (ready) {
+      watcherConnectionState.value = 'connected'
+    }
+  }
+
+  function setWatcherConnectionState(clusterId: string | null, state: WatcherConnectionState) {
+    if (
+      clusterId !== null &&
+      activeClusterId.value !== null &&
+      clusterId !== activeClusterId.value
+    ) {
+      return
+    }
+    watcherConnectionState.value = state
   }
 
   function setAppLoading(loading: boolean) {
@@ -343,6 +362,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setActiveClusterId(id: string | null) {
+    watcherConnectionState.value = 'connected'
     if (activeClusterId.value === id) return
     activeClusterId.value = id
     // Sync active cluster and reset transient table selection state when switching clusters
@@ -819,6 +839,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     lastUpdatedAt,
     cpuHistory,
     memHistory,
-    activePortForwards
+    activePortForwards,
+    watcherConnectionState,
+    setWatcherConnectionState
   }
 })

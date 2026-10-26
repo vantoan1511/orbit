@@ -13,7 +13,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useShortcutStore } from '@/stores/shortcutStore'
 import { syncAppearanceFromSettings } from '@/composables/useAppearance'
 import { isAddClusterModalVisible } from '@/composables/useCluster'
-import { OrbitEvents } from '@/types/events'
+import { OrbitEvents, type OrbitEventMap } from '@/types/events'
 import type {
   ClusterInfo,
   ConfigMapInfo,
@@ -170,6 +170,10 @@ const handleActiveClusterChanged = (payload: { active_cluster_id: string | null 
   k8sStore.setActiveClusterId(payload.active_cluster_id)
 }
 
+const handleWatcherConnectionChanged = (payload: OrbitEventMap['watcherConnectionChanged']) => {
+  k8sStore.setWatcherConnectionState(payload.clusterId, payload.state)
+}
+
 let lastConnectionErrorTime = 0
 
 const handleErrorOccurred = (payload: { message: string }) => {
@@ -303,6 +307,7 @@ onMounted(async () => {
     events.on(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated),
     events.on(OrbitEvents.ClustersUpdated, handleClustersUpdated),
     events.on(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged),
+    events.on(OrbitEvents.WatcherConnectionChanged, handleWatcherConnectionChanged),
     events.on(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated),
     events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred),
     events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded),
@@ -339,6 +344,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.PoliciesUpdated, handlePoliciesUpdated)
   events.off(OrbitEvents.ClustersUpdated, handleClustersUpdated)
   events.off(OrbitEvents.ActiveClusterChanged, handleActiveClusterChanged)
+  events.off(OrbitEvents.WatcherConnectionChanged, handleWatcherConnectionChanged)
   events.off(OrbitEvents.UserProfileUpdated, handleUserProfileUpdated)
   events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
   events.off(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
