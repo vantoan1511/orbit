@@ -44,7 +44,7 @@ app.use(PrimeVue, {
           'bg-(--ui-dialog-bg) border border-(--border) shadow-[var(--ui-card-shadow,var(--shadow))] rounded-[var(--ui-radius-card)] overflow-hidden'
       },
       mask: {
-        class: 'bg-(--ui-mask-bg) backdrop-blur-(--ui-mask-blur) transition-all duration-200'
+        class: 'bg-(--ui-mask-bg) ui-modal-mask transition-all duration-200'
       },
       header: {
         class:

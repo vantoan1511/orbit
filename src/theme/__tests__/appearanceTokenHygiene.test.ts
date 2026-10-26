@@ -267,6 +267,7 @@ test('main.ts defines canonical global pass-through for dialog with ui-dialog-bg
     content.includes('bg-(--ui-mask-bg)'),
     'main.ts dialog pt must configure bg-(--ui-mask-bg)'
   )
+  assert.ok(content.includes('ui-modal-mask'), 'main.ts dialog pt must configure ui-modal-mask')
   assert.ok(
     content.includes('rounded-[var(--ui-radius-card)]'),
     'main.ts dialog pt must use rounded-[var(--ui-radius-card)]'
