@@ -364,23 +364,10 @@ const handleClose = (): void => emit('update:visible', false)
     dismissable-mask
     :closable="!isSubmitting"
     data-component="add-cluster-modal"
-    class="w-full max-w-2xl border border-(--border) bg-(--bg-card) text-(--text-primary) shadow-[var(--ui-card-shadow,none)] rounded-[var(--ui-radius-card)] overflow-hidden"
+    class="w-full max-w-2xl"
     :pt="{
-      root: { class: 'p-0 overflow-hidden' },
-      mask: { class: 'bg-black/60 backdrop-blur-xs' },
-      header: {
-        class:
-          'border-b border-(--border) px-5 py-3.5 bg-(--bg-sidebar) flex items-center justify-between'
-      },
-      content: { class: 'p-5 max-h-[75vh] overflow-y-auto flex flex-col gap-6 bg-(--bg-card)' },
-      footer: {
-        class:
-          'border-t border-(--border) px-5 py-3 bg-(--bg-sidebar) flex items-center justify-between'
-      },
-      closeButton: {
-        class:
-          'w-7 h-7 p-0 text-muted-color hover:text-(--text-primary) hover:bg-(--bg-hover) rounded-[var(--ui-radius-control)] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary'
-      }
+      content: { class: 'max-h-[75vh] overflow-y-auto' },
+      footer: { class: 'justify-between' }
     }"
     @update:visible="emit('update:visible', $event)"
   >

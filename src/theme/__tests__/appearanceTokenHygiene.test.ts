@@ -231,6 +231,10 @@ test('base.css defines all core design tokens across all 5 UI styles (flat, glas
     '--ui-control-bg',
     '--ui-card-bg',
     '--ui-overlay-bg',
+    '--ui-dialog-bg',
+    '--ui-dialog-blur',
+    '--ui-mask-bg',
+    '--ui-mask-blur',
     '--border',
     '--ui-glass-blur',
     '--ui-sheen-highlight'
@@ -247,6 +251,27 @@ test('base.css defines all core design tokens across all 5 UI styles (flat, glas
       `base.css must define [data-ui-style="${style}"] preset rules`
     )
   }
+})
+
+test('main.ts defines canonical global pass-through for dialog with ui-dialog-bg and ui-mask-bg', () => {
+  const mainTsPath = path.resolve(process.cwd(), 'src/main.ts')
+  const content = fs.readFileSync(mainTsPath, 'utf-8')
+
+  assert.ok(content.includes('pt:'), 'main.ts must configure PrimeVue global pt')
+  assert.ok(content.includes('dialog:'), 'main.ts pt must configure dialog')
+  assert.ok(
+    content.includes('bg-(--ui-dialog-bg)'),
+    'main.ts dialog pt must configure bg-(--ui-dialog-bg)'
+  )
+  assert.ok(
+    content.includes('bg-(--ui-mask-bg)'),
+    'main.ts dialog pt must configure bg-(--ui-mask-bg)'
+  )
+  assert.ok(content.includes('ui-modal-mask'), 'main.ts dialog pt must configure ui-modal-mask')
+  assert.ok(
+    content.includes('rounded-[var(--ui-radius-card)]'),
+    'main.ts dialog pt must use rounded-[var(--ui-radius-card)]'
+  )
 })
 
 test('Stylesheets and Vue components contain zero ad-hoc .p-* CSS overrides or !important declarations', () => {

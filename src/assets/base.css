@@ -161,6 +161,10 @@
   --ui-control-bg: var(--input-bg);
   --ui-overlay-bg: var(--bg-card);
   --ui-overlay-blur: none;
+  --ui-dialog-bg: var(--ui-overlay-bg);
+  --ui-dialog-blur: var(--ui-overlay-blur, var(--ui-glass-blur));
+  --ui-mask-bg: rgba(0, 0, 0, 0.4);
+  --ui-mask-blur: none;
   --ui-glass-blur: none;
   --ui-sheen-highlight: none;
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -272,6 +276,10 @@
   --ui-control-bg: var(--input-bg);
   --ui-overlay-bg: var(--bg-card);
   --ui-overlay-blur: none;
+  --ui-dialog-bg: var(--ui-overlay-bg);
+  --ui-dialog-blur: var(--ui-overlay-blur, var(--ui-glass-blur));
+  --ui-mask-bg: rgba(0, 0, 0, 0.6);
+  --ui-mask-blur: none;
 }
 
 /* ===========================
@@ -286,11 +294,21 @@
   --ui-control-bg: var(--input-bg);
   --ui-overlay-bg: var(--bg-card);
   --ui-overlay-blur: none;
+  --ui-dialog-bg: var(--bg-card);
+  --ui-dialog-blur: none;
+  --ui-mask-bg: rgba(0, 0, 0, 0.4);
+  --ui-mask-blur: none;
   --ui-glass-blur: none;
   --ui-sheen-highlight: none;
   --ui-card-sheen: var(--ui-sheen-highlight);
   --ui-card-shadow: none;
   --ui-backdrop-blur: var(--ui-glass-blur);
+}
+
+[data-ui-style="flat"].my-app-dark,
+.my-app-dark[data-ui-style="flat"] {
+  --ui-mask-bg: rgba(0, 0, 0, 0.6);
+  --ui-mask-blur: none;
 }
 
 /* Glass UI */
@@ -305,6 +323,10 @@
   --ui-control-bg: rgba(255, 255, 255, 0.72);
   --ui-overlay-bg: rgba(255, 255, 255, 0.78);
   --ui-overlay-blur: blur(20px) saturate(160%);
+  --ui-dialog-bg: rgba(255, 255, 255, 0.80);
+  --ui-dialog-blur: blur(20px) saturate(160%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.25);
+  --ui-mask-blur: blur(4px);
   --ui-glass-blur: blur(14px);
   --ui-sheen-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.15);
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -324,6 +346,10 @@
   --ui-control-bg: rgba(26, 29, 33, 0.72);
   --ui-overlay-bg: rgba(14, 16, 18, 0.78);
   --ui-overlay-blur: blur(20px) saturate(160%);
+  --ui-dialog-bg: rgba(16, 20, 24, 0.80);
+  --ui-dialog-blur: blur(20px) saturate(160%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.55);
+  --ui-mask-blur: blur(4px);
   --ui-glass-blur: blur(14px);
   --ui-sheen-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.1);
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -344,6 +370,10 @@
   --ui-control-bg: rgba(255, 255, 255, 0.82);
   --ui-overlay-bg: rgba(255, 255, 255, 0.82);
   --ui-overlay-blur: blur(18px) saturate(150%);
+  --ui-dialog-bg: rgba(255, 255, 255, 0.85);
+  --ui-dialog-blur: blur(18px) saturate(150%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.25);
+  --ui-mask-blur: blur(3px);
   --ui-glass-blur: blur(14px);
   --ui-sheen-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -364,6 +394,10 @@
   --ui-control-bg: rgba(24, 30, 38, 0.78);
   --ui-overlay-bg: rgba(18, 24, 32, 0.80);
   --ui-overlay-blur: blur(18px) saturate(150%);
+  --ui-dialog-bg: rgba(20, 26, 36, 0.82);
+  --ui-dialog-blur: blur(18px) saturate(150%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.55);
+  --ui-mask-blur: blur(3px);
   --ui-glass-blur: blur(14px);
   --ui-sheen-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.01) 100%);
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -384,6 +418,10 @@
   --ui-control-bg: rgba(255, 255, 255, 0.62);
   --ui-overlay-bg: rgba(255, 255, 255, 0.72);
   --ui-overlay-blur: blur(24px) saturate(190%);
+  --ui-dialog-bg: rgba(255, 255, 255, 0.74);
+  --ui-dialog-blur: blur(24px) saturate(190%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.30);
+  --ui-mask-blur: blur(6px);
   --ui-glass-blur: blur(20px) saturate(180%);
   --ui-sheen-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -404,6 +442,10 @@
   --ui-control-bg: rgba(20, 26, 36, 0.68);
   --ui-overlay-bg: rgba(15, 20, 28, 0.76);
   --ui-overlay-blur: blur(24px) saturate(190%);
+  --ui-dialog-bg: rgba(18, 24, 34, 0.78);
+  --ui-dialog-blur: blur(24px) saturate(190%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.60);
+  --ui-mask-blur: blur(6px);
   --ui-glass-blur: blur(20px) saturate(180%);
   --ui-sheen-highlight: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -423,6 +465,10 @@
   --ui-control-bg: rgba(242, 242, 247, 0.82);
   --ui-overlay-bg: rgba(255, 255, 255, 0.80);
   --ui-overlay-blur: blur(25px) saturate(190%);
+  --ui-dialog-bg: rgba(255, 255, 255, 0.82);
+  --ui-dialog-blur: blur(25px) saturate(190%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.25);
+  --ui-mask-blur: blur(5px);
   --ui-glass-blur: blur(24px) saturate(190%);
   --ui-sheen-highlight: none;
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -442,6 +488,10 @@
   --ui-control-bg: rgba(44, 44, 46, 0.82);
   --ui-overlay-bg: rgba(30, 30, 32, 0.80);
   --ui-overlay-blur: blur(25px) saturate(190%);
+  --ui-dialog-bg: rgba(32, 32, 36, 0.82);
+  --ui-dialog-blur: blur(25px) saturate(190%);
+  --ui-mask-bg: rgba(0, 0, 0, 0.55);
+  --ui-mask-blur: blur(5px);
   --ui-glass-blur: blur(24px) saturate(190%);
   --ui-sheen-highlight: none;
   --ui-card-sheen: var(--ui-sheen-highlight);
@@ -451,7 +501,8 @@
 
 /* Surface token helpers */
 .bg-\(--bg-card\),
-.bg-\(--ui-overlay-bg\) {
+.bg-\(--ui-overlay-bg\),
+.bg-\(--ui-dialog-bg\) {
   border-radius: var(--ui-radius-card);
   box-shadow: var(--ui-card-shadow, none);
   transition: border-radius 0.2s ease, box-shadow 0.2s ease;
@@ -459,8 +510,10 @@
 
 [data-ui-style="aero"] .bg-\(--bg-card\),
 [data-ui-style="aero"] .bg-\(--ui-overlay-bg\),
+[data-ui-style="aero"] .bg-\(--ui-dialog-bg\),
 [data-ui-style="liquidglass"] .bg-\(--bg-card\),
-[data-ui-style="liquidglass"] .bg-\(--ui-overlay-bg\) {
+[data-ui-style="liquidglass"] .bg-\(--ui-overlay-bg\),
+[data-ui-style="liquidglass"] .bg-\(--ui-dialog-bg\) {
   background-image: var(--ui-sheen-highlight);
 }
 
@@ -476,16 +529,30 @@
 [data-ui-style="ios"] .bg-\(--bg-sidebar\),
 [data-ui-style="ios"] .bg-\(--bg-card\),
 [data-ui-style="ios"] .bg-\(--bg-panel\) {
-  backdrop-filter: var(--ui-glass-blur);
   -webkit-backdrop-filter: var(--ui-glass-blur);
+  backdrop-filter: var(--ui-glass-blur);
 }
 
 [data-ui-style="glass"] .bg-\(--ui-overlay-bg\),
 [data-ui-style="aero"] .bg-\(--ui-overlay-bg\),
 [data-ui-style="liquidglass"] .bg-\(--ui-overlay-bg\),
 [data-ui-style="ios"] .bg-\(--ui-overlay-bg\) {
-  backdrop-filter: var(--ui-overlay-blur, var(--ui-glass-blur));
   -webkit-backdrop-filter: var(--ui-overlay-blur, var(--ui-glass-blur));
+  backdrop-filter: var(--ui-overlay-blur, var(--ui-glass-blur));
+}
+
+[data-ui-style="glass"] .bg-\(--ui-dialog-bg\),
+[data-ui-style="aero"] .bg-\(--ui-dialog-bg\),
+[data-ui-style="liquidglass"] .bg-\(--ui-dialog-bg\),
+[data-ui-style="ios"] .bg-\(--ui-dialog-bg\) {
+  -webkit-backdrop-filter: var(--ui-dialog-blur, var(--ui-glass-blur));
+  backdrop-filter: var(--ui-dialog-blur, var(--ui-glass-blur));
+}
+
+/* Modal Mask Utility */
+.ui-modal-mask {
+  -webkit-backdrop-filter: var(--ui-mask-blur);
+  backdrop-filter: var(--ui-mask-blur);
 }
 
 /* Subtle ambient background glow for translucent styles to make backdrop-blur pop */
