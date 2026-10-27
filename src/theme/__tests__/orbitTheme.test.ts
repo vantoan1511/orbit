@@ -113,7 +113,7 @@ test('Noir preset components connect surfaces, radii, borders, glass blur, and s
   assert.ok(datatable, 'datatable component config must exist')
   assert.equal(datatable.root?.borderColor, 'var(--border)')
   assert.equal(datatable.headerCell?.borderColor, 'var(--border)')
-  assert.equal(datatable.bodyCell?.borderColor, 'var(--border)')
+  assert.equal(datatable.bodyCell?.borderColor, 'var(--border-subtle, var(--border))')
   assert.equal(datatable.row?.background, 'var(--ui-card-bg)')
   assert.equal(datatable.row?.hoverBackground, 'var(--bg-hover)')
 

@@ -13,8 +13,7 @@ test('getTabContainerClass returns active tab styling without blue border-t-(--a
   assert.equal(activeClass.includes('bg-(--bg-card)'), true)
   assert.equal(activeClass.includes('text-primary'), true)
   assert.equal(activeClass.includes('font-medium'), true)
-  assert.equal(activeClass.includes('border-r'), true)
-  assert.equal(activeClass.includes('border-(--border)'), true)
+  assert.equal(activeClass.includes('border-r'), false)
   assert.equal(activeClass.includes('border-b-(--bg-card)'), true)
 })
 

@@ -7,7 +7,7 @@
  */
 export function getTabContainerClass(isActive: boolean, isDragging = false): string {
   const cursorClass = isDragging ? 'cursor-grabbing' : 'cursor-pointer'
-  const base = `group relative flex items-center gap-2 h-8 px-3 border-r border-(--border) text-xs ${cursorClass} select-none transition-all duration-150 shrink-0 max-w-52 min-w-28`
+  const base = `group relative flex items-center gap-2 h-8 px-3 text-xs ${cursorClass} select-none transition-all duration-150 shrink-0 max-w-52 min-w-28`
 
   if (isActive) {
     return `${base} bg-(--bg-card) text-primary font-medium border-t border-t-transparent border-b border-b-(--bg-card)`
