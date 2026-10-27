@@ -63,15 +63,28 @@ pub fn update_app_settings(
 
                     let autostart_enabled = current_config.launch_on_startup();
                     if prev_autostart != autostart_enabled {
-                        let _ = tokio::task::spawn_blocking(move || {
-                            if let Ok(manager) = crate::autostart::AutostartManager::new_default() {
-                                let _ = if autostart_enabled {
-                                    manager.enable()
-                                } else {
-                                    manager.disable()
-                                };
-                            }
+                        let autostart_res = tokio::task::spawn_blocking(move || {
+                            crate::autostart::service().and_then(|s| s.set_enabled(autostart_enabled))
                         }).await;
+
+                        match autostart_res {
+                            Ok(Ok(outcome)) => {
+                                tracing::info!(outcome = ?outcome, enabled = autostart_enabled, "Autostart updated via settings");
+                            }
+                            Ok(Err(e)) => {
+                                tracing::warn!(code = e.code(), error = %e, "Failed to apply autostart setting to operating system");
+                                let _ = Bridge::send_event(
+                                    &writer,
+                                    &token,
+                                    &OrbitEvent::ErrorOccurred {
+                                        message: format!("Failed to apply autostart setting: {}", e),
+                                    },
+                                ).await;
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "Autostart background task panicked");
+                            }
+                        }
                     }
 
                     let mut w_manager = manager.write().await;
@@ -128,23 +141,28 @@ pub fn set_launch_on_startup(
             return;
         }
 
-        let _ = tokio::task::spawn_blocking(move || {
-            match crate::autostart::AutostartManager::new_default() {
-                Ok(manager) => {
-                    let res = if enabled {
-                        manager.enable()
-                    } else {
-                        manager.disable()
-                    };
-                    if let Err(e) = res {
-                        tracing::warn!(error = %e, "Failed to apply autostart setting to operating system");
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, "Failed to initialize autostart manager");
-                }
-            }
+        let autostart_res = tokio::task::spawn_blocking(move || {
+            crate::autostart::service().and_then(|s| s.set_enabled(enabled))
         }).await;
+
+        match autostart_res {
+            Ok(Ok(outcome)) => {
+                tracing::info!(outcome = ?outcome, enabled, "Autostart set via set_launch_on_startup");
+            }
+            Ok(Err(e)) => {
+                tracing::warn!(code = e.code(), error = %e, "Failed to apply autostart setting to operating system");
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ErrorOccurred {
+                        message: format!("Failed to apply autostart setting: {}", e),
+                    },
+                ).await;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Autostart background task panicked");
+            }
+        }
 
         let mut w_manager = manager.write().await;
         w_manager.config = current_config.clone();
@@ -162,12 +180,23 @@ pub fn set_launch_on_startup(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
+    use crate::autostart::AutostartBackend;
     use crate::ipc::emitter::{set_global_emitter, MockEventEmitter};
 
     #[tokio::test]
     async fn test_set_launch_on_startup_emits_app_settings_updated() {
         let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_on_startup");
+        let in_memory_backend = Arc::new(crate::autostart::InMemoryBackend::new());
+        let test_service = Arc::new(crate::autostart::AutostartService::new(
+            in_memory_backend.clone(),
+            crate::autostart::RunMode::Prod,
+            "OrbitTest".to_string(),
+            PathBuf::from("C:\\fake\\orbit.exe"),
+        ));
+        let _autostart_guard = crate::autostart::AutostartTestGuard::install(test_service);
+
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
@@ -187,13 +216,136 @@ mod tests {
             }
         }
         assert!(found, "appSettingsUpdated event must be emitted");
+        assert!(
+            in_memory_backend.is_registered("OrbitTest").unwrap(),
+            "in_memory_backend must be registered"
+        );
+    }
 
-        // Clean up test registry entry
-        let _ = tokio::task::spawn_blocking(|| {
-            if let Ok(manager) = crate::autostart::AutostartManager::new(crate::autostart::DEFAULT_APP_NAME) {
-                let _ = manager.disable();
+    #[tokio::test]
+    async fn test_set_launch_on_startup_failure_emits_error_occurred() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_failure");
+        let failing_service = Arc::new(crate::autostart::AutostartService::new(
+            Arc::new(crate::autostart::memory::InMemoryBackend::new()),
+            crate::autostart::RunMode::Prod,
+            "OrbitTest".to_string(),
+            PathBuf::from("D:\\Projects\\orbit\\target\\debug\\deps\\orbit_app-unsafe.exe"),
+        ));
+        let _autostart_guard = crate::autostart::AutostartTestGuard::install(failing_service);
+
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let payload = Some(serde_json::json!({ "enabled": true }));
+
+        set_launch_on_startup(payload, writer, "token".to_string(), manager);
+
+        let mut found = false;
+        for _ in 0..40 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            let emitted = mock_emitter.get_emitted_events().await;
+            if emitted.iter().any(|(name, _)| name == "errorOccurred") {
+                found = true;
+                break;
             }
-        }).await;
+        }
+        assert!(found, "errorOccurred event must be emitted when autostart fails");
+    }
+
+    #[tokio::test]
+    async fn test_set_launch_on_startup_in_dev_mode_does_not_register() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_dev_mode");
+        let in_memory_backend = Arc::new(crate::autostart::InMemoryBackend::new());
+        let test_service = Arc::new(crate::autostart::AutostartService::new(
+            in_memory_backend.clone(),
+            crate::autostart::RunMode::Dev,
+            "Orbit Dev".to_string(),
+            PathBuf::from("C:\\fake\\orbit.exe"),
+        ));
+        let _autostart_guard = crate::autostart::AutostartTestGuard::install(test_service);
+
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let payload = Some(serde_json::json!({ "enabled": true }));
+
+        set_launch_on_startup(payload, writer, "token".to_string(), manager);
+
+        for _ in 0..20 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
+
+        assert!(
+            in_memory_backend.list().unwrap().is_empty(),
+            "Dev mode service must not register autostart"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_app_settings_toggling_launch_on_startup_calls_backend() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("toggle_launch_on_startup");
+        let in_memory_backend = Arc::new(crate::autostart::InMemoryBackend::new());
+        let test_service = Arc::new(crate::autostart::AutostartService::new(
+            in_memory_backend.clone(),
+            crate::autostart::RunMode::Prod,
+            "OrbitTest".to_string(),
+            PathBuf::from("C:\\fake\\orbit.exe"),
+        ));
+        let _autostart_guard = crate::autostart::AutostartTestGuard::install(test_service);
+
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let payload = Some(serde_json::json!({ "launchOnStartup": true }));
+
+        update_app_settings(payload, writer, "token".to_string(), manager);
+
+        let mut registered = false;
+        for _ in 0..40 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            if in_memory_backend.is_registered("OrbitTest").unwrap() {
+                registered = true;
+                break;
+            }
+        }
+        assert!(registered, "in_memory_backend must be registered via update_app_settings");
+    }
+
+    #[tokio::test]
+    #[cfg(target_os = "windows")]
+    async fn test_handlers_do_not_touch_production_run_key() {
+        use crate::autostart::AutostartBackend;
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("prod_run_key_untouched");
+        let _autostart_lock = crate::autostart::AUTOSTART_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+
+        let prod_backend = crate::autostart::WindowsRunKeyBackend::production();
+        let prod_before = prod_backend.list().unwrap();
+
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let payload = Some(serde_json::json!({ "enabled": true }));
+
+        set_launch_on_startup(payload, writer, "token".to_string(), manager);
+
+        for _ in 0..20 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
+
+        let prod_after = prod_backend.list().unwrap();
+        assert_eq!(prod_before, prod_after, "Production Run key must not be modified by handlers in tests");
     }
 
     #[tokio::test]
