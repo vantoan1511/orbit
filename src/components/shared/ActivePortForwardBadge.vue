@@ -40,7 +40,7 @@ const stopPortForward = async (id: string) => {
       <span class="text-[10px] font-mono font-semibold">{{ props.portForwards.length }}</span>
     </div>
 
-    <Popover ref="op" class="shadow-lg min-w-64" @click.stop>
+    <Popover ref="op" class="min-w-64" @click.stop>
       <div class="flex flex-col gap-3 p-1">
         <div class="flex flex-col gap-0.5">
           <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">

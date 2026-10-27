@@ -133,7 +133,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. data-migration-job"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         aria-describedby="create-job-name-error"
         class="text-xs"
@@ -157,7 +156,6 @@ const handleCreate = async () => {
         v-model="namespace"
         :options="namespaceOptions"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -172,7 +170,6 @@ const handleCreate = async () => {
         v-model="image"
         placeholder="e.g. perl:5.34.0 or busybox:latest"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -187,7 +184,6 @@ const handleCreate = async () => {
         v-model="command"
         placeholder="e.g. echo hello world"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -205,7 +201,6 @@ const handleCreate = async () => {
           :max="1000"
           showButtons
           fluid
-          size="small"
         />
       </div>
 
@@ -220,7 +215,6 @@ const handleCreate = async () => {
           :max="1000"
           showButtons
           fluid
-          size="small"
         />
       </div>
     </div>
@@ -238,7 +232,6 @@ const handleCreate = async () => {
           :max="100"
           showButtons
           fluid
-          size="small"
         />
       </div>
 
@@ -251,7 +244,6 @@ const handleCreate = async () => {
           v-model="restartPolicy"
           :options="KUBERNETES_JOB_RESTART_POLICIES"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -263,7 +255,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -271,7 +262,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

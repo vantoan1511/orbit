@@ -139,7 +139,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. staging"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         class="text-xs"
       />
@@ -175,7 +174,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -183,7 +181,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

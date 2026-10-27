@@ -353,7 +353,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="completions"
                     :min="1"
-                    size="small"
                     fluid
                     placeholder="Leave empty for work queues"
                     @update:model-value="handleFieldChange"
@@ -368,7 +367,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="parallelism"
                     :min="0"
-                    size="small"
                     fluid
                     @update:model-value="handleFieldChange"
                   />
@@ -383,7 +381,6 @@ const handleFieldChange = () => {
                 <InputNumber
                   v-model="backoffLimit"
                   :min="0"
-                  size="small"
                   fluid
                   @update:model-value="handleFieldChange"
                 />
@@ -413,7 +410,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="activeDeadlineSeconds"
                     :min="1"
-                    size="small"
                     fluid
                     placeholder="Unlimited"
                     @update:model-value="handleFieldChange"
@@ -430,7 +426,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="ttlSecondsAfterFinished"
                     :min="0"
-                    size="small"
                     fluid
                     placeholder="Disabled"
                     @update:model-value="handleFieldChange"
@@ -472,7 +467,6 @@ const handleFieldChange = () => {
                   <Select
                     v-model="completionMode"
                     :options="KUBERNETES_JOB_COMPLETION_MODES"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -491,7 +485,6 @@ const handleFieldChange = () => {
                     :options="KUBERNETES_POD_REPLACEMENT_POLICIES"
                     showClear
                     placeholder="Default"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -513,7 +506,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="backoffLimitPerIndex"
                     :min="0"
-                    size="small"
                     fluid
                     placeholder="None"
                     @update:model-value="handleFieldChange"
@@ -528,7 +520,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="maxFailedIndexes"
                     :min="0"
-                    size="small"
                     fluid
                     placeholder="None"
                     @update:model-value="handleFieldChange"
@@ -660,7 +651,6 @@ const handleFieldChange = () => {
                     v-model="serviceAccountName"
                     placeholder="e.g. default"
                     :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -672,7 +662,6 @@ const handleFieldChange = () => {
                   <Select
                     v-model="restartPolicy"
                     :options="KUBERNETES_JOB_RESTART_POLICIES"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -691,7 +680,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="terminationGracePeriodSeconds"
                     :min="0"
-                    size="small"
                     fluid
                     class="text-xs"
                     @update:model-value="handleFieldChange"
@@ -703,7 +691,6 @@ const handleFieldChange = () => {
                   <Select
                     v-model="dnsPolicy"
                     :options="KUBERNETES_DNS_POLICIES"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -796,7 +783,6 @@ const handleFieldChange = () => {
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
               :label="c.name || `Container ${idx + 1}`"
-              size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
               class="text-xs cursor-pointer"
@@ -828,7 +814,6 @@ const handleFieldChange = () => {
                           !isValidK8sLabel(currentContainer.name.trim())
                         )
                       "
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -840,7 +825,6 @@ const handleFieldChange = () => {
                     <Select
                       v-model="currentContainer.imagePullPolicy"
                       :options="KUBERNETES_IMAGE_PULL_POLICIES"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -853,7 +837,6 @@ const handleFieldChange = () => {
                   <InputText
                     v-model="currentContainer.image"
                     placeholder="e.g. busybox:latest"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -870,7 +853,6 @@ const handleFieldChange = () => {
                         currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
                       )
                     "
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"

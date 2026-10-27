@@ -92,7 +92,6 @@ const handleClone = () => {
         id="clone-deployment-name"
         v-model="newName"
         fluid
-        size="small"
         :invalid="Boolean(newName.trim() && nameErrorMessage)"
         class="text-xs"
       />
@@ -113,7 +112,6 @@ const handleClone = () => {
         v-model="newNamespace"
         :options="namespaceOptions"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -124,10 +122,9 @@ const handleClone = () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         @click="handleCancel"
       />
-      <Button type="submit" label="Clone" severity="primary" size="small" :disabled="!isValid" />
+      <Button type="submit" label="Clone" severity="primary" :disabled="!isValid" />
     </div>
   </form>
 </template>

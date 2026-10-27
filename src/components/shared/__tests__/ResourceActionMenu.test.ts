@@ -3,14 +3,14 @@ import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
-test('ResourceActionMenu uses centralized ui-overlay-bg token and delegates hover/focus states to PrimeVue', () => {
+test('ResourceActionMenu delegates root surfaces to PrimeVue preset and delegates hover/focus states', () => {
   const filePath = path.resolve('src/components/shared/ResourceActionMenu.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
-  // Menu and ContextMenu root surfaces must use --ui-overlay-bg
+  // Menu and ContextMenu root surfaces delegate styling to PrimeVue preset; must not have ad-hoc surface classes
   assert.ok(
-    content.includes('bg-(--ui-overlay-bg)'),
-    'ResourceActionMenu must use bg-(--ui-overlay-bg) for menu root containers'
+    !content.includes('bg-(--ui-overlay-bg)'),
+    'ResourceActionMenu must not have ad-hoc bg-(--ui-overlay-bg) in template'
   )
   assert.ok(!content.includes('bg-(--bg-card)'), 'ResourceActionMenu must not use bg-(--bg-card)')
 

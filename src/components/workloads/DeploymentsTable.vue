@@ -304,7 +304,7 @@ const saveImages = async () => {
   </GenericResourceTable>
 
   <!-- Inline Replicas Edit Popover -->
-  <Popover ref="replicasPopover" class="shadow-lg">
+  <Popover ref="replicasPopover">
     <div class="flex flex-col gap-3 p-1 min-w-56" @click.stop>
       <div class="flex flex-col gap-0.5">
         <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
@@ -332,7 +332,7 @@ const saveImages = async () => {
   </Popover>
 
   <!-- Inline Images Edit Popover -->
-  <Popover ref="imagePopover" class="shadow-lg">
+  <Popover ref="imagePopover">
     <div class="flex flex-col gap-3 p-1 min-w-80" @click.stop>
       <div class="flex flex-col gap-0.5">
         <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">

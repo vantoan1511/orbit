@@ -240,7 +240,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. my-pod"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         class="text-xs"
       />
@@ -262,7 +261,6 @@ const handleCreate = async () => {
         v-model="namespace"
         :options="namespaceOptions"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -277,7 +275,6 @@ const handleCreate = async () => {
         v-model="image"
         placeholder="e.g. nginx:alpine"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -295,7 +292,6 @@ const handleCreate = async () => {
           :max="65535"
           placeholder="e.g. 80"
           fluid
-          size="small"
           :invalid="Boolean(port !== null && portErrorMessage)"
         />
         <small
@@ -315,7 +311,6 @@ const handleCreate = async () => {
           v-model="restartPolicy"
           :options="KUBERNETES_RESTART_POLICIES"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -327,7 +322,6 @@ const handleCreate = async () => {
         type="button"
         variant="text"
         severity="secondary"
-        size="small"
         class="text-xs p-0 font-semibold text-muted-color flex items-center gap-1.5 hover:text-primary"
         @click="showAdvanced = !showAdvanced"
       >
@@ -356,7 +350,6 @@ const handleCreate = async () => {
           v-model="containerName"
           placeholder="Defaults to pod name"
           fluid
-          size="small"
           :invalid="Boolean(containerName.trim() && containerNameErrorMessage)"
           class="text-xs"
         />
@@ -378,7 +371,6 @@ const handleCreate = async () => {
           v-model="command"
           placeholder="e.g. sleep 3600 or sh, -c, echo hello"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -409,7 +401,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -417,7 +408,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

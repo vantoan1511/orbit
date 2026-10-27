@@ -79,16 +79,9 @@ function handleCancel() {
           label="Cancel"
           severity="secondary"
           variant="text"
-          size="small"
           @click="handleCancel"
         />
-        <Button
-          type="button"
-          label="Swap & Assign"
-          severity="primary"
-          size="small"
-          @click="handleConfirm"
-        />
+        <Button type="button" label="Swap & Assign" severity="primary" @click="handleConfirm" />
       </div>
     </template>
   </Dialog>

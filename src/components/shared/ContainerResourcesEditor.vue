@@ -35,7 +35,6 @@ const emit = defineEmits<{
           :model-value="cpuRequest"
           placeholder="e.g. 100m or 0.5"
           :disabled="disabled"
-          size="small"
           fluid
           @update:model-value="(val) => emit('update:cpuRequest', val ?? '')"
         />
@@ -47,7 +46,6 @@ const emit = defineEmits<{
           :model-value="memoryRequest"
           placeholder="e.g. 128Mi or 1Gi"
           :disabled="disabled"
-          size="small"
           fluid
           @update:model-value="(val) => emit('update:memoryRequest', val ?? '')"
         />
@@ -59,7 +57,6 @@ const emit = defineEmits<{
           :model-value="cpuLimit"
           placeholder="e.g. 500m or 1"
           :disabled="disabled"
-          size="small"
           fluid
           @update:model-value="(val) => emit('update:cpuLimit', val ?? '')"
         />
@@ -71,7 +68,6 @@ const emit = defineEmits<{
           :model-value="memoryLimit"
           placeholder="e.g. 512Mi or 2Gi"
           :disabled="disabled"
-          size="small"
           fluid
           @update:model-value="(val) => emit('update:memoryLimit', val ?? '')"
         />

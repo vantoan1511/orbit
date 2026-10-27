@@ -51,7 +51,6 @@ const handleScale = () => {
         :max="100"
         showButtons
         class="w-full"
-        size="small"
         inputClass="text-center font-mono font-medium"
       />
     </div>
@@ -62,10 +61,9 @@ const handleScale = () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         @click="handleCancel"
       />
-      <Button type="submit" label="Scale" severity="primary" size="small" />
+      <Button type="submit" label="Scale" severity="primary" />
     </div>
   </form>
 </template>

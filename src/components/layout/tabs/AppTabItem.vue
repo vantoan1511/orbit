@@ -167,11 +167,7 @@ const handleMiddleClick = () => {
     </Button>
 
     <!-- Context Menu -->
-    <ContextMenu
-      ref="contextMenuRef"
-      :model="menuItems"
-      class="min-w-48 bg-(--ui-overlay-bg) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-xl text-xs select-none"
-    >
+    <ContextMenu ref="contextMenuRef" :model="menuItems" class="min-w-48 text-xs select-none">
       <template #item="{ item, props: menuProps }">
         <div v-if="item.separator" class="h-px bg-(--border) my-1 mx-1" />
         <a

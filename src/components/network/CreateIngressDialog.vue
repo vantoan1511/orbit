@@ -231,7 +231,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. my-ingress"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         class="text-xs"
       />
@@ -254,7 +253,6 @@ const handleCreate = async () => {
           v-model="namespace"
           :options="namespaceOptions"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -268,7 +266,6 @@ const handleCreate = async () => {
           v-model="className"
           placeholder="e.g. nginx"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -285,7 +282,6 @@ const handleCreate = async () => {
           v-model="serviceName"
           placeholder="e.g. web-service"
           fluid
-          size="small"
           :invalid="Boolean(serviceName.trim() && serviceNameErrorMessage)"
           class="text-xs"
         />
@@ -308,7 +304,6 @@ const handleCreate = async () => {
           :max="65535"
           placeholder="e.g. 80"
           fluid
-          size="small"
           :invalid="Boolean(portErrorMessage)"
         />
         <small v-if="portErrorMessage" class="text-(--danger) text-[11px] leading-tight">
@@ -328,7 +323,6 @@ const handleCreate = async () => {
           v-model="host"
           placeholder="e.g. app.example.com"
           fluid
-          size="small"
           :invalid="Boolean(host.trim() && hostErrorMessage)"
           class="text-xs"
         />
@@ -349,7 +343,6 @@ const handleCreate = async () => {
           v-model="path"
           placeholder="/"
           fluid
-          size="small"
           :invalid="Boolean(path.trim() && pathErrorMessage)"
           class="text-xs"
         />
@@ -369,7 +362,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -377,7 +369,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

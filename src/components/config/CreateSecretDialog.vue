@@ -167,7 +167,6 @@ const handleCreate = async () => {
           v-model="name"
           placeholder="e.g. app-secret"
           fluid
-          size="small"
           :invalid="Boolean(name.trim() && nameErrorMessage)"
         />
         <small
@@ -188,7 +187,6 @@ const handleCreate = async () => {
           :options="namespaceOptions"
           placeholder="Select Namespace"
           fluid
-          size="small"
         />
       </div>
     </div>
@@ -204,7 +202,6 @@ const handleCreate = async () => {
         :options="secretTypeOptions"
         placeholder="Select Type"
         fluid
-        size="small"
       />
     </div>
 
@@ -227,7 +224,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -235,7 +231,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

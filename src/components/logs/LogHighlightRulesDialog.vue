@@ -93,7 +93,6 @@ const handleSaveEdit = () => {
             optionValue="value"
             optionGroupLabel="label"
             optionGroupChildren="items"
-            size="small"
             class="text-xs min-w-48"
             @change="highlighting.saveRules"
           />
@@ -101,8 +100,7 @@ const handleSaveEdit = () => {
             v-if="highlighting.isCustomPresetActive.value"
             severity="danger"
             variant="text"
-            size="small"
-            class="w-8 h-8 p-0 shrink-0"
+            class="shrink-0"
             v-tooltip="'Delete this custom preset'"
             @click="highlighting.deleteCustomPreset"
           >
@@ -113,15 +111,9 @@ const handleSaveEdit = () => {
         </div>
 
         <div class="flex items-center gap-2">
-          <InputText
-            v-model="newPresetName"
-            placeholder="Preset name..."
-            size="small"
-            class="text-xs w-40"
-          />
+          <InputText v-model="newPresetName" placeholder="Preset name..." class="text-xs w-40" />
           <Button
             label="Save"
-            size="small"
             severity="secondary"
             :disabled="
               !highlighting.customRules.value.length || !highlighting.newPresetName.value.trim()
@@ -145,7 +137,6 @@ const handleSaveEdit = () => {
           <InputText
             v-model="rule.pattern"
             placeholder="Pattern..."
-            size="small"
             class="text-xs flex-1"
             :disabled="highlighting.isBuiltInRule(rule)"
             @change="highlighting.saveRules"
@@ -155,7 +146,6 @@ const handleSaveEdit = () => {
             :options="highlighting.colorOptions"
             optionLabel="label"
             optionValue="value"
-            size="small"
             class="text-xs min-w-32"
             :disabled="highlighting.isBuiltInRule(rule)"
             @change="highlighting.saveRules"
@@ -206,7 +196,6 @@ const handleSaveEdit = () => {
             <Button
               severity="secondary"
               variant="text"
-              size="small"
               class="p-1 text-muted-color hover:text-primary cursor-pointer"
               v-tooltip.top="'Edit rule'"
               @click="openEditModal(rule)"
@@ -218,7 +207,6 @@ const handleSaveEdit = () => {
             <Button
               severity="danger"
               variant="text"
-              size="small"
               class="p-1 text-muted-color hover:text-rose-500 cursor-pointer"
               v-tooltip.top="'Delete rule'"
               @click="highlighting.deleteCustomRule(rule.id)"
@@ -247,7 +235,6 @@ const handleSaveEdit = () => {
             id="edit-pattern"
             v-model="editForm.pattern"
             placeholder="e.g. error, timeout, \b(404|500)\b"
-            size="small"
             class="text-xs w-full"
             :invalid="!!editError"
           />
@@ -263,7 +250,6 @@ const handleSaveEdit = () => {
             :options="highlighting.colorOptions"
             optionLabel="label"
             optionValue="value"
-            size="small"
             class="text-xs w-full"
           />
         </div>
@@ -304,17 +290,11 @@ const handleSaveEdit = () => {
         <div class="flex justify-end items-center gap-2 w-full">
           <Button
             label="Cancel"
-            size="small"
             severity="secondary"
             variant="text"
             @click="isEditModalOpen = false"
           />
-          <Button
-            label="Save Changes"
-            size="small"
-            :disabled="!!editError"
-            @click="handleSaveEdit"
-          />
+          <Button label="Save Changes" :disabled="!!editError" @click="handleSaveEdit" />
         </div>
       </template>
     </Dialog>
@@ -322,18 +302,12 @@ const handleSaveEdit = () => {
     <!-- Dialog Footer -->
     <template #footer>
       <div class="flex justify-between items-center w-full">
-        <Button
-          label="Add Rule"
-          size="small"
-          severity="secondary"
-          variant="text"
-          @click="highlighting.addRule"
-        >
+        <Button label="Add Rule" severity="secondary" variant="text" @click="highlighting.addRule">
           <template #icon>
             <Plus class="w-3.5 h-3.5 mr-1" />
           </template>
         </Button>
-        <Button label="Close" size="small" severity="secondary" @click="visible = false" />
+        <Button label="Close" severity="secondary" @click="visible = false" />
       </div>
     </template>
   </Dialog>

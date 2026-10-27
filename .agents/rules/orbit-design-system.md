@@ -842,3 +842,46 @@ Never use any of the following:
 - Z-index values that are not a token.
 
 ---
+
+## Overlay Parity Contract
+
+Every PrimeVue floating surface consumes a single unified overlay token contract across all 5 UI styles (Flat, Glass, Aero, Liquid Glass, iOS):
+
+| Surface | PrimeVue Token Group | Container Selector (preset `css` hook) | Item Radius Token |
+|---|---|---|---|
+| Menu (popup) | `menu.root` | `.p-menu-overlay` | `menu.item` |
+| ContextMenu | `contextmenu.root` | `.p-contextmenu`, `.p-contextmenu-submenu` | `contextmenu.item` |
+| TieredMenu | `tieredmenu.root` | `.p-tieredmenu-overlay`, `.p-tieredmenu-submenu` | `tieredmenu.item` |
+| Select overlay | `select.overlay` | `.p-select-overlay` | `select.option` |
+| MultiSelect overlay | `multiselect.overlay` | `.p-multiselect-overlay` | `multiselect.option` |
+| Popover | `popover.root` | `.p-popover` | n/a |
+
+### Canonical Token Values
+
+| Property | Value |
+|---|---|
+| `background` | `var(--ui-overlay-bg)` |
+| `borderColor` | `var(--border)` |
+| `borderRadius` | `var(--ui-radius-card)` (items: `var(--ui-radius-control)`) |
+| `shadow` | `var(--ui-card-shadow, var(--shadow))` |
+| `backdropBlur` | `var(--ui-overlay-blur)` |
+| `sheenHighlight` | `var(--ui-sheen-highlight)` |
+
+Custom properties (`backdropBlur`, `sheenHighlight`) are bound to CSS properties via the preset `css: ({ dt }) => ...` hook on each component. Ad-hoc surface classes (e.g. `bg-(--ui-overlay-bg)`, `shadow-*`, `rounded-*`) on overlay tags in `.vue` templates are banned.
+
+---
+
+## Control Sizing Contract
+
+Interactive form controls (`Button`, `InputText`, `Select`, `InputNumber`, `MultiSelect`, `Textarea`) adhere to a strict two-tier height and sizing contract:
+
+| Tier | PrimeVue API | Height | Font Size | Padding-X | Where |
+|---|---|---|---|---|---|
+| **Compact / Dense** | `size="small"` | `--ui-control-height-sm` (32px / 2rem) | `--ui-control-font-size-sm` (0.75rem) | `--ui-control-padding-x-sm` (0.625rem) | K8s DataTable toolbars, filter bars, inline cell actions, terminal toolbars |
+| **Standard** | *omit `size`* | `--ui-control-height-md` (36px / 2.25rem) | `--ui-control-font-size-md` (0.875rem) | `--ui-control-padding-x-md` (0.75rem) | Dialog / Drawer forms, Settings pages, standalone form cards |
+
+### Sizing Invariants
+1. **Parity**: `Button`, `InputText`, `Select`, `InputNumber` (inner input), and `MultiSelect` share identical height and horizontal padding per tier. Single-line controls use explicit `height`; `MultiSelect` uses `min-height` to allow chips to wrap; `Textarea` shares font-size and padding without height restriction.
+2. **Icon-Only Buttons**: `iconOnlyWidth` strictly equals the tier height (`iconOnlyWidth: 'var(--ui-control-height-md)'` for Standard 36px, `sm.iconOnlyWidth: 'var(--ui-control-height-sm)'` for Compact 32px). Ad-hoc `w-7 h-7 p-1` overrides are banned.
+3. **No Per-Instance Height Overrides**: Tailwind `h-*`, `min-h-*`, `py-*` overrides on PrimeVue controls are banned unless explicitly annotated with `data-sizing-exempt="<reason>"`.
+4. **Context-Based Tiering**: Tier is chosen per file role (forms = Standard, toolbars = Compact), never per control instance.

@@ -86,7 +86,6 @@ function removeTag(tagToRemove: string): void {
       <InputText
         :model-value="alias"
         placeholder="e.g. Staging US-West"
-        size="small"
         class="w-full text-xs rounded-[var(--ui-radius-control)]"
         @update:model-value="updateAlias"
       />
@@ -102,6 +101,7 @@ function removeTag(tagToRemove: string): void {
         <Button
           v-for="preset in COLOR_PRESETS"
           :key="preset.hex"
+          data-sizing-exempt="color-swatch-circle"
           v-tooltip.top="preset.label"
           type="button"
           :style="{ backgroundColor: preset.hex }"
@@ -120,10 +120,9 @@ function removeTag(tagToRemove: string): void {
         <Button
           v-if="color"
           v-tooltip.top="'Clear Color'"
-          size="small"
           variant="text"
           severity="secondary"
-          class="p-0 text-[11px] text-muted-color hover:text-(--text-primary) ml-1 h-6 rounded-[var(--ui-radius-control)]"
+          class="p-0 text-[11px] text-muted-color hover:text-(--text-primary) ml-1 rounded-[var(--ui-radius-control)]"
           @click="clearColor"
         >
           Clear
@@ -148,7 +147,7 @@ function removeTag(tagToRemove: string): void {
             type="button"
             variant="text"
             severity="secondary"
-            size="small"
+            data-sizing-exempt="tag-chip-dismiss"
             class="w-3.5 h-3.5 p-0 text-muted-color hover:text-(--danger) cursor-pointer flex items-center justify-center border-none shadow-none bg-transparent"
             @click="removeTag(t)"
           >
@@ -160,7 +159,6 @@ function removeTag(tagToRemove: string): void {
         <InputText
           v-model="newTagInput"
           placeholder="+ Add tag (Enter)..."
-          size="small"
           class="flex-1 min-w-24 text-[11px] p-0 border-none bg-transparent shadow-none focus:outline-none"
           @keydown="handleTagKeydown"
           @blur="addTag"

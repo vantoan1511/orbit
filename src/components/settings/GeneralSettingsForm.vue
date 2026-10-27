@@ -167,7 +167,7 @@ const formatArrayValue = (val: unknown): string => {
               severity="secondary"
               variant="text"
               rounded
-              class="w-7 h-7 p-0 shrink-0"
+              class="shrink-0"
               :disabled="!config.enable || settingsStore.isSaving"
               @click="handleReset(config)"
             >
@@ -209,7 +209,7 @@ const formatArrayValue = (val: unknown): string => {
             severity="secondary"
             variant="text"
             rounded
-            class="w-7 h-7 p-0 shrink-0"
+            class="shrink-0"
             :disabled="!config.enable || settingsStore.isSaving"
             @click="handleReset(config)"
           >
@@ -233,7 +233,7 @@ const formatArrayValue = (val: unknown): string => {
                 :modelValue="kubeconfigDisplayPath"
                 readonly
                 disabled
-                class="pl-9 pr-4 py-1.5 w-full text-xs"
+                class="pl-9 pr-4 w-full text-xs"
               />
             </div>
             <Button
@@ -242,14 +242,13 @@ const formatArrayValue = (val: unknown): string => {
               severity="secondary"
               variant="text"
               rounded
-              class="w-7 h-7 p-0 shrink-0 self-center"
+              class="shrink-0 self-center"
               :disabled="!config.enable || settingsStore.isSaving"
               @click="handleReset(config)"
             >
               <RotateCcw class="w-3.5 h-3.5" />
             </Button>
             <Button
-              size="small"
               severity="secondary"
               variant="outlined"
               :loading="isReloading"
@@ -277,7 +276,7 @@ const formatArrayValue = (val: unknown): string => {
               severity="secondary"
               variant="text"
               rounded
-              class="w-7 h-7 p-0 shrink-0"
+              class="shrink-0"
               :disabled="!config.enable || settingsStore.isSaving"
               @click="handleReset(config)"
             >
@@ -301,7 +300,7 @@ const formatArrayValue = (val: unknown): string => {
             severity="secondary"
             variant="text"
             rounded
-            class="w-7 h-7 p-0 shrink-0"
+            class="shrink-0"
             :disabled="!config.enable || settingsStore.isSaving"
             @click="handleReset(config)"
           >
@@ -329,31 +328,13 @@ const formatArrayValue = (val: unknown): string => {
             These operations immediately wipe local caches and restore application defaults.
           </span>
           <div class="flex flex-wrap gap-2">
-            <Button
-              size="small"
-              severity="danger"
-              variant="outlined"
-              disabled
-              class="text-xs font-medium"
-            >
+            <Button severity="danger" variant="outlined" disabled class="text-xs font-medium">
               Reset Cache
             </Button>
-            <Button
-              size="small"
-              severity="danger"
-              variant="outlined"
-              disabled
-              class="text-xs font-medium"
-            >
+            <Button severity="danger" variant="outlined" disabled class="text-xs font-medium">
               Delete Cached Contexts
             </Button>
-            <Button
-              size="small"
-              severity="danger"
-              variant="outlined"
-              disabled
-              class="text-xs font-medium"
-            >
+            <Button severity="danger" variant="outlined" disabled class="text-xs font-medium">
               Reset All Settings
             </Button>
           </div>

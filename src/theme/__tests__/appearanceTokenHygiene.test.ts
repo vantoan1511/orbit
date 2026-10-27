@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
+import { CONTROL_TIERS } from '../uiContract.ts'
 
 const FORBIDDEN_CLASSES = [
   'bg-emerald-500',
@@ -251,6 +252,48 @@ test('base.css defines all core design tokens across all 5 UI styles (flat, glas
         content.includes(`[data-ui-style="${style}"]`),
       `base.css must define [data-ui-style="${style}"] preset rules`
     )
+  }
+})
+
+test('base.css :root defines --ui-control-height-sm|md, font-size-sm|md, padding-x-sm|md and CONTROL_TIERS reference only defined tokens', () => {
+  const baseCssPath = path.resolve(process.cwd(), 'src/assets/base.css')
+  const content = fs.readFileSync(baseCssPath, 'utf-8')
+
+  // Extract :root block (before .my-app-dark)
+  const rootBlockMatch = content.match(/:root\s*\{([\s\S]*?)\n\}/)
+  assert.ok(rootBlockMatch, ':root block must exist in base.css')
+  const rootContent = rootBlockMatch[1]
+
+  const controlTokens = [
+    '--ui-control-height-sm',
+    '--ui-control-height-md',
+    '--ui-control-font-size-sm',
+    '--ui-control-font-size-md',
+    '--ui-control-padding-x-sm',
+    '--ui-control-padding-x-md'
+  ]
+
+  for (const token of controlTokens) {
+    assert.ok(
+      rootContent.includes(`${token}:`),
+      `:root in base.css must define control token ${token}`
+    )
+  }
+
+  // Verify CONTROL_TIERS values reference only defined tokens
+  const varRegex = /var\((--[a-z0-9-]+)\)/g
+  for (const [tier, tokens] of Object.entries(CONTROL_TIERS)) {
+    for (const [prop, val] of Object.entries(tokens)) {
+      const matches = [...val.matchAll(varRegex)]
+      assert.ok(matches.length > 0, `${tier}.${prop} must reference a CSS variable`)
+      for (const match of matches) {
+        const tokenName = match[1]
+        assert.ok(
+          rootContent.includes(`${tokenName}:`),
+          `${tier}.${prop} references ${tokenName} which must be defined in :root`
+        )
+      }
+    }
   }
 })
 

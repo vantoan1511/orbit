@@ -428,7 +428,6 @@ const removePort = (index: number) => {
                   <Select
                     v-model="serviceType"
                     :options="serviceTypeOptions"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -443,7 +442,6 @@ const removePort = (index: number) => {
                   <InputText
                     v-model="clusterIP"
                     placeholder="e.g. 10.96.0.1 or None for headless"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -458,7 +456,6 @@ const removePort = (index: number) => {
                     v-model="externalName"
                     placeholder="e.g. db.example.com"
                     :invalid="Boolean(externalNameError)"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -484,7 +481,6 @@ const removePort = (index: number) => {
                   <Select
                     v-model="externalTrafficPolicy"
                     :options="externalTrafficPolicyOptions"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -499,7 +495,6 @@ const removePort = (index: number) => {
                   <InputText
                     v-model="loadBalancerIP"
                     placeholder="e.g. 198.51.100.1"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -526,7 +521,6 @@ const removePort = (index: number) => {
                   <Select
                     v-model="sessionAffinity"
                     :options="sessionAffinityOptions"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -542,7 +536,6 @@ const removePort = (index: number) => {
                     :min="1"
                     :max="86400"
                     placeholder="e.g. 10800 (default 3h)"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -598,13 +591,7 @@ const removePort = (index: number) => {
                 <span class="text-xs font-medium text-muted-color">
                   {{ portsList.length }} Port Definition{{ portsList.length === 1 ? '' : 's' }}
                 </span>
-                <Button
-                  size="small"
-                  variant="text"
-                  label="Add Port"
-                  class="text-xs"
-                  @click="addPort"
-                >
+                <Button variant="text" label="Add Port" class="text-xs" @click="addPort">
                   <template #icon>
                     <Plus class="w-3.5 h-3.5 mr-1" />
                   </template>
@@ -628,7 +615,6 @@ const removePort = (index: number) => {
                       v-model="portItem.name"
                       placeholder="e.g. http"
                       :invalid="Boolean(getPortNameError(portItem.name, pIdx))"
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -647,7 +633,6 @@ const removePort = (index: number) => {
                     <Select
                       v-model="portItem.protocol"
                       :options="protocolOptions"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -665,7 +650,6 @@ const removePort = (index: number) => {
                       :max="65535"
                       placeholder="e.g. 80"
                       :invalid="Boolean(getPortNumberError(portItem.port, portItem.protocol, pIdx))"
-                      size="small"
                       fluid
                       @change="handleFieldChange"
                     />
@@ -684,7 +668,6 @@ const removePort = (index: number) => {
                       v-model="portItem.targetPort"
                       placeholder="e.g. 8080 or http"
                       :invalid="Boolean(getTargetPortError(portItem.targetPort))"
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -702,7 +685,6 @@ const removePort = (index: number) => {
                     <Button
                       variant="text"
                       severity="danger"
-                      size="small"
                       class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
                       aria-label="Remove Port"
                       @click="removePort(pIdx)"
@@ -734,7 +716,6 @@ const removePort = (index: number) => {
                       :max="65535"
                       placeholder="e.g. 30080"
                       :invalid="Boolean(getNodePortError(portItem.nodePort, pIdx))"
-                      size="small"
                       fluid
                       @change="handleFieldChange"
                     />
@@ -753,7 +734,6 @@ const removePort = (index: number) => {
                     <InputText
                       v-model="portItem.appProtocol"
                       placeholder="e.g. http, https, grpc"
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"

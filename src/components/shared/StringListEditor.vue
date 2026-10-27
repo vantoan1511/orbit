@@ -57,14 +57,7 @@ const updateItem = (index: number, val: string) => {
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <label v-if="title" class="text-xs font-medium text-muted-color">{{ title }}</label>
-      <Button
-        v-if="!disabled"
-        size="small"
-        variant="text"
-        :label="addLabel"
-        class="text-xs"
-        @click="addItem"
-      >
+      <Button v-if="!disabled" variant="text" :label="addLabel" class="text-xs" @click="addItem">
         <template #icon>
           <Plus class="w-3.5 h-3.5 mr-1" />
         </template>
@@ -82,7 +75,6 @@ const updateItem = (index: number, val: string) => {
           :placeholder="placeholder"
           :disabled="disabled"
           :invalid="Boolean(getItemError(item, idx))"
-          size="small"
           class="flex-1 text-xs"
           @update:model-value="(val) => updateItem(idx, val ?? '')"
         />
@@ -90,7 +82,6 @@ const updateItem = (index: number, val: string) => {
           v-if="!disabled"
           variant="text"
           severity="danger"
-          size="small"
           class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
           @click="removeItem(idx)"
         >

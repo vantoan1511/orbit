@@ -208,7 +208,6 @@ const handleStart = async () => {
           :options="namespaceOptions"
           placeholder="Select Namespace"
           fluid
-          size="small"
         />
       </div>
 
@@ -222,7 +221,6 @@ const handleStart = async () => {
           :options="supportedKinds"
           placeholder="Select Kind"
           fluid
-          size="small"
         />
       </div>
     </div>
@@ -244,7 +242,6 @@ const handleStart = async () => {
             : `Select ${kind.toLowerCase()}...`
         "
         fluid
-        size="small"
       />
     </div>
 
@@ -274,7 +271,6 @@ const handleStart = async () => {
           :useGrouping="false"
           placeholder="8080"
           fluid
-          size="small"
           class="text-xs font-mono"
         />
       </div>
@@ -291,7 +287,6 @@ const handleStart = async () => {
           :useGrouping="false"
           placeholder="8080"
           fluid
-          size="small"
           class="text-xs font-mono"
           :invalid="isLocalPortInUse"
         />
@@ -308,7 +303,6 @@ const handleStart = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         @click="handleCancel"
       />
       <Button
@@ -316,7 +310,6 @@ const handleStart = async () => {
         label="Start Forwarding"
         icon="pi pi-play"
         severity="primary"
-        size="small"
         :loading="isSubmitting"
         :disabled="!isValid || isSubmitting"
       />

@@ -442,7 +442,6 @@ const handleClose = (): void => emit('update:visible', false)
                 </p>
               </div>
               <Button
-                size="small"
                 severity="secondary"
                 class="flex items-center gap-1.5 text-xs mt-1 rounded-[var(--ui-radius-control)]"
                 @click.stop="handleBrowseFile"
@@ -470,10 +469,9 @@ const handleClose = (): void => emit('update:visible', false)
                 <Button
                   v-if="pastedYaml"
                   v-tooltip.top="'Clear YAML'"
-                  size="small"
                   variant="text"
                   severity="secondary"
-                  class="p-1 h-6 text-xs flex items-center gap-1 text-muted-color hover:text-(--text-primary) rounded-[var(--ui-radius-control)]"
+                  class="p-1 text-xs flex items-center gap-1 text-muted-color hover:text-(--text-primary) rounded-[var(--ui-radius-control)]"
                   @click="pastedYaml = ''"
                 >
                   <Trash2 class="w-3 h-3" />
@@ -503,7 +501,6 @@ const handleClose = (): void => emit('update:visible', false)
                   <InputText
                     v-model="manualConfig.clusterName"
                     placeholder="e.g. k8s-production"
-                    size="small"
                     class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
@@ -516,7 +513,6 @@ const handleClose = (): void => emit('update:visible', false)
                         ? `${manualConfig.clusterName}-context`
                         : 'e.g. prod-admin'
                     "
-                    size="small"
                     class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
@@ -529,7 +525,6 @@ const handleClose = (): void => emit('update:visible', false)
                 <InputText
                   v-model="manualConfig.serverUrl"
                   placeholder="https://192.168.1.100:6443 or https://k8s.example.com:6443"
-                  size="small"
                   class="w-full text-xs font-mono rounded-[var(--ui-radius-control)]"
                 />
               </div>
@@ -541,8 +536,7 @@ const handleClose = (): void => emit('update:visible', false)
                   :options="AUTH_TYPE_OPTIONS"
                   option-label="label"
                   option-value="value"
-                  size="small"
-                  class="w-full text-xs rounded-[var(--ui-radius-control)]"
+                  class="w-full text-xs"
                 />
               </div>
 
@@ -590,7 +584,6 @@ const handleClose = (): void => emit('update:visible', false)
                   <InputText
                     v-model="manualConfig.username"
                     placeholder="admin"
-                    size="small"
                     class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
@@ -599,7 +592,6 @@ const handleClose = (): void => emit('update:visible', false)
                   <InputText
                     v-model="manualConfig.password"
                     type="password"
-                    size="small"
                     class="w-full text-xs rounded-[var(--ui-radius-control)]"
                   />
                 </div>
@@ -724,7 +716,7 @@ const handleClose = (): void => emit('update:visible', false)
         <Button
           variant="text"
           severity="secondary"
-          class="w-full px-4 py-3 flex items-center justify-between text-left text-xs font-medium text-(--text-primary) hover:bg-(--bg-hover)/40 transition-colors cursor-pointer select-none rounded-none border-none"
+          class="w-full px-4 flex items-center justify-between text-left text-xs font-medium text-(--text-primary) hover:bg-(--bg-hover)/40 transition-colors cursor-pointer select-none rounded-none border-none"
           @click="showCustomization = !showCustomization"
         >
           <div class="flex items-center gap-2">
@@ -761,14 +753,12 @@ const handleClose = (): void => emit('update:visible', false)
           label="Cancel"
           severity="secondary"
           variant="text"
-          size="small"
           class="rounded-[var(--ui-radius-control)]"
           :disabled="isSubmitting"
           @click="handleClose"
         />
         <Button
           severity="primary"
-          size="small"
           :loading="isSubmitting"
           :disabled="!canSubmit"
           class="flex items-center gap-1.5 px-4 rounded-[var(--ui-radius-control)]"

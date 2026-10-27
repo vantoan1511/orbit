@@ -152,7 +152,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. database-backup"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         aria-describedby="create-cronjob-name-error"
         class="text-xs"
@@ -176,7 +175,6 @@ const handleCreate = async () => {
         v-model="namespace"
         :options="namespaceOptions"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -191,7 +189,6 @@ const handleCreate = async () => {
         v-model="schedule"
         placeholder="e.g. */5 * * * * or 0 0 * * *"
         fluid
-        size="small"
         :invalid="Boolean(schedule.trim() && scheduleErrorMessage)"
         aria-describedby="create-cronjob-schedule-error"
         class="text-xs font-mono"
@@ -219,7 +216,6 @@ const handleCreate = async () => {
         v-model="image"
         placeholder="e.g. curlimages/curl:latest or busybox:latest"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -234,7 +230,6 @@ const handleCreate = async () => {
         v-model="command"
         placeholder="e.g. curl -s http://service-host/health"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -250,7 +245,6 @@ const handleCreate = async () => {
           v-model="concurrencyPolicy"
           :options="KUBERNETES_CONCURRENCY_POLICIES"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -264,7 +258,6 @@ const handleCreate = async () => {
           v-model="restartPolicy"
           :options="KUBERNETES_JOB_RESTART_POLICIES"
           fluid
-          size="small"
           class="text-xs"
         />
       </div>
@@ -285,7 +278,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -293,7 +285,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

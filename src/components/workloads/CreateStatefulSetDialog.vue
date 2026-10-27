@@ -153,7 +153,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. redis-cluster"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         aria-describedby="create-statefulset-name-error"
         class="text-xs"
@@ -177,7 +176,6 @@ const handleCreate = async () => {
         v-model="namespace"
         :options="namespaceOptions"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -192,7 +190,6 @@ const handleCreate = async () => {
         v-model="serviceName"
         placeholder="e.g. redis-service (defaults to StatefulSet name)"
         fluid
-        size="small"
         :invalid="Boolean(serviceName.trim() && serviceNameErrorMessage)"
         aria-describedby="create-statefulset-service-error"
         class="text-xs"
@@ -216,7 +213,6 @@ const handleCreate = async () => {
         v-model="image"
         placeholder="e.g. redis:7-alpine"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -234,7 +230,6 @@ const handleCreate = async () => {
           :max="1000"
           showButtons
           fluid
-          size="small"
         />
       </div>
 
@@ -249,7 +244,6 @@ const handleCreate = async () => {
           :max="65535"
           placeholder="e.g. 6379"
           fluid
-          size="small"
           :invalid="Boolean(port !== null && portErrorMessage)"
           aria-describedby="create-statefulset-port-error"
         />
@@ -269,7 +263,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -277,7 +270,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

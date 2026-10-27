@@ -202,7 +202,6 @@ const handleFieldChange = () => {
                   v-model="secretType"
                   :options="secretTypeOptions"
                   editable
-                  size="small"
                   fluid
                   class="text-xs"
                   @change="handleFieldChange"
