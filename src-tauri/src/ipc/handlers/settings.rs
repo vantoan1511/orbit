@@ -63,16 +63,28 @@ pub fn update_app_settings(
 
                     let autostart_enabled = current_config.launch_on_startup();
                     if prev_autostart != autostart_enabled {
-                        let _ = tokio::task::spawn_blocking(move || {
-                            match crate::autostart::service().and_then(|s| s.set_enabled(autostart_enabled)) {
-                                Ok(outcome) => {
-                                    tracing::info!(outcome = ?outcome, enabled = autostart_enabled, "Autostart updated via settings");
-                                }
-                                Err(e) => {
-                                    tracing::warn!(code = e.code(), error = %e, "Failed to apply autostart setting to operating system");
-                                }
-                            }
+                        let autostart_res = tokio::task::spawn_blocking(move || {
+                            crate::autostart::service().and_then(|s| s.set_enabled(autostart_enabled))
                         }).await;
+
+                        match autostart_res {
+                            Ok(Ok(outcome)) => {
+                                tracing::info!(outcome = ?outcome, enabled = autostart_enabled, "Autostart updated via settings");
+                            }
+                            Ok(Err(e)) => {
+                                tracing::warn!(code = e.code(), error = %e, "Failed to apply autostart setting to operating system");
+                                let _ = Bridge::send_event(
+                                    &writer,
+                                    &token,
+                                    &OrbitEvent::ErrorOccurred {
+                                        message: format!("Failed to apply autostart setting: {}", e),
+                                    },
+                                ).await;
+                            }
+                            Err(e) => {
+                                tracing::error!(error = %e, "Autostart background task panicked");
+                            }
+                        }
                     }
 
                     let mut w_manager = manager.write().await;
@@ -129,16 +141,28 @@ pub fn set_launch_on_startup(
             return;
         }
 
-        let _ = tokio::task::spawn_blocking(move || {
-            match crate::autostart::service().and_then(|s| s.set_enabled(enabled)) {
-                Ok(outcome) => {
-                    tracing::info!(outcome = ?outcome, enabled, "Autostart set via set_launch_on_startup");
-                }
-                Err(e) => {
-                    tracing::warn!(code = e.code(), error = %e, "Failed to apply autostart setting to operating system");
-                }
-            }
+        let autostart_res = tokio::task::spawn_blocking(move || {
+            crate::autostart::service().and_then(|s| s.set_enabled(enabled))
         }).await;
+
+        match autostart_res {
+            Ok(Ok(outcome)) => {
+                tracing::info!(outcome = ?outcome, enabled, "Autostart set via set_launch_on_startup");
+            }
+            Ok(Err(e)) => {
+                tracing::warn!(code = e.code(), error = %e, "Failed to apply autostart setting to operating system");
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ErrorOccurred {
+                        message: format!("Failed to apply autostart setting: {}", e),
+                    },
+                ).await;
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Autostart background task panicked");
+            }
+        }
 
         let mut w_manager = manager.write().await;
         w_manager.config = current_config.clone();
@@ -196,6 +220,39 @@ mod tests {
             in_memory_backend.is_registered("OrbitTest").unwrap(),
             "in_memory_backend must be registered"
         );
+    }
+
+    #[tokio::test]
+    async fn test_set_launch_on_startup_failure_emits_error_occurred() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_failure");
+        let failing_service = Arc::new(crate::autostart::AutostartService::new(
+            Arc::new(crate::autostart::memory::InMemoryBackend::new()),
+            crate::autostart::RunMode::Prod,
+            "OrbitTest".to_string(),
+            PathBuf::from("D:\\Projects\\orbit\\target\\debug\\deps\\orbit_app-unsafe.exe"),
+        ));
+        let _autostart_guard = crate::autostart::AutostartTestGuard::install(failing_service);
+
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let payload = Some(serde_json::json!({ "enabled": true }));
+
+        set_launch_on_startup(payload, writer, "token".to_string(), manager);
+
+        let mut found = false;
+        for _ in 0..40 {
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            let emitted = mock_emitter.get_emitted_events().await;
+            if emitted.iter().any(|(name, _)| name == "errorOccurred") {
+                found = true;
+                break;
+            }
+        }
+        assert!(found, "errorOccurred event must be emitted when autostart fails");
     }
 
     #[tokio::test]

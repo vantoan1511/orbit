@@ -135,6 +135,7 @@ mod tests {
 
     #[test]
     fn from_environment_in_dev_mode_marks_run_mode_dev() {
+        let _guard = AUTOSTART_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let original_dev = std::env::var("ORBIT_DEV").ok();
 
         unsafe {

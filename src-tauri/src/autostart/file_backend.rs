@@ -193,12 +193,14 @@ impl AutostartBackend for FileAutostartBackend {
                 detail: e.to_string(),
             })?;
             let path = entry.path();
-            if path.is_file() {
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Some(registered) = self.format.parse(&content) {
-                        list.push(registered);
-                    }
-                }
+            if !path.is_file() {
+                continue;
+            }
+            let Ok(content) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            if let Some(registered) = self.format.parse(&content) {
+                list.push(registered);
             }
         }
 

@@ -98,6 +98,7 @@ mod tests {
 
     #[test]
     fn test_autostart_default_app_name_dev_vs_prod() {
+        let _lock = AUTOSTART_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
 
         // 1. Dev mode
