@@ -236,6 +236,7 @@ test('base.css defines all core design tokens across all 5 UI styles (flat, glas
     '--ui-mask-bg',
     '--ui-mask-blur',
     '--border',
+    '--border-subtle',
     '--ui-glass-blur',
     '--ui-sheen-highlight'
   ]

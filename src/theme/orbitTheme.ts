@@ -334,7 +334,7 @@ export const Noir = definePreset(Nora, {
       },
       bodyCell: {
         padding: '0.5rem 0.75rem',
-        borderColor: 'var(--border)'
+        borderColor: 'var(--border-subtle, var(--border))'
       },
       row: {
         background: 'var(--ui-card-bg)',
@@ -356,7 +356,7 @@ export const Noir = definePreset(Nora, {
             hoverBackground: 'var(--bg-hover)'
           },
           bodyCell: {
-            borderColor: 'var(--border)'
+            borderColor: 'var(--border-subtle, var(--border))'
           }
         },
         dark: {
@@ -374,7 +374,7 @@ export const Noir = definePreset(Nora, {
             hoverBackground: 'var(--bg-hover)'
           },
           bodyCell: {
-            borderColor: 'var(--border)'
+            borderColor: 'var(--border-subtle, var(--border))'
           }
         }
       }
