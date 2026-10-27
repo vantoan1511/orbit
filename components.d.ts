@@ -68,6 +68,7 @@ declare module 'vue' {
     EventListCard: typeof import('./src/components/dashboard/EventListCard.vue')['default']
     EventMetricsCards: typeof import('./src/components/events/EventMetricsCards.vue')['default']
     EventsDataTable: typeof import('./src/components/events/EventsDataTable.vue')['default']
+    FooterStatusAction: typeof import('./src/components/layout/FooterStatusAction.vue')['default']
     GeneralSettingsForm: typeof import('./src/components/settings/GeneralSettingsForm.vue')['default']
     GenericResourceTable: typeof import('./src/components/shared/GenericResourceTable.vue')['default']
     HealthOverview: typeof import('./src/components/dashboard/HealthOverview.vue')['default']
