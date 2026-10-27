@@ -243,7 +243,6 @@ const handleCreate = async () => {
           v-model="name"
           placeholder="e.g. backend-svc"
           fluid
-          size="small"
           :invalid="Boolean(name.trim() && nameErrorMessage)"
         />
         <small
@@ -264,7 +263,6 @@ const handleCreate = async () => {
           :options="namespaceOptions"
           placeholder="Select Namespace"
           fluid
-          size="small"
         />
       </div>
     </div>
@@ -281,7 +279,6 @@ const handleCreate = async () => {
           :options="serviceTypeOptions"
           placeholder="Select Type"
           fluid
-          size="small"
         />
       </div>
 
@@ -294,7 +291,6 @@ const handleCreate = async () => {
           v-model="selectorApp"
           placeholder="e.g. backend"
           fluid
-          size="small"
           :invalid="Boolean(selectorApp.trim() && selectorAppErrorMessage)"
         />
         <small
@@ -319,7 +315,6 @@ const handleCreate = async () => {
           :max="65535"
           placeholder="e.g. 80"
           fluid
-          size="small"
           :invalid="Boolean(portErrorMessage)"
         />
         <small v-if="portErrorMessage" class="text-(--danger) text-[11px] leading-tight">
@@ -338,7 +333,6 @@ const handleCreate = async () => {
           :max="65535"
           placeholder="e.g. 8080"
           fluid
-          size="small"
           :invalid="Boolean(targetPort !== null && targetPortErrorMessage)"
         />
         <small
@@ -362,7 +356,6 @@ const handleCreate = async () => {
         :max="65535"
         placeholder="e.g. 30080 (auto-assigned if empty)"
         fluid
-        size="small"
         :invalid="Boolean(nodePort !== null && nodePortErrorMessage)"
       />
       <small
@@ -380,7 +373,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -388,7 +380,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

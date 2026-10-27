@@ -1,5 +1,13 @@
 import { definePreset } from '@primeuix/themes'
+import type { StyleOptions } from '@primeuix/styled'
 import Nora from '@primeuix/themes/nora'
+import {
+  OVERLAY_SURFACES,
+  OVERLAY_SURFACE_TOKENS,
+  SIZED_CONTROLS,
+  buildControlSizingCss,
+  buildOverlaySurfaceCss
+} from './uiContract.ts'
 
 declare module '@primeuix/themes/types/card' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -65,6 +73,27 @@ declare module '@primeuix/themes/types/select' {
   namespace SelectTokenSections {
     interface Overlay {
       backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/multiselect' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace MultiSelectTokenSections {
+    interface Overlay {
+      backdropBlur?: string
+      sheenHighlight?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/tieredmenu' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace TieredMenuTokenSections {
+    interface Root {
+      backdropBlur?: string
+      sheenHighlight?: string
     }
   }
 }
@@ -98,6 +127,43 @@ declare module '@primeuix/themes/types/menu' {
     }
   }
 }
+
+const MENU_ITEM_TOKENS = {
+  focusBackground: 'var(--bg-hover)',
+  borderRadius: 'var(--ui-radius-control)',
+  color: '{text.color}',
+  focusColor: '{text.color}'
+}
+
+function componentCss(component: string) {
+  const overlaySpecs = OVERLAY_SURFACES.filter((s) => s.component === component)
+  const sizingSpecs = SIZED_CONTROLS.filter((s) => s.component === component)
+  if (overlaySpecs.length === 0 && sizingSpecs.length === 0) return undefined
+
+  return ({ dt }: StyleOptions): string => {
+    const parts: string[] = []
+    for (const spec of overlaySpecs) {
+      parts.push(buildOverlaySurfaceCss(spec, dt))
+    }
+    for (const spec of sizingSpecs) {
+      parts.push(buildControlSizingCss(spec))
+    }
+    return parts.join('\n')
+  }
+}
+
+function overlayTokens(): Record<string, Record<string, unknown>> {
+  const result: Record<string, Record<string, unknown>> = {}
+  for (const spec of OVERLAY_SURFACES) {
+    result[spec.component] = {
+      [spec.tokenGroup]: { ...OVERLAY_SURFACE_TOKENS },
+      css: componentCss(spec.component)
+    }
+  }
+  return result
+}
+
+const overlays = overlayTokens()
 
 export const Noir = definePreset(Nora, {
   primitive: {
@@ -166,13 +232,13 @@ export const Noir = definePreset(Nora, {
     },
     overlay: {
       select: {
-        background: 'var(--ui-card-bg)',
-        borderRadius: 'var(--ui-radius-control)',
+        background: 'var(--ui-overlay-bg)',
+        borderRadius: 'var(--ui-radius-card)',
         borderColor: 'var(--border)',
         shadow: 'var(--ui-card-shadow, var(--shadow))'
       },
       popover: {
-        background: 'var(--ui-card-bg)',
+        background: 'var(--ui-overlay-bg)',
         borderRadius: 'var(--ui-radius-card)',
         borderColor: 'var(--border)',
         shadow: 'var(--ui-card-shadow, var(--shadow))'
@@ -228,11 +294,11 @@ export const Noir = definePreset(Nora, {
         },
         overlay: {
           select: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-overlay-bg)',
             borderColor: 'var(--border)'
           },
           popover: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-overlay-bg)',
             borderColor: 'var(--border)'
           },
           modal: {
@@ -284,11 +350,11 @@ export const Noir = definePreset(Nora, {
         },
         overlay: {
           select: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-overlay-bg)',
             borderColor: 'var(--border)'
           },
           popover: {
-            background: 'var(--ui-card-bg)',
+            background: 'var(--ui-overlay-bg)',
             borderColor: 'var(--border)'
           },
           modal: {
@@ -381,14 +447,16 @@ export const Noir = definePreset(Nora, {
     },
     button: {
       root: {
-        paddingX: '0.75rem',
+        paddingX: 'var(--ui-control-padding-x-md)',
         paddingY: '0.375rem',
         borderRadius: 'var(--ui-radius-control)',
         sheenHighlight: 'var(--ui-sheen-highlight)',
+        iconOnlyWidth: 'var(--ui-control-height-md)',
         sm: {
-          fontSize: '0.75rem',
-          paddingX: '0.625rem',
-          paddingY: '0.25rem'
+          fontSize: 'var(--ui-control-font-size-sm)',
+          paddingX: 'var(--ui-control-padding-x-sm)',
+          paddingY: '0.25rem',
+          iconOnlyWidth: 'var(--ui-control-height-sm)'
         }
       },
       colorScheme: {
@@ -418,28 +486,23 @@ export const Noir = definePreset(Nora, {
             }
           }
         }
-      }
+      },
+      css: componentCss('button')
     },
     select: {
       root: {
         background: 'var(--ui-control-bg)',
-        paddingX: '0.625rem',
+        paddingX: 'var(--ui-control-padding-x-md)',
         paddingY: '0.375rem',
         borderColor: 'var(--input-border, var(--border))',
         borderRadius: 'var(--ui-radius-control)',
         sm: {
-          fontSize: '0.75rem',
-          paddingX: '0.5rem',
+          fontSize: 'var(--ui-control-font-size-sm)',
+          paddingX: 'var(--ui-control-padding-x-sm)',
           paddingY: '0.25rem'
         }
       },
-      overlay: {
-        background: 'var(--ui-card-bg)',
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-control)',
-        shadow: 'var(--ui-card-shadow, var(--shadow))',
-        backdropBlur: 'var(--ui-glass-blur)'
-      },
+      ...overlays.select,
       option: {
         padding: '0.375rem 0.625rem',
         borderRadius: 'var(--ui-radius-control)'
@@ -448,49 +511,55 @@ export const Noir = definePreset(Nora, {
     inputtext: {
       root: {
         background: 'var(--ui-control-bg)',
-        paddingX: '0.625rem',
+        paddingX: 'var(--ui-control-padding-x-md)',
         paddingY: '0.375rem',
         borderColor: 'var(--input-border, var(--border))',
         borderRadius: 'var(--ui-radius-control)',
         sm: {
-          fontSize: '0.75rem',
-          paddingX: '0.5rem',
+          fontSize: 'var(--ui-control-font-size-sm)',
+          paddingX: 'var(--ui-control-padding-x-sm)',
           paddingY: '0.25rem'
         }
-      }
+      },
+      css: componentCss('inputtext')
     },
     textarea: {
       root: {
         background: 'var(--ui-control-bg)',
-        paddingX: '0.625rem',
+        paddingX: 'var(--ui-control-padding-x-md)',
         paddingY: '0.375rem',
         borderColor: 'var(--input-border, var(--border))',
         borderRadius: 'var(--ui-radius-control)',
         sm: {
-          fontSize: '0.75rem',
-          paddingX: '0.5rem',
+          fontSize: 'var(--ui-control-font-size-sm)',
+          paddingX: 'var(--ui-control-padding-x-sm)',
           paddingY: '0.25rem'
         }
-      }
+      },
+      css: componentCss('textarea')
     },
     inputnumber: {
       button: {
         background: 'var(--ui-control-bg)',
         borderColor: 'var(--input-border, var(--border))',
         borderRadius: 'var(--ui-radius-control)'
-      }
+      },
+      css: componentCss('inputnumber')
     },
     multiselect: {
       root: {
         background: 'var(--ui-control-bg)',
+        paddingX: 'var(--ui-control-padding-x-md)',
+        paddingY: '0.375rem',
         borderColor: 'var(--input-border, var(--border))',
-        borderRadius: 'var(--ui-radius-control)'
+        borderRadius: 'var(--ui-radius-control)',
+        sm: {
+          fontSize: 'var(--ui-control-font-size-sm)',
+          paddingX: 'var(--ui-control-padding-x-sm)',
+          paddingY: '0.25rem'
+        }
       },
-      overlay: {
-        background: 'var(--ui-card-bg)',
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-control)'
-      },
+      ...overlays.multiselect,
       option: {
         borderRadius: 'var(--ui-radius-control)'
       }
@@ -501,14 +570,7 @@ export const Noir = definePreset(Nora, {
       }
     },
     popover: {
-      root: {
-        background: 'var(--ui-card-bg)',
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)',
-        shadow: 'var(--ui-card-shadow, var(--shadow))',
-        backdropBlur: 'var(--ui-glass-blur)',
-        sheenHighlight: 'var(--ui-sheen-highlight)'
-      }
+      ...overlays.popover
     },
     drawer: {
       root: {
@@ -520,36 +582,16 @@ export const Noir = definePreset(Nora, {
       }
     },
     contextmenu: {
-      root: {
-        background: 'var(--ui-overlay-bg)',
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)',
-        shadow: 'var(--ui-card-shadow, var(--shadow))',
-        backdropBlur: 'var(--ui-glass-blur)',
-        sheenHighlight: 'var(--ui-sheen-highlight)'
-      },
-      item: {
-        focusBackground: 'var(--bg-hover)',
-        borderRadius: 'var(--ui-radius-control)',
-        color: '{text.color}',
-        focusColor: '{text.color}'
-      }
+      ...overlays.contextmenu,
+      item: MENU_ITEM_TOKENS
     },
     menu: {
-      root: {
-        background: 'var(--ui-overlay-bg)',
-        borderColor: 'var(--border)',
-        borderRadius: 'var(--ui-radius-card)',
-        shadow: 'var(--ui-card-shadow, var(--shadow))',
-        backdropBlur: 'var(--ui-glass-blur)',
-        sheenHighlight: 'var(--ui-sheen-highlight)'
-      },
-      item: {
-        focusBackground: 'var(--bg-hover)',
-        borderRadius: 'var(--ui-radius-control)',
-        color: '{text.color}',
-        focusColor: '{text.color}'
-      }
+      ...overlays.menu,
+      item: MENU_ITEM_TOKENS
+    },
+    tieredmenu: {
+      ...overlays.tieredmenu,
+      item: MENU_ITEM_TOKENS
     },
     tabs: {
       tab: {

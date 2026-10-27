@@ -25,3 +25,18 @@
 ## 4. PassThrough (`pt`) Scope Discipline
 - Only use component `pt` (PassThrough) when the styling is strictly contextual to that one screen.
 - If the same `pt` override appears in 2 or more files, it belongs in the shared Nora preset configuration ([src/theme/orbitTheme.ts](file:///d:/Projects/orbit/src/theme/orbitTheme.ts)).
+
+---
+
+## 5. No `size="normal"`
+- PrimeVue components do not have a `"normal"` size prop. Standard tier is represented by omitting the `size` prop entirely (e.g. `<Button>`, `<InputText>`). Setting `size="normal"` is a TypeScript type error.
+
+---
+
+## 6. Custom Tokens Need a `css` Hook to Take Effect
+- Defining custom properties (e.g. `backdropBlur`, `sheenHighlight`) via module augmentation on PrimeVue token sections generates CSS variables (`--p-<component>-...`), but PrimeVue's component stylesheets do not automatically bind them to CSS properties. Presets must provide a `css: ({ dt }) => ...` hook on the component in `orbitTheme.ts` to emit the CSS declarations.
+
+---
+
+## 7. Tailwind `backdrop-blur-(--var)` Nests `blur()`
+- Never use Tailwind's `backdrop-blur-(--ui-overlay-blur)` arbitrary property utility. Tailwind compiles this to `backdrop-filter: blur(var(--ui-overlay-blur))`, resulting in nested `blur(blur(20px))` which is invalid CSS at runtime. Use explicit CSS declarations or the preset `css` hook referencing the token directly.

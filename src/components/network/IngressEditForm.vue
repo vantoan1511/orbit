@@ -551,7 +551,6 @@ const removeTlsRow = (index: number) => {
                   v-model="ingressClassName"
                   placeholder="e.g. nginx"
                   :invalid="Boolean(ingressClassName && !isValidK8sLabel(ingressClassName))"
-                  size="small"
                   class="w-full md:w-80 text-xs"
                   @input="handleFieldChange"
                 />
@@ -577,7 +576,6 @@ const removeTlsRow = (index: number) => {
                     v-model="defaultBackendServiceName"
                     placeholder="e.g. default-backend-svc"
                     :invalid="Boolean(getServiceNameError(defaultBackendServiceName))"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -595,7 +593,6 @@ const removeTlsRow = (index: number) => {
                     v-model="defaultBackendServicePort"
                     placeholder="e.g. 80 or http"
                     :invalid="Boolean(getServicePortError(defaultBackendServicePort))"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -630,13 +627,7 @@ const removeTlsRow = (index: number) => {
                 <span class="text-xs font-medium text-muted-color">
                   {{ ruleGroups.length }} Host Group{{ ruleGroups.length === 1 ? '' : 's' }}
                 </span>
-                <Button
-                  size="small"
-                  variant="text"
-                  label="Add Host Group"
-                  class="text-xs"
-                  @click="addRuleGroup"
-                >
+                <Button variant="text" label="Add Host Group" class="text-xs" @click="addRuleGroup">
                   <template #icon>
                     <Plus class="w-3.5 h-3.5 mr-1" />
                   </template>
@@ -662,7 +653,6 @@ const removeTlsRow = (index: number) => {
                       v-model="group.host"
                       placeholder="e.g. app.example.com or *.example.com"
                       :invalid="Boolean(getHostError(group.host, gIdx))"
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -678,7 +668,6 @@ const removeTlsRow = (index: number) => {
                   <Button
                     variant="text"
                     severity="danger"
-                    size="small"
                     class="p-1 text-muted-color hover:text-(--danger) cursor-pointer mt-5"
                     aria-label="Remove Host Group"
                     @click="removeRuleGroup(gIdx)"
@@ -698,10 +687,9 @@ const removeTlsRow = (index: number) => {
                       Paths ({{ group.paths.length }})
                     </span>
                     <Button
-                      size="small"
                       variant="text"
                       label="Add Path"
-                      class="text-[11px] py-1 px-2"
+                      class="text-[11px] px-2"
                       @click="addPathToGroup(gIdx)"
                     >
                       <template #icon>
@@ -725,7 +713,6 @@ const removeTlsRow = (index: number) => {
                         v-model="path.path"
                         placeholder="e.g. / or /api"
                         :invalid="Boolean(getPathError(group.host, path.path, gIdx, pIdx))"
-                        size="small"
                         fluid
                         class="text-xs"
                         @input="handleFieldChange"
@@ -743,7 +730,6 @@ const removeTlsRow = (index: number) => {
                       <Select
                         v-model="path.pathType"
                         :options="pathTypeOptions"
-                        size="small"
                         fluid
                         class="text-xs"
                         @change="handleFieldChange"
@@ -756,7 +742,6 @@ const removeTlsRow = (index: number) => {
                         v-model="path.serviceName"
                         placeholder="e.g. my-service"
                         :invalid="Boolean(getServiceNameError(path.serviceName))"
-                        size="small"
                         fluid
                         class="text-xs"
                         @input="handleFieldChange"
@@ -775,7 +760,6 @@ const removeTlsRow = (index: number) => {
                         v-model="path.servicePort"
                         placeholder="e.g. 80 or http"
                         :invalid="Boolean(getServicePortError(path.servicePort))"
-                        size="small"
                         fluid
                         class="text-xs"
                         @input="handleFieldChange"
@@ -792,7 +776,6 @@ const removeTlsRow = (index: number) => {
                       <Button
                         variant="text"
                         severity="danger"
-                        size="small"
                         class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
                         aria-label="Remove Path"
                         @click="removePathFromGroup(gIdx, pIdx)"
@@ -828,13 +811,7 @@ const removeTlsRow = (index: number) => {
                     tlsConfigs.length === 1 ? '' : 's'
                   }}</span
                 >
-                <Button
-                  size="small"
-                  variant="text"
-                  label="Add TLS Config"
-                  class="text-xs"
-                  @click="addTlsRow"
-                >
+                <Button variant="text" label="Add TLS Config" class="text-xs" @click="addTlsRow">
                   <template #icon>
                     <Plus class="w-3.5 h-3.5 mr-1" />
                   </template>
@@ -855,7 +832,6 @@ const removeTlsRow = (index: number) => {
                   <Button
                     variant="text"
                     severity="danger"
-                    size="small"
                     class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
                     aria-label="Remove TLS"
                     @click="removeTlsRow(idx)"
@@ -873,7 +849,6 @@ const removeTlsRow = (index: number) => {
                       v-model="tls.secretName"
                       placeholder="e.g. tls-secret"
                       :invalid="Boolean(tls.secretName && !isValidK8sName(tls.secretName))"
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -886,7 +861,6 @@ const removeTlsRow = (index: number) => {
                     <InputText
                       v-model="tls.hosts"
                       placeholder="e.g. example.com, api.example.com"
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"

@@ -125,11 +125,11 @@ const handleFieldChange = () => {
       <div class="md:col-span-8 flex flex-col gap-3">
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-muted-color">Namespace Name</label>
-          <InputText disabled v-model="name" size="small" fluid />
+          <InputText disabled v-model="name" fluid />
         </div>
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-muted-color">Status Phase</label>
-          <InputText disabled v-model="statusPhase" size="small" fluid />
+          <InputText disabled v-model="statusPhase" fluid />
         </div>
       </div>
     </div>

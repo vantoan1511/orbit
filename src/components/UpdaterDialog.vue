@@ -244,7 +244,6 @@ const openUrl = async (url?: string) => {
         <Button
           severity="secondary"
           variant="text"
-          size="small"
           label="Dismiss"
           :disabled="updaterStore.isDownloading"
           @click="updaterStore.showUpdateDialog = false"
@@ -255,7 +254,6 @@ const openUrl = async (url?: string) => {
         </Button>
         <Button
           severity="primary"
-          size="small"
           :label="
             updaterStore.isDownloading
               ? `Downloading... ${updaterStore.downloadProgress}%`

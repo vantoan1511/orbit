@@ -333,7 +333,6 @@ const emitUpdate = () => {
                   <Select
                     v-model="strategyType"
                     :options="KUBERNETES_DAEMONSET_UPDATE_STRATEGIES"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -352,7 +351,6 @@ const emitUpdate = () => {
                     v-model="maxUnavailable"
                     placeholder="e.g. 1 or 25%"
                     :invalid="Boolean(maxUnavailable && !isValidMaxUnavailable(maxUnavailable))"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -368,7 +366,6 @@ const emitUpdate = () => {
                     v-model="maxSurge"
                     placeholder="e.g. 0 or 25%"
                     :invalid="Boolean(maxSurge && !isValidMaxSurge(maxSurge))"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -394,13 +391,7 @@ const emitUpdate = () => {
             <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-muted-color">Min Ready Seconds</label>
-                <InputNumber
-                  v-model="minReadySeconds"
-                  :min="0"
-                  size="small"
-                  fluid
-                  @change="handleFieldChange"
-                />
+                <InputNumber v-model="minReadySeconds" :min="0" fluid @change="handleFieldChange" />
               </div>
 
               <div class="flex flex-col gap-1.5">
@@ -408,7 +399,6 @@ const emitUpdate = () => {
                 <InputNumber
                   v-model="revisionHistoryLimit"
                   :min="0"
-                  size="small"
                   fluid
                   @change="handleFieldChange"
                 />
@@ -533,7 +523,6 @@ const emitUpdate = () => {
                   v-model="serviceAccountName"
                   placeholder="e.g. default"
                   :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
-                  size="small"
                   fluid
                   class="text-xs"
                   @input="handleFieldChange"
@@ -562,7 +551,6 @@ const emitUpdate = () => {
                   <InputNumber
                     v-model="terminationGracePeriodSeconds"
                     :min="0"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -619,7 +607,6 @@ const emitUpdate = () => {
                 <Select
                   v-model="dnsPolicy"
                   :options="DNS_POLICIES"
-                  size="small"
                   fluid
                   class="text-xs"
                   @change="handleFieldChange"
@@ -662,7 +649,6 @@ const emitUpdate = () => {
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
               :label="c.name || `Container ${idx + 1}`"
-              size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
               class="text-xs cursor-pointer"
@@ -693,7 +679,6 @@ const emitUpdate = () => {
                           !isValidK8sLabel(currentContainer.name.trim())
                         )
                       "
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -705,7 +690,6 @@ const emitUpdate = () => {
                     <Select
                       v-model="currentContainer.imagePullPolicy"
                       :options="KUBERNETES_IMAGE_PULL_POLICIES"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -718,7 +702,6 @@ const emitUpdate = () => {
                   <InputText
                     v-model="currentContainer.image"
                     placeholder="e.g. fluent/fluentd:v1.16"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -735,7 +718,6 @@ const emitUpdate = () => {
                         currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
                       )
                     "
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"

@@ -270,7 +270,6 @@ const handleFieldChange = () => {
                   buttonLayout="horizontal"
                   :min="0"
                   :max="1000"
-                  size="small"
                   @update:model-value="handleFieldChange"
                   @change="handleFieldChange"
                 />
@@ -297,7 +296,6 @@ const handleFieldChange = () => {
                 <InputNumber
                   v-model="minReadySeconds"
                   :min="0"
-                  size="small"
                   fluid
                   @update:model-value="handleFieldChange"
                   @change="handleFieldChange"
@@ -427,7 +425,6 @@ const handleFieldChange = () => {
                   v-model="serviceAccountName"
                   placeholder="e.g. default"
                   :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
-                  size="small"
                   fluid
                   class="text-xs"
                   @input="handleFieldChange"
@@ -440,7 +437,6 @@ const handleFieldChange = () => {
                   <Select
                     v-model="restartPolicy"
                     :options="KUBERNETES_RESTART_POLICIES"
-                    size="small"
                     fluid
                     class="text-xs"
                     @change="handleFieldChange"
@@ -454,7 +450,6 @@ const handleFieldChange = () => {
                   <InputNumber
                     v-model="terminationGracePeriodSeconds"
                     :min="0"
-                    size="small"
                     fluid
                     @update:model-value="handleFieldChange"
                     @change="handleFieldChange"
@@ -512,7 +507,6 @@ const handleFieldChange = () => {
                 <Select
                   v-model="dnsPolicy"
                   :options="KUBERNETES_DNS_POLICIES"
-                  size="small"
                   fluid
                   class="text-xs"
                   @change="handleFieldChange"
@@ -555,7 +549,6 @@ const handleFieldChange = () => {
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
               :label="c.name || `Container ${idx + 1}`"
-              size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
               class="text-xs cursor-pointer"
@@ -586,7 +579,6 @@ const handleFieldChange = () => {
                           !isValidK8sLabel(currentContainer.name.trim())
                         )
                       "
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -598,7 +590,6 @@ const handleFieldChange = () => {
                     <Select
                       v-model="currentContainer.imagePullPolicy"
                       :options="KUBERNETES_IMAGE_PULL_POLICIES"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -611,7 +602,6 @@ const handleFieldChange = () => {
                   <InputText
                     v-model="currentContainer.image"
                     placeholder="e.g. nginx:alpine"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -628,7 +618,6 @@ const handleFieldChange = () => {
                         currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
                       )
                     "
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"

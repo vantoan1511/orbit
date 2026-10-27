@@ -101,7 +101,7 @@ defineExpose({
 </script>
 
 <template>
-  <Popover ref="popoverRef" class="w-72 shadow-xl border border-(--border)" @click.stop>
+  <Popover ref="popoverRef" class="w-72" @click.stop>
     <div class="flex flex-col gap-2 p-1 select-none">
       <div class="px-2 pt-1 pb-1">
         <span class="text-xs font-semibold text-muted-color uppercase tracking-wider">

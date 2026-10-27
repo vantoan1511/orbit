@@ -164,7 +164,7 @@ const isIndeterminate = computed(() => {
     <!-- Bulk Actions Toolbar -->
     <div
       v-if="selection && selection.length > 0"
-      class="flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-[var(--ui-radius-card)] px-3 py-2 min-h-[42px]"
+      class="flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-[var(--ui-radius-card)] px-3 py-2"
     >
       <div class="flex items-center gap-3">
         <span class="text-xs font-semibold text-primary"> {{ selection.length }} selected </span>
@@ -173,7 +173,6 @@ const isIndeterminate = computed(() => {
           severity="secondary"
           variant="text"
           size="small"
-          class="p-1 h-6 w-6"
           @click="selection = []"
         >
           <template #icon>
@@ -234,7 +233,6 @@ const isIndeterminate = computed(() => {
             severity="secondary"
             variant="text"
             size="small"
-            class="p-1 w-7 h-7"
             @click="emit('refresh')"
             :loading="loading"
           >
@@ -248,7 +246,6 @@ const isIndeterminate = computed(() => {
             severity="secondary"
             variant="text"
             size="small"
-            class="p-1 w-7 h-7"
             @click="toggleConfig"
           >
             <template #icon>

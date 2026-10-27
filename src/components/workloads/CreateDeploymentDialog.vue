@@ -140,7 +140,6 @@ const handleCreate = async () => {
         v-model="name"
         placeholder="e.g. my-app"
         fluid
-        size="small"
         :invalid="Boolean(name.trim() && nameErrorMessage)"
         aria-describedby="create-deployment-name-error"
         class="text-xs"
@@ -164,7 +163,6 @@ const handleCreate = async () => {
         v-model="namespace"
         :options="namespaceOptions"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -179,7 +177,6 @@ const handleCreate = async () => {
         v-model="image"
         placeholder="e.g. nginx:latest"
         fluid
-        size="small"
         class="text-xs"
       />
     </div>
@@ -197,7 +194,6 @@ const handleCreate = async () => {
           :max="1000"
           showButtons
           fluid
-          size="small"
         />
       </div>
 
@@ -212,7 +208,6 @@ const handleCreate = async () => {
           :max="65535"
           placeholder="e.g. 80"
           fluid
-          size="small"
           :invalid="Boolean(port !== null && portErrorMessage)"
           aria-describedby="create-deployment-port-error"
         />
@@ -232,7 +227,6 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         :disabled="isCreating"
         @click="handleCancel"
       />
@@ -240,7 +234,6 @@ const handleCreate = async () => {
         type="submit"
         label="Create"
         severity="primary"
-        size="small"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
       />

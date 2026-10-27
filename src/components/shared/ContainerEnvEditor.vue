@@ -179,14 +179,7 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <label class="text-xs font-medium text-muted-color">Environment Variables</label>
-      <Button
-        v-if="!disabled"
-        size="small"
-        variant="text"
-        label="Add Env"
-        class="text-xs"
-        @click="addEnv"
-      >
+      <Button v-if="!disabled" variant="text" label="Add Env" class="text-xs" @click="addEnv">
         <template #icon>
           <Plus class="w-3.5 h-3.5 mr-1" />
         </template>
@@ -209,7 +202,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
         optionLabel="label"
         optionValue="value"
         :disabled="disabled"
-        size="small"
         class="w-40 shrink-0 text-xs"
         @update:model-value="(val) => updateEnvField(idx, 'type', val as EnvSourceType)"
       />
@@ -222,7 +214,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
           editable
           :placeholder="item.type === 'ConfigMapEnvFrom' ? 'ConfigMap Name' : 'Secret Name'"
           :disabled="disabled"
-          size="small"
           class="flex-1 min-w-36 font-mono text-xs"
           @update:model-value="(val) => updateEnvField(idx, 'refName', val ?? '')"
         />
@@ -230,7 +221,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
           :model-value="item.prefix || ''"
           placeholder="Prefix (optional)"
           :disabled="disabled"
-          size="small"
           class="w-36 shrink-0 font-mono text-xs"
           @update:model-value="(val) => updateEnvField(idx, 'prefix', val ?? '')"
         />
@@ -242,7 +232,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
           :model-value="item.name || ''"
           placeholder="NAME"
           :disabled="disabled"
-          size="small"
           class="w-44 shrink-0 font-mono text-xs"
           @update:model-value="(val) => updateEnvField(idx, 'name', val ?? '')"
         />
@@ -254,7 +243,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
             :model-value="item.value || ''"
             placeholder="VALUE"
             :disabled="disabled"
-            size="small"
             class="flex-1 min-w-36 font-mono text-xs"
             @update:model-value="(val) => updateEnvField(idx, 'value', val ?? '')"
           />
@@ -268,7 +256,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
             editable
             :placeholder="item.type === 'ConfigMapKey' ? 'ConfigMap Name' : 'Secret Name'"
             :disabled="disabled"
-            size="small"
             class="flex-1 min-w-36 font-mono text-xs"
             @update:model-value="(val) => updateEnvField(idx, 'refName', val ?? '')"
           />
@@ -278,7 +265,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
             editable
             placeholder="Key"
             :disabled="disabled"
-            size="small"
             class="w-36 shrink-0 font-mono text-xs"
             @update:model-value="(val) => updateEnvField(idx, 'refKey', val ?? '')"
           />
@@ -292,7 +278,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
             editable
             placeholder="Field Path (e.g. metadata.name)"
             :disabled="disabled"
-            size="small"
             class="flex-1 min-w-36 font-mono text-xs"
             @update:model-value="(val) => updateEnvField(idx, 'fieldPath', val ?? '')"
           />
@@ -306,7 +291,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
             editable
             placeholder="Resource (e.g. limits.cpu)"
             :disabled="disabled"
-            size="small"
             class="flex-1 min-w-36 font-mono text-xs"
             @update:model-value="(val) => updateEnvField(idx, 'fieldPath', val ?? '')"
           />
@@ -318,7 +302,6 @@ const updateEnvField = <K extends keyof ContainerEnvItem>(
         v-if="!disabled"
         variant="text"
         severity="danger"
-        size="small"
         class="p-1 shrink-0 text-muted-color hover:text-(--danger) cursor-pointer"
         @click="removeEnv(idx)"
       >

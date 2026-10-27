@@ -520,7 +520,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   v-model="replicas"
                   showButtons
                   buttonLayout="horizontal"
-                  size="small"
                   :min="0"
                   :max="1000"
                   @update:model-value="handleFieldChange"
@@ -556,7 +555,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <Select
                   v-model="strategyType"
                   :options="['RollingUpdate', 'Recreate']"
-                  size="small"
                   class="w-full md:w-64"
                   @change="handleFieldChange"
                 />
@@ -568,7 +566,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputText
                     v-model="maxSurge"
                     placeholder="e.g. 25% or 1"
-                    size="small"
                     fluid
                     @input="handleFieldChange"
                   />
@@ -579,7 +576,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputText
                     v-model="maxUnavailable"
                     placeholder="e.g. 25% or 0"
-                    size="small"
                     fluid
                     @input="handleFieldChange"
                   />
@@ -601,13 +597,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             <div class="md:col-span-8 grid grid-cols-3 gap-4">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-muted-color">Min Ready Secs</label>
-                <InputNumber
-                  v-model="minReadySeconds"
-                  :min="0"
-                  size="small"
-                  fluid
-                  @change="handleFieldChange"
-                />
+                <InputNumber v-model="minReadySeconds" :min="0" fluid @change="handleFieldChange" />
               </div>
 
               <div class="flex flex-col gap-1.5">
@@ -615,7 +605,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <InputNumber
                   v-model="revisionHistoryLimit"
                   :min="0"
-                  size="small"
                   fluid
                   @change="handleFieldChange"
                 />
@@ -626,7 +615,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <InputNumber
                   v-model="progressDeadlineSeconds"
                   :min="0"
-                  size="small"
                   fluid
                   @change="handleFieldChange"
                 />
@@ -753,7 +741,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   v-model="serviceAccountName"
                   placeholder="e.g. default"
                   :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
-                  size="small"
                   fluid
                   class="text-xs"
                   @input="handleFieldChange"
@@ -766,7 +753,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <Select
                     v-model="restartPolicy"
                     :options="KUBERNETES_RESTART_POLICIES"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -779,7 +765,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputNumber
                     v-model="terminationGracePeriodSeconds"
                     :min="0"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -820,7 +805,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
               :label="c.name || `Container ${idx + 1}`"
-              size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
               class="text-xs cursor-pointer"
@@ -848,7 +832,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                       :invalid="
                         Boolean(currentContainer.name && !isValidK8sLabel(currentContainer.name))
                       "
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -860,7 +843,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     <Select
                       v-model="currentContainer.imagePullPolicy"
                       :options="['Always', 'IfNotPresent', 'Never']"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -873,7 +855,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputText
                     v-model="currentContainer.image"
                     placeholder="e.g. nginx:latest"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -890,7 +871,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                         currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
                       )
                     "
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"

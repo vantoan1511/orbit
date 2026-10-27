@@ -312,7 +312,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     v-model="replicas"
                     showButtons
                     buttonLayout="horizontal"
-                    size="small"
                     :min="0"
                     :max="1000"
                   />
@@ -326,7 +325,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     v-model="serviceName"
                     placeholder="e.g. headless-svc"
                     :invalid="!serviceName || !isValidK8sName(serviceName)"
-                    size="small"
                     fluid
                     class="text-xs font-mono"
                     @input="handleFieldChange"
@@ -369,7 +367,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <Select
                   v-model="strategyType"
                   :options="KUBERNETES_STATEFULSET_UPDATE_STRATEGIES"
-                  size="small"
                   class="w-full md:w-64"
                   @change="handleFieldChange"
                 />
@@ -381,13 +378,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               >
                 <div class="flex flex-col gap-1.5">
                   <label class="text-xs font-medium text-muted-color">Partition Ordinal</label>
-                  <InputNumber
-                    v-model="partition"
-                    :min="0"
-                    size="small"
-                    fluid
-                    @change="handleFieldChange"
-                  />
+                  <InputNumber v-model="partition" :min="0" fluid @change="handleFieldChange" />
                   <span class="text-[11px] text-muted-color">
                     Canary barrier: pods from Replicas-1 down to Partition will be updated.
                   </span>
@@ -399,7 +390,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     v-model="maxUnavailable"
                     placeholder="e.g. 1 or 25%"
                     :invalid="Boolean(maxUnavailable && !isValidMaxUnavailable(maxUnavailable))"
-                    size="small"
                     fluid
                     @input="handleFieldChange"
                   />
@@ -424,13 +414,7 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
             <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="flex flex-col gap-1.5">
                 <label class="text-xs font-medium text-muted-color">Min Ready Seconds</label>
-                <InputNumber
-                  v-model="minReadySeconds"
-                  :min="0"
-                  size="small"
-                  fluid
-                  @change="handleFieldChange"
-                />
+                <InputNumber v-model="minReadySeconds" :min="0" fluid @change="handleFieldChange" />
               </div>
 
               <div class="flex flex-col gap-1.5">
@@ -438,7 +422,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                 <InputNumber
                   v-model="revisionHistoryLimit"
                   :min="0"
-                  size="small"
                   fluid
                   @change="handleFieldChange"
                 />
@@ -563,7 +546,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   v-model="serviceAccountName"
                   placeholder="e.g. default"
                   :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
-                  size="small"
                   fluid
                   class="text-xs"
                   @input="handleFieldChange"
@@ -592,7 +574,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputNumber
                     v-model="terminationGracePeriodSeconds"
                     :min="0"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -633,7 +614,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
               :label="c.name || `Container ${idx + 1}`"
-              size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
               class="text-xs cursor-pointer"
@@ -661,7 +641,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                       :invalid="
                         Boolean(currentContainer.name && !isValidK8sLabel(currentContainer.name))
                       "
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -673,7 +652,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     <Select
                       v-model="currentContainer.imagePullPolicy"
                       :options="['Always', 'IfNotPresent', 'Never']"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -686,7 +664,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputText
                     v-model="currentContainer.image"
                     placeholder="e.g. redis:7.2"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -703,7 +680,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                         currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
                       )
                     "
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"

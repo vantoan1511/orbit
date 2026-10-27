@@ -54,22 +54,13 @@ const MenuItemButton = (props: { item: MenuItem; menuProps: any }) => {
 </script>
 
 <template>
-  <Menu
-    ref="menuRef"
-    :model="menuModel"
-    popup
-    class="min-w-44 bg-(--ui-overlay-bg) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-lg"
-  >
+  <Menu ref="menuRef" :model="menuModel" popup class="min-w-44">
     <template #item="{ item, props: menuProps }">
       <MenuItemButton :item="item" :menuProps="menuProps" />
     </template>
   </Menu>
 
-  <ContextMenu
-    ref="contextMenuRef"
-    :model="menuModel"
-    class="min-w-44 bg-(--ui-overlay-bg) border border-(--border) p-1 rounded-[var(--ui-radius-card)] shadow-lg"
-  >
+  <ContextMenu ref="contextMenuRef" :model="menuModel" class="min-w-44">
     <template #item="{ item, props: menuProps }">
       <MenuItemButton :item="item" :menuProps="menuProps" />
     </template>

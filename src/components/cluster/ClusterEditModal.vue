@@ -147,7 +147,6 @@ const handleSave = async () => {
       <Button
         variant="text"
         severity="secondary"
-        size="small"
         :disabled="!hasCustomizations || isSaving"
         class="flex items-center gap-1.5 text-xs text-muted-color hover:text-primary"
         @click="handleReset"
@@ -161,20 +160,13 @@ const handleSave = async () => {
         <Button
           variant="text"
           severity="secondary"
-          size="small"
-          class="h-8 px-3 text-xs"
+          class="px-3 text-xs"
           :disabled="isSaving"
           @click="handleClose"
         >
           Cancel
         </Button>
-        <Button
-          severity="primary"
-          size="small"
-          class="h-8 px-3 text-xs"
-          :loading="isSaving"
-          @click="handleSave"
-        >
+        <Button severity="primary" class="px-3 text-xs" :loading="isSaving" @click="handleSave">
           Save Changes
         </Button>
       </div>

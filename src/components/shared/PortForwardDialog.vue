@@ -108,7 +108,6 @@ const handleStart = () => {
           :useGrouping="false"
           placeholder="8080"
           fluid
-          size="small"
           class="text-xs font-mono"
           autofocus
         />
@@ -138,7 +137,6 @@ const handleStart = () => {
           :useGrouping="false"
           placeholder="8080"
           fluid
-          size="small"
           class="text-xs font-mono"
         />
       </div>
@@ -150,7 +148,6 @@ const handleStart = () => {
         label="Cancel"
         severity="secondary"
         variant="text"
-        size="small"
         @click="handleCancel"
       />
       <Button
@@ -158,7 +155,6 @@ const handleStart = () => {
         label="Start Forwarding"
         icon="pi pi-external-link"
         severity="primary"
-        size="small"
         :disabled="!isValid"
       />
     </div>

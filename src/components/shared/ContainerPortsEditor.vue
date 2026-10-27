@@ -57,14 +57,7 @@ const updatePortField = <K extends keyof ContainerPortItem>(
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <label class="text-xs font-medium text-muted-color">Container Ports</label>
-      <Button
-        v-if="!disabled"
-        size="small"
-        variant="text"
-        label="Add Port"
-        class="text-xs"
-        @click="addPort"
-      >
+      <Button v-if="!disabled" variant="text" label="Add Port" class="text-xs" @click="addPort">
         <template #icon>
           <Plus class="w-3.5 h-3.5 mr-1" />
         </template>
@@ -81,7 +74,6 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         placeholder="Port Name (e.g. http)"
         :disabled="disabled"
         :invalid="Boolean(port.name && !isValidK8sLabel(port.name))"
-        size="small"
         class="w-1/3 text-xs"
         @update:model-value="(val) => updatePortField(idx, 'name', val ?? '')"
       />
@@ -91,7 +83,6 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :disabled="disabled"
         :min="1"
         :max="65535"
-        size="small"
         class="w-1/3"
         fluid
         @update:model-value="(val) => updatePortField(idx, 'containerPort', Number(val ?? 80))"
@@ -100,7 +91,6 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         :model-value="port.protocol"
         :options="protocolOptions"
         :disabled="disabled"
-        size="small"
         class="w-1/4"
         @update:model-value="(val) => updatePortField(idx, 'protocol', val ?? 'TCP')"
       />
@@ -108,7 +98,6 @@ const updatePortField = <K extends keyof ContainerPortItem>(
         v-if="!disabled"
         variant="text"
         severity="danger"
-        size="small"
         class="p-1 text-muted-color hover:text-(--danger) cursor-pointer"
         @click="removePort(idx)"
       >

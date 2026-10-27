@@ -6,16 +6,20 @@ This recipe provides the authoritative visual and component patterns for PrimeVu
 
 ## 1. Interactive Form Controls
 
-Always use PrimeVue v4 components instead of raw HTML elements:
+Always use PrimeVue v4 components instead of raw HTML elements.
 
-| Control | Correct PrimeVue Component | Banned Raw HTML | Example Usage |
-|---|---|---|---|
-| Action trigger | `<Button label="..." />` | `<button>` | `<Button label="Save" severity="primary" size="small" />` |
-| Text input | `<InputText v-model="..." />` | `<input type="text">` | `<InputText v-model="name" size="small" placeholder="..." />` |
-| Number input | `<InputNumber v-model="..." />` | `<input type="number">` | `<InputNumber v-model="port" :min="1" :max="65535" size="small" />` |
-| Dropdown select | `<Select v-model="..." :options="..." />` | `<select>` | `<Select v-model="selectedNs" :options="namespaces" size="small" />` |
-| Toggle switch | `<ToggleSwitch v-model="..." />` | `<input type="checkbox">` | `<ToggleSwitch v-model="enableSsl" />` |
-| Multi-line text | `<Textarea v-model="..." />` | `<textarea>` | `<Textarea v-model="description" rows="3" autoResize />` |
+Controls follow Orbit's **Control Sizing Contract**:
+- **Standard Tier (36px default)**: Used in Dialogs, Modals, EditForms, form editors, and settings forms. Omit the `size` prop.
+- **Compact Tier (32px)**: Used in K8s Resource DataTable toolbars, filter bars, and dense tool surfaces. Explicitly pass `size="small"`.
+
+| Control | Correct PrimeVue Component | Banned Raw HTML | Example Standard Usage | Example Compact Usage |
+|---|---|---|---|---|
+| Action trigger | `<Button label="..." />` | `<button>` | `<Button label="Save" severity="primary" />` | `<Button label="Filter" size="small" />` |
+| Text input | `<InputText v-model="..." />` | `<input type="text">` | `<InputText v-model="name" placeholder="..." />` | `<InputText v-model="search" size="small" />` |
+| Number input | `<InputNumber v-model="..." />` | `<input type="number">` | `<InputNumber v-model="port" :min="1" :max="65535" />` | `<InputNumber v-model="limit" size="small" />` |
+| Dropdown select | `<Select v-model="..." :options="..." />` | `<select>` | `<Select v-model="selectedNs" :options="namespaces" />` | `<Select v-model="kind" :options="kinds" size="small" />` |
+| Toggle switch | `<ToggleSwitch v-model="..." />` | `<input type="checkbox">` | `<ToggleSwitch v-model="enableSsl" />` | `<ToggleSwitch v-model="live" />` |
+| Multi-line text | `<Textarea v-model="..." />` | `<textarea>` | `<Textarea v-model="description" rows="3" autoResize />` | `<Textarea v-model="notes" rows="2" size="small" />` |
 
 ---
 
@@ -57,7 +61,7 @@ Orbit uses a borderless, two-column grouping for forms instead of heavy containe
     </div>
     <div class="flex flex-col gap-1.5">
       <label class="text-xs font-medium text-(--text-secondary)">Port</label>
-      <InputNumber v-model="form.port" size="small" />
+      <InputNumber v-model="form.port" />
     </div>
   </div>
 </div>
@@ -66,6 +70,8 @@ Orbit uses a borderless, two-column grouping for forms instead of heavy containe
 ---
 
 ## 4. Modal Dialogs & Confirmations
+
+Dialog footer action buttons use the Standard tier (omit `size`):
 
 ```vue
 <template>
@@ -82,10 +88,24 @@ Orbit uses a borderless, two-column grouping for forms instead of heavy containe
 
     <template #footer>
       <div class="flex justify-end gap-2 pt-2">
-        <Button label="Cancel" severity="secondary" variant="text" size="small" @click="visible = false" />
-        <Button label="Delete" severity="danger" size="small" @click="confirmDelete" />
+        <Button label="Cancel" severity="secondary" variant="text" @click="visible = false" />
+        <Button label="Delete" severity="danger" @click="confirmDelete" />
       </div>
     </template>
   </Dialog>
 </template>
+```
+
+---
+
+## 5. Compact Table Toolbars
+
+Table toolbars and filter bars use the Compact tier (`size="small"`, height 32px):
+
+```vue
+<div class="flex items-center gap-3">
+  <InputText v-model="search" placeholder="Search..." size="small" />
+  <Select v-model="namespace" :options="namespaces" size="small" />
+  <Button icon="pi pi-refresh" severity="secondary" variant="text" size="small" v-tooltip.top="'Refresh'" />
+</div>
 ```

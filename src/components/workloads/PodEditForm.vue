@@ -475,7 +475,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   v-model="serviceAccountName"
                   placeholder="e.g. default"
                   :invalid="Boolean(serviceAccountName && !isValidK8sName(serviceAccountName))"
-                  size="small"
                   fluid
                   class="text-xs"
                   @input="handleFieldChange"
@@ -488,7 +487,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <Select
                     v-model="restartPolicy"
                     :options="KUBERNETES_RESTART_POLICIES"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -501,7 +499,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputNumber
                     v-model="terminationGracePeriodSeconds"
                     :min="0"
-                    size="small"
                     fluid
                     @change="handleFieldChange"
                   />
@@ -542,7 +539,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
               v-for="(c, idx) in containers"
               :key="'cbtn-' + idx"
               :label="c.name || `Container ${idx + 1}`"
-              size="small"
               :variant="activeContainerIndex === idx ? undefined : 'text'"
               :severity="activeContainerIndex === idx ? 'primary' : 'secondary'"
               class="text-xs cursor-pointer"
@@ -570,7 +566,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                       :invalid="
                         Boolean(currentContainer.name && !isValidK8sLabel(currentContainer.name))
                       "
-                      size="small"
                       fluid
                       class="text-xs"
                       @input="handleFieldChange"
@@ -582,7 +577,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                     <Select
                       v-model="currentContainer.imagePullPolicy"
                       :options="['Always', 'IfNotPresent', 'Never']"
-                      size="small"
                       fluid
                       class="text-xs"
                       @change="handleFieldChange"
@@ -595,7 +589,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                   <InputText
                     v-model="currentContainer.image"
                     placeholder="e.g. nginx:latest"
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"
@@ -612,7 +605,6 @@ const currentContainer = computed(() => containers.value[activeContainerIndex.va
                         currentContainer.workingDir && !isValidPath(currentContainer.workingDir)
                       )
                     "
-                    size="small"
                     fluid
                     class="text-xs"
                     @input="handleFieldChange"

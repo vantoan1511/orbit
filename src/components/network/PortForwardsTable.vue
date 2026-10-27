@@ -248,6 +248,7 @@ const handleRefresh = async () => {
               variant="text"
               severity="secondary"
               size="small"
+              data-sizing-exempt="inline-cell-micro-action"
               class="w-5 h-5 p-0 text-muted-color hover:text-primary shrink-0"
               @click.stop="openBrowser(data.localPort)"
             />
@@ -290,7 +291,6 @@ const handleRefresh = async () => {
               variant="text"
               severity="secondary"
               size="small"
-              class="w-7 h-7 p-0"
               @click.stop="openBrowser(data.localPort)"
             />
             <Button
@@ -299,7 +299,6 @@ const handleRefresh = async () => {
               severity="danger"
               variant="text"
               size="small"
-              class="w-7 h-7 p-0"
               :loading="stopping[data.id]"
               @click.stop="stopSinglePortForward(data.id, data.name)"
             />
