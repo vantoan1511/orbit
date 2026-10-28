@@ -149,6 +149,22 @@ function buildToastSeverity(statusVar: string, softVar: string) {
   }
 }
 
+function buildToastCss({ dt }: StyleOptions): string {
+  const blur = String(dt('toast.root.backdrop.blur') ?? '')
+  return `
+.p-toast-message,
+.p-toast-message.p-toast-message-info,
+.p-toast-message.p-toast-message-success,
+.p-toast-message.p-toast-message-warn,
+.p-toast-message.p-toast-message-error,
+.p-toast-message.p-toast-message-secondary,
+.p-toast-message.p-toast-message-contrast {
+  -webkit-backdrop-filter: ${blur};
+  backdrop-filter: ${blur};
+}
+`
+}
+
 const TOAST_COLOR_SCHEME = {
   info: buildToastSeverity('var(--info)', 'var(--info-soft)'),
   success: buildToastSeverity('var(--success)', 'var(--success-soft)'),
@@ -740,7 +756,8 @@ export const Noir = definePreset(Nora, {
       colorScheme: {
         light: TOAST_COLOR_SCHEME,
         dark: TOAST_COLOR_SCHEME
-      }
+      },
+      css: buildToastCss
     },
     tooltip: {
       root: {

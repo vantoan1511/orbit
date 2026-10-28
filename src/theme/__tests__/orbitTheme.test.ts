@@ -425,6 +425,7 @@ interface ToastPresetTokens {
   }
   closeIcon: Record<string, string>
   colorScheme: Record<string, Record<string, ToastSeverityTokens>>
+  css?: ({ dt }: { dt: (path: string) => string }) => string
 }
 
 test('Noir preset maps toast root, typography, padding, and dual-theme color schemes to centralized tokens', () => {
@@ -552,4 +553,18 @@ test('Noir preset maps toast root, typography, padding, and dual-theme color sch
     assert.equal(scheme.contrast.closeButton.focusRing.color, 'var(--border-strong)')
     assert.equal(scheme.contrast.closeButton.focusRing.shadow, 'none')
   }
+
+  // Toast CSS hook for dynamic UI style backdrop-filter
+  assert.equal(typeof toast.css, 'function', 'toast must configure a css hook for backdrop-filter')
+  const stubDt = (p: string) => `var(--p-${p.replace(/\./g, '-')})`
+  const cssOutput = toast.css!({ dt: stubDt })
+  assert.ok(
+    cssOutput.includes('backdrop-filter: var(--p-toast-root-backdrop-blur)'),
+    'toast css hook must contain backdrop-filter with toast backdrop blur token'
+  )
+  assert.ok(
+    cssOutput.includes('-webkit-backdrop-filter: var(--p-toast-root-backdrop-blur)'),
+    'toast css hook must contain -webkit-backdrop-filter with toast backdrop blur token'
+  )
+  assert.ok(cssOutput.includes('.p-toast-message'), 'toast css hook must target .p-toast-message')
 })
