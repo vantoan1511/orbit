@@ -135,6 +135,65 @@ const MENU_ITEM_TOKENS = {
   focusColor: '{text.color}'
 }
 
+function buildToastSeverity(statusVar: string, softVar: string) {
+  return {
+    background: `linear-gradient(${softVar}, ${softVar}), var(--ui-overlay-bg)`,
+    borderColor: `var(--border) var(--border) var(--border) ${statusVar}`,
+    color: statusVar,
+    detailColor: 'var(--text-secondary)',
+    shadow: 'var(--ui-card-shadow, var(--shadow))',
+    closeButton: {
+      hoverBackground: 'var(--bg-hover)',
+      focusRing: { color: statusVar, shadow: 'none' }
+    }
+  }
+}
+
+function buildToastCss({ dt }: StyleOptions): string {
+  const blur = String(dt('toast.root.backdrop.blur') ?? '')
+  return `
+.p-toast-message,
+.p-toast-message.p-toast-message-info,
+.p-toast-message.p-toast-message-success,
+.p-toast-message.p-toast-message-warn,
+.p-toast-message.p-toast-message-error,
+.p-toast-message.p-toast-message-secondary,
+.p-toast-message.p-toast-message-contrast {
+  -webkit-backdrop-filter: ${blur};
+  backdrop-filter: ${blur};
+}
+`
+}
+
+const TOAST_COLOR_SCHEME = {
+  info: buildToastSeverity('var(--info)', 'var(--info-soft)'),
+  success: buildToastSeverity('var(--success)', 'var(--success-soft)'),
+  warn: buildToastSeverity('var(--warning)', 'var(--warning-soft)'),
+  error: buildToastSeverity('var(--danger)', 'var(--danger-soft)'),
+  secondary: {
+    background: 'var(--ui-overlay-bg)',
+    borderColor: 'var(--border)',
+    color: 'var(--text-primary)',
+    detailColor: 'var(--text-secondary)',
+    shadow: 'var(--ui-card-shadow, var(--shadow))',
+    closeButton: {
+      hoverBackground: 'var(--bg-hover)',
+      focusRing: { color: 'var(--border-strong)', shadow: 'none' }
+    }
+  },
+  contrast: {
+    background: 'var(--ui-overlay-bg)',
+    borderColor: 'var(--border-strong)',
+    color: 'var(--text-primary)',
+    detailColor: 'var(--text-secondary)',
+    shadow: 'var(--ui-card-shadow, var(--shadow))',
+    closeButton: {
+      hoverBackground: 'var(--bg-hover)',
+      focusRing: { color: 'var(--border-strong)', shadow: 'none' }
+    }
+  }
+}
+
 function componentCss(component: string) {
   const overlaySpecs = OVERLAY_SURFACES.filter((s) => s.component === component)
   const sizingSpecs = SIZED_CONTROLS.filter((s) => s.component === component)
@@ -656,10 +715,49 @@ export const Noir = definePreset(Nora, {
     },
     toast: {
       root: {
+        width: '24rem',
         borderRadius: 'var(--ui-radius-card)',
+        borderWidth: '1px 1px 1px 3px',
+        transitionDuration: '{transition.duration}',
         backdropBlur: 'var(--ui-glass-blur)',
         sheenHighlight: 'var(--ui-sheen-highlight)'
-      }
+      },
+      icon: {
+        size: '1rem'
+      },
+      content: {
+        padding: '0.75rem 0.875rem',
+        gap: '0.625rem'
+      },
+      text: {
+        gap: '0.25rem'
+      },
+      summary: {
+        fontWeight: '600',
+        fontSize: '0.875rem'
+      },
+      detail: {
+        fontWeight: '400',
+        fontSize: '0.75rem'
+      },
+      closeButton: {
+        width: '1.5rem',
+        height: '1.5rem',
+        borderRadius: 'var(--ui-radius-control)',
+        focusRing: {
+          width: '1px',
+          style: 'solid',
+          offset: '1px'
+        }
+      },
+      closeIcon: {
+        size: '0.875rem'
+      },
+      colorScheme: {
+        light: TOAST_COLOR_SCHEME,
+        dark: TOAST_COLOR_SCHEME
+      },
+      css: buildToastCss
     },
     tooltip: {
       root: {
