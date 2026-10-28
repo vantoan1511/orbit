@@ -194,6 +194,8 @@ export interface OrbitEventMap {
   resourceRawData: {
     kind: string
     name: string
+    namespace: string
+    requestId?: string
     data: Record<string, unknown>
   }
   portForwardStarted: {

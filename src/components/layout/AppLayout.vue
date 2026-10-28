@@ -7,9 +7,11 @@ import { useTabsStore } from '@/stores/tabsStore'
 import { useTerminalStore } from '@/stores/terminalStore'
 import OfflineClusterView from '@/views/OfflineClusterView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
+import EditView from '@/views/EditView.vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getTabMetadataForRoute } from '@/utils/tabIcons'
+import { defaultEditHostRegistry, getEditCacheNames, isEditRoutePath } from '@/utils/editKeepAlive'
 import {
   getLayoutContentPaddingClass,
   getLayoutMainClass,
@@ -37,6 +39,24 @@ const isSwitchingCluster = ref(false)
 const currentLayoutMeta = computed(() => {
   return resolveRouteLayoutMeta(route.path, route.meta as LayoutRouteMeta)
 })
+
+const editCacheNames = computed(() => getEditCacheNames(tabsStore.tabs))
+
+watch(
+  () => tabsStore.tabs,
+  (tabs) => {
+    defaultEditHostRegistry.pruneEditHosts(tabs.map((t) => t.id))
+  },
+  { deep: true }
+)
+
+function resolveViewComponent(Component: unknown, currentRoute: typeof route) {
+  if (isEditRoutePath(currentRoute.path)) {
+    const tabId = currentRoute.fullPath
+    return defaultEditHostRegistry.getOrCreateEditHost(tabId, EditView)
+  }
+  return Component
+}
 
 // Synchronize current route with tabsStore
 watch(
@@ -228,9 +248,14 @@ onUnmounted(() => {
                       route.path !== '/settings'
                     "
                   />
-                  <RouterView v-else v-slot="{ Component }">
+                  <RouterView v-else v-slot="{ Component, route: currentRoute }">
                     <transition name="page" mode="out-in">
-                      <component :is="Component" />
+                      <KeepAlive :include="editCacheNames">
+                        <component
+                          :is="resolveViewComponent(Component, currentRoute)"
+                          :key="currentRoute.fullPath"
+                        />
+                      </KeepAlive>
                     </transition>
                   </RouterView>
                 </template>

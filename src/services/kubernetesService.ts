@@ -230,7 +230,12 @@ export const kubernetesService = {
     await coreEngine.dispatch('restartPod', params)
   },
 
-  async getResourceRaw(params: { namespace: string; kind: string; name: string }): Promise<void> {
+  async getResourceRaw(params: {
+    namespace: string
+    kind: string
+    name: string
+    requestId?: string
+  }): Promise<void> {
     await coreEngine.dispatch('getResourceRaw', params)
   },
 

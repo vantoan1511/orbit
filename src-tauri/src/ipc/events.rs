@@ -172,9 +172,13 @@ pub enum OrbitEvent {
         message: String,
     },
     #[serde(rename = "resourceRawData")]
+    #[serde(rename_all = "camelCase")]
     ResourceRawData {
         kind: String,
         name: String,
+        namespace: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
         data: serde_json::Value,
     },
     #[serde(rename = "portForwardStarted")]
@@ -321,5 +325,31 @@ mod tests {
         assert!(json.contains(r#""state":"degraded""#));
         assert!(json.contains(r#""failingWatchers":3"#));
         assert_eq!(evt.event_name(), "watcherConnectionChanged");
+    }
+
+    #[test]
+    fn test_resource_raw_data_serialization_includes_namespace_and_request_id() {
+        let evt = OrbitEvent::ResourceRawData {
+            kind: "Deployment".to_string(),
+            name: "x".to_string(),
+            namespace: "a".to_string(),
+            request_id: Some("r1".to_string()),
+            data: serde_json::json!({}),
+        };
+        let json = serde_json::to_string(&evt).unwrap();
+        assert!(json.contains(r#""event":"resourceRawData""#));
+        assert!(json.contains(r#""namespace":"a""#));
+        assert!(json.contains(r#""requestId":"r1""#));
+
+        let evt_no_req = OrbitEvent::ResourceRawData {
+            kind: "Deployment".to_string(),
+            name: "x".to_string(),
+            namespace: "a".to_string(),
+            request_id: None,
+            data: serde_json::json!({}),
+        };
+        let json_no_req = serde_json::to_string(&evt_no_req).unwrap();
+        assert!(!json_no_req.contains("requestId"));
+        assert_eq!(evt.event_name(), "resourceRawData");
     }
 }

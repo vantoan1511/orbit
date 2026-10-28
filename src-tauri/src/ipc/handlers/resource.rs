@@ -16,7 +16,8 @@ pub fn get_resource_raw(
         let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
         let kind = get_string(&data, "kind").unwrap_or_default();
         let name = get_string(&data, "name").unwrap_or_default();
-        tracing::debug!(namespace = %namespace, kind = %kind, name = %name, "Fetching raw resource data");
+        let request_id = get_string(&data, "requestId");
+        tracing::debug!(namespace = %namespace, kind = %kind, name = %name, ?request_id, "Fetching raw resource data");
 
         let client = {
             let r_manager = manager.read().await;
@@ -32,6 +33,8 @@ pub fn get_resource_raw(
                         &OrbitEvent::ResourceRawData {
                             kind,
                             name,
+                            namespace,
+                            request_id,
                             data: raw_data,
                         },
                     ).await;

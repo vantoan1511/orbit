@@ -28,6 +28,11 @@ import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
+import {
+  buildEditRequestId,
+  matchesEditResponse,
+  shouldHandleCommandResult
+} from '@/utils/editSession'
 
 const props = defineProps<{
   kind: string
@@ -82,14 +87,75 @@ const formValues = ref({
   annotations: [] as { key: string; value: string }[]
 })
 
-let eventHandler: (data: { name: string; kind: string; data: KubernetesResource }) => void
+let currentRequestId = ''
+let eventHandler: (data: {
+  name: string
+  kind: string
+  namespace?: string
+  requestId?: string
+  data: Record<string, unknown>
+}) => void
 let errorHandler: (data: { message: string }) => void
 let successHandler: (data: { message?: string }) => void
 
+const resetState = () => {
+  rawData.value = null
+  yamlContent.value = ''
+  isYamlMode.value = false
+  isLoading.value = true
+  isSaving.value = false
+  formValues.value = {
+    name: '',
+    namespace: '',
+    labels: [],
+    annotations: []
+  }
+}
+
+const loadResource = () => {
+  currentRequestId = buildEditRequestId(props.kind, props.namespace, props.name)
+  isLoading.value = true
+  kubernetesService.getResourceRaw({
+    namespace: props.namespace,
+    kind: props.kind,
+    name: props.name,
+    requestId: currentRequestId
+  })
+}
+
+watch(
+  () => [props.kind, props.namespace, props.name],
+  () => {
+    resetState()
+    loadResource()
+  }
+)
+
 onMounted(() => {
-  eventHandler = (data: { name: string; kind: string; data: KubernetesResource }) => {
-    if (data.name === props.name && data.kind === props.kind) {
-      rawData.value = data.data
+  eventHandler = (data: {
+    name: string
+    kind: string
+    namespace?: string
+    requestId?: string
+    data: Record<string, unknown>
+  }) => {
+    if (
+      matchesEditResponse(
+        {
+          kind: data.kind,
+          name: data.name,
+          namespace: data.namespace,
+          requestId: data.requestId
+        },
+        {
+          kind: props.kind,
+          namespace: props.namespace,
+          name: props.name,
+          requestId: currentRequestId
+        }
+      )
+    ) {
+      rawData.value = data.data as KubernetesResource
       yamlContent.value = yaml.stringify(rawData.value)
 
       // Populate basic form fields
@@ -115,10 +181,12 @@ onMounted(() => {
 
   errorHandler = () => {
     // Error toast is handled globally by App.vue
+    if (!shouldHandleCommandResult(isSaving.value)) return
     isSaving.value = false
   }
 
   successHandler = () => {
+    if (!shouldHandleCommandResult(isSaving.value)) return
     isSaving.value = false
     router.back()
   }
@@ -128,11 +196,7 @@ onMounted(() => {
   events.on(OrbitEvents.CommandSucceeded, successHandler)
 
   // Fetch initial data
-  kubernetesService.getResourceRaw({
-    namespace: props.namespace,
-    kind: props.kind,
-    name: props.name
-  })
+  loadResource()
 })
 
 onUnmounted(() => {
