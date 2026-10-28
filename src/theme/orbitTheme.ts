@@ -128,6 +128,24 @@ declare module '@primeuix/themes/types/menu' {
   }
 }
 
+declare module '@primeuix/themes/types/tag' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace TagTokenSections {
+    interface Root {
+      backdropBlur?: string
+    }
+  }
+}
+
+declare module '@primeuix/themes/types/badge' {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace BadgeTokenSections {
+    interface Root {
+      backdropBlur?: string
+    }
+  }
+}
+
 const MENU_ITEM_TOKENS = {
   focusBackground: 'var(--bg-hover)',
   borderRadius: 'var(--ui-radius-control)',
@@ -192,6 +210,71 @@ const TOAST_COLOR_SCHEME = {
       focusRing: { color: 'var(--border-strong)', shadow: 'none' }
     }
   }
+}
+
+function buildBadgeSeverity(statusVar: string, softVar: string) {
+  return {
+    background: softVar,
+    color: statusVar
+  }
+}
+
+const BADGE_COLOR_SCHEME = {
+  primary: buildBadgeSeverity('var(--accent)', 'var(--accent-soft)'),
+  secondary: {
+    background: 'var(--bg-hover)',
+    color: 'var(--text-secondary)'
+  },
+  success: buildBadgeSeverity('var(--success)', 'var(--success-soft)'),
+  info: buildBadgeSeverity('var(--info)', 'var(--info-soft)'),
+  warn: buildBadgeSeverity('var(--warning)', 'var(--warning-soft)'),
+  danger: buildBadgeSeverity('var(--danger)', 'var(--danger-soft)'),
+  contrast: {
+    background: 'var(--text-primary)',
+    color: 'var(--bg-app)'
+  }
+}
+
+function buildTagCss({ dt }: StyleOptions): string {
+  const blur = String(dt('tag.root.backdrop.blur') ?? 'var(--ui-glass-blur)')
+  return `
+.p-tag {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  -webkit-backdrop-filter: ${blur};
+  backdrop-filter: ${blur};
+}
+
+.p-tag.p-tag-secondary {
+  border-color: var(--border);
+}
+
+.p-tag.p-tag-contrast {
+  border-color: transparent;
+}
+`
+}
+
+function buildBadgeCss({ dt }: StyleOptions): string {
+  const blur = String(dt('badge.root.backdrop.blur') ?? 'var(--ui-glass-blur)')
+  return `
+.p-badge {
+  border: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+  -webkit-backdrop-filter: ${blur};
+  backdrop-filter: ${blur};
+}
+
+.p-badge-dot {
+  border: none;
+}
+
+.p-badge.p-badge-secondary {
+  border-color: var(--border);
+}
+
+.p-badge.p-badge-contrast {
+  border-color: transparent;
+}
+`
 }
 
 function componentCss(component: string) {
@@ -768,10 +851,55 @@ export const Noir = definePreset(Nora, {
     tag: {
       root: {
         fontSize: '0.75rem',
-        fontWeight: '600',
+        fontWeight: '500',
         padding: '0.125rem 0.5rem',
-        borderRadius: 'var(--ui-radius-control)'
-      }
+        borderRadius: 'var(--ui-radius-control)',
+        roundedBorderRadius: '9999px',
+        gap: '0.25rem',
+        backdropBlur: 'var(--ui-glass-blur)'
+      },
+      icon: {
+        size: '0.75rem'
+      },
+      colorScheme: {
+        light: BADGE_COLOR_SCHEME,
+        dark: BADGE_COLOR_SCHEME
+      },
+      css: buildTagCss
+    },
+    badge: {
+      root: {
+        borderRadius: 'var(--ui-radius-control)',
+        padding: '0 0.375rem',
+        fontSize: '0.6875rem',
+        fontWeight: '600',
+        minWidth: '1.25rem',
+        height: '1.25rem',
+        backdropBlur: 'var(--ui-glass-blur)'
+      },
+      dot: {
+        size: '0.5rem'
+      },
+      sm: {
+        fontSize: '0.625rem',
+        minWidth: '1rem',
+        height: '1rem'
+      },
+      lg: {
+        fontSize: '0.875rem',
+        minWidth: '1.5rem',
+        height: '1.5rem'
+      },
+      xl: {
+        fontSize: '1rem',
+        minWidth: '1.75rem',
+        height: '1.75rem'
+      },
+      colorScheme: {
+        light: BADGE_COLOR_SCHEME,
+        dark: BADGE_COLOR_SCHEME
+      },
+      css: buildBadgeCss
     }
   }
 })
