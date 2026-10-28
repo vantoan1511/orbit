@@ -394,3 +394,162 @@ test('css hook output contains height: var(--ui-control-height-md) for .p-inputt
     'multiselect css must contain compact min-height'
   )
 })
+
+interface ToastSeverityTokens {
+  background: string
+  borderColor: string
+  color: string
+  detailColor: string
+  shadow: string
+  closeButton: {
+    hoverBackground: string
+    focusRing: {
+      color: string
+      shadow: string
+    }
+  }
+}
+
+interface ToastPresetTokens {
+  root: Record<string, string>
+  icon: Record<string, string>
+  content: Record<string, string>
+  text: Record<string, string>
+  summary: Record<string, string>
+  detail: Record<string, string>
+  closeButton: {
+    width: string
+    height: string
+    borderRadius: string
+    focusRing: Record<string, string>
+  }
+  closeIcon: Record<string, string>
+  colorScheme: Record<string, Record<string, ToastSeverityTokens>>
+}
+
+test('Noir preset maps toast root, typography, padding, and dual-theme color schemes to centralized tokens', () => {
+  const components = Noir.components as Record<string, unknown>
+  const toast = components.toast as unknown as ToastPresetTokens
+  assert.ok(toast, 'toast component config must exist')
+
+  // Root geometry & backdrop
+  assert.equal(toast.root.width, '24rem')
+  assert.equal(toast.root.borderRadius, 'var(--ui-radius-card)')
+  assert.equal(toast.root.borderWidth, '1px 1px 1px 3px')
+  assert.equal(toast.root.transitionDuration, '{transition.duration}')
+  assert.equal(toast.root.backdropBlur, 'var(--ui-glass-blur)')
+  assert.equal(toast.root.sheenHighlight, 'var(--ui-sheen-highlight)')
+
+  // Icon sizing
+  assert.equal(toast.icon.size, '1rem')
+
+  // Content padding & layout
+  assert.equal(toast.content.padding, '0.75rem 0.875rem')
+  assert.equal(toast.content.gap, '0.625rem')
+  assert.equal(toast.text.gap, '0.25rem')
+
+  // Typography
+  assert.equal(toast.summary.fontWeight, '600')
+  assert.equal(toast.summary.fontSize, '0.875rem')
+  assert.equal(toast.detail.fontWeight, '400')
+  assert.equal(toast.detail.fontSize, '0.75rem')
+
+  // Close button
+  assert.equal(toast.closeButton.width, '1.5rem')
+  assert.equal(toast.closeButton.height, '1.5rem')
+  assert.equal(toast.closeButton.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(toast.closeButton.focusRing.width, '1px')
+  assert.equal(toast.closeButton.focusRing.style, 'solid')
+  assert.equal(toast.closeButton.focusRing.offset, '1px')
+  assert.equal(toast.closeIcon.size, '0.875rem')
+
+  // Dual-theme color schemes
+  const colorScheme = toast.colorScheme
+  assert.ok(colorScheme, 'toast colorScheme must exist')
+
+  for (const mode of ['light', 'dark']) {
+    const scheme = colorScheme[mode]
+    assert.ok(scheme, `toast colorScheme.${mode} must exist`)
+
+    // Info
+    assert.equal(
+      scheme.info.background,
+      'linear-gradient(var(--info-soft), var(--info-soft)), var(--ui-overlay-bg)'
+    )
+    assert.equal(scheme.info.borderColor, 'var(--border) var(--border) var(--border) var(--info)')
+    assert.equal(scheme.info.color, 'var(--info)')
+    assert.equal(scheme.info.detailColor, 'var(--text-secondary)')
+    assert.equal(scheme.info.shadow, 'var(--ui-card-shadow, var(--shadow))')
+    assert.equal(scheme.info.closeButton.hoverBackground, 'var(--bg-hover)')
+    assert.equal(scheme.info.closeButton.focusRing.color, 'var(--info)')
+    assert.equal(scheme.info.closeButton.focusRing.shadow, 'none')
+
+    // Success
+    assert.equal(
+      scheme.success.background,
+      'linear-gradient(var(--success-soft), var(--success-soft)), var(--ui-overlay-bg)'
+    )
+    assert.equal(
+      scheme.success.borderColor,
+      'var(--border) var(--border) var(--border) var(--success)'
+    )
+    assert.equal(scheme.success.color, 'var(--success)')
+    assert.equal(scheme.success.detailColor, 'var(--text-secondary)')
+    assert.equal(scheme.success.shadow, 'var(--ui-card-shadow, var(--shadow))')
+    assert.equal(scheme.success.closeButton.hoverBackground, 'var(--bg-hover)')
+    assert.equal(scheme.success.closeButton.focusRing.color, 'var(--success)')
+    assert.equal(scheme.success.closeButton.focusRing.shadow, 'none')
+
+    // Warn
+    assert.equal(
+      scheme.warn.background,
+      'linear-gradient(var(--warning-soft), var(--warning-soft)), var(--ui-overlay-bg)'
+    )
+    assert.equal(
+      scheme.warn.borderColor,
+      'var(--border) var(--border) var(--border) var(--warning)'
+    )
+    assert.equal(scheme.warn.color, 'var(--warning)')
+    assert.equal(scheme.warn.detailColor, 'var(--text-secondary)')
+    assert.equal(scheme.warn.shadow, 'var(--ui-card-shadow, var(--shadow))')
+    assert.equal(scheme.warn.closeButton.hoverBackground, 'var(--bg-hover)')
+    assert.equal(scheme.warn.closeButton.focusRing.color, 'var(--warning)')
+    assert.equal(scheme.warn.closeButton.focusRing.shadow, 'none')
+
+    // Error
+    assert.equal(
+      scheme.error.background,
+      'linear-gradient(var(--danger-soft), var(--danger-soft)), var(--ui-overlay-bg)'
+    )
+    assert.equal(
+      scheme.error.borderColor,
+      'var(--border) var(--border) var(--border) var(--danger)'
+    )
+    assert.equal(scheme.error.color, 'var(--danger)')
+    assert.equal(scheme.error.detailColor, 'var(--text-secondary)')
+    assert.equal(scheme.error.shadow, 'var(--ui-card-shadow, var(--shadow))')
+    assert.equal(scheme.error.closeButton.hoverBackground, 'var(--bg-hover)')
+    assert.equal(scheme.error.closeButton.focusRing.color, 'var(--danger)')
+    assert.equal(scheme.error.closeButton.focusRing.shadow, 'none')
+
+    // Secondary
+    assert.equal(scheme.secondary.background, 'var(--ui-overlay-bg)')
+    assert.equal(scheme.secondary.borderColor, 'var(--border)')
+    assert.equal(scheme.secondary.color, 'var(--text-primary)')
+    assert.equal(scheme.secondary.detailColor, 'var(--text-secondary)')
+    assert.equal(scheme.secondary.shadow, 'var(--ui-card-shadow, var(--shadow))')
+    assert.equal(scheme.secondary.closeButton.hoverBackground, 'var(--bg-hover)')
+    assert.equal(scheme.secondary.closeButton.focusRing.color, 'var(--border-strong)')
+    assert.equal(scheme.secondary.closeButton.focusRing.shadow, 'none')
+
+    // Contrast
+    assert.equal(scheme.contrast.background, 'var(--ui-overlay-bg)')
+    assert.equal(scheme.contrast.borderColor, 'var(--border-strong)')
+    assert.equal(scheme.contrast.color, 'var(--text-primary)')
+    assert.equal(scheme.contrast.detailColor, 'var(--text-secondary)')
+    assert.equal(scheme.contrast.shadow, 'var(--ui-card-shadow, var(--shadow))')
+    assert.equal(scheme.contrast.closeButton.hoverBackground, 'var(--bg-hover)')
+    assert.equal(scheme.contrast.closeButton.focusRing.color, 'var(--border-strong)')
+    assert.equal(scheme.contrast.closeButton.focusRing.shadow, 'none')
+  }
+})
