@@ -12,7 +12,7 @@ import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { PodInfo } from '@/types/kubernetes'
 import { sortEventsDesc } from '@/utils/events'
 import { getPodStatusBadgeClass } from '@/utils/severity'
-import { Activity, Shield, SquareTerminal, Terminal } from '@lucide/vue'
+import { Activity, Shield, SquareTerminal, Terminal as TerminalIcon } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
@@ -192,7 +192,7 @@ const viewPodLogs = (containerName?: string) => {
         v-tooltip.top="'View Pod Logs'"
         @click="viewPodLogs()"
       >
-        <Terminal class="w-3.5 h-3.5" />
+        <TerminalIcon class="w-3.5 h-3.5" />
         <span>Logs</span>
       </Button>
     </template>

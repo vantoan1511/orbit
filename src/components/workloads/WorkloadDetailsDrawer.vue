@@ -23,6 +23,7 @@ import {
   getWorkloadStatusBadgeClass
 } from '@/utils/severity'
 import { sortEventsDesc } from '@/utils/events'
+import { Activity, FileCode, Layers, Terminal as TerminalIcon } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
@@ -331,7 +332,7 @@ const copyYaml = async () => {
         v-tooltip="'View Logs'"
         @click="viewLogs"
       >
-        <Terminal class="w-3.5 h-3.5" />
+        <TerminalIcon class="w-3.5 h-3.5" />
         <span>Logs</span>
       </Button>
 
