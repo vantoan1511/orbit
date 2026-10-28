@@ -568,3 +568,81 @@ test('Noir preset maps toast root, typography, padding, and dual-theme color sch
   )
   assert.ok(cssOutput.includes('.p-toast-message'), 'toast css hook must target .p-toast-message')
 })
+
+interface TagPresetTokens {
+  root: Record<string, string>
+  icon?: Record<string, string>
+  colorScheme: Record<string, Record<string, { background: string; color: string }>>
+  css?: ({ dt }: { dt: (path: string) => string }) => string
+}
+
+interface BadgePresetTokens {
+  root: Record<string, string>
+  dot?: Record<string, string>
+  sm?: Record<string, string>
+  lg?: Record<string, string>
+  xl?: Record<string, string>
+  colorScheme: Record<string, Record<string, { background: string; color: string }>>
+  css?: ({ dt }: { dt: (path: string) => string }) => string
+}
+
+test('Noir preset configures Tag component with soft design tokens and adaptive styling', () => {
+  const components = Noir.components as Record<string, unknown>
+  const tag = components.tag as unknown as TagPresetTokens
+  assert.ok(tag, 'tag component config must exist')
+
+  assert.equal(tag.root.borderRadius, 'var(--ui-radius-control)')
+  assert.equal(tag.root.roundedBorderRadius, '9999px')
+
+  const colorScheme = tag.colorScheme
+  assert.ok(colorScheme, 'tag colorScheme must exist')
+
+  assert.equal(colorScheme.light.success.background, 'var(--success-soft)')
+  assert.equal(colorScheme.light.success.color, 'var(--success)')
+  assert.equal(colorScheme.dark.danger.background, 'var(--danger-soft)')
+  assert.equal(colorScheme.dark.danger.color, 'var(--danger)')
+  assert.equal(colorScheme.light.secondary.background, 'var(--bg-hover)')
+  assert.equal(colorScheme.light.secondary.color, 'var(--text-secondary)')
+
+  assert.equal(typeof tag.css, 'function', 'tag must configure a css hook')
+  const stubDt = (p: string) => `var(--p-${p.replace(/\./g, '-')})`
+  const cssOutput = tag.css!({ dt: stubDt })
+  assert.ok(
+    cssOutput.includes('border: 1px solid color-mix(in srgb, currentColor 20%, transparent)'),
+    'tag css hook must contain 1px color-mix border'
+  )
+  assert.ok(
+    cssOutput.includes('backdrop-filter: var(--p-tag-root-backdrop-blur)'),
+    'tag css hook must contain backdrop-filter'
+  )
+})
+
+test('Noir preset configures Badge component with soft design tokens and adaptive styling', () => {
+  const components = Noir.components as Record<string, unknown>
+  const badge = components.badge as unknown as BadgePresetTokens
+  assert.ok(badge, 'badge component config must exist')
+
+  assert.equal(badge.root.borderRadius, 'var(--ui-radius-control)')
+
+  const colorScheme = badge.colorScheme
+  assert.ok(colorScheme, 'badge colorScheme must exist')
+
+  assert.equal(colorScheme.light.info.background, 'var(--info-soft)')
+  assert.equal(colorScheme.light.info.color, 'var(--info)')
+  assert.equal(colorScheme.dark.warn.background, 'var(--warning-soft)')
+  assert.equal(colorScheme.dark.warn.color, 'var(--warning)')
+
+  assert.equal(typeof badge.css, 'function', 'badge must configure a css hook')
+  const stubDt = (p: string) => `var(--p-${p.replace(/\./g, '-')})`
+  const cssOutput = badge.css!({ dt: stubDt })
+  assert.ok(cssOutput.includes('.p-badge'), 'badge css hook must target .p-badge')
+  assert.ok(
+    cssOutput.includes('border: 1px solid color-mix(in srgb, currentColor 20%, transparent)'),
+    'badge css hook must contain 1px color-mix border'
+  )
+  assert.ok(
+    cssOutput.includes('backdrop-filter: var(--p-badge-root-backdrop-blur)'),
+    'badge css hook must contain backdrop-filter'
+  )
+  assert.ok(cssOutput.includes('.p-badge-dot'), 'badge css hook must target .p-badge-dot')
+})
