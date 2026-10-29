@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  applyMetadataFormValuesToResource,
   buildEditRequestId,
   extractResourceMetadataFormValues,
   matchesEditResponse,
   matchesSaveResult,
-  shouldHandleCommandResult
+  shouldHandleCommandResult,
+  transitionEditMode
 } from '../editSession.ts'
 
 test('matchesEditResponse matches by requestId equality even if namespace missing', () => {
@@ -192,4 +194,184 @@ test('extractResourceMetadataFormValues extracts name, namespace, labels, annota
   assert.equal(partialValues.namespace, '')
   assert.deepEqual(partialValues.labels, [])
   assert.deepEqual(partialValues.annotations, [])
+})
+
+test('applyMetadataFormValuesToResource updates labels and annotations immutably while preserving spec and other metadata fields', () => {
+  const cronJob = {
+    apiVersion: 'batch/v1',
+    kind: 'CronJob',
+    metadata: {
+      name: 'nightly-backup',
+      namespace: 'ops',
+      uid: 'uid-1234',
+      creationTimestamp: '2026-01-01T00:00:00Z',
+      labels: { env: 'production', old: 'to-remove' }
+    },
+    spec: {
+      schedule: '0 0 * * *',
+      jobTemplate: {
+        spec: {
+          template: {
+            spec: {
+              containers: [{ name: 'backup', image: 'backup:v1' }]
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const formValues = {
+    name: 'nightly-backup',
+    namespace: 'ops',
+    labels: [
+      { key: 'env', value: 'staging' },
+      { key: 'tier', value: 'backend' },
+      { key: '   ', value: 'ignored-empty-key' }
+    ],
+    annotations: [
+      { key: 'orbit.dev/managed-by', value: 'admin' },
+      { key: '', value: 'ignored' }
+    ]
+  }
+
+  const updated = applyMetadataFormValuesToResource(cronJob, formValues)
+
+  // Verify immutability
+  assert.notEqual(updated, cronJob)
+  assert.notEqual(updated.metadata, cronJob.metadata)
+
+  // Verify spec and original metadata preservation
+  assert.deepEqual(updated.spec, cronJob.spec)
+  assert.equal(updated.metadata.name, 'nightly-backup')
+  assert.equal(updated.metadata.namespace, 'ops')
+  assert.equal(updated.metadata.uid, 'uid-1234')
+  assert.equal(updated.metadata.creationTimestamp, '2026-01-01T00:00:00Z')
+
+  // Verify updated labels & annotations (empty/whitespace keys stripped)
+  assert.deepEqual(updated.metadata.labels, {
+    env: 'staging',
+    tier: 'backend'
+  })
+  assert.deepEqual(updated.metadata.annotations, {
+    'orbit.dev/managed-by': 'admin'
+  })
+})
+
+test('transitionEditMode Form -> YAML serializes latest rawData including Deployment and fallback edits', () => {
+  const rawData = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: 'web',
+      namespace: 'default',
+      labels: { app: 'web' }
+    },
+    spec: {
+      replicas: 3
+    }
+  }
+
+  const result = transitionEditMode({
+    targetYamlMode: true,
+    rawData,
+    yamlContent: '',
+    hasCustomForm: true
+  })
+
+  assert.equal(result.ok, true)
+  if (result.ok) {
+    assert.equal(result.isYamlMode, true)
+    assert.deepEqual(result.rawData, rawData)
+    assert.match(result.yamlContent, /replicas: 3/)
+    assert.match(result.yamlContent, /name: web/)
+  }
+})
+
+test('transitionEditMode YAML -> Form parses valid YAML, updates rawData, and refreshes formValues for fallback resources', () => {
+  const oldData = {
+    apiVersion: 'v1',
+    kind: 'ConfigMap',
+    metadata: { name: 'settings', namespace: 'default' }
+  }
+
+  const editedYaml = `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: default
+  labels:
+    app.kubernetes.io/name: orbit
+  annotations:
+    description: main config
+data:
+  theme: noir
+`
+
+  const result = transitionEditMode({
+    targetYamlMode: false,
+    rawData: oldData,
+    yamlContent: editedYaml,
+    hasCustomForm: false
+  })
+
+  assert.equal(result.ok, true)
+  if (result.ok) {
+    assert.equal(result.isYamlMode, false)
+    assert.equal(result.rawData?.kind, 'ConfigMap')
+    assert.deepEqual(result.rawData?.data, { theme: 'noir' })
+    assert.ok(
+      result.formValues,
+      'formValues must be populated for fallback resources without custom form'
+    )
+    assert.equal(result.formValues?.name, 'settings')
+    assert.deepEqual(result.formValues?.labels, [{ key: 'app.kubernetes.io/name', value: 'orbit' }])
+    assert.deepEqual(result.formValues?.annotations, [{ key: 'description', value: 'main config' }])
+  }
+})
+
+test('transitionEditMode YAML -> Form rejects invalid YAML syntax or scalar/array YAML and stays in YAML mode', () => {
+  const malformedYaml = `apiVersion: v1
+  bad: [unclosed`
+
+  const resultInvalid = transitionEditMode({
+    targetYamlMode: false,
+    rawData: null,
+    yamlContent: malformedYaml,
+    hasCustomForm: false
+  })
+
+  assert.equal(resultInvalid.ok, false)
+  assert.equal(resultInvalid.isYamlMode, true)
+  if (!resultInvalid.ok) {
+    assert.ok(resultInvalid.errorMessage.length > 0)
+  }
+
+  const scalarYaml = 'just-a-string'
+  const resultScalar = transitionEditMode({
+    targetYamlMode: false,
+    rawData: null,
+    yamlContent: scalarYaml,
+    hasCustomForm: false
+  })
+
+  assert.equal(resultScalar.ok, false)
+  assert.equal(resultScalar.isYamlMode, true)
+  if (!resultScalar.ok) {
+    assert.match(resultScalar.errorMessage, /object/i)
+  }
+
+  const arrayYaml = '- item1\n- item2'
+  const resultArray = transitionEditMode({
+    targetYamlMode: false,
+    rawData: null,
+    yamlContent: arrayYaml,
+    hasCustomForm: false
+  })
+
+  assert.equal(resultArray.ok, false)
+  assert.equal(resultArray.isYamlMode, true)
+  if (!resultArray.ok) {
+    assert.match(resultArray.errorMessage, /object/i)
+  }
 })

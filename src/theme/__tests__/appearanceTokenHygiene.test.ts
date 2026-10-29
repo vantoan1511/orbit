@@ -75,6 +75,9 @@ const ADAPTED_COMPONENTS = [
   'src/components/shared/ContainerPortsEditor.vue',
   'src/components/shared/KeyValueEditor.vue',
   'src/components/shared/StringListEditor.vue',
+  'src/components/shared/YamlCodeEditor.vue',
+  'src/components/shared/YamlCodeEditorLoading.vue',
+  'src/views/EditView.vue',
 
   // Shared Badges & Metric Cards
   'src/components/shared/StatusBadge.vue',

@@ -159,7 +159,6 @@ declare module 'vue' {
     TabPanels: typeof import('primevue/tabpanels')['default']
     Tabs: typeof import('primevue/tabs')['default']
     Tag: typeof import('primevue/tag')['default']
-    Terminal: typeof import('primevue/terminal')['default']
     TerminalPanel: typeof import('./src/components/terminal/TerminalPanel.vue')['default']
     TerminalTab: typeof import('./src/components/terminal/TerminalTab.vue')['default']
     ThemeModeSelector: typeof import('./src/components/settings/appearance/ThemeModeSelector.vue')['default']
@@ -177,6 +176,8 @@ declare module 'vue' {
     WorkloadPodsTab: typeof import('./src/components/workloads/WorkloadPodsTab.vue')['default']
     WorkloadSummaries: typeof import('./src/components/dashboard/WorkloadSummaries.vue')['default']
     WorkloadYamlTab: typeof import('./src/components/workloads/WorkloadYamlTab.vue')['default']
+    YamlCodeEditor: typeof import('./src/components/shared/YamlCodeEditor.vue')['default']
+    YamlCodeEditorLoading: typeof import('./src/components/shared/YamlCodeEditorLoading.vue')['default']
   }
   export interface GlobalDirectives {
     Tooltip: typeof import('primevue/tooltip')['default']

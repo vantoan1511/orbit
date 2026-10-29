@@ -1,6 +1,7 @@
 /**
  * Utility functions for edit resource session management and event correlation.
  */
+import * as yaml from 'yaml'
 import type { KubernetesResource } from '../types/kubernetes.ts'
 
 let counter = 0
@@ -120,4 +121,112 @@ export function extractResourceMetadataFormValues(
   }))
 
   return { name, namespace, labels, annotations }
+}
+
+export function applyMetadataFormValuesToResource(
+  resource: KubernetesResource | Record<string, unknown> | null | undefined,
+  formValues: ResourceMetadataFormValues
+): KubernetesResource {
+  const baseResource = (resource && typeof resource === 'object' ? resource : {}) as Record<
+    string,
+    unknown
+  >
+  const existingMetadata = (
+    baseResource.metadata && typeof baseResource.metadata === 'object' ? baseResource.metadata : {}
+  ) as Record<string, unknown>
+
+  const labels: Record<string, string> = {}
+  for (const item of formValues.labels || []) {
+    const trimmedKey = typeof item?.key === 'string' ? item.key.trim() : ''
+    if (trimmedKey) {
+      labels[trimmedKey] = typeof item.value === 'string' ? item.value : String(item.value ?? '')
+    }
+  }
+
+  const annotations: Record<string, string> = {}
+  for (const item of formValues.annotations || []) {
+    const trimmedKey = typeof item?.key === 'string' ? item.key.trim() : ''
+    if (trimmedKey) {
+      annotations[trimmedKey] =
+        typeof item.value === 'string' ? item.value : String(item.value ?? '')
+    }
+  }
+
+  const updatedMetadata: Record<string, unknown> = {
+    ...existingMetadata,
+    name:
+      formValues.name || (typeof existingMetadata.name === 'string' ? existingMetadata.name : ''),
+    namespace:
+      formValues.namespace ||
+      (typeof existingMetadata.namespace === 'string' ? existingMetadata.namespace : ''),
+    labels,
+    annotations
+  }
+
+  return {
+    ...baseResource,
+    metadata: updatedMetadata
+  } as KubernetesResource
+}
+
+export interface EditModeTransitionInput {
+  targetYamlMode: boolean
+  rawData: KubernetesResource | null
+  yamlContent: string
+  hasCustomForm: boolean
+}
+
+export type EditModeTransitionResult =
+  | {
+      ok: true
+      isYamlMode: boolean
+      rawData: KubernetesResource | null
+      yamlContent: string
+      formValues?: ResourceMetadataFormValues
+    }
+  | {
+      ok: false
+      isYamlMode: true
+      errorMessage: string
+    }
+
+export function transitionEditMode(input: EditModeTransitionInput): EditModeTransitionResult {
+  if (input.targetYamlMode) {
+    const nextYaml = input.rawData ? yaml.stringify(input.rawData) : input.yamlContent
+    return {
+      ok: true,
+      isYamlMode: true,
+      rawData: input.rawData,
+      yamlContent: nextYaml
+    }
+  }
+
+  try {
+    const parsed = yaml.parse(input.yamlContent)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        ok: false,
+        isYamlMode: true,
+        errorMessage: 'Parsed YAML must be a valid Kubernetes object'
+      }
+    }
+
+    const kubernetesResource = parsed as KubernetesResource
+    return {
+      ok: true,
+      isYamlMode: false,
+      rawData: kubernetesResource,
+      yamlContent: input.yamlContent,
+      formValues: input.hasCustomForm
+        ? undefined
+        : extractResourceMetadataFormValues(kubernetesResource)
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    return {
+      ok: false,
+      isYamlMode: true,
+      errorMessage: message
+    }
+  }
 }
