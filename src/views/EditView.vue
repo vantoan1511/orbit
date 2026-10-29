@@ -44,17 +44,30 @@ const YamlCodeEditor = defineAsyncComponent({
   delay: 0
 })
 
-const props = defineProps<{
-  kind: string
-  namespace: string
-  name: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    kind?: string
+    namespace?: string
+    name?: string
+  }>(),
+  {
+    kind: '',
+    namespace: '',
+    name: ''
+  }
+)
 
 const router = useRouter()
 const route = useRoute()
 const tabsStore = useTabsStore()
 const toast = useToast()
 const { isDark } = useTheme()
+
+const resourceKind = computed(() => (props.kind || (route.params.kind as string) || '').trim())
+const resourceNamespace = computed(() =>
+  (props.namespace || (route.params.namespace as string) || '').trim()
+)
+const resourceName = computed(() => (props.name || (route.params.name as string) || '').trim())
 
 const rawData = ref<KubernetesResource | null>(null)
 const formComponentMap: Record<string, Component> = {
@@ -70,7 +83,7 @@ const formComponentMap: Record<string, Component> = {
   [KUBERNETES_RESOURCE_KIND.Secret]: SecretEditForm,
   [KUBERNETES_RESOURCE_KIND.Namespace]: NamespaceEditForm
 }
-const activeFormComponent = computed(() => formComponentMap[props.kind] || null)
+const activeFormComponent = computed(() => formComponentMap[resourceKind.value] || null)
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -132,21 +145,29 @@ const resetState = () => {
 }
 
 const loadResource = () => {
-  currentRequestId = buildEditRequestId(props.kind, props.namespace, props.name)
+  const kind = resourceKind.value
+  const namespace = resourceNamespace.value
+  const name = resourceName.value
+  if (!kind || !name) {
+    return
+  }
+  currentRequestId = buildEditRequestId(kind, namespace, name)
   isLoading.value = true
   kubernetesService.getResourceRaw({
-    namespace: props.namespace,
-    kind: props.kind,
-    name: props.name,
+    namespace,
+    kind,
+    name,
     requestId: currentRequestId
   })
 }
 
 watch(
-  () => [props.kind, props.namespace, props.name],
+  () => [resourceKind.value, resourceNamespace.value, resourceName.value],
   () => {
     resetState()
-    loadResource()
+    if (resourceKind.value && resourceName.value) {
+      loadResource()
+    }
   }
 )
 
@@ -167,9 +188,9 @@ onMounted(() => {
           requestId: data.requestId
         },
         {
-          kind: props.kind,
-          namespace: props.namespace,
-          name: props.name,
+          kind: resourceKind.value,
+          namespace: resourceNamespace.value,
+          name: resourceName.value,
           requestId: currentRequestId
         }
       )
@@ -183,9 +204,9 @@ onMounted(() => {
     if (
       !matchesSaveResult(payload, {
         isSaving: isSaving.value,
-        kind: props.kind,
-        namespace: props.namespace,
-        name: props.name,
+        kind: resourceKind.value,
+        namespace: resourceNamespace.value,
+        name: resourceName.value,
         requestId: activeSaveRequestId
       })
     ) {
@@ -249,9 +270,12 @@ const handleModeChange = (targetYamlMode: boolean) => {
 }
 
 const saveChanges = () => {
-  if (isSaving.value || isLoading.value) return
+  const kind = resourceKind.value
+  const namespace = resourceNamespace.value
+  const name = resourceName.value
+  if (!kind || !name || isSaving.value || isLoading.value) return
   isSaving.value = true
-  activeSaveRequestId = buildEditRequestId(props.kind, props.namespace, props.name)
+  activeSaveRequestId = buildEditRequestId(kind, namespace, name)
   try {
     let updatedData: KubernetesResource
     if (isYamlMode.value) {
@@ -260,9 +284,9 @@ const saveChanges = () => {
       updatedData = rawData.value || {}
     }
     kubernetesService.applyResource({
-      namespace: props.namespace,
-      kind: props.kind,
-      name: props.name,
+      namespace,
+      kind,
+      name,
       data: updatedData,
       requestId: activeSaveRequestId
     })
@@ -307,13 +331,13 @@ const handleFallbackMetadataChange = () => {
         </Button>
         <div class="flex flex-col">
           <h1 class="text-lg font-bold tracking-tight text-primary leading-tight">
-            Edit {{ props.kind }}
+            Edit {{ resourceKind }}
           </h1>
           <span class="text-xs font-medium text-muted-color font-mono">
             {{
-              props.namespace && props.namespace !== '-'
-                ? `${props.namespace} / ${props.name}`
-                : props.name
+              resourceNamespace && resourceNamespace !== '-'
+                ? `${resourceNamespace} / ${resourceName}`
+                : resourceName
             }}
           </span>
         </div>

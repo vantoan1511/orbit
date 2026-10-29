@@ -251,6 +251,7 @@ onUnmounted(() => {
                         <component
                           :is="resolveViewComponent(Component, currentRoute)"
                           :key="currentRoute.fullPath"
+                          v-bind="currentRoute.params"
                         />
                       </KeepAlive>
                     </transition>

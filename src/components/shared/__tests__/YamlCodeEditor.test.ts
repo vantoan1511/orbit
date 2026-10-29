@@ -109,3 +109,25 @@ test('EditView lazy-loads YamlCodeEditor via defineAsyncComponent and uses contr
     'Must not use uncontrolled v-model on ToggleSwitch'
   )
 })
+
+test('AppLayout forwards route params to keep-alive view and EditView guards against empty resource params', () => {
+  const appLayoutPath = path.resolve('src/components/layout/AppLayout.vue')
+  const appLayoutContent = fs.readFileSync(appLayoutPath, 'utf-8')
+
+  assert.ok(
+    appLayoutContent.includes('v-bind="currentRoute.params"'),
+    'AppLayout must pass v-bind="currentRoute.params" to resolveViewComponent host'
+  )
+
+  const editViewPath = path.resolve('src/views/EditView.vue')
+  const editViewContent = fs.readFileSync(editViewPath, 'utf-8')
+
+  assert.ok(
+    editViewContent.includes('resourceKind') && editViewContent.includes('resourceName'),
+    'EditView must compute effective resource params with fallback'
+  )
+  assert.ok(
+    editViewContent.includes('if (!kind || !name)'),
+    'loadResource must guard against missing kind or name before calling getResourceRaw'
+  )
+})
