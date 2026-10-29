@@ -202,6 +202,7 @@
   --ui-tooltip-color: var(--text-primary);
   --ui-tooltip-border: var(--border);
   --ui-tooltip-blur: var(--ui-overlay-blur, var(--ui-glass-blur));
+  --ui-tooltip-sheen: var(--ui-sheen-highlight);
   --ui-tooltip-shadow: var(--shadow-sm);
   --ui-tooltip-font-size: var(--ui-font-size-xs);
   --ui-tooltip-line-height: var(--ui-line-height-xs);

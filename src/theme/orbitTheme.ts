@@ -137,6 +137,7 @@ declare module '@primeuix/themes/types/tooltip' {
       fontWeight?: string
       borderColor?: string
       backdropBlur?: string
+      sheenHighlight?: string
     }
   }
 }
@@ -291,9 +292,8 @@ function buildBadgeCss({ dt }: StyleOptions): string {
 }
 
 function buildTooltipCss({ dt }: StyleOptions): string {
-  const blur = String(
-    dt('tooltip.root.backdrop.blur') ?? 'var(--ui-overlay-blur, var(--ui-glass-blur))'
-  )
+  const blur = String(dt('tooltip.root.backdrop.blur') ?? 'var(--ui-overlay-blur)')
+  const sheen = String(dt('tooltip.root.sheen.highlight') ?? 'var(--ui-sheen-highlight)')
   return `
 .p-tooltip-text {
   font-family: var(--font-ui);
@@ -301,9 +301,15 @@ function buildTooltipCss({ dt }: StyleOptions): string {
   line-height: ${String(dt('tooltip.root.line.height') ?? 'var(--ui-line-height-xs)')};
   font-weight: ${String(dt('tooltip.root.font.weight') ?? '500')};
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
+  box-shadow: ${String(dt('tooltip.root.shadow') ?? 'var(--shadow-sm)')};
+  background-color: var(--ui-overlay-bg);
+  background-image: ${sheen};
   -webkit-backdrop-filter: ${blur};
   backdrop-filter: ${blur};
+}
+
+.p-tooltip-arrow {
+  display: none;
 }
 `
 }
@@ -887,7 +893,8 @@ export const Noir = definePreset(Nora, {
         fontSize: 'var(--ui-font-size-xs)',
         lineHeight: 'var(--ui-line-height-xs)',
         fontWeight: '500',
-        backdropBlur: 'var(--ui-overlay-blur, var(--ui-glass-blur))'
+        backdropBlur: 'var(--ui-overlay-blur)',
+        sheenHighlight: 'var(--ui-sheen-highlight)'
       },
       colorScheme: {
         light: {

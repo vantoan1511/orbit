@@ -660,6 +660,8 @@ test('Noir preset configures Tooltip component with compact typography and adapt
   assert.equal(root.background, 'var(--ui-overlay-bg)')
   assert.equal(root.color, 'var(--text-primary)')
   assert.equal(root.borderColor, 'var(--border)')
+  assert.equal(root.backdropBlur, 'var(--ui-overlay-blur)')
+  assert.equal(root.sheenHighlight, 'var(--ui-sheen-highlight)')
 
   const colorScheme = tooltip.colorScheme as Record<string, Record<string, Record<string, string>>>
   assert.ok(colorScheme, 'tooltip colorScheme must exist')
@@ -685,8 +687,20 @@ test('Noir preset configures Tooltip component with compact typography and adapt
     'tooltip css must configure 1px border'
   )
   assert.ok(
+    cssOutput.includes('background-color: var(--ui-overlay-bg)'),
+    'tooltip css must configure background-color via var(--ui-overlay-bg)'
+  )
+  assert.ok(
+    cssOutput.includes('background-image: var(--p-tooltip-root-sheen-highlight)'),
+    'tooltip css must configure sheen highlight background-image'
+  )
+  assert.ok(
     cssOutput.includes('backdrop-filter: var(--p-tooltip-root-backdrop-blur)'),
     'tooltip css must configure backdrop-filter'
+  )
+  assert.ok(
+    cssOutput.includes('.p-tooltip-arrow') && cssOutput.includes('display: none'),
+    'tooltip css must hide border triangle arrow for clean glass blur aesthetic'
   )
 })
 

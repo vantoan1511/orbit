@@ -438,6 +438,7 @@ test('base.css :root and .my-app-dark define complete typography scale design to
     '--ui-tooltip-color',
     '--ui-tooltip-border',
     '--ui-tooltip-blur',
+    '--ui-tooltip-sheen',
     '--ui-tooltip-shadow',
     '--ui-tooltip-font-size',
     '--ui-tooltip-line-height',
