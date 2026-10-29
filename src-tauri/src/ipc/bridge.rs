@@ -34,7 +34,7 @@ impl Bridge {
             emitter
                 .emit_orbit_event(event)
                 .await
-                .map_err(|e| Box::<dyn std::error::Error>::from(e))?;
+                .map_err(Box::<dyn std::error::Error>::from)?;
         }
         Ok(())
     }

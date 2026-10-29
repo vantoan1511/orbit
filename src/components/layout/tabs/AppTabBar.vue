@@ -51,14 +51,9 @@ const handleMoveTabRight = (tabId: string) => {
 }
 
 const handleCloseTab = (tabId: string) => {
-  const wasActive = tabsStore.activeTabId === tabId
-  tabsStore.closeTab(tabId)
-  if (wasActive) {
-    if (tabsStore.activeTab) {
-      void router.push(tabsStore.activeTab.route)
-    } else {
-      void router.push('/')
-    }
+  const nextRoute = tabsStore.closeTabAndResolveRoute(tabId)
+  if (nextRoute) {
+    void router.push(nextRoute)
   }
 }
 

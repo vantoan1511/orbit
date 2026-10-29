@@ -281,10 +281,21 @@ const eventHandlerMap = new Map<string, Set<EventHandler>>()
 const windowHandlerMap = new Map<string, Map<EventHandler, (evt: unknown) => void>>()
 const tauriUnlistenMap = new Map<string, Map<EventHandler, () => void>>()
 
+export type TauriListenFn = <T>(
+  event: string,
+  handler: (evt: { payload: T }) => void
+) => Promise<() => void>
+
+let mockListenFn: TauriListenFn | null = null
+
 /**
  * Safe wrapper for typed events API
  */
 export const events = {
+  __setMockListen(mock: TauriListenFn | null): void {
+    mockListenFn = mock
+  },
+
   async on<K extends OrbitEventName>(
     event: K,
     handler: (data: OrbitEventMap[K]) => void
@@ -319,10 +330,27 @@ export const events = {
 
     if (isTauriEnvironment()) {
       try {
-        const { listen } = await import('@tauri-apps/api/event')
-        const unlisten = await listen<OrbitEventMap[K]>(event, (evt) => {
+        const listenFn: TauriListenFn =
+          mockListenFn ??
+          ((await import('@tauri-apps/api/event')).listen as unknown as TauriListenFn)
+
+        const existingUnlisten = tauriUnlistenMap.get(event)?.get(handler as EventHandler)
+        if (existingUnlisten) {
+          existingUnlisten()
+          tauriUnlistenMap.get(event)?.delete(handler as EventHandler)
+        }
+
+        const unlisten = await listenFn<OrbitEventMap[K]>(event, (evt) => {
+          if (!eventHandlerMap.get(event)?.has(handler as EventHandler)) {
+            return
+          }
           handler(evt.payload)
         })
+
+        if (!eventHandlerMap.get(event)?.has(handler as EventHandler)) {
+          unlisten()
+          return
+        }
 
         let tauriHandlers = tauriUnlistenMap.get(event)
         if (!tauriHandlers) {

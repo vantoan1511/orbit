@@ -764,10 +764,9 @@ pub fn close_terminal(data: Option<Value>) {
             if let Some(cancel) = session.cancel_tx.take() {
                 let _ = cancel.send(());
             }
-            if let TerminalSender::Local { child, .. } = &session.sender {
-                if let Ok(mut c) = child.lock() {
-                    let _ = c.kill();
-                }
+            if let TerminalSender::Local { child, .. } = &session.sender
+                && let Ok(mut c) = child.lock() {
+                let _ = c.kill();
             }
         }
     });
@@ -787,10 +786,9 @@ pub async fn close_all_pod_terminals() {
         })
         .collect();
     for id in pod_ids {
-        if let Some(mut session) = sessions.remove(&id) {
-            if let Some(cancel) = session.cancel_tx.take() {
-                let _ = cancel.send(());
-            }
+        if let Some(mut session) = sessions.remove(&id)
+            && let Some(cancel) = session.cancel_tx.take() {
+            let _ = cancel.send(());
         }
     }
 }

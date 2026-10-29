@@ -194,7 +194,18 @@ export interface OrbitEventMap {
   resourceRawData: {
     kind: string
     name: string
+    namespace: string
+    requestId?: string
     data: Record<string, unknown>
+  }
+  resourceApplyFinished: {
+    kind: string
+    name: string
+    namespace: string
+    requestId?: string
+    success: boolean
+    data?: Record<string, unknown>
+    error?: string
   }
   portForwardStarted: {
     id: string
@@ -275,6 +286,7 @@ export const OrbitEvents = {
   UpdateInstallFailed: 'updateInstallFailed',
   CommandSucceeded: 'commandSucceeded',
   ResourceRawData: 'resourceRawData',
+  ResourceApplyFinished: 'resourceApplyFinished',
   PortForwardStarted: 'portForwardStarted',
   PortForwardStopped: 'portForwardStopped',
   PortForwardsUpdated: 'portForwardsUpdated',
