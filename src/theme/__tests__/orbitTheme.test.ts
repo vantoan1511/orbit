@@ -451,9 +451,9 @@ test('Noir preset maps toast root, typography, padding, and dual-theme color sch
 
   // Typography
   assert.equal(toast.summary.fontWeight, '600')
-  assert.equal(toast.summary.fontSize, '0.875rem')
+  assert.equal(toast.summary.fontSize, 'var(--ui-font-size-base)')
   assert.equal(toast.detail.fontWeight, '400')
-  assert.equal(toast.detail.fontSize, '0.75rem')
+  assert.equal(toast.detail.fontSize, 'var(--ui-font-size-xs)')
 
   // Close button
   assert.equal(toast.closeButton.width, '1.5rem')
@@ -645,4 +645,86 @@ test('Noir preset configures Badge component with soft design tokens and adaptiv
     'badge css hook must contain backdrop-filter'
   )
   assert.ok(cssOutput.includes('.p-badge-dot'), 'badge css hook must target .p-badge-dot')
+})
+
+test('Noir preset configures Tooltip component with compact typography and adaptive styling', () => {
+  const components = Noir.components as Record<string, unknown>
+  const tooltip = components.tooltip as Record<string, unknown>
+  assert.ok(tooltip, 'tooltip component config must exist')
+
+  const root = tooltip.root as Record<string, string>
+  assert.ok(root, 'tooltip.root must exist')
+  assert.equal(root.fontSize, 'var(--ui-font-size-xs)')
+  assert.equal(root.lineHeight, 'var(--ui-line-height-xs)')
+  assert.equal(root.fontWeight, '500')
+  assert.equal(root.background, 'var(--ui-overlay-bg)')
+  assert.equal(root.color, 'var(--text-primary)')
+  assert.equal(root.borderColor, 'var(--border)')
+  assert.equal(root.backdropBlur, 'var(--ui-overlay-blur)')
+  assert.equal(root.sheenHighlight, 'var(--ui-sheen-highlight)')
+
+  const colorScheme = tooltip.colorScheme as Record<string, Record<string, Record<string, string>>>
+  assert.ok(colorScheme, 'tooltip colorScheme must exist')
+  assert.equal(colorScheme.light.root.background, 'var(--ui-overlay-bg)')
+  assert.equal(colorScheme.light.root.color, 'var(--text-primary)')
+  assert.equal(colorScheme.dark.root.background, 'var(--ui-overlay-bg)')
+  assert.equal(colorScheme.dark.root.color, 'var(--text-primary)')
+
+  assert.equal(typeof tooltip.css, 'function', 'tooltip must configure a css hook')
+  const stubDt = (p: string) => `var(--p-${p.replace(/\./g, '-')})`
+  const cssOutput = (tooltip.css as (opt: { dt: (p: string) => string }) => string)({ dt: stubDt })
+  assert.ok(cssOutput.includes('.p-tooltip-text'), 'tooltip css must target .p-tooltip-text')
+  assert.ok(
+    cssOutput.includes('font-size: var(--p-tooltip-root-font-size)'),
+    'tooltip css must configure font-size via dt'
+  )
+  assert.ok(
+    cssOutput.includes('line-height: var(--p-tooltip-root-line-height)'),
+    'tooltip css must configure line-height via dt'
+  )
+  assert.ok(
+    cssOutput.includes('border: 1px solid var(--border)'),
+    'tooltip css must configure 1px border'
+  )
+  assert.ok(
+    cssOutput.includes('background-color: var(--ui-overlay-bg)'),
+    'tooltip css must configure background-color via var(--ui-overlay-bg)'
+  )
+  assert.ok(
+    cssOutput.includes('background-image: var(--p-tooltip-root-sheen-highlight)'),
+    'tooltip css must configure sheen highlight background-image'
+  )
+  assert.ok(
+    cssOutput.includes('backdrop-filter: var(--p-tooltip-root-backdrop-blur)'),
+    'tooltip css must configure backdrop-filter'
+  )
+  assert.ok(
+    cssOutput.includes('.p-tooltip-arrow') && cssOutput.includes('display: none'),
+    'tooltip css must hide border triangle arrow for clean glass blur aesthetic'
+  )
+})
+
+test('Noir preset components harmonize typography with centralized design tokens', () => {
+  const components = Noir.components as Record<string, Record<string, unknown>>
+
+  const tag = components.tag as Record<string, Record<string, string>>
+  assert.equal(tag.root.fontSize, 'var(--ui-font-size-xs)')
+  assert.equal(tag.icon.size, 'var(--ui-font-size-xs)')
+
+  const badge = components.badge as Record<string, Record<string, string>>
+  assert.equal(badge.root.fontSize, 'var(--ui-font-size-2xs)')
+  assert.equal(badge.sm.fontSize, 'var(--ui-font-size-3xs)')
+  assert.equal(badge.lg.fontSize, 'var(--ui-font-size-base)')
+
+  const card = components.card as Record<string, Record<string, string>>
+  assert.equal(card.title.fontSize, 'var(--ui-font-size-base)')
+
+  const dialog = components.dialog as Record<string, Record<string, string>>
+  assert.ok(dialog.title, 'dialog.title must exist')
+  assert.equal(dialog.title.fontSize, 'var(--ui-font-size-base)')
+  assert.equal(dialog.title.fontWeight, '600')
+
+  const toast = components.toast as Record<string, Record<string, string>>
+  assert.equal(toast.summary.fontSize, 'var(--ui-font-size-base)')
+  assert.equal(toast.detail.fontSize, 'var(--ui-font-size-xs)')
 })
