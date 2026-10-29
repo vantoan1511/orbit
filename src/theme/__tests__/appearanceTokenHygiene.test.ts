@@ -388,3 +388,72 @@ test('Vue views and components use design-token-aligned corner radius utilities 
     `Found hardcoded corner-radius classes or ! modifiers in Vue files:\n${violations.slice(0, 30).join('\n')}${violations.length > 30 ? `\n...and ${violations.length - 30} more` : ''}`
   )
 })
+
+test('base.css :root and .my-app-dark define complete typography scale design tokens and tooltip tokens', () => {
+  const baseCssPath = path.resolve(process.cwd(), 'src/assets/base.css')
+  const content = fs.readFileSync(baseCssPath, 'utf-8')
+
+  // Typography scale tokens
+  const requiredFontTokens = [
+    '--ui-font-size-3xs',
+    '--ui-font-size-2xs',
+    '--ui-font-size-xs',
+    '--ui-font-size-sm',
+    '--ui-font-size-base',
+    '--ui-font-size-md',
+    '--ui-font-size-lg',
+    '--ui-font-size-xl'
+  ]
+  for (const token of requiredFontTokens) {
+    assert.ok(content.includes(`${token}:`), `base.css must define ${token}`)
+  }
+
+  // Line height tokens
+  const requiredLineHeights = [
+    '--ui-line-height-3xs',
+    '--ui-line-height-2xs',
+    '--ui-line-height-xs',
+    '--ui-line-height-sm',
+    '--ui-line-height-base',
+    '--ui-line-height-lg'
+  ]
+  for (const token of requiredLineHeights) {
+    assert.ok(content.includes(`${token}:`), `base.css must define ${token}`)
+  }
+
+  // Font weights
+  const requiredWeights = [
+    '--ui-font-weight-normal',
+    '--ui-font-weight-medium',
+    '--ui-font-weight-semibold',
+    '--ui-font-weight-bold'
+  ]
+  for (const token of requiredWeights) {
+    assert.ok(content.includes(`${token}:`), `base.css must define ${token}`)
+  }
+
+  // Tooltip tokens
+  const requiredTooltipTokens = [
+    '--ui-tooltip-bg',
+    '--ui-tooltip-color',
+    '--ui-tooltip-border',
+    '--ui-tooltip-blur',
+    '--ui-tooltip-shadow',
+    '--ui-tooltip-font-size',
+    '--ui-tooltip-line-height',
+    '--ui-tooltip-font-weight'
+  ]
+  for (const token of requiredTooltipTokens) {
+    assert.ok(content.includes(`${token}:`), `base.css must define ${token}`)
+  }
+
+  // Control font size mapping
+  assert.ok(
+    content.includes('--ui-control-font-size-sm: var(--ui-font-size-xs)'),
+    'base.css must map --ui-control-font-size-sm to var(--ui-font-size-xs)'
+  )
+  assert.ok(
+    content.includes('--ui-control-font-size-md: var(--ui-font-size-sm)'),
+    'base.css must map --ui-control-font-size-md to var(--ui-font-size-sm)'
+  )
+})
