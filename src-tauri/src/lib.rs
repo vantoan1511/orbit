@@ -46,10 +46,9 @@ async fn read_text_file(path: String) -> Result<String, String> {
 
 #[tauri::command]
 async fn write_text_file(path: String, content: String) -> Result<(), String> {
-    if let Some(parent) = std::path::Path::new(&path).parent() {
-        if !parent.as_os_str().is_empty() {
-            tokio::fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
-        }
+    if let Some(parent) = std::path::Path::new(&path).parent()
+        && !parent.as_os_str().is_empty() {
+        tokio::fs::create_dir_all(parent).await.map_err(|e| e.to_string())?;
     }
     tokio::fs::write(&path, content).await.map_err(|e| e.to_string())
 }
@@ -142,10 +141,9 @@ pub fn run() {
             }
 
             // If running in development mode, ensure window title reflects dev mode even if not launched with dev config overlay
-            if crate::config::OrbitConfig::is_dev_mode() {
-                if let Some(window) = handle.get_webview_window("main") {
-                    let _ = window.set_title("Orbit [Dev]");
-                }
+            if crate::config::OrbitConfig::is_dev_mode()
+                && let Some(window) = handle.get_webview_window("main") {
+                let _ = window.set_title("Orbit [Dev]");
             }
 
             // Reconcile OS autostart state with saved application configuration

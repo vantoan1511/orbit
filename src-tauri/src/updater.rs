@@ -39,7 +39,7 @@ pub struct GithubReleaseItem {
 impl UpdateManifest {
     /// Matches Windows setup installer asset from release assets.
     /// Excludes .msi, .zip, .sig, .tar.gz, etc.
-    pub fn find_windows_installer<'a>(assets: &'a [GithubReleaseAsset]) -> Option<&'a GithubReleaseAsset> {
+    pub fn find_windows_installer(assets: &[GithubReleaseAsset]) -> Option<&GithubReleaseAsset> {
         assets.iter().find(|asset| {
             let name = &asset.name;
             (name.ends_with("_setup.exe") || (name.starts_with("Orbit_") && name.ends_with(".exe")))
@@ -97,10 +97,9 @@ impl UpdateManifest {
 
         let release = resp.json::<GithubReleaseItem>().await?;
         if let Some((mut manifest, has_update)) = Self::from_github_release(&release, current_version) {
-            if has_update {
-                if let Some(notes) = Self::fetch_github_release_notes(&manifest.version, current_version).await {
-                    manifest.release_notes = Some(notes);
-                }
+            if has_update
+                && let Some(notes) = Self::fetch_github_release_notes(&manifest.version, current_version).await {
+                manifest.release_notes = Some(notes);
             }
             return Ok(Some((manifest, has_update)));
         }

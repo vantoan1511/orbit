@@ -130,6 +130,20 @@ export const useTabsStore = defineStore('tabs', () => {
     scheduleSave()
   }
 
+  function closeTabAndResolveRoute(tabId: string, fallbackRoute = '/'): string | null {
+    const target = tabs.value.find((t) => t.id === tabId || t.route === tabId)
+    if (!target) return null
+
+    const wasActive = activeTabId.value === target.id
+    closeTab(target.id)
+
+    if (wasActive) {
+      return activeTab.value ? activeTab.value.route : fallbackRoute
+    }
+
+    return null
+  }
+
   function closeOtherTabs(tabId: string): void {
     const target = tabs.value.find((t) => t.id === tabId)
     if (!target) return
@@ -283,6 +297,7 @@ export const useTabsStore = defineStore('tabs', () => {
     openTab,
     setActiveTab,
     closeTab,
+    closeTabAndResolveRoute,
     closeOtherTabs,
     closeTabsToTheRight,
     closeAllTabs,

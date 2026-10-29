@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
-import { OrbitEvents } from '@/types/events'
+import { OrbitEvents, type OrbitEventMap } from '@/types/events'
+import { useTabsStore } from '@/stores/tabsStore'
 import VueMonacoEditor from '@guolao/vue-monaco-editor'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -9,7 +10,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Component } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
 import { ArrowLeft, Loader2 } from '@lucide/vue'
@@ -30,8 +31,9 @@ import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
 import {
   buildEditRequestId,
+  extractResourceMetadataFormValues,
   matchesEditResponse,
-  shouldHandleCommandResult
+  matchesSaveResult
 } from '@/utils/editSession'
 
 const props = defineProps<{
@@ -41,6 +43,8 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const route = useRoute()
+const tabsStore = useTabsStore()
 const toast = useToast()
 const { isDark } = useTheme()
 
@@ -88,6 +92,7 @@ const formValues = ref({
 })
 
 let currentRequestId = ''
+let activeSaveRequestId = ''
 let eventHandler: (data: {
   name: string
   kind: string
@@ -95,8 +100,13 @@ let eventHandler: (data: {
   requestId?: string
   data: Record<string, unknown>
 }) => void
-let errorHandler: (data: { message: string }) => void
-let successHandler: (data: { message?: string }) => void
+let applyFinishedHandler: (payload: OrbitEventMap['resourceApplyFinished']) => void
+
+const applyLoadedResource = (resource: KubernetesResource) => {
+  rawData.value = resource
+  yamlContent.value = yaml.stringify(resource)
+  formValues.value = extractResourceMetadataFormValues(resource)
+}
 
 const resetState = () => {
   rawData.value = null
@@ -104,6 +114,7 @@ const resetState = () => {
   isYamlMode.value = false
   isLoading.value = true
   isSaving.value = false
+  activeSaveRequestId = ''
   formValues.value = {
     name: '',
     namespace: '',
@@ -155,45 +166,34 @@ onMounted(() => {
         }
       )
     ) {
-      rawData.value = data.data as KubernetesResource
-      yamlContent.value = yaml.stringify(rawData.value)
-
-      // Populate basic form fields
-      const metadata = rawData.value?.metadata || {}
-      formValues.value.name = metadata.name || ''
-      formValues.value.namespace = metadata.namespace || ''
-
-      const lbls = metadata.labels || {}
-      formValues.value.labels = Object.entries(lbls).map(([key, value]) => ({
-        key,
-        value: String(value)
-      }))
-
-      const anns = metadata.annotations || {}
-      formValues.value.annotations = Object.entries(anns).map(([key, value]) => ({
-        key,
-        value: String(value)
-      }))
-
+      applyLoadedResource(data.data as KubernetesResource)
       isLoading.value = false
     }
   }
 
-  errorHandler = () => {
-    // Error toast is handled globally by App.vue
-    if (!shouldHandleCommandResult(isSaving.value)) return
-    isSaving.value = false
-  }
+  applyFinishedHandler = (payload: OrbitEventMap['resourceApplyFinished']) => {
+    if (
+      !matchesSaveResult(payload, {
+        isSaving: isSaving.value,
+        kind: props.kind,
+        namespace: props.namespace,
+        name: props.name,
+        requestId: activeSaveRequestId
+      })
+    ) {
+      return
+    }
 
-  successHandler = () => {
-    if (!shouldHandleCommandResult(isSaving.value)) return
     isSaving.value = false
-    router.back()
+    activeSaveRequestId = ''
+
+    if (payload.success && payload.data) {
+      applyLoadedResource(payload.data as KubernetesResource)
+    }
   }
 
   events.on(OrbitEvents.ResourceRawData, eventHandler)
-  events.on(OrbitEvents.ErrorOccurred, errorHandler)
-  events.on(OrbitEvents.CommandSucceeded, successHandler)
+  events.on(OrbitEvents.ResourceApplyFinished, applyFinishedHandler)
 
   // Fetch initial data
   loadResource()
@@ -201,12 +201,19 @@ onMounted(() => {
 
 onUnmounted(() => {
   events.off(OrbitEvents.ResourceRawData, eventHandler)
-  events.off(OrbitEvents.ErrorOccurred, errorHandler)
-  events.off(OrbitEvents.CommandSucceeded, successHandler)
+  events.off(OrbitEvents.ResourceApplyFinished, applyFinishedHandler)
 })
 
 const goBack = () => {
-  router.back()
+  const tabId = route.fullPath
+  if (tabsStore.tabs.some((t) => t.id === tabId || t.route === tabId)) {
+    const nextRoute = tabsStore.closeTabAndResolveRoute(tabId)
+    if (nextRoute) {
+      void router.replace(nextRoute)
+      return
+    }
+  }
+  void router.replace('/')
 }
 
 const handleModeToggle = () => {
@@ -237,6 +244,7 @@ const handleModeToggle = () => {
 const saveChanges = () => {
   if (isSaving.value || isLoading.value) return
   isSaving.value = true
+  activeSaveRequestId = buildEditRequestId(props.kind, props.namespace, props.name)
   try {
     let updatedData: KubernetesResource
     if (isYamlMode.value) {
@@ -248,11 +256,13 @@ const saveChanges = () => {
       namespace: props.namespace,
       kind: props.kind,
       name: props.name,
-      data: updatedData
+      data: updatedData,
+      requestId: activeSaveRequestId
     })
   } catch (err) {
     toast.add({ severity: 'error', summary: 'YAML Parse Error', detail: String(err), life: 5000 })
     isSaving.value = false
+    activeSaveRequestId = ''
   }
 }
 

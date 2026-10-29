@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   buildEditRequestId,
+  extractResourceMetadataFormValues,
   matchesEditResponse,
+  matchesSaveResult,
   shouldHandleCommandResult
 } from '../editSession.ts'
 
@@ -88,4 +90,106 @@ test('buildEditRequestId is deterministic for same inputs + nonce and differs ac
 test('shouldHandleCommandResult returns true only when saving', () => {
   assert.equal(shouldHandleCommandResult(true), true)
   assert.equal(shouldHandleCommandResult(false), false)
+})
+
+test('matchesSaveResult returns false when isSaving is false even if requestId matches', () => {
+  const payload = {
+    kind: 'Deployment',
+    name: 'api',
+    namespace: 'prod',
+    requestId: 'req-save-1',
+    success: true
+  }
+  const ctx = {
+    isSaving: false,
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'api',
+    requestId: 'req-save-1'
+  }
+  assert.equal(matchesSaveResult(payload, ctx), false)
+})
+
+test('matchesSaveResult returns true when isSaving is true and requestId matches', () => {
+  const payload = {
+    kind: 'Deployment',
+    name: 'api',
+    namespace: 'prod',
+    requestId: 'req-save-1',
+    success: true
+  }
+  const ctx = {
+    isSaving: true,
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'api',
+    requestId: 'req-save-1'
+  }
+  assert.equal(matchesSaveResult(payload, ctx), true)
+})
+
+test('matchesSaveResult returns false when payload has different requestId or omits requestId when ctx has requestId', () => {
+  const ctx = {
+    isSaving: true,
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'api',
+    requestId: 'req-save-1'
+  }
+
+  const payloadMismatchedReq = {
+    kind: 'Deployment',
+    name: 'api',
+    namespace: 'prod',
+    requestId: 'req-save-2',
+    success: true
+  }
+  assert.equal(matchesSaveResult(payloadMismatchedReq, ctx), false)
+
+  const payloadMissingReq = {
+    kind: 'Deployment',
+    name: 'api',
+    namespace: 'prod',
+    success: true
+  }
+  assert.equal(matchesSaveResult(payloadMissingReq, ctx), false)
+})
+
+test('extractResourceMetadataFormValues extracts name, namespace, labels, annotations and handles missing metadata safely', () => {
+  const resource = {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: 'web',
+      namespace: 'production',
+      labels: {
+        app: 'web',
+        tier: 'frontend'
+      },
+      annotations: {
+        'deployment.kubernetes.io/revision': '2'
+      }
+    }
+  }
+
+  const values = extractResourceMetadataFormValues(resource)
+  assert.equal(values.name, 'web')
+  assert.equal(values.namespace, 'production')
+  assert.deepEqual(values.labels, [
+    { key: 'app', value: 'web' },
+    { key: 'tier', value: 'frontend' }
+  ])
+  assert.deepEqual(values.annotations, [{ key: 'deployment.kubernetes.io/revision', value: '2' }])
+
+  const emptyValues = extractResourceMetadataFormValues(null)
+  assert.equal(emptyValues.name, '')
+  assert.equal(emptyValues.namespace, '')
+  assert.deepEqual(emptyValues.labels, [])
+  assert.deepEqual(emptyValues.annotations, [])
+
+  const partialValues = extractResourceMetadataFormValues({ metadata: { name: 'bare' } })
+  assert.equal(partialValues.name, 'bare')
+  assert.equal(partialValues.namespace, '')
+  assert.deepEqual(partialValues.labels, [])
+  assert.deepEqual(partialValues.annotations, [])
 })

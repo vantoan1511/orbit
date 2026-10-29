@@ -244,6 +244,7 @@ export const kubernetesService = {
     kind: string
     name: string
     data: KubernetesResource | Record<string, unknown>
+    requestId?: string
   }): Promise<void> {
     await coreEngine.dispatch('applyResource', params)
   },

@@ -166,11 +166,11 @@ pub async fn apply_resource(
     kind: &str,
     name: &str,
     raw_json: Value,
-) -> Result<(), kube::Error> {
+) -> Result<Value, kube::Error> {
     let post_params = PostParams::default();
 
     macro_rules! replace_resource {
-        ($api_type:ty) => {{
+        ($api_type:ty, $resolved_kind:expr) => {{
             let api: Api<$api_type> = Api::namespaced(client.clone(), namespace);
             let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
                 kube::Error::Api(kube::error::ErrorResponse {
@@ -180,12 +180,13 @@ pub async fn apply_resource(
                     code: 400,
                 })
             })?;
-            api.replace(name, &post_params, &parsed).await?;
+            let updated = api.replace(name, &post_params, &parsed).await?;
+            to_json_val(&updated, $resolved_kind)
         }};
     }
 
     macro_rules! replace_cluster_resource {
-        ($api_type:ty) => {{
+        ($api_type:ty, $resolved_kind:expr) => {{
             let api: Api<$api_type> = Api::all(client.clone());
             let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
                 kube::Error::Api(kube::error::ErrorResponse {
@@ -195,7 +196,8 @@ pub async fn apply_resource(
                     code: 400,
                 })
             })?;
-            api.replace(name, &post_params, &parsed).await?;
+            let updated = api.replace(name, &post_params, &parsed).await?;
+            to_json_val(&updated, $resolved_kind)
         }};
     }
 
@@ -204,38 +206,38 @@ pub async fn apply_resource(
             .get("kind")
             .and_then(|k| k.as_str())
             .unwrap_or(kind)
+            .to_string()
     } else {
-        kind
+        kind.to_string()
     };
 
-    match resolved_kind {
-        "Pod" => replace_resource!(Pod),
-        "Deployment" => replace_resource!(Deployment),
-        "StatefulSet" => replace_resource!(StatefulSet),
-        "DaemonSet" => replace_resource!(DaemonSet),
-        "ReplicaSet" => replace_resource!(ReplicaSet),
-        "Job" => replace_resource!(Job),
-        "CronJob" => replace_resource!(CronJob),
-        "Service" => replace_resource!(Service),
-        "ConfigMap" => replace_resource!(ConfigMap),
-        "Secret" => replace_resource!(Secret),
-        "PersistentVolumeClaim" => replace_resource!(PersistentVolumeClaim),
-        "NetworkPolicy" => replace_resource!(NetworkPolicy),
-        "Ingress" => replace_resource!(Ingress),
-        "Node" => replace_cluster_resource!(Node),
-        "Namespace" => replace_cluster_resource!(Namespace),
-        "ResourceQuota" => replace_resource!(ResourceQuota),
-        "LimitRange" => replace_resource!(LimitRange),
-        "ValidatingWebhookConfiguration" => replace_cluster_resource!(ValidatingWebhookConfiguration),
-        "MutatingWebhookConfiguration" => replace_cluster_resource!(MutatingWebhookConfiguration),
-        _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
+    match resolved_kind.as_str() {
+        "Pod" => replace_resource!(Pod, &resolved_kind),
+        "Deployment" => replace_resource!(Deployment, &resolved_kind),
+        "StatefulSet" => replace_resource!(StatefulSet, &resolved_kind),
+        "DaemonSet" => replace_resource!(DaemonSet, &resolved_kind),
+        "ReplicaSet" => replace_resource!(ReplicaSet, &resolved_kind),
+        "Job" => replace_resource!(Job, &resolved_kind),
+        "CronJob" => replace_resource!(CronJob, &resolved_kind),
+        "Service" => replace_resource!(Service, &resolved_kind),
+        "ConfigMap" => replace_resource!(ConfigMap, &resolved_kind),
+        "Secret" => replace_resource!(Secret, &resolved_kind),
+        "PersistentVolumeClaim" => replace_resource!(PersistentVolumeClaim, &resolved_kind),
+        "NetworkPolicy" => replace_resource!(NetworkPolicy, &resolved_kind),
+        "Ingress" => replace_resource!(Ingress, &resolved_kind),
+        "Node" => replace_cluster_resource!(Node, &resolved_kind),
+        "Namespace" => replace_cluster_resource!(Namespace, &resolved_kind),
+        "ResourceQuota" => replace_resource!(ResourceQuota, &resolved_kind),
+        "LimitRange" => replace_resource!(LimitRange, &resolved_kind),
+        "ValidatingWebhookConfiguration" => replace_cluster_resource!(ValidatingWebhookConfiguration, &resolved_kind),
+        "MutatingWebhookConfiguration" => replace_cluster_resource!(MutatingWebhookConfiguration, &resolved_kind),
+        _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported apply resource kind: {}", kind),
             reason: "BadRequest".to_string(),
             code: 400,
         })),
     }
-    Ok(())
 }
 
 pub async fn create_resource(

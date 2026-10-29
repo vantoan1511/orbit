@@ -436,3 +436,40 @@ test('closing only remaining tab leaves activeTab null allowing fallback to empt
   assert.equal(store.activeTabId, null)
   assert.equal(store.activeTab, null)
 })
+
+test('tabsStore.closeTabAndResolveRoute resolves route for active tab, last tab, inactive tab, and unknown tab', () => {
+  const store = useTabsStore()
+
+  // 1. Closing active Edit tab when another tab is open activates neighbor and returns its route
+  const tab1 = store.openTab({ route: '/workloads?tab=deployments', title: 'Deployments' })
+  const tab2 = store.openTab({ route: '/edit/Deployment/prod/api', title: 'Edit api' })
+  assert.equal(store.activeTabId, tab2.id)
+
+  const nextRoute1 = store.closeTabAndResolveRoute(tab2.id)
+  assert.equal(nextRoute1, '/workloads?tab=deployments')
+  assert.equal(store.tabs.length, 1)
+  assert.equal(store.activeTabId, tab1.id)
+
+  // 2. Closing last remaining active tab returns fallback ('/' by default or custom)
+  const nextRoute2 = store.closeTabAndResolveRoute(tab1.id, '/custom-fallback')
+  assert.equal(nextRoute2, '/custom-fallback')
+  assert.equal(store.tabs.length, 0)
+  assert.equal(store.activeTabId, null)
+
+  // Setup tabs for inactive tab test
+  const tA = store.openTab({ route: '/tabA', title: 'Tab A' })
+  const tB = store.openTab({ route: '/tabB', title: 'Tab B' })
+  assert.equal(store.activeTabId, tB.id)
+
+  // 3. Closing inactive tab removes it, keeps active tab intact, and returns null
+  const nextRouteInactive = store.closeTabAndResolveRoute(tA.id)
+  assert.equal(nextRouteInactive, null)
+  assert.equal(store.tabs.length, 1)
+  assert.equal(store.activeTabId, tB.id)
+
+  // 4. Calling with unknown tabId returns null without mutating open tabs
+  const nextRouteUnknown = store.closeTabAndResolveRoute('unknown-tab-id')
+  assert.equal(nextRouteUnknown, null)
+  assert.equal(store.tabs.length, 1)
+  assert.equal(store.activeTabId, tB.id)
+})

@@ -136,12 +136,9 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
     if (tabsStore.activeTabId) {
       e.preventDefault()
-      const wasActive = tabsStore.activeTabId
-      tabsStore.closeTab(wasActive)
-      if (tabsStore.activeTab) {
-        void router.push(tabsStore.activeTab.route)
-      } else {
-        void router.push('/')
+      const nextRoute = tabsStore.closeTabAndResolveRoute(tabsStore.activeTabId)
+      if (nextRoute) {
+        void router.push(nextRoute)
       }
     }
     return
