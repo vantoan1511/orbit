@@ -156,11 +156,17 @@ export function applyMetadataFormValuesToResource(
     ...existingMetadata,
     name:
       formValues.name || (typeof existingMetadata.name === 'string' ? existingMetadata.name : ''),
-    namespace:
-      formValues.namespace ||
-      (typeof existingMetadata.namespace === 'string' ? existingMetadata.namespace : ''),
     labels,
     annotations
+  }
+
+  const resolvedNs =
+    formValues.namespace ||
+    (typeof existingMetadata.namespace === 'string' ? existingMetadata.namespace : '')
+  if (resolvedNs && resolvedNs.length > 0) {
+    updatedMetadata.namespace = resolvedNs
+  } else {
+    delete updatedMetadata.namespace
   }
 
   return {

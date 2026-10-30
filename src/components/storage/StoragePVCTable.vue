@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import PersistentVolumeClaimDetailsDrawer from '@/components/storage/PersistentVolumeClaimDetailsDrawer.vue'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -54,7 +55,7 @@ const handleRefresh = async () => {
           <span
             v-if="data.volume"
             class="font-mono text-muted-color truncate max-w-44 block"
-            :title="data.volume"
+            v-tooltip.top="data.volume"
           >
             {{ data.volume }}
           </span>
@@ -94,6 +95,15 @@ const handleRefresh = async () => {
           <span class="font-mono text-muted-color font-semibold">{{ data.storageClass }}</span>
         </template>
       </Column>
+    </template>
+
+    <!-- Details Drawer Slot -->
+    <template #drawer="{ visible, selectedItem, close }">
+      <PersistentVolumeClaimDetailsDrawer
+        :visible="visible"
+        :pvc="selectedItem"
+        @update:visible="(val) => !val && close()"
+      />
     </template>
   </GenericResourceTable>
 </template>

@@ -26,9 +26,13 @@ import PodEditForm from '@/components/workloads/PodEditForm.vue'
 import ReplicaSetEditForm from '@/components/workloads/ReplicaSetEditForm.vue'
 import JobEditForm from '@/components/workloads/JobEditForm.vue'
 import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
+import PersistentVolumeEditForm from '@/components/storage/PersistentVolumeEditForm.vue'
+import PersistentVolumeClaimEditForm from '@/components/storage/PersistentVolumeClaimEditForm.vue'
+import StorageClassEditForm from '@/components/storage/StorageClassEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
+import { RESOURCE_BREADCRUMB_MAP } from '@/utils/breadcrumb'
 import {
   applyMetadataFormValuesToResource,
   buildEditRequestId,
@@ -81,9 +85,15 @@ const formComponentMap: Record<string, Component> = {
   [KUBERNETES_RESOURCE_KIND.Service]: ServiceEditForm,
   [KUBERNETES_RESOURCE_KIND.ConfigMap]: ConfigMapEditForm,
   [KUBERNETES_RESOURCE_KIND.Secret]: SecretEditForm,
-  [KUBERNETES_RESOURCE_KIND.Namespace]: NamespaceEditForm
+  [KUBERNETES_RESOURCE_KIND.Namespace]: NamespaceEditForm,
+  [KUBERNETES_RESOURCE_KIND.PersistentVolume]: PersistentVolumeEditForm,
+  [KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim]: PersistentVolumeClaimEditForm,
+  [KUBERNETES_RESOURCE_KIND.StorageClass]: StorageClassEditForm
 }
 const activeFormComponent = computed(() => formComponentMap[resourceKind.value] || null)
+const isClusterScoped = computed(() => {
+  return Boolean(RESOURCE_BREADCRUMB_MAP[resourceKind.value]?.isClusterScoped)
+})
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -335,7 +345,7 @@ const handleFallbackMetadataChange = () => {
           </h1>
           <span class="text-xs font-medium text-muted-color font-mono">
             {{
-              resourceNamespace && resourceNamespace !== '-'
+              !isClusterScoped && resourceNamespace && resourceNamespace !== '-'
                 ? `${resourceNamespace} / ${resourceName}`
                 : resourceName
             }}

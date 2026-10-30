@@ -2,11 +2,46 @@ use kube::{
     api::{Api, DeleteParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Namespace, ResourceQuota, LimitRange};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolume, PersistentVolumeClaim, Namespace, ResourceQuota, LimitRange};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
 use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
+use k8s_openapi::api::storage::v1::StorageClass;
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResourceApiScope {
+    Namespaced,
+    ClusterScoped,
+}
+
+#[allow(dead_code)]
+pub(crate) fn resolve_delete_scope(kind: &str) -> Option<ResourceApiScope> {
+    match kind {
+        "Pod"
+        | "Deployment"
+        | "StatefulSet"
+        | "DaemonSet"
+        | "ReplicaSet"
+        | "Job"
+        | "CronJob"
+        | "Service"
+        | "ConfigMap"
+        | "Secret"
+        | "PersistentVolumeClaim"
+        | "NetworkPolicy"
+        | "Ingress"
+        | "ResourceQuota"
+        | "LimitRange" => Some(ResourceApiScope::Namespaced),
+        "Namespace"
+        | "PersistentVolume"
+        | "StorageClass"
+        | "ValidatingWebhookConfiguration"
+        | "MutatingWebhookConfiguration" => Some(ResourceApiScope::ClusterScoped),
+        _ => None,
+    }
+}
 
 pub async fn delete_resource(
     client: &Client,
@@ -89,6 +124,14 @@ pub async fn delete_resource(
             let api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
             api.delete(name, &delete_params).await?;
         }
+        "PersistentVolume" => {
+            let api: Api<PersistentVolume> = Api::all(client.clone());
+            api.delete(name, &delete_params).await?;
+        }
+        "StorageClass" => {
+            let api: Api<StorageClass> = Api::all(client.clone());
+            api.delete(name, &delete_params).await?;
+        }
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported delete resource kind: {}", kind),
@@ -97,4 +140,19 @@ pub async fn delete_resource(
         })),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_delete_resource_scope() {
+        assert_eq!(resolve_delete_scope("PersistentVolume"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_delete_scope("StorageClass"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_delete_scope("PersistentVolumeClaim"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_delete_scope("Pod"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_delete_scope("Namespace"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_delete_scope("Unknown"), None);
+    }
 }

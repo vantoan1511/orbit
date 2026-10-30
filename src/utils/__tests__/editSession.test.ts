@@ -375,3 +375,11 @@ test('transitionEditMode YAML -> Form rejects invalid YAML syntax or scalar/arra
     assert.match(resultArray.errorMessage, /object/i)
   }
 })
+
+test('applyMetadataFormValuesToResource omits metadata.namespace for cluster-scoped resources when empty', () => {
+  const result = applyMetadataFormValuesToResource(
+    { apiVersion: 'v1', kind: 'PersistentVolume', metadata: { name: 'pv-1' } },
+    { name: 'pv-1', namespace: '', labels: [], annotations: [] }
+  )
+  assert.equal(result.metadata?.namespace, undefined)
+})

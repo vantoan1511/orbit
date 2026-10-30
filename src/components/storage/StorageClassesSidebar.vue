@@ -1,24 +1,20 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Chart from 'primevue/chart'
+import { Tag } from 'primevue'
 import { Layers, PieChart, Activity } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTheme } from '@/composables/useTheme'
+import { parseCapacityToGiB, formatDonutTotalCapacity } from '@/utils/storageQuantity'
 
 const k8sStore = useKubernetesStore()
+const { isDark } = useTheme()
 const storageClasses = computed(() => k8sStore.storageClasses)
 const pvs = computed(() => k8sStore.persistentVolumes)
 
 // Chart configuration
 const chartData = ref()
 const chartOptions = ref()
-
-const parseCapacityToGiB = (cap: string): number => {
-  const num = parseFloat(cap)
-  if (cap.toLowerCase().includes('tib')) return num * 1024
-  if (cap.toLowerCase().includes('gib')) return num
-  if (cap.toLowerCase().includes('mib')) return num / 1024
-  return num
-}
 
 // Calculate capacity by StorageClass
 const scCapacityData = computed(() => {
@@ -31,12 +27,18 @@ const scCapacityData = computed(() => {
 
   // Aggregate PV capacities
   pvs.value.forEach((pv) => {
-    const sc = pv.storageClass
+    const rawSc = pv.storageClass?.trim()
+    const sc = !rawSc || rawSc === '-' ? 'Unassigned' : rawSc
     const capGiB = parseCapacityToGiB(pv.capacity)
     capacityMap[sc] = (capacityMap[sc] || 0) + capGiB
   })
 
   return capacityMap
+})
+
+const totalCapacitySummary = computed(() => {
+  const total = Object.values(scCapacityData.value).reduce((sum, v) => sum + v, 0)
+  return formatDonutTotalCapacity(total)
 })
 
 // Count PVs by Status
@@ -51,13 +53,13 @@ const statusCounts = computed(() => {
 })
 
 const updateChart = () => {
-  const isDark = document.documentElement.classList.contains('my-app-dark')
+  const dark = isDark.value
 
-  const colors = isDark
+  const colors = dark
     ? ['#46d16e', '#3b82f6', '#a855f7', '#f59e0b', '#ec4899', '#64748b']
     : ['#28a745', '#2563eb', '#8b5cf6', '#d97706', '#db2777', '#475569']
 
-  const hoverColors = isDark
+  const hoverColors = dark
     ? [
         'rgba(70, 209, 110, 0.8)',
         'rgba(59, 130, 246, 0.8)',
@@ -83,10 +85,10 @@ const updateChart = () => {
     datasets: [
       {
         data: dataValues,
-        backgroundColor: colors.slice(0, labels.length),
-        hoverBackgroundColor: hoverColors.slice(0, labels.length),
-        borderWidth: isDark ? 2 : 1,
-        borderColor: isDark ? '#0e1012' : '#ffffff'
+        backgroundColor: labels.map((_, idx) => colors[idx % colors.length]),
+        hoverBackgroundColor: labels.map((_, idx) => hoverColors[idx % hoverColors.length]),
+        borderWidth: dark ? 2 : 1,
+        borderColor: dark ? '#0e1012' : '#ffffff'
       }
     ]
   }
@@ -99,7 +101,7 @@ const updateChart = () => {
       legend: {
         position: 'bottom',
         labels: {
-          color: isDark ? '#eceef2' : '#181a1f',
+          color: dark ? '#eceef2' : '#181a1f',
           font: {
             family: 'Inter',
             size: 10,
@@ -114,7 +116,7 @@ const updateChart = () => {
   }
 }
 
-watch(scCapacityData, updateChart, { immediate: true })
+watch([scCapacityData, isDark], updateChart, { immediate: true })
 </script>
 
 <template>
@@ -126,7 +128,7 @@ watch(scCapacityData, updateChart, { immediate: true })
       <div
         class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
-        <Layers class="w-4 h-4 text-amber-400" />
+        <Layers class="w-4 h-4 text-(--warning)" />
         Storage Classes ({{ storageClasses.length }})
       </div>
 
@@ -161,7 +163,7 @@ watch(scCapacityData, updateChart, { immediate: true })
       <div
         class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
-        <PieChart class="w-4 h-4 text-violet-400" />
+        <PieChart class="w-4 h-4 text-(--accent)" />
         Capacity by SC (GiB)
       </div>
 
@@ -177,10 +179,10 @@ watch(scCapacityData, updateChart, { immediate: true })
 
         <!-- Total Label overlay -->
         <div class="absolute flex flex-col items-center justify-center pointer-events-none">
-          <span class="text-2xl font-bold text-primary">2,620</span>
-          <span class="text-[9px] uppercase font-bold text-muted-color tracking-wider"
-            >Total GiB</span
-          >
+          <span class="text-2xl font-bold text-primary">{{ totalCapacitySummary.value }}</span>
+          <span class="text-[9px] uppercase font-bold text-muted-color tracking-wider">{{
+            totalCapacitySummary.unit
+          }}</span>
         </div>
       </div>
     </div>
@@ -192,7 +194,7 @@ watch(scCapacityData, updateChart, { immediate: true })
       <div
         class="text-sm font-semibold text-primary uppercase tracking-wider mb-4 flex items-center gap-2"
       >
-        <Activity class="w-4 h-4 text-emerald-400" />
+        <Activity class="w-4 h-4 text-(--success)" />
         Volume Status
       </div>
 
