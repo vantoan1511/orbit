@@ -1,4 +1,33 @@
-import type { PodInfo } from '../types/kubernetes.ts'
+import type { PodInfo, Replicas } from '../types/kubernetes.ts'
+
+export const REPLICAS_SORT_MULTIPLIER = 1_000_000
+
+/**
+ * Computes a deterministic numeric sort key for workload replica counts.
+ * Orders primarily by desired replicas, breaking ties by current replicas.
+ */
+export function computeReplicasSortKey(replicas?: Replicas | null): number {
+  if (!replicas) return 0
+  const desired = Number.isFinite(replicas.desired) ? Math.max(0, Math.trunc(replicas.desired)) : 0
+  const current = Number.isFinite(replicas.current) ? Math.max(0, Math.trunc(replicas.current)) : 0
+  return desired * REPLICAS_SORT_MULTIPLIER + Math.min(current, REPLICAS_SORT_MULTIPLIER - 1)
+}
+
+export type WithReplicasSortKey<T> = T & {
+  replicasSortKey: number
+}
+
+/**
+ * Attaches a numeric replicasSortKey to a list of workload items without mutating the original items.
+ */
+export function withReplicasSortKey<T extends { replicas?: Replicas | null }>(
+  items: readonly T[]
+): WithReplicasSortKey<T>[] {
+  return items.map((item) => ({
+    ...item,
+    replicasSortKey: computeReplicasSortKey(item.replicas)
+  }))
+}
 
 const REPLICA_SET_PREFIX = 'ReplicaSet/'
 
