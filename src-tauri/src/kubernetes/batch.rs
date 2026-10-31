@@ -69,6 +69,7 @@ pub fn map_job(j: &Job) -> models::JobInfo {
     let annotations = j.metadata.annotations.clone().unwrap_or_default();
 
     models::JobInfo {
+        kind: "Job".to_string(),
         name,
         namespace: namespace_name,
         status,
@@ -140,6 +141,7 @@ pub fn map_cronjob(cj: &CronJob) -> models::CronJobInfo {
     let annotations = cj.metadata.annotations.clone().unwrap_or_default();
 
     models::CronJobInfo {
+        kind: "CronJob".to_string(),
         name,
         namespace: namespace_name,
         schedule,
@@ -166,4 +168,40 @@ pub async fn list_cronjobs(client: &Client, namespace: Option<String>) -> Result
     }
 
     Ok(list)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+
+    #[test]
+    fn test_map_job_kind() {
+        let j = Job {
+            metadata: ObjectMeta {
+                name: Some("migrate-db".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mapped = map_job(&j);
+        assert_eq!(mapped.name, "migrate-db");
+        assert_eq!(mapped.kind, "Job");
+    }
+
+    #[test]
+    fn test_map_cronjob_kind() {
+        let cj = CronJob {
+            metadata: ObjectMeta {
+                name: Some("nightly-backup".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mapped = map_cronjob(&cj);
+        assert_eq!(mapped.name, "nightly-backup");
+        assert_eq!(mapped.kind, "CronJob");
+    }
 }
