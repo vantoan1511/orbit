@@ -51,6 +51,9 @@ const ADAPTED_COMPONENTS = [
   'src/components/network/IngressDetailsDrawer.vue',
   'src/components/services/ServiceDetailsDrawer.vue',
   'src/components/pods/PodDetailsDrawer.vue',
+  'src/components/storage/PersistentVolumeDetailsDrawer.vue',
+  'src/components/storage/PersistentVolumeClaimDetailsDrawer.vue',
+  'src/components/storage/StorageClassDetailsDrawer.vue',
 
   // Dashboard & Pod/Service details
   'src/components/dashboard/AlertsEvents.vue',
@@ -69,6 +72,12 @@ const ADAPTED_COMPONENTS = [
   'src/components/workloads/JobEditForm.vue',
   'src/components/workloads/PodEditForm.vue',
   'src/components/workloads/CreateCronJobDialog.vue',
+  'src/components/storage/PersistentVolumeEditForm.vue',
+  'src/components/storage/PersistentVolumeClaimEditForm.vue',
+  'src/components/storage/StorageClassEditForm.vue',
+  'src/components/storage/CreatePVDialog.vue',
+  'src/components/storage/CreatePVCDialog.vue',
+  'src/components/storage/CreateStorageClassDialog.vue',
 
   // Shared Editors
   'src/components/shared/ContainerEnvEditor.vue',
@@ -212,7 +221,10 @@ test('verifies all resource drawers have data-component attribute', () => {
     'src/components/nodes/NodeDetailsDrawer.vue',
     'src/components/network/IngressDetailsDrawer.vue',
     'src/components/services/ServiceDetailsDrawer.vue',
-    'src/components/pods/PodDetailsDrawer.vue'
+    'src/components/pods/PodDetailsDrawer.vue',
+    'src/components/storage/PersistentVolumeDetailsDrawer.vue',
+    'src/components/storage/PersistentVolumeClaimDetailsDrawer.vue',
+    'src/components/storage/StorageClassDetailsDrawer.vue'
   ]
 
   for (const file of drawerFiles) {

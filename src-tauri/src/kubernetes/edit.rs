@@ -2,12 +2,41 @@ use kube::{
     api::{Api, PostParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolumeClaim, Node, Namespace, ResourceQuota, LimitRange};
+use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolume, PersistentVolumeClaim, Node, Namespace, ResourceQuota, LimitRange};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
 use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
+use k8s_openapi::api::storage::v1::StorageClass;
 use serde_json::Value;
+use crate::kubernetes::models::ResourceApiScope;
+
+pub(crate) fn resolve_resource_scope(kind: &str) -> Option<ResourceApiScope> {
+    match kind {
+        "Pod"
+        | "Deployment"
+        | "StatefulSet"
+        | "DaemonSet"
+        | "ReplicaSet"
+        | "Job"
+        | "CronJob"
+        | "Service"
+        | "ConfigMap"
+        | "Secret"
+        | "PersistentVolumeClaim"
+        | "NetworkPolicy"
+        | "Ingress"
+        | "ResourceQuota"
+        | "LimitRange" => Some(ResourceApiScope::Namespaced),
+        "Node"
+        | "Namespace"
+        | "PersistentVolume"
+        | "StorageClass"
+        | "ValidatingWebhookConfiguration"
+        | "MutatingWebhookConfiguration" => Some(ResourceApiScope::ClusterScoped),
+        _ => None,
+    }
+}
 
 fn to_json_val<T: serde::Serialize>(val: &T, kind: &str) -> Result<Value, kube::Error> {
     serde_json::to_value(val).map_err(|e| {
@@ -26,6 +55,15 @@ pub async fn get_resource_raw(
     kind: &str,
     name: &str,
 ) -> Result<Value, kube::Error> {
+    if kind != "Policy" && resolve_resource_scope(kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported get resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
+
     match kind {
         "Pod" => {
             let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
@@ -122,6 +160,16 @@ pub async fn get_resource_raw(
             let resource = api.get(name).await?;
             to_json_val(&resource, kind)
         }
+        "PersistentVolume" => {
+            let api: Api<PersistentVolume> = Api::all(client.clone());
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
+        "StorageClass" => {
+            let api: Api<StorageClass> = Api::all(client.clone());
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
         "Policy" => {
             // Attempt resolution across the 5 policy types supported by Orbit
             let net_api: Api<NetworkPolicy> = Api::namespaced(client.clone(), namespace);
@@ -211,6 +259,15 @@ pub async fn apply_resource(
         kind.to_string()
     };
 
+    if resolve_resource_scope(&resolved_kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported apply resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
+
     match resolved_kind.as_str() {
         "Pod" => replace_resource!(Pod, &resolved_kind),
         "Deployment" => replace_resource!(Deployment, &resolved_kind),
@@ -231,6 +288,8 @@ pub async fn apply_resource(
         "LimitRange" => replace_resource!(LimitRange, &resolved_kind),
         "ValidatingWebhookConfiguration" => replace_cluster_resource!(ValidatingWebhookConfiguration, &resolved_kind),
         "MutatingWebhookConfiguration" => replace_cluster_resource!(MutatingWebhookConfiguration, &resolved_kind),
+        "PersistentVolume" => replace_cluster_resource!(PersistentVolume, &resolved_kind),
+        "StorageClass" => replace_cluster_resource!(StorageClass, &resolved_kind),
         _ => Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported apply resource kind: {}", kind),
@@ -287,6 +346,15 @@ pub async fn create_resource(
         kind
     };
 
+    if resolve_resource_scope(resolved_kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported create resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
+
     match resolved_kind {
         "Pod" => create_resource!(Pod),
         "Deployment" => create_resource!(Deployment),
@@ -307,6 +375,8 @@ pub async fn create_resource(
         "LimitRange" => create_resource!(LimitRange),
         "ValidatingWebhookConfiguration" => create_cluster_resource!(ValidatingWebhookConfiguration),
         "MutatingWebhookConfiguration" => create_cluster_resource!(MutatingWebhookConfiguration),
+        "PersistentVolume" => create_cluster_resource!(PersistentVolume),
+        "StorageClass" => create_cluster_resource!(StorageClass),
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported create resource kind: {}", kind),
@@ -452,5 +522,102 @@ mod tests {
             kind
         };
         assert_eq!(resolved_kind, "NetworkPolicy");
+    }
+
+    #[test]
+    fn test_storage_resource_api_scope() {
+        assert_eq!(resolve_resource_scope("PersistentVolume"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_resource_scope("StorageClass"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_resource_scope("PersistentVolumeClaim"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_resource_scope("UnknownKind"), None);
+    }
+
+    #[test]
+    fn test_persistent_volume_manifest_parse() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "PersistentVolume",
+            "metadata": {
+                "name": "pv-demo",
+                "labels": {
+                    "type": "local"
+                }
+            },
+            "spec": {
+                "capacity": {
+                    "storage": "20Gi"
+                },
+                "accessModes": ["ReadWriteOnce"],
+                "persistentVolumeReclaimPolicy": "Retain",
+                "storageClassName": "manual",
+                "hostPath": {
+                    "path": "/mnt/data"
+                }
+            }
+        });
+        let parsed: Result<PersistentVolume, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let pv = parsed.unwrap();
+        assert_eq!(pv.metadata.name.as_deref(), Some("pv-demo"));
+        assert!(pv.metadata.namespace.is_none());
+        let spec = pv.spec.expect("spec should be present");
+        let capacity = spec.capacity.expect("capacity should be present");
+        assert_eq!(capacity.get("storage").map(|q| q.0.as_str()), Some("20Gi"));
+    }
+
+    #[test]
+    fn test_persistent_volume_claim_manifest_parse() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeClaim",
+            "metadata": {
+                "name": "pvc-demo",
+                "namespace": "default"
+            },
+            "spec": {
+                "accessModes": ["ReadWriteOnce"],
+                "resources": {
+                    "requests": {
+                        "storage": "10Gi"
+                    }
+                }
+            }
+        });
+        let parsed: Result<PersistentVolumeClaim, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let pvc = parsed.unwrap();
+        assert_eq!(pvc.metadata.name.as_deref(), Some("pvc-demo"));
+        assert_eq!(pvc.metadata.namespace.as_deref(), Some("default"));
+    }
+
+    #[test]
+    fn test_storage_class_manifest_parse() {
+        let manifest_json = serde_json::json!({
+            "apiVersion": "storage.k8s.io/v1",
+            "kind": "StorageClass",
+            "metadata": {
+                "name": "fast-storage",
+                "annotations": {
+                    "storageclass.kubernetes.io/is-default-class": "true"
+                }
+            },
+            "provisioner": "kubernetes.io/no-provisioner",
+            "reclaimPolicy": "Delete",
+            "volumeBindingMode": "WaitForFirstConsumer",
+            "allowVolumeExpansion": true,
+            "parameters": {
+                "type": "gp3"
+            },
+            "mountOptions": ["debug"]
+        });
+        let parsed: Result<StorageClass, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let sc = parsed.unwrap();
+        assert_eq!(sc.metadata.name.as_deref(), Some("fast-storage"));
+        assert_eq!(sc.provisioner, "kubernetes.io/no-provisioner");
+        assert_eq!(sc.reclaim_policy.as_deref(), Some("Delete"));
+        assert_eq!(sc.volume_binding_mode.as_deref(), Some("WaitForFirstConsumer"));
+        assert_eq!(sc.allow_volume_expansion, Some(true));
+        assert_eq!(sc.mount_options.as_deref(), Some(&vec!["debug".to_string()][..]));
     }
 }

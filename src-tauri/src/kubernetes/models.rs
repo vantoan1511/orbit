@@ -434,3 +434,11 @@ pub struct PodMetricItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_bytes: Option<f64>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ResourceApiScope {
+    Namespaced,
+    ClusterScoped,
+}
+

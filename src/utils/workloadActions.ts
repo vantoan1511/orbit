@@ -1,6 +1,7 @@
 import { KUBERNETES_RESOURCE_KIND } from '../constants/kubernetes.ts'
 
 export interface EditWorkloadTargetParams {
+  [key: string]: string
   kind: string
   namespace: string
   name: string

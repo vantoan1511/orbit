@@ -113,11 +113,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // View Details
-    const noDetailsKinds: readonly string[] = [
-      KUBERNETES_RESOURCE_KIND.PersistentVolume,
-      KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim,
-      KUBERNETES_RESOURCE_KIND.Node
-    ]
+    const noDetailsKinds: readonly string[] = [KUBERNETES_RESOURCE_KIND.Node]
     if (!noDetailsKinds.includes(resourceKind)) {
       items.push({
         label: 'View Details',
