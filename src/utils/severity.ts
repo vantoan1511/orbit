@@ -6,6 +6,7 @@ import {
   KUBERNETES_POD_STATUS,
   KUBERNETES_RESOURCE_KIND,
   KUBERNETES_SERVICE_TYPE,
+  KUBERNETES_VOLUME_STATUS,
   KUBERNETES_WORKLOAD_STATUS
 } from '../constants/kubernetes.ts'
 
@@ -126,6 +127,25 @@ export function getWorkloadStatusBadgeClass(status?: string): string {
       return 'bg-(--warning)'
     case KUBERNETES_WORKLOAD_STATUS.Failed:
     case KUBERNETES_POD_STATUS.CrashLoopBackOff:
+      return 'bg-(--danger)'
+    default:
+      return 'bg-muted-color'
+  }
+}
+
+/**
+ * Returns background color class for a Volume status dot/badge.
+ */
+export function getVolumeStatusBadgeClass(status?: string): string {
+  switch (status) {
+    case KUBERNETES_VOLUME_STATUS.Bound:
+    case KUBERNETES_VOLUME_STATUS.Available:
+      return 'bg-(--success)'
+    case KUBERNETES_VOLUME_STATUS.Pending:
+    case KUBERNETES_VOLUME_STATUS.Released:
+      return 'bg-(--warning)'
+    case KUBERNETES_VOLUME_STATUS.Failed:
+    case KUBERNETES_VOLUME_STATUS.Lost:
       return 'bg-(--danger)'
     default:
       return 'bg-muted-color'

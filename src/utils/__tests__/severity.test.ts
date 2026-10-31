@@ -5,14 +5,16 @@ import {
   getNodeStatusBadgeClass,
   getNamespaceStatusBadgeClass,
   getWorkloadStatusBadgeClass,
-  getPolicyStatusBadgeClass
+  getPolicyStatusBadgeClass,
+  getVolumeStatusBadgeClass
 } from '../severity.ts'
 import {
   KUBERNETES_NODE_STATUS,
   KUBERNETES_POD_STATUS,
   KUBERNETES_NAMESPACE_STATUS,
   KUBERNETES_WORKLOAD_STATUS,
-  KUBERNETES_JOB_STATUS
+  KUBERNETES_JOB_STATUS,
+  KUBERNETES_VOLUME_STATUS
 } from '../../constants/kubernetes.ts'
 
 test('getPodStatusBadgeClass returns semantic CSS variable classes', () => {
@@ -59,4 +61,15 @@ test('getWorkloadStatusBadgeClass and getPolicyStatusBadgeClass return semantic 
   assert.equal(getPolicyStatusBadgeClass('Audit'), 'bg-(--info)')
   assert.equal(getPolicyStatusBadgeClass('Disabled'), 'bg-muted-color')
   assert.equal(getPolicyStatusBadgeClass(undefined), 'bg-muted-color')
+})
+
+test('getVolumeStatusBadgeClass returns semantic CSS variable classes', () => {
+  assert.equal(getVolumeStatusBadgeClass(KUBERNETES_VOLUME_STATUS.Bound), 'bg-(--success)')
+  assert.equal(getVolumeStatusBadgeClass(KUBERNETES_VOLUME_STATUS.Available), 'bg-(--success)')
+  assert.equal(getVolumeStatusBadgeClass(KUBERNETES_VOLUME_STATUS.Pending), 'bg-(--warning)')
+  assert.equal(getVolumeStatusBadgeClass(KUBERNETES_VOLUME_STATUS.Released), 'bg-(--warning)')
+  assert.equal(getVolumeStatusBadgeClass(KUBERNETES_VOLUME_STATUS.Failed), 'bg-(--danger)')
+  assert.equal(getVolumeStatusBadgeClass(KUBERNETES_VOLUME_STATUS.Lost), 'bg-(--danger)')
+  assert.equal(getVolumeStatusBadgeClass('Unknown'), 'bg-muted-color')
+  assert.equal(getVolumeStatusBadgeClass(undefined), 'bg-muted-color')
 })

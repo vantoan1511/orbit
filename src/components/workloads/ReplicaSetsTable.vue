@@ -4,11 +4,14 @@ import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constant
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
+import { withReplicasSortKey } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
 const loading = ref(false)
+
+const replicaSets = computed(() => withReplicasSortKey(k8sStore.replicaSets))
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
@@ -39,7 +42,7 @@ const fetchReplicaSets = async () => {
 <template>
   <GenericResourceTable
     data-component="replicasets-table"
-    :data="k8sStore.replicaSets"
+    :data="replicaSets"
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"
@@ -52,7 +55,14 @@ const fetchReplicaSets = async () => {
   >
     <template #default="{ visibleCols }">
       <!-- Replicas Column -->
-      <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
+      <Column
+        v-if="visibleCols['replicas']"
+        field="replicas"
+        sortField="replicasSortKey"
+        header="Replicas"
+        sortable
+        class="p-3"
+      >
         <template #body="{ data }">
           <div class="flex items-center gap-2 font-mono text-muted-color">
             <span class="font-bold">{{ data.replicas.current }}</span>

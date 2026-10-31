@@ -32,3 +32,35 @@ test('getResourceRaw forwards requestId to coreEngine.dispatch', async () => {
     coreEngine.dispatch = originalDispatch
   }
 })
+
+test('applyResource forwards requestId and resource data to coreEngine.dispatch', async () => {
+  let calledEvent = ''
+  let calledData: unknown = null
+
+  const originalDispatch = coreEngine.dispatch
+  coreEngine.dispatch = async (event: string, data?: unknown) => {
+    calledEvent = event
+    calledData = data
+  }
+
+  try {
+    await kubernetesService.applyResource({
+      namespace: 'prod',
+      kind: 'Deployment',
+      name: 'api',
+      data: { spec: { replicas: 3 } },
+      requestId: 'edit:Deployment:prod:api:1'
+    })
+
+    assert.equal(calledEvent, 'applyResource')
+    assert.deepEqual(calledData, {
+      namespace: 'prod',
+      kind: 'Deployment',
+      name: 'api',
+      data: { spec: { replicas: 3 } },
+      requestId: 'edit:Deployment:prod:api:1'
+    })
+  } finally {
+    coreEngine.dispatch = originalDispatch
+  }
+})

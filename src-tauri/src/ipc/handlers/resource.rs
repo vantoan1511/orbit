@@ -54,6 +54,35 @@ pub fn get_resource_raw(
     });
 }
 
+pub(crate) fn build_apply_finished_event(
+    kind: String,
+    name: String,
+    namespace: String,
+    request_id: Option<String>,
+    result: Result<Value, String>,
+) -> OrbitEvent {
+    match result {
+        Ok(data) => OrbitEvent::ResourceApplyFinished {
+            kind,
+            name,
+            namespace,
+            request_id,
+            success: true,
+            data: Some(data),
+            error: None,
+        },
+        Err(err_msg) => OrbitEvent::ResourceApplyFinished {
+            kind,
+            name,
+            namespace,
+            request_id,
+            success: false,
+            data: None,
+            error: Some(err_msg),
+        },
+    }
+}
+
 pub fn apply_resource(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -64,6 +93,7 @@ pub fn apply_resource(
         let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
         let kind = get_string(&data, "kind").unwrap_or_default();
         let name = get_string(&data, "name").unwrap_or_default();
+        let request_id = get_string(&data, "requestId");
         let raw_json = data.as_ref()
             .and_then(|d| d.get("data"))
             .cloned()
@@ -74,6 +104,7 @@ pub fn apply_resource(
             namespace = %namespace,
             kind = %kind,
             name = %name,
+            ?request_id,
             "Kubernetes operation started"
         );
 
@@ -84,7 +115,7 @@ pub fn apply_resource(
 
         if let Some(ref client) = client {
             match crate::kubernetes::apply_resource(client, &namespace, &kind, &name, raw_json).await {
-                Ok(()) => {
+                Ok(updated_data) => {
                     tracing::info!(
                         event = "applyResource",
                         namespace = %namespace,
@@ -99,6 +130,17 @@ pub fn apply_resource(
                             message: format!("Applied {} {}", kind, name),
                         },
                     ).await;
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &build_apply_finished_event(
+                            kind,
+                            name,
+                            namespace,
+                            request_id,
+                            Ok(updated_data),
+                        ),
+                    ).await;
                 }
                 Err(e) => {
                     tracing::error!(
@@ -109,15 +151,47 @@ pub fn apply_resource(
                         error = %e,
                         "Kubernetes operation failed"
                     );
+                    let formatted_err = crate::kubernetes::format_error(&e);
                     let _ = Bridge::send_event(
                         &writer,
                         &token,
                         &OrbitEvent::ErrorOccurred {
-                            message: format!("Failed to apply resource: {}", crate::kubernetes::format_error(&e)),
+                            message: format!("Failed to apply resource: {}", formatted_err),
                         },
+                    ).await;
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &build_apply_finished_event(
+                            kind,
+                            name,
+                            namespace,
+                            request_id,
+                            Err(formatted_err),
+                        ),
                     ).await;
                 }
             }
+        } else {
+            let err_msg = "Failed to apply resource: no active Kubernetes client".to_string();
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: err_msg.clone(),
+                },
+            ).await;
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &build_apply_finished_event(
+                    kind,
+                    name,
+                    namespace,
+                    request_id,
+                    Err(err_msg),
+                ),
+            ).await;
         }
     });
 }
@@ -290,4 +364,72 @@ pub fn delete_resource(
             ).await;
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_apply_finished_event_success() {
+        let data = serde_json::json!({"metadata": {"resourceVersion": "100"}});
+        let evt = build_apply_finished_event(
+            "Deployment".to_string(),
+            "web".to_string(),
+            "default".to_string(),
+            Some("req-123".to_string()),
+            Ok(data.clone()),
+        );
+        match evt {
+            OrbitEvent::ResourceApplyFinished {
+                kind,
+                name,
+                namespace,
+                request_id,
+                success,
+                data: evt_data,
+                error,
+            } => {
+                assert_eq!(kind, "Deployment");
+                assert_eq!(name, "web");
+                assert_eq!(namespace, "default");
+                assert_eq!(request_id, Some("req-123".to_string()));
+                assert!(success);
+                assert_eq!(evt_data, Some(data));
+                assert_eq!(error, None);
+            }
+            _ => panic!("Expected ResourceApplyFinished"),
+        }
+    }
+
+    #[test]
+    fn test_build_apply_finished_event_failure() {
+        let evt = build_apply_finished_event(
+            "Deployment".to_string(),
+            "web".to_string(),
+            "default".to_string(),
+            None,
+            Err("Conflict".to_string()),
+        );
+        match evt {
+            OrbitEvent::ResourceApplyFinished {
+                kind,
+                name,
+                namespace,
+                request_id,
+                success,
+                data,
+                error,
+            } => {
+                assert_eq!(kind, "Deployment");
+                assert_eq!(name, "web");
+                assert_eq!(namespace, "default");
+                assert_eq!(request_id, None);
+                assert!(!success);
+                assert_eq!(data, None);
+                assert_eq!(error, Some("Conflict".to_string()));
+            }
+            _ => panic!("Expected ResourceApplyFinished"),
+        }
+    }
 }

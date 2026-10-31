@@ -4,24 +4,9 @@ import { Card } from 'primevue'
 import { Database, HardDrive, FileSpreadsheet, Layers } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
+import { parseCapacityToGiB, formatStorageGiB } from '@/utils/storageQuantity'
 
 const k8sStore = useKubernetesStore()
-
-const parseCapacityToGiB = (cap: string): number => {
-  const num = parseFloat(cap)
-  if (isNaN(num)) return 0
-  if (cap.toLowerCase().includes('tib')) return num * 1024
-  if (cap.toLowerCase().includes('gib')) return num
-  if (cap.toLowerCase().includes('mib')) return num / 1024
-  return num
-}
-
-const formatCapacity = (gib: number): string => {
-  if (gib >= 1024) {
-    return `${(gib / 1024).toFixed(1)} TiB`
-  }
-  return `${gib.toFixed(1)} GiB`
-}
 
 const metrics = computed(() => {
   const pvs = k8sStore.persistentVolumes
@@ -52,14 +37,14 @@ const metrics = computed(() => {
   return [
     {
       title: 'Total Capacity',
-      value: formatCapacity(totalCapGiB),
+      value: formatStorageGiB(totalCapGiB),
       subtext: `${totalPVs} Total Volumes`,
       icon: Database,
       iconClass: 'bg-(--bg-hover) text-muted-color'
     },
     {
       title: 'Used Capacity',
-      value: formatCapacity(usedCapGiB),
+      value: formatStorageGiB(usedCapGiB),
       subtext: `${usedPct}% of cluster total`,
       subtextClass: 'text-(--accent) font-medium',
       icon: HardDrive,
@@ -67,7 +52,7 @@ const metrics = computed(() => {
     },
     {
       title: 'Available Capacity',
-      value: formatCapacity(availableCapGiB),
+      value: formatStorageGiB(availableCapGiB),
       subtext: `${availablePct}% remaining`,
       subtextClass: 'text-(--success) font-medium',
       icon: HardDrive,

@@ -181,6 +181,20 @@ pub enum OrbitEvent {
         request_id: Option<String>,
         data: serde_json::Value,
     },
+    #[serde(rename = "resourceApplyFinished")]
+    #[serde(rename_all = "camelCase")]
+    ResourceApplyFinished {
+        kind: String,
+        name: String,
+        namespace: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
+        success: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
     #[serde(rename = "portForwardStarted")]
     #[serde(rename_all = "camelCase")]
     PortForwardStarted {
@@ -270,6 +284,7 @@ impl OrbitEvent {
             OrbitEvent::UpdateReady { .. } => "updateReady",
             OrbitEvent::UpdateInstallFailed { .. } => "updateInstallFailed",
             OrbitEvent::ResourceRawData { .. } => "resourceRawData",
+            OrbitEvent::ResourceApplyFinished { .. } => "resourceApplyFinished",
             OrbitEvent::PortForwardStarted { .. } => "portForwardStarted",
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
             OrbitEvent::PortForwardsUpdated { .. } => "portForwardsUpdated",
@@ -351,5 +366,51 @@ mod tests {
         let json_no_req = serde_json::to_string(&evt_no_req).unwrap();
         assert!(!json_no_req.contains("requestId"));
         assert_eq!(evt.event_name(), "resourceRawData");
+    }
+
+    #[test]
+    fn test_resource_apply_finished_serialization() {
+        let evt = OrbitEvent::ResourceApplyFinished {
+            kind: "Deployment".to_string(),
+            name: "api".to_string(),
+            namespace: "prod".to_string(),
+            request_id: Some("save-1".to_string()),
+            success: true,
+            data: Some(serde_json::json!({
+                "metadata": {
+                    "resourceVersion": "42"
+                }
+            })),
+            error: None,
+        };
+        let json = serde_json::to_string(&evt).unwrap();
+        let val: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(val["event"], "resourceApplyFinished");
+        assert_eq!(val["data"]["kind"], "Deployment");
+        assert_eq!(val["data"]["name"], "api");
+        assert_eq!(val["data"]["namespace"], "prod");
+        assert_eq!(val["data"]["requestId"], "save-1");
+        assert_eq!(val["data"]["success"], true);
+        assert_eq!(val["data"]["data"]["metadata"]["resourceVersion"], "42");
+        assert!(val["data"].get("error").is_none());
+        assert_eq!(evt.event_name(), "resourceApplyFinished");
+
+        let err_evt = OrbitEvent::ResourceApplyFinished {
+            kind: "Deployment".to_string(),
+            name: "api".to_string(),
+            namespace: "prod".to_string(),
+            request_id: None,
+            success: false,
+            data: None,
+            error: Some("conflict".to_string()),
+        };
+        let err_json = serde_json::to_string(&err_evt).unwrap();
+        let err_val: serde_json::Value = serde_json::from_str(&err_json).unwrap();
+        assert_eq!(err_val["event"], "resourceApplyFinished");
+        assert_eq!(err_val["data"]["success"], false);
+        assert_eq!(err_val["data"]["error"], "conflict");
+        assert!(err_val["data"].get("requestId").is_none());
+        assert!(err_val["data"].get("data").is_none());
+        assert_eq!(err_evt.event_name(), "resourceApplyFinished");
     }
 }

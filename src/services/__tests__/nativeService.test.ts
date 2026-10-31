@@ -305,3 +305,84 @@ test('windowService delegates to getCurrentWindow in Tauri environment', async (
     ;(globalThis as unknown as { window?: unknown }).window = originalWindow
   }
 })
+
+test('events.off called before async Tauri listen resolves immediately unlistens and suppresses handler', async () => {
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {}
+  }
+
+  let unlistenCalled = 0
+  let handlerCalled = 0
+  let capturedCallback: ((evt: { payload: unknown }) => void) | null = null
+  let resolveListenPromise!: (unlisten: () => void) => void
+
+  const deferredListenPromise = new Promise<() => void>((resolve) => {
+    resolveListenPromise = resolve
+  })
+
+  events.__setMockListen?.((_event, cb) => {
+    capturedCallback = cb as (evt: { payload: unknown }) => void
+    return deferredListenPromise
+  })
+
+  const handler = () => {
+    handlerCalled++
+  }
+
+  try {
+    const onPromise = events.on('commandSucceeded', handler)
+    await events.off('commandSucceeded', handler)
+
+    resolveListenPromise(() => {
+      unlistenCalled++
+    })
+    await onPromise
+
+    if (capturedCallback) {
+      capturedCallback({ payload: { message: 'should be ignored' } })
+    }
+
+    assert.equal(unlistenCalled, 1)
+    assert.equal(handlerCalled, 0)
+  } finally {
+    events.__setMockListen?.(null)
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('events.off suppresses Tauri callback even if native emitter fires after removal', async () => {
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {}
+  }
+
+  let unlistenCalled = 0
+  let handlerCalled = 0
+  let capturedCallback: ((evt: { payload: unknown }) => void) | null = null
+
+  events.__setMockListen?.((_event, cb) => {
+    capturedCallback = cb as (evt: { payload: unknown }) => void
+    return Promise.resolve(() => {
+      unlistenCalled++
+    })
+  })
+
+  const handler = () => {
+    handlerCalled++
+  }
+
+  try {
+    await events.on('commandSucceeded', handler)
+    await events.off('commandSucceeded', handler)
+
+    assert.equal(unlistenCalled, 1)
+    if (capturedCallback) {
+      capturedCallback({ payload: { message: 'late native event' } })
+    }
+    assert.equal(handlerCalled, 0)
+  } finally {
+    events.__setMockListen?.(null)
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})

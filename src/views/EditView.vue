@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { kubernetesService } from '@/services/kubernetesService'
 import { events } from '@/services/nativeService'
-import { OrbitEvents } from '@/types/events'
-import VueMonacoEditor from '@guolao/vue-monaco-editor'
+import { OrbitEvents, type OrbitEventMap } from '@/types/events'
+import { useTabsStore } from '@/stores/tabsStore'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import ToggleSwitch from 'primevue/toggleswitch'
 import { useToast } from 'primevue/usetoast'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Component } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import * as yaml from 'yaml'
 
 import { ArrowLeft, Loader2 } from '@lucide/vue'
 import KeyValueEditor from '@/components/shared/KeyValueEditor.vue'
+import YamlCodeEditorLoading from '@/components/shared/YamlCodeEditorLoading.vue'
 import ConfigMapEditForm from '@/components/config/ConfigMapEditForm.vue'
 import SecretEditForm from '@/components/config/SecretEditForm.vue'
 import IngressEditForm from '@/components/network/IngressEditForm.vue'
@@ -25,24 +26,52 @@ import PodEditForm from '@/components/workloads/PodEditForm.vue'
 import ReplicaSetEditForm from '@/components/workloads/ReplicaSetEditForm.vue'
 import JobEditForm from '@/components/workloads/JobEditForm.vue'
 import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
+import PersistentVolumeEditForm from '@/components/storage/PersistentVolumeEditForm.vue'
+import PersistentVolumeClaimEditForm from '@/components/storage/PersistentVolumeClaimEditForm.vue'
+import StorageClassEditForm from '@/components/storage/StorageClassEditForm.vue'
 import { useTheme } from '@/composables/useTheme'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { KubernetesResource } from '@/types/kubernetes'
+import { RESOURCE_BREADCRUMB_MAP } from '@/utils/breadcrumb'
 import {
+  applyMetadataFormValuesToResource,
   buildEditRequestId,
+  extractResourceMetadataFormValues,
   matchesEditResponse,
-  shouldHandleCommandResult
+  matchesSaveResult,
+  transitionEditMode
 } from '@/utils/editSession'
 
-const props = defineProps<{
-  kind: string
-  namespace: string
-  name: string
-}>()
+const YamlCodeEditor = defineAsyncComponent({
+  loader: () => import('@/components/shared/YamlCodeEditor.vue'),
+  loadingComponent: YamlCodeEditorLoading,
+  delay: 0
+})
+
+const props = withDefaults(
+  defineProps<{
+    kind?: string
+    namespace?: string
+    name?: string
+  }>(),
+  {
+    kind: '',
+    namespace: '',
+    name: ''
+  }
+)
 
 const router = useRouter()
+const route = useRoute()
+const tabsStore = useTabsStore()
 const toast = useToast()
 const { isDark } = useTheme()
+
+const resourceKind = computed(() => (props.kind || (route.params.kind as string) || '').trim())
+const resourceNamespace = computed(() =>
+  (props.namespace || (route.params.namespace as string) || '').trim()
+)
+const resourceName = computed(() => (props.name || (route.params.name as string) || '').trim())
 
 const rawData = ref<KubernetesResource | null>(null)
 const formComponentMap: Record<string, Component> = {
@@ -56,9 +85,15 @@ const formComponentMap: Record<string, Component> = {
   [KUBERNETES_RESOURCE_KIND.Service]: ServiceEditForm,
   [KUBERNETES_RESOURCE_KIND.ConfigMap]: ConfigMapEditForm,
   [KUBERNETES_RESOURCE_KIND.Secret]: SecretEditForm,
-  [KUBERNETES_RESOURCE_KIND.Namespace]: NamespaceEditForm
+  [KUBERNETES_RESOURCE_KIND.Namespace]: NamespaceEditForm,
+  [KUBERNETES_RESOURCE_KIND.PersistentVolume]: PersistentVolumeEditForm,
+  [KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim]: PersistentVolumeClaimEditForm,
+  [KUBERNETES_RESOURCE_KIND.StorageClass]: StorageClassEditForm
 }
-const activeFormComponent = computed(() => formComponentMap[props.kind] || null)
+const activeFormComponent = computed(() => formComponentMap[resourceKind.value] || null)
+const isClusterScoped = computed(() => {
+  return Boolean(RESOURCE_BREADCRUMB_MAP[resourceKind.value]?.isClusterScoped)
+})
 const yamlContent = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -76,7 +111,7 @@ const isYamlValid = computed(() => {
 })
 
 const isFormValid = computed(() => {
-  return isYamlMode.value ? isYamlValid.value : isChildFormValid.value
+  return isYamlMode.value ? isYamlValid.value : !activeFormComponent.value || isChildFormValid.value
 })
 
 // Simple form fields
@@ -88,6 +123,7 @@ const formValues = ref({
 })
 
 let currentRequestId = ''
+let activeSaveRequestId = ''
 let eventHandler: (data: {
   name: string
   kind: string
@@ -95,8 +131,13 @@ let eventHandler: (data: {
   requestId?: string
   data: Record<string, unknown>
 }) => void
-let errorHandler: (data: { message: string }) => void
-let successHandler: (data: { message?: string }) => void
+let applyFinishedHandler: (payload: OrbitEventMap['resourceApplyFinished']) => void
+
+const applyLoadedResource = (resource: KubernetesResource) => {
+  rawData.value = resource
+  yamlContent.value = yaml.stringify(resource)
+  formValues.value = extractResourceMetadataFormValues(resource)
+}
 
 const resetState = () => {
   rawData.value = null
@@ -104,6 +145,8 @@ const resetState = () => {
   isYamlMode.value = false
   isLoading.value = true
   isSaving.value = false
+  isChildFormValid.value = true
+  activeSaveRequestId = ''
   formValues.value = {
     name: '',
     namespace: '',
@@ -113,21 +156,29 @@ const resetState = () => {
 }
 
 const loadResource = () => {
-  currentRequestId = buildEditRequestId(props.kind, props.namespace, props.name)
+  const kind = resourceKind.value
+  const namespace = resourceNamespace.value
+  const name = resourceName.value
+  if (!kind || !name) {
+    return
+  }
+  currentRequestId = buildEditRequestId(kind, namespace, name)
   isLoading.value = true
   kubernetesService.getResourceRaw({
-    namespace: props.namespace,
-    kind: props.kind,
-    name: props.name,
+    namespace,
+    kind,
+    name,
     requestId: currentRequestId
   })
 }
 
 watch(
-  () => [props.kind, props.namespace, props.name],
+  () => [resourceKind.value, resourceNamespace.value, resourceName.value],
   () => {
     resetState()
-    loadResource()
+    if (resourceKind.value && resourceName.value) {
+      loadResource()
+    }
   }
 )
 
@@ -148,52 +199,41 @@ onMounted(() => {
           requestId: data.requestId
         },
         {
-          kind: props.kind,
-          namespace: props.namespace,
-          name: props.name,
+          kind: resourceKind.value,
+          namespace: resourceNamespace.value,
+          name: resourceName.value,
           requestId: currentRequestId
         }
       )
     ) {
-      rawData.value = data.data as KubernetesResource
-      yamlContent.value = yaml.stringify(rawData.value)
-
-      // Populate basic form fields
-      const metadata = rawData.value?.metadata || {}
-      formValues.value.name = metadata.name || ''
-      formValues.value.namespace = metadata.namespace || ''
-
-      const lbls = metadata.labels || {}
-      formValues.value.labels = Object.entries(lbls).map(([key, value]) => ({
-        key,
-        value: String(value)
-      }))
-
-      const anns = metadata.annotations || {}
-      formValues.value.annotations = Object.entries(anns).map(([key, value]) => ({
-        key,
-        value: String(value)
-      }))
-
+      applyLoadedResource(data.data as KubernetesResource)
       isLoading.value = false
     }
   }
 
-  errorHandler = () => {
-    // Error toast is handled globally by App.vue
-    if (!shouldHandleCommandResult(isSaving.value)) return
-    isSaving.value = false
-  }
+  applyFinishedHandler = (payload: OrbitEventMap['resourceApplyFinished']) => {
+    if (
+      !matchesSaveResult(payload, {
+        isSaving: isSaving.value,
+        kind: resourceKind.value,
+        namespace: resourceNamespace.value,
+        name: resourceName.value,
+        requestId: activeSaveRequestId
+      })
+    ) {
+      return
+    }
 
-  successHandler = () => {
-    if (!shouldHandleCommandResult(isSaving.value)) return
     isSaving.value = false
-    router.back()
+    activeSaveRequestId = ''
+
+    if (payload.success && payload.data) {
+      applyLoadedResource(payload.data as KubernetesResource)
+    }
   }
 
   events.on(OrbitEvents.ResourceRawData, eventHandler)
-  events.on(OrbitEvents.ErrorOccurred, errorHandler)
-  events.on(OrbitEvents.CommandSucceeded, successHandler)
+  events.on(OrbitEvents.ResourceApplyFinished, applyFinishedHandler)
 
   // Fetch initial data
   loadResource()
@@ -201,42 +241,52 @@ onMounted(() => {
 
 onUnmounted(() => {
   events.off(OrbitEvents.ResourceRawData, eventHandler)
-  events.off(OrbitEvents.ErrorOccurred, errorHandler)
-  events.off(OrbitEvents.CommandSucceeded, successHandler)
+  events.off(OrbitEvents.ResourceApplyFinished, applyFinishedHandler)
 })
 
 const goBack = () => {
-  router.back()
-}
-
-const handleModeToggle = () => {
-  if (!isYamlMode.value) {
-    // Toggled from YAML to Form mode -> sync YAML back to rawData
-    try {
-      const parsed = yaml.parse(yamlContent.value) as KubernetesResource
-      if (parsed && typeof parsed === 'object') {
-        rawData.value = parsed
-      }
-    } catch (err) {
-      toast.add({
-        severity: 'error',
-        summary: 'YAML Parse Error',
-        detail: `Cannot switch to Form mode: ${err}`,
-        life: 5000
-      })
-      isYamlMode.value = true // Keep in YAML mode so user can fix syntax
-    }
-  } else {
-    // Toggled from Form to YAML mode -> ensure YAML string reflects latest rawData
-    if (rawData.value) {
-      yamlContent.value = yaml.stringify(rawData.value)
+  const tabId = route.fullPath
+  if (tabsStore.tabs.some((t) => t.id === tabId || t.route === tabId)) {
+    const nextRoute = tabsStore.closeTabAndResolveRoute(tabId)
+    if (nextRoute) {
+      void router.replace(nextRoute)
+      return
     }
   }
+  void router.replace('/')
+}
+
+const handleModeChange = (targetYamlMode: boolean) => {
+  const result = transitionEditMode({
+    targetYamlMode,
+    rawData: rawData.value,
+    yamlContent: yamlContent.value,
+    hasCustomForm: Boolean(activeFormComponent.value)
+  })
+  if (!result.ok) {
+    toast.add({
+      severity: 'error',
+      summary: 'YAML Parse Error',
+      detail: `Cannot switch to Form mode: ${result.errorMessage}`,
+      life: 5000
+    })
+    return
+  }
+  rawData.value = result.rawData
+  yamlContent.value = result.yamlContent
+  if (result.formValues) {
+    formValues.value = result.formValues
+  }
+  isYamlMode.value = result.isYamlMode
 }
 
 const saveChanges = () => {
-  if (isSaving.value || isLoading.value) return
+  const kind = resourceKind.value
+  const namespace = resourceNamespace.value
+  const name = resourceName.value
+  if (!kind || !name || isSaving.value || isLoading.value) return
   isSaving.value = true
+  activeSaveRequestId = buildEditRequestId(kind, namespace, name)
   try {
     let updatedData: KubernetesResource
     if (isYamlMode.value) {
@@ -245,14 +295,16 @@ const saveChanges = () => {
       updatedData = rawData.value || {}
     }
     kubernetesService.applyResource({
-      namespace: props.namespace,
-      kind: props.kind,
-      name: props.name,
-      data: updatedData
+      namespace,
+      kind,
+      name,
+      data: updatedData,
+      requestId: activeSaveRequestId
     })
   } catch (err) {
     toast.add({ severity: 'error', summary: 'YAML Parse Error', detail: String(err), life: 5000 })
     isSaving.value = false
+    activeSaveRequestId = ''
   }
 }
 
@@ -261,38 +313,12 @@ const handleCustomFormUpdate = (updatedData: KubernetesResource) => {
   yamlContent.value = yaml.stringify(updatedData)
 }
 
-// Watch form fields to sync to YAML for fallback non-custom resources
-watch(
-  () => formValues.value,
-  (newVal) => {
-    if (!rawData.value || activeFormComponent.value) return
-    try {
-      const currentData = yaml.parse(yamlContent.value) || {}
-      if (!currentData.metadata) currentData.metadata = {}
-
-      currentData.metadata.labels = newVal.labels.reduce(
-        (acc, { key, value }) => {
-          if (key) acc[key] = value
-          return acc
-        },
-        {} as Record<string, string>
-      )
-
-      currentData.metadata.annotations = newVal.annotations.reduce(
-        (acc, { key, value }) => {
-          if (key) acc[key] = value
-          return acc
-        },
-        {} as Record<string, string>
-      )
-
-      yamlContent.value = yaml.stringify(currentData)
-    } catch {
-      // Ignore parse errors while typing
-    }
-  },
-  { deep: true }
-)
+const handleFallbackMetadataChange = () => {
+  if (!rawData.value || activeFormComponent.value) return
+  const updated = applyMetadataFormValuesToResource(rawData.value, formValues.value)
+  rawData.value = updated
+  yamlContent.value = yaml.stringify(updated)
+}
 </script>
 
 <template>
@@ -316,13 +342,13 @@ watch(
         </Button>
         <div class="flex flex-col">
           <h1 class="text-lg font-bold tracking-tight text-primary leading-tight">
-            Edit {{ props.kind }}
+            Edit {{ resourceKind }}
           </h1>
           <span class="text-xs font-medium text-muted-color font-mono">
             {{
-              props.namespace && props.namespace !== '-'
-                ? `${props.namespace} / ${props.name}`
-                : props.name
+              !isClusterScoped && resourceNamespace && resourceNamespace !== '-'
+                ? `${resourceNamespace} / ${resourceName}`
+                : resourceName
             }}
           </span>
         </div>
@@ -337,7 +363,7 @@ watch(
           >
             Form
           </span>
-          <ToggleSwitch v-model="isYamlMode" @change="handleModeToggle" />
+          <ToggleSwitch :model-value="isYamlMode" @update:model-value="handleModeChange" />
           <span
             class="text-xs font-medium transition-colors"
             :class="isYamlMode ? 'text-primary font-semibold' : 'text-muted-color'"
@@ -413,7 +439,12 @@ watch(
               <div
                 class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
               >
-                <KeyValueEditor v-model="formValues.labels" title="Labels" add-label="Add Label" />
+                <KeyValueEditor
+                  v-model="formValues.labels"
+                  title="Labels"
+                  add-label="Add Label"
+                  @update:model-value="handleFallbackMetadataChange"
+                />
               </div>
               <div
                 class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
@@ -422,6 +453,7 @@ watch(
                   v-model="formValues.annotations"
                   title="Annotations"
                   add-label="Add Annotation"
+                  @update:model-value="handleFallbackMetadataChange"
                 />
               </div>
             </div>
@@ -431,24 +463,7 @@ watch(
 
       <!-- YAML Mode -->
       <div v-else class="w-full h-full flex-1 min-h-0 pt-2">
-        <vue-monaco-editor
-          v-model:value="yamlContent"
-          :theme="isDark ? 'vs-dark' : 'vs'"
-          language="yaml"
-          height="100%"
-          width="100%"
-          :options="{
-            automaticLayout: true,
-            minimap: { enabled: true },
-            fontSize: 13,
-            lineHeight: 22,
-            scrollBeyondLastLine: false,
-            roundedSelection: false,
-            padding: { top: 16 },
-            readOnly: isSaving
-          }"
-          class="h-full w-full"
-        />
+        <YamlCodeEditor v-model="yamlContent" :is-dark="isDark" :read-only="isSaving" />
       </div>
     </div>
   </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import PersistentVolumeDetailsDrawer from '@/components/storage/PersistentVolumeDetailsDrawer.vue'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
@@ -84,7 +85,7 @@ const handleRefresh = async () => {
     <!-- Custom Name with Alert -->
     <template #name="{ data }">
       <div class="flex items-center gap-1.5">
-        <span class="font-semibold font-mono truncate max-w-56" :title="data.name">
+        <span class="font-semibold font-mono truncate max-w-56" v-tooltip.top="data.name">
           {{ data.name }}
         </span>
         <AlertCircle
@@ -138,6 +139,15 @@ const handleRefresh = async () => {
           <span class="font-mono text-muted-color font-semibold">{{ data.storageClass }}</span>
         </template>
       </Column>
+    </template>
+
+    <!-- Details Drawer Slot -->
+    <template #drawer="{ visible, selectedItem, close }">
+      <PersistentVolumeDetailsDrawer
+        :visible="visible"
+        :pv="selectedItem"
+        @update:visible="(val) => !val && close()"
+      />
     </template>
   </GenericResourceTable>
 </template>

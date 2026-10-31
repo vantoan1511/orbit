@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import StorageClassDetailsDrawer from '@/components/storage/StorageClassDetailsDrawer.vue'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 
 const k8sStore = useKubernetesStore()
 
@@ -87,6 +89,15 @@ const handleRefresh = async () => {
           />
         </template>
       </Column>
+    </template>
+
+    <!-- Details Drawer Slot -->
+    <template #drawer="{ visible, selectedItem, close }">
+      <StorageClassDetailsDrawer
+        :visible="visible"
+        :storage-class="selectedItem"
+        @update:visible="(val) => !val && close()"
+      />
     </template>
   </GenericResourceTable>
 </template>

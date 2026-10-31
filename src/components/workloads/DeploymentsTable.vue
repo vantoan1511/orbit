@@ -13,7 +13,7 @@ import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
-import { computeDeploymentRestarts } from '@/utils/workloadMetrics'
+import { computeDeploymentRestarts, computeReplicasSortKey } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
 const loading = ref(false)
@@ -36,7 +36,8 @@ const deployments = computed(() => {
   const restartMap = deploymentRestartsMap.value
   return k8sStore.deployments.map((d) => ({
     ...d,
-    restarts: restartMap.get(`${d.namespace}/${d.name}`) ?? 0
+    restarts: restartMap.get(`${d.namespace}/${d.name}`) ?? 0,
+    replicasSortKey: computeReplicasSortKey(d.replicas)
   }))
 })
 
@@ -204,11 +205,18 @@ const saveImages = async () => {
       </Column>
 
       <!-- Replicas Column -->
-      <Column v-if="visibleCols['replicas']" header="Replicas" class="p-3">
+      <Column
+        v-if="visibleCols['replicas']"
+        field="replicas"
+        sortField="replicasSortKey"
+        header="Replicas"
+        sortable
+        class="p-3"
+      >
         <template #body="{ data }">
           <div
-            class="group inline-flex items-center gap-1.5 font-mono text-muted-color px-1.5 py-0.5 rounded hover:bg-(--bg-hover) hover:text-primary transition-colors cursor-pointer"
-            title="Click to edit replicas"
+            v-tooltip.top="'Click to edit replicas'"
+            class="group inline-flex items-center gap-1.5 font-mono text-muted-color px-1.5 py-0.5 rounded-[var(--ui-radius-control)] hover:bg-(--bg-hover) hover:text-primary transition-colors cursor-pointer"
             @click.stop="openReplicasEdit($event, data)"
           >
             <span class="font-bold">{{ data.replicas.current }}</span>
@@ -271,8 +279,8 @@ const saveImages = async () => {
       <Column v-if="visibleCols['images']" header="Images" class="p-3 max-w-48">
         <template #body="{ data }">
           <div
+            v-tooltip.top="'Click to edit container images'"
             class="group flex items-center gap-1 max-w-full min-w-0 cursor-pointer"
-            title="Click to edit container images"
             @click.stop="openImagesEdit($event, data)"
           >
             <div class="flex flex-wrap gap-1 max-w-full min-w-0">
