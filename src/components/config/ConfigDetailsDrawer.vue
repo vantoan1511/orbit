@@ -196,21 +196,26 @@ const { displayedYaml, isYamlLoading, copied, copyYaml } = useResourceRawManifes
         <div>
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider">Used By</h3>
-            <button
-              type="button"
-              class="text-xs text-primary hover:text-primary/80 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+            <Button
+              variant="text"
+              size="small"
+              class="text-xs text-primary hover:text-primary/80 p-0 font-semibold flex items-center gap-1 h-auto"
+              :disabled="!props.resource?.mountedPods"
               @click="handleViewAllPods"
             >
-              <span>View all ({{ props.resource.mountedPods }})</span>
+              <span>View all ({{ props.resource?.mountedPods ?? 0 }})</span>
               <span class="text-[10px]">&rarr;</span>
-            </button>
+            </Button>
           </div>
           <div class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3 flex flex-col gap-2">
             <div
               v-for="pod in props.resource.usedBy"
               :key="pod.name"
               class="flex items-center justify-between p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-card) hover:bg-(--bg-hover) transition-colors cursor-pointer group"
+              tabindex="0"
+              role="button"
               @click="handleNavigateToPod(pod)"
+              @keydown.enter.space.prevent="handleNavigateToPod(pod)"
             >
               <div class="flex items-center gap-2 min-w-0">
                 <TagIcon

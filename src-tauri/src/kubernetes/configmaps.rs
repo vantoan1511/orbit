@@ -27,21 +27,21 @@ pub fn resolve_configmap_pod_usage(pods: &[Pod]) -> HashMap<(String, String), Ve
             // 1. Volumes & projected volumes
             if let Some(volumes) = &spec.volumes {
                 for vol in volumes {
-                    if let Some(cm) = &vol.config_map {
-                        if !cm.name.is_empty() {
-                            let entry = pod_cm_usage.entry(cm.name.clone()).or_insert((false, false, false));
-                            entry.0 = true;
-                        }
+                    if let Some(cm) = &vol.config_map
+                        && !cm.name.is_empty()
+                    {
+                        let entry = pod_cm_usage.entry(cm.name.clone()).or_insert((false, false, false));
+                        entry.0 = true;
                     }
-                    if let Some(proj) = &vol.projected {
-                        if let Some(sources) = &proj.sources {
-                            for source in sources {
-                                if let Some(cm) = &source.config_map {
-                                    if !cm.name.is_empty() {
-                                        let entry = pod_cm_usage.entry(cm.name.clone()).or_insert((false, false, false));
-                                        entry.0 = true;
-                                    }
-                                }
+                    if let Some(proj) = &vol.projected
+                        && let Some(sources) = &proj.sources
+                    {
+                        for source in sources {
+                            if let Some(cm) = &source.config_map
+                                && !cm.name.is_empty()
+                            {
+                                let entry = pod_cm_usage.entry(cm.name.clone()).or_insert((false, false, false));
+                                entry.0 = true;
                             }
                         }
                     }
@@ -53,23 +53,22 @@ pub fn resolve_configmap_pod_usage(pods: &[Pod]) -> HashMap<(String, String), Ve
                                       env_from: Option<&Vec<k8s_openapi::api::core::v1::EnvFromSource>>| {
                 if let Some(envs) = env {
                     for e in envs {
-                        if let Some(vf) = &e.value_from {
-                            if let Some(cm_ref) = &vf.config_map_key_ref {
-                                if !cm_ref.name.is_empty() {
-                                    let entry = pod_cm_usage.entry(cm_ref.name.clone()).or_insert((false, false, false));
-                                    entry.1 = true;
-                                }
-                            }
+                        if let Some(vf) = &e.value_from
+                            && let Some(cm_ref) = &vf.config_map_key_ref
+                            && !cm_ref.name.is_empty()
+                        {
+                            let entry = pod_cm_usage.entry(cm_ref.name.clone()).or_insert((false, false, false));
+                            entry.1 = true;
                         }
                     }
                 }
                 if let Some(efs) = env_from {
                     for ef in efs {
-                        if let Some(cm_ref) = &ef.config_map_ref {
-                            if !cm_ref.name.is_empty() {
-                                let entry = pod_cm_usage.entry(cm_ref.name.clone()).or_insert((false, false, false));
-                                entry.2 = true;
-                            }
+                        if let Some(cm_ref) = &ef.config_map_ref
+                            && !cm_ref.name.is_empty()
+                        {
+                            let entry = pod_cm_usage.entry(cm_ref.name.clone()).or_insert((false, false, false));
+                            entry.2 = true;
                         }
                     }
                 }

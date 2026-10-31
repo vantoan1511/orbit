@@ -48,4 +48,24 @@ test('ConfigDetailsDrawer.vue renders mountType badges and handles interactive p
     !/<(button|div|span|input|a)\b[^>]*\btitle=/i.test(content),
     'ConfigDetailsDrawer.vue must not contain native HTML title attributes on elements'
   )
+
+  // Must NOT use raw HTML <button> tags (PrimeVue Button enforcement)
+  assert.ok(
+    !/<button\b/.test(content),
+    'ConfigDetailsDrawer.vue must not contain raw <button> tags'
+  )
+
+  // Must ensure pod row has keyboard accessibility attributes
+  assert.ok(
+    content.includes('tabindex="0"'),
+    'ConfigDetailsDrawer.vue must specify tabindex="0" on pod row'
+  )
+  assert.ok(
+    content.includes('role="button"'),
+    'ConfigDetailsDrawer.vue must specify role="button" on pod row'
+  )
+  assert.ok(
+    content.includes('@keydown.enter.space.prevent'),
+    'ConfigDetailsDrawer.vue must handle keyboard activation via enter and space'
+  )
 })

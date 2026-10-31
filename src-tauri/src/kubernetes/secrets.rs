@@ -29,23 +29,22 @@ pub fn resolve_secret_pod_usage(pods: &[Pod]) -> HashMap<(String, String), Vec<U
             // 1. Volumes & projected volumes
             if let Some(volumes) = &spec.volumes {
                 for vol in volumes {
-                    if let Some(sec) = &vol.secret {
-                        if let Some(name) = &sec.secret_name {
-                            if !name.is_empty() {
-                                let entry = pod_sec_usage.entry(name.clone()).or_insert((false, false, false, false));
-                                entry.0 = true;
-                            }
-                        }
+                    if let Some(sec) = &vol.secret
+                        && let Some(name) = &sec.secret_name
+                        && !name.is_empty()
+                    {
+                        let entry = pod_sec_usage.entry(name.clone()).or_insert((false, false, false, false));
+                        entry.0 = true;
                     }
-                    if let Some(proj) = &vol.projected {
-                        if let Some(sources) = &proj.sources {
-                            for source in sources {
-                                if let Some(sec) = &source.secret {
-                                    if !sec.name.is_empty() {
-                                        let entry = pod_sec_usage.entry(sec.name.clone()).or_insert((false, false, false, false));
-                                        entry.0 = true;
-                                    }
-                                }
+                    if let Some(proj) = &vol.projected
+                        && let Some(sources) = &proj.sources
+                    {
+                        for source in sources {
+                            if let Some(sec) = &source.secret
+                                && !sec.name.is_empty()
+                            {
+                                let entry = pod_sec_usage.entry(sec.name.clone()).or_insert((false, false, false, false));
+                                entry.0 = true;
                             }
                         }
                     }
@@ -57,23 +56,22 @@ pub fn resolve_secret_pod_usage(pods: &[Pod]) -> HashMap<(String, String), Vec<U
                                       env_from: Option<&Vec<k8s_openapi::api::core::v1::EnvFromSource>>| {
                 if let Some(envs) = env {
                     for e in envs {
-                        if let Some(vf) = &e.value_from {
-                            if let Some(sec_ref) = &vf.secret_key_ref {
-                                if !sec_ref.name.is_empty() {
-                                    let entry = pod_sec_usage.entry(sec_ref.name.clone()).or_insert((false, false, false, false));
-                                    entry.1 = true;
-                                }
-                            }
+                        if let Some(vf) = &e.value_from
+                            && let Some(sec_ref) = &vf.secret_key_ref
+                            && !sec_ref.name.is_empty()
+                        {
+                            let entry = pod_sec_usage.entry(sec_ref.name.clone()).or_insert((false, false, false, false));
+                            entry.1 = true;
                         }
                     }
                 }
                 if let Some(efs) = env_from {
                     for ef in efs {
-                        if let Some(sec_ref) = &ef.secret_ref {
-                            if !sec_ref.name.is_empty() {
-                                let entry = pod_sec_usage.entry(sec_ref.name.clone()).or_insert((false, false, false, false));
-                                entry.2 = true;
-                            }
+                        if let Some(sec_ref) = &ef.secret_ref
+                            && !sec_ref.name.is_empty()
+                        {
+                            let entry = pod_sec_usage.entry(sec_ref.name.clone()).or_insert((false, false, false, false));
+                            entry.2 = true;
                         }
                     }
                 }
