@@ -239,13 +239,13 @@ where
         .metadata()
         .resource_version
         .as_ref()
-        .map_or(true, |v| v.trim().is_empty())
+        .is_none_or(|v| v.trim().is_empty())
+        && let Ok(latest) = api.get(name).await
     {
-        if let Ok(latest) = api.get(name).await {
-            sync_resource_version(parsed.metadata_mut(), latest.metadata());
-        }
+        sync_resource_version(parsed.metadata_mut(), latest.metadata());
     }
 
+    let max_attempts = max_attempts.max(1);
     let mut attempts = 0;
     loop {
         attempts += 1;
