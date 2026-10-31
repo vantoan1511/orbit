@@ -383,3 +383,74 @@ test('applyMetadataFormValuesToResource omits metadata.namespace for cluster-sco
   )
   assert.equal(result.metadata?.namespace, undefined)
 })
+
+test('matchesSaveResult supports sequential save cycles with new requestIds and updated resourceVersions', () => {
+  // Save Cycle 1
+  const ctxSave1 = {
+    isSaving: true,
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'web-app',
+    requestId: 'req-save-1'
+  }
+
+  const payloadSave1 = {
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'web-app',
+    requestId: 'req-save-1',
+    success: true,
+    data: {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: {
+        name: 'web-app',
+        namespace: 'prod',
+        resourceVersion: '1001'
+      }
+    }
+  }
+
+  // Matches active Save 1
+  assert.equal(matchesSaveResult(payloadSave1, ctxSave1), true)
+
+  // Save Cycle 2 - consecutive save on the same resource with new requestId and newer resourceVersion
+  const ctxSave2 = {
+    isSaving: true,
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'web-app',
+    requestId: 'req-save-2'
+  }
+
+  const payloadSave2 = {
+    kind: 'Deployment',
+    namespace: 'prod',
+    name: 'web-app',
+    requestId: 'req-save-2',
+    success: true,
+    data: {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: {
+        name: 'web-app',
+        namespace: 'prod',
+        resourceVersion: '1002'
+      }
+    }
+  }
+
+  // Active Save 2 matches payload 2
+  assert.equal(matchesSaveResult(payloadSave2, ctxSave2), true)
+
+  // Delayed or stale payload 1 must be rejected by active Save 2 context
+  assert.equal(matchesSaveResult(payloadSave1, ctxSave2), false)
+
+  // Stale payload 2 must be rejected by inactive Save context (after save finishes)
+  const ctxInactive = {
+    ...ctxSave2,
+    isSaving: false,
+    requestId: ''
+  }
+  assert.equal(matchesSaveResult(payloadSave2, ctxInactive), false)
+})
