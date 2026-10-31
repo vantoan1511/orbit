@@ -1,16 +1,32 @@
 <script setup lang="ts">
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
 import { useDialog } from 'primevue/usedialog'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import CreatePVDialog from '@/components/storage/CreatePVDialog.vue'
 import CreatePVCDialog from '@/components/storage/CreatePVCDialog.vue'
 import CreateStorageClassDialog from '@/components/storage/CreateStorageClassDialog.vue'
-import StorageClassesTable from '../components/storage/StorageClassesTable.vue'
-import StorageMetricsCards from '../components/storage/StorageMetricsCards.vue'
-import StorageOverview from '../components/storage/StorageOverview.vue'
-import StoragePVCTable from '../components/storage/StoragePVCTable.vue'
-import StoragePVTable from '../components/storage/StoragePVTable.vue'
+import StorageClassesTable from '@/components/storage/StorageClassesTable.vue'
+import StorageMetricsCards from '@/components/storage/StorageMetricsCards.vue'
+import StorageOverview from '@/components/storage/StorageOverview.vue'
+import StoragePVCTable from '@/components/storage/StoragePVCTable.vue'
+import StoragePVTable from '@/components/storage/StoragePVTable.vue'
 
 const dialog = useDialog()
+const k8sStore = useKubernetesStore()
+const filterStore = useTableFilterStore()
+
+const getInitialNamespace = (): string | undefined => {
+  const filters = filterStore.getFilters(
+    KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim,
+    k8sStore.activeClusterId || undefined
+  )
+  if (filters?.selectedNamespace?.length === 1 && filters.selectedNamespace[0] !== 'all') {
+    return filters.selectedNamespace[0]
+  }
+  return undefined
+}
 
 const openCreatePVDialog = () => {
   dialog.open(CreatePVDialog, {
@@ -32,6 +48,9 @@ const openCreatePVCDialog = () => {
         width: '520px'
       },
       modal: true
+    },
+    data: {
+      initialNamespace: getInitialNamespace()
     }
   })
 }

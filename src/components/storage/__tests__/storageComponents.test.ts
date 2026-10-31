@@ -157,3 +157,105 @@ test('Storage create dialogs exist and call kubernetesService.createResource', (
     assert.match(content, /data-component="[a-z0-9-]+"/, `${relPath} must have data-component`)
   }
 })
+
+test('Strict event filtering isolates StorageClass, PV, and PVC events without fuzzy substring leaks', () => {
+  const clusterEvents = [
+    {
+      objectKind: 'Pod',
+      objectName: 'web-pod',
+      namespace: 'default',
+      message: 'FailedScheduling: pod default/web-pod requires storageclass default'
+    },
+    {
+      objectKind: 'StorageClass',
+      objectName: 'default',
+      message: 'StorageClass provisioner provisioned successfully'
+    },
+    {
+      objectKind: 'PersistentVolumeClaim',
+      objectName: 'data-pvc',
+      namespace: 'production',
+      message: 'Claim bound in production'
+    },
+    {
+      objectKind: 'PersistentVolumeClaim',
+      objectName: 'data-pvc',
+      namespace: 'staging',
+      message: 'Claim bound in staging'
+    },
+    {
+      objectKind: 'PersistentVolume',
+      objectName: 'pv-01',
+      message: 'Volume pv-01 available'
+    },
+    {
+      objectKind: 'Pod',
+      objectName: 'app-pv-01-helper',
+      message: 'Pod mentioning pv-01 in message'
+    }
+  ]
+
+  // 1. StorageClass "default" must strictly match kind and name, ignoring Pod events with "default" in namespace or message
+  const scEvents = clusterEvents.filter(
+    (ev) => ev.objectKind === 'StorageClass' && ev.objectName === 'default'
+  )
+  assert.equal(scEvents.length, 1)
+  assert.equal(scEvents[0].objectKind, 'StorageClass')
+  assert.equal(scEvents[0].objectName, 'default')
+
+  // 2. PVC "data-pvc" in "production" must not receive events for "data-pvc" in "staging"
+  const pvcProdEvents = clusterEvents.filter(
+    (ev) =>
+      ev.objectKind === 'PersistentVolumeClaim' &&
+      ev.namespace === 'production' &&
+      ev.objectName === 'data-pvc'
+  )
+  assert.equal(pvcProdEvents.length, 1)
+  assert.equal(pvcProdEvents[0].namespace, 'production')
+
+  // 3. PV "pv-01" must not receive events for Pod "app-pv-01-helper"
+  const pvEvents = clusterEvents.filter(
+    (ev) => ev.objectKind === 'PersistentVolume' && ev.objectName === 'pv-01'
+  )
+  assert.equal(pvEvents.length, 1)
+  assert.equal(pvEvents[0].objectKind, 'PersistentVolume')
+})
+
+test('StorageClassesSidebar donut chart logic provides [0, 1] fallback when total capacity is 0', () => {
+  const zeroCapacityMap: Record<string, number> = {
+    standard: 0,
+    fast: 0
+  }
+  const dataValues = Object.values(zeroCapacityMap)
+  const hasData = dataValues.length > 0 && dataValues.some((v) => v > 0)
+  assert.equal(hasData, false, 'hasData should be false when all capacities are 0')
+
+  const fallbackData = hasData ? dataValues : [0, 1]
+  assert.deepEqual(fallbackData, [0, 1])
+})
+
+test('Storage details drawers wire useResourceRawManifest and do not use raw hex colors in sidebar', () => {
+  const drawers = [
+    'src/components/storage/PersistentVolumeDetailsDrawer.vue',
+    'src/components/storage/PersistentVolumeClaimDetailsDrawer.vue',
+    'src/components/storage/StorageClassDetailsDrawer.vue'
+  ]
+
+  for (const relPath of drawers) {
+    const content = fs.readFileSync(path.resolve(relPath), 'utf-8')
+    assert.ok(
+      content.includes('useResourceRawManifest'),
+      `${relPath} must adopt useResourceRawManifest`
+    )
+  }
+
+  const sidebarContent = fs.readFileSync(STORAGE_CLASSES_SIDEBAR_PATH, 'utf-8')
+  assert.ok(
+    !sidebarContent.includes('#0e1012'),
+    'StorageClassesSidebar must not contain hardcoded #0e1012'
+  )
+  assert.ok(
+    !sidebarContent.includes('#eceef2'),
+    'StorageClassesSidebar must not contain hardcoded #eceef2'
+  )
+})

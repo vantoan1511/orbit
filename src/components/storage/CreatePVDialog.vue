@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import KeyValueEditor, { type KeyValuePair } from '@/components/shared/KeyValueEditor.vue'
+import { useCreateResourceDialog } from '@/composables/useCreateResourceDialog'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
-import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { OrbitEvents } from '@/types/events'
 import { buildCreatePVManifest, validateCreatePV, type CreatePVParams } from '@/utils/storageForms'
 import { Plus } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
 import MultiSelect from 'primevue/multiselect'
 import Select from 'primevue/select'
-import { computed, inject, onMounted, onUnmounted, ref, type Ref } from 'vue'
+import { computed, inject, ref, type Ref } from 'vue'
 
 const dialogRef = inject<
   | Ref<{
@@ -21,6 +20,10 @@ const dialogRef = inject<
 >('dialogRef')
 
 const k8sStore = useKubernetesStore()
+
+const { isCreating, submittedName } = useCreateResourceDialog({
+  onSuccess: () => void k8sStore.fetchPersistentVolumes()
+})
 
 const name = ref('')
 const capacity = ref('10Gi')
@@ -36,11 +39,8 @@ const csiDriver = ref('')
 const csiVolumeHandle = ref('')
 const labels = ref<KeyValuePair[]>([])
 
-const isCreating = ref(false)
-const submittedName = ref('')
-
 const accessModeOptions = ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
-const reclaimPolicyOptions = ['Retain', 'Delete', 'Recycle']
+const reclaimPolicyOptions = ['Retain', 'Delete']
 const volumeModeOptions = ['Filesystem', 'Block']
 const sourceTypeOptions = [
   { label: 'HostPath (Local Node)', value: 'hostPath' },
@@ -72,32 +72,6 @@ const validationResult = computed(() => {
 })
 
 const isFormValid = computed(() => validationResult.value.valid)
-
-const handleCommandSucceeded = (payload: { message: string }) => {
-  if (isCreating.value && submittedName.value && payload.message.includes(submittedName.value)) {
-    isCreating.value = false
-    submittedName.value = ''
-    void k8sStore.fetchPersistentVolumes()
-    dialogRef?.value?.close()
-  }
-}
-
-const handleErrorOccurred = () => {
-  if (isCreating.value) {
-    isCreating.value = false
-    submittedName.value = ''
-  }
-}
-
-onMounted(() => {
-  events.on(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
-  events.on(OrbitEvents.ErrorOccurred, handleErrorOccurred)
-})
-
-onUnmounted(() => {
-  events.off(OrbitEvents.CommandSucceeded, handleCommandSucceeded)
-  events.off(OrbitEvents.ErrorOccurred, handleErrorOccurred)
-})
 
 const handleCancel = () => {
   dialogRef?.value?.close()
@@ -133,8 +107,6 @@ const handleCreate = async () => {
       name: submittedName.value,
       data: manifest
     })
-    await k8sStore.fetchPersistentVolumes()
-    dialogRef?.value?.close()
   } catch (err) {
     console.error('Failed to create PersistentVolume:', err)
     isCreating.value = false
@@ -144,12 +116,17 @@ const handleCreate = async () => {
 </script>
 
 <template>
-  <div data-component="create-pv-dialog" class="flex flex-col gap-4 p-1">
+  <form
+    data-component="create-pv-dialog"
+    class="flex flex-col gap-4 p-1"
+    @submit.prevent="handleCreate"
+  >
     <!-- Volume Name & Capacity -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Volume Name *</label>
+        <label for="pv-name" class="text-xs font-medium text-muted-color">Volume Name *</label>
         <InputText
+          id="pv-name"
           v-model="name"
           placeholder="e.g. pv-data-01"
           :invalid="Boolean(name && validationResult.errors.name)"
@@ -161,8 +138,9 @@ const handleCreate = async () => {
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Capacity *</label>
+        <label for="pv-capacity" class="text-xs font-medium text-muted-color">Capacity *</label>
         <InputText
+          id="pv-capacity"
           v-model="capacity"
           placeholder="e.g. 10Gi, 500Mi"
           :invalid="Boolean(capacity && validationResult.errors.capacity)"
@@ -180,31 +158,48 @@ const handleCreate = async () => {
     <!-- Access Modes & Volume Mode -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Access Modes *</label>
+        <label for="pv-access-modes" class="text-xs font-medium text-muted-color"
+          >Access Modes *</label
+        >
         <MultiSelect
+          id="pv-access-modes"
           v-model="accessModes"
           :options="accessModeOptions"
           placeholder="Select modes"
+          :invalid="Boolean(validationResult.errors.accessModes)"
           fluid
         />
+        <span v-if="validationResult.errors.accessModes" class="text-[11px] text-(--danger)">
+          {{ validationResult.errors.accessModes }}
+        </span>
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Volume Mode</label>
-        <Select v-model="volumeMode" :options="volumeModeOptions" fluid />
+        <label for="pv-volume-mode" class="text-xs font-medium text-muted-color">Volume Mode</label>
+        <Select id="pv-volume-mode" v-model="volumeMode" :options="volumeModeOptions" fluid />
       </div>
     </div>
 
     <!-- Reclaim Policy & StorageClass -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Reclaim Policy</label>
-        <Select v-model="reclaimPolicy" :options="reclaimPolicyOptions" fluid />
+        <label for="pv-reclaim-policy" class="text-xs font-medium text-muted-color"
+          >Reclaim Policy</label
+        >
+        <Select
+          id="pv-reclaim-policy"
+          v-model="reclaimPolicy"
+          :options="reclaimPolicyOptions"
+          fluid
+        />
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Storage Class</label>
+        <label for="pv-storage-class" class="text-xs font-medium text-muted-color"
+          >Storage Class</label
+        >
         <Select
+          id="pv-storage-class"
           v-model="storageClassName"
           :options="storageClassOptions"
           editable
@@ -216,8 +211,11 @@ const handleCreate = async () => {
 
     <!-- Volume Source Type & Conditional Inputs -->
     <div class="flex flex-col gap-1.5">
-      <label class="text-xs font-medium text-muted-color">Volume Source Plugin *</label>
+      <label for="pv-source-type" class="text-xs font-medium text-muted-color"
+        >Volume Source Plugin *</label
+      >
       <Select
+        id="pv-source-type"
         v-model="sourceType"
         :options="sourceTypeOptions"
         option-label="label"
@@ -231,8 +229,9 @@ const handleCreate = async () => {
       v-if="sourceType === 'hostPath'"
       class="p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-2"
     >
-      <label class="text-xs font-medium text-muted-color">Host Path *</label>
+      <label for="pv-host-path" class="text-xs font-medium text-muted-color">Host Path *</label>
       <InputText
+        id="pv-host-path"
         v-model="hostPath"
         placeholder="/mnt/data"
         :invalid="Boolean(hostPath && validationResult.errors.hostPath)"
@@ -249,12 +248,30 @@ const handleCreate = async () => {
       class="p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
     >
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">NFS Server *</label>
-        <InputText v-model="nfsServer" placeholder="nfs.example.com or 192.168.1.100" fluid />
+        <label for="pv-nfs-server" class="text-xs font-medium text-muted-color">NFS Server *</label>
+        <InputText
+          id="pv-nfs-server"
+          v-model="nfsServer"
+          placeholder="nfs.example.com or 192.168.1.100"
+          :invalid="Boolean(validationResult.errors.nfsServer)"
+          fluid
+        />
+        <span v-if="validationResult.errors.nfsServer" class="text-[11px] text-(--danger)">
+          {{ validationResult.errors.nfsServer }}
+        </span>
       </div>
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">NFS Path *</label>
-        <InputText v-model="nfsPath" placeholder="/exports/data" fluid />
+        <label for="pv-nfs-path" class="text-xs font-medium text-muted-color">NFS Path *</label>
+        <InputText
+          id="pv-nfs-path"
+          v-model="nfsPath"
+          placeholder="/exports/data"
+          :invalid="Boolean(validationResult.errors.nfsPath)"
+          fluid
+        />
+        <span v-if="validationResult.errors.nfsPath" class="text-[11px] text-(--danger)">
+          {{ validationResult.errors.nfsPath }}
+        </span>
       </div>
     </div>
 
@@ -264,12 +281,32 @@ const handleCreate = async () => {
       class="p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-3"
     >
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">CSI Driver *</label>
-        <InputText v-model="csiDriver" placeholder="hostpath.csi.k8s.io" fluid />
+        <label for="pv-csi-driver" class="text-xs font-medium text-muted-color">CSI Driver *</label>
+        <InputText
+          id="pv-csi-driver"
+          v-model="csiDriver"
+          placeholder="hostpath.csi.k8s.io"
+          :invalid="Boolean(validationResult.errors.csiDriver)"
+          fluid
+        />
+        <span v-if="validationResult.errors.csiDriver" class="text-[11px] text-(--danger)">
+          {{ validationResult.errors.csiDriver }}
+        </span>
       </div>
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium text-muted-color">Volume Handle *</label>
-        <InputText v-model="csiVolumeHandle" placeholder="csi-vol-12345" fluid />
+        <label for="pv-csi-volume-handle" class="text-xs font-medium text-muted-color"
+          >Volume Handle *</label
+        >
+        <InputText
+          id="pv-csi-volume-handle"
+          v-model="csiVolumeHandle"
+          placeholder="csi-vol-12345"
+          :invalid="Boolean(validationResult.errors.csiVolumeHandle)"
+          fluid
+        />
+        <span v-if="validationResult.errors.csiVolumeHandle" class="text-[11px] text-(--danger)">
+          {{ validationResult.errors.csiVolumeHandle }}
+        </span>
       </div>
     </div>
 
@@ -284,17 +321,18 @@ const handleCreate = async () => {
         label="Cancel"
         severity="secondary"
         variant="text"
+        :disabled="isCreating"
         @click="handleCancel"
       />
       <Button
+        type="submit"
         :loading="isCreating"
         :disabled="!isFormValid || isCreating"
         class="flex items-center gap-1.5"
-        @click="handleCreate"
       >
         <Plus class="w-3.5 h-3.5" />
         <span>{{ isCreating ? 'Creating...' : 'Create Volume' }}</span>
       </Button>
     </div>
-  </div>
+  </form>
 </template>

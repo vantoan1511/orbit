@@ -8,15 +8,8 @@ use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
 use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
 use k8s_openapi::api::storage::v1::StorageClass;
+use crate::kubernetes::models::ResourceApiScope;
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ResourceApiScope {
-    Namespaced,
-    ClusterScoped,
-}
-
-#[allow(dead_code)]
 pub(crate) fn resolve_delete_scope(kind: &str) -> Option<ResourceApiScope> {
     match kind {
         "Pod"
@@ -49,6 +42,15 @@ pub async fn delete_resource(
     kind: &str,
     name: &str,
 ) -> Result<(), kube::Error> {
+    if resolve_delete_scope(kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported delete resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
+
     let delete_params = DeleteParams::default();
 
     match kind {

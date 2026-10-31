@@ -12,7 +12,8 @@ import {
   buildCreatePVCManifest,
   validateCreatePVC,
   buildCreateStorageClassManifest,
-  validateCreateStorageClass
+  validateCreateStorageClass,
+  validatePVCStorageExpansion
 } from '../storageForms.ts'
 
 test('PV form extractor and merger preserves volume source and omits namespace', () => {
@@ -157,7 +158,7 @@ test('StorageClass form extractor and merger handles top-level fields and defaul
     undefined
   )
   assert.equal(updatedSC.allowVolumeExpansion, false)
-  assert.deepEqual(updatedSC.mountOptions, [])
+  assert.equal(updatedSC.mountOptions, undefined)
   // Top-level immutable fields preserved
   assert.equal(updatedSC.provisioner, 'kubernetes.io/no-provisioner')
   assert.equal(updatedSC.reclaimPolicy, 'Delete')
@@ -265,4 +266,105 @@ test('Create builders and validators for PV, PVC, and StorageClass', () => {
   assert.equal(scAnnotations['storageclass.kubernetes.io/is-default-class'], 'true')
   assert.equal(scManifest.provisioner, 'rancher.io/local-path')
   assert.deepEqual(scManifest.parameters, { type: 'local' })
+})
+
+test('extractStorageClassFormValues excludes default-class annotation from generic annotations list', () => {
+  const sc = {
+    apiVersion: 'storage.k8s.io/v1',
+    kind: 'StorageClass',
+    metadata: {
+      name: 'fast',
+      annotations: {
+        'storageclass.kubernetes.io/is-default-class': 'true',
+        'storageclass.beta.kubernetes.io/is-default-class': 'true',
+        'custom.io/tier': 'ssd'
+      }
+    },
+    provisioner: 'kubernetes.io/no-provisioner'
+  }
+  const form = extractStorageClassFormValues(sc as Record<string, unknown>)
+  assert.equal(form.isDefaultClass, true)
+  assert.deepEqual(form.annotations, [{ key: 'custom.io/tier', value: 'ssd' }])
+})
+
+test('applyStorageClassFormToResource sets default-class annotation when isDefaultClass is true, and removes it when false', () => {
+  const initialSC = {
+    apiVersion: 'storage.k8s.io/v1',
+    kind: 'StorageClass',
+    metadata: {
+      name: 'fast',
+      annotations: {
+        'custom.io/tier': 'ssd'
+      }
+    },
+    provisioner: 'kubernetes.io/no-provisioner'
+  }
+
+  // Set default class to true
+  const formTrue = extractStorageClassFormValues(initialSC as Record<string, unknown>)
+  formTrue.isDefaultClass = true
+  const updatedTrue = applyStorageClassFormToResource(
+    initialSC as Record<string, unknown>,
+    formTrue
+  )
+  const trueAnnotations = (updatedTrue.metadata as Record<string, unknown>).annotations as Record<
+    string,
+    string
+  >
+  assert.equal(trueAnnotations['storageclass.kubernetes.io/is-default-class'], 'true')
+  assert.equal(trueAnnotations['custom.io/tier'], 'ssd')
+
+  // Set default class to false
+  formTrue.isDefaultClass = false
+  const updatedFalse = applyStorageClassFormToResource(updatedTrue, formTrue)
+  const falseAnnotations = (updatedFalse.metadata as Record<string, unknown>).annotations as Record<
+    string,
+    string
+  >
+  assert.equal(falseAnnotations['storageclass.kubernetes.io/is-default-class'], undefined)
+  assert.equal(falseAnnotations['storageclass.beta.kubernetes.io/is-default-class'], undefined)
+  assert.equal(falseAnnotations['custom.io/tier'], 'ssd')
+})
+
+test('applyPVFormToResource deletes metadata.finalizers when form.finalizers is empty array', () => {
+  const initialPV = {
+    apiVersion: 'v1',
+    kind: 'PersistentVolume',
+    metadata: {
+      name: 'pv-test',
+      finalizers: ['kubernetes.io/pv-protection']
+    },
+    spec: {
+      capacity: { storage: '10Gi' },
+      accessModes: ['ReadWriteOnce']
+    }
+  }
+
+  const form = extractPVFormValues(initialPV as Record<string, unknown>)
+  form.finalizers = []
+  const updatedPV = applyPVFormToResource(initialPV as Record<string, unknown>, form)
+  assert.equal((updatedPV.metadata as Record<string, unknown>).finalizers, undefined)
+})
+
+test('applyStorageClassFormToResource removes mountOptions if array is empty or contains only whitespace', () => {
+  const initialSC = {
+    apiVersion: 'storage.k8s.io/v1',
+    kind: 'StorageClass',
+    metadata: { name: 'fast' },
+    provisioner: 'kubernetes.io/no-provisioner',
+    mountOptions: ['ro', 'debug']
+  }
+
+  const form = extractStorageClassFormValues(initialSC as Record<string, unknown>)
+  form.mountOptions = ['   ', '']
+  const updatedSC = applyStorageClassFormToResource(initialSC as Record<string, unknown>, form)
+  assert.equal(updatedSC.mountOptions, undefined)
+})
+
+test('validatePVCStorageExpansion allows equal or larger capacity and rejects reduced capacity', () => {
+  assert.equal(validatePVCStorageExpansion('10Gi', '10Gi'), true)
+  assert.equal(validatePVCStorageExpansion('10Gi', '20Gi'), true)
+  assert.equal(validatePVCStorageExpansion('10Gi', '10240Mi'), true)
+  assert.equal(validatePVCStorageExpansion('10Gi', '5Gi'), false)
+  assert.equal(validatePVCStorageExpansion('10Gi', 'invalid'), false)
 })

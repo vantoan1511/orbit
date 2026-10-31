@@ -7,7 +7,8 @@
  * - StorageClass (cluster-scoped, top-level fields — NO spec wrapper!)
  */
 
-import { isValidStorageQuantity } from './storageQuantity.ts'
+import type { KubernetesResource } from '../types/kubernetes.ts'
+import { isValidStorageQuantity, parseStorageBytes } from './storageQuantity.ts'
 import { isValidK8sName } from './validators.ts'
 
 export interface KeyValueItem {
@@ -53,7 +54,9 @@ export interface PVFormValues {
   claimRefSummary: string
 }
 
-export function extractPVFormValues(pv?: Record<string, unknown> | null): PVFormValues {
+export function extractPVFormValues(
+  pv?: Record<string, unknown> | KubernetesResource | null
+): PVFormValues {
   const meta = (pv?.metadata as Record<string, unknown>) || {}
   const spec = (pv?.spec as Record<string, unknown>) || {}
   const cap = (spec.capacity as Record<string, string>) || {}
@@ -102,7 +105,7 @@ export function extractPVFormValues(pv?: Record<string, unknown> | null): PVForm
 }
 
 export function applyPVFormToResource(
-  initialResource: Record<string, unknown>,
+  initialResource: Record<string, unknown> | KubernetesResource,
   form: PVFormValues
 ): Record<string, unknown> {
   const meta = { ...((initialResource?.metadata as Record<string, unknown>) || {}) }
@@ -128,6 +131,8 @@ export function applyPVFormToResource(
 
   if (form.finalizers && form.finalizers.length > 0) {
     meta.finalizers = [...form.finalizers]
+  } else {
+    delete meta.finalizers
   }
 
   // Mutable spec fields
@@ -171,7 +176,9 @@ export interface PVCFormValues {
   volumeMode: string
 }
 
-export function extractPVCFormValues(pvc?: Record<string, unknown> | null): PVCFormValues {
+export function extractPVCFormValues(
+  pvc?: Record<string, unknown> | KubernetesResource | null
+): PVCFormValues {
   const meta = (pvc?.metadata as Record<string, unknown>) || {}
   const spec = (pvc?.spec as Record<string, unknown>) || {}
   const resources = (spec.resources as Record<string, unknown>) || {}
@@ -195,7 +202,7 @@ export function extractPVCFormValues(pvc?: Record<string, unknown> | null): PVCF
 }
 
 export function applyPVCFormToResource(
-  initialResource: Record<string, unknown>,
+  initialResource: Record<string, unknown> | KubernetesResource,
   form: PVCFormValues
 ): Record<string, unknown> {
   const meta = { ...((initialResource?.metadata as Record<string, unknown>) || {}) }
@@ -252,30 +259,39 @@ export interface StorageClassFormValues {
 }
 
 export function extractStorageClassFormValues(
-  sc?: Record<string, unknown> | null
+  sc?: Record<string, unknown> | KubernetesResource | null
 ): StorageClassFormValues {
   const meta = (sc?.metadata as Record<string, unknown>) || {}
+  const scRecord = sc as Record<string, unknown> | undefined
   const annotations = (meta.annotations as Record<string, string>) || {}
   const isDefaultClass =
     annotations['storageclass.kubernetes.io/is-default-class'] === 'true' ||
     annotations['storageclass.beta.kubernetes.io/is-default-class'] === 'true'
 
+  const filteredAnnotations = objectToKeyValueItems(
+    meta.annotations as Record<string, unknown>
+  ).filter(
+    (item) =>
+      item.key !== 'storageclass.kubernetes.io/is-default-class' &&
+      item.key !== 'storageclass.beta.kubernetes.io/is-default-class'
+  )
+
   return {
     name: (meta.name as string) || '',
     labels: objectToKeyValueItems(meta.labels as Record<string, unknown>),
-    annotations: objectToKeyValueItems(meta.annotations as Record<string, unknown>),
+    annotations: filteredAnnotations,
     isDefaultClass,
-    provisioner: (sc?.provisioner as string) || '',
-    reclaimPolicy: (sc?.reclaimPolicy as string) || 'Delete',
-    volumeBindingMode: (sc?.volumeBindingMode as string) || 'Immediate',
-    allowVolumeExpansion: Boolean(sc?.allowVolumeExpansion),
-    mountOptions: Array.isArray(sc?.mountOptions) ? (sc?.mountOptions as string[]) : [],
-    parameters: objectToKeyValueItems(sc?.parameters as Record<string, unknown>)
+    provisioner: (scRecord?.provisioner as string) || '',
+    reclaimPolicy: (scRecord?.reclaimPolicy as string) || 'Delete',
+    volumeBindingMode: (scRecord?.volumeBindingMode as string) || 'Immediate',
+    allowVolumeExpansion: Boolean(scRecord?.allowVolumeExpansion),
+    mountOptions: Array.isArray(scRecord?.mountOptions) ? (scRecord.mountOptions as string[]) : [],
+    parameters: objectToKeyValueItems(scRecord?.parameters as Record<string, unknown>)
   }
 }
 
 export function applyStorageClassFormToResource(
-  initialResource: Record<string, unknown>,
+  initialResource: Record<string, unknown> | KubernetesResource,
   form: StorageClassFormValues
 ): Record<string, unknown> {
   const meta = { ...((initialResource?.metadata as Record<string, unknown>) || {}) }
@@ -310,8 +326,13 @@ export function applyStorageClassFormToResource(
     allowVolumeExpansion: form.allowVolumeExpansion
   }
 
-  if (Array.isArray(form.mountOptions)) {
-    updated.mountOptions = [...form.mountOptions]
+  const cleanedMountOptions = Array.isArray(form.mountOptions)
+    ? form.mountOptions.map((m) => m.trim()).filter(Boolean)
+    : []
+  if (cleanedMountOptions.length > 0) {
+    updated.mountOptions = cleanedMountOptions
+  } else {
+    delete updated.mountOptions
   }
 
   return updated
@@ -566,9 +587,26 @@ export function buildCreateStorageClassManifest(
     manifest.parameters = parameters
   }
 
-  if (params.mountOptions && params.mountOptions.length > 0) {
-    manifest.mountOptions = [...params.mountOptions]
+  const cleanedMountOptions = params.mountOptions
+    ? params.mountOptions.map((m) => m.trim()).filter(Boolean)
+    : []
+  if (cleanedMountOptions.length > 0) {
+    manifest.mountOptions = cleanedMountOptions
   }
 
   return manifest
+}
+
+/**
+ * Validates that a PVC storage expansion does not reduce the requested capacity.
+ * In Kubernetes, PVC storage capacity can only be expanded, never shrunk.
+ */
+export function validatePVCStorageExpansion(
+  initialQuantity: string | null | undefined,
+  newQuantity: string | null | undefined
+): boolean {
+  const initialBytes = parseStorageBytes(initialQuantity)
+  const newBytes = parseStorageBytes(newQuantity)
+  if (newBytes <= 0) return false
+  return newBytes >= initialBytes
 }

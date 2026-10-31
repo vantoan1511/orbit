@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import KeyValueEditor, { type KeyValuePair } from '@/components/shared/KeyValueEditor.vue'
 import StringListEditor from '@/components/shared/StringListEditor.vue'
+import type { KubernetesResource } from '@/types/kubernetes'
 import { extractPVFormValues, applyPVFormToResource, type PVFormValues } from '@/utils/storageForms'
 import { isValidStorageQuantity } from '@/utils/storageQuantity'
 import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
+import Tag from 'primevue/tag'
 import { computed, ref, toRaw, watch } from 'vue'
 
 const props = defineProps<{
-  rawData: Record<string, unknown> | null
+  rawData: KubernetesResource | Record<string, unknown> | null
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +48,7 @@ watch(
   { immediate: true }
 )
 
-const syncFromRawData = (data: Record<string, unknown> | null) => {
+const syncFromRawData = (data: KubernetesResource | Record<string, unknown> | null) => {
   if (!data || isEmitting) return
   const form = extractPVFormValues(data)
   name.value = form.name
@@ -100,7 +102,10 @@ const handleFieldChange = () => {
 </script>
 
 <template>
-  <div data-component="persistent-volume-edit-form" class="flex flex-col gap-8 pb-12">
+  <div
+    data-component="persistent-volume-edit-form"
+    class="w-full h-full overflow-y-auto pt-2 flex flex-col gap-8 pb-12"
+  >
     <!-- Section 1: Resource Identity & Status (Read-Only) -->
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl">
       <div class="md:col-span-4 flex flex-col gap-1">
@@ -129,6 +134,12 @@ const handleFieldChange = () => {
           <div class="flex flex-col gap-1.5">
             <label class="text-xs font-medium text-muted-color">Claim Reference</label>
             <InputText disabled :model-value="claimRefSummary" fluid />
+          </div>
+        </div>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-medium text-muted-color">Access Modes</label>
+          <div class="flex flex-wrap gap-1.5 items-center">
+            <Tag v-for="mode in accessModes" :key="mode" :value="mode" severity="secondary" />
           </div>
         </div>
       </div>

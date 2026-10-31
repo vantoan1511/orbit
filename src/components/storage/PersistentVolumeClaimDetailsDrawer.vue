@@ -4,23 +4,21 @@ import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
 import WorkloadEventsTab from '@/components/workloads/WorkloadEventsTab.vue'
+import { useResourceRawManifest } from '@/composables/useResourceRawManifest'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
-import { kubernetesService } from '@/services/kubernetesService'
-import { events } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { OrbitEvents } from '@/types/events'
 import type { PersistentVolumeClaimInfo } from '@/types/kubernetes'
 import { sortEventsDesc } from '@/utils/events'
 import { getVolumeStatusBadgeClass } from '@/utils/severity'
+import { resolveEditTargetParams } from '@/utils/workloadActions'
 import { Activity, Pencil } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import Button from 'primevue/button'
 import Tab from 'primevue/tab'
 import TabPanel from 'primevue/tabpanel'
 import Tag from 'primevue/tag'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import * as yaml from 'yaml'
 
 const props = defineProps<{
   visible: boolean
@@ -36,130 +34,15 @@ const k8sStore = useKubernetesStore()
 const { events: clusterEvents } = storeToRefs(k8sStore)
 
 const activeTab = ref('overview')
-const rawYamlData = ref<string | null>(null)
-const rawManifest = ref<Record<string, unknown> | null>(null)
-const isYamlLoading = ref<boolean>(false)
-const yamlError = ref<string | null>(null)
-const copied = ref<boolean>(false)
-const currentRequestId = ref<number>(0)
 
-const pvcEvents = computed(() => {
-  if (!props.pvc) return []
-  const name = props.pvc.name
-  const ns = props.pvc.namespace
-  const filtered = clusterEvents.value.filter((ev) => {
-    const matchesNs = !ev.namespace || ev.namespace === ns
-    return matchesNs && (ev.objectName === name || ev.message?.includes(name))
-  })
-  return sortEventsDesc(filtered)
-})
-
-const handleEdit = () => {
-  if (!props.pvc) return
-  router.push({
-    name: 'edit-workload',
-    params: {
-      kind: KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim,
-      namespace: props.pvc.namespace,
-      name: props.pvc.name
-    }
-  })
-}
-
-const fetchRawYaml = async () => {
-  if (!props.pvc || !props.visible) return
-  const reqId = ++currentRequestId.value
-  isYamlLoading.value = true
-  yamlError.value = null
-  try {
-    await kubernetesService.getResourceRaw({
-      namespace: props.pvc.namespace,
-      kind: KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim,
-      name: props.pvc.name,
-      requestId: String(reqId)
-    })
-  } catch (e) {
-    if (reqId === currentRequestId.value) {
-      isYamlLoading.value = false
-      yamlError.value = String(e)
-    }
-  }
-}
-
-const handleRawData = (payload: {
-  kind?: string
-  name?: string
-  namespace?: string
-  data?: unknown
-  requestId?: string
-}) => {
-  if (!props.visible || !props.pvc) return
-  if (payload?.requestId && payload.requestId !== String(currentRequestId.value)) return
-
-  const matchesKind =
-    !payload?.kind ||
-    payload.kind.toLowerCase() === KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim.toLowerCase()
-  const matchesName = payload?.name === props.pvc.name
-  const matchesNs = !payload?.namespace || payload.namespace === props.pvc.namespace
-
-  if (matchesKind && matchesName && matchesNs) {
-    if (payload.data) {
-      if (typeof payload.data === 'string') {
-        try {
-          rawManifest.value = JSON.parse(payload.data) as Record<string, unknown>
-          rawYamlData.value = payload.data
-        } catch {
-          rawYamlData.value = payload.data
-        }
-      } else {
-        rawManifest.value = payload.data as Record<string, unknown>
-        rawYamlData.value = JSON.stringify(payload.data)
-      }
-    }
-    isYamlLoading.value = false
-  }
-}
-
-const handleBatchUpdate = (payload: { kind?: string }) => {
-  if (
-    props.visible &&
-    props.pvc &&
-    (!payload?.kind || payload.kind === KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim)
-  ) {
-    void fetchRawYaml()
-  }
-}
-
-onMounted(() => {
-  events.on(OrbitEvents.ResourceRawData, handleRawData)
-  events.on(OrbitEvents.ResourceBatchUpdated, handleBatchUpdate)
-})
-
-onUnmounted(() => {
-  events.off(OrbitEvents.ResourceRawData, handleRawData)
-  events.off(OrbitEvents.ResourceBatchUpdated, handleBatchUpdate)
-})
-
-watch(
-  () => [props.visible, props.pvc?.name, props.pvc?.namespace] as const,
-  ([newVisible, newName], prev) => {
-    const oldVisible = prev?.[0]
-    const oldName = prev?.[1]
-    if (newVisible && props.pvc) {
-      if (newName !== oldName || !oldVisible) {
-        rawYamlData.value = null
-        rawManifest.value = null
-        void fetchRawYaml()
-      }
-    }
-  },
-  { immediate: true }
-)
-
-const displayedYaml = computed(() => {
-  if (!rawYamlData.value) {
-    if (!props.pvc) return ''
-    return yaml.stringify({
+const { rawManifest, displayedYaml, isYamlLoading, copied, copyYaml } = useResourceRawManifest({
+  kind: KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim,
+  name: computed(() => props.pvc?.name),
+  namespace: computed(() => props.pvc?.namespace),
+  visible: computed(() => props.visible),
+  fallbackResource: computed(() => {
+    if (!props.pvc) return null
+    return {
       apiVersion: 'v1',
       kind: 'PersistentVolumeClaim',
       metadata: {
@@ -179,27 +62,35 @@ const displayedYaml = computed(() => {
       status: {
         phase: props.pvc.status
       }
-    })
-  }
-  try {
-    const parsed = JSON.parse(rawYamlData.value)
-    return yaml.stringify(parsed)
-  } catch {
-    return rawYamlData.value
-  }
+    }
+  })
 })
 
-const copyYaml = async () => {
-  if (!displayedYaml.value) return
-  try {
-    await navigator.clipboard.writeText(displayedYaml.value)
-    copied.value = true
-    setTimeout(() => {
-      copied.value = false
-    }, 2000)
-  } catch (e) {
-    console.error('Failed to copy YAML:', e)
-  }
+const pvcEvents = computed(() => {
+  if (!props.pvc) return []
+  const name = props.pvc.name
+  const ns = props.pvc.namespace
+  const filtered = clusterEvents.value.filter((ev) => {
+    return (
+      ev.objectKind === KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim &&
+      ev.namespace === ns &&
+      ev.objectName === name
+    )
+  })
+  return sortEventsDesc(filtered)
+})
+
+const handleEdit = () => {
+  if (!props.pvc) return
+  const target = resolveEditTargetParams(props.pvc, KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim)
+  router.push({
+    name: 'edit-workload',
+    params: {
+      kind: target.kind,
+      namespace: target.namespace,
+      name: target.name
+    }
+  })
 }
 
 const pvcLabels = computed(() => {
@@ -252,132 +143,110 @@ const conditions = computed<PvcCondition[]>(() => {
     :kind="KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim"
     kind-severity="info"
     :status-badge-class="getVolumeStatusBadgeClass(props.pvc?.status)"
-    :namespace="props.pvc?.namespace"
-    :age="props.pvc?.age"
+    :status-text="props.pvc?.status ?? 'Unknown'"
     @update:visible="emit('update:visible', $event)"
   >
-    <template #tags>
-      <Tag
-        rounded
-        severity="info"
-        class="font-mono"
-        :value="KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim"
-      />
-      <Tag
-        v-if="props.pvc?.storageClass"
-        rounded
-        severity="secondary"
-        class="font-mono"
-        :value="props.pvc.storageClass"
-      />
-    </template>
-
-    <template #actions>
+    <template #header-actions>
       <Button
         v-if="props.pvc"
-        size="small"
         severity="secondary"
-        variant="outlined"
+        size="small"
         class="flex items-center gap-1.5"
         @click="handleEdit"
       >
-        <Pencil class="w-3.5 h-3.5" />
+        <Pencil class="w-3.5 h-3.5 text-muted-color" />
         <span>Edit</span>
       </Button>
     </template>
 
     <template #extra-tabs>
-      <Tab value="events" class="text-xs flex items-center gap-1.5 py-2.5 px-3">
+      <Tab value="events" class="flex items-center gap-1.5">
         <Activity class="w-3.5 h-3.5" />
         <span>Events ({{ pvcEvents.length }})</span>
       </Tab>
     </template>
 
     <template #overview>
-      <div v-if="props.pvc" class="space-y-6">
-        <!-- General Info -->
-        <div>
-          <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">General</h3>
-          <div
-            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-3 text-xs font-ui"
-          >
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Name</span>
-              <span class="col-span-2 font-mono text-primary font-semibold">{{
-                props.pvc.name
-              }}</span>
+      <div v-if="props.pvc" class="flex flex-col gap-6">
+        <!-- Claim Information -->
+        <div class="flex flex-col gap-3">
+          <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+            Claim Information
+          </span>
+          <div class="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Name</span>
+              <span class="font-mono text-primary truncate">{{ props.pvc.name }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Namespace</span>
-              <span class="col-span-2 font-mono text-primary">{{ props.pvc.namespace }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Namespace</span>
+              <span class="font-mono text-primary truncate">{{ props.pvc.namespace }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Status</span>
-              <span class="col-span-2 font-mono text-primary">{{ props.pvc.status }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Status</span>
+              <div>
+                <Tag
+                  :value="props.pvc.status"
+                  :class="getVolumeStatusBadgeClass(props.pvc.status)"
+                  class="text-[11px]"
+                />
+              </div>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Bound Volume</span>
-              <span class="col-span-2 font-mono text-primary">{{ props.pvc.volume || '-' }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Bound Volume</span>
+              <span class="font-mono text-primary truncate">{{ props.pvc.volume || '-' }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Requested Storage</span>
-              <span class="col-span-2 font-mono text-(--accent) font-semibold">{{
-                props.pvc.capacity
-              }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Requested Storage</span>
+              <span class="font-semibold text-primary">{{ props.pvc.capacity }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Actual Capacity</span>
-              <span class="col-span-2 font-mono text-primary">{{ actualCapacity }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Actual Capacity</span>
+              <span class="font-semibold text-primary">{{ actualCapacity }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Volume Mode</span>
-              <span class="col-span-2 font-mono text-primary">{{ volumeMode }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Access Mode</span>
+              <span class="font-mono text-primary">{{ props.pvc.accessMode }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Access Modes</span>
-              <span class="col-span-2 font-mono text-primary">{{ props.pvc.accessMode }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Storage Class</span>
+              <span class="font-mono text-primary">{{ props.pvc.storageClass || '-' }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Storage Class</span>
-              <span class="col-span-2 font-mono text-primary">{{
-                props.pvc.storageClass || '-'
-              }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Volume Mode</span>
+              <span class="text-primary">{{ volumeMode }}</span>
             </div>
-            <div class="grid grid-cols-3">
-              <span class="text-muted-color font-semibold">Age</span>
-              <span class="col-span-2 text-primary"><ReactiveAge :age="props.pvc.age" /></span>
+            <div class="flex flex-col gap-1">
+              <span class="text-muted-color">Age</span>
+              <ReactiveAge :age="props.pvc.age" class="text-primary font-medium" />
             </div>
-            <div class="grid grid-cols-3 items-start gap-4">
-              <span class="text-muted-color font-semibold shrink-0">UID</span>
-              <span class="col-span-2 font-mono text-[10px] text-muted-color truncate">{{
-                pvcUid
-              }}</span>
+            <div class="col-span-2 flex flex-col gap-1">
+              <span class="text-muted-color">UID</span>
+              <span class="font-mono text-xs text-muted-color break-all">{{ pvcUid }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Conditions -->
-        <div v-if="conditions.length > 0">
-          <h3 class="text-xs font-bold text-muted-color uppercase tracking-wider mb-3">
-            Conditions
-          </h3>
-          <div class="space-y-2">
+        <!-- Conditions (e.g. Resizing) -->
+        <div v-if="conditions.length > 0" class="flex flex-col gap-2">
+          <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
+            Volume Conditions
+          </span>
+          <div class="flex flex-col gap-2">
             <div
               v-for="cond in conditions"
               :key="cond.type"
-              class="p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/40 text-xs font-mono flex flex-col gap-1"
+              class="p-3 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-1 text-xs"
             >
               <div class="flex items-center justify-between">
                 <span class="font-semibold text-primary">{{ cond.type }}</span>
                 <Tag
-                  rounded
-                  :severity="cond.status === 'True' ? 'success' : 'secondary'"
                   :value="cond.status"
+                  :severity="cond.status === 'True' ? 'success' : 'secondary'"
+                  class="text-[11px]"
                 />
               </div>
-              <div v-if="cond.message" class="text-muted-color text-[11px] mt-0.5">
-                {{ cond.message }}
-              </div>
+              <p v-if="cond.message" class="text-muted-color">{{ cond.message }}</p>
             </div>
           </div>
         </div>

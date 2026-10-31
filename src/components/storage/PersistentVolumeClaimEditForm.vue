@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import KeyValueEditor, { type KeyValuePair } from '@/components/shared/KeyValueEditor.vue'
+import type { KubernetesResource } from '@/types/kubernetes'
 import {
   extractPVCFormValues,
   applyPVCFormToResource,
+  validatePVCStorageExpansion,
   type PVCFormValues
 } from '@/utils/storageForms'
 import { isValidStorageQuantity } from '@/utils/storageQuantity'
@@ -11,7 +13,7 @@ import Tag from 'primevue/tag'
 import { computed, ref, toRaw, watch } from 'vue'
 
 const props = defineProps<{
-  rawData: Record<string, unknown> | null
+  rawData: KubernetesResource | Record<string, unknown> | null
 }>()
 
 const emit = defineEmits<{
@@ -22,6 +24,7 @@ const emit = defineEmits<{
 const name = ref('')
 const namespace = ref('default')
 const storageRequest = ref('10Gi')
+const initialStorageRequest = ref('10Gi')
 const accessModes = ref<string[]>(['ReadWriteOnce'])
 const storageClassName = ref('')
 const volumeName = ref('')
@@ -31,10 +34,16 @@ const annotations = ref<KeyValuePair[]>([])
 
 let isEmitting = false
 
-const isStorageValid = computed(() => isValidStorageQuantity(storageRequest.value))
+const isStorageFormatValid = computed(() => isValidStorageQuantity(storageRequest.value))
+
+const isStorageExpansionValid = computed(() => {
+  if (!isStorageFormatValid.value) return false
+  if (!initialStorageRequest.value) return true
+  return validatePVCStorageExpansion(initialStorageRequest.value, storageRequest.value)
+})
 
 const isFormValid = computed(() => {
-  return isStorageValid.value
+  return isStorageFormatValid.value && isStorageExpansionValid.value
 })
 
 watch(
@@ -45,12 +54,13 @@ watch(
   { immediate: true }
 )
 
-const syncFromRawData = (data: Record<string, unknown> | null) => {
+const syncFromRawData = (data: KubernetesResource | Record<string, unknown> | null) => {
   if (!data || isEmitting) return
   const form = extractPVCFormValues(data)
   name.value = form.name
   namespace.value = form.namespace
   storageRequest.value = form.storageRequest
+  initialStorageRequest.value = form.storageRequest
   accessModes.value = [...form.accessModes]
   storageClassName.value = form.storageClassName
   volumeName.value = form.volumeName
@@ -94,7 +104,10 @@ const handleFieldChange = () => {
 </script>
 
 <template>
-  <div data-component="persistent-volume-claim-edit-form" class="flex flex-col gap-8 pb-12">
+  <div
+    data-component="persistent-volume-claim-edit-form"
+    class="w-full h-full overflow-y-auto pt-2 flex flex-col gap-8 pb-12"
+  >
     <!-- Section 1: Resource Identity & Spec (Immutable) -->
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl">
       <div class="md:col-span-4 flex flex-col gap-1">
@@ -166,12 +179,15 @@ const handleFieldChange = () => {
           <InputText
             v-model="storageRequest"
             placeholder="e.g. 20Gi"
-            :invalid="!isStorageValid"
+            :invalid="!isFormValid"
             fluid
             @update:model-value="handleFieldChange"
           />
-          <span v-if="!isStorageValid" class="text-[11px] text-(--danger)">
+          <span v-if="!isStorageFormatValid" class="text-[11px] text-(--danger)">
             Valid storage quantity required (e.g. 20Gi, 500Mi).
+          </span>
+          <span v-else-if="!isStorageExpansionValid" class="text-[11px] text-(--danger)">
+            Storage request can only be expanded, not reduced.
           </span>
           <span v-else class="text-[11px] text-muted-color">
             Modifying this field triggers Kubernetes volume expansion if supported by the

@@ -111,7 +111,7 @@ const isYamlValid = computed(() => {
 })
 
 const isFormValid = computed(() => {
-  return isYamlMode.value ? isYamlValid.value : isChildFormValid.value
+  return isYamlMode.value ? isYamlValid.value : !activeFormComponent.value || isChildFormValid.value
 })
 
 // Simple form fields
@@ -145,6 +145,7 @@ const resetState = () => {
   isYamlMode.value = false
   isLoading.value = true
   isSaving.value = false
+  isChildFormValid.value = true
   activeSaveRequestId = ''
   formValues.value = {
     name: '',

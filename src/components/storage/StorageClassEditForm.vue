@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import KeyValueEditor, { type KeyValuePair } from '@/components/shared/KeyValueEditor.vue'
 import StringListEditor from '@/components/shared/StringListEditor.vue'
+import type { KubernetesResource } from '@/types/kubernetes'
 import {
   extractStorageClassFormValues,
   applyStorageClassFormToResource,
@@ -11,7 +13,7 @@ import ToggleSwitch from 'primevue/toggleswitch'
 import { computed, ref, toRaw, watch } from 'vue'
 
 const props = defineProps<{
-  rawData: Record<string, unknown> | null
+  rawData: KubernetesResource | Record<string, unknown> | null
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +32,14 @@ const parameters = ref<KeyValuePair[]>([])
 const labels = ref<KeyValuePair[]>([])
 const annotations = ref<KeyValuePair[]>([])
 
+const parametersRecord = computed<Record<string, string>>(() => {
+  const result: Record<string, string> = {}
+  for (const p of parameters.value) {
+    if (p.key) result[p.key] = p.value
+  }
+  return result
+})
+
 let isEmitting = false
 
 const isFormValid = computed(() => true)
@@ -42,7 +52,7 @@ watch(
   { immediate: true }
 )
 
-const syncFromRawData = (data: Record<string, unknown> | null) => {
+const syncFromRawData = (data: KubernetesResource | Record<string, unknown> | null) => {
   if (!data || isEmitting) return
   const form = extractStorageClassFormValues(data)
   name.value = form.name
@@ -93,7 +103,10 @@ const handleFieldChange = () => {
 </script>
 
 <template>
-  <div data-component="storage-class-edit-form" class="flex flex-col gap-8 pb-12">
+  <div
+    data-component="storage-class-edit-form"
+    class="w-full h-full overflow-y-auto pt-2 flex flex-col gap-8 pb-12"
+  >
     <!-- Section 1: Provisioner & Binding (Immutable) -->
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6 max-w-7xl">
       <div class="md:col-span-4 flex flex-col gap-1">
@@ -184,14 +197,7 @@ const handleFieldChange = () => {
       </div>
       <div class="md:col-span-8 flex flex-col gap-3">
         <div class="p-4 rounded-[var(--ui-radius-card)] bg-(--bg-hover)/30 flex flex-col gap-2">
-          <div
-            v-for="param in parameters"
-            :key="param.key"
-            class="flex items-center justify-between text-xs font-mono py-1 border-b border-(--border) last:border-0"
-          >
-            <span class="text-muted-color font-semibold">{{ param.key }}</span>
-            <span class="text-primary">{{ param.value }}</span>
-          </div>
+          <KeyValueBadgeList :items="parametersRecord" variant="list" />
         </div>
       </div>
     </div>

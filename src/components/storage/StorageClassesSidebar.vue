@@ -52,6 +52,14 @@ const statusCounts = computed(() => {
   return counts
 })
 
+function getCssVariable(name: string, fallback: string): string {
+  if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    if (val) return val
+  }
+  return fallback
+}
+
 const updateChart = () => {
   const dark = isDark.value
 
@@ -79,16 +87,30 @@ const updateChart = () => {
 
   const labels = Object.keys(scCapacityData.value)
   const dataValues = Object.values(scCapacityData.value)
+  const hasData = dataValues.length > 0 && dataValues.some((v) => v > 0)
+  const trackColor = dark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)'
+  const cardBg = getCssVariable(
+    '--bg-card',
+    dark ? 'rgba(18, 20, 24, 1)' : 'rgba(255, 255, 255, 1)'
+  )
+  const textColor = getCssVariable(
+    '--text-primary',
+    dark ? 'rgba(236, 238, 242, 1)' : 'rgba(24, 26, 31, 1)'
+  )
 
   chartData.value = {
-    labels: labels,
+    labels: hasData ? labels : ['No Capacity Allocation'],
     datasets: [
       {
-        data: dataValues,
-        backgroundColor: labels.map((_, idx) => colors[idx % colors.length]),
-        hoverBackgroundColor: labels.map((_, idx) => hoverColors[idx % hoverColors.length]),
-        borderWidth: dark ? 2 : 1,
-        borderColor: dark ? '#0e1012' : '#ffffff'
+        data: hasData ? dataValues : [0, 1],
+        backgroundColor: hasData
+          ? labels.map((_, idx) => colors[idx % colors.length])
+          : [trackColor, trackColor],
+        hoverBackgroundColor: hasData
+          ? labels.map((_, idx) => hoverColors[idx % hoverColors.length])
+          : [trackColor, trackColor],
+        borderWidth: hasData ? (dark ? 2 : 1) : 0,
+        borderColor: cardBg
       }
     ]
   }
@@ -99,9 +121,10 @@ const updateChart = () => {
     cutout: '70%',
     plugins: {
       legend: {
+        display: hasData,
         position: 'bottom',
         labels: {
-          color: dark ? '#eceef2' : '#181a1f',
+          color: textColor,
           font: {
             family: 'Inter',
             size: 10,

@@ -9,15 +9,8 @@ use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
 use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
 use k8s_openapi::api::storage::v1::StorageClass;
 use serde_json::Value;
+use crate::kubernetes::models::ResourceApiScope;
 
-#[allow(dead_code)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ResourceApiScope {
-    Namespaced,
-    ClusterScoped,
-}
-
-#[allow(dead_code)]
 pub(crate) fn resolve_resource_scope(kind: &str) -> Option<ResourceApiScope> {
     match kind {
         "Pod"
@@ -62,6 +55,15 @@ pub async fn get_resource_raw(
     kind: &str,
     name: &str,
 ) -> Result<Value, kube::Error> {
+    if kind != "Policy" && resolve_resource_scope(kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported get resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
+
     match kind {
         "Pod" => {
             let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
@@ -257,6 +259,15 @@ pub async fn apply_resource(
         kind.to_string()
     };
 
+    if resolve_resource_scope(&resolved_kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported apply resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
+
     match resolved_kind.as_str() {
         "Pod" => replace_resource!(Pod, &resolved_kind),
         "Deployment" => replace_resource!(Deployment, &resolved_kind),
@@ -334,6 +345,15 @@ pub async fn create_resource(
     } else {
         kind
     };
+
+    if resolve_resource_scope(resolved_kind).is_none() {
+        return Err(kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: format!("Unsupported create resource kind: {}", kind),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        }));
+    }
 
     match resolved_kind {
         "Pod" => create_resource!(Pod),
