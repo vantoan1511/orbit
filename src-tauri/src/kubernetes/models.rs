@@ -107,6 +107,13 @@ pub struct DaemonSetReplicas {
     pub available: i32,
 }
 
+fn default_deployment_kind() -> String { "Deployment".to_string() }
+fn default_statefulset_kind() -> String { "StatefulSet".to_string() }
+fn default_daemonset_kind() -> String { "DaemonSet".to_string() }
+fn default_replicaset_kind() -> String { "ReplicaSet".to_string() }
+fn default_job_kind() -> String { "Job".to_string() }
+fn default_cronjob_kind() -> String { "CronJob".to_string() }
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerImageInfo {
@@ -117,6 +124,8 @@ pub struct ContainerImageInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DeploymentInfo {
+    #[serde(default = "default_deployment_kind")]
+    pub kind: String,
     pub name: String,
     pub namespace: String,
     pub status: String,
@@ -139,6 +148,8 @@ pub struct DeploymentInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StatefulSetInfo {
+    #[serde(default = "default_statefulset_kind")]
+    pub kind: String,
     pub name: String,
     pub namespace: String,
     pub status: String,
@@ -152,6 +163,8 @@ pub struct StatefulSetInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DaemonSetInfo {
+    #[serde(default = "default_daemonset_kind")]
+    pub kind: String,
     pub name: String,
     pub namespace: String,
     pub status: String,
@@ -165,6 +178,8 @@ pub struct DaemonSetInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplicaSetInfo {
+    #[serde(default = "default_replicaset_kind")]
+    pub kind: String,
     pub name: String,
     pub namespace: String,
     pub status: String,
@@ -178,6 +193,8 @@ pub struct ReplicaSetInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct JobInfo {
+    #[serde(default = "default_job_kind")]
+    pub kind: String,
     pub name: String,
     pub namespace: String,
     pub status: String,
@@ -192,6 +209,8 @@ pub struct JobInfo {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CronJobInfo {
+    #[serde(default = "default_cronjob_kind")]
+    pub kind: String,
     pub name: String,
     pub namespace: String,
     pub schedule: String,

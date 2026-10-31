@@ -119,6 +119,7 @@ export interface ContainerImageInfo {
 }
 
 export interface DeploymentInfo {
+  kind?: 'Deployment' | string
   name: string
   namespace: string
   status: string
@@ -138,6 +139,7 @@ export interface DeploymentInfo {
 }
 
 export interface StatefulSetInfo {
+  kind?: 'StatefulSet' | string
   name: string
   namespace: string
   status: string
@@ -149,6 +151,7 @@ export interface StatefulSetInfo {
 }
 
 export interface DaemonSetInfo {
+  kind?: 'DaemonSet' | string
   name: string
   namespace: string
   status: string
@@ -160,6 +163,7 @@ export interface DaemonSetInfo {
 }
 
 export interface ReplicaSetInfo {
+  kind?: 'ReplicaSet' | string
   name: string
   namespace: string
   status: string
@@ -171,6 +175,7 @@ export interface ReplicaSetInfo {
 }
 
 export interface JobInfo {
+  kind?: 'Job' | string
   name: string
   namespace: string
   status: string
@@ -183,6 +188,7 @@ export interface JobInfo {
 }
 
 export interface CronJobInfo {
+  kind?: 'CronJob' | string
   name: string
   namespace: string
   schedule: string

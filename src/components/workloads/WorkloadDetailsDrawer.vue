@@ -23,6 +23,7 @@ import {
   getWorkloadStatusBadgeClass
 } from '@/utils/severity'
 import { sortEventsDesc } from '@/utils/events'
+import { getWorkloadKind } from '@/utils/workloadKind'
 import { Activity, FileCode, Layers, Terminal as TerminalIcon } from '@lucide/vue'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
@@ -47,19 +48,6 @@ const k8sStore = useKubernetesStore()
 const { pods, events: clusterEvents } = storeToRefs(k8sStore)
 
 const activeTab = ref('overview')
-
-const getWorkloadKind = (w: WorkloadInfo): string => {
-  if ('schedule' in w) return KUBERNETES_RESOURCE_KIND.CronJob
-  if ('completions' in w) return KUBERNETES_RESOURCE_KIND.Job
-  if ('strategy' in w) return KUBERNETES_RESOURCE_KIND.Deployment
-  if ('replicas' in w && w.replicas) {
-    const reps = w.replicas
-    if ('ready' in reps && 'upToDate' in reps) return KUBERNETES_RESOURCE_KIND.DaemonSet
-    if (w.name.includes('stateful')) return KUBERNETES_RESOURCE_KIND.StatefulSet
-    return KUBERNETES_RESOURCE_KIND.ReplicaSet
-  }
-  return 'Workload'
-}
 
 const workloadKind = computed(() => {
   return props.workload ? getWorkloadKind(props.workload) : 'Workload'

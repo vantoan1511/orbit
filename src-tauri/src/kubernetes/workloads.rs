@@ -218,6 +218,7 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
     let annotations = d.metadata.annotations.clone().unwrap_or_default();
 
     models::DeploymentInfo {
+        kind: "Deployment".to_string(),
         name,
         namespace: namespace_name,
         status,
@@ -281,6 +282,7 @@ pub fn map_statefulset(ss: &StatefulSet) -> models::StatefulSetInfo {
     let annotations = ss.metadata.annotations.clone().unwrap_or_default();
 
     models::StatefulSetInfo {
+        kind: "StatefulSet".to_string(),
         name,
         namespace: namespace_name,
         status,
@@ -346,6 +348,7 @@ pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
     let annotations = ds.metadata.annotations.clone().unwrap_or_default();
 
     models::DaemonSetInfo {
+        kind: "DaemonSet".to_string(),
         name,
         namespace: namespace_name,
         status,
@@ -401,6 +404,7 @@ pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
     let annotations = rs.metadata.annotations.clone().unwrap_or_default();
 
     models::ReplicaSetInfo {
+        kind: "ReplicaSet".to_string(),
         name,
         namespace: namespace_name,
         status,
@@ -975,6 +979,7 @@ mod tests {
 
         let mapped = map_deployment(&dep);
         assert_eq!(mapped.name, "test-deploy");
+        assert_eq!(mapped.kind, "Deployment");
         let conditions = mapped.conditions.as_ref().unwrap();
         assert_eq!(conditions.len(), 2);
         assert_eq!(conditions[0].type_, "Available");
@@ -1042,6 +1047,7 @@ mod tests {
 
         let mapped = map_deployment(&dep);
         assert_eq!(mapped.name, "web-app");
+        assert_eq!(mapped.kind, "Deployment");
         assert_eq!(mapped.ports, vec![80, 443, 9090]);
     }
 
@@ -1058,6 +1064,51 @@ mod tests {
 
         let mapped = map_deployment(&dep);
         assert_eq!(mapped.ports, Vec::<i32>::new());
+    }
+
+    #[test]
+    fn test_map_statefulset_kind() {
+        let ss = StatefulSet {
+            metadata: ObjectMeta {
+                name: Some("redis".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mapped = map_statefulset(&ss);
+        assert_eq!(mapped.name, "redis");
+        assert_eq!(mapped.kind, "StatefulSet");
+    }
+
+    #[test]
+    fn test_map_daemonset_kind() {
+        let ds = DaemonSet {
+            metadata: ObjectMeta {
+                name: Some("node-exporter".to_string()),
+                namespace: Some("monitoring".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mapped = map_daemonset(&ds);
+        assert_eq!(mapped.name, "node-exporter");
+        assert_eq!(mapped.kind, "DaemonSet");
+    }
+
+    #[test]
+    fn test_map_replicaset_kind() {
+        let rs = ReplicaSet {
+            metadata: ObjectMeta {
+                name: Some("frontend-rs".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mapped = map_replicaset(&rs);
+        assert_eq!(mapped.name, "frontend-rs");
+        assert_eq!(mapped.kind, "ReplicaSet");
     }
 }
 
