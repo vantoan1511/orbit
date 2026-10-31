@@ -174,7 +174,7 @@ const handleRefresh = async () => {
         <template #body="{ data }">
           <span
             class="font-mono font-semibold"
-            :class="data.mountedPods > 0 ? 'text-emerald-400' : 'text-muted-color'"
+            :class="data.mountedPods > 0 ? 'text-(--success)' : 'text-muted-color'"
           >
             {{ data.mountedPods }} {{ data.mountedPods === 1 ? 'pod' : 'pods' }}
           </span>
