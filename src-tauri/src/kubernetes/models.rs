@@ -291,11 +291,13 @@ pub struct IngressInfo {
     pub rules_summary: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct UsedByPod {
     pub name: String,
+    pub namespace: String,
     pub status: String,
+    pub mount_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

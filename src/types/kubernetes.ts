@@ -277,7 +277,9 @@ export interface IngressInfo {
 
 export interface UsedByPod {
   name: string
+  namespace: string
   status: KubernetesPodStatus | string
+  mountType: string
 }
 
 export interface ConfigMapInfo {

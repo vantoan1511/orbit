@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
-import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
-import type { ConfigMapInfo, SecretInfo } from '@/types/kubernetes'
-import { Eye, EyeOff, Shield, Tag as TagIcon } from '@lucide/vue'
+import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
+import { useResourceRawManifest } from '@/composables/useResourceRawManifest'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import type { ConfigMapInfo, SecretInfo, UsedByPod } from '@/types/kubernetes'
+import { Eye, EyeOff, Shield, Tag as TagIcon } from '@lucide/vue'
 import Button from 'primevue/button'
 import Tab from 'primevue/tab'
 import TabPanel from 'primevue/tabpanel'
-import { ref, watch } from 'vue'
+import Tag from 'primevue/tag'
+import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 const props = defineProps<{
   visible: boolean
@@ -18,6 +23,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
+
+const router = useRouter()
+const tableFilterStore = useTableFilterStore()
 
 const activeTab = ref('overview')
 const revealedKeys = ref<Record<string, boolean>>({})
@@ -47,38 +55,36 @@ const decodeSecretValue = (val: string) => {
   }
 }
 
-const generateYaml = (res: ConfigMapInfo | SecretInfo) => {
-  const isSec = isSecret(res)
-  const baseYaml = `apiVersion: v1
-kind: ${isSec ? KUBERNETES_RESOURCE_KIND.Secret : KUBERNETES_RESOURCE_KIND.ConfigMap}
-metadata:
-  name: ${res.name}
-  namespace: ${res.namespace}
-  uid: ${res.resourceVersion}3df1-4ae8-8288-ee2b${res.resourceVersion}
-  creationTimestamp: "${res.created}"
-  resourceVersion: "${res.resourceVersion}"
-  labels:
-${Object.entries(res.labels)
-  .map(([k, v]) => `    ${k}: ${v}`)
-  .join('\n')}
-${isSec ? `type: ${res.type}\n` : ''}data:
-${Object.entries(res.data)
-  .map(
-    ([k, v]) =>
-      `  ${k}: ${
-        isSec
-          ? v
-          : `|-\n` +
-            v
-              .split('\n')
-              .map((line) => `    ${line}`)
-              .join('\n')
-      }`
-  )
-  .join('\n')}
-`
-  return baseYaml
+const handleNavigateToPod = (pod: UsedByPod) => {
+  tableFilterStore.setFilter('pod', 'searchQuery', pod.name)
+  if (pod.namespace) {
+    tableFilterStore.setFilter('pod', 'selectedNamespace', [pod.namespace])
+  }
+  emit('update:visible', false)
+  router.push({ path: '/workloads', query: { tab: 'pods' } })
 }
+
+const handleViewAllPods = () => {
+  if (props.resource?.namespace) {
+    tableFilterStore.setFilter('pod', 'selectedNamespace', [props.resource.namespace])
+  }
+  tableFilterStore.setFilter('pod', 'searchQuery', '')
+  emit('update:visible', false)
+  router.push({ path: '/workloads', query: { tab: 'pods' } })
+}
+
+const { displayedYaml, isYamlLoading, copied, copyYaml } = useResourceRawManifest({
+  kind: computed(() =>
+    props.resource
+      ? isSecret(props.resource)
+        ? KUBERNETES_RESOURCE_KIND.Secret
+        : KUBERNETES_RESOURCE_KIND.ConfigMap
+      : ''
+  ),
+  name: computed(() => props.resource?.name),
+  namespace: computed(() => props.resource?.namespace),
+  visible: computed(() => props.visible)
+})
 </script>
 
 <template>
@@ -190,31 +196,58 @@ ${Object.entries(res.data)
         <div>
           <div class="flex items-center justify-between mb-3">
             <h3 class="text-xs font-bold uppercase text-muted-color tracking-wider">Used By</h3>
-            <a
-              href="#"
-              class="text-xs text-violet-400 hover:text-violet-300 font-semibold flex items-center gap-1"
+            <Button
+              variant="text"
+              size="small"
+              class="text-xs text-primary hover:text-primary/80 p-0 font-semibold flex items-center gap-1 h-auto"
+              :disabled="!props.resource?.mountedPods"
+              @click="handleViewAllPods"
             >
-              <span>View all ({{ props.resource.mountedPods }})</span>
+              <span>View all ({{ props.resource?.mountedPods ?? 0 }})</span>
               <span class="text-[10px]">&rarr;</span>
-            </a>
+            </Button>
           </div>
           <div class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-3 flex flex-col gap-2">
             <div
               v-for="pod in props.resource.usedBy"
               :key="pod.name"
-              class="flex items-center justify-between p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-card)"
+              class="flex items-center justify-between p-2.5 rounded-[var(--ui-radius-card)] bg-(--bg-card) hover:bg-(--bg-hover) transition-colors cursor-pointer group"
+              tabindex="0"
+              role="button"
+              @click="handleNavigateToPod(pod)"
+              @keydown.enter.space.prevent="handleNavigateToPod(pod)"
             >
-              <div class="flex items-center gap-2">
-                <TagIcon class="w-3.5 h-3.5 text-violet-400" />
-                <span class="text-xs font-mono text-primary truncate max-w-72">
-                  {{ pod.name }}
-                </span>
+              <div class="flex items-center gap-2 min-w-0">
+                <TagIcon
+                  class="w-3.5 h-3.5 text-muted-color shrink-0 group-hover:text-primary transition-colors"
+                />
+                <div class="flex flex-col min-w-0">
+                  <span class="text-xs font-mono text-primary truncate max-w-64 font-medium">
+                    {{ pod.name }}
+                  </span>
+                  <span
+                    v-if="pod.namespace && pod.namespace !== props.resource.namespace"
+                    class="text-[10px] font-mono text-muted-color truncate"
+                  >
+                    {{ pod.namespace }}
+                  </span>
+                </div>
               </div>
-              <Tag
-                rounded
-                :severity="pod.status === KUBERNETES_POD_STATUS.Running ? 'success' : 'secondary'"
-                :value="pod.status"
-              />
+              <div class="flex items-center gap-2 shrink-0">
+                <Tag
+                  v-for="mType in pod.mountType ? pod.mountType.split(', ') : []"
+                  :key="mType"
+                  rounded
+                  severity="secondary"
+                  :value="mType"
+                  class="text-[10px] font-mono"
+                />
+                <Tag
+                  rounded
+                  :severity="pod.status === KUBERNETES_POD_STATUS.Running ? 'success' : 'secondary'"
+                  :value="pod.status"
+                />
+              </div>
             </div>
             <div
               v-if="props.resource.usedBy.length === 0"
@@ -237,15 +270,15 @@ ${Object.entries(res.data)
             class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-2"
           >
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold font-mono text-violet-400">{{ key }}</span>
+              <span class="text-xs font-bold font-mono text-primary">{{ key }}</span>
 
               <Button
                 v-if="props.resource && isSecret(props.resource)"
+                v-tooltip.top="'Toggle visibility'"
                 severity="secondary"
                 variant="text"
                 size="small"
                 class="p-1 h-auto"
-                title="Toggle visibility"
                 @click="toggleRevealKey(key)"
               >
                 <EyeOff v-if="revealedKeys[key]" class="w-3.5 h-3.5" />
@@ -269,10 +302,12 @@ ${Object.entries(res.data)
 
     <!-- YAML Panel -->
     <template #yaml>
-      <pre
-        v-if="props.resource"
-        class="text-xs font-mono p-4 rounded-[var(--ui-radius-card)] bg-(--bg-card) text-primary overflow-x-auto whitespace-pre select-all"
-        >{{ generateYaml(props.resource) }}</pre>
+      <ResourceYamlTab
+        :displayed-yaml="displayedYaml"
+        :is-yaml-loading="isYamlLoading"
+        :copied="copied"
+        @copy-yaml="copyYaml"
+      />
     </template>
   </BaseResourceDrawer>
 </template>
