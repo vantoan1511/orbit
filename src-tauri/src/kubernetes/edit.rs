@@ -2,6 +2,8 @@ use kube::{
     api::{Api, PostParams},
     Client,
 };
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::Metadata;
 use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolume, PersistentVolumeClaim, Node, Namespace, ResourceQuota, LimitRange};
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
@@ -208,6 +210,64 @@ pub async fn get_resource_raw(
     }
 }
 
+pub fn is_conflict_error(error: &kube::Error) -> bool {
+    matches!(error, kube::Error::Api(err) if err.code == 409)
+}
+
+pub fn sync_resource_version(target: &mut ObjectMeta, source: &ObjectMeta) {
+    if let Some(ref version) = source.resource_version {
+        target.resource_version = Some(version.clone());
+    }
+}
+
+pub async fn replace_with_conflict_retry<K>(
+    api: &Api<K>,
+    name: &str,
+    post_params: &PostParams,
+    parsed: &mut K,
+    max_attempts: usize,
+) -> Result<K, kube::Error>
+where
+    K: kube::Resource<DynamicType = ()>
+        + Clone
+        + serde::de::DeserializeOwned
+        + serde::Serialize
+        + std::fmt::Debug
+        + Metadata<Ty = ObjectMeta>,
+{
+    if parsed
+        .metadata()
+        .resource_version
+        .as_ref()
+        .is_none_or(|v| v.trim().is_empty())
+        && let Ok(latest) = api.get(name).await
+    {
+        sync_resource_version(parsed.metadata_mut(), latest.metadata());
+    }
+
+    let max_attempts = max_attempts.max(1);
+    let mut attempts = 0;
+    loop {
+        attempts += 1;
+        match api.replace(name, post_params, parsed).await {
+            Ok(updated) => return Ok(updated),
+            Err(e) if is_conflict_error(&e) && attempts < max_attempts => {
+                tracing::warn!(
+                    "Resource version conflict (HTTP 409) updating {} '{}', retrying ({}/{})",
+                    K::kind(&()),
+                    name,
+                    attempts,
+                    max_attempts
+                );
+                let latest = api.get(name).await?;
+                sync_resource_version(parsed.metadata_mut(), latest.metadata());
+                tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+}
+
 pub async fn apply_resource(
     client: &Client,
     namespace: &str,
@@ -220,7 +280,7 @@ pub async fn apply_resource(
     macro_rules! replace_resource {
         ($api_type:ty, $resolved_kind:expr) => {{
             let api: Api<$api_type> = Api::namespaced(client.clone(), namespace);
-            let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
+            let mut parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
                 kube::Error::Api(kube::error::ErrorResponse {
                     status: "Failure".to_string(),
                     message: format!("Failed to parse {}: {}", kind, e),
@@ -228,7 +288,7 @@ pub async fn apply_resource(
                     code: 400,
                 })
             })?;
-            let updated = api.replace(name, &post_params, &parsed).await?;
+            let updated = replace_with_conflict_retry(&api, name, &post_params, &mut parsed, 3).await?;
             to_json_val(&updated, $resolved_kind)
         }};
     }
@@ -236,7 +296,7 @@ pub async fn apply_resource(
     macro_rules! replace_cluster_resource {
         ($api_type:ty, $resolved_kind:expr) => {{
             let api: Api<$api_type> = Api::all(client.clone());
-            let parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
+            let mut parsed: $api_type = serde_json::from_value(raw_json).map_err(|e| {
                 kube::Error::Api(kube::error::ErrorResponse {
                     status: "Failure".to_string(),
                     message: format!("Failed to parse {}: {}", kind, e),
@@ -244,7 +304,7 @@ pub async fn apply_resource(
                     code: 400,
                 })
             })?;
-            let updated = api.replace(name, &post_params, &parsed).await?;
+            let updated = replace_with_conflict_retry(&api, name, &post_params, &mut parsed, 3).await?;
             to_json_val(&updated, $resolved_kind)
         }};
     }
@@ -407,6 +467,56 @@ mod tests {
         let val = to_json_val(&dummy, "Deployment").expect("Serialization should succeed");
         assert_eq!(val["name"], "test-dep");
         assert_eq!(val["replicas"], 3);
+    }
+
+    #[test]
+    fn test_is_conflict_error_matches_code_409() {
+        let conflict_err = kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: "Operation cannot be fulfilled: the object has been modified; please apply your changes to the latest version and try again".to_string(),
+            reason: "Conflict".to_string(),
+            code: 409,
+        });
+        assert!(is_conflict_error(&conflict_err));
+
+        let bad_request_err = kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: "Bad request".to_string(),
+            reason: "BadRequest".to_string(),
+            code: 400,
+        });
+        assert!(!is_conflict_error(&bad_request_err));
+
+        let not_found_err = kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: "Not found".to_string(),
+            reason: "NotFound".to_string(),
+            code: 404,
+        });
+        assert!(!is_conflict_error(&not_found_err));
+
+        let internal_err = kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: "Internal server error".to_string(),
+            reason: "InternalError".to_string(),
+            code: 500,
+        });
+        assert!(!is_conflict_error(&internal_err));
+    }
+
+    #[test]
+    fn test_sync_resource_version_populates_target() {
+        let mut target = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+            resource_version: Some("100".to_string()),
+            ..Default::default()
+        };
+        let source = k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+            resource_version: Some("102".to_string()),
+            ..Default::default()
+        };
+
+        sync_resource_version(&mut target, &source);
+        assert_eq!(target.resource_version.as_deref(), Some("102"));
     }
 
     #[test]
