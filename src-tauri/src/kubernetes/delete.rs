@@ -26,7 +26,8 @@ pub(crate) fn resolve_delete_scope(kind: &str) -> Option<ResourceApiScope> {
         | "NetworkPolicy"
         | "Ingress"
         | "ResourceQuota"
-        | "LimitRange" => Some(ResourceApiScope::Namespaced),
+        | "LimitRange"
+        | "Policy" => Some(ResourceApiScope::Namespaced),
         "Namespace"
         | "PersistentVolume"
         | "StorageClass"
@@ -134,6 +135,34 @@ pub async fn delete_resource(
             let api: Api<StorageClass> = Api::all(client.clone());
             api.delete(name, &delete_params).await?;
         }
+        "Policy" => {
+            let np_api: Api<NetworkPolicy> = Api::namespaced(client.clone(), namespace);
+            if np_api.delete(name, &delete_params).await.is_ok() {
+                return Ok(());
+            }
+            let rq_api: Api<ResourceQuota> = Api::namespaced(client.clone(), namespace);
+            if rq_api.delete(name, &delete_params).await.is_ok() {
+                return Ok(());
+            }
+            let lr_api: Api<LimitRange> = Api::namespaced(client.clone(), namespace);
+            if lr_api.delete(name, &delete_params).await.is_ok() {
+                return Ok(());
+            }
+            let val_api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
+            if val_api.delete(name, &delete_params).await.is_ok() {
+                return Ok(());
+            }
+            let mut_api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
+            if mut_api.delete(name, &delete_params).await.is_ok() {
+                return Ok(());
+            }
+            return Err(kube::Error::Api(kube::error::ErrorResponse {
+                status: "Failure".to_string(),
+                message: format!("Policy resource not found: {}", name),
+                reason: "NotFound".to_string(),
+                code: 404,
+            }));
+        }
         _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Unsupported delete resource kind: {}", kind),
@@ -156,5 +185,15 @@ mod tests {
         assert_eq!(resolve_delete_scope("Pod"), Some(ResourceApiScope::Namespaced));
         assert_eq!(resolve_delete_scope("Namespace"), Some(ResourceApiScope::ClusterScoped));
         assert_eq!(resolve_delete_scope("Unknown"), None);
+    }
+
+    #[test]
+    fn test_resolve_delete_scope_policy_kinds() {
+        assert_eq!(resolve_delete_scope("NetworkPolicy"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_delete_scope("ResourceQuota"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_delete_scope("LimitRange"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_delete_scope("ValidatingWebhookConfiguration"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_delete_scope("MutatingWebhookConfiguration"), Some(ResourceApiScope::ClusterScoped));
+        assert_eq!(resolve_delete_scope("Policy"), Some(ResourceApiScope::Namespaced));
     }
 }

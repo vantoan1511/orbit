@@ -3,8 +3,23 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { computed, ref } from 'vue'
+import Tag from 'primevue/tag'
+import { computed, ref, watch } from 'vue'
 import PolicyDetailsDrawer from './PolicyDetailsDrawer.vue'
+import {
+  filterPolicies,
+  getFilterOptionsForCategory,
+  type PolicyCategoryFilter
+} from './policyFilter'
+
+const props = withDefaults(
+  defineProps<{
+    categoryFilter?: PolicyCategoryFilter
+  }>(),
+  {
+    categoryFilter: 'overview'
+  }
+)
 
 const k8sStore = useKubernetesStore()
 
@@ -19,23 +34,19 @@ const columns = [
   { field: 'lastUpdated', header: 'Last Updated', visible: true }
 ]
 
-const selectedType = ref('All Types')
-const types = [
-  'All Types',
-  'Network Policy',
-  'Pod Security',
-  'Resource Quota',
-  'RBAC',
-  'Admission Policy'
-]
+const filterOptions = computed(() => getFilterOptionsForCategory(props.categoryFilter))
+const selectedType = ref(filterOptions.value[0] || '')
+
+watch(
+  () => props.categoryFilter,
+  (newCat) => {
+    const opts = getFilterOptionsForCategory(newCat)
+    selectedType.value = opts[0] || ''
+  }
+)
 
 const filteredPolicies = computed(() => {
-  return k8sStore.policies.filter((p) => {
-    if (selectedType.value !== 'All Types' && p.type !== selectedType.value) {
-      return false
-    }
-    return true
-  })
+  return filterPolicies(k8sStore.policies, props.categoryFilter, selectedType.value)
 })
 
 const handleRefresh = async () => {
@@ -76,15 +87,15 @@ const getStatusSeverity = (status: string) => {
     @refresh="handleRefresh"
   >
     <!-- Custom Filter -->
-    <template #filters>
-      <TableFilterSelect v-model="selectedType" :options="types" />
+    <template #filters v-if="filterOptions.length > 0">
+      <TableFilterSelect v-model="selectedType" :options="filterOptions" />
     </template>
 
     <!-- Custom Name -->
     <template #name="{ data }">
       <span
+        v-tooltip="data.name"
         class="font-mono text-(--accent) hover:underline transition-colors truncate"
-        :title="data.name"
       >
         {{ data.name }}
       </span>

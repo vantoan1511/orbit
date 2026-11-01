@@ -8,7 +8,6 @@ const tabs: ResourceTab[] = [
   { id: 'network' },
   { id: 'pod-security' },
   { id: 'resource' },
-  { id: 'rbac' },
   { id: 'admission' }
 ]
 </script>
@@ -19,49 +18,28 @@ const tabs: ResourceTab[] = [
     <template #tab-overview>
       <div class="flex flex-col gap-6">
         <PoliciesMetricsCards />
-        <PoliciesDataTable />
+        <PoliciesDataTable category-filter="overview" />
       </div>
     </template>
 
-    <!-- Other Tabs (Placeholder logic) -->
+    <!-- Network Tab -->
     <template #tab-network>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Network Policies specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="network" />
     </template>
 
+    <!-- Pod Security Tab -->
     <template #tab-pod-security>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Pod Security specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="pod-security" />
     </template>
 
+    <!-- Resource Policies Tab -->
     <template #tab-resource>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Resource Policies specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="resource" />
     </template>
 
-    <template #tab-rbac>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        RBAC specific view coming soon.
-      </div>
-    </template>
-
+    <!-- Admission Webhooks Tab -->
     <template #tab-admission>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Admission Policies specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="admission" />
     </template>
   </ResourceTabsLayout>
 </template>

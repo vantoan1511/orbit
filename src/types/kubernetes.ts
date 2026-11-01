@@ -381,13 +381,15 @@ export interface EventInfo {
   annotations: Record<string, string>
 }
 
+export type PolicyStatus = 'Enforced' | 'Audit' | 'Disabled'
+
 export interface PolicyInfo {
   uid: string
   name: string
   type: string
   scope: string
   namespace: string
-  status: string
+  status: PolicyStatus | string
   mode: string
   violations: number
   lastUpdated: string

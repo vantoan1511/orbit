@@ -21,7 +21,10 @@ import {
   Network,
   Server,
   Settings2,
-  ShieldCheck
+  ShieldAlert,
+  ShieldCheck,
+  Sliders,
+  Webhook
 } from '@lucide/vue'
 import type { MenuItem } from 'primevue/menuitem'
 import type { Component } from 'vue'
@@ -199,7 +202,36 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
     }
   ],
   security: [
-    { key: 'security-policies', label: 'Policies', customIcon: ShieldCheck, route: '/policies' }
+    {
+      key: 'security-overview',
+      label: 'Overview',
+      customIcon: ShieldCheck,
+      route: '/policies?tab=overview'
+    },
+    {
+      key: 'security-network',
+      label: 'Network Policies',
+      customIcon: Network,
+      route: '/policies?tab=network'
+    },
+    {
+      key: 'security-pod-security',
+      label: 'Pod Security',
+      customIcon: ShieldAlert,
+      route: '/policies?tab=pod-security'
+    },
+    {
+      key: 'security-resource',
+      label: 'Resource Quotas & Limits',
+      customIcon: Sliders,
+      route: '/policies?tab=resource'
+    },
+    {
+      key: 'security-admission',
+      label: 'Admission Webhooks',
+      customIcon: Webhook,
+      route: '/policies?tab=admission'
+    }
   ],
   logs: [{ key: 'logs-main', label: 'Logs', customIcon: FileText, route: '/logs' }]
 }

@@ -41,14 +41,36 @@ pub(crate) fn resolve_resource_scope(kind: &str) -> Option<ResourceApiScope> {
 }
 
 fn to_json_val<T: serde::Serialize>(val: &T, kind: &str) -> Result<Value, kube::Error> {
-    serde_json::to_value(val).map_err(|e| {
+    let mut json = serde_json::to_value(val).map_err(|e| {
         kube::Error::Api(kube::error::ErrorResponse {
             status: "Failure".to_string(),
             message: format!("Failed to serialize {}: {}", kind, e),
             reason: "InternalError".to_string(),
             code: 500,
         })
-    })
+    })?;
+
+    if let Value::Object(ref mut map) = json {
+        if !map.contains_key("kind") || map.get("kind").map(|v| v.is_null()).unwrap_or(false) {
+            map.insert("kind".to_string(), Value::String(kind.to_string()));
+        }
+        if !map.contains_key("apiVersion") || map.get("apiVersion").map(|v| v.is_null()).unwrap_or(false) {
+            let api_version = match kind {
+                "Pod" | "Service" | "ConfigMap" | "Secret" | "PersistentVolume" | "PersistentVolumeClaim" | "Namespace" | "Node" | "ResourceQuota" | "LimitRange" => "v1",
+                "Deployment" | "StatefulSet" | "DaemonSet" | "ReplicaSet" => "apps/v1",
+                "Job" | "CronJob" => "batch/v1",
+                "NetworkPolicy" | "Ingress" => "networking.k8s.io/v1",
+                "ValidatingWebhookConfiguration" | "MutatingWebhookConfiguration" => "admissionregistration.k8s.io/v1",
+                "StorageClass" => "storage.k8s.io/v1",
+                _ => "",
+            };
+            if !api_version.is_empty() {
+                map.insert("apiVersion".to_string(), Value::String(api_version.to_string()));
+            }
+        }
+    }
+
+    Ok(json)
 }
 
 pub async fn get_resource_raw(
@@ -729,5 +751,30 @@ mod tests {
         assert_eq!(sc.volume_binding_mode.as_deref(), Some("WaitForFirstConsumer"));
         assert_eq!(sc.allow_volume_expansion, Some(true));
         assert_eq!(sc.mount_options.as_deref(), Some(&vec!["debug".to_string()][..]));
+    }
+
+    #[test]
+    fn test_policy_manifest_roundtrip_kind() {
+        let np = NetworkPolicy {
+            metadata: ObjectMeta {
+                name: Some("netpol".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let val = to_json_val(&np, "NetworkPolicy").expect("serialize netpol");
+        assert_eq!(val.get("kind").and_then(|v| v.as_str()), Some("NetworkPolicy"));
+        assert_eq!(val.get("apiVersion").and_then(|v| v.as_str()), Some("networking.k8s.io/v1"));
+
+        let rq = ResourceQuota {
+            metadata: ObjectMeta {
+                name: Some("quota".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let val = to_json_val(&rq, "ResourceQuota").expect("serialize quota");
+        assert_eq!(val.get("kind").and_then(|v| v.as_str()), Some("ResourceQuota"));
+        assert_eq!(val.get("apiVersion").and_then(|v| v.as_str()), Some("v1"));
     }
 }
