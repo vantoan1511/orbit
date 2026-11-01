@@ -51,9 +51,29 @@ test('getTabMetadataForRoute resolves Network, Config, Storage, Security, Logs',
   assert.equal(configmaps.category, 'config')
 
   const policies = getTabMetadataForRoute('/policies')
-  assert.equal(policies.title, 'Policies')
+  assert.equal(policies.title, 'Overview')
   assert.equal(policies.iconName, 'ShieldCheck')
   assert.equal(policies.category, 'security')
+
+  const netPolicies = getTabMetadataForRoute('/policies', { tab: 'network' })
+  assert.equal(netPolicies.title, 'Network Policies')
+  assert.equal(netPolicies.iconName, 'Network')
+  assert.equal(netPolicies.category, 'security')
+
+  const psa = getTabMetadataForRoute('/policies', { tab: 'pod-security' })
+  assert.equal(psa.title, 'Pod Security')
+  assert.equal(psa.iconName, 'ShieldAlert')
+  assert.equal(psa.category, 'security')
+
+  const resourcePolicies = getTabMetadataForRoute('/policies', { tab: 'resource' })
+  assert.equal(resourcePolicies.title, 'Resource Quotas & Limits')
+  assert.equal(resourcePolicies.iconName, 'Sliders')
+  assert.equal(resourcePolicies.category, 'security')
+
+  const admission = getTabMetadataForRoute('/policies', { tab: 'admission' })
+  assert.equal(admission.title, 'Admission Webhooks')
+  assert.equal(admission.iconName, 'Webhook')
+  assert.equal(admission.category, 'security')
 
   const logs = getTabMetadataForRoute('/logs')
   assert.equal(logs.title, 'Logs')

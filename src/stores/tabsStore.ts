@@ -56,7 +56,12 @@ export const useTabsStore = defineStore('tabs', () => {
     category?: string
     closable?: boolean
   }): AppTab {
-    const { path, query } = parseRoute(target.route)
+    let normalizedRoute = target.route
+    if (normalizedRoute === '/policies') {
+      normalizedRoute = '/policies?tab=overview'
+    }
+
+    const { path, query } = parseRoute(normalizedRoute)
     const metadata = getTabMetadataForRoute(path, query)
 
     const resolvedTitle =
@@ -64,7 +69,7 @@ export const useTabsStore = defineStore('tabs', () => {
     const resolvedIconName = target.iconName || metadata.iconName
     const resolvedCategory = target.category || metadata.category
 
-    const existing = tabs.value.find((t) => t.route === target.route || t.id === target.route)
+    const existing = tabs.value.find((t) => t.route === normalizedRoute || t.id === normalizedRoute)
     if (existing) {
       activeTabId.value = existing.id
       if (
@@ -85,9 +90,9 @@ export const useTabsStore = defineStore('tabs', () => {
     }
 
     const newTab: AppTab = {
-      id: target.route,
+      id: normalizedRoute,
       title: resolvedTitle,
-      route: target.route,
+      route: normalizedRoute,
       path,
       query,
       iconName: resolvedIconName,
@@ -219,7 +224,10 @@ export const useTabsStore = defineStore('tabs', () => {
           .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
           .join('&')
       : ''
-    const fullRoute = queryParts ? `${routePath}?${queryParts}` : routePath
+    let fullRoute = queryParts ? `${routePath}?${queryParts}` : routePath
+    if (routePath === '/policies' && !routeQuery?.tab) {
+      fullRoute = '/policies?tab=overview'
+    }
 
     const meta = getTabMetadataForRoute(routePath, routeQuery)
     const resolvedTitle = title && title.trim() && title !== 'Tab' ? title : meta.title

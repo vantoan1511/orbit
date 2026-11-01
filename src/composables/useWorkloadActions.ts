@@ -14,7 +14,7 @@ import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
 import PortForwardDialog from '@/components/shared/PortForwardDialog.vue'
 import { getAvailablePorts } from '@/utils/portForward'
-import { resolveEditTargetParams } from '@/utils/workloadActions'
+import { resolveDeleteTargetParams, resolveEditTargetParams } from '@/utils/workloadActions'
 
 export { getAvailablePorts }
 
@@ -535,39 +535,57 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
 
     // Delete / Terminate
     if (resourceKind !== KUBERNETES_RESOURCE_KIND.Event) {
-      const deleteLabel = resourceKind === KUBERNETES_RESOURCE_KIND.Pod ? 'Terminate' : 'Delete'
-      items.push({
-        label: deleteLabel,
-        icon: 'pi pi-trash',
-        class: 'text-red-400 hover:text-red-300',
-        command: () => {
-          const row = selectedActionRow.value
-          if (!row) return
-          confirmAction(
-            `Are you sure you want to ${deleteLabel.toLowerCase()} ${resourceKind} "${row.name}"?`,
-            `Confirm ${deleteLabel}`,
-            deleteLabel,
-            async () => {
-              try {
-                // Note: This try/catch only handles IPC dispatch transport failures.
-                // Kubernetes API errors are handled globally by App.vue listening to OrbitEvents.ErrorOccurred.
-                await kubernetesService.deleteResource({
-                  namespace: row.namespace || 'default',
-                  kind: resourceKind,
-                  name: row.name
-                })
-              } catch (e) {
-                toast.add({
-                  severity: 'error',
-                  summary: 'Error',
-                  detail: e instanceof Error ? e.message : `Failed to ${deleteLabel.toLowerCase()}`,
-                  life: 5000
-                })
+      const selectedRow = selectedActionRow.value as {
+        name: string
+        namespace?: string
+        kind?: string
+        type?: string
+      } | null
+      const targetParams = selectedRow
+        ? resolveDeleteTargetParams(selectedRow, resourceKind)
+        : { kind: resourceKind, namespace: 'default', name: '', isSuppressed: false }
+
+      if (!targetParams.isSuppressed) {
+        const targetKind = targetParams.kind
+        const deleteLabel = targetKind === KUBERNETES_RESOURCE_KIND.Pod ? 'Terminate' : 'Delete'
+        items.push({
+          label: deleteLabel,
+          icon: 'pi pi-trash',
+          class: 'text-(--danger)',
+          command: () => {
+            const row = selectedActionRow.value
+            if (!row) return
+            const resolved = resolveDeleteTargetParams(
+              row as { name: string; namespace?: string; kind?: string; type?: string },
+              resourceKind
+            )
+            confirmAction(
+              `Are you sure you want to ${deleteLabel.toLowerCase()} ${resolved.kind} "${row.name}"?`,
+              `Confirm ${deleteLabel}`,
+              deleteLabel,
+              async () => {
+                try {
+                  // Note: This try/catch only handles IPC dispatch transport failures.
+                  // Kubernetes API errors are handled globally by App.vue listening to OrbitEvents.ErrorOccurred.
+                  await kubernetesService.deleteResource({
+                    namespace: resolved.namespace,
+                    kind: resolved.kind,
+                    name: row.name
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail:
+                      e instanceof Error ? e.message : `Failed to ${deleteLabel.toLowerCase()}`,
+                    life: 5000
+                  })
+                }
               }
-            }
-          )
-        }
-      })
+            )
+          }
+        })
+      }
     }
 
     return items.filter((item, index, arr) => {

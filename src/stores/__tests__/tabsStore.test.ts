@@ -473,3 +473,17 @@ test('tabsStore.closeTabAndResolveRoute resolves route for active tab, last tab,
   assert.equal(store.tabs.length, 1)
   assert.equal(store.activeTabId, tB.id)
 })
+
+test('tabsStore normalizes /policies to /policies?tab=overview to avoid duplicate overview tabs', () => {
+  const store = useTabsStore()
+  store.closeAllTabs()
+
+  const tab1 = store.openTab({ route: '/policies' })
+  assert.equal(tab1.route, '/policies?tab=overview')
+  assert.equal(tab1.title, 'Overview')
+  assert.equal(store.tabs.length, 1)
+
+  const tab2 = store.openTab({ route: '/policies?tab=overview' })
+  assert.equal(tab2.id, tab1.id)
+  assert.equal(store.tabs.length, 1)
+})

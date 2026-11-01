@@ -1,67 +1,65 @@
 <script setup lang="ts">
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import PoliciesDataTable from '../components/policies/PoliciesDataTable.vue'
 import PoliciesMetricsCards from '../components/policies/PoliciesMetricsCards.vue'
+
+const route = useRoute()
+const currentTab = computed(() => (route.query.tab as string) || 'overview')
+const pageTitle = computed(() => {
+  switch (currentTab.value) {
+    case 'network':
+      return 'Network Policies'
+    case 'pod-security':
+      return 'Pod Security'
+    case 'resource':
+      return 'Resource Quotas & Limits'
+    case 'admission':
+      return 'Admission Webhooks'
+    case 'overview':
+    default:
+      return 'Policies'
+  }
+})
 
 const tabs: ResourceTab[] = [
   { id: 'overview' },
   { id: 'network' },
   { id: 'pod-security' },
   { id: 'resource' },
-  { id: 'rbac' },
   { id: 'admission' }
 ]
 </script>
 
 <template>
-  <ResourceTabsLayout title="Policies" default-tab="overview" :tabs="tabs">
+  <ResourceTabsLayout :title="pageTitle" default-tab="overview" :tabs="tabs">
     <!-- Overview Tab -->
     <template #tab-overview>
       <div class="flex flex-col gap-6">
         <PoliciesMetricsCards />
-        <PoliciesDataTable />
+        <PoliciesDataTable category-filter="overview" />
       </div>
     </template>
 
-    <!-- Other Tabs (Placeholder logic) -->
+    <!-- Network Tab -->
     <template #tab-network>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Network Policies specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="network" />
     </template>
 
+    <!-- Pod Security Tab -->
     <template #tab-pod-security>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Pod Security specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="pod-security" />
     </template>
 
+    <!-- Resource Policies Tab -->
     <template #tab-resource>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Resource Policies specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="resource" />
     </template>
 
-    <template #tab-rbac>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        RBAC specific view coming soon.
-      </div>
-    </template>
-
+    <!-- Admission Webhooks Tab -->
     <template #tab-admission>
-      <div
-        class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-      >
-        Admission Policies specific view coming soon.
-      </div>
+      <PoliciesDataTable category-filter="admission" />
     </template>
   </ResourceTabsLayout>
 </template>

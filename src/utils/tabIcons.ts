@@ -23,7 +23,10 @@ import {
   Server,
   Settings,
   Settings2,
-  ShieldCheck
+  ShieldAlert,
+  ShieldCheck,
+  Sliders,
+  Webhook
 } from '@lucide/vue'
 
 export interface TabMetadata {
@@ -58,7 +61,10 @@ export const ICON_MAP: Record<string, Component> = {
   Server,
   Settings,
   Settings2,
-  ShieldCheck
+  ShieldAlert,
+  ShieldCheck,
+  Sliders,
+  Webhook
 }
 
 export function getTabMetadataForRoute(path: string, query?: Record<string, string>): TabMetadata {
@@ -275,12 +281,48 @@ export function getTabMetadataForRoute(path: string, query?: Record<string, stri
   }
 
   if (path === '/policies') {
-    return {
-      title: 'Policies',
-      iconName: 'ShieldCheck',
-      icon: ShieldCheck,
-      iconColorClass: 'text-primary',
-      category: 'security'
+    switch (tab) {
+      case 'network':
+        return {
+          title: 'Network Policies',
+          iconName: 'Network',
+          icon: Network,
+          iconColorClass: 'text-primary',
+          category: 'security'
+        }
+      case 'pod-security':
+        return {
+          title: 'Pod Security',
+          iconName: 'ShieldAlert',
+          icon: ShieldAlert,
+          iconColorClass: 'text-primary',
+          category: 'security'
+        }
+      case 'resource':
+        return {
+          title: 'Resource Quotas & Limits',
+          iconName: 'Sliders',
+          icon: Sliders,
+          iconColorClass: 'text-primary',
+          category: 'security'
+        }
+      case 'admission':
+        return {
+          title: 'Admission Webhooks',
+          iconName: 'Webhook',
+          icon: Webhook,
+          iconColorClass: 'text-primary',
+          category: 'security'
+        }
+      case 'overview':
+      default:
+        return {
+          title: 'Overview',
+          iconName: 'ShieldCheck',
+          icon: ShieldCheck,
+          iconColorClass: 'text-primary',
+          category: 'security'
+        }
     }
   }
 
