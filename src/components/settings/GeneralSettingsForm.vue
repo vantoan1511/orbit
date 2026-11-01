@@ -2,6 +2,9 @@
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useProfileStore } from '@/stores/profileStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useNotificationStore } from '@/stores/notificationStore'
+import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { appSettingsService } from '@/services/appSettingsService'
 import { CONFIG_KEYS, isGeneralConfigKey, type Configuration } from '@/types/settings'
 import { AlertTriangle, Folder, Lock, RefreshCw, RotateCcw } from '@lucide/vue'
 import Button from 'primevue/button'
@@ -10,13 +13,17 @@ import InputText from 'primevue/inputtext'
 import Select from 'primevue/select'
 import Tag from 'primevue/tag'
 import ToggleSwitch from 'primevue/toggleswitch'
+import { useConfirm } from 'primevue/useconfirm'
 import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 
 const profileStore = useProfileStore()
 const k8sStore = useKubernetesStore()
 const settingsStore = useSettingsStore()
+const notificationStore = useNotificationStore()
+const tableFilterStore = useTableFilterStore()
 const toast = useToast()
+const confirm = useConfirm()
 
 const isReloading = ref(false)
 
@@ -114,6 +121,103 @@ const formatArrayValue = (val: unknown): string => {
     return val.join(', ')
   }
   return typeof val === 'string' ? val : ''
+}
+
+const handleResetCache = () => {
+  confirm.require({
+    header: 'Reset Application Cache',
+    message:
+      'This will clear all in-memory table filters, reset notification history, and refresh active cluster resources. Are you sure?',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: {
+      label: 'Cancel',
+      severity: 'secondary',
+      variant: 'text',
+      size: 'small'
+    },
+    acceptProps: {
+      label: 'Reset Cache',
+      severity: 'danger',
+      size: 'small'
+    },
+    accept: async () => {
+      notificationStore.clearAll()
+      tableFilterStore.resetAllSelections()
+      await k8sStore.loadInitialData()
+      toast.add({
+        severity: 'success',
+        summary: 'Cache Cleared',
+        detail: 'Local application cache and filters have been reset.',
+        life: 2500
+      })
+    }
+  })
+}
+
+const handleDeleteCachedContexts = () => {
+  confirm.require({
+    header: 'Delete Custom Contexts & Customizations',
+    message:
+      'This will remove all custom added kubeconfig file paths and cluster visual customizations (aliases, tags, colors). Auto-discovered clusters remain intact. Proceed?',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: {
+      label: 'Cancel',
+      severity: 'secondary',
+      variant: 'text',
+      size: 'small'
+    },
+    acceptProps: {
+      label: 'Delete Contexts',
+      severity: 'danger',
+      size: 'small'
+    },
+    accept: async () => {
+      await settingsStore.updateConfigValue(CONFIG_KEYS.CUSTOM_KUBECONFIG_PATHS, [])
+      await settingsStore.updateConfigValue(CONFIG_KEYS.CLUSTER_CUSTOMIZATIONS, {})
+      await profileStore.fetchProfile()
+      await k8sStore.loadInitialData()
+      toast.add({
+        severity: 'success',
+        summary: 'Contexts Cleared',
+        detail: 'Custom kubeconfig paths and cluster customizations have been removed.',
+        life: 2500
+      })
+    }
+  })
+}
+
+const handleResetAllSettings = () => {
+  confirm.require({
+    header: 'Reset All Orbit Settings',
+    message:
+      'Are you sure you want to restore all Orbit application settings to factory defaults? All preferences, appearance tokens, and configs will be reset.',
+    icon: 'pi pi-exclamation-triangle',
+    rejectProps: {
+      label: 'Cancel',
+      severity: 'secondary',
+      variant: 'text',
+      size: 'small'
+    },
+    acceptProps: {
+      label: 'Reset Everything',
+      severity: 'danger',
+      size: 'small'
+    },
+    accept: async () => {
+      const resetConfigs = settingsStore.settings.map((cfg) => ({
+        ...cfg,
+        value: cfg.defaultValue ?? null
+      }))
+      await appSettingsService.updateAppSettings(resetConfigs)
+      await settingsStore.fetchSettings()
+      toast.add({
+        severity: 'success',
+        summary: 'Settings Restored',
+        detail: 'All application settings have been restored to defaults.',
+        life: 2500
+      })
+    }
+  })
 }
 </script>
 
@@ -311,12 +415,11 @@ const formatArrayValue = (val: unknown): string => {
     </div>
 
     <!-- Danger Zone Section -->
-    <div class="flex flex-col md:flex-row gap-6 lg:gap-10 pt-2 opacity-60">
+    <div class="flex flex-col md:flex-row gap-6 lg:gap-10 pt-2">
       <div class="w-full md:w-1/3 xl:w-1/4 flex flex-col gap-1 shrink-0">
-        <div class="flex items-center gap-1.5 text-muted-color">
+        <div class="flex items-center gap-1.5 text-danger">
           <AlertTriangle class="w-3.5 h-3.5" />
           <h4 class="text-xs font-semibold uppercase tracking-wider">Danger Zone</h4>
-          <Tag severity="secondary" value="Coming soon" />
         </div>
         <p class="text-[11px] text-muted-color">Irreversible actions and configuration resets.</p>
       </div>
@@ -328,13 +431,28 @@ const formatArrayValue = (val: unknown): string => {
             These operations immediately wipe local caches and restore application defaults.
           </span>
           <div class="flex flex-wrap gap-2">
-            <Button severity="danger" variant="outlined" disabled class="text-xs font-medium">
+            <Button
+              severity="danger"
+              variant="outlined"
+              class="text-xs font-medium"
+              @click="handleResetCache"
+            >
               Reset Cache
             </Button>
-            <Button severity="danger" variant="outlined" disabled class="text-xs font-medium">
+            <Button
+              severity="danger"
+              variant="outlined"
+              class="text-xs font-medium"
+              @click="handleDeleteCachedContexts"
+            >
               Delete Cached Contexts
             </Button>
-            <Button severity="danger" variant="outlined" disabled class="text-xs font-medium">
+            <Button
+              severity="danger"
+              variant="outlined"
+              class="text-xs font-medium"
+              @click="handleResetAllSettings"
+            >
               Reset All Settings
             </Button>
           </div>

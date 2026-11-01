@@ -10,14 +10,15 @@ export const CONFIG_KEYS = {
   AUTO_CHECK_UPDATES: 'autoCheckUpdates',
   LAUNCH_ON_STARTUP: 'launchOnStartup',
   CLOSE_TO_TRAY: 'closeToTray',
-  SHARE_TELEMETRY: 'shareTelemetry',
   DEFAULT_TERMINAL_SHELL: 'defaultTerminalShell',
   KEYBOARD_SHORTCUTS: 'keyboardShortcuts',
   THEME_MODE: 'themeMode',
   ACCENT_COLOR: 'accentColor',
   UI_STYLE: 'uiStyle',
   SEMANTIC_COLORS: 'semanticColors',
-  CLUSTER_CUSTOMIZATIONS: 'clusterCustomizations'
+  CLUSTER_CUSTOMIZATIONS: 'clusterCustomizations',
+  NOTIFICATION_PREFERENCES: 'notificationPreferences',
+  PROXY_SETTINGS: 'proxySettings'
 } as const
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
@@ -32,7 +33,9 @@ export const SPECIALIZED_CONFIG_KEYS: readonly string[] = [
   CONFIG_KEYS.ACCENT_COLOR,
   CONFIG_KEYS.UI_STYLE,
   CONFIG_KEYS.SEMANTIC_COLORS,
-  CONFIG_KEYS.CLUSTER_CUSTOMIZATIONS
+  CONFIG_KEYS.CLUSTER_CUSTOMIZATIONS,
+  CONFIG_KEYS.NOTIFICATION_PREFERENCES,
+  CONFIG_KEYS.PROXY_SETTINGS
 ] as const
 
 export function isGeneralConfigKey(key: string): boolean {
@@ -65,6 +68,26 @@ export interface Configuration<T = unknown> {
 }
 
 /**
+ * Granular notification preferences stored under CONFIG_KEYS.NOTIFICATION_PREFERENCES.
+ */
+export interface NotificationPreferences {
+  enableToasts: boolean
+  notifyOnSuccess: boolean
+  notifyOnError: boolean
+  notifyOnUpdates: boolean
+}
+
+/**
+ * Proxy configuration stored under CONFIG_KEYS.PROXY_SETTINGS.
+ */
+export interface ProxySettings {
+  enabled: boolean
+  httpProxy: string
+  httpsProxy: string
+  noProxy: string
+}
+
+/**
  * Key-value mapping for direct overrides and backward compatibility.
  */
 export type ConfigurationMap = Record<string, unknown>
@@ -87,5 +110,7 @@ export const ENABLED_SETTINGS_TABS: readonly SettingsSubTab[] = [
   'clusters',
   'preferences',
   'appearance',
+  'notifications',
+  'proxy',
   'about'
 ] as const

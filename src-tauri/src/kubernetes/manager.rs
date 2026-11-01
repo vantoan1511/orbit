@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use http::Uri;
 use kube::{Client, config::{Kubeconfig, KubeConfigOptions, Config}};
 use crate::kubernetes::models::{ClusterInfo, UserProfileInfo};
 use crate::config::OrbitConfig;
@@ -182,6 +183,28 @@ impl KubeManager {
         }
     }
 
+    /// Resolves outbound proxy URI from given proxy settings configuration.
+    pub fn resolve_proxy_uri(proxy_settings: &serde_json::Value) -> Option<Uri> {
+        if !proxy_settings.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return None;
+        }
+
+        let proxy_str = proxy_settings
+            .get("httpsProxy")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                proxy_settings
+                    .get("httpProxy")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })?;
+
+        proxy_str.parse::<Uri>().ok()
+    }
+
     pub async fn switch_context(&mut self, context_name: &str) -> Result<(), String> {
         let config = self.kubeconfig.as_ref().ok_or_else(|| "No kubeconfig loaded".to_string())?;
         
@@ -190,11 +213,15 @@ impl KubeManager {
             ..Default::default()
         };
         
-        let config = Config::from_custom_kubeconfig(config.clone(), &options)
+        let mut client_config = Config::from_custom_kubeconfig(config.clone(), &options)
             .await
             .map_err(|e| format!("Failed to create client config: {}", e))?;
+
+        if let Some(proxy_uri) = Self::resolve_proxy_uri(&self.config.proxy_settings()) {
+            client_config.proxy_url = Some(proxy_uri);
+        }
             
-        let client = Client::try_from(config)
+        let client = Client::try_from(client_config)
             .map_err(|e| format!("Failed to build client: {}", e))?;
             
         // Test connection
@@ -445,6 +472,43 @@ users:
         assert_eq!(profile.auth_type, "None");
         assert_eq!(profile.cluster_name, None);
         assert_eq!(profile.server_url, None);
+    }
+
+    #[test]
+    fn test_resolve_proxy_uri() {
+        let disabled_cfg = serde_json::json!({
+            "enabled": false,
+            "httpProxy": "http://127.0.0.1:8080",
+            "httpsProxy": "http://127.0.0.1:8443",
+            "noProxy": ""
+        });
+        assert_eq!(KubeManager::resolve_proxy_uri(&disabled_cfg), None);
+
+        let enabled_https = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "http://127.0.0.1:8080",
+            "httpsProxy": "http://proxy.corp.internal:8443",
+            "noProxy": ""
+        });
+        let uri = KubeManager::resolve_proxy_uri(&enabled_https).expect("Should resolve URI");
+        assert_eq!(uri.to_string(), "http://proxy.corp.internal:8443/");
+
+        let enabled_http_fallback = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "http://proxy.corp.internal:8080",
+            "httpsProxy": "",
+            "noProxy": ""
+        });
+        let uri = KubeManager::resolve_proxy_uri(&enabled_http_fallback).expect("Should resolve HTTP fallback");
+        assert_eq!(uri.to_string(), "http://proxy.corp.internal:8080/");
+
+        let invalid_uri = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "not a uri",
+            "httpsProxy": "",
+            "noProxy": ""
+        });
+        assert_eq!(KubeManager::resolve_proxy_uri(&invalid_uri), None);
     }
 }
 

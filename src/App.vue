@@ -36,7 +36,7 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import type { UserProfileInfo } from '@/types/profile'
-import { CONFIG_KEYS, type Configuration } from '@/types/settings'
+import { CONFIG_KEYS, type Configuration, type NotificationPreferences } from '@/types/settings'
 import ConfirmDialog from 'primevue/confirmdialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
@@ -195,12 +195,24 @@ const handleErrorOccurred = (payload: { message: string }) => {
     displayMessage = 'Connection not ready. Please verify your cluster status.'
   }
 
-  toast.add({
-    severity: 'error',
-    summary: 'Error',
-    detail: displayMessage,
-    life: 5000
-  })
+  const notifPrefs = settingsStore.getConfigValue<NotificationPreferences>(
+    CONFIG_KEYS.NOTIFICATION_PREFERENCES,
+    {
+      enableToasts: true,
+      notifyOnSuccess: true,
+      notifyOnError: true,
+      notifyOnUpdates: true
+    }
+  )
+
+  if (notifPrefs.enableToasts && notifPrefs.notifyOnError) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: displayMessage,
+      life: 5000
+    })
+  }
   notificationStore.addNotification({
     title: 'Error',
     message: displayMessage,
@@ -210,12 +222,24 @@ const handleErrorOccurred = (payload: { message: string }) => {
 }
 
 const handleCommandSucceeded = (payload: { message: string }) => {
-  toast.add({
-    severity: 'success',
-    summary: 'Success',
-    detail: payload.message,
-    life: 3000
-  })
+  const notifPrefs = settingsStore.getConfigValue<NotificationPreferences>(
+    CONFIG_KEYS.NOTIFICATION_PREFERENCES,
+    {
+      enableToasts: true,
+      notifyOnSuccess: true,
+      notifyOnError: true,
+      notifyOnUpdates: true
+    }
+  )
+
+  if (notifPrefs.enableToasts && notifPrefs.notifyOnSuccess) {
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: payload.message,
+      life: 3000
+    })
+  }
   notificationStore.addNotification({
     title: 'Command Succeeded',
     message: payload.message,
