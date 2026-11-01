@@ -55,3 +55,18 @@ test('resolveEditTargetParams falls back to "default" if namespace is missing', 
     name: 'worker-node-1'
   })
 })
+
+test('resolveEditTargetParams resolves PSA row to underlying Namespace manifest name and default namespace', () => {
+  const row = {
+    name: 'psa-production',
+    namespace: 'production',
+    kind: 'Namespace',
+    type: 'Pod Security'
+  }
+  const params = resolveEditTargetParams(row, 'Policy')
+  assert.deepEqual(params, {
+    kind: 'Namespace',
+    namespace: 'default',
+    name: 'production'
+  })
+})

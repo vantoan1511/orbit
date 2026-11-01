@@ -8,14 +8,16 @@ export interface EditWorkloadTargetParams {
 }
 
 export function resolveEditTargetParams<
-  T extends { name: string; namespace?: string; kind?: string }
+  T extends { name: string; namespace?: string; kind?: string; type?: string }
 >(row: T, defaultKind: string = KUBERNETES_RESOURCE_KIND.Deployment): EditWorkloadTargetParams {
   const kind = row.kind || defaultKind
-  const namespace = row.namespace && row.namespace !== '-' ? row.namespace : 'default'
+  const name = row.type === 'Pod Security' && row.namespace ? row.namespace : row.name
+  const namespace =
+    kind === 'Namespace' || !row.namespace || row.namespace === '-' ? 'default' : row.namespace
   return {
     kind,
     namespace,
-    name: row.name
+    name
   }
 }
 

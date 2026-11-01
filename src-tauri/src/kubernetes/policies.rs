@@ -21,6 +21,21 @@ fn parse_quota_quantity(key: &str, q: &str) -> f64 {
     }
 }
 
+pub(crate) async fn query_cluster_scoped_if_applicable<T, F, Fut>(
+    is_cluster: bool,
+    fetch: F,
+) -> Option<T>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = T>,
+{
+    if is_cluster {
+        Some(fetch().await)
+    } else {
+        None
+    }
+}
+
 pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result<Vec<PolicyInfo>, kube::Error> {
     let mut all_policies = Vec::new();
 
@@ -42,9 +57,26 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
         Api::all(client.clone())
     };
 
-    let val_api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
-    let mut_api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
     let lp = ListParams::default();
+    let is_cluster = namespace.is_none();
+
+    let val_future = query_cluster_scoped_if_applicable(is_cluster, {
+        let client_clone = client.clone();
+        let lp_clone = lp.clone();
+        move || async move {
+            let val_api: Api<ValidatingWebhookConfiguration> = Api::all(client_clone);
+            val_api.list(&lp_clone).await
+        }
+    });
+
+    let mut_future = query_cluster_scoped_if_applicable(is_cluster, {
+        let client_clone = client.clone();
+        let lp_clone = lp.clone();
+        move || async move {
+            let mut_api: Api<MutatingWebhookConfiguration> = Api::all(client_clone);
+            mut_api.list(&lp_clone).await
+        }
+    });
 
     let ns_future = {
         let client_clone = client.clone();
@@ -70,8 +102,8 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
         net_api.list(&lp),
         quota_api.list(&lp),
         limit_api.list(&lp),
-        val_api.list(&lp),
-        mut_api.list(&lp),
+        val_future,
+        mut_future,
         ns_future
     );
 
@@ -109,20 +141,22 @@ pub async fn list_policies(client: &Client, namespace: Option<String>) -> Result
         tracing::warn!(error = %e, "Failed to list Namespaces for Pod Security Admission");
     }
 
-    if namespace.is_none() {
-        if let Ok(list) = val_res {
+    if let Some(res) = val_res {
+        if let Ok(list) = res {
             for p in list {
                 all_policies.push(format_val_webhook(&p));
             }
-        } else if let Err(e) = val_res {
+        } else if let Err(e) = res {
             tracing::warn!(error = %e, "Failed to list ValidatingWebhookConfigurations");
         }
+    }
 
-        if let Ok(list) = mut_res {
+    if let Some(res) = mut_res {
+        if let Ok(list) = res {
             for p in list {
                 all_policies.push(format_mut_webhook(&p));
             }
-        } else if let Err(e) = mut_res {
+        } else if let Err(e) = res {
             tracing::warn!(error = %e, "Failed to list MutatingWebhookConfigurations");
         }
     }
@@ -211,7 +245,7 @@ pub fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
             if let Some(used_q) = used_map.get(k) {
                 let hard_val = parse_quota_quantity(k, &hard_q.0);
                 let used_val = parse_quota_quantity(k, &used_q.0);
-                if hard_val > 0.0 && used_val >= hard_val {
+                if hard_val > 0.0 && used_val > hard_val {
                     violations += 1;
                 }
             }
@@ -532,6 +566,26 @@ mod tests {
         assert_eq!(info.description, "1 webhook(s)");
     }
 
+    #[tokio::test]
+    async fn test_query_cluster_scoped_if_applicable_skips_when_namespaced() {
+        let called = std::sync::atomic::AtomicBool::new(false);
+        let result = query_cluster_scoped_if_applicable(false, || async {
+            called.store(true, std::sync::atomic::Ordering::SeqCst);
+            "webhooks"
+        }).await;
+
+        assert_eq!(result, None);
+        assert!(!called.load(std::sync::atomic::Ordering::SeqCst), "fetch closure should not be executed when not cluster-scoped");
+
+        let result_cluster = query_cluster_scoped_if_applicable(true, || async {
+            called.store(true, std::sync::atomic::Ordering::SeqCst);
+            "webhooks"
+        }).await;
+
+        assert_eq!(result_cluster, Some("webhooks"));
+        assert!(called.load(std::sync::atomic::Ordering::SeqCst));
+    }
+
     #[test]
     fn test_format_resource_quota_violations_calculation() {
         use k8s_openapi::api::core::v1::ResourceQuotaStatus;
@@ -544,9 +598,9 @@ mod tests {
         hard.insert("pods".to_string(), Quantity("10".to_string()));
 
         let mut used = BTreeMap::new();
-        used.insert("cpu".to_string(), Quantity("5".to_string())); // over quota
+        used.insert("cpu".to_string(), Quantity("5".to_string())); // over quota: violation
         used.insert("memory".to_string(), Quantity("4Gi".to_string())); // within quota
-        used.insert("pods".to_string(), Quantity("10".to_string())); // at limit: violation
+        used.insert("pods".to_string(), Quantity("10".to_string())); // at limit (100% saturated): not a violation
 
         let p = ResourceQuota {
             metadata: ObjectMeta {
@@ -563,7 +617,7 @@ mod tests {
 
         let info = format_resource_quota(&p);
         assert_eq!(info.status, "Enforced");
-        assert_eq!(info.violations, 2);
+        assert_eq!(info.violations, 1);
         assert_eq!(info.description, "Resource limits (3/3 tracked)");
     }
 

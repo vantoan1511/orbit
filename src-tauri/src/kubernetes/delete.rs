@@ -37,6 +37,10 @@ pub(crate) fn resolve_delete_scope(kind: &str) -> Option<ResourceApiScope> {
     }
 }
 
+pub(crate) fn is_not_found_error(error: &kube::Error) -> bool {
+    matches!(error, kube::Error::Api(err) if err.code == 404 || err.reason == "NotFound")
+}
+
 pub async fn delete_resource(
     client: &Client,
     namespace: &str,
@@ -137,24 +141,34 @@ pub async fn delete_resource(
         }
         "Policy" => {
             let np_api: Api<NetworkPolicy> = Api::namespaced(client.clone(), namespace);
-            if np_api.delete(name, &delete_params).await.is_ok() {
-                return Ok(());
+            match np_api.delete(name, &delete_params).await {
+                Ok(_) => return Ok(()),
+                Err(e) if is_not_found_error(&e) => {}
+                Err(e) => return Err(e),
             }
             let rq_api: Api<ResourceQuota> = Api::namespaced(client.clone(), namespace);
-            if rq_api.delete(name, &delete_params).await.is_ok() {
-                return Ok(());
+            match rq_api.delete(name, &delete_params).await {
+                Ok(_) => return Ok(()),
+                Err(e) if is_not_found_error(&e) => {}
+                Err(e) => return Err(e),
             }
             let lr_api: Api<LimitRange> = Api::namespaced(client.clone(), namespace);
-            if lr_api.delete(name, &delete_params).await.is_ok() {
-                return Ok(());
+            match lr_api.delete(name, &delete_params).await {
+                Ok(_) => return Ok(()),
+                Err(e) if is_not_found_error(&e) => {}
+                Err(e) => return Err(e),
             }
             let val_api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
-            if val_api.delete(name, &delete_params).await.is_ok() {
-                return Ok(());
+            match val_api.delete(name, &delete_params).await {
+                Ok(_) => return Ok(()),
+                Err(e) if is_not_found_error(&e) => {}
+                Err(e) => return Err(e),
             }
             let mut_api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
-            if mut_api.delete(name, &delete_params).await.is_ok() {
-                return Ok(());
+            match mut_api.delete(name, &delete_params).await {
+                Ok(_) => return Ok(()),
+                Err(e) if is_not_found_error(&e) => {}
+                Err(e) => return Err(e),
             }
             return Err(kube::Error::Api(kube::error::ErrorResponse {
                 status: "Failure".to_string(),
@@ -195,5 +209,34 @@ mod tests {
         assert_eq!(resolve_delete_scope("ValidatingWebhookConfiguration"), Some(ResourceApiScope::ClusterScoped));
         assert_eq!(resolve_delete_scope("MutatingWebhookConfiguration"), Some(ResourceApiScope::ClusterScoped));
         assert_eq!(resolve_delete_scope("Policy"), Some(ResourceApiScope::Namespaced));
+    }
+
+    #[test]
+    fn test_is_not_found_error_distinguishes_errors() {
+        use kube::error::ErrorResponse;
+
+        let not_found_404 = kube::Error::Api(ErrorResponse {
+            status: "Failure".to_string(),
+            message: "not found".to_string(),
+            reason: "NotFound".to_string(),
+            code: 404,
+        });
+        assert!(is_not_found_error(&not_found_404));
+
+        let forbidden_403 = kube::Error::Api(ErrorResponse {
+            status: "Failure".to_string(),
+            message: "forbidden".to_string(),
+            reason: "Forbidden".to_string(),
+            code: 403,
+        });
+        assert!(!is_not_found_error(&forbidden_403));
+
+        let conflict_409 = kube::Error::Api(ErrorResponse {
+            status: "Failure".to_string(),
+            message: "conflict".to_string(),
+            reason: "Conflict".to_string(),
+            code: 409,
+        });
+        assert!(!is_not_found_error(&conflict_409));
     }
 }
