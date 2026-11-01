@@ -81,7 +81,7 @@ export const categories: SidebarCategory[] = [
     id: 'security',
     name: 'Security',
     icon: ShieldCheck,
-    defaultPath: '/policies',
+    defaultPath: '/policies?tab=overview',
     requiresCluster: true
   },
   { id: 'logs', name: 'Logs', icon: FileText, defaultPath: '/logs', requiresCluster: true }

@@ -1,7 +1,27 @@
 <script setup lang="ts">
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import PoliciesDataTable from '../components/policies/PoliciesDataTable.vue'
 import PoliciesMetricsCards from '../components/policies/PoliciesMetricsCards.vue'
+
+const route = useRoute()
+const currentTab = computed(() => (route.query.tab as string) || 'overview')
+const pageTitle = computed(() => {
+  switch (currentTab.value) {
+    case 'network':
+      return 'Network Policies'
+    case 'pod-security':
+      return 'Pod Security'
+    case 'resource':
+      return 'Resource Quotas & Limits'
+    case 'admission':
+      return 'Admission Webhooks'
+    case 'overview':
+    default:
+      return 'Policies'
+  }
+})
 
 const tabs: ResourceTab[] = [
   { id: 'overview' },
@@ -13,7 +33,7 @@ const tabs: ResourceTab[] = [
 </script>
 
 <template>
-  <ResourceTabsLayout title="Policies" default-tab="overview" :tabs="tabs">
+  <ResourceTabsLayout :title="pageTitle" default-tab="overview" :tabs="tabs">
     <!-- Overview Tab -->
     <template #tab-overview>
       <div class="flex flex-col gap-6">

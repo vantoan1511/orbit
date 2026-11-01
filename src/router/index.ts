@@ -79,7 +79,12 @@ const router = createRouter({
     {
       path: '/policies',
       name: 'policies',
-      component: PoliciesView
+      component: PoliciesView,
+      beforeEnter: (to) => {
+        if (!to.query.tab) {
+          return { path: '/policies', query: { ...to.query, tab: 'overview' }, replace: true }
+        }
+      }
     },
     {
       path: '/logs',
