@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { CONFIG_KEYS, type ProxySettings } from '@/types/settings'
+import { CONFIG_KEYS, DEFAULT_PROXY_SETTINGS, type ProxySettings } from '@/types/settings'
 import { RotateCcw } from '@lucide/vue'
 import Button from 'primevue/button'
 import InputText from 'primevue/inputtext'
@@ -11,13 +11,6 @@ import { useToast } from 'primevue/usetoast'
 const settingsStore = useSettingsStore()
 const toast = useToast()
 
-const DEFAULT_PROXY_SETTINGS: ProxySettings = {
-  enabled: false,
-  httpProxy: '',
-  httpsProxy: '',
-  noProxy: ''
-}
-
 const proxySettings = computed<ProxySettings>(() => {
   return settingsStore.getConfigValue<ProxySettings>(
     CONFIG_KEYS.PROXY_SETTINGS,
@@ -25,25 +18,95 @@ const proxySettings = computed<ProxySettings>(() => {
   )
 })
 
+type ProxyTextField = 'httpProxy' | 'httpsProxy' | 'noProxy'
+
+const localValues = ref<Record<ProxyTextField, string>>({
+  httpProxy: proxySettings.value.httpProxy,
+  httpsProxy: proxySettings.value.httpsProxy,
+  noProxy: proxySettings.value.noProxy
+})
+
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  () => proxySettings.value,
+  (newVal) => {
+    localValues.value = {
+      httpProxy: newVal.httpProxy,
+      httpsProxy: newVal.httpsProxy,
+      noProxy: newVal.noProxy
+    }
+  },
+  { immediate: true }
+)
+
 const isModified = computed(() => {
   const current = proxySettings.value
+  const local = localValues.value
   return (
     current.enabled !== DEFAULT_PROXY_SETTINGS.enabled ||
-    current.httpProxy !== DEFAULT_PROXY_SETTINGS.httpProxy ||
-    current.httpsProxy !== DEFAULT_PROXY_SETTINGS.httpsProxy ||
-    current.noProxy !== DEFAULT_PROXY_SETTINGS.noProxy
+    local.httpProxy !== DEFAULT_PROXY_SETTINGS.httpProxy ||
+    local.httpsProxy !== DEFAULT_PROXY_SETTINGS.httpsProxy ||
+    local.noProxy !== DEFAULT_PROXY_SETTINGS.noProxy
   )
 })
 
-async function updateProxyField<K extends keyof ProxySettings>(field: K, val: ProxySettings[K]) {
+async function flush() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  const current = proxySettings.value
+  const local = localValues.value
+  if (
+    current.httpProxy !== local.httpProxy ||
+    current.httpsProxy !== local.httpsProxy ||
+    current.noProxy !== local.noProxy
+  ) {
+    const updated: ProxySettings = {
+      ...current,
+      httpProxy: local.httpProxy,
+      httpsProxy: local.httpsProxy,
+      noProxy: local.noProxy
+    }
+    await settingsStore.updateConfigValue(CONFIG_KEYS.PROXY_SETTINGS, updated)
+  }
+}
+
+function handleInput(field: ProxyTextField, val: string) {
+  localValues.value[field] = val
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+  }
+  debounceTimer = setTimeout(() => {
+    void flush()
+  }, 400)
+}
+
+function flushField() {
+  void flush()
+}
+
+async function toggleEnabled(val: boolean) {
+  await flush()
   const updated: ProxySettings = {
     ...proxySettings.value,
-    [field]: val
+    ...localValues.value,
+    enabled: val
   }
   await settingsStore.updateConfigValue(CONFIG_KEYS.PROXY_SETTINGS, updated)
 }
 
 async function handleReset() {
+  if (debounceTimer) {
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+  }
+  localValues.value = {
+    httpProxy: DEFAULT_PROXY_SETTINGS.httpProxy,
+    httpsProxy: DEFAULT_PROXY_SETTINGS.httpsProxy,
+    noProxy: DEFAULT_PROXY_SETTINGS.noProxy
+  }
   await settingsStore.updateConfigValue(CONFIG_KEYS.PROXY_SETTINGS, DEFAULT_PROXY_SETTINGS)
   toast.add({
     severity: 'success',
@@ -52,6 +115,10 @@ async function handleReset() {
     life: 2500
   })
 }
+
+onBeforeUnmount(() => {
+  void flush()
+})
 </script>
 
 <template>
@@ -104,7 +171,7 @@ async function handleReset() {
         </div>
         <ToggleSwitch
           :model-value="proxySettings.enabled"
-          @update:model-value="(val) => updateProxyField('enabled', Boolean(val))"
+          @update:model-value="(val) => toggleEnabled(Boolean(val))"
         />
       </div>
     </div>
@@ -121,10 +188,11 @@ async function handleReset() {
       <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-1.5">
         <InputText
           :disabled="!proxySettings.enabled"
-          :model-value="proxySettings.httpProxy"
+          :model-value="localValues.httpProxy"
           placeholder="http://proxy.corp.internal:8080"
           class="w-full text-xs font-mono"
-          @update:model-value="(val) => updateProxyField('httpProxy', String(val ?? ''))"
+          @update:model-value="(val) => handleInput('httpProxy', String(val ?? ''))"
+          @blur="flushField"
         />
         <span class="text-[11px] text-muted-color">
           Format: http://[user:password@]host[:port]
@@ -144,10 +212,11 @@ async function handleReset() {
       <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-1.5">
         <InputText
           :disabled="!proxySettings.enabled"
-          :model-value="proxySettings.httpsProxy"
+          :model-value="localValues.httpsProxy"
           placeholder="http://proxy.corp.internal:8443"
           class="w-full text-xs font-mono"
-          @update:model-value="(val) => updateProxyField('httpsProxy', String(val ?? ''))"
+          @update:model-value="(val) => handleInput('httpsProxy', String(val ?? ''))"
+          @blur="flushField"
         />
         <span class="text-[11px] text-muted-color">
           Used by default for all secure apiserver connections if defined
@@ -167,10 +236,11 @@ async function handleReset() {
       <div class="w-full md:w-2/3 xl:w-3/4 flex flex-col gap-1.5">
         <InputText
           :disabled="!proxySettings.enabled"
-          :model-value="proxySettings.noProxy"
+          :model-value="localValues.noProxy"
           placeholder="localhost,127.0.0.1,.cluster.local,.internal"
           class="w-full text-xs font-mono"
-          @update:model-value="(val) => updateProxyField('noProxy', String(val ?? ''))"
+          @update:model-value="(val) => handleInput('noProxy', String(val ?? ''))"
+          @blur="flushField"
         />
         <span class="text-[11px] text-muted-color">
           Comma-separated list of hostnames, IP addresses, CIDR blocks, or domain suffixes

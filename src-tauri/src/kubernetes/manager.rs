@@ -205,6 +205,50 @@ impl KubeManager {
         proxy_str.parse::<Uri>().ok()
     }
 
+    /// Checks whether a given host should bypass the proxy according to the `no_proxy` rules.
+    pub fn should_bypass_proxy(no_proxy: &str, target_host: &str) -> bool {
+        let trimmed_host = target_host.trim().to_lowercase();
+        if trimmed_host.is_empty() {
+            return false;
+        }
+
+        for item in no_proxy.split(',') {
+            let item = item.trim().to_lowercase();
+            if item.is_empty() {
+                continue;
+            }
+            if item == "*" {
+                return true;
+            }
+            let item_clean = item.strip_prefix('.').unwrap_or(&item);
+            if trimmed_host == item_clean || trimmed_host.ends_with(&format!(".{}", item_clean)) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Resolves outbound proxy URI from proxy settings, checking if the cluster URL host is in the bypass list.
+    pub fn resolve_proxy_uri_for_cluster(
+        proxy_settings: &serde_json::Value,
+        cluster_url: &Uri,
+    ) -> Option<Uri> {
+        if !proxy_settings.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return None;
+        }
+
+        if let Some(host) = cluster_url.host() {
+            if let Some(no_proxy) = proxy_settings.get("noProxy").and_then(|v| v.as_str()) {
+                if Self::should_bypass_proxy(no_proxy, host) {
+                    return None;
+                }
+            }
+        }
+
+        Self::resolve_proxy_uri(proxy_settings)
+    }
+
     pub async fn switch_context(&mut self, context_name: &str) -> Result<(), String> {
         let config = self.kubeconfig.as_ref().ok_or_else(|| "No kubeconfig loaded".to_string())?;
         
@@ -217,7 +261,7 @@ impl KubeManager {
             .await
             .map_err(|e| format!("Failed to create client config: {}", e))?;
 
-        if let Some(proxy_uri) = Self::resolve_proxy_uri(&self.config.proxy_settings()) {
+        if let Some(proxy_uri) = Self::resolve_proxy_uri_for_cluster(&self.config.proxy_settings(), &client_config.cluster_url) {
             client_config.proxy_url = Some(proxy_uri);
         }
             
@@ -510,5 +554,43 @@ users:
         });
         assert_eq!(KubeManager::resolve_proxy_uri(&invalid_uri), None);
     }
+
+    #[test]
+    fn test_should_bypass_proxy() {
+        let no_proxy = "localhost, 127.0.0.1, .cluster.local, internal";
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "localhost"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "127.0.0.1"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "cluster.local"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "minikube.cluster.local"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "api.internal"));
+        assert!(!KubeManager::should_bypass_proxy(no_proxy, "example.com"));
+        assert!(!KubeManager::should_bypass_proxy(no_proxy, "10.0.0.1"));
+
+        // Wildcard support
+        assert!(KubeManager::should_bypass_proxy("*", "anyhost.org"));
+        assert!(!KubeManager::should_bypass_proxy("", "localhost"));
+    }
+
+    #[test]
+    fn test_resolve_proxy_uri_for_cluster() {
+        let proxy_cfg = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "http://proxy.corp.internal:8080",
+            "httpsProxy": "http://proxy.corp.internal:8443",
+            "noProxy": "localhost,127.0.0.1,.cluster.local"
+        });
+
+        let local_cluster: Uri = "https://127.0.0.1:6443".parse().expect("valid uri");
+        assert_eq!(KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &local_cluster), None);
+
+        let k8s_local: Uri = "https://minikube.cluster.local:8443".parse().expect("valid uri");
+        assert_eq!(KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &k8s_local), None);
+
+        let remote_cluster: Uri = "https://k8s.cloud.provider.com:6443".parse().expect("valid uri");
+        let resolved = KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &remote_cluster)
+            .expect("should route remote cluster through proxy");
+        assert_eq!(resolved.to_string(), "http://proxy.corp.internal:8443/");
+    }
 }
+
 

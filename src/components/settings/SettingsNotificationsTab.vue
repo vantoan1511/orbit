@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { CONFIG_KEYS, type NotificationPreferences } from '@/types/settings'
+import {
+  CONFIG_KEYS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences
+} from '@/types/settings'
 import { RotateCcw } from '@lucide/vue'
 import Button from 'primevue/button'
 import ToggleSwitch from 'primevue/toggleswitch'
@@ -10,27 +14,20 @@ import { useToast } from 'primevue/usetoast'
 const settingsStore = useSettingsStore()
 const toast = useToast()
 
-const DEFAULT_PREFERENCES: NotificationPreferences = {
-  enableToasts: true,
-  notifyOnSuccess: true,
-  notifyOnError: true,
-  notifyOnUpdates: true
-}
-
 const preferences = computed<NotificationPreferences>(() => {
   return settingsStore.getConfigValue<NotificationPreferences>(
     CONFIG_KEYS.NOTIFICATION_PREFERENCES,
-    DEFAULT_PREFERENCES
+    DEFAULT_NOTIFICATION_PREFERENCES
   )
 })
 
 const isModified = computed(() => {
   const current = preferences.value
   return (
-    current.enableToasts !== DEFAULT_PREFERENCES.enableToasts ||
-    current.notifyOnSuccess !== DEFAULT_PREFERENCES.notifyOnSuccess ||
-    current.notifyOnError !== DEFAULT_PREFERENCES.notifyOnError ||
-    current.notifyOnUpdates !== DEFAULT_PREFERENCES.notifyOnUpdates
+    current.enableToasts !== DEFAULT_NOTIFICATION_PREFERENCES.enableToasts ||
+    current.notifyOnSuccess !== DEFAULT_NOTIFICATION_PREFERENCES.notifyOnSuccess ||
+    current.notifyOnError !== DEFAULT_NOTIFICATION_PREFERENCES.notifyOnError ||
+    current.notifyOnUpdates !== DEFAULT_NOTIFICATION_PREFERENCES.notifyOnUpdates
   )
 })
 
@@ -46,7 +43,10 @@ async function updatePreference<K extends keyof NotificationPreferences>(
 }
 
 async function handleReset() {
-  await settingsStore.updateConfigValue(CONFIG_KEYS.NOTIFICATION_PREFERENCES, DEFAULT_PREFERENCES)
+  await settingsStore.updateConfigValue(
+    CONFIG_KEYS.NOTIFICATION_PREFERENCES,
+    DEFAULT_NOTIFICATION_PREFERENCES
+  )
   toast.add({
     severity: 'success',
     summary: 'Notifications Reset',

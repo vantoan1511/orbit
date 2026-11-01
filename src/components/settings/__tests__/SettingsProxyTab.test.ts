@@ -47,3 +47,21 @@ test('SettingsProxyTab adheres to token hygiene with zero ad-hoc .p-* overrides 
     'SettingsProxyTab must not use Tailwind !important modifiers'
   )
 })
+
+test('SettingsProxyTab handles debounced input and flushes on blur for proxy URLs', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/settings/SettingsProxyTab.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('@blur') || content.includes('blur'),
+    'SettingsProxyTab must attach blur handler to flush inputs on blur'
+  )
+  assert.ok(
+    content.includes('setTimeout') || content.includes('debounce'),
+    'SettingsProxyTab must debounce text input changes'
+  )
+  assert.ok(
+    content.includes('onBeforeUnmount'),
+    'SettingsProxyTab must clean up or flush pending debounce timers on unmount'
+  )
+})

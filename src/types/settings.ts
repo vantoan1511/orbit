@@ -77,6 +77,13 @@ export interface NotificationPreferences {
   notifyOnUpdates: boolean
 }
 
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  enableToasts: true,
+  notifyOnSuccess: true,
+  notifyOnError: true,
+  notifyOnUpdates: true
+}
+
 /**
  * Proxy configuration stored under CONFIG_KEYS.PROXY_SETTINGS.
  */
@@ -85,6 +92,13 @@ export interface ProxySettings {
   httpProxy: string
   httpsProxy: string
   noProxy: string
+}
+
+export const DEFAULT_PROXY_SETTINGS: ProxySettings = {
+  enabled: false,
+  httpProxy: '',
+  httpsProxy: '',
+  noProxy: ''
 }
 
 /**

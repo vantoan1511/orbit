@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { CONFIG_KEYS } from '@/types/settings'
+import {
+  CONFIG_KEYS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences
+} from '@/types/settings'
 import {
   RESTART_DIALOG_MESSAGE,
   formatUpdateInstallErrorMessage
@@ -36,13 +40,19 @@ watch(
   () => updaterStore.hasUpdate,
   (hasUpdate) => {
     if (hasUpdate) {
-      toast.add({
-        severity: 'info',
-        summary: 'Update Available',
-        detail: 'A new version of Orbit is available.',
-        group: 'updater',
-        life: 15000
-      })
+      const notifPrefs = settingsStore.getConfigValue<NotificationPreferences>(
+        CONFIG_KEYS.NOTIFICATION_PREFERENCES,
+        DEFAULT_NOTIFICATION_PREFERENCES
+      )
+      if (notifPrefs.enableToasts && notifPrefs.notifyOnUpdates) {
+        toast.add({
+          severity: 'info',
+          summary: 'Update Available',
+          detail: 'A new version of Orbit is available.',
+          group: 'updater',
+          life: 15000
+        })
+      }
     }
   }
 )

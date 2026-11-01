@@ -30,3 +30,22 @@ test('UpdaterNotifications.vue integrates useSettingsStore and respects CONFIG_K
     'UpdaterNotifications.vue must read config via settingsStore.getConfigValue'
   )
 })
+
+test('UpdaterNotifications.vue checks NOTIFICATION_PREFERENCES enableToasts and notifyOnUpdates before triggering toast', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/UpdaterNotifications.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('CONFIG_KEYS.NOTIFICATION_PREFERENCES') ||
+      content.includes('NOTIFICATION_PREFERENCES'),
+    'UpdaterNotifications.vue must reference NOTIFICATION_PREFERENCES'
+  )
+  assert.ok(
+    content.includes('DEFAULT_NOTIFICATION_PREFERENCES'),
+    'UpdaterNotifications.vue must reference DEFAULT_NOTIFICATION_PREFERENCES'
+  )
+  assert.ok(
+    content.includes('enableToasts') && content.includes('notifyOnUpdates'),
+    'UpdaterNotifications.vue must check enableToasts and notifyOnUpdates before displaying toast'
+  )
+})

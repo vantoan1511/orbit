@@ -36,7 +36,12 @@ import type {
   StorageClassInfo
 } from '@/types/kubernetes'
 import type { UserProfileInfo } from '@/types/profile'
-import { CONFIG_KEYS, type Configuration, type NotificationPreferences } from '@/types/settings'
+import {
+  CONFIG_KEYS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type Configuration,
+  type NotificationPreferences
+} from '@/types/settings'
 import ConfirmDialog from 'primevue/confirmdialog'
 import DynamicDialog from 'primevue/dynamicdialog'
 import Toast from 'primevue/toast'
@@ -197,12 +202,7 @@ const handleErrorOccurred = (payload: { message: string }) => {
 
   const notifPrefs = settingsStore.getConfigValue<NotificationPreferences>(
     CONFIG_KEYS.NOTIFICATION_PREFERENCES,
-    {
-      enableToasts: true,
-      notifyOnSuccess: true,
-      notifyOnError: true,
-      notifyOnUpdates: true
-    }
+    DEFAULT_NOTIFICATION_PREFERENCES
   )
 
   if (notifPrefs.enableToasts && notifPrefs.notifyOnError) {
@@ -224,12 +224,7 @@ const handleErrorOccurred = (payload: { message: string }) => {
 const handleCommandSucceeded = (payload: { message: string }) => {
   const notifPrefs = settingsStore.getConfigValue<NotificationPreferences>(
     CONFIG_KEYS.NOTIFICATION_PREFERENCES,
-    {
-      enableToasts: true,
-      notifyOnSuccess: true,
-      notifyOnError: true,
-      notifyOnUpdates: true
-    }
+    DEFAULT_NOTIFICATION_PREFERENCES
   )
 
   if (notifPrefs.enableToasts && notifPrefs.notifyOnSuccess) {
