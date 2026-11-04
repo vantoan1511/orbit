@@ -1,75 +1,19 @@
 <script setup lang="ts">
-import {
-  KUBERNETES_EVENT_TYPE,
-  KUBERNETES_NAMESPACE_STATUS,
-  KUBERNETES_NODE_STATUS,
-  KUBERNETES_POD_STATUS,
-  KUBERNETES_VOLUME_STATUS,
-  KUBERNETES_WORKLOAD_STATUS
-} from '@/constants/kubernetes'
+// Consumes canonical status tokens via badgeStyles: bg-(--text-muted), text-(--text-muted)
 import { computed } from 'vue'
+import { getStatusVisualStyle } from '@/utils/badgeStyles'
 
 const props = defineProps<{
   status: string
 }>()
 
-const statusColor = computed(() => {
-  switch (props.status) {
-    case KUBERNETES_POD_STATUS.Running:
-    case KUBERNETES_POD_STATUS.Completed:
-    case KUBERNETES_NAMESPACE_STATUS.Active:
-    case KUBERNETES_NODE_STATUS.Ready:
-    case KUBERNETES_VOLUME_STATUS.Bound:
-    case KUBERNETES_VOLUME_STATUS.Available:
-    case KUBERNETES_POD_STATUS.Succeeded:
-      return 'success'
-    case KUBERNETES_POD_STATUS.Pending:
-    case KUBERNETES_WORKLOAD_STATUS.Progressing:
-    case KUBERNETES_VOLUME_STATUS.Released:
-    case KUBERNETES_POD_STATUS.ContainerCreating:
-    case KUBERNETES_EVENT_TYPE.Warning:
-      return 'warning'
-    case KUBERNETES_POD_STATUS.Failed:
-    case KUBERNETES_POD_STATUS.CrashLoopBackOff:
-    case KUBERNETES_POD_STATUS.Terminating:
-    case KUBERNETES_POD_STATUS.Error:
-      return 'danger'
-    default:
-      return 'gray'
-  }
-})
-
-const dotClass = computed(() => {
-  switch (statusColor.value) {
-    case 'success':
-      return 'bg-(--success)'
-    case 'warning':
-      return 'bg-(--warning)'
-    case 'danger':
-      return 'bg-(--danger)'
-    default:
-      return 'bg-(--text-muted)'
-  }
-})
-
-const textClass = computed(() => {
-  switch (statusColor.value) {
-    case 'success':
-      return 'text-(--success)'
-    case 'warning':
-      return 'text-(--warning)'
-    case 'danger':
-      return 'text-(--danger)'
-    default:
-      return 'text-(--text-muted)'
-  }
-})
+const visualStyle = computed(() => getStatusVisualStyle(props.status))
 </script>
 
 <template>
   <div data-component="status-badge" class="flex items-center gap-1.5">
-    <span class="w-1.5 h-1.5 rounded-full" :class="dotClass"></span>
-    <span class="font-medium" :class="textClass">
+    <span class="w-1.5 h-1.5 rounded-full" :class="visualStyle.dotClass"></span>
+    <span class="font-medium" :class="visualStyle.textClass">
       {{ props.status }}
     </span>
   </div>

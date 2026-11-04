@@ -32,6 +32,27 @@ test('getResourceCompositeKey: handles cluster-scoped resources with /name', () 
   assert.equal(getResourceCompositeKey(itemWithEmptyNs), '/cluster-role-1')
 })
 
+test('getResourceCompositeKey: memoises result by object identity in WeakMap', () => {
+  const item1 = {
+    namespace: 'prod',
+    name: 'web-deployment'
+  }
+  const key1 = getResourceCompositeKey(item1)
+  assert.equal(key1, 'prod/web-deployment')
+  assert.equal(getResourceCompositeKey(item1), key1)
+
+  const item2 = {
+    namespace: 'prod',
+    name: 'web-deployment'
+  }
+  const key2 = getResourceCompositeKey(item2)
+  assert.equal(key2, 'prod/web-deployment')
+  // Even if item1's name is mutated, memoised key remains stable for that object reference
+  ;(item1 as Record<string, unknown>).name = 'mutated'
+  assert.equal(getResourceCompositeKey(item1), key1)
+  assert.equal(getResourceCompositeKey(item2), key2)
+})
+
 test('shouldShowSkeleton: returns true only when loading and data length is 0', () => {
   assert.equal(shouldShowSkeleton(true, 0), true)
   assert.equal(shouldShowSkeleton(true, 10), false)

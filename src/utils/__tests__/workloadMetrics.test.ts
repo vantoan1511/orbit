@@ -6,6 +6,7 @@ import {
   computeDeploymentRestarts,
   computeReplicasSortKey,
   createDeploymentRowDecorator,
+  createPodRowDecorator,
   getTopConsumers,
   restartFingerprint,
   withReplicasSortKey
@@ -211,4 +212,92 @@ test('restartFingerprint memoises by pods array identity and ignores non-Replica
   // Same array identity returns same string
   const fp2 = restartFingerprint(pods)
   assert.equal(fp1, fp2)
+})
+
+test('createDeploymentRowDecorator precomputes orderedConditions and imageTags and preserves row reference when unchanged', () => {
+  const decorator = createDeploymentRowDecorator()
+  const dep: DeploymentInfo = {
+    name: 'web-service',
+    namespace: 'prod',
+    readyReplicas: 3,
+    replicas: { current: 3, desired: 3 },
+    availableReplicas: 3,
+    age: '5d',
+    images: ['registry.example.com/org/web:v1.2.3', 'sidecar:latest'],
+    conditions: [
+      {
+        type: 'Progressing',
+        status: 'True',
+        reason: 'NewReplicaSetAvailable',
+        message: 'Deployment has minimum availability.'
+      },
+      { type: 'Available', status: 'True', message: 'Deployment is available.' },
+      { type: 'ReplicaFailure', status: 'False' } // False condition should be excluded
+    ]
+  }
+
+  const restartMap = new Map<string, number>([['prod/web-service', 2]])
+  const [row1] = decorator([dep], restartMap)
+  assert.ok(row1)
+  assert.equal(row1.restarts, 2)
+  assert.equal(row1.imageTags.length, 2)
+  assert.equal(row1.imageTags[0].full, 'registry.example.com/org/web:v1.2.3')
+  assert.equal(row1.imageTags[0].short, 'web:v1.2.3')
+  assert.equal(row1.imageTags[1].short, 'sidecar:latest')
+
+  // Ordered conditions: Available (1) before Progressing (2)
+  assert.equal(row1.orderedConditions.length, 2)
+  assert.equal(row1.orderedConditions[0].type, 'Available')
+  assert.equal(row1.orderedConditions[0].severity, 'success')
+  assert.equal(row1.orderedConditions[1].type, 'Progressing')
+  assert.equal(row1.orderedConditions[1].severity, 'info')
+
+  // Calling again with same object preserves row reference
+  const [row2] = decorator([dep], restartMap)
+  assert.equal(row1, row2)
+})
+
+test('withReplicasSortKey memoises row objects via WeakMap and precomputes imageTags', () => {
+  const rs = {
+    name: 'web-rs-1',
+    replicas: { current: 2, desired: 2 },
+    images: ['docker.io/library/nginx:alpine']
+  }
+
+  const [row1] = withReplicasSortKey([rs])
+  assert.equal(row1.imageTags.length, 1)
+  assert.equal(row1.imageTags[0].full, 'docker.io/library/nginx:alpine')
+  assert.equal(row1.imageTags[0].short, 'nginx:alpine')
+
+  // Calling again returns identical object reference from WeakMap
+  const [row2] = withReplicasSortKey([rs])
+  assert.equal(row1, row2)
+})
+
+test('createPodRowDecorator memoises PodRow objects via WeakMap and precomputes nodeShort and CPU/memory bar styles', () => {
+  const podDecorator = createPodRowDecorator()
+  const pod = createSamplePod('api-pod-1', 'prod', 0, undefined, 42.5, 75.2)
+  pod.node = 'k8s-worker-node-1.internal.cloud'
+  pod.cpu = '250m'
+  pod.memory = '512Mi'
+
+  const [row1] = podDecorator([pod])
+  assert.equal(row1.nodeShort, 'k8s-worker-node-1')
+  assert.equal(row1.hasCpuPct, true)
+  assert.equal(row1.cpuWidthStyle, '42.5%')
+  assert.equal(row1.hasMemoryPct, true)
+  assert.equal(row1.memoryWidthStyle, '75.2%')
+
+  // Calling again returns identical object reference from WeakMap
+  const [row2] = podDecorator([pod])
+  assert.equal(row1, row2)
+
+  // Empty or invalid metrics
+  const podBlank = createSamplePod('blank-pod', 'prod')
+  const [blankRow] = podDecorator([podBlank])
+  assert.equal(blankRow.nodeShort, 'N/A')
+  assert.equal(blankRow.hasCpuPct, false)
+  assert.equal(blankRow.cpuWidthStyle, '0%')
+  assert.equal(blankRow.hasMemoryPct, false)
+  assert.equal(blankRow.memoryWidthStyle, '0%')
 })

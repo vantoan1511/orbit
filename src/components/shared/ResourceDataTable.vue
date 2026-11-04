@@ -4,6 +4,7 @@ import Button from 'primevue/button'
 import Checkbox from 'primevue/checkbox'
 import DataTable from 'primevue/datatable'
 import InputText from 'primevue/inputtext'
+import Paginator from 'primevue/paginator'
 import Popover from 'primevue/popover'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
@@ -12,6 +13,21 @@ import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue
 import { type TableColumn } from '@/composables/useTableColumns'
 import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
 import { shouldShowSkeleton } from '@/utils/resourceKey'
+import {
+  DEFAULT_VIRTUAL_SCROLLER_OPTIONS,
+  VIRTUAL_SCROLL_HEIGHT,
+  paginateTableRows,
+  shouldEnableVirtualScroll,
+  sortTableRows
+} from '@/utils/tableVirtualPagination'
+
+const PAGINATOR_PT = Object.freeze({
+  pcRowPerPageDropdown: {
+    root: {
+      class: 'p-variant-filled p-select-sm min-w-20'
+    }
+  }
+})
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const selection = defineModel<any[]>('selection')
@@ -78,6 +94,50 @@ watch(
   }
 )
 
+const first = ref(0)
+const sortField = ref<string | undefined>(undefined)
+const sortOrder = ref<number | undefined>(undefined)
+
+const isVirtualScrollEnabled = computed(() => shouldEnableVirtualScroll(rowsPerPage.value))
+
+const sortedData = computed(() => {
+  return sortTableRows(props.data, sortField.value, sortOrder.value)
+})
+
+const paginatedResult = computed(() => {
+  return paginateTableRows(sortedData.value, first.value, rowsPerPage.value)
+})
+
+watch(
+  () => paginatedResult.value.clampedFirst,
+  (newClamped) => {
+    if (newClamped !== first.value) {
+      first.value = newClamped
+    }
+  }
+)
+
+const displayRows = computed(() => paginatedResult.value.pageRows)
+
+const onSort = (event: {
+  sortField?: string | ((item: any) => string)
+  sortOrder?: number | null
+}) => {
+  if (typeof event.sortField === 'string') {
+    sortField.value = event.sortField
+  } else {
+    sortField.value = undefined
+  }
+  sortOrder.value = event.sortOrder ?? undefined
+}
+
+const onPageChange = (event: { first: number; rows: number }) => {
+  first.value = event.first
+  if (event.rows !== rowsPerPage.value) {
+    rowsPerPage.value = event.rows
+  }
+}
+
 const localSearchQuery = ref(props.searchQuery ?? '')
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -91,6 +151,7 @@ watch(
 )
 
 const emitSearch = (val: string) => {
+  first.value = 0
   if (searchDebounceTimer) {
     clearTimeout(searchDebounceTimer)
     searchDebounceTimer = null
@@ -161,7 +222,7 @@ const isIndeterminate = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div data-component="resource-data-table" class="flex flex-col gap-4">
     <!-- Bulk Actions Toolbar -->
     <div
       v-if="selection && selection.length > 0"
@@ -308,44 +369,50 @@ const isIndeterminate = computed(() => {
         <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
       </slot>
 
-      <!-- Data Table -->
-      <DataTable
-        v-else
-        :value="data"
-        v-model:selection="selection"
-        :dataKey="dataKey"
-        paginator
-        :rowHover="true"
-        v-model:rows="rowsPerPage"
-        :rowsPerPageOptions="rowsPerPageOptions"
-        class="p-datatable-sm cursor-pointer"
-        tableClass="w-full text-left text-xs border-collapse"
-        paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
-        :currentPageReportTemplate="reportTemplate"
-        :pt="{
-          pcPaginator: {
-            pcRowPerPageDropdown: {
-              root: {
-                class: 'p-variant-filled p-select-sm min-w-20'
-              }
-            }
-          }
-        }"
-        @row-click="emit('row-click', $event)"
-        @row-contextmenu="emit('row-contextmenu', $event)"
-      >
-        <template #empty>
-          <slot name="empty">
-            <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
-              <Info class="w-8 h-8 text-muted-color/50" />
-              <span>{{ emptyMessage }}</span>
-            </div>
-          </slot>
-        </template>
+      <template v-else>
+        <!-- Data Table -->
+        <DataTable
+          :value="displayRows"
+          v-model:selection="selection"
+          :dataKey="dataKey"
+          :rowHover="true"
+          class="p-datatable-sm cursor-pointer"
+          tableClass="w-full text-left text-xs border-collapse"
+          :scrollable="isVirtualScrollEnabled"
+          :scrollHeight="isVirtualScrollEnabled ? VIRTUAL_SCROLL_HEIGHT : undefined"
+          :virtualScrollerOptions="
+            isVirtualScrollEnabled ? DEFAULT_VIRTUAL_SCROLLER_OPTIONS : undefined
+          "
+          :sortField="sortField"
+          :sortOrder="sortOrder"
+          @sort="onSort"
+          @row-click="emit('row-click', $event)"
+          @row-contextmenu="emit('row-contextmenu', $event)"
+        >
+          <template #empty>
+            <slot name="empty">
+              <div class="text-center py-10 text-muted-color flex flex-col items-center gap-2">
+                <Info class="w-8 h-8 text-muted-color/50" />
+                <span>{{ emptyMessage }}</span>
+              </div>
+            </slot>
+          </template>
 
-        <!-- Pass columns down -->
-        <slot></slot>
-      </DataTable>
+          <!-- Pass columns down -->
+          <slot></slot>
+        </DataTable>
+
+        <Paginator
+          :rows="rowsPerPage"
+          :totalRecords="data.length"
+          :rowsPerPageOptions="rowsPerPageOptions"
+          :first="first"
+          template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
+          :currentPageReportTemplate="reportTemplate"
+          :pt="PAGINATOR_PT"
+          @page="onPageChange"
+        />
+      </template>
     </div>
 
     <!-- Details slideout drawer -->

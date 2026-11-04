@@ -1,22 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { getNamespaceSeverity } from '@/utils/badgeStyles'
 
 const props = defineProps<{
   namespace: string
 }>()
 
-const severity = computed(() => {
-  switch (props.namespace) {
-    case 'kube-system':
-      return 'secondary'
-    case 'monitoring':
-      return 'warn'
-    case 'logging':
-      return 'info'
-    default:
-      return 'secondary'
-  }
-})
+const severity = computed(() => getNamespaceSeverity(props.namespace))
 </script>
 
 <template>

@@ -6,19 +6,38 @@ export interface IdentifiableResource {
   objectName?: string
 }
 
+const compositeKeyCache = new WeakMap<object, string>()
+
 /**
  * Computes a unique composite key for a Kubernetes resource.
  * Prefers `uid` when present, otherwise defaults to `${namespace}/${name}` or `/${name}` for cluster-scoped resources.
+ * Results are memoised by object identity in a WeakMap for O(1) repeated evaluation.
  */
 export function getResourceCompositeKey(item: IdentifiableResource): string {
+  if (typeof item === 'object' && item !== null) {
+    const cached = compositeKeyCache.get(item)
+    if (cached !== undefined) {
+      return cached
+    }
+  }
+
+  let key: string
   if (item.uid) {
-    return item.uid
+    key = item.uid
+  } else {
+    const name = item.name ?? item.objectName ?? item.id ?? ''
+    if (item.namespace) {
+      key = `${item.namespace}/${name}`
+    } else {
+      key = `/${name}`
+    }
   }
-  const name = item.name ?? item.objectName ?? item.id ?? ''
-  if (item.namespace) {
-    return `${item.namespace}/${name}`
+
+  if (typeof item === 'object' && item !== null) {
+    compositeKeyCache.set(item, key)
   }
-  return `/${name}`
+
+  return key
 }
 
 /**
