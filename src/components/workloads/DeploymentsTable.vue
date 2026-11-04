@@ -11,11 +11,10 @@ import Column from 'primevue/column'
 import InputNumber from 'primevue/inputnumber'
 import InputText from 'primevue/inputtext'
 import Popover from 'primevue/popover'
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 import {
   computeDeploymentRestarts,
-  computeReplicasSortKey,
   createDeploymentRowDecorator,
   restartFingerprint
 } from '@/utils/workloadMetrics'
@@ -24,13 +23,17 @@ const k8sStore = useKubernetesStore()
 const loading = ref(false)
 
 const deploymentDecorator = createDeploymentRowDecorator()
-const currentRestartFingerprint = computed(() => restartFingerprint(k8sStore.pods))
-const deploymentRestartsMap = computed(() => {
-  void currentRestartFingerprint.value
-  return computeDeploymentRestarts(k8sStore.pods)
-})
+const deploymentRestartsMap = shallowRef(new Map<string, number>())
 
-// Memoised decorator preserves row reference and computes replicasSortKey: computeReplicasSortKey(d.replicas)
+watch(
+  () => restartFingerprint(k8sStore.pods),
+  () => {
+    deploymentRestartsMap.value = computeDeploymentRestarts(k8sStore.pods)
+  },
+  { immediate: true }
+)
+
+// Memoised decorator preserves row reference and computes replicasSortKey
 const deployments = computed(() => {
   return deploymentDecorator(k8sStore.deployments, deploymentRestartsMap.value)
 })

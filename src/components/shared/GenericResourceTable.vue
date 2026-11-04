@@ -432,13 +432,16 @@ const getPortForwards = (data: T): ActivePortForward[] => {
       <template #body="{ data }">
         <Button
           v-tooltip.top="'Actions'"
+          aria-label="Actions"
           severity="secondary"
           variant="text"
           size="small"
           class="p-1"
           @click="toggleActionMenu($event, data)"
         >
-          <MoreVertical class="w-4 h-4 text-muted-color" />
+          <template #icon>
+            <MoreVertical class="w-4 h-4 text-muted-color" />
+          </template>
         </Button>
       </template>
     </Column>

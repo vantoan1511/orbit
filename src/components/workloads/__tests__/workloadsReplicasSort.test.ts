@@ -7,19 +7,37 @@ test('DeploymentsTable configures sortable replicas column with replicasSortKey 
   const filePath = path.resolve('src/components/workloads/DeploymentsTable.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
-  // 1. Imports computeReplicasSortKey
+  // 1. Imports createDeploymentRowDecorator and does NOT import computeReplicasSortKey
   assert.ok(
-    content.includes('computeReplicasSortKey'),
-    'DeploymentsTable must import computeReplicasSortKey from @/utils/workloadMetrics'
+    content.includes('createDeploymentRowDecorator'),
+    'DeploymentsTable must import createDeploymentRowDecorator from @/utils/workloadMetrics'
+  )
+  assert.ok(
+    !content.includes('computeReplicasSortKey'),
+    'DeploymentsTable must NOT import unused computeReplicasSortKey'
   )
 
-  // 2. Computes replicasSortKey in deployments computed
+  // 2. Uses shallowRef and watch observing restartFingerprint for deploymentRestartsMap
   assert.ok(
-    /replicasSortKey:\s*computeReplicasSortKey\(\s*d\.replicas\s*\)/.test(content),
-    'deployments computed list must attach replicasSortKey'
+    /const\s+deploymentRestartsMap\s*=\s*shallowRef\(new\s+Map<string,\s*number>\(\)\)/.test(
+      content
+    ),
+    'DeploymentsTable must declare deploymentRestartsMap using shallowRef'
+  )
+  assert.ok(
+    /watch\(\s*\(\)\s*=>\s*restartFingerprint\(k8sStore\.pods\)/.test(content),
+    'DeploymentsTable must watch restartFingerprint(k8sStore.pods)'
   )
 
-  // 3. Configures sortable Column with field="replicas" and sortField="replicasSortKey"
+  // 3. Computes deployments using deploymentDecorator
+  assert.ok(
+    /deploymentDecorator\(\s*k8sStore\.deployments,\s*deploymentRestartsMap\.value\s*\)/.test(
+      content
+    ),
+    'DeploymentsTable must compute deployments with deploymentDecorator'
+  )
+
+  // 4. Configures sortable Column with field="replicas" and sortField="replicasSortKey"
   assert.ok(
     content.includes('sortField="replicasSortKey"'),
     'Replicas Column must configure sortField="replicasSortKey"'
@@ -34,13 +52,13 @@ test('DeploymentsTable configures sortable replicas column with replicasSortKey 
     'Replicas Column must be sortable with field="replicas" and sortField="replicasSortKey"'
   )
 
-  // 4. Preserves inline replica scaling click handler
+  // 5. Preserves inline replica scaling click handler
   assert.ok(
     content.includes('@click.stop="openReplicasEdit($event, data)"'),
     'Must preserve openReplicasEdit click handler'
   )
 
-  // 5. Tooltip directive hygiene: zero static title="..." in template
+  // 6. Tooltip directive hygiene: zero static title="..." in template
   const templateMatch = content.match(/<template\b[^>]*>([\s\S]*?)<\/template>/)
   assert.ok(templateMatch, 'Must contain template block')
   const templateContent = templateMatch[1]
@@ -51,7 +69,7 @@ test('DeploymentsTable configures sortable replicas column with replicasSortKey 
     `DeploymentsTable template must not contain static title="..." attributes; found: ${staticTitleMatches.map((m) => m[0]).join(', ')}`
   )
 
-  // 6. Uses v-tooltip.top for edit triggers
+  // 7. Uses v-tooltip.top for edit triggers
   assert.ok(
     content.includes('v-tooltip.top="\'Click to edit replicas\'"'),
     'Replicas edit trigger must use v-tooltip.top'

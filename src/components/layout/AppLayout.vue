@@ -82,9 +82,9 @@ watch(
 watch(
   () => k8sStore.activeClusterId,
   async (newClusterId) => {
+    defaultViewHostRegistry.clearAll()
+    defaultEditHostRegistry.clearAll()
     if (newClusterId) {
-      defaultViewHostRegistry.clearAll()
-      defaultEditHostRegistry.clearAll()
       isSwitchingCluster.value = true
       try {
         void kubernetesService.stopLogs()
