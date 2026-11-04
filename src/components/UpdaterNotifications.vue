@@ -1,5 +1,11 @@
 <script setup lang="ts">
 import { useUpdaterStore } from '@/stores/updater'
+import { useSettingsStore } from '@/stores/settingsStore'
+import {
+  CONFIG_KEYS,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences
+} from '@/types/settings'
 import {
   RESTART_DIALOG_MESSAGE,
   formatUpdateInstallErrorMessage
@@ -12,6 +18,7 @@ import { useToast } from 'primevue/usetoast'
 import { onMounted, ref, watch } from 'vue'
 
 const updaterStore = useUpdaterStore()
+const settingsStore = useSettingsStore()
 const toast = useToast()
 
 const showRestartDialog = ref(false)
@@ -20,21 +27,32 @@ const countdown = ref(3)
 onMounted(() => {
   updaterStore.initListeners()
 
-  // Trigger check on startup:
-  setTimeout(() => updaterStore.checkForUpdates(), 2000)
+  // Trigger check on startup if autoCheckUpdates is enabled:
+  setTimeout(() => {
+    const autoCheck = settingsStore.getConfigValue<boolean>(CONFIG_KEYS.AUTO_CHECK_UPDATES, true)
+    if (autoCheck) {
+      updaterStore.checkForUpdates()
+    }
+  }, 2000)
 })
 
 watch(
   () => updaterStore.hasUpdate,
   (hasUpdate) => {
     if (hasUpdate) {
-      toast.add({
-        severity: 'info',
-        summary: 'Update Available',
-        detail: 'A new version of Orbit is available.',
-        group: 'updater',
-        life: 15000
-      })
+      const notifPrefs = settingsStore.getConfigValue<NotificationPreferences>(
+        CONFIG_KEYS.NOTIFICATION_PREFERENCES,
+        DEFAULT_NOTIFICATION_PREFERENCES
+      )
+      if (notifPrefs.enableToasts && notifPrefs.notifyOnUpdates) {
+        toast.add({
+          severity: 'info',
+          summary: 'Update Available',
+          detail: 'A new version of Orbit is available.',
+          group: 'updater',
+          life: 15000
+        })
+      }
     }
   }
 )

@@ -2972,6 +2972,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "futures-util",
+ "http",
  "k8s-openapi",
  "kube",
  "portable-pty",

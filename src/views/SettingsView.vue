@@ -7,7 +7,9 @@ import SettingsAboutTab from '../components/settings/SettingsAboutTab.vue'
 import SettingsAppearanceTab from '../components/settings/SettingsAppearanceTab.vue'
 import SettingsClustersTab from '../components/settings/SettingsClustersTab.vue'
 import SettingsGeneralTab from '../components/settings/SettingsGeneralTab.vue'
+import SettingsNotificationsTab from '../components/settings/SettingsNotificationsTab.vue'
 import SettingsPreferencesTab from '../components/settings/SettingsPreferencesTab.vue'
+import SettingsProxyTab from '../components/settings/SettingsProxyTab.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,20 +53,10 @@ watch(activeTab, (newTab) => {
         <Tab value="appearance" class="px-3 py-2 text-xs font-semibold cursor-pointer">
           Appearance
         </Tab>
-        <Tab
-          value="notifications"
-          disabled
-          class="px-3 py-2 text-xs font-semibold opacity-40 cursor-not-allowed"
-        >
+        <Tab value="notifications" class="px-3 py-2 text-xs font-semibold cursor-pointer">
           Notifications
         </Tab>
-        <Tab
-          value="proxy"
-          disabled
-          class="px-3 py-2 text-xs font-semibold opacity-40 cursor-not-allowed"
-        >
-          Proxy
-        </Tab>
+        <Tab value="proxy" class="px-3 py-2 text-xs font-semibold cursor-pointer"> Proxy </Tab>
         <Tab value="about" class="px-3 py-2 text-xs font-semibold cursor-pointer">About</Tab>
       </TabList>
 
@@ -88,19 +80,11 @@ watch(activeTab, (newTab) => {
         </TabPanel>
 
         <TabPanel value="notifications">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-          >
-            Notifications settings coming soon.
-          </div>
+          <SettingsNotificationsTab />
         </TabPanel>
 
         <TabPanel value="proxy">
-          <div
-            class="text-muted-color flex items-center justify-center p-10 border border-(--border) rounded-[var(--ui-radius-card)] border-dashed"
-          >
-            Proxy settings coming soon.
-          </div>
+          <SettingsProxyTab />
         </TabPanel>
 
         <TabPanel value="about">

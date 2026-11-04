@@ -81,7 +81,7 @@ impl Configuration {
                 value: None,
                 is_confidential: false,
                 cardinality: "1..1".to_string(),
-                enable: false, // Planned for future release
+                enable: true,
                 created_at: Some(created.clone()),
                 last_updated_at: None,
             },
@@ -108,19 +108,6 @@ impl Configuration {
                 is_confidential: false,
                 cardinality: "1..1".to_string(),
                 enable: true,
-                created_at: Some(created.clone()),
-                last_updated_at: None,
-            },
-            Configuration {
-                key: "shareTelemetry".to_string(),
-                name: "Share Telemetry".to_string(),
-                description: "Anonymous crash reporting and usage telemetry to improve stability.".to_string(),
-                datatype: "boolean".to_string(),
-                default_value: Some(serde_json::json!(false)),
-                value: None,
-                is_confidential: false,
-                cardinality: "1..1".to_string(),
-                enable: false, // Disabled
                 created_at: Some(created.clone()),
                 last_updated_at: None,
             },
@@ -214,6 +201,42 @@ impl Configuration {
                 description: "User-defined custom cluster metadata such as aliases, labels, tags, and colors.".to_string(),
                 datatype: "string".to_string(),
                 default_value: Some(serde_json::json!({})),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "notificationPreferences".to_string(),
+                name: "Notification Preferences".to_string(),
+                description: "Granular controls for UI toast popups and operational notifications.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({
+                    "enableToasts": true,
+                    "notifyOnSuccess": true,
+                    "notifyOnError": true,
+                    "notifyOnUpdates": true
+                })),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "proxySettings".to_string(),
+                name: "HTTP and HTTPS Proxy".to_string(),
+                description: "Proxy configuration for outbound Kubernetes API requests and cluster connectivity.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({
+                    "enabled": false,
+                    "httpProxy": "",
+                    "httpsProxy": "",
+                    "noProxy": ""
+                })),
                 value: None,
                 is_confidential: false,
                 cardinality: "0..1".to_string(),
@@ -386,6 +409,44 @@ impl OrbitConfig {
             .get("closeToTray")
             .and_then(|v| v.as_bool())
             .unwrap_or(true)
+    }
+
+    /// Returns whether automatically checking for updates is enabled. Defaults to true.
+    pub fn auto_check_updates(&self) -> bool {
+        self.values
+            .get("autoCheckUpdates")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true)
+    }
+
+    /// Returns notification preferences configuration.
+    pub fn notification_preferences(&self) -> serde_json::Value {
+        self.values
+            .get("notificationPreferences")
+            .cloned()
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "enableToasts": true,
+                    "notifyOnSuccess": true,
+                    "notifyOnError": true,
+                    "notifyOnUpdates": true
+                })
+            })
+    }
+
+    /// Returns HTTP and HTTPS proxy settings.
+    pub fn proxy_settings(&self) -> serde_json::Value {
+        self.values
+            .get("proxySettings")
+            .cloned()
+            .unwrap_or_else(|| {
+                serde_json::json!({
+                    "enabled": false,
+                    "httpProxy": "",
+                    "httpsProxy": "",
+                    "noProxy": ""
+                })
+            })
     }
 
     /// Returns custom keyboard shortcuts keybindings map.
@@ -599,6 +660,8 @@ impl Drop for TestConfigDirGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn test_orbit_config_default_and_getters() {
@@ -889,8 +952,14 @@ mod tests {
 
     #[test]
     fn test_orbit_config_dev_mode_directory_resolution() {
+        let _lock = ENV_LOCK.lock().unwrap();
         // Save current env state
         let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
+        let original_config_dir = std::env::var_os("ORBIT_CONFIG_DIR");
+
+        unsafe {
+            std::env::remove_var("ORBIT_CONFIG_DIR");
+        }
 
         // 1. Explicit Dev mode via ORBIT_DEV=1
         unsafe {
@@ -926,6 +995,10 @@ mod tests {
 
         // Restore env
         unsafe {
+            match original_config_dir {
+                Some(val) => std::env::set_var("ORBIT_CONFIG_DIR", val),
+                None => std::env::remove_var("ORBIT_CONFIG_DIR"),
+            }
             match original_orbit_dev {
                 Some(val) => std::env::set_var("ORBIT_DEV", val),
                 None => std::env::remove_var("ORBIT_DEV"),
@@ -935,6 +1008,7 @@ mod tests {
 
     #[test]
     fn test_orbit_config_dir_respects_custom_env_override() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let original_custom = std::env::var_os("ORBIT_CONFIG_DIR");
         let test_custom_path = PathBuf::from("/custom/test/orbit_config_path");
 
@@ -985,6 +1059,104 @@ mod tests {
         // Test clearing customization when empty
         config.set_cluster_customization("ctx-1", ClusterCustomization::default());
         assert!(config.cluster_customizations().is_empty());
+    }
+
+    #[test]
+    fn test_auto_check_updates_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "autoCheckUpdates")
+            .expect("autoCheckUpdates must exist in system definitions");
+        assert!(cfg.enable, "autoCheckUpdates must be enabled");
+        assert_eq!(cfg.datatype, "boolean");
+        assert_eq!(cfg.default_value, Some(serde_json::json!(true)));
+    }
+
+    #[test]
+    fn test_auto_check_updates_getter() {
+        let mut config = OrbitConfig::default();
+        assert!(config.auto_check_updates(), "Default auto_check_updates should be true");
+
+        config.values.insert("autoCheckUpdates".to_string(), serde_json::json!(false));
+        assert!(!config.auto_check_updates());
+
+        config.values.insert("autoCheckUpdates".to_string(), serde_json::json!(true));
+        assert!(config.auto_check_updates());
+    }
+
+    #[test]
+    fn test_share_telemetry_absent_from_system_definitions() {
+        let defs = Configuration::system_definitions();
+        assert!(
+            defs.iter().find(|c| c.key == "shareTelemetry").is_none(),
+            "shareTelemetry should be removed from system definitions"
+        );
+    }
+
+    #[test]
+    fn test_notification_preferences_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "notificationPreferences")
+            .expect("notificationPreferences must exist");
+        assert!(cfg.enable);
+        assert_eq!(cfg.datatype, "string");
+        let default_val = cfg.default_value.as_ref().expect("default value must exist");
+        assert_eq!(default_val["enableToasts"], true);
+        assert_eq!(default_val["notifyOnSuccess"], true);
+        assert_eq!(default_val["notifyOnError"], true);
+        assert_eq!(default_val["notifyOnUpdates"], true);
+
+        let mut config = OrbitConfig::default();
+        let notif = config.notification_preferences();
+        assert_eq!(notif["enableToasts"], true);
+
+        config.values.insert(
+            "notificationPreferences".to_string(),
+            serde_json::json!({
+                "enableToasts": false,
+                "notifyOnSuccess": false,
+                "notifyOnError": true,
+                "notifyOnUpdates": false
+            }),
+        );
+        let updated_notif = config.notification_preferences();
+        assert_eq!(updated_notif["enableToasts"], false);
+    }
+
+    #[test]
+    fn test_proxy_settings_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "proxySettings")
+            .expect("proxySettings must exist");
+        assert!(cfg.enable);
+        assert_eq!(cfg.datatype, "string");
+        let default_val = cfg.default_value.as_ref().expect("default value must exist");
+        assert_eq!(default_val["enabled"], false);
+        assert_eq!(default_val["httpProxy"], "");
+        assert_eq!(default_val["httpsProxy"], "");
+        assert_eq!(default_val["noProxy"], "");
+
+        let mut config = OrbitConfig::default();
+        let proxy = config.proxy_settings();
+        assert_eq!(proxy["enabled"], false);
+
+        config.values.insert(
+            "proxySettings".to_string(),
+            serde_json::json!({
+                "enabled": true,
+                "httpProxy": "http://proxy.corp.internal:8080",
+                "httpsProxy": "http://proxy.corp.internal:8080",
+                "noProxy": "localhost,127.0.0.1,.internal"
+            }),
+        );
+        let updated_proxy = config.proxy_settings();
+        assert_eq!(updated_proxy["enabled"], true);
+        assert_eq!(updated_proxy["httpProxy"], "http://proxy.corp.internal:8080");
     }
 }
 
