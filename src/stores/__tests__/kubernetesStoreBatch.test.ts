@@ -2,13 +2,103 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { shallowRef } from 'vue'
 import { KUBERNETES_ACTION } from '../../constants/kubernetes.ts'
-import { MAX_EVENTS_RETAINED, updateResourceBatch } from '../kubernetesStore.ts'
+import {
+  MAX_EVENTS_RETAINED,
+  resourcesEqual,
+  updateResourceBatch
+} from '../kubernetesStoreBatch.ts'
 
 interface TestResource {
   name: string
   namespace: string
   version?: number
+  metadata?: {
+    labels?: Record<string, string>
+    annotations?: string[]
+  }
 }
+
+test('resourcesEqual handles primitives, nested objects, ordered arrays, and undefined vs missing keys', () => {
+  // Primitives
+  assert.equal(resourcesEqual(1, 1), true)
+  assert.equal(resourcesEqual('a', 'a'), true)
+  assert.equal(resourcesEqual(true, true), true)
+  assert.equal(resourcesEqual(null, null), true)
+  assert.equal(resourcesEqual(null, undefined), false)
+  assert.equal(resourcesEqual(1, '1'), false)
+
+  // Arrays: ordered
+  assert.equal(resourcesEqual([1, 2, 3], [1, 2, 3]), true)
+  assert.equal(resourcesEqual([1, 2, 3], [1, 3, 2]), false)
+  assert.equal(resourcesEqual([1, 2], [1, 2, 3]), false)
+
+  // Nested objects
+  assert.equal(
+    resourcesEqual({ a: 1, b: { c: [1, 2], d: 'hello' } }, { a: 1, b: { c: [1, 2], d: 'hello' } }),
+    true
+  )
+  assert.equal(
+    resourcesEqual({ a: 1, b: { c: [1, 2], d: 'hello' } }, { a: 1, b: { c: [1, 3], d: 'hello' } }),
+    false
+  )
+
+  // Undefined vs missing key treated equal
+  assert.equal(resourcesEqual({ a: 1, b: undefined }, { a: 1 }), true)
+  assert.equal(resourcesEqual({ a: 1 }, { a: 1, b: undefined }), true)
+  assert.equal(resourcesEqual({ a: 1, b: undefined }, { a: 1, b: undefined }), true)
+  assert.equal(resourcesEqual({ a: 1, b: 2 }, { a: 1 }), false)
+})
+
+test('updateResourceBatch: identical Applied payload keeps list reference', () => {
+  const item1: TestResource = { name: 'pod-1', namespace: 'default', version: 1 }
+  const item2: TestResource = { name: 'pod-2', namespace: 'default', version: 1 }
+  const listRef = shallowRef<TestResource[]>([item1, item2])
+  const before = listRef.value
+
+  const getKey = (item: TestResource) => `${item.namespace}/${item.name}`
+
+  updateResourceBatch(
+    listRef,
+    [
+      {
+        action: KUBERNETES_ACTION.Applied,
+        data: { name: 'pod-1', namespace: 'default', version: 1 }
+      }
+    ],
+    getKey
+  )
+
+  // List reference must be completely untouched
+  assert.equal(listRef.value, before)
+  assert.equal(listRef.value[0], item1)
+  assert.equal(listRef.value[1], item2)
+})
+
+test('updateResourceBatch: one changed item replaces only that index', () => {
+  const item1: TestResource = { name: 'pod-1', namespace: 'default', version: 1 }
+  const item2: TestResource = { name: 'pod-2', namespace: 'default', version: 1 }
+  const listRef = shallowRef<TestResource[]>([item1, item2])
+
+  const getKey = (item: TestResource) => `${item.namespace}/${item.name}`
+
+  updateResourceBatch(
+    listRef,
+    [
+      {
+        action: KUBERNETES_ACTION.Applied,
+        data: { name: 'pod-1', namespace: 'default', version: 2 }
+      }
+    ],
+    getKey
+  )
+
+  assert.notEqual(listRef.value, [item1, item2])
+  assert.equal(listRef.value.length, 2)
+  assert.notEqual(listRef.value[0], item1)
+  assert.equal(listRef.value[0]?.version, 2)
+  // item2 must preserve exact reference equality!
+  assert.equal(listRef.value[1], item2)
+})
 
 interface TestEvent {
   uid: string

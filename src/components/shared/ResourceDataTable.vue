@@ -11,6 +11,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
 import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const selection = defineModel<any[]>('selection')
@@ -303,7 +304,7 @@ const isIndeterminate = computed(() => {
       class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card)"
     >
       <!-- Loading Skeleton or Data Table -->
-      <slot name="loading" v-if="loading">
+      <slot name="loading" v-if="shouldShowSkeleton(loading, data.length)">
         <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
       </slot>
 

@@ -1,6 +1,30 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { useTicker, resetTickerForTesting } from '../useTicker.ts'
+import { useTicker, resetTickerForTesting, getSubscriberCountForTesting } from '../useTicker.ts'
+
+test('subscribe -> unsubscribe -> subscribe manages activeSubscribers and interval consistently', () => {
+  resetTickerForTesting()
+
+  const { subscribe, unsubscribe } = useTicker()
+  assert.equal(getSubscriberCountForTesting(), 0)
+
+  subscribe()
+  assert.equal(getSubscriberCountForTesting(), 1)
+
+  unsubscribe()
+  assert.equal(getSubscriberCountForTesting(), 0)
+
+  // Subscribing again increments properly
+  subscribe()
+  assert.equal(getSubscriberCountForTesting(), 1)
+
+  // Double unsubscribe does not make it negative
+  unsubscribe()
+  unsubscribe()
+  assert.equal(getSubscriberCountForTesting(), 0)
+
+  resetTickerForTesting()
+})
 
 test('pauses interval when document becomes hidden, resumes on visible', async () => {
   // Setup mock document

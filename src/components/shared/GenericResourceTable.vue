@@ -31,6 +31,7 @@ import { MoreVertical } from '@lucide/vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { getResourceCompositeKey, type IdentifiableResource } from '@/utils/resourceKey'
 import { computed, ref, toRef, watch } from 'vue'
 
 const selection = defineModel<T[]>('selection', { default: () => [] })
@@ -48,7 +49,7 @@ const props = withDefaults(
     reportTemplate?: string
     loading?: boolean
     selectable?: boolean
-    dataKey?: string
+    dataKey?: string | ((data: T) => string)
     hideNamespaceFilter?: boolean
     hideStatusFilter?: boolean
     hideNameColumn?: boolean
@@ -72,7 +73,7 @@ const props = withDefaults(
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
     selectable: true,
-    dataKey: 'name',
+    dataKey: (r: IdentifiableResource) => getResourceCompositeKey(r),
     hideNamespaceFilter: false,
     hideStatusFilter: false,
     hideNameColumn: false,
@@ -131,13 +132,16 @@ watch(selectedStatus, (val) => {
 
 // Row selection persistence
 const getRowKey = (item: T): string => {
-  const keyProp = props.dataKey as keyof T
-  if (keyProp && item[keyProp] != null) {
-    return String(item[keyProp])
+  if (typeof props.dataKey === 'function') {
+    return props.dataKey(item)
   }
-  const record = item as Record<string, unknown>
-  const fallback = record.uid || record.objectName || record.id || ''
-  return item.name || String(fallback)
+  if (typeof props.dataKey === 'string' && props.dataKey) {
+    const keyProp = props.dataKey as keyof T
+    if (item[keyProp] != null) {
+      return String(item[keyProp])
+    }
+  }
+  return getResourceCompositeKey(item)
 }
 
 const storedRowKeys = filterStore.getFilters(
@@ -427,11 +431,11 @@ const getPortForwards = (data: T): ActivePortForward[] => {
     <Column v-if="!hideActionsColumn" class="p-3 text-center w-12 shrink-0">
       <template #body="{ data }">
         <Button
+          v-tooltip.top="'Actions'"
           severity="secondary"
           variant="text"
           size="small"
           class="p-1"
-          title="Actions"
           @click="toggleActionMenu($event, data)"
         >
           <MoreVertical class="w-4 h-4 text-muted-color" />

@@ -40,9 +40,11 @@ import {
   keyNamespaced,
   keyService,
   MAX_EVENTS_RETAINED,
+  resourcesEqual,
   updateResourceBatch,
   type ResourceKeyExtractor
 } from './kubernetesStoreBatch.ts'
+import { createFrameBatcher, type FrameBatcher } from './frameBatcher.ts'
 
 export {
   MAX_EVENTS_RETAINED,
@@ -51,6 +53,7 @@ export {
   keyByName,
   keyByUid,
   keyService,
+  resourcesEqual,
   updateResourceBatch
 }
 
@@ -135,7 +138,15 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   >()
 
-  function enrichPodWithMetrics(pod: PodInfo, nodesList: NodeInfo[] = nodes.value): PodInfo {
+  function getNodeIndex(nodesList: NodeInfo[] = nodes.value): Map<string, NodeInfo> {
+    const map = new Map<string, NodeInfo>()
+    for (const node of nodesList) {
+      map.set(node.name, node)
+    }
+    return map
+  }
+
+  function enrichPodWithMetrics(pod: PodInfo, nodeIndex?: Map<string, NodeInfo>): PodInfo {
     const key = `${pod.namespace}/${pod.name}`
     const cached = podMetricsMap.get(key)
 
@@ -146,7 +157,11 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     let cpuPct = typeof pod.cpuPct === 'number' ? pod.cpuPct : undefined
     let memoryPct = typeof pod.memoryPct === 'number' ? pod.memoryPct : undefined
 
-    const node = pod.node ? nodesList.find((n) => n.name === pod.node) : undefined
+    const node = pod.node
+      ? nodeIndex
+        ? nodeIndex.get(pod.node)
+        : nodes.value.find((n) => n.name === pod.node)
+      : undefined
 
     if (cpuCores !== undefined && node) {
       const nodeCpuTotal = parseFloat(node.cpuTotal || '0')
@@ -205,7 +220,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setPods(newPods: PodInfo[]) {
-    pods.value = newPods.map((p) => enrichPodWithMetrics(p))
+    const nodeIndex = getNodeIndex()
+    pods.value = newPods.map((p) => enrichPodWithMetrics(p, nodeIndex))
     podsLoading.value = false
   }
 
@@ -239,17 +255,49 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobsLoading.value = false
   }
 
-  let prevNodeMetricsHash = ''
+  const prevNodeTotalsMap = new Map<string, string>()
 
   function setNodes(newNodes: NodeInfo[]) {
-    const newHash = newNodes.map((n) => `${n.name}:${n.cpuUsed}:${n.memUsed}`).join('|')
+    const changedNodeNames = new Set<string>()
+    const nextTotalsMap = new Map<string, string>()
+    const nodeIndex = new Map<string, NodeInfo>()
+
+    for (const node of newNodes) {
+      nodeIndex.set(node.name, node)
+      const totalsHash = `${node.cpuTotal ?? ''}:${node.memTotal ?? ''}`
+      nextTotalsMap.set(node.name, totalsHash)
+      const prev = prevNodeTotalsMap.get(node.name)
+      if (prev !== totalsHash) {
+        changedNodeNames.add(node.name)
+      }
+    }
+
+    for (const name of prevNodeTotalsMap.keys()) {
+      if (!nextTotalsMap.has(name)) {
+        changedNodeNames.add(name)
+      }
+    }
+
+    prevNodeTotalsMap.clear()
+    for (const [name, hash] of nextTotalsMap) {
+      prevNodeTotalsMap.set(name, hash)
+    }
+
     nodes.value = newNodes
     nodesLoading.value = false
-    if (pods.value.length > 0 && newHash !== prevNodeMetricsHash) {
-      prevNodeMetricsHash = newHash
-      pods.value = pods.value.map((p) => enrichPodWithMetrics(p, newNodes))
-    } else {
-      prevNodeMetricsHash = newHash
+
+    if (pods.value.length > 0 && changedNodeNames.size > 0) {
+      let changed = false
+      const nextPods = pods.value.map((p) => {
+        if (p.node && changedNodeNames.has(p.node)) {
+          changed = true
+          return enrichPodWithMetrics(p, nodeIndex)
+        }
+        return p
+      })
+      if (changed) {
+        pods.value = nextPods
+      }
     }
   }
 
@@ -362,6 +410,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setActiveClusterId(id: string | null) {
+    frameBatcher.clear()
     watcherConnectionState.value = 'connected'
     if (activeClusterId.value === id) return
     activeClusterId.value = id
@@ -372,7 +421,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const logsStore = useLogsStore()
     void logsStore.setClusterId(id)
     podMetricsMap.clear()
-    prevNodeMetricsHash = ''
+    prevNodeTotalsMap.clear()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
     pods.value = []
@@ -670,6 +719,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       )
   }
 
+  const frameBatcher: FrameBatcher<{ action: KubernetesAction; data: KubernetesResourceInfo }> =
+    createFrameBatcher((kind, updates) => {
+      const handler = resourceUpdaters[kind]
+      if (handler) {
+        handler(updates)
+      }
+    })
+
   function onResourceBatchUpdated(payload: {
     kind: string
     cluster_id: string | null
@@ -678,10 +735,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     if (payload.cluster_id && payload.cluster_id !== activeClusterId.value) {
       return
     }
-    const handler = resourceUpdaters[payload.kind]
-    if (handler) {
-      handler(payload.updates)
-    }
+    frameBatcher.push(payload.kind, payload.updates)
   }
 
   const activePortForwards = ref<ActivePortForward[]>([])
@@ -713,13 +767,14 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
     if (pods.value.length === 0 || changedKeys.size === 0) return
 
+    const nodeIndex = getNodeIndex()
     let changed = false
     const currentPods = pods.value
     const newPods = currentPods.map((p) => {
       const key = `${p.namespace}/${p.name}`
       if (!changedKeys.has(key)) return p
       changed = true
-      return enrichPodWithMetrics(p)
+      return enrichPodWithMetrics(p, nodeIndex)
     })
 
     if (changed) {
@@ -841,6 +896,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     memHistory,
     activePortForwards,
     watcherConnectionState,
-    setWatcherConnectionState
+    setWatcherConnectionState,
+    frameBatcher
   }
 })

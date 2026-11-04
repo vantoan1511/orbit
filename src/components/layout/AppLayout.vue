@@ -8,10 +8,11 @@ import { useTerminalStore } from '@/stores/terminalStore'
 import OfflineClusterView from '@/views/OfflineClusterView.vue'
 import WelcomeView from '@/views/WelcomeView.vue'
 import EditView from '@/views/EditView.vue'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, type Component as VueComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getTabMetadataForRoute } from '@/utils/tabIcons'
 import { defaultEditHostRegistry, getEditCacheNames, isEditRoutePath } from '@/utils/editKeepAlive'
+import { defaultViewHostRegistry, getViewCacheNames, resolveViewKey } from '@/utils/viewKeepAlive'
 import {
   getLayoutContentPaddingClass,
   getLayoutMainClass,
@@ -41,13 +42,14 @@ const currentLayoutMeta = computed(() => {
 })
 
 const editCacheNames = computed(() => getEditCacheNames(tabsStore.tabs))
+const viewCacheNames = computed(() => getViewCacheNames(tabsStore.tabs))
 
 watch(
-  () => tabsStore.tabs,
-  (tabs) => {
-    defaultEditHostRegistry.pruneEditHosts(tabs.map((t) => t.id))
-  },
-  { deep: true }
+  () => tabsStore.tabs.map((t) => t.id + t.path).join('|'),
+  () => {
+    defaultEditHostRegistry.pruneEditHosts(tabsStore.tabs.map((t) => t.id))
+    defaultViewHostRegistry.prune(tabsStore.tabs.map((t) => t.path))
+  }
 )
 
 function resolveViewComponent(Component: unknown, currentRoute: typeof route) {
@@ -55,7 +57,7 @@ function resolveViewComponent(Component: unknown, currentRoute: typeof route) {
     const tabId = currentRoute.fullPath
     return defaultEditHostRegistry.getOrCreateEditHost(tabId, EditView)
   }
-  return Component
+  return defaultViewHostRegistry.getOrCreateHost(currentRoute.path, Component as VueComponent)
 }
 
 // Synchronize current route with tabsStore
@@ -81,6 +83,8 @@ watch(
   () => k8sStore.activeClusterId,
   async (newClusterId) => {
     if (newClusterId) {
+      defaultViewHostRegistry.clearAll()
+      defaultEditHostRegistry.clearAll()
       isSwitchingCluster.value = true
       try {
         void kubernetesService.stopLogs()
@@ -246,15 +250,16 @@ onUnmounted(() => {
                     "
                   />
                   <RouterView v-else v-slot="{ Component, route: currentRoute }">
-                    <transition name="page" mode="out-in">
-                      <KeepAlive :include="editCacheNames">
-                        <component
-                          :is="resolveViewComponent(Component, currentRoute)"
-                          :key="currentRoute.fullPath"
-                          v-bind="currentRoute.params"
-                        />
-                      </KeepAlive>
-                    </transition>
+                    <KeepAlive
+                      :include="[...editCacheNames, ...viewCacheNames]"
+                      :max="Math.max(1, tabsStore.tabs.length)"
+                    >
+                      <component
+                        :is="resolveViewComponent(Component, currentRoute)"
+                        :key="resolveViewKey(currentRoute.path, currentRoute.fullPath)"
+                        v-bind="currentRoute.params"
+                      />
+                    </KeepAlive>
                   </RouterView>
                 </template>
                 <WelcomeView v-else />

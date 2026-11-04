@@ -1,4 +1,4 @@
-import type { PodInfo, Replicas } from '../types/kubernetes.ts'
+import type { DeploymentInfo, PodInfo, Replicas } from '../types/kubernetes.ts'
 
 export const REPLICAS_SORT_MULTIPLIER = 1_000_000
 
@@ -50,6 +50,61 @@ export function computeDeploymentRestarts(pods: PodInfo[]): Map<string, number> 
     }
   }
   return map
+}
+
+export interface DeploymentRow extends DeploymentInfo {
+  restarts: number
+  replicasSortKey: number
+}
+
+/**
+ * Creates a memoised decorator for Deployment rows.
+ * Reuses previous row object when source deployment object & restart count are unchanged.
+ */
+export function createDeploymentRowDecorator(): (
+  deployments: DeploymentInfo[],
+  restarts: Map<string, number>
+) => DeploymentRow[] {
+  const cache = new WeakMap<DeploymentInfo, { restarts: number; row: DeploymentRow }>()
+
+  return (deployments: DeploymentInfo[], restarts: Map<string, number>): DeploymentRow[] => {
+    return deployments.map((d) => {
+      const key = `${d.namespace ?? ''}/${d.name}`
+      const r = restarts.get(key) ?? 0
+      const cached = cache.get(d)
+      if (cached && cached.restarts === r) {
+        return cached.row
+      }
+      const row: DeploymentRow = {
+        ...d,
+        restarts: r,
+        replicasSortKey: computeReplicasSortKey(d.replicas)
+      }
+      cache.set(d, { restarts: r, row })
+      return row
+    })
+  }
+}
+
+const fingerprintCache = new WeakMap<PodInfo[], string>()
+
+/**
+ * Computes a restart fingerprint for pods controlled by a ReplicaSet.
+ * Memoised by pods array reference identity.
+ */
+export function restartFingerprint(pods: PodInfo[]): string {
+  const cached = fingerprintCache.get(pods)
+  if (cached !== undefined) return cached
+
+  const parts: string[] = []
+  for (const p of pods) {
+    if (p.restarts && p.controlledBy?.startsWith(REPLICA_SET_PREFIX)) {
+      parts.push(`${p.namespace ?? ''}/${p.name}:${p.restarts}`)
+    }
+  }
+  const fp = parts.join('|')
+  fingerprintCache.set(pods, fp)
+  return fp
 }
 
 export type MetricType = 'cpu' | 'memory' | 'restarts'

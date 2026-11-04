@@ -72,3 +72,31 @@ test('setActiveClusterId thoroughly clears all resources including pods and port
   // Verify logsStore is updated with the new clusterId
   assert.equal(logsStore.activeClusterId, 'cluster-2')
 })
+
+test('pending updates for old cluster are dropped on cluster switch', async () => {
+  const store = useKubernetesStore()
+  store.setActiveClusterId('cluster-1')
+
+  const samplePod: PodInfo = {
+    name: 'nginx-pod-1',
+    namespace: 'default',
+    status: 'Running',
+    ready: '1/1',
+    restarts: 0,
+    age: '5m',
+    cpu: '10m',
+    memory: '20Mi'
+  }
+
+  // Queue a batch update for cluster-1 (without flushing)
+  store.frameBatcher.push('Pod', [{ action: 'Applied', data: samplePod }])
+
+  // Switch to cluster-2 before frame drains
+  store.setActiveClusterId('cluster-2')
+
+  // Flush frame batcher
+  store.frameBatcher.flush()
+
+  // Pods in cluster-2 must remain empty
+  assert.equal(store.pods.length, 0)
+})

@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import type { PodInfo } from '../../types/kubernetes.ts'
+import type { DeploymentInfo, PodInfo } from '../../types/kubernetes.ts'
 import {
   REPLICAS_SORT_MULTIPLIER,
   computeDeploymentRestarts,
   computeReplicasSortKey,
+  createDeploymentRowDecorator,
   getTopConsumers,
+  restartFingerprint,
   withReplicasSortKey
 } from '../workloadMetrics.ts'
 
@@ -148,4 +150,65 @@ test('withReplicasSortKey enriches items without mutating original workload reco
   assert.equal(enriched[1].id, 'dep-2')
   assert.equal(enriched[1].replicasSortKey, 0)
   assert.equal('replicasSortKey' in original[0], false)
+})
+
+test('createDeploymentRowDecorator reuses row object identity when source object and restarts are identical', () => {
+  const decorator = createDeploymentRowDecorator()
+
+  const dep1: DeploymentInfo = {
+    name: 'web',
+    namespace: 'default',
+    readyReplicas: 2,
+    replicas: { current: 2, desired: 2 },
+    availableReplicas: 2,
+    age: '1d',
+    conditions: []
+  }
+  const dep2: DeploymentInfo = {
+    name: 'api',
+    namespace: 'default',
+    readyReplicas: 1,
+    replicas: { current: 1, desired: 1 },
+    availableReplicas: 1,
+    age: '2d',
+    conditions: []
+  }
+
+  const restartMap1 = new Map<string, number>([['default/web', 3]])
+  const rows1 = decorator([dep1, dep2], restartMap1)
+  assert.equal(rows1.length, 2)
+  assert.equal(rows1[0]?.restarts, 3)
+  assert.equal(rows1[1]?.restarts, 0)
+
+  // Call again with same dep references and same restarts
+  const rows2 = decorator([dep1, dep2], restartMap1)
+  assert.equal(rows2[0], rows1[0], 'dep1 row must be identical object reference')
+  assert.equal(rows2[1], rows1[1], 'dep2 row must be identical object reference')
+
+  // Change restarts for dep1
+  const restartMap2 = new Map<string, number>([['default/web', 4]])
+  const rows3 = decorator([dep1, dep2], restartMap2)
+  assert.notEqual(rows3[0], rows1[0], 'dep1 row must be recreated when restarts change')
+  assert.equal(rows3[0]?.restarts, 4)
+  assert.equal(rows3[1], rows1[1], 'dep2 row must remain identical object reference')
+
+  // Change source object for dep2
+  const dep2Updated: DeploymentInfo = { ...dep2, readyReplicas: 2 }
+  const rows4 = decorator([dep1, dep2Updated], restartMap2)
+  assert.equal(rows4[0], rows3[0], 'dep1 row remains identical')
+  assert.notEqual(rows4[1], rows1[1], 'dep2 row recreated when source deployment changed')
+})
+
+test('restartFingerprint memoises by pods array identity and ignores non-ReplicaSet pods', () => {
+  const pods: PodInfo[] = [
+    createSamplePod('web-rs1-abc', 'prod', 2, 'ReplicaSet/web-rs1'),
+    createSamplePod('daemon-pod', 'prod', 5, 'DaemonSet/daemon-ds')
+  ]
+
+  const fp1 = restartFingerprint(pods)
+  assert.equal(fp1, 'prod/web-rs1-abc:2')
+
+  // Same array identity returns same string
+  const fp2 = restartFingerprint(pods)
+  assert.equal(fp1, fp2)
 })
