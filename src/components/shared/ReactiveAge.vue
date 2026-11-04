@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTicker } from '@/composables/useTicker'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   age?: string
@@ -11,6 +11,21 @@ const { currentTimestamp, subscribe, unsubscribe } = useTicker()
 let initialAgeSeconds = 0
 let receivedAt = Date.now()
 const lastAgeProp = ref(props.age)
+let isSubscribed = false
+
+function handleSubscribe() {
+  if (!isSubscribed) {
+    isSubscribed = true
+    subscribe()
+  }
+}
+
+function handleUnsubscribe() {
+  if (isSubscribed) {
+    isSubscribed = false
+    unsubscribe()
+  }
+}
 
 const parseAgeToSeconds = (ageStr?: string): number => {
   if (!ageStr) return 0
@@ -72,11 +87,19 @@ const displayAge = computed(() => {
 })
 
 onMounted(() => {
-  subscribe()
+  handleSubscribe()
+})
+
+onActivated(() => {
+  handleSubscribe()
+})
+
+onDeactivated(() => {
+  handleUnsubscribe()
 })
 
 onUnmounted(() => {
-  unsubscribe()
+  handleUnsubscribe()
 })
 </script>
 

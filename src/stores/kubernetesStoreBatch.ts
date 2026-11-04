@@ -17,6 +17,59 @@ export const keyService: ResourceKeyExtractor<ServiceInfo> = (item) =>
   item.uid || `${item.namespace ?? ''}/${item.name ?? ''}`
 
 /**
+ * Structural equality for plain JSON resource payloads.
+ * Handles nested objects, order-sensitive arrays, and treats missing keys vs undefined as equal.
+ */
+export function resourcesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) {
+    return false
+  }
+
+  const isArrA = Array.isArray(a)
+  const isArrB = Array.isArray(b)
+  if (isArrA !== isArrB) return false
+
+  if (isArrA && isArrB) {
+    const arrA = a as unknown[]
+    const arrB = b as unknown[]
+    if (arrA.length !== arrB.length) return false
+    for (let i = 0; i < arrA.length; i++) {
+      if (!resourcesEqual(arrA[i], arrB[i])) return false
+    }
+    return true
+  }
+
+  const objA = a as Record<string, unknown>
+  const objB = b as Record<string, unknown>
+
+  const keys = new Set<string>()
+  for (const k in objA) {
+    if (Object.prototype.hasOwnProperty.call(objA, k)) {
+      keys.add(k)
+    }
+  }
+  for (const k in objB) {
+    if (Object.prototype.hasOwnProperty.call(objB, k)) {
+      keys.add(k)
+    }
+  }
+
+  for (const k of keys) {
+    const valA = objA[k]
+    const valB = objB[k]
+    if (valA === undefined && valB === undefined) {
+      continue
+    }
+    if (!resourcesEqual(valA, valB)) {
+      return false
+    }
+  }
+
+  return true
+}
+
+/**
  * Applies a batch of Kubernetes resource updates (Applied / Deleted) to a shallowRef array in O(N + M) time.
  */
 export function updateResourceBatch<T>(
@@ -51,16 +104,20 @@ export function updateResourceBatch<T>(
       }
       const existingIdx = indexMap.get(key)
       if (existingIdx !== undefined) {
+        const existing = (current ? current[existingIdx] : baseList[existingIdx]) as T | undefined
+        const next = merge && existing !== undefined ? merge(existing, update.data) : update.data
+        if (existing !== undefined && resourcesEqual(existing, next)) {
+          continue
+        }
         if (!current) current = [...baseList]
-        const existing = current[existingIdx]
-        current[existingIdx] =
-          merge && existing !== undefined ? merge(existing, update.data) : update.data
+        current[existingIdx] = next
+        changed = true
       } else {
         if (!current) current = [...baseList]
         indexMap.set(key, current.length)
         current.push(update.data)
+        changed = true
       }
-      changed = true
     } else if (update.action === KUBERNETES_ACTION.Deleted) {
       if (indexMap.has(key)) {
         deletedKeys.add(key)

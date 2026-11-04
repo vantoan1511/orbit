@@ -77,3 +77,7 @@ export function resetTickerForTesting() {
   isVisibilityListenerAttached = false
   currentTimestamp.value = Date.now()
 }
+
+export function getSubscriberCountForTesting(): number {
+  return activeSubscribers
+}

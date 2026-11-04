@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::fmt::Debug;
 use std::collections::HashMap;
+use std::hash::{DefaultHasher, Hasher};
 use std::time::Duration;
 use futures_util::StreamExt;
 use kube::{Api, Client, Resource};
@@ -13,11 +14,57 @@ use crate::ipc::events::{OrbitEvent, ResourceUpdate, WatcherConnectionState};
 use crate::kubernetes::watch_error::classify_watcher_error;
 use crate::kubernetes::watch_health::WatcherHealthTracker;
 
-const COALESCE_INTERVAL: Duration = Duration::from_millis(50);
+const COALESCE_INTERVAL: Duration = Duration::from_millis(250);
 const COALESCE_BUFFER_MAX: usize = 100;
 const STREAM_RETRY_INTERVAL: Duration = Duration::from_secs(3);
 const ACTION_APPLIED: &str = "Applied";
 const ACTION_DELETED: &str = "Deleted";
+
+/// Tracks last-emitted payload fingerprint per resource key.
+#[derive(Debug)]
+pub(crate) struct EmitDedup {
+    last: HashMap<String, u64>,
+}
+
+impl EmitDedup {
+    pub(crate) fn new() -> Self {
+        Self {
+            last: HashMap::new(),
+        }
+    }
+
+    /// Returns true if the update should be emitted (changed or Deleted action).
+    pub(crate) fn should_emit(&mut self, key: &str, action: &str, data: &serde_json::Value) -> bool {
+        if action == ACTION_DELETED {
+            self.last.remove(key);
+            return true;
+        }
+
+        let hash = match serde_json::to_vec(data) {
+            Ok(bytes) => {
+                let mut hasher = DefaultHasher::new();
+                hasher.write(&bytes);
+                hasher.finish()
+            }
+            Err(_) => {
+                // Fail-open: on serialization error, emit
+                return true;
+            }
+        };
+
+        if self.last.get(key) == Some(&hash) {
+            return false;
+        }
+
+        self.last.insert(key.to_string(), hash);
+        true
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn clear(&mut self) {
+        self.last.clear();
+    }
+}
 
 #[derive(Clone)]
 pub struct ConnectionReporter {
@@ -197,6 +244,7 @@ pub async fn watch_resource<K, M, F>(
             .boxed();
 
         let mut buffer = WatchBuffer::new();
+        let mut dedup = EmitDedup::new();
         let mut flush_interval = tokio::time::interval(COALESCE_INTERVAL);
         flush_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
@@ -223,7 +271,10 @@ pub async fn watch_resource<K, M, F>(
                             let key = get_resource_key(&obj);
                             let mapped = mapper(&obj);
                             if let Ok(data) = serde_json::to_value(&mapped) {
-                                tracing::debug!(kind = %kind, action = %action, data = ?data, "Watcher event processed");
+                                if !dedup.should_emit(&key, action, &data) {
+                                    continue;
+                                }
+                                tracing::debug!(kind = %kind, action = %action, key = %key, "Watcher event processed");
                                 let update = ResourceUpdate {
                                     action: action.to_string(),
                                     data,
@@ -310,6 +361,48 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(get_resource_key(&pod), "/node-1");
+    }
+
+    #[test]
+    fn coalesce_interval_is_250ms() {
+        assert_eq!(COALESCE_INTERVAL, Duration::from_millis(250));
+    }
+
+    #[test]
+    fn emit_dedup_suppresses_identical_applied() {
+        let mut dedup = EmitDedup::new();
+        let data = serde_json::json!({"status": "Running", "ready": "1/1"});
+
+        // First application emits
+        assert!(dedup.should_emit("default/pod-1", ACTION_APPLIED, &data));
+
+        // Identical application is suppressed
+        assert!(!dedup.should_emit("default/pod-1", ACTION_APPLIED, &data));
+    }
+
+    #[test]
+    fn emit_dedup_emits_changed_payload() {
+        let mut dedup = EmitDedup::new();
+        let data1 = serde_json::json!({"status": "Pending"});
+        let data2 = serde_json::json!({"status": "Running"});
+
+        assert!(dedup.should_emit("default/pod-1", ACTION_APPLIED, &data1));
+        assert!(dedup.should_emit("default/pod-1", ACTION_APPLIED, &data2));
+    }
+
+    #[test]
+    fn emit_dedup_deleted_always_emits_and_resets_key() {
+        let mut dedup = EmitDedup::new();
+        let data = serde_json::json!({"name": "pod-1"});
+
+        // Apply
+        assert!(dedup.should_emit("default/pod-1", ACTION_APPLIED, &data));
+
+        // Delete always emits
+        assert!(dedup.should_emit("default/pod-1", ACTION_DELETED, &data));
+
+        // Re-applying same payload after delete must emit!
+        assert!(dedup.should_emit("default/pod-1", ACTION_APPLIED, &data));
     }
 
     #[tokio::test]
