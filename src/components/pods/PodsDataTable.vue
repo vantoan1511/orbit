@@ -3,9 +3,14 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import { computed } from 'vue'
 import PodDetailsDrawer from './PodDetailsDrawer.vue'
+import { createPodRowDecorator } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
+const podDecorator = createPodRowDecorator()
+
+const pods = computed(() => podDecorator(k8sStore.pods))
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
@@ -23,7 +28,7 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
 <template>
   <GenericResourceTable
     data-component="pods-data-table"
-    :data="k8sStore.pods"
+    :data="pods"
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'node']"
@@ -39,9 +44,9 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
         <template #body="{ data }">
           <span
             class="text-muted-color font-mono truncate block max-w-44"
-            :title="data.node || 'N/A'"
+            v-tooltip.top="data.node"
           >
-            {{ data.node ? data.node.split('.')[0] : 'N/A' }}
+            {{ data.nodeShort }}
           </span>
         </template>
       </Column>
@@ -71,19 +76,15 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
           <div class="flex flex-col gap-1 w-28">
             <div class="flex justify-between font-mono text-[10px]">
               <span class="text-muted-color">{{ data.cpu || '-' }}</span>
-              <span
-                class="text-muted-color"
-                v-if="typeof data.cpuPct === 'number' && data.cpu && data.cpu !== '-'"
-                >{{ data.cpuPct }}%</span
-              >
+              <span class="text-muted-color" v-if="data.hasCpuPct">{{ data.cpuPct }}%</span>
             </div>
             <div
               class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-              v-if="typeof data.cpuPct === 'number' && data.cpu && data.cpu !== '-'"
+              v-if="data.hasCpuPct"
             >
               <div
                 class="h-full rounded-full bg-(--accent)"
-                :style="{ width: Math.min(data.cpuPct || 0, 100) + '%' }"
+                :style="{ width: data.cpuWidthStyle }"
               ></div>
             </div>
           </div>
@@ -96,19 +97,15 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_POD_STATUS)]
           <div class="flex flex-col gap-1 w-28">
             <div class="flex justify-between font-mono text-[10px]">
               <span class="text-muted-color">{{ data.memory || '-' }}</span>
-              <span
-                class="text-muted-color"
-                v-if="typeof data.memoryPct === 'number' && data.memory && data.memory !== '-'"
-                >{{ data.memoryPct }}%</span
-              >
+              <span class="text-muted-color" v-if="data.hasMemoryPct">{{ data.memoryPct }}%</span>
             </div>
             <div
               class="w-full h-1 bg-(--bg-hover) rounded-full overflow-hidden"
-              v-if="typeof data.memoryPct === 'number' && data.memory && data.memory !== '-'"
+              v-if="data.hasMemoryPct"
             >
               <div
                 class="h-full rounded-full bg-(--color-node)"
-                :style="{ width: Math.min(data.memoryPct || 0, 100) + '%' }"
+                :style="{ width: data.memoryWidthStyle }"
               ></div>
             </div>
           </div>

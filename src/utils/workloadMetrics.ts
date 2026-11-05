@@ -1,3 +1,4 @@
+import type { DeploymentCondition } from 'kubernetes-types/apps/v1'
 import type { DeploymentInfo, PodInfo, Replicas } from '../types/kubernetes.ts'
 
 export const REPLICAS_SORT_MULTIPLIER = 1_000_000
@@ -13,20 +14,104 @@ export function computeReplicasSortKey(replicas?: Replicas | null): number {
   return desired * REPLICAS_SORT_MULTIPLIER + Math.min(current, REPLICAS_SORT_MULTIPLIER - 1)
 }
 
-export type WithReplicasSortKey<T> = T & {
-  replicasSortKey: number
+export interface ImageTagItem {
+  full: string
+  short: string
 }
 
 /**
- * Attaches a numeric replicasSortKey to a list of workload items without mutating the original items.
+ * Precomputes full and short image names for container image tags.
  */
-export function withReplicasSortKey<T extends { replicas?: Replicas | null }>(
+export function formatImageTags(images?: readonly string[]): ImageTagItem[] {
+  if (!images || images.length === 0) return []
+  return images.map((img) => ({
+    full: img,
+    short: img.split('/').pop() || img
+  }))
+}
+
+export interface OrderedDeploymentCondition {
+  type: string
+  status: string
+  reason?: string
+  message?: string
+  severity: 'danger' | 'success' | 'info' | 'secondary'
+  tooltip: string
+}
+
+const CONDITION_ORDER: Record<string, number> = {
+  Available: 1,
+  Progressing: 2,
+  ReplicaFailure: 3
+}
+
+export function getConditionSeverity(type: string): 'danger' | 'success' | 'info' | 'secondary' {
+  switch (type) {
+    case 'ReplicaFailure':
+      return 'danger'
+    case 'Available':
+      return 'success'
+    case 'Progressing':
+      return 'info'
+    default:
+      return 'secondary'
+  }
+}
+
+/**
+ * Precomputes and orders active (status: 'True') deployment conditions.
+ */
+export function formatOrderedDeploymentConditions(
+  conditions?: readonly DeploymentCondition[]
+): OrderedDeploymentCondition[] {
+  if (!conditions || conditions.length === 0) return []
+  return [...conditions]
+    .filter((c) => c.status === 'True')
+    .sort((a, b) => {
+      const orderA = CONDITION_ORDER[a.type] ?? 99
+      const orderB = CONDITION_ORDER[b.type] ?? 99
+      if (orderA !== orderB) return orderA - orderB
+      return a.type.localeCompare(b.type)
+    })
+    .map((c) => ({
+      type: c.type,
+      status: c.status,
+      reason: c.reason,
+      message: c.message,
+      severity: getConditionSeverity(c.type),
+      tooltip: c.message || c.reason || c.type
+    }))
+}
+
+export type WithReplicasSortKey<T> = T & {
+  replicasSortKey: number
+  imageTags: ImageTagItem[]
+}
+
+const replicasSortKeyCache = new WeakMap<object, WithReplicasSortKey<unknown>>()
+
+/**
+ * Attaches numeric replicasSortKey and precomputed imageTags to workload items without mutating the original items.
+ * Memoised by object identity via a WeakMap.
+ */
+export function withReplicasSortKey<T extends { replicas?: Replicas | null; images?: string[] }>(
   items: readonly T[]
 ): WithReplicasSortKey<T>[] {
-  return items.map((item) => ({
-    ...item,
-    replicasSortKey: computeReplicasSortKey(item.replicas)
-  }))
+  return items.map((item) => {
+    if (typeof item === 'object' && item !== null) {
+      const cached = replicasSortKeyCache.get(item)
+      if (cached) return cached as unknown as WithReplicasSortKey<T>
+    }
+    const decorated: WithReplicasSortKey<T> = {
+      ...item,
+      replicasSortKey: computeReplicasSortKey(item.replicas),
+      imageTags: formatImageTags(item.images)
+    }
+    if (typeof item === 'object' && item !== null) {
+      replicasSortKeyCache.set(item, decorated)
+    }
+    return decorated
+  })
 }
 
 const REPLICA_SET_PREFIX = 'ReplicaSet/'
@@ -55,6 +140,8 @@ export function computeDeploymentRestarts(pods: PodInfo[]): Map<string, number> 
 export interface DeploymentRow extends DeploymentInfo {
   restarts: number
   replicasSortKey: number
+  orderedConditions: OrderedDeploymentCondition[]
+  imageTags: ImageTagItem[]
 }
 
 /**
@@ -78,9 +165,54 @@ export function createDeploymentRowDecorator(): (
       const row: DeploymentRow = {
         ...d,
         restarts: r,
-        replicasSortKey: computeReplicasSortKey(d.replicas)
+        replicasSortKey: computeReplicasSortKey(d.replicas),
+        orderedConditions: formatOrderedDeploymentConditions(d.conditions),
+        imageTags: formatImageTags(d.images)
       }
       cache.set(d, { restarts: r, row })
+      return row
+    })
+  }
+}
+
+export interface PodRow extends PodInfo {
+  nodeShort: string
+  hasCpuPct: boolean
+  cpuWidthStyle: string
+  hasMemoryPct: boolean
+  memoryWidthStyle: string
+}
+
+/**
+ * Creates a memoised decorator for Pod rows.
+ * Precomputes nodeShort, CPU/memory progress bar styles, and memoises results via WeakMap.
+ */
+export function createPodRowDecorator(): (pods: PodInfo[]) => PodRow[] {
+  const cache = new WeakMap<PodInfo, PodRow>()
+
+  return (pods: PodInfo[]): PodRow[] => {
+    return pods.map((p) => {
+      const cached = cache.get(p)
+      if (cached) return cached
+
+      const nodeShort = p.node ? (p.node.split('.')[0] ?? 'N/A') : 'N/A'
+      const hasCpuPct = typeof p.cpuPct === 'number' && Boolean(p.cpu) && p.cpu !== '-'
+      const cpuPctClamped = hasCpuPct ? Math.min(Math.max(p.cpuPct ?? 0, 0), 100) : 0
+      const cpuWidthStyle = `${cpuPctClamped}%`
+
+      const hasMemoryPct = typeof p.memoryPct === 'number' && Boolean(p.memory) && p.memory !== '-'
+      const memoryPctClamped = hasMemoryPct ? Math.min(Math.max(p.memoryPct ?? 0, 0), 100) : 0
+      const memoryWidthStyle = `${memoryPctClamped}%`
+
+      const row: PodRow = {
+        ...p,
+        nodeShort,
+        hasCpuPct,
+        cpuWidthStyle,
+        hasMemoryPct,
+        memoryWidthStyle
+      }
+      cache.set(p, row)
       return row
     })
   }

@@ -6,6 +6,10 @@ import test from 'node:test'
 test('StatusBadge and ReplicasProgressBar consume CSS variable tokens', () => {
   const statusBadgePath = path.resolve('src/components/shared/StatusBadge.vue')
   const statusBadgeContent = fs.readFileSync(statusBadgePath, 'utf-8')
+  const badgeStylesPath = path.resolve('src/utils/badgeStyles.ts')
+  const badgeStylesContent = fs.existsSync(badgeStylesPath)
+    ? fs.readFileSync(badgeStylesPath, 'utf-8')
+    : ''
 
   assert.ok(
     statusBadgeContent.includes('data-component="status-badge"'),
@@ -20,7 +24,8 @@ test('StatusBadge and ReplicasProgressBar consume CSS variable tokens', () => {
     'StatusBadge must not have hardcoded text-gray-400'
   )
   assert.ok(
-    statusBadgeContent.includes('bg-(--text-muted)'),
+    statusBadgeContent.includes('bg-(--text-muted)') ||
+      badgeStylesContent.includes('bg-(--text-muted)'),
     'StatusBadge must use bg-(--text-muted) for fallback dot'
   )
 

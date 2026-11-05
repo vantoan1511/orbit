@@ -36,9 +36,9 @@ const tabs: ResourceTab[] = [
   <ResourceTabsLayout :title="pageTitle" default-tab="overview" :tabs="tabs">
     <!-- Overview Tab -->
     <template #tab-overview>
-      <div class="flex flex-col gap-6">
-        <PoliciesMetricsCards />
-        <PoliciesDataTable category-filter="overview" />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <PoliciesMetricsCards class="shrink-0" />
+        <PoliciesDataTable category-filter="overview" class="flex-1 min-h-0" />
       </div>
     </template>
 

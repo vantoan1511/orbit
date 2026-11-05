@@ -108,25 +108,25 @@ const tabs: ResourceTab[] = [
 
     <!-- Persistent Volumes Tab Panel -->
     <template #tab-pvs>
-      <div class="flex flex-col gap-6">
-        <StorageMetricsCards />
-        <StoragePVTable />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <StorageMetricsCards class="shrink-0" />
+        <StoragePVTable class="flex-1 min-h-0" />
       </div>
     </template>
 
     <!-- PVCs Tab Panel -->
     <template #tab-pvcs>
-      <div class="flex flex-col gap-6">
-        <StorageMetricsCards />
-        <StoragePVCTable />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <StorageMetricsCards class="shrink-0" />
+        <StoragePVCTable class="flex-1 min-h-0" />
       </div>
     </template>
 
     <!-- StorageClasses Tab Panel -->
     <template #tab-classes>
-      <div class="flex flex-col gap-6">
-        <StorageMetricsCards />
-        <StorageClassesTable />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <StorageMetricsCards class="shrink-0" />
+        <StorageClassesTable class="flex-1 min-h-0" />
       </div>
     </template>
   </ResourceTabsLayout>

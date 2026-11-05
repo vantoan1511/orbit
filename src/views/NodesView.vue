@@ -6,7 +6,7 @@ import NodesTable from '../components/nodes/NodesTable.vue'
 
 <template>
   <ViewLayout title="Nodes">
-    <NodeMetricsCards />
-    <NodesTable />
+    <NodeMetricsCards class="shrink-0" />
+    <NodesTable class="flex-1 min-h-0" />
   </ViewLayout>
 </template>

@@ -77,12 +77,12 @@ const fetchReplicaSets = async () => {
         <template #body="{ data }">
           <div class="flex flex-wrap gap-1">
             <Tag
-              v-for="img in data.images"
-              :key="img"
+              v-for="img in data.imageTags"
+              :key="img.full"
               severity="secondary"
               class="font-mono truncate max-w-full"
-              :title="img"
-              :value="img.split('/').pop()"
+              v-tooltip.top="img.full"
+              :value="img.short"
             />
           </div>
         </template>

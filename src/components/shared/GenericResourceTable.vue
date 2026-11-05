@@ -73,7 +73,7 @@ const props = withDefaults(
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
     selectable: true,
-    dataKey: (r: IdentifiableResource) => getResourceCompositeKey(r),
+    dataKey: () => (r: IdentifiableResource) => getResourceCompositeKey(r),
     hideNamespaceFilter: false,
     hideStatusFilter: false,
     hideNameColumn: false,
@@ -149,7 +149,8 @@ const storedRowKeys = filterStore.getFilters(
   k8sStore.activeClusterId || undefined
 ).selectedRowKeys
 if (storedRowKeys.length > 0) {
-  const matched = props.data.filter((item) => storedRowKeys.includes(getRowKey(item)))
+  const rowKeySet = new Set(storedRowKeys)
+  const matched = props.data.filter((item) => rowKeySet.has(getRowKey(item)))
   if (matched.length > 0) {
     selection.value = matched
   }
@@ -163,7 +164,8 @@ watch(
       k8sStore.activeClusterId || undefined
     ).selectedRowKeys
     if (keys.length > 0 && selection.value.length === 0) {
-      const matched = newData.filter((item) => keys.includes(getRowKey(item)))
+      const keySet = new Set(keys)
+      const matched = newData.filter((item) => keySet.has(getRowKey(item)))
       if (matched.length > 0) {
         selection.value = matched
       }
@@ -431,7 +433,6 @@ const getPortForwards = (data: T): ActivePortForward[] => {
     <Column v-if="!hideActionsColumn" class="p-3 text-center w-12 shrink-0">
       <template #body="{ data }">
         <Button
-          v-tooltip.top="'Actions'"
           aria-label="Actions"
           severity="secondary"
           variant="text"
