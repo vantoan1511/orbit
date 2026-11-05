@@ -777,4 +777,9 @@ mod tests {
         assert_eq!(val.get("kind").and_then(|v| v.as_str()), Some("ResourceQuota"));
         assert_eq!(val.get("apiVersion").and_then(|v| v.as_str()), Some("v1"));
     }
+
+    #[test]
+    fn test_resolve_resource_scope_namespace() {
+        assert_eq!(resolve_resource_scope("Namespace"), Some(ResourceApiScope::ClusterScoped));
+    }
 }

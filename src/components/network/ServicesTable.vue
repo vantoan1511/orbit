@@ -3,7 +3,10 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
+import { os } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import type { ServiceInfo } from '@/types/kubernetes'
+import { resolveServiceExternalUrl } from '@/utils/serviceEndpoints'
 import { getServiceTypeSeverity } from '@/utils/severity'
 import { ExternalLink } from '@lucide/vue'
 import Column from 'primevue/column'
@@ -11,6 +14,13 @@ import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from '@/components/services/ServiceDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+
+const handleOpenExternal = async (service: ServiceInfo) => {
+  const url = resolveServiceExternalUrl(service)
+  if (url) {
+    await os.open(url)
+  }
+}
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
@@ -93,7 +103,9 @@ const handleRefresh = async () => {
             <span class="font-mono text-muted-color">{{ data.externalIP }}</span>
             <ExternalLink
               v-if="data.externalIP !== '-'"
-              class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
+              v-tooltip.top="'Open external endpoint'"
+              class="w-3 h-3 text-(--accent) hover:text-(--accent-hover) cursor-pointer"
+              @click.stop="handleOpenExternal(data)"
             />
           </div>
         </template>

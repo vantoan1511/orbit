@@ -227,14 +227,20 @@ pub fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_yaml::to_string(&p.spec).unwrap_or_default();
-
     let hard = p
         .status
         .as_ref()
         .and_then(|s| s.hard.as_ref())
         .or_else(|| p.spec.as_ref().and_then(|s| s.hard.as_ref()));
     let used = p.status.as_ref().and_then(|s| s.used.as_ref());
+
+    let quota_payload = serde_json::json!({
+        "hard": hard,
+        "used": used,
+        "spec": &p.spec,
+        "status": &p.status,
+    });
+    let rules = serde_yaml::to_string(&quota_payload).unwrap_or_default();
 
     let mut violations = 0;
     let hard_count = hard.map(|h| h.len()).unwrap_or(0);
@@ -707,5 +713,42 @@ mod tests {
             ..Default::default()
         };
         assert!(format_pod_security_namespace(&empty_ns).is_none());
+    }
+
+    #[test]
+    fn test_format_resource_quota_preserves_used_and_hard_in_rules() {
+        use k8s_openapi::api::core::v1::{ResourceQuotaSpec, ResourceQuotaStatus};
+        use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+        use std::collections::BTreeMap;
+
+        let mut hard = BTreeMap::new();
+        hard.insert("cpu".to_string(), Quantity("4".to_string()));
+        hard.insert("memory".to_string(), Quantity("8Gi".to_string()));
+
+        let mut used = BTreeMap::new();
+        used.insert("cpu".to_string(), Quantity("1".to_string()));
+        used.insert("memory".to_string(), Quantity("2Gi".to_string()));
+
+        let p = ResourceQuota {
+            metadata: ObjectMeta {
+                name: Some("compute-quota".to_string()),
+                namespace: Some("prod".to_string()),
+                ..Default::default()
+            },
+            spec: Some(ResourceQuotaSpec {
+                hard: Some(hard.clone()),
+                ..Default::default()
+            }),
+            status: Some(ResourceQuotaStatus {
+                hard: Some(hard),
+                used: Some(used),
+            }),
+        };
+
+        let info = format_resource_quota(&p);
+        assert!(info.rules.contains("hard:"), "rules should contain hard:");
+        assert!(info.rules.contains("used:"), "rules should contain used:");
+        assert!(info.rules.contains("4"), "rules should contain 4");
+        assert!(info.rules.contains("2Gi"), "rules should contain 2Gi");
     }
 }

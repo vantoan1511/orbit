@@ -4,20 +4,9 @@ import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { NamespaceInfo } from '@/types/kubernetes'
-import Chart from 'primevue/chart'
 import Column from 'primevue/column'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import NamespaceDetailsDrawer from './NamespaceDetailsDrawer.vue'
-
-interface MappedNamespaceInfo extends NamespaceInfo {
-  pods: number
-  podSparkline: number[]
-  workloads: number
-  services: number
-  configMaps: number
-  secrets: number
-}
 
 const store = useKubernetesStore()
 const selectedLabel = ref('All Labels')
@@ -69,20 +58,9 @@ const mappedNamespaces = computed(() => {
     const configMapsCount = store.configMaps.filter((c) => c.namespace === ns.name).length
     const secretsCount = store.secrets.filter((s) => s.namespace === ns.name).length
 
-    const podSparkline = [
-      podsCount,
-      podsCount,
-      podsCount,
-      podsCount,
-      podsCount,
-      podsCount,
-      podsCount
-    ]
-
     return {
       ...ns,
       pods: podsCount,
-      podSparkline,
       workloads: workloadsCount,
       services: servicesCount,
       configMaps: configMapsCount,
@@ -107,41 +85,6 @@ const handleRefresh = async () => {
     console.error('Error fetching namespaces:', error)
   }
 }
-
-// Sparkline chart options - minimal, no axes, no tooltips
-const sparklineOptions = ref()
-
-onMounted(() => {
-  sparklineOptions.value = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: { enabled: false }
-    },
-    scales: {
-      x: { display: false },
-      y: { display: false }
-    },
-    elements: {
-      point: { radius: 0, hoverRadius: 0 },
-      line: { tension: 0.4, borderWidth: 1.5 }
-    },
-    events: []
-  }
-})
-
-const getSparklineData = (ns: MappedNamespaceInfo) => ({
-  labels: ['1', '2', '3', '4', '5', '6', '7'],
-  datasets: [
-    {
-      data: ns.podSparkline,
-      borderColor: ns.status === KUBERNETES_NAMESPACE_STATUS.Terminating ? '#f59e0b' : '#10b981',
-      backgroundColor: 'transparent',
-      fill: false
-    }
-  ]
-})
 
 const MAX_VISIBLE_LABELS = 2
 </script>
@@ -175,20 +118,10 @@ const MAX_VISIBLE_LABELS = 2
     </template>
 
     <template #default="{ visibleCols }">
-      <!-- Pods Column with sparkline -->
+      <!-- Pods Column -->
       <Column v-if="visibleCols['pods']" field="pods" header="Pods" sortable class="p-3">
         <template #body="{ data }">
-          <div class="flex items-center gap-3">
-            <span class="font-mono text-primary min-w-6">{{ data.pods }}</span>
-            <div class="w-16 h-6 shrink-0" v-if="sparklineOptions">
-              <Chart
-                type="line"
-                :data="getSparklineData(data)"
-                :options="sparklineOptions"
-                class="w-full h-full"
-              />
-            </div>
-          </div>
+          <span class="font-mono text-primary min-w-6">{{ data.pods }}</span>
         </template>
       </Column>
 
