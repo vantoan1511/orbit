@@ -56,17 +56,17 @@ onMounted(async () => {
   <ResourceTabsLayout title="ConfigMaps & Secrets" default-tab="configmaps" :tabs="tabs">
     <!-- ConfigMaps Tab Panel -->
     <template #tab-configmaps>
-      <div class="flex flex-col gap-6">
-        <ConfigMetricsCards activeTab="configmaps" />
-        <ConfigDataTable activeTab="configmaps" />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <ConfigMetricsCards activeTab="configmaps" class="shrink-0" />
+        <ConfigDataTable activeTab="configmaps" class="flex-1 min-h-0" />
       </div>
     </template>
 
     <!-- Secrets Tab Panel -->
     <template #tab-secrets>
-      <div class="flex flex-col gap-6">
-        <ConfigMetricsCards activeTab="secrets" />
-        <ConfigDataTable activeTab="secrets" />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <ConfigMetricsCards activeTab="secrets" class="shrink-0" />
+        <ConfigDataTable activeTab="secrets" class="flex-1 min-h-0" />
       </div>
     </template>
   </ResourceTabsLayout>

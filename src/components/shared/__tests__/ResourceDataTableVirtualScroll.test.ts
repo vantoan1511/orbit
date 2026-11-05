@@ -26,8 +26,12 @@ test('ResourceDataTable hoists passthrough config and configures virtualScroller
   assert.match(content, /:virtualScrollerOptions=/)
   assert.match(content, /<Paginator/)
 
-  // Verifies table container has data-component attribute
+  // Verifies table container has data-component attribute and full-height flex layout
   assert.match(content, /data-component="resource-data-table"/)
+  assert.match(content, /class="[^"]*flex-1 min-h-0[^"]*"/)
+  assert.match(content, /scrollHeight="flex"/)
+  assert.match(content, /:scrollable="true"/)
+  assert.match(content, /:pt="DATATABLE_PT"/)
 })
 
 test('GenericResourceTable uses Set for selectedRowKeys lookup and omits redundant v-tooltip on Actions button', () => {

@@ -26,7 +26,7 @@ const openCreateNamespaceDialog = () => {
     <template #actions>
       <Button label="Create" icon="pi pi-plus" size="small" @click="openCreateNamespaceDialog" />
     </template>
-    <NamespaceMetricsCards />
-    <NamespacesDataTable />
+    <NamespaceMetricsCards class="shrink-0" />
+    <NamespacesDataTable class="flex-1 min-h-0" />
   </ViewLayout>
 </template>

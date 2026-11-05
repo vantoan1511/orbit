@@ -15,7 +15,6 @@ import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
 import { getResourceCompositeKey, shouldShowSkeleton } from '@/utils/resourceKey'
 import {
   DEFAULT_VIRTUAL_SCROLLER_OPTIONS,
-  VIRTUAL_SCROLL_HEIGHT,
   paginateTableRows,
   shouldEnableVirtualScroll,
   sortTableRows
@@ -26,6 +25,12 @@ const PAGINATOR_PT = Object.freeze({
     root: {
       class: 'p-variant-filled p-select-sm min-w-20'
     }
+  }
+})
+
+const DATATABLE_PT = Object.freeze({
+  tableContainer: {
+    class: 'min-h-0 flex-1'
   }
 })
 
@@ -222,11 +227,11 @@ const isIndeterminate = computed(() => {
 </script>
 
 <template>
-  <div data-component="resource-data-table" class="flex flex-col gap-4">
+  <div data-component="resource-data-table" class="flex flex-col gap-4 flex-1 min-h-0">
     <!-- Bulk Actions Toolbar -->
     <div
       v-if="selection && selection.length > 0"
-      class="flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-[var(--ui-radius-card)] px-3 py-2"
+      class="shrink-0 flex items-center justify-between gap-4 bg-(--bg-hover)/40 border border-(--border) rounded-[var(--ui-radius-card)] px-3 py-2"
     >
       <div class="flex items-center gap-3">
         <span class="text-xs font-semibold text-primary"> {{ selection.length }} selected </span>
@@ -253,7 +258,7 @@ const isIndeterminate = computed(() => {
     </div>
 
     <!-- Filter Toolbar -->
-    <div v-else class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div v-else class="shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div class="flex items-center gap-3 flex-wrap">
         <!-- Search -->
         <div class="relative min-w-64" v-if="!hideSearch">
@@ -362,7 +367,7 @@ const isIndeterminate = computed(() => {
 
     <!-- Table Container -->
     <div
-      class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card)"
+      class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card) flex-1 min-h-0 flex flex-col"
     >
       <!-- Loading Skeleton or Data Table -->
       <slot name="loading" v-if="shouldShowSkeleton(loading, data.length)">
@@ -376,15 +381,16 @@ const isIndeterminate = computed(() => {
           v-model:selection="selection"
           :dataKey="dataKey"
           :rowHover="true"
-          class="p-datatable-sm cursor-pointer"
+          class="p-datatable-sm cursor-pointer flex-1 min-h-0"
           tableClass="w-full text-left text-xs border-collapse"
-          :scrollable="isVirtualScrollEnabled"
-          :scrollHeight="isVirtualScrollEnabled ? VIRTUAL_SCROLL_HEIGHT : undefined"
+          :scrollable="true"
+          scrollHeight="flex"
           :virtualScrollerOptions="
             isVirtualScrollEnabled ? DEFAULT_VIRTUAL_SCROLLER_OPTIONS : undefined
           "
           :sortField="sortField"
           :sortOrder="sortOrder"
+          :pt="DATATABLE_PT"
           @sort="onSort"
           @row-click="emit('row-click', $event)"
           @row-contextmenu="emit('row-contextmenu', $event)"
@@ -410,6 +416,7 @@ const isIndeterminate = computed(() => {
           template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink RowsPerPageDropdown CurrentPageReport"
           :currentPageReportTemplate="reportTemplate"
           :pt="PAGINATOR_PT"
+          class="shrink-0"
           @page="onPageChange"
         />
       </template>

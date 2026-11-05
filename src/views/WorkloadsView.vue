@@ -146,9 +146,9 @@ const tabs: ResourceTab[] = [
 
     <!-- Pods Tab -->
     <template #tab-pods>
-      <div class="flex flex-col gap-6">
-        <PodMetricsCards />
-        <PodsDataTable />
+      <div class="flex flex-col gap-6 flex-1 min-h-0">
+        <PodMetricsCards class="shrink-0" />
+        <PodsDataTable class="flex-1 min-h-0" />
       </div>
     </template>
 

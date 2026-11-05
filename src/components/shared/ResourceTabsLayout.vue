@@ -63,9 +63,14 @@ const currentTabConfig = computed(() => props.tabs.find((t) => t.id === activeTa
       </slot>
     </template>
 
-    <Tabs v-model:value="activeTab">
-      <TabPanels>
-        <TabPanel v-for="tab in tabs" :key="tab.id" :value="tab.id">
+    <Tabs v-model:value="activeTab" class="flex-1 min-h-0 flex flex-col">
+      <TabPanels class="flex-1 min-h-0 flex flex-col p-0 bg-transparent">
+        <TabPanel
+          v-for="tab in tabs"
+          :key="tab.id"
+          :value="tab.id"
+          class="flex-1 min-h-0 flex flex-col p-0"
+        >
           <slot v-if="visitedTabs.has(tab.id)" :name="`tab-${tab.id}`" :active-tab="activeTab" />
         </TabPanel>
       </TabPanels>
