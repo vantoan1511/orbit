@@ -3,7 +3,9 @@ import ActivePortForwardsList from '@/components/shared/ActivePortForwardsList.v
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
+import { os } from '@/services/nativeService'
 import type { ServiceInfo } from '@/types/kubernetes'
+import { resolveServiceExternalUrl } from '@/utils/serviceEndpoints'
 import { getServiceTypeSeverity } from '@/utils/severity'
 import { ExternalLink } from '@lucide/vue'
 import Tag from 'primevue/tag'
@@ -11,6 +13,13 @@ import Tag from 'primevue/tag'
 defineProps<{
   service: ServiceInfo
 }>()
+
+const handleOpenExternal = async (service: ServiceInfo) => {
+  const url = resolveServiceExternalUrl(service)
+  if (url) {
+    await os.open(url)
+  }
+}
 </script>
 
 <template>
@@ -46,7 +55,9 @@ defineProps<{
               <span class="font-mono text-primary">{{ service.externalIP || '-' }}</span>
               <ExternalLink
                 v-if="service.externalIP && service.externalIP !== '-'"
-                class="w-3 h-3 text-violet-400 hover:text-violet-300 cursor-pointer"
+                v-tooltip.top="'Open external endpoint'"
+                class="w-3 h-3 text-(--accent) hover:text-(--accent-hover) cursor-pointer"
+                @click.stop="handleOpenExternal(service)"
               />
             </div>
           </div>

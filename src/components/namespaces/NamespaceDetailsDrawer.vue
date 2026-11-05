@@ -6,31 +6,24 @@ import { BarChart2, Clock, FileCode, Layers } from '@lucide/vue'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import KeyValueBadgeList from '@/components/shared/KeyValueBadgeList.vue'
 import ReactiveAge from '@/components/shared/ReactiveAge.vue'
+import ResourceYamlTab from '@/components/shared/ResourceYamlTab.vue'
+import { useResourceRawManifest } from '@/composables/useResourceRawManifest'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import {
+  extractNamespaceResourceQuota,
+  extractNamespaceLimitRanges,
+  aggregateNamespacePodMetrics,
+  type ResourceQuotaInfo,
+  type LimitRangeInfo,
+  type AggregatedNamespaceMetrics
+} from '@/utils/namespaceResources'
 import Chart from 'primevue/chart'
 import Tab from 'primevue/tab'
 import TabPanel from 'primevue/tabpanel'
 import Tag from 'primevue/tag'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-interface ResourceQuotaInfo {
-  cpuRequest: string
-  cpuLimit: string
-  cpuUsed: string
-  cpuPercent: number
-  memoryRequest: string
-  memoryLimit: string
-  memoryUsed: string
-  memoryPercent: number
-}
-
-interface LimitRangeInfo {
-  type: string
-  resource: string
-  min: string
-  max: string
-  default: string
-  defaultRequest?: string
-}
+export type { ResourceQuotaInfo, LimitRangeInfo }
 
 export interface DrawerNamespaceInfo extends NamespaceInfo {
   cpuUsage?: string
@@ -52,7 +45,63 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
 
+const k8sStore = useKubernetesStore()
 const activeTab = ref('overview')
+
+const { displayedYaml, isYamlLoading, copied, copyYaml } = useResourceRawManifest({
+  kind: computed(() => KUBERNETES_RESOURCE_KIND.Namespace),
+  name: computed(() => props.namespace?.name),
+  namespace: computed(() => ''),
+  visible: computed(() => props.visible)
+})
+
+const effectiveResourceQuota = computed<ResourceQuotaInfo | null>(() => {
+  if (!props.namespace?.name) return null
+  if (props.namespace.resourceQuota !== undefined) {
+    return props.namespace.resourceQuota
+  }
+  return extractNamespaceResourceQuota(k8sStore.policies, props.namespace.name)
+})
+
+const effectiveLimitRanges = computed<LimitRangeInfo[]>(() => {
+  if (!props.namespace?.name) return []
+  if (props.namespace.limitRanges !== undefined) {
+    return props.namespace.limitRanges
+  }
+  return extractNamespaceLimitRanges(k8sStore.policies, props.namespace.name)
+})
+
+const aggregatedMetrics = computed<AggregatedNamespaceMetrics>(() => {
+  if (!props.namespace?.name) {
+    return {
+      cpuUsage: '0m',
+      cpuCores: 0,
+      cpuPercent: 0,
+      memoryUsage: '0Mi',
+      memoryBytes: 0,
+      memoryPercent: 0
+    }
+  }
+  return aggregateNamespacePodMetrics(
+    k8sStore.pods,
+    props.namespace.name,
+    k8sStore.nodes,
+    effectiveResourceQuota.value
+  )
+})
+
+const displayCpuUsage = computed(
+  () => props.namespace?.cpuUsage ?? aggregatedMetrics.value.cpuUsage
+)
+const displayCpuPercent = computed(
+  () => props.namespace?.cpuPercent ?? aggregatedMetrics.value.cpuPercent
+)
+const displayMemoryUsage = computed(
+  () => props.namespace?.memoryUsage ?? aggregatedMetrics.value.memoryUsage
+)
+const displayMemoryPercent = computed(
+  () => props.namespace?.memoryPercent ?? aggregatedMetrics.value.memoryPercent
+)
 
 const cpuChartData = ref()
 const memoryChartData = ref()
@@ -84,11 +133,22 @@ const updateCharts = (ns: DrawerNamespaceInfo) => {
     }
   }
 
+  const currentCpuPct = displayCpuPercent.value
+  const currentMemPct = displayMemoryPercent.value
+
   cpuChartData.value = {
     labels: ['10m ago', '8m ago', '6m ago', '4m ago', '2m ago', '1m ago', 'Now'],
     datasets: [
       {
-        data: ns.cpuHistory || [0, 0, 0, 0, 0, 0, 0],
+        data: ns.cpuHistory || [
+          currentCpuPct,
+          currentCpuPct,
+          currentCpuPct,
+          currentCpuPct,
+          currentCpuPct,
+          currentCpuPct,
+          currentCpuPct
+        ],
         borderColor: violetColor,
         backgroundColor: 'rgba(139, 92, 246, 0.05)',
         fill: true
@@ -100,7 +160,15 @@ const updateCharts = (ns: DrawerNamespaceInfo) => {
     labels: ['10m ago', '8m ago', '6m ago', '4m ago', '2m ago', '1m ago', 'Now'],
     datasets: [
       {
-        data: ns.memoryHistory || [0, 0, 0, 0, 0, 0, 0],
+        data: ns.memoryHistory || [
+          currentMemPct,
+          currentMemPct,
+          currentMemPct,
+          currentMemPct,
+          currentMemPct,
+          currentMemPct,
+          currentMemPct
+        ],
         borderColor: blueColor,
         backgroundColor: 'rgba(59, 130, 246, 0.05)',
         fill: true
@@ -110,14 +178,22 @@ const updateCharts = (ns: DrawerNamespaceInfo) => {
 }
 
 watch(
+  () => [props.namespace, aggregatedMetrics.value],
+  ([ns]) => {
+    if (ns) {
+      updateCharts(ns as DrawerNamespaceInfo)
+    }
+  },
+  { immediate: true }
+)
+
+watch(
   () => props.namespace,
   (ns) => {
     if (ns) {
       activeTab.value = 'overview'
-      updateCharts(ns)
     }
-  },
-  { immediate: true }
+  }
 )
 
 const getStatusTextClass = (status: string) => {
@@ -146,7 +222,6 @@ const getStatusTextClass = (status: string) => {
     :status-badge-class="
       props.namespace ? getNamespaceStatusBadgeClass(props.namespace.status) : 'bg-muted-color'
     "
-    :show-yaml-tab="false"
     @update:visible="emit('update:visible', $event)"
   >
     <template #metadata>
@@ -237,24 +312,15 @@ const getStatusTextClass = (status: string) => {
             <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
               Resource Usage
             </h3>
-            <span v-if="props.namespace.cpuUsage" class="text-[10px] text-muted-color"
-              >Last 1 hour</span
-            >
+            <span class="text-[10px] text-muted-color">Last 1 hour</span>
           </div>
-          <div
-            v-if="!props.namespace.cpuUsage"
-            class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-6 text-center text-xs text-muted-color"
-          >
-            Resource usage metrics are currently unavailable. Dynamic metric monitoring is planned
-            for a future update.
-          </div>
-          <div v-else class="space-y-4">
+          <div class="space-y-4">
             <!-- CPU Usage -->
             <div class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 flex flex-col gap-2">
               <div class="flex justify-between items-center text-xs">
                 <span class="text-muted-color font-semibold">CPU Usage</span>
                 <span class="font-mono font-bold text-(--accent)">
-                  {{ props.namespace.cpuUsage }} ({{ props.namespace.cpuPercent }}%)
+                  {{ displayCpuUsage }} ({{ displayCpuPercent }}%)
                 </span>
               </div>
               <div class="h-20 w-full" v-if="cpuChartData">
@@ -272,7 +338,7 @@ const getStatusTextClass = (status: string) => {
               <div class="flex justify-between items-center text-xs">
                 <span class="text-muted-color font-semibold">Memory Usage</span>
                 <span class="font-mono font-bold text-(--color-service)">
-                  {{ props.namespace.memoryUsage }} ({{ props.namespace.memoryPercent }}%)
+                  {{ displayMemoryUsage }} ({{ displayMemoryPercent }}%)
                 </span>
               </div>
               <div class="h-20 w-full" v-if="memoryChartData">
@@ -293,7 +359,7 @@ const getStatusTextClass = (status: string) => {
     <template #extra-panels>
       <!-- RESOURCE QUOTAS PANEL -->
       <TabPanel value="quotas" class="space-y-6">
-        <div v-if="props.namespace?.resourceQuota" class="space-y-5">
+        <div v-if="effectiveResourceQuota" class="space-y-5">
           <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider">
             Resource Quotas
           </h3>
@@ -303,23 +369,20 @@ const getStatusTextClass = (status: string) => {
             <div class="flex justify-between items-center text-xs">
               <span class="text-muted-color font-semibold">CPU</span>
               <span class="font-mono text-muted-color"
-                >{{ props.namespace.resourceQuota.cpuUsed }} /
-                {{ props.namespace.resourceQuota.cpuLimit }}</span
+                >{{ effectiveResourceQuota.cpuUsed }} / {{ effectiveResourceQuota.cpuLimit }}</span
               >
             </div>
             <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
               <div
                 class="h-full bg-(--accent) rounded-full transition-all duration-500"
                 :style="{
-                  width: `${Math.min(100, props.namespace.resourceQuota.cpuPercent)}%`
+                  width: `${Math.min(100, effectiveResourceQuota.cpuPercent)}%`
                 }"
               ></div>
             </div>
             <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
               <span>Usage</span>
-              <span class="font-bold text-primary"
-                >{{ props.namespace.resourceQuota.cpuPercent }}%</span
-              >
+              <span class="font-bold text-primary">{{ effectiveResourceQuota.cpuPercent }}%</span>
             </div>
           </div>
 
@@ -328,22 +391,22 @@ const getStatusTextClass = (status: string) => {
             <div class="flex justify-between items-center text-xs">
               <span class="text-muted-color font-semibold">Memory</span>
               <span class="font-mono text-muted-color"
-                >{{ props.namespace.resourceQuota.memoryUsed }} /
-                {{ props.namespace.resourceQuota.memoryLimit }}</span
+                >{{ effectiveResourceQuota.memoryUsed }} /
+                {{ effectiveResourceQuota.memoryLimit }}</span
               >
             </div>
             <div class="h-2 bg-(--bg-app) rounded-full overflow-hidden">
               <div
                 class="h-full bg-(--color-service) rounded-full transition-all duration-500"
                 :style="{
-                  width: `${Math.min(100, props.namespace.resourceQuota.memoryPercent)}%`
+                  width: `${Math.min(100, effectiveResourceQuota.memoryPercent)}%`
                 }"
               ></div>
             </div>
             <div class="flex justify-between items-center text-[10px] text-muted-color font-mono">
               <span>Usage</span>
               <span class="font-bold text-primary"
-                >{{ props.namespace.resourceQuota.memoryPercent }}%</span
+                >{{ effectiveResourceQuota.memoryPercent }}%</span
               >
             </div>
           </div>
@@ -355,12 +418,12 @@ const getStatusTextClass = (status: string) => {
 
       <!-- LIMIT RANGES PANEL -->
       <TabPanel value="limitranges" class="space-y-4">
-        <div v-if="props.namespace?.limitRanges && props.namespace.limitRanges.length > 0">
+        <div v-if="effectiveLimitRanges && effectiveLimitRanges.length > 0">
           <h3 class="text-[10px] font-bold text-muted-color uppercase tracking-wider mb-4">
             Limit Ranges
           </h3>
           <div
-            v-for="(lr, idx) in props.namespace.limitRanges"
+            v-for="(lr, idx) in effectiveLimitRanges"
             :key="idx"
             class="bg-(--bg-hover)/40 rounded-[var(--ui-radius-card)] p-4 mb-3"
           >
@@ -401,6 +464,16 @@ const getStatusTextClass = (status: string) => {
           </div>
         </div>
       </TabPanel>
+    </template>
+
+    <!-- YAML Panel -->
+    <template #yaml>
+      <ResourceYamlTab
+        :displayed-yaml="displayedYaml"
+        :is-yaml-loading="isYamlLoading"
+        :copied="copied"
+        @copy-yaml="copyYaml"
+      />
     </template>
   </BaseResourceDrawer>
 </template>
