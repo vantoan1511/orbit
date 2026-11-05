@@ -73,7 +73,7 @@ const props = withDefaults(
     reportTemplate: 'Showing {first} to {last} of {totalRecords} items',
     loading: false,
     selectable: true,
-    dataKey: (r: IdentifiableResource) => getResourceCompositeKey(r),
+    dataKey: () => (r: IdentifiableResource) => getResourceCompositeKey(r),
     hideNamespaceFilter: false,
     hideStatusFilter: false,
     hideNameColumn: false,

@@ -12,7 +12,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
 import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
-import { shouldShowSkeleton } from '@/utils/resourceKey'
+import { getResourceCompositeKey, shouldShowSkeleton } from '@/utils/resourceKey'
 import {
   DEFAULT_VIRTUAL_SCROLLER_OPTIONS,
   VIRTUAL_SCROLL_HEIGHT,
@@ -64,7 +64,7 @@ const props = withDefaults(
     hideConfig: false,
     hideRowsPerPage: false,
     columns: () => [],
-    dataKey: 'name'
+    dataKey: () => (r: any) => getResourceCompositeKey(r)
   }
 )
 
