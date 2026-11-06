@@ -123,6 +123,27 @@ export const kubernetesService = {
   },
 
   /**
+   * Cordon a node (mark as unschedulable)
+   */
+  async cordonNode(params: { name: string }): Promise<void> {
+    await coreEngine.dispatch('cordonNode', params)
+  },
+
+  /**
+   * Uncordon a node (mark as schedulable)
+   */
+  async uncordonNode(params: { name: string }): Promise<void> {
+    await coreEngine.dispatch('uncordonNode', params)
+  },
+
+  /**
+   * Drain a node (cordon and evict scheduled pods)
+   */
+  async drainNode(params: { name: string }): Promise<void> {
+    await coreEngine.dispatch('drainNode', params)
+  },
+
+  /**
    * Request list of policies, optionally filtered by namespace
    */
   async getPolicies(namespace?: string): Promise<void> {

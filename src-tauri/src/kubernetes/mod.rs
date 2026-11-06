@@ -25,7 +25,7 @@ pub use secrets::list_secrets;
 pub use storage::{list_pvs, list_pvcs, list_storage_classes};
 pub use workloads::{list_pods, list_deployments, list_statefulsets, list_daemonsets, list_replicasets};
 pub use batch::{list_jobs, list_cronjobs};
-pub use nodes::list_nodes;
+pub use nodes::{list_nodes, map_node, set_node_schedulable, drain_node};
 pub use namespaces::list_namespaces;
 pub use services::list_services;
 pub use ingresses::{list_ingresses, clone_ingress};

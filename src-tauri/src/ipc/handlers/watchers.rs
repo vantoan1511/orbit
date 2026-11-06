@@ -94,6 +94,7 @@ pub fn spawn_watchers(
     }
 
     spawn_watcher!(k8s_openapi::api::core::v1::Service, "Service", crate::kubernetes::services::map_service);
+    spawn_watcher!(k8s_openapi::api::core::v1::Node, "Node", crate::kubernetes::nodes::map_node);
     spawn_watcher!(k8s_openapi::api::networking::v1::Ingress, "Ingress", crate::kubernetes::ingresses::map_ingress);
     spawn_watcher!(k8s_openapi::api::apps::v1::Deployment, "Deployment", crate::kubernetes::workloads::map_deployment);
     spawn_watcher!(k8s_openapi::api::core::v1::Pod, "Pod", crate::kubernetes::workloads::map_pod);

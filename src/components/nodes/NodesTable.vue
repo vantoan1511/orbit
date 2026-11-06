@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import NodeDetailsDrawer from '@/components/nodes/NodeDetailsDrawer.vue'
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import StatusBadge from '@/components/shared/StatusBadge.vue'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import Tag from 'primevue/tag'
 
 const k8sStore = useKubernetesStore()
 
@@ -44,13 +46,26 @@ const handleRefresh = async () => {
     :hideNamespaceFilter="true"
     :hideNamespaceColumn="true"
     :hideAgeColumn="true"
-    :hideActionsColumn="true"
+    :hideActionsColumn="false"
+    :selectable="false"
     searchPlaceholder="Search nodes..."
     emptyMessage="No nodes found in cluster."
     reportTemplate="Showing {first} to {last} of {totalRecords} nodes"
     :loading="k8sStore.nodesLoading"
     @refresh="handleRefresh"
   >
+    <template #status="{ data }">
+      <div class="flex items-center gap-1.5">
+        <StatusBadge :status="data.status" />
+        <Tag
+          v-if="data.isCordoned"
+          severity="warn"
+          value="Cordoned"
+          class="font-mono text-[10px]"
+        />
+      </div>
+    </template>
+
     <template #default="{ visibleCols }">
       <!-- Role Column -->
       <Column v-if="visibleCols['role']" field="role" header="Role" sortable class="p-3">
@@ -172,15 +187,15 @@ const handleRefresh = async () => {
             <Tag
               v-for="label in (data.labels || []).slice(0, MAX_VISIBLE_LABELS)"
               :key="label"
+              v-tooltip.top="label"
               severity="secondary"
               class="font-mono whitespace-nowrap"
-              :title="label"
               :value="label"
             />
             <Tag
               v-if="(data.labels || []).length > MAX_VISIBLE_LABELS"
+              v-tooltip.top="(data.labels || []).slice(MAX_VISIBLE_LABELS).join('\n')"
               severity="secondary"
-              :title="(data.labels || []).slice(MAX_VISIBLE_LABELS).join('\n')"
               :value="`+${(data.labels || []).length - MAX_VISIBLE_LABELS}`"
             />
           </div>

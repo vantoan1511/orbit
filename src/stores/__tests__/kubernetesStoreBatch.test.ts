@@ -4,6 +4,7 @@ import { shallowRef } from 'vue'
 import { KUBERNETES_ACTION } from '../../constants/kubernetes.ts'
 import {
   MAX_EVENTS_RETAINED,
+  mergeNodeWatchUpdate,
   resourcesEqual,
   updateResourceBatch
 } from '../kubernetesStoreBatch.ts'
@@ -257,4 +258,62 @@ test('updateResourceBatch: handles insertion followed by deletion in the same ba
 
   assert.equal(listRef.value.length, 1)
   assert.equal(listRef.value[0]?.name, 'pod-1')
+})
+
+test('mergeNodeWatchUpdate preserves existing CPU, memory, and pod metrics when watcher payload has zero metrics', () => {
+  const existing = {
+    name: 'node-1',
+    status: 'Ready',
+    role: 'worker',
+    version: 'v1.30.0',
+    cpuPct: 45.5,
+    cpuUsed: '1.82',
+    cpuTotal: '4',
+    memPct: 62.1,
+    memUsed: '9.94',
+    memTotal: '16',
+    podsCount: 18,
+    podsLimit: 110,
+    uptime: '5d',
+    labels: ['env=prod'],
+    labelsMap: { env: 'prod' },
+    annotations: {},
+    isCordoned: false,
+    addresses: [],
+    conditions: [],
+    taints: [],
+    imagesCount: 20
+  } as unknown as import('../../types/kubernetes.ts').NodeInfo
+
+  const incoming = {
+    name: 'node-1',
+    status: 'Ready',
+    role: 'worker',
+    version: 'v1.30.0',
+    cpuPct: 0,
+    cpuUsed: '0',
+    cpuTotal: '4',
+    memPct: 0,
+    memUsed: '0',
+    memTotal: '16',
+    podsCount: 0,
+    podsLimit: 110,
+    uptime: '5d',
+    labels: ['env=prod'],
+    labelsMap: { env: 'prod' },
+    annotations: {},
+    isCordoned: true,
+    addresses: [],
+    conditions: [],
+    taints: [],
+    imagesCount: 20
+  } as unknown as import('../../types/kubernetes.ts').NodeInfo
+
+  const merged = mergeNodeWatchUpdate(existing, incoming)
+  assert.equal(merged.isCordoned, true)
+  assert.equal(merged.cpuPct, 45.5)
+  assert.equal(merged.cpuUsed, '1.82')
+  assert.equal(merged.memPct, 62.1)
+  assert.equal(merged.memUsed, '9.94')
+  assert.equal(merged.podsCount, 18)
 })

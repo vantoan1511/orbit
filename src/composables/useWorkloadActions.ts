@@ -14,7 +14,11 @@ import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
 import PortForwardDialog from '@/components/shared/PortForwardDialog.vue'
 import { getAvailablePorts } from '@/utils/portForward'
-import { resolveDeleteTargetParams, resolveEditTargetParams } from '@/utils/workloadActions'
+import {
+  resolveDeleteTargetParams,
+  resolveEditTargetParams,
+  resolveNodeActionConfig
+} from '@/utils/workloadActions'
 
 export { getAvailablePorts }
 
@@ -113,7 +117,7 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
     }
 
     // View Details
-    const noDetailsKinds: readonly string[] = [KUBERNETES_RESOURCE_KIND.Node]
+    const noDetailsKinds: readonly string[] = []
     if (!noDetailsKinds.includes(resourceKind)) {
       items.push({
         label: 'View Details',
@@ -445,6 +449,102 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                 })
               }
             }
+          )
+        }
+      })
+    }
+
+    // Node Administration Actions (Cordon / Uncordon, Drain)
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.Node) {
+      const row = selectedActionRow.value as (T & { isCordoned?: boolean }) | null
+      const isCordoned = Boolean(row?.isCordoned)
+      const actionConfig = resolveNodeActionConfig(isCordoned)
+
+      items.push({
+        label: actionConfig.cordonLabel,
+        icon: actionConfig.cordonIcon,
+        command: () => {
+          const currentRow = selectedActionRow.value
+          if (!currentRow) return
+
+          if (actionConfig.needsConfirmation) {
+            confirmAction(
+              `Are you sure you want to cordon node "${currentRow.name}"? New pods will not be scheduled on this node.`,
+              'Confirm Cordon Node',
+              'Cordon',
+              async () => {
+                try {
+                  await kubernetesService.cordonNode({ name: currentRow.name })
+                  toast.add({
+                    severity: 'warn',
+                    summary: 'Node Cordoned',
+                    detail: `Node ${currentRow.name} marked as unschedulable`,
+                    life: 3000
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to cordon node',
+                    life: 5000
+                  })
+                }
+              },
+              'primary'
+            )
+          } else {
+            void (async () => {
+              try {
+                await kubernetesService.uncordonNode({ name: currentRow.name })
+                toast.add({
+                  severity: 'success',
+                  summary: 'Node Uncordoned',
+                  detail: `Node ${currentRow.name} marked as schedulable`,
+                  life: 3000
+                })
+              } catch (e) {
+                toast.add({
+                  severity: 'error',
+                  summary: 'Error',
+                  detail: e instanceof Error ? e.message : 'Failed to uncordon node',
+                  life: 5000
+                })
+              }
+            })()
+          }
+        }
+      })
+
+      items.push({
+        label: 'Drain',
+        icon: 'pi pi-sign-out',
+        class: 'text-(--danger)',
+        command: () => {
+          const currentRow = selectedActionRow.value
+          if (!currentRow) return
+          confirmAction(
+            `Are you sure you want to drain node "${currentRow.name}"? The node will be cordoned and all eligible pods will be evicted.`,
+            'Confirm Drain Node',
+            'Drain',
+            async () => {
+              try {
+                await kubernetesService.drainNode({ name: currentRow.name })
+                toast.add({
+                  severity: 'success',
+                  summary: 'Drain Initiated',
+                  detail: `Node ${currentRow.name} drain initiated`,
+                  life: 3000
+                })
+              } catch (e) {
+                toast.add({
+                  severity: 'error',
+                  summary: 'Error',
+                  detail: e instanceof Error ? e.message : 'Failed to drain node',
+                  life: 5000
+                })
+              }
+            },
+            'danger'
           )
         }
       })
