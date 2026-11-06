@@ -24,7 +24,10 @@ import {
 } from '@/utils/severity'
 import { sortEventsDesc } from '@/utils/events'
 import { getWorkloadKind } from '@/utils/workloadKind'
-import { Activity, FileCode, Layers, Terminal as TerminalIcon } from '@lucide/vue'
+import { resolveCronJobActionConfig } from '@/utils/workloadActions'
+import { Activity, FileCode, Layers, Pause, Play, Terminal as TerminalIcon } from '@lucide/vue'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import { storeToRefs } from 'pinia'
 import BaseResourceDrawer from '@/components/shared/BaseResourceDrawer.vue'
 import Button from 'primevue/button'
@@ -43,11 +46,24 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
 
+const toast = useToast()
+const confirm = useConfirm()
 const router = useRouter()
 const k8sStore = useKubernetesStore()
-const { pods, events: clusterEvents } = storeToRefs(k8sStore)
+const { pods, events: clusterEvents, cronJobs } = storeToRefs(k8sStore)
 
 const activeTab = ref('overview')
+
+const liveWorkload = computed(() => {
+  if (!props.workload) return null
+  if (getWorkloadKind(props.workload) === KUBERNETES_RESOURCE_KIND.CronJob) {
+    const liveCj = cronJobs.value.find(
+      (cj) => cj.name === props.workload?.name && cj.namespace === props.workload?.namespace
+    )
+    if (liveCj) return liveCj
+  }
+  return props.workload
+})
 
 const workloadKind = computed(() => {
   return props.workload ? getWorkloadKind(props.workload) : 'Workload'
@@ -71,8 +87,9 @@ const workloadAnnotations = computed(() => props.workload?.annotations ?? {})
 const workloadImages = computed(() => props.workload?.images ?? [])
 
 const getProp = <T,>(key: string): T | undefined => {
-  if (props.workload && key in props.workload) {
-    return (props.workload as unknown as Record<string, unknown>)[key] as T
+  const target = liveWorkload.value || props.workload
+  if (target && key in target) {
+    return (target as unknown as Record<string, unknown>)[key] as T
   }
   return undefined
 }
@@ -163,6 +180,84 @@ const editYaml = () => {
       name: workloadName.value
     }
   })
+}
+
+const cronJobActionConfig = computed(() => resolveCronJobActionConfig(Boolean(suspend.value)))
+
+const triggerCronJobNow = async () => {
+  if (!props.workload) return
+  try {
+    await kubernetesService.triggerCronJob({
+      namespace: workloadNamespace.value || 'default',
+      name: workloadName.value
+    })
+    toast.add({
+      severity: 'success',
+      summary: 'Job Triggered',
+      detail: `Triggered manual execution for ${workloadName.value}`,
+      life: 3000
+    })
+  } catch (e) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: e instanceof Error ? e.message : 'Failed to trigger CronJob',
+      life: 5000
+    })
+  }
+}
+
+const toggleCronJobSuspend = () => {
+  if (!props.workload) return
+  const config = cronJobActionConfig.value
+  const name = workloadName.value
+  const namespace = workloadNamespace.value || 'default'
+
+  const executeToggle = async () => {
+    try {
+      await kubernetesService.setCronJobSuspend({
+        namespace,
+        name,
+        suspend: config.targetSuspend
+      })
+      toast.add({
+        severity: 'info',
+        summary: config.targetSuspend ? 'CronJob Suspended' : 'CronJob Resumed',
+        detail: `${name} ${config.targetSuspend ? 'suspended' : 'resumed'}`,
+        life: 3000
+      })
+    } catch (e) {
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail:
+          e instanceof Error ? e.message : `Failed to ${config.suspendLabel.toLowerCase()} CronJob`,
+        life: 5000
+      })
+    }
+  }
+
+  if (config.needsConfirmation) {
+    confirm.require({
+      message: `Are you sure you want to suspend CronJob "${name}"? Scheduled runs will be paused.`,
+      header: 'Confirm Suspend CronJob',
+      icon: 'pi pi-exclamation-triangle',
+      rejectProps: {
+        label: 'Cancel',
+        severity: 'secondary',
+        variant: 'text',
+        size: 'small'
+      },
+      acceptProps: {
+        label: 'Suspend',
+        severity: 'primary',
+        size: 'small'
+      },
+      accept: executeToggle
+    })
+  } else {
+    void executeToggle()
+  }
 }
 
 // Live Raw YAML & JSON Fetching
@@ -312,6 +407,33 @@ const copyYaml = async () => {
     @update:visible="emit('update:visible', $event)"
   >
     <template #actions>
+      <template v-if="workloadKind === KUBERNETES_RESOURCE_KIND.CronJob">
+        <Button
+          severity="secondary"
+          size="small"
+          variant="outlined"
+          class="text-xs flex items-center gap-1.5"
+          v-tooltip="'Trigger Now'"
+          @click="triggerCronJobNow"
+        >
+          <Play class="w-3.5 h-3.5" />
+          <span>Trigger</span>
+        </Button>
+
+        <Button
+          severity="secondary"
+          size="small"
+          variant="outlined"
+          class="text-xs flex items-center gap-1.5"
+          :v-tooltip="cronJobActionConfig.suspendLabel"
+          @click="toggleCronJobSuspend"
+        >
+          <Pause v-if="!suspend" class="w-3.5 h-3.5" />
+          <Play v-else class="w-3.5 h-3.5" />
+          <span>{{ cronJobActionConfig.suspendLabel }}</span>
+        </Button>
+      </template>
+
       <Button
         severity="secondary"
         size="small"

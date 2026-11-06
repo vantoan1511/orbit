@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import {
   resolveEditTargetParams,
   resolveDeleteTargetParams,
-  resolveNodeActionConfig
+  resolveNodeActionConfig,
+  resolveCronJobActionConfig
 } from '../workloadActions.ts'
 
 test('resolveEditTargetParams uses row.kind when available on row object', () => {
@@ -96,4 +97,24 @@ test('resolveNodeActionConfig returns correct label and confirmation config for 
   assert.equal(cordoned.cordonLabel, 'Uncordon')
   assert.equal(cordoned.cordonIcon, 'pi pi-check-circle')
   assert.equal(cordoned.needsConfirmation, false)
+})
+
+test('resolveCronJobActionConfig returns Suspend config when isSuspended is false', () => {
+  const config = resolveCronJobActionConfig(false)
+  assert.deepEqual(config, {
+    suspendLabel: 'Suspend',
+    suspendIcon: 'pi pi-pause',
+    targetSuspend: true,
+    needsConfirmation: true
+  })
+})
+
+test('resolveCronJobActionConfig returns Resume config when isSuspended is true', () => {
+  const config = resolveCronJobActionConfig(true)
+  assert.deepEqual(config, {
+    suspendLabel: 'Resume',
+    suspendIcon: 'pi pi-play',
+    targetSuspend: false,
+    needsConfirmation: false
+  })
 })

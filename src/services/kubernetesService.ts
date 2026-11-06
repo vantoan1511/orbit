@@ -306,6 +306,18 @@ export const kubernetesService = {
     await coreEngine.dispatch('rollbackDeployment', params)
   },
 
+  async triggerCronJob(params: { namespace: string; name: string }): Promise<void> {
+    await coreEngine.dispatch('triggerCronJob', params)
+  },
+
+  async setCronJobSuspend(params: {
+    namespace: string
+    name: string
+    suspend: boolean
+  }): Promise<void> {
+    await coreEngine.dispatch('setCronJobSuspend', params)
+  },
+
   async startPortForward(params: {
     namespace: string
     kind: string

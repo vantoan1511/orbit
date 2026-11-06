@@ -4,6 +4,7 @@ use kube::{
 };
 use k8s_openapi::api::core::v1::Pod;
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
+use k8s_openapi::api::batch::v1::{CronJob, Job};
 use crate::kubernetes::{models, format_age};
 
 pub fn map_pod(p: &Pod) -> models::PodInfo {
@@ -757,6 +758,139 @@ pub async fn rollback_deployment(
     Ok(())
 }
 
+pub const CRONJOB_INSTANTIATE_ANNOTATION: &str = "cronjob.kubernetes.io/instantiate";
+
+pub fn build_cronjob_suspend_patch(suspend: bool) -> serde_json::Value {
+    serde_json::json!({
+        "spec": {
+            "suspend": suspend
+        }
+    })
+}
+
+pub fn format_manual_job_name(cronjob_name: &str, suffix: &str) -> String {
+    let suffix_len = suffix.len() + "-manual-".len(); // e.g. 8 for 3-char suffix or 13 for 5-char suffix
+    let max_base_len = 63usize.saturating_sub(suffix_len);
+    let mut base = cronjob_name;
+    if base.len() > max_base_len {
+        base = &base[..max_base_len];
+    }
+    let trimmed = base.trim_end_matches('-');
+    format!("{}-manual-{}", trimmed, suffix)
+}
+
+pub fn build_job_from_cronjob(
+    cronjob: &CronJob,
+    job_name: String,
+) -> Result<Job, String> {
+    let spec = cronjob
+        .spec
+        .as_ref()
+        .ok_or_else(|| "CronJob has no spec".to_string())?;
+
+    let job_template = &spec.job_template;
+    let job_spec = job_template
+        .spec
+        .clone()
+        .ok_or_else(|| "CronJob jobTemplate has no spec".to_string())?;
+
+    let mut annotations = job_template
+        .metadata
+        .as_ref()
+        .and_then(|m| m.annotations.clone())
+        .unwrap_or_default();
+    annotations.insert(CRONJOB_INSTANTIATE_ANNOTATION.to_string(), "manual".to_string());
+
+    let labels = job_template
+        .metadata
+        .as_ref()
+        .and_then(|m| m.labels.clone());
+
+    let cronjob_name = cronjob
+        .metadata
+        .name
+        .clone()
+        .unwrap_or_default();
+    let cronjob_uid = cronjob
+        .metadata
+        .uid
+        .clone()
+        .unwrap_or_default();
+
+    let owner_references = if !cronjob_name.is_empty() && !cronjob_uid.is_empty() {
+        Some(vec![k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference {
+            api_version: "batch/v1".to_string(),
+            kind: "CronJob".to_string(),
+            name: cronjob_name,
+            uid: cronjob_uid,
+            controller: Some(true),
+            block_owner_deletion: Some(true),
+        }])
+    } else {
+        None
+    };
+
+    let namespace = cronjob.metadata.namespace.clone();
+
+    Ok(Job {
+        metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+            name: Some(job_name),
+            namespace,
+            labels,
+            annotations: Some(annotations),
+            owner_references,
+            ..Default::default()
+        },
+        spec: Some(job_spec),
+        status: None,
+    })
+}
+
+pub async fn trigger_cronjob(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+) -> Result<String, kube::Error> {
+    tracing::info!(namespace = %namespace, name = %name, "Triggering CronJob manually");
+    let cj_api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
+    let cronjob = cj_api.get(name).await?;
+
+    let random_suffix = uuid::Uuid::new_v4().to_string().replace('-', "")[..5].to_lowercase();
+    let job_name = format_manual_job_name(name, &random_suffix);
+
+    let job = build_job_from_cronjob(&cronjob, job_name.clone()).map_err(|e| {
+        kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: e,
+            reason: "Invalid".to_string(),
+            code: 400,
+        })
+    })?;
+
+    let job_api: Api<Job> = Api::namespaced(client.clone(), namespace);
+    let post_params = PostParams::default();
+    job_api.create(&post_params, &job).await?;
+    tracing::info!(namespace = %namespace, name = %name, job_name = %job_name, "Successfully created manual Job from CronJob");
+
+    Ok(job_name)
+}
+
+pub async fn set_cronjob_suspend(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+    suspend: bool,
+) -> Result<(), kube::Error> {
+    tracing::info!(namespace = %namespace, name = %name, suspend = %suspend, "Setting CronJob suspend state");
+    let cj_api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
+    let patch = build_cronjob_suspend_patch(suspend);
+    let patch_params = PatchParams::default();
+    cj_api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+    tracing::info!(namespace = %namespace, name = %name, suspend = %suspend, "Successfully updated CronJob suspend state");
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1109,6 +1243,93 @@ mod tests {
         let mapped = map_replicaset(&rs);
         assert_eq!(mapped.name, "frontend-rs");
         assert_eq!(mapped.kind, "ReplicaSet");
+    }
+
+    #[test]
+    fn test_build_cronjob_suspend_patch() {
+        let p_true = build_cronjob_suspend_patch(true);
+        assert_eq!(p_true, serde_json::json!({"spec": {"suspend": true}}));
+
+        let p_false = build_cronjob_suspend_patch(false);
+        assert_eq!(p_false, serde_json::json!({"spec": {"suspend": false}}));
+    }
+
+    #[test]
+    fn test_format_manual_job_name_truncates_to_63_chars() {
+        let name = format_manual_job_name("nightly-db-backup", "abc12");
+        assert_eq!(name, "nightly-db-backup-manual-abc12");
+
+        let long_cj_name = "a".repeat(60);
+        let long_job = format_manual_job_name(&long_cj_name, "abc12");
+        assert!(long_job.len() <= 63);
+        assert!(long_job.ends_with("-manual-abc12"));
+        assert!(!long_job.contains("--"));
+    }
+
+    #[test]
+    fn test_build_job_from_cronjob_copies_spec_metadata_and_owner_ref() {
+        use k8s_openapi::api::batch::v1::{CronJobSpec, JobSpec, JobTemplateSpec};
+        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+
+        let mut cj_labels = BTreeMap::new();
+        cj_labels.insert("app".to_string(), "backup".to_string());
+
+        let mut job_labels = BTreeMap::new();
+        job_labels.insert("tier".to_string(), "batch".to_string());
+
+        let cronjob = CronJob {
+            metadata: ObjectMeta {
+                name: Some("nightly-backup".to_string()),
+                namespace: Some("default".to_string()),
+                uid: Some("cj-uid-1".to_string()),
+                labels: Some(cj_labels),
+                ..Default::default()
+            },
+            spec: Some(CronJobSpec {
+                schedule: "0 0 * * *".to_string(),
+                job_template: JobTemplateSpec {
+                    metadata: Some(ObjectMeta {
+                        labels: Some(job_labels.clone()),
+                        ..Default::default()
+                    }),
+                    spec: Some(JobSpec {
+                        template: PodTemplateSpec {
+                            spec: Some(PodSpec {
+                                containers: vec![Container {
+                                    name: "worker".to_string(),
+                                    image: Some("alpine:latest".to_string()),
+                                    ..Default::default()
+                                }],
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }),
+                },
+                ..Default::default()
+            }),
+            status: None,
+        };
+
+        let job = build_job_from_cronjob(&cronjob, "nightly-backup-manual-123".to_string())
+            .expect("Should build job");
+
+        assert_eq!(job.metadata.name.as_deref(), Some("nightly-backup-manual-123"));
+        assert_eq!(job.metadata.namespace.as_deref(), Some("default"));
+        let annotations = job.metadata.annotations.unwrap();
+        assert_eq!(
+            annotations.get(CRONJOB_INSTANTIATE_ANNOTATION).map(|s| s.as_str()),
+            Some("manual")
+        );
+        let owners = job.metadata.owner_references.unwrap();
+        assert_eq!(owners.len(), 1);
+        assert_eq!(owners[0].kind, "CronJob");
+        assert_eq!(owners[0].name, "nightly-backup");
+        assert_eq!(owners[0].uid, "cj-uid-1");
+        assert_eq!(owners[0].controller, Some(true));
+        assert_eq!(job.metadata.labels.unwrap(), job_labels);
+        assert!(job.spec.is_some());
     }
 }
 

@@ -76,6 +76,8 @@ pub fn dispatch(
         "cloneIngress" => network::clone_ingress(data, writer, token, manager),
         "cloneDeployment" => workloads::clone_deployment(data, writer, token, manager),
         "rollbackDeployment" => workloads::rollback_deployment(data, writer, token, manager),
+        "triggerCronJob" => workloads::trigger_cronjob(data, writer, token, manager),
+        "setCronJobSuspend" => workloads::set_cronjob_suspend(data, writer, token, manager),
         "startPortForward" => network::start_port_forward(data, writer, token, manager),
         "stopPortForward" => network::stop_port_forward(data, writer, token, manager),
         "getPortForwards" => network::get_port_forwards(writer, token, manager),
