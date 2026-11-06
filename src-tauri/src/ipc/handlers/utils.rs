@@ -13,6 +13,12 @@ pub fn get_i64(data: &Option<Value>, key: &str) -> Option<i64> {
         .and_then(|v| v.as_i64())
 }
 
+pub fn get_bool(data: &Option<Value>, key: &str) -> Option<bool> {
+    data.as_ref()
+        .and_then(|d| d.get(key))
+        .and_then(|v| v.as_bool())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -42,5 +48,22 @@ mod tests {
         assert_eq!(get_i64(&data, "text"), None);
         assert_eq!(get_i64(&data, "nonexistent"), None);
         assert_eq!(get_i64(&None, "count"), None);
+    }
+
+    #[test]
+    fn test_get_bool() {
+        let data = Some(json!({
+            "is_active": true,
+            "is_suspended": false,
+            "text": "true",
+            "number": 1
+        }));
+
+        assert_eq!(get_bool(&data, "is_active"), Some(true));
+        assert_eq!(get_bool(&data, "is_suspended"), Some(false));
+        assert_eq!(get_bool(&data, "text"), None);
+        assert_eq!(get_bool(&data, "number"), None);
+        assert_eq!(get_bool(&data, "nonexistent"), None);
+        assert_eq!(get_bool(&None, "is_active"), None);
     }
 }

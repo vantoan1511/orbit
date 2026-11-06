@@ -55,3 +55,19 @@ export function resolveNodeActionConfig(isCordoned: boolean): NodeActionConfig {
     needsConfirmation: !isCordoned
   }
 }
+
+export interface CronJobActionConfig {
+  suspendLabel: 'Suspend' | 'Resume'
+  suspendIcon: string
+  targetSuspend: boolean
+  needsConfirmation: boolean
+}
+
+export function resolveCronJobActionConfig(isSuspended: boolean): CronJobActionConfig {
+  return {
+    suspendLabel: isSuspended ? 'Resume' : 'Suspend',
+    suspendIcon: isSuspended ? 'pi pi-play' : 'pi pi-pause',
+    targetSuspend: !isSuspended,
+    needsConfirmation: !isSuspended
+  }
+}

@@ -212,6 +212,83 @@ export function useWorkloadBulkActions<T extends { name?: string; namespace?: st
       })
     }
 
+    // CronJob Bulk Actions (Suspend, Resume)
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.CronJob) {
+      items.push({
+        label: 'Suspend',
+        icon: 'pi pi-pause',
+        severity: 'warn',
+        variant: 'text',
+        command: () => {
+          confirmAction(
+            `Are you sure you want to suspend ${count} selected CronJob(s)?`,
+            'Confirm Bulk Suspend',
+            'Suspend All',
+            async () => {
+              let successCount = 0
+              let failCount = 0
+              await Promise.allSettled(
+                selectedItems.value.map(async (row) => {
+                  try {
+                    await kubernetesService.setCronJobSuspend({
+                      namespace: row.namespace || 'default',
+                      name: row.name || '',
+                      suspend: true
+                    })
+                    successCount++
+                  } catch {
+                    failCount++
+                  }
+                })
+              )
+              toast.add({
+                severity: failCount === 0 ? 'success' : 'warn',
+                summary: 'Bulk Suspend',
+                detail: `Suspended ${successCount} CronJob(s)${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+                life: 5000
+              })
+              options.clearSelection?.()
+            },
+            'primary'
+          )
+        }
+      })
+
+      items.push({
+        label: 'Resume',
+        icon: 'pi pi-play',
+        severity: 'success',
+        variant: 'text',
+        command: () => {
+          void (async () => {
+            let successCount = 0
+            let failCount = 0
+            await Promise.allSettled(
+              selectedItems.value.map(async (row) => {
+                try {
+                  await kubernetesService.setCronJobSuspend({
+                    namespace: row.namespace || 'default',
+                    name: row.name || '',
+                    suspend: false
+                  })
+                  successCount++
+                } catch {
+                  failCount++
+                }
+              })
+            )
+            toast.add({
+              severity: failCount === 0 ? 'success' : 'warn',
+              summary: 'Bulk Resume',
+              detail: `Resumed ${successCount} CronJob(s)${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+              life: 5000
+            })
+            options.clearSelection?.()
+          })()
+        }
+      })
+    }
+
     // Delete / Terminate
     if (resourceKind !== KUBERNETES_RESOURCE_KIND.Event) {
       const deleteLabel = resourceKind === KUBERNETES_RESOURCE_KIND.Pod ? 'Terminate' : 'Delete'

@@ -17,7 +17,8 @@ import { getAvailablePorts } from '@/utils/portForward'
 import {
   resolveDeleteTargetParams,
   resolveEditTargetParams,
-  resolveNodeActionConfig
+  resolveNodeActionConfig,
+  resolveCronJobActionConfig
 } from '@/utils/workloadActions'
 
 export { getAvailablePorts }
@@ -546,6 +547,88 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
             },
             'danger'
           )
+        }
+      })
+    }
+
+    // CronJob Specific Actions (Trigger Now, Suspend / Resume)
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.CronJob) {
+      items.push({
+        label: 'Trigger Now',
+        icon: 'pi pi-play',
+        command: async () => {
+          const row = selectedActionRow.value
+          if (!row) return
+          try {
+            await kubernetesService.triggerCronJob({
+              namespace: row.namespace || 'default',
+              name: row.name
+            })
+            toast.add({
+              severity: 'success',
+              summary: 'Job Triggered',
+              detail: `Triggered manual execution for ${row.name}`,
+              life: 3000
+            })
+          } catch (e) {
+            toast.add({
+              severity: 'error',
+              summary: 'Error',
+              detail: e instanceof Error ? e.message : 'Failed to trigger CronJob',
+              life: 5000
+            })
+          }
+        }
+      })
+
+      const row = selectedActionRow.value as (T & { suspend?: boolean }) | null
+      const isSuspended = Boolean(row?.suspend)
+      const actionConfig = resolveCronJobActionConfig(isSuspended)
+
+      items.push({
+        label: actionConfig.suspendLabel,
+        icon: actionConfig.suspendIcon,
+        command: () => {
+          const currentRow = selectedActionRow.value as (T & { suspend?: boolean }) | null
+          if (!currentRow) return
+
+          const executeToggle = async () => {
+            try {
+              await kubernetesService.setCronJobSuspend({
+                namespace: currentRow.namespace || 'default',
+                name: currentRow.name,
+                suspend: actionConfig.targetSuspend
+              })
+              toast.add({
+                severity: 'info',
+                summary: actionConfig.targetSuspend ? 'CronJob Suspended' : 'CronJob Resumed',
+                detail: `${currentRow.name} ${actionConfig.targetSuspend ? 'suspended' : 'resumed'}`,
+                life: 3000
+              })
+            } catch (e) {
+              toast.add({
+                severity: 'error',
+                summary: 'Error',
+                detail:
+                  e instanceof Error
+                    ? e.message
+                    : `Failed to ${actionConfig.suspendLabel.toLowerCase()} CronJob`,
+                life: 5000
+              })
+            }
+          }
+
+          if (actionConfig.needsConfirmation) {
+            confirmAction(
+              `Are you sure you want to suspend CronJob "${currentRow.name}"? Scheduled runs will be paused.`,
+              'Confirm Suspend CronJob',
+              'Suspend',
+              executeToggle,
+              'primary'
+            )
+          } else {
+            void executeToggle()
+          }
         }
       })
     }

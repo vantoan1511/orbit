@@ -25,6 +25,7 @@ import StatefulSetEditForm from '@/components/workloads/StatefulSetEditForm.vue'
 import PodEditForm from '@/components/workloads/PodEditForm.vue'
 import ReplicaSetEditForm from '@/components/workloads/ReplicaSetEditForm.vue'
 import JobEditForm from '@/components/workloads/JobEditForm.vue'
+import CronJobEditForm from '@/components/workloads/CronJobEditForm.vue'
 import NamespaceEditForm from '@/components/namespaces/NamespaceEditForm.vue'
 import PersistentVolumeEditForm from '@/components/storage/PersistentVolumeEditForm.vue'
 import PersistentVolumeClaimEditForm from '@/components/storage/PersistentVolumeClaimEditForm.vue'
@@ -80,6 +81,7 @@ const formComponentMap: Record<string, Component> = {
   [KUBERNETES_RESOURCE_KIND.StatefulSet]: StatefulSetEditForm,
   [KUBERNETES_RESOURCE_KIND.ReplicaSet]: ReplicaSetEditForm,
   [KUBERNETES_RESOURCE_KIND.Job]: JobEditForm,
+  [KUBERNETES_RESOURCE_KIND.CronJob]: CronJobEditForm,
   [KUBERNETES_RESOURCE_KIND.Pod]: PodEditForm,
   [KUBERNETES_RESOURCE_KIND.Ingress]: IngressEditForm,
   [KUBERNETES_RESOURCE_KIND.Service]: ServiceEditForm,

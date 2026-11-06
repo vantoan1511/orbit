@@ -5,7 +5,7 @@ use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes;
 use crate::kubernetes::manager::KubeManager;
-use super::utils::{get_i64, get_string};
+use super::utils::{get_bool, get_i64, get_string};
 
 pub fn get_pods(
     data: Option<Value>,
@@ -652,4 +652,208 @@ pub fn clone_deployment(
             }
         }
     });
+}
+
+pub fn trigger_cronjob(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+        let name = get_string(&data, "name").unwrap_or_default();
+
+        if name.trim().is_empty() {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "CronJob name is required to trigger manually".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        tracing::info!(
+            event = "triggerCronJob",
+            namespace = %namespace,
+            name = %name,
+            "Kubernetes operation started"
+        );
+
+        let client = {
+            let r_manager = manager.read().await;
+            r_manager.active_client.clone()
+        };
+
+        if let Some(ref client) = client {
+            match crate::kubernetes::workloads::trigger_cronjob(client, &namespace, &name).await {
+                Ok(job_name) => {
+                    tracing::info!(
+                        event = "triggerCronJob",
+                        namespace = %namespace,
+                        name = %name,
+                        job_name = %job_name,
+                        "Kubernetes operation completed"
+                    );
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::CommandSucceeded {
+                            message: format!("Created Job {} from CronJob {}", job_name, name),
+                        },
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        event = "triggerCronJob",
+                        namespace = %namespace,
+                        name = %name,
+                        error = %e,
+                        "Kubernetes operation failed"
+                    );
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: format!("Failed to trigger CronJob: {}", crate::kubernetes::format_error(&e)),
+                        },
+                    )
+                    .await;
+                }
+            }
+        }
+    });
+}
+
+pub fn set_cronjob_suspend(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+        let name = get_string(&data, "name").unwrap_or_default();
+        let suspend = get_bool(&data, "suspend").unwrap_or(true);
+
+        if name.trim().is_empty() {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "CronJob name is required to update suspend state".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        let action_verb = if suspend { "suspend" } else { "resume" };
+        tracing::info!(
+            event = "setCronJobSuspend",
+            namespace = %namespace,
+            name = %name,
+            suspend = %suspend,
+            "Kubernetes operation started"
+        );
+
+        let client = {
+            let r_manager = manager.read().await;
+            r_manager.active_client.clone()
+        };
+
+        if let Some(ref client) = client {
+            match crate::kubernetes::workloads::set_cronjob_suspend(client, &namespace, &name, suspend).await {
+                Ok(()) => {
+                    tracing::info!(
+                        event = "setCronJobSuspend",
+                        namespace = %namespace,
+                        name = %name,
+                        suspend = %suspend,
+                        "Kubernetes operation completed"
+                    );
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::CommandSucceeded {
+                            message: format!("Successfully {}ed CronJob {}", action_verb, name),
+                        },
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        event = "setCronJobSuspend",
+                        namespace = %namespace,
+                        name = %name,
+                        suspend = %suspend,
+                        error = %e,
+                        "Kubernetes operation failed"
+                    );
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: format!("Failed to {} CronJob: {}", action_verb, crate::kubernetes::format_error(&e)),
+                        },
+                    )
+                    .await;
+                }
+            }
+        }
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ipc::emitter::{set_global_emitter, MockEventEmitter};
+
+    #[tokio::test]
+    async fn test_trigger_cronjob_empty_name_emits_error() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+
+        trigger_cronjob(
+            Some(serde_json::json!({ "name": "", "namespace": "default" })),
+            writer,
+            "token".to_string(),
+            manager,
+        );
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let emitted = mock_emitter.get_emitted_events().await;
+        let err_event = emitted.iter().find(|(name, _)| name == "errorOccurred");
+        assert!(err_event.is_some(), "Expected errorOccurred event when name is empty");
+    }
+
+    #[tokio::test]
+    async fn test_set_cronjob_suspend_empty_name_emits_error() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+
+        set_cronjob_suspend(
+            Some(serde_json::json!({ "name": "", "namespace": "default", "suspend": true })),
+            writer,
+            "token".to_string(),
+            manager,
+        );
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let emitted = mock_emitter.get_emitted_events().await;
+        let err_event = emitted.iter().find(|(name, _)| name == "errorOccurred");
+        assert!(err_event.is_some(), "Expected errorOccurred event when name is empty");
+    }
 }
