@@ -1,6 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveEditTargetParams } from '../workloadActions.ts'
+import {
+  resolveEditTargetParams,
+  resolveDeleteTargetParams,
+  resolveNodeActionConfig
+} from '../workloadActions.ts'
 
 test('resolveEditTargetParams uses row.kind when available on row object', () => {
   const row = {
@@ -69,4 +73,27 @@ test('resolveEditTargetParams resolves PSA row to underlying Namespace manifest 
     namespace: 'default',
     name: 'production'
   })
+})
+
+test('resolveDeleteTargetParams suppresses delete action for Node kind', () => {
+  const row = {
+    name: 'node-1',
+    kind: 'Node'
+  }
+  const params = resolveDeleteTargetParams(row, 'Node')
+  assert.equal(params.isSuppressed, true)
+  assert.equal(params.kind, 'Node')
+  assert.equal(params.name, 'node-1')
+})
+
+test('resolveNodeActionConfig returns correct label and confirmation config for cordoned vs uncordoned nodes', () => {
+  const uncordoned = resolveNodeActionConfig(false)
+  assert.equal(uncordoned.cordonLabel, 'Cordon')
+  assert.equal(uncordoned.cordonIcon, 'pi pi-ban')
+  assert.equal(uncordoned.needsConfirmation, true)
+
+  const cordoned = resolveNodeActionConfig(true)
+  assert.equal(cordoned.cordonLabel, 'Uncordon')
+  assert.equal(cordoned.cordonIcon, 'pi pi-check-circle')
+  assert.equal(cordoned.needsConfirmation, false)
 })

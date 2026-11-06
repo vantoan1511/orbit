@@ -40,6 +40,7 @@ import {
   keyNamespaced,
   keyService,
   MAX_EVENTS_RETAINED,
+  mergeNodeWatchUpdate,
   resourcesEqual,
   updateResourceBatch,
   type ResourceKeyExtractor
@@ -48,6 +49,7 @@ import { createFrameBatcher, type FrameBatcher } from './frameBatcher.ts'
 
 export {
   MAX_EVENTS_RETAINED,
+  mergeNodeWatchUpdate,
   type ResourceKeyExtractor,
   keyNamespaced,
   keyByName,
@@ -689,7 +691,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       updateResourceBatch(
         nodes,
         updates as Array<{ action: KubernetesAction; data: NodeInfo }>,
-        keyByName
+        keyByName,
+        mergeNodeWatchUpdate
       ),
     [KUBERNETES_RESOURCE_KIND.PersistentVolume]: (updates) =>
       updateResourceBatch(

@@ -1,5 +1,5 @@
 import { KUBERNETES_ACTION } from '../constants/kubernetes.ts'
-import type { KubernetesAction, ServiceInfo } from '../types/kubernetes.ts'
+import type { KubernetesAction, NodeInfo, ServiceInfo } from '../types/kubernetes.ts'
 import type { ShallowRef } from 'vue'
 
 export const MAX_EVENTS_RETAINED = 1000
@@ -15,6 +15,40 @@ export const keyByUid: ResourceKeyExtractor<{ uid?: string }> = (item) => item.u
 
 export const keyService: ResourceKeyExtractor<ServiceInfo> = (item) =>
   item.uid || `${item.namespace ?? ''}/${item.name ?? ''}`
+
+/**
+ * Merges a single Node watch update with the existing Node record.
+ * Preserves CPU, memory, and pod metric counts when the incoming watch payload
+ * has zero/empty metrics (since watch events come from kube-apiserver without metrics server data).
+ */
+export function mergeNodeWatchUpdate(existing: NodeInfo, incoming: NodeInfo): NodeInfo {
+  const hasIncomingMetrics =
+    Boolean(incoming.cpuPct && incoming.cpuPct > 0) ||
+    Boolean(incoming.cpuUsed && incoming.cpuUsed !== '0' && incoming.cpuUsed !== '0.00') ||
+    Boolean(incoming.memPct && incoming.memPct > 0) ||
+    Boolean(incoming.memUsed && incoming.memUsed !== '0' && incoming.memUsed !== '0.00') ||
+    Boolean(incoming.podsCount && incoming.podsCount > 0)
+
+  if (
+    !hasIncomingMetrics &&
+    (existing.cpuPct ||
+      existing.cpuUsed ||
+      existing.memPct ||
+      existing.memUsed ||
+      existing.podsCount)
+  ) {
+    return {
+      ...incoming,
+      cpuPct: existing.cpuPct,
+      cpuUsed: existing.cpuUsed,
+      memPct: existing.memPct,
+      memUsed: existing.memUsed,
+      podsCount: existing.podsCount
+    }
+  }
+
+  return incoming
+}
 
 /**
  * Structural equality for plain JSON resource payloads.
