@@ -8,15 +8,18 @@ export interface UseDeferredMountOptions {
 }
 
 export interface UseDeferredMountReturn {
-  /** False on initial synchronous mount frame; flips to true on next animation frame */
+  /** False on initial synchronous mount frame; flips to true after second animation frame */
   isHydrated: Ref<boolean>
 }
 
 /**
  * Returns a reactive `isHydrated` ref that is synchronously `false` when called,
- * deferring the true state to the next animation frame.
- * This allows heavy data tables and child components to yield the initial paint frame to
- * lightweight skeleton loaders and instant tab bar updates.
+ * deferring the true state across two animation frames.
+ *
+ * Browsers execute `requestAnimationFrame` callbacks before the next paint. Scheduling
+ * through two consecutive animation frames guarantees that the browser paints at least
+ * one frame containing the skeleton loader and tab chrome before heavy data table
+ * rows and DOM elements mount.
  */
 export function useDeferredMount(options?: UseDeferredMountOptions): UseDeferredMountReturn {
   const isHydrated = ref(false)
@@ -40,13 +43,22 @@ export function useDeferredMount(options?: UseDeferredMountOptions): UseDeferred
       }
     })
 
-  const handle = schedule(() => {
-    isHydrated.value = true
+  let pending: unknown = null
+  let disposed = false
+
+  pending = schedule(() => {
+    if (disposed) return
+    pending = schedule(() => {
+      if (!disposed) {
+        isHydrated.value = true
+      }
+    })
   })
 
   if (getCurrentScope()) {
     onScopeDispose(() => {
-      cancel(handle)
+      disposed = true
+      cancel(pending)
     })
   }
 
