@@ -450,8 +450,15 @@ test('tabsStore.closeTabAndResolveRoute resolves route for active tab, last tab,
   assert.equal(store.tabs.length, 1)
   assert.equal(store.activeTabId, tab1.id)
 
-  // 2. Closing last remaining active tab returns fallback ('/' by default or custom)
-  const nextRoute2 = store.closeTabAndResolveRoute(tab1.id, '/custom-fallback')
+  // 2. Closing last remaining active tab returns fallback (null by default or custom fallback)
+  const nextRouteDefault = store.closeTabAndResolveRoute(tab1.id)
+  assert.equal(nextRouteDefault, null)
+  assert.equal(store.tabs.length, 0)
+  assert.equal(store.activeTabId, null)
+
+  const customTab = store.openTab({ route: '/custom-tab', title: 'Custom' })
+  assert.equal(store.activeTabId, customTab.id)
+  const nextRoute2 = store.closeTabAndResolveRoute(customTab.id, '/custom-fallback')
   assert.equal(nextRoute2, '/custom-fallback')
   assert.equal(store.tabs.length, 0)
   assert.equal(store.activeTabId, null)

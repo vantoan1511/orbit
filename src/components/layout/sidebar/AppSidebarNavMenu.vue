@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTabsStore } from '@/stores/tabsStore'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { categoryNavItems, type AppSidebarMenuItem, type CategoryId } from './navigation'
@@ -10,6 +11,7 @@ const props = defineProps<{
 }>()
 
 const k8sStore = useKubernetesStore()
+const tabsStore = useTabsStore()
 const route = useRoute()
 
 const flatItems = computed<AppSidebarMenuItem[]>(() => {
@@ -18,6 +20,7 @@ const flatItems = computed<AppSidebarMenuItem[]>(() => {
 })
 
 const isLinkActive = (linkPath: string) => {
+  if (tabsStore.tabs.length === 0) return false
   if (linkPath.includes('?')) {
     const [path, queryStr] = linkPath.split('?')
     if (route.path !== path || !queryStr) return false

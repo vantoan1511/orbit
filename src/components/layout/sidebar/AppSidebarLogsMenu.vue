@@ -2,6 +2,7 @@
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useLogsStore, type RecentLogInfo } from '@/stores/logsStore'
+import { useTabsStore } from '@/stores/tabsStore'
 import { highlightMatch } from '@/utils/text'
 import { Box, ChevronDown, ChevronRight, Clock, Folder, Trash2 } from '@lucide/vue'
 import Accordion from 'primevue/accordion'
@@ -15,6 +16,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 const k8sStore = useKubernetesStore()
 const logsStore = useLogsStore()
+const tabsStore = useTabsStore()
 const route = useRoute()
 const router = useRouter()
 
@@ -191,6 +193,7 @@ const getWorkloadColorClass = (kind: string) => {
 }
 
 const isCurrentLogActive = (ns: string, workload: string, kind?: string) => {
+  if (tabsStore.tabs.length === 0) return false
   if (route.path !== '/logs') return false
   const qNs = route.query.namespace as string
   const qWorkload = route.query.workload as string
@@ -203,7 +206,7 @@ const isCurrentLogActive = (ns: string, workload: string, kind?: string) => {
 }
 
 const selectLogTarget = (ns: string, workload: string, kind: string) => {
-  router.push({
+  void router.push({
     path: '/logs',
     query: {
       namespace: ns,
@@ -216,7 +219,7 @@ const selectLogTarget = (ns: string, workload: string, kind: string) => {
 }
 
 const selectRecentLog = (log: RecentLogInfo) => {
-  router.push({
+  void router.push({
     path: '/logs',
     query: {
       namespace: log.namespace,

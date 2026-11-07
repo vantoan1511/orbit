@@ -3,8 +3,10 @@ import { getThemeModeTooltip, useAppearance } from '@/composables/useAppearance'
 import { os } from '@/services/nativeService'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
+import { useTabsStore } from '@/stores/tabsStore'
 import { Bell, Laptop, Moon, Settings, Sun, User } from '@lucide/vue'
 import { Button } from 'primevue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { GitHubIcon } from 'vue3-simple-icons'
 import { categories, type CategoryId, type SidebarCategory } from './navigation'
@@ -31,9 +33,16 @@ const isCategoryDisabled = (cat: SidebarCategory): boolean => {
 
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
+const tabsStore = useTabsStore()
 const route = useRoute()
 const router = useRouter()
 const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
+
+const isSettingsActive = computed(() => {
+  if (route.path !== '/settings') return false
+  if (props.hasActiveCluster && tabsStore.tabs.length === 0) return false
+  return true
+})
 </script>
 
 <template>
@@ -86,7 +95,7 @@ const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
         severity="secondary"
         :class="[
           'w-10 h-10',
-          route.path === '/settings'
+          isSettingsActive
             ? 'bg-(--bg-active) text-(--text-primary)'
             : 'text-muted-color hover:bg-(--bg-hover)'
         ]"

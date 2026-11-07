@@ -61,22 +61,26 @@ function resolveViewComponent(Component: unknown, currentRoute: typeof route) {
 }
 
 // Synchronize current route with tabsStore
+function syncRouteWithTabs(newPath: string, newQuery?: Record<string, string>) {
+  if (!isSwitchingCluster.value && k8sStore.activeClusterId !== null && newPath !== '/welcome') {
+    const meta = getTabMetadataForRoute(newPath, newQuery)
+    tabsStore.syncWithRoute(newPath, newQuery, meta.title, meta.iconName, meta.category)
+  }
+}
+
 watch(
   () => [route.path, route.query],
   ([newPath, newQuery]) => {
-    if (!isSwitchingCluster.value && k8sStore.activeClusterId !== null && newPath !== '/welcome') {
-      const meta = getTabMetadataForRoute(newPath as string, newQuery as Record<string, string>)
-      tabsStore.syncWithRoute(
-        newPath as string,
-        newQuery as Record<string, string>,
-        meta.title,
-        meta.iconName,
-        meta.category
-      )
-    }
+    syncRouteWithTabs(newPath as string, newQuery as Record<string, string>)
   },
   { immediate: true }
 )
+
+const unregisterAfterEach = router.afterEach((to) => {
+  if (tabsStore.tabs.length === 0) {
+    syncRouteWithTabs(to.path, to.query as Record<string, string>)
+  }
+})
 
 // Rehydrate tabs on active cluster change
 watch(
@@ -195,9 +199,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   // 6. Open Settings
   if (shortcutStore.matchesAction(e, 'openSettings')) {
     e.preventDefault()
-    if (route.path !== '/settings') {
-      void router.push('/settings')
-    }
+    void router.push('/settings')
     return
   }
 }
@@ -207,6 +209,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unregisterAfterEach()
   window.removeEventListener('keydown', handleKeyDown)
 })
 </script>
@@ -239,7 +242,7 @@ onUnmounted(() => {
               <div :class="getLayoutContentPaddingClass(currentLayoutMeta)">
                 <template v-if="k8sStore.activeClusterId !== null || route.path === '/settings'">
                   <EmptyWorkspaceView
-                    v-if="tabsStore.tabs.length === 0 && route.path !== '/settings'"
+                    v-if="k8sStore.activeClusterId !== null && tabsStore.tabs.length === 0"
                     @open-picker="handleOpenEmptyPicker"
                   />
                   <OfflineClusterView
