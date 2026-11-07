@@ -32,7 +32,7 @@ import Button from 'primevue/button'
 import Column from 'primevue/column'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
 import { getResourceCompositeKey, type IdentifiableResource } from '@/utils/resourceKey'
-import { computed, ref, toRef, watch } from 'vue'
+import { computed, onMounted, ref, toRef, watch } from 'vue'
 
 const selection = defineModel<T[]>('selection', { default: () => [] })
 
@@ -92,6 +92,21 @@ const emit = defineEmits<{
 
 const k8sStore = useKubernetesStore()
 const filterStore = useTableFilterStore()
+
+onMounted(() => {
+  if (props.kind) {
+    void k8sStore.ensureKindLoaded(props.kind).catch(() => {})
+  }
+})
+
+watch(
+  () => props.kind,
+  (newKind) => {
+    if (newKind) {
+      void k8sStore.ensureKindLoaded(newKind).catch(() => {})
+    }
+  }
+)
 
 // Resource filtering (search, namespace)
 const resolvedStoreKey = (props.storeKey ?? props.kind ?? 'deployment').toLowerCase()

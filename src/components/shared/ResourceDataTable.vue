@@ -10,6 +10,7 @@ import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { type TableColumn } from '@/composables/useTableColumns'
 import { useTableScrollGuard } from '@/composables/useTableScrollGuard'
 import { useVisibleResourceKind } from '@/composables/useVisibleResourceKind'
@@ -82,6 +83,7 @@ const emit = defineEmits<{
 
 useVisibleResourceKind(() => props.resourceKind)
 const { isScrolling, onScroll } = useTableScrollGuard()
+const { isHydrated } = useDeferredMount()
 
 const rowsPerPage = ref(
   props.rowsPerPageOptions.includes(props.rows) ? props.rows : ALLOWED_ROW_OPTIONS[0]
@@ -117,6 +119,9 @@ const resolveRowKey = (row: any): string => {
 }
 
 const sortedData = computed(() => {
+  if (!isHydrated.value) {
+    return []
+  }
   const result = sortTableRowsStable(
     props.data,
     sortField.value,
@@ -391,7 +396,7 @@ const isIndeterminate = computed(() => {
       @scroll.capture.passive="onScroll"
     >
       <!-- Loading Skeleton or Data Table -->
-      <slot name="loading" v-if="shouldShowSkeleton(loading, data.length)">
+      <slot name="loading" v-if="shouldShowSkeleton(loading, data.length, isHydrated)">
         <ResourceTableSkeleton :rows="rowsPerPage" :columns="columns?.length || 6" />
       </slot>
 

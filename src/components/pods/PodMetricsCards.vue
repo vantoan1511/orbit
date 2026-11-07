@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { KUBERNETES_POD_STATUS } from '@/constants/kubernetes'
 import { AlertTriangle, Box, CheckCircle2, HelpCircle, Loader2 } from '@lucide/vue'
 import { Card } from 'primevue'
@@ -7,6 +10,7 @@ import Chart from 'primevue/chart'
 import { computed, onMounted, ref } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 
 const totalPods = computed(() => k8sStore.pods.length)
 const maxPods = computed(() => Math.max(k8sStore.nodes.length * 110, 110))
@@ -121,7 +125,13 @@ const unknownChartData = computed(() => {
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(k8sStore.podsLoading, k8sStore.pods.length, isHydrated)"
+    :cards="5"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  />
   <div
+    v-else
     data-component="pod-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
   >

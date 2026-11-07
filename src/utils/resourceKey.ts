@@ -42,8 +42,14 @@ export function getResourceCompositeKey(item: IdentifiableResource): string {
 
 /**
  * Determines whether the full table skeleton should be displayed.
- * Skeletons are only displayed on initial load when data is empty; subsequent refreshes preserve the mounted table.
+ * Returns true on the initial unhydrated frame (!isHydrated) or during initial load when data is empty.
+ * Subsequent refreshes preserve the mounted table once hydrated.
  */
-export function shouldShowSkeleton(loading: boolean, dataLength: number): boolean {
+export function shouldShowSkeleton(
+  loading: boolean,
+  dataLength: number,
+  isHydrated = true
+): boolean {
+  if (!isHydrated) return true
   return Boolean(loading && dataLength === 0)
 }

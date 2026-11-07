@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { computed } from 'vue'
 import { Card } from 'primevue'
 import { FileText, ShieldAlert, Activity, Boxes, FileWarning, Lock } from '@lucide/vue'
@@ -11,6 +14,14 @@ const props = defineProps<{
 
 const k8sStore = useKubernetesStore()
 const { configMaps, secrets } = storeToRefs(k8sStore)
+const { isHydrated } = useDeferredMount()
+
+const isLoading = computed(() =>
+  props.activeTab === 'configmaps' ? k8sStore.configMapsLoading : k8sStore.secretsLoading
+)
+const dataLength = computed(() =>
+  props.activeTab === 'configmaps' ? configMaps.value.length : secrets.value.length
+)
 
 const parseSizeToBytes = (sizeStr: string): number => {
   const match = sizeStr.match(/^([\d.]+)\s*([A-Za-z]+)?$/)
@@ -113,7 +124,13 @@ const metrics = computed(() => {
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(isLoading, dataLength, isHydrated)"
+    :cards="4"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+  />
   <div
+    v-else
     data-component="config-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
   >

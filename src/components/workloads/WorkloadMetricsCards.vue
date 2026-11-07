@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { AlertTriangle, Boxes, CheckCircle2, Server, TrendingUp } from '@lucide/vue'
 import Chart from 'primevue/chart'
 import { computed, onMounted, ref } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const deployments = computed(() => k8sStore.deployments)
 
 const totals = computed(() => {
@@ -186,7 +190,13 @@ const cardItems = computed(() => [
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(k8sStore.deploymentsLoading, k8sStore.deployments.length, isHydrated)"
+    :cards="6"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6"
+  />
   <div
+    v-else
     data-component="workload-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6"
   >
