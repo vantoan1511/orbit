@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Shift-Left Verification
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri -> target
+            . -> target
+      - name: Install Dependencies
+        run: npm ci
+      - name: Shift-Left Pre-Flight Check
+        run: python .agents/scripts/verify_shift_left.py
+      - name: Type Check
+        run: npm run type-check
+      - name: Lint
+        run: npm run lint
+      - name: Frontend Unit Tests
+        run: npm test
+      - name: Backend Unit Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml

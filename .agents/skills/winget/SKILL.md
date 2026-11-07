@@ -17,9 +17,8 @@ This workflow guide covers publishing Orbit releases to the Windows Package Mana
                  ▼
      [.github/workflows/release.yml]
      - Builds binaries & installers
-     - Updates update-manifest.json
-     - Pushes Git tag (e.g. v0.9.0)
-     - Publishes GitHub Release with Orbit-Setup-<version>.exe
+     - Pushes Git tag (e.g. v1.0.0)
+     - Publishes GitHub Release with Orbit_<version>_x64-setup.exe & .msi
                  │
                  ▼ (workflow_run: Release completed)
      [.github/workflows/winget.yml]

@@ -21,34 +21,45 @@ describe('Update Manifest and Release Packaging Contracts', () => {
     )
   })
 
-  it('release.yml packages and publishes orbit-update.zip only for versions <= 0.14.8 using node semver', () => {
+  it('release.yml and scripts do not contain dead <= 0.14.8 zip or update-manifest generation steps', () => {
     const workflowPath = path.resolve('.github/workflows/release.yml')
     assert.ok(fs.existsSync(workflowPath), '.github/workflows/release.yml must exist')
 
     const content = fs.readFileSync(workflowPath, 'utf8')
 
-    // Must package orbit-update.zip conditionally
+    // Must NOT contain dead <= 0.14.8 zip or update-manifest steps
     assert.ok(
-      content.includes('Package Update Zip'),
-      'release.yml must contain "Package Update Zip" step'
+      !content.includes('Package Update Zip'),
+      'release.yml must not contain "Package Update Zip" step'
     )
     assert.ok(
-      content.includes('0.14.8'),
-      'release.yml must gate legacy packaging to bridge version 0.14.8'
+      !content.includes('Update Manifest'),
+      'release.yml must not contain "Update Manifest" step'
     )
     assert.ok(
-      content.includes('semver.lte') || content.includes('s.lte'),
-      'release.yml must use semver lte comparison to support prereleases safely'
+      !content.includes('generate-manifest.js'),
+      'release.yml must not reference generate-manifest.js'
     )
+    assert.ok(!content.includes('dist/*.zip'), 'release.yml must not upload dist/*.zip assets')
+
+    // scripts/generate-manifest.js must not exist
+    const generateManifestScript = path.resolve('scripts/generate-manifest.js')
     assert.ok(
-      content.includes('orbit-win_x64.exe'),
-      'release.yml must stage orbit-win_x64.exe inside the zip for legacy compatibility'
+      !fs.existsSync(generateManifestScript),
+      'scripts/generate-manifest.js must be removed'
     )
 
-    // Must upload orbit-update.zip conditionally or via glob
+    // scripts/release.js must not reference update-manifest.json or update zip package
+    const releaseScript = path.resolve('scripts/release.js')
+    assert.ok(fs.existsSync(releaseScript), 'scripts/release.js must exist')
+    const releaseScriptContent = fs.readFileSync(releaseScript, 'utf8')
     assert.ok(
-      content.includes('dist/*.zip') || content.includes('orbit-update.zip'),
-      'release.yml must handle zip asset upload safely'
+      !releaseScriptContent.includes('update-manifest.json'),
+      'scripts/release.js must not reference update-manifest.json'
+    )
+    assert.ok(
+      !releaseScriptContent.includes('update zip package'),
+      'scripts/release.js must not reference update zip package'
     )
   })
 
@@ -74,10 +85,6 @@ describe('Update Manifest and Release Packaging Contracts', () => {
     assert.ok(
       content.includes('scripts/verify-installer-elevation.ts $env:NSIS_INSTALLER_PATH'),
       'Verify Installer Elevation must consume $env:NSIS_INSTALLER_PATH'
-    )
-    assert.ok(
-      content.includes('Copy-Item $env:NSIS_INSTALLER_PATH'),
-      'Package Update Zip must consume $env:NSIS_INSTALLER_PATH without duplicate discovery'
     )
   })
 })
