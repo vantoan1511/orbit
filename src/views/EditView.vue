@@ -252,8 +252,8 @@ const goBack = () => {
     const nextRoute = tabsStore.closeTabAndResolveRoute(tabId)
     if (nextRoute) {
       void router.replace(nextRoute)
-      return
     }
+    return
   }
   void router.replace('/')
 }

@@ -135,7 +135,10 @@ export const useTabsStore = defineStore('tabs', () => {
     scheduleSave()
   }
 
-  function closeTabAndResolveRoute(tabId: string, fallbackRoute = '/'): string | null {
+  function closeTabAndResolveRoute(
+    tabId: string,
+    fallbackRoute: string | null = null
+  ): string | null {
     const target = tabs.value.find((t) => t.id === tabId || t.route === tabId)
     if (!target) return null
 

@@ -34,4 +34,8 @@ test('AppBreadcrumbs component defines PrimeVue Breadcrumb with route hierarchy 
     'AppBreadcrumbs must truncate long resource labels to prevent layout overflow'
   )
   assert.ok(content.includes('pi pi-home'), 'AppBreadcrumbs must provide home route icon')
+  assert.ok(
+    content.includes('k8sStore.activeClusterId !== null && tabsStore.tabs.length === 0'),
+    'AppBreadcrumbs must return empty items when cluster is active and tabs are empty'
+  )
 })

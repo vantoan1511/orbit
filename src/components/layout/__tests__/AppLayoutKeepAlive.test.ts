@@ -72,3 +72,35 @@ test('KeepAlive include list aggregates edit and view cache names', () => {
   assert.ok(combined.includes(editTabCacheName('/workloads/Deployment/default/nginx/edit')))
   assert.ok(combined.includes(viewTabCacheName('/workloads')))
 })
+
+test('AppLayout renders EmptyWorkspaceView whenever activeClusterId is set and tabs are empty, and re-syncs on router.afterEach', () => {
+  const layoutPath = path.resolve('src/components/layout/AppLayout.vue')
+  const content = fs.readFileSync(layoutPath, 'utf-8')
+
+  assert.ok(
+    content.includes('k8sStore.activeClusterId !== null && tabsStore.tabs.length === 0'),
+    'AppLayout must render EmptyWorkspaceView when activeClusterId is set and tabsStore.tabs.length === 0'
+  )
+  assert.ok(content.includes('router.afterEach('), 'AppLayout must register router.afterEach hook')
+
+  const navMenuPath = path.resolve('src/components/layout/sidebar/AppSidebarNavMenu.vue')
+  const navMenuContent = fs.readFileSync(navMenuPath, 'utf-8')
+  assert.ok(
+    navMenuContent.includes('tabsStore.tabs.length === 0'),
+    'AppSidebarNavMenu isLinkActive must check tabsStore.tabs.length === 0'
+  )
+
+  const logsMenuPath = path.resolve('src/components/layout/sidebar/AppSidebarLogsMenu.vue')
+  const logsMenuContent = fs.readFileSync(logsMenuPath, 'utf-8')
+  assert.ok(
+    logsMenuContent.includes('tabsStore.tabs.length === 0'),
+    'AppSidebarLogsMenu isCurrentLogActive must check tabsStore.tabs.length === 0'
+  )
+
+  const activityBarPath = path.resolve('src/components/layout/sidebar/AppSidebarActivityBar.vue')
+  const activityBarContent = fs.readFileSync(activityBarPath, 'utf-8')
+  assert.ok(
+    activityBarContent.includes('tabsStore.tabs.length === 0'),
+    'AppSidebarActivityBar Settings active state must check tabsStore.tabs.length === 0 when hasActiveCluster is true'
+  )
+})

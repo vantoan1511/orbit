@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { useTabsStore } from '@/stores/tabsStore'
+import { getResourceBreadcrumbs, TAB_LABEL_MAP } from '@/utils/breadcrumb'
 import Breadcrumb from 'primevue/breadcrumb'
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { getResourceBreadcrumbs, TAB_LABEL_MAP } from '@/utils/breadcrumb'
 
 const route = useRoute()
+const k8sStore = useKubernetesStore()
+const tabsStore = useTabsStore()
 
 const home = computed(() => ({
   icon: 'pi pi-home',
@@ -26,6 +30,10 @@ const ROUTE_LABEL_MAP: Record<string, string> = {
 }
 
 const items = computed(() => {
+  if (k8sStore.activeClusterId !== null && tabsStore.tabs.length === 0) {
+    return []
+  }
+
   const currentRouteName = route.name as string
   if (!currentRouteName || currentRouteName === 'dashboard' || currentRouteName === 'welcome') {
     return []
