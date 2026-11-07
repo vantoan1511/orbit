@@ -4,6 +4,7 @@ let activeSubscribers = 0
 let tickerInterval: ReturnType<typeof setInterval> | null = null
 const currentTimestamp: Ref<number> = ref(Date.now())
 let isVisibilityListenerAttached = false
+let isTickerPaused = false
 
 function isDocumentHidden(): boolean {
   if (typeof document === 'undefined') return false
@@ -14,6 +15,7 @@ function startInterval() {
   if (tickerInterval || isDocumentHidden() || activeSubscribers <= 0) return
   currentTimestamp.value = Date.now()
   tickerInterval = setInterval(() => {
+    if (isTickerPaused) return
     currentTimestamp.value = Date.now()
   }, 1000)
 }
@@ -71,6 +73,7 @@ export function useTicker() {
 export function resetTickerForTesting() {
   stopInterval()
   activeSubscribers = 0
+  isTickerPaused = false
   if (isVisibilityListenerAttached && typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
@@ -80,4 +83,16 @@ export function resetTickerForTesting() {
 
 export function getSubscriberCountForTesting(): number {
   return activeSubscribers
+}
+
+export function setTickerPaused(paused: boolean) {
+  if (isTickerPaused === paused) return
+  isTickerPaused = paused
+  if (!isTickerPaused && activeSubscribers > 0 && !isDocumentHidden()) {
+    currentTimestamp.value = Date.now()
+  }
+}
+
+export function isTickerPausedForTesting(): boolean {
+  return isTickerPaused
 }

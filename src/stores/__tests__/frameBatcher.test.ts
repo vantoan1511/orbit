@@ -386,3 +386,73 @@ test('frameBatcher: flush() drains all pending updates synchronously', () => {
   assert.deepEqual(calls[0], { kind: 'Deployment', updates: [10, 20] })
   assert.deepEqual(calls[1], { kind: 'Service', updates: [100] })
 })
+
+test('frameBatcher: holds visible updates while scrolling and flushes immediately when scrolling stops', () => {
+  const env = createFakeEnvironment()
+  const calls: Array<{ kind: string; updates: number[] }> = []
+
+  const batcher = createFrameBatcher<number>(
+    (kind, updates) => {
+      calls.push({ kind, updates })
+    },
+    {
+      now: env.now,
+      scheduleFrame: env.scheduleFrame,
+      scheduleTimeout: env.scheduleTimeout,
+      cancelTimeout: env.cancelTimeout
+    }
+  )
+
+  batcher.registerVisibleKind('Pod')
+  assert.equal(batcher.isScrolling(), false)
+
+  batcher.setScrolling(true)
+  assert.equal(batcher.isScrolling(), true)
+
+  batcher.push('Pod', [1, 2])
+  env.runFrames()
+  assert.equal(calls.length, 0, 'visible updates must not flush while scrolling')
+
+  // Advance time partially (e.g. 200ms < 1000ms maxScrollHoldMs)
+  env.advanceTime(200)
+  assert.equal(calls.length, 0, 'visible updates must remain held within hold window')
+
+  batcher.setScrolling(false)
+  assert.equal(batcher.isScrolling(), false)
+  assert.equal(calls.length, 1, 'must flush immediately when scrolling stops')
+  assert.deepEqual(calls[0], { kind: 'Pod', updates: [1, 2] })
+})
+
+test('frameBatcher: flushes visible updates after maxScrollHoldMs during continuous scrolling', () => {
+  const env = createFakeEnvironment()
+  const calls: Array<{ kind: string; updates: number[] }> = []
+
+  const batcher = createFrameBatcher<number>(
+    (kind, updates) => {
+      calls.push({ kind, updates })
+    },
+    {
+      now: env.now,
+      scheduleFrame: env.scheduleFrame,
+      scheduleTimeout: env.scheduleTimeout,
+      cancelTimeout: env.cancelTimeout,
+      maxScrollHoldMs: 1000
+    }
+  )
+
+  batcher.registerVisibleKind('Pod')
+  batcher.setScrolling(true)
+
+  batcher.push('Pod', [10])
+  env.runFrames()
+  assert.equal(calls.length, 0)
+
+  // Advance 999ms - still within maxScrollHoldMs
+  env.advanceTime(999)
+  assert.equal(calls.length, 0)
+
+  // Advance past 1000ms
+  env.advanceTime(2)
+  assert.equal(calls.length, 1, 'must flush after maxScrollHoldMs despite scrolling')
+  assert.deepEqual(calls[0], { kind: 'Pod', updates: [10] })
+})

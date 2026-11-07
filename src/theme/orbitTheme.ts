@@ -314,6 +314,35 @@ function buildTooltipCss({ dt }: StyleOptions): string {
 `
 }
 
+function buildDataTableCss(): string {
+  return `
+.p-datatable-table-container {
+  overscroll-behavior: contain;
+  will-change: scroll-position;
+  transform: translateZ(0);
+}
+
+.p-datatable-scrollable-table > .p-datatable-thead {
+  z-index: 2;
+  transform: translateZ(0);
+}
+
+.p-datatable-tbody > tr {
+  transition: none;
+}
+
+.p-datatable .p-tag,
+.p-datatable .p-badge {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-scrolling="true"] .p-datatable-tbody {
+  pointer-events: none;
+}
+`
+}
+
 function componentCss(component: string) {
   const overlaySpecs = OVERLAY_SURFACES.filter((s) => s.component === component)
   const sizingSpecs = SIZED_CONTROLS.filter((s) => s.component === component)
@@ -622,7 +651,8 @@ export const Noir = definePreset(Nora, {
             borderColor: 'var(--border-subtle, var(--border))'
           }
         }
-      }
+      },
+      css: buildDataTableCss
     },
     button: {
       root: {
