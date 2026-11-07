@@ -11,14 +11,10 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
+import { useVisibleResourceKind } from '@/composables/useVisibleResourceKind'
 import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
 import { getResourceCompositeKey, shouldShowSkeleton } from '@/utils/resourceKey'
-import {
-  DEFAULT_VIRTUAL_SCROLLER_OPTIONS,
-  paginateTableRows,
-  shouldEnableVirtualScroll,
-  sortTableRows
-} from '@/utils/tableVirtualPagination'
+import { paginateTableRows, sortTableRowsStable } from '@/utils/tablePagination'
 
 const PAGINATOR_PT = Object.freeze({
   pcRowPerPageDropdown: {
@@ -54,6 +50,7 @@ const props = withDefaults(
     hideRowsPerPage?: boolean
     columns?: TableColumn[]
     dataKey?: string | ((data: any) => string)
+    resourceKind?: string
   }>(),
   {
     searchQuery: '',
@@ -82,6 +79,8 @@ const emit = defineEmits<{
   (e: 'row-contextmenu', event: { originalEvent: Event; data: any; index?: number }): void
 }>()
 
+useVisibleResourceKind(() => props.resourceKind)
+
 const rowsPerPage = ref(
   props.rowsPerPageOptions.includes(props.rows) ? props.rows : ALLOWED_ROW_OPTIONS[0]
 )
@@ -103,10 +102,28 @@ const first = ref(0)
 const sortField = ref<string | undefined>(undefined)
 const sortOrder = ref<number | undefined>(undefined)
 
-const isVirtualScrollEnabled = computed(() => shouldEnableVirtualScroll(rowsPerPage.value))
+let previousOrder = new Map<string, number>()
+
+const resolveRowKey = (row: any): string => {
+  if (typeof props.dataKey === 'function') {
+    return props.dataKey(row)
+  }
+  if (typeof props.dataKey === 'string' && row && row[props.dataKey] !== undefined) {
+    return String(row[props.dataKey])
+  }
+  return getResourceCompositeKey(row)
+}
 
 const sortedData = computed(() => {
-  return sortTableRows(props.data, sortField.value, sortOrder.value)
+  const result = sortTableRowsStable(
+    props.data,
+    sortField.value,
+    sortOrder.value,
+    resolveRowKey,
+    previousOrder
+  )
+  previousOrder = result.order
+  return result.rows
 })
 
 const paginatedResult = computed(() => {
@@ -385,9 +402,6 @@ const isIndeterminate = computed(() => {
           tableClass="w-full text-left text-xs border-collapse"
           :scrollable="true"
           scrollHeight="flex"
-          :virtualScrollerOptions="
-            isVirtualScrollEnabled ? DEFAULT_VIRTUAL_SCROLLER_OPTIONS : undefined
-          "
           :sortField="sortField"
           :sortOrder="sortOrder"
           :pt="DATATABLE_PT"
