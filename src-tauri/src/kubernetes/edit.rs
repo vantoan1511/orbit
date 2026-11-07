@@ -8,6 +8,7 @@ use k8s_openapi::api::core::v1::{Pod, Service, ConfigMap, Secret, PersistentVolu
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
+use k8s_openapi::api::autoscaling::v2::HorizontalPodAutoscaler;
 use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
 use k8s_openapi::api::storage::v1::StorageClass;
 use serde_json::Value;
@@ -28,6 +29,7 @@ pub(crate) fn resolve_resource_scope(kind: &str) -> Option<ResourceApiScope> {
         | "PersistentVolumeClaim"
         | "NetworkPolicy"
         | "Ingress"
+        | "HorizontalPodAutoscaler"
         | "ResourceQuota"
         | "LimitRange" => Some(ResourceApiScope::Namespaced),
         "Node"
@@ -59,6 +61,7 @@ fn to_json_val<T: serde::Serialize>(val: &T, kind: &str) -> Result<Value, kube::
                 "Pod" | "Service" | "ConfigMap" | "Secret" | "PersistentVolume" | "PersistentVolumeClaim" | "Namespace" | "Node" | "ResourceQuota" | "LimitRange" => "v1",
                 "Deployment" | "StatefulSet" | "DaemonSet" | "ReplicaSet" => "apps/v1",
                 "Job" | "CronJob" => "batch/v1",
+                "HorizontalPodAutoscaler" => "autoscaling/v2",
                 "NetworkPolicy" | "Ingress" => "networking.k8s.io/v1",
                 "ValidatingWebhookConfiguration" | "MutatingWebhookConfiguration" => "admissionregistration.k8s.io/v1",
                 "StorageClass" => "storage.k8s.io/v1",
@@ -151,6 +154,11 @@ pub async fn get_resource_raw(
         }
         "Ingress" => {
             let api: Api<Ingress> = Api::namespaced(client.clone(), namespace);
+            let resource = api.get(name).await?;
+            to_json_val(&resource, kind)
+        }
+        "HorizontalPodAutoscaler" => {
+            let api: Api<HorizontalPodAutoscaler> = Api::namespaced(client.clone(), namespace);
             let resource = api.get(name).await?;
             to_json_val(&resource, kind)
         }
@@ -364,6 +372,7 @@ pub async fn apply_resource(
         "PersistentVolumeClaim" => replace_resource!(PersistentVolumeClaim, &resolved_kind),
         "NetworkPolicy" => replace_resource!(NetworkPolicy, &resolved_kind),
         "Ingress" => replace_resource!(Ingress, &resolved_kind),
+        "HorizontalPodAutoscaler" => replace_resource!(HorizontalPodAutoscaler, &resolved_kind),
         "Node" => replace_cluster_resource!(Node, &resolved_kind),
         "Namespace" => replace_cluster_resource!(Namespace, &resolved_kind),
         "ResourceQuota" => replace_resource!(ResourceQuota, &resolved_kind),
@@ -451,6 +460,7 @@ pub async fn create_resource(
         "PersistentVolumeClaim" => create_resource!(PersistentVolumeClaim),
         "NetworkPolicy" => create_resource!(NetworkPolicy),
         "Ingress" => create_resource!(Ingress),
+        "HorizontalPodAutoscaler" => create_resource!(HorizontalPodAutoscaler),
         "Node" => create_cluster_resource!(Node),
         "Namespace" => create_cluster_resource!(Namespace),
         "ResourceQuota" => create_resource!(ResourceQuota),
@@ -781,5 +791,53 @@ mod tests {
     #[test]
     fn test_resolve_resource_scope_namespace() {
         assert_eq!(resolve_resource_scope("Namespace"), Some(ResourceApiScope::ClusterScoped));
+    }
+
+    #[test]
+    fn test_hpa_scope_and_manifest_parse() {
+        assert_eq!(
+            resolve_resource_scope("HorizontalPodAutoscaler"),
+            Some(ResourceApiScope::Namespaced)
+        );
+
+        let hpa = HorizontalPodAutoscaler {
+            metadata: ObjectMeta {
+                name: Some("hpa-test".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let val = to_json_val(&hpa, "HorizontalPodAutoscaler").expect("serialize hpa");
+        assert_eq!(
+            val.get("kind").and_then(|v| v.as_str()),
+            Some("HorizontalPodAutoscaler")
+        );
+        assert_eq!(
+            val.get("apiVersion").and_then(|v| v.as_str()),
+            Some("autoscaling/v2")
+        );
+
+        let manifest_json = serde_json::json!({
+            "apiVersion": "autoscaling/v2",
+            "kind": "HorizontalPodAutoscaler",
+            "metadata": {
+                "name": "php-apache",
+                "namespace": "default"
+            },
+            "spec": {
+                "scaleTargetRef": {
+                    "apiVersion": "apps/v1",
+                    "kind": "Deployment",
+                    "name": "php-apache"
+                },
+                "minReplicas": 1,
+                "maxReplicas": 10
+            }
+        });
+        let parsed: Result<HorizontalPodAutoscaler, _> = serde_json::from_value(manifest_json);
+        assert!(parsed.is_ok());
+        let parsed_hpa = parsed.unwrap();
+        assert_eq!(parsed_hpa.metadata.name.as_deref(), Some("php-apache"));
+        assert_eq!(parsed_hpa.spec.as_ref().unwrap().max_replicas, 10);
     }
 }

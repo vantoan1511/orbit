@@ -3,6 +3,7 @@ import type {
   ClusterInfo,
   ConfigMapInfo,
   CronJobInfo,
+  HpaInfo,
   DaemonSetInfo,
   DeploymentInfo,
   EventInfo,
@@ -51,6 +52,7 @@ export type KubernetesResourceInfo =
   | ReplicaSetInfo
   | JobInfo
   | CronJobInfo
+  | HpaInfo
   | NodeInfo
   | NamespaceInfo
   | ConfigMapInfo
@@ -107,6 +109,9 @@ export interface OrbitEventMap {
   }
   cronJobsUpdated: {
     cron_jobs: CronJobInfo[]
+  }
+  hpasUpdated: {
+    hpas: HpaInfo[]
   }
   clustersUpdated: {
     clusters: ClusterInfo[]
@@ -262,6 +267,7 @@ export const OrbitEvents = {
   ReplicaSetsUpdated: 'replicaSetsUpdated',
   JobsUpdated: 'jobsUpdated',
   CronJobsUpdated: 'cronJobsUpdated',
+  HpasUpdated: 'hpasUpdated',
   ClustersUpdated: 'clustersUpdated',
   ActiveClusterChanged: 'activeClusterChanged',
   UserProfileUpdated: 'userProfileUpdated',

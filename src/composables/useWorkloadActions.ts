@@ -10,6 +10,7 @@ import { kubernetesService } from '@/services/kubernetesService'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import type { ActivePortForward } from '@/types/kubernetes'
 import ScaleDialog from '@/components/shared/ScaleDialog.vue'
+import ScaleHpaDialog from '@/components/shared/ScaleHpaDialog.vue'
 import CloneIngressDialog from '@/components/shared/CloneIngressDialog.vue'
 import CloneDeploymentDialog from '@/components/shared/CloneDeploymentDialog.vue'
 import PortForwardDialog from '@/components/shared/PortForwardDialog.vue'
@@ -704,6 +705,65 @@ export function useWorkloadActions<T extends { name: string; namespace?: string 
                     severity: 'error',
                     summary: 'Error',
                     detail: e instanceof Error ? e.message : 'Failed to scale',
+                    life: 5000
+                  })
+                }
+              }
+            }
+          })
+        }
+      })
+    }
+
+    // Edit HPA Replicas
+    if (resourceKind === KUBERNETES_RESOURCE_KIND.HorizontalPodAutoscaler) {
+      items.push({
+        label: 'Edit Bounds',
+        icon: 'pi pi-sliders-h',
+        command: () => {
+          const row = selectedActionRow.value as
+            (T & { minReplicas?: number; maxReplicas?: number }) | null
+          if (!row) return
+
+          dialog.open(ScaleHpaDialog, {
+            props: {
+              header: 'Edit Replica Bounds',
+              style: {
+                width: '360px'
+              },
+              modal: true
+            },
+            data: {
+              name: row.name,
+              namespace: row.namespace || 'default',
+              minReplicas: row.minReplicas ?? 1,
+              maxReplicas: row.maxReplicas ?? 10
+            },
+            onClose: async (options) => {
+              const bounds = options?.data
+              if (
+                bounds &&
+                typeof bounds.minReplicas === 'number' &&
+                typeof bounds.maxReplicas === 'number'
+              ) {
+                try {
+                  await kubernetesService.updateHpaReplicas({
+                    namespace: row.namespace || 'default',
+                    name: row.name,
+                    minReplicas: bounds.minReplicas,
+                    maxReplicas: bounds.maxReplicas
+                  })
+                  toast.add({
+                    severity: 'success',
+                    summary: 'Success',
+                    detail: `Updated replica bounds for ${row.name}`,
+                    life: 3000
+                  })
+                } catch (e) {
+                  toast.add({
+                    severity: 'error',
+                    summary: 'Error',
+                    detail: e instanceof Error ? e.message : 'Failed to update replica bounds',
                     life: 5000
                   })
                 }

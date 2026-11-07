@@ -201,6 +201,48 @@ export interface CronJobInfo {
   annotations: Record<string, string>
 }
 
+export interface HpaTargetRef {
+  kind: string
+  name: string
+  apiVersion?: string
+}
+
+export interface HpaMetricTarget {
+  metricType: string
+  name: string
+  targetType: string
+  targetValue: string
+  currentValue?: string
+}
+
+export interface HpaConditionInfo {
+  type: string
+  status: string
+  reason?: string
+  message?: string
+  lastTransitionTime?: string
+}
+
+export interface HpaInfo {
+  kind?: 'HorizontalPodAutoscaler' | string
+  name: string
+  namespace: string
+  status: string
+  scaleTargetRef: HpaTargetRef
+  minReplicas: number
+  maxReplicas: number
+  currentReplicas: number
+  desiredReplicas: number
+  metrics: HpaMetricTarget[]
+  metricsSummary: string[]
+  conditions: HpaConditionInfo[]
+  lastScaleTime?: string
+  age: string
+  created: string
+  labels: Record<string, string>
+  annotations: Record<string, string>
+}
+
 export type WorkloadInfo =
   DeploymentInfo | StatefulSetInfo | DaemonSetInfo | ReplicaSetInfo | JobInfo | CronJobInfo
 

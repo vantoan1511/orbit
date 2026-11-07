@@ -8,6 +8,7 @@ use k8s_openapi::api::batch::v1::{Job, CronJob};
 use k8s_openapi::api::networking::v1::{NetworkPolicy, Ingress};
 use k8s_openapi::api::admissionregistration::v1::{ValidatingWebhookConfiguration, MutatingWebhookConfiguration};
 use k8s_openapi::api::storage::v1::StorageClass;
+use k8s_openapi::api::autoscaling::v2::HorizontalPodAutoscaler;
 use crate::kubernetes::models::ResourceApiScope;
 
 pub(crate) fn resolve_delete_scope(kind: &str) -> Option<ResourceApiScope> {
@@ -25,6 +26,7 @@ pub(crate) fn resolve_delete_scope(kind: &str) -> Option<ResourceApiScope> {
         | "PersistentVolumeClaim"
         | "NetworkPolicy"
         | "Ingress"
+        | "HorizontalPodAutoscaler"
         | "ResourceQuota"
         | "LimitRange"
         | "Policy" => Some(ResourceApiScope::Namespaced),
@@ -109,6 +111,10 @@ pub async fn delete_resource(
         }
         "Ingress" => {
             let api: Api<Ingress> = Api::namespaced(client.clone(), namespace);
+            api.delete(name, &delete_params).await?;
+        }
+        "HorizontalPodAutoscaler" => {
+            let api: Api<HorizontalPodAutoscaler> = Api::namespaced(client.clone(), namespace);
             api.delete(name, &delete_params).await?;
         }
         "Namespace" => {
@@ -197,6 +203,7 @@ mod tests {
         assert_eq!(resolve_delete_scope("StorageClass"), Some(ResourceApiScope::ClusterScoped));
         assert_eq!(resolve_delete_scope("PersistentVolumeClaim"), Some(ResourceApiScope::Namespaced));
         assert_eq!(resolve_delete_scope("Pod"), Some(ResourceApiScope::Namespaced));
+        assert_eq!(resolve_delete_scope("HorizontalPodAutoscaler"), Some(ResourceApiScope::Namespaced));
         assert_eq!(resolve_delete_scope("Namespace"), Some(ResourceApiScope::ClusterScoped));
         assert_eq!(resolve_delete_scope("Unknown"), None);
     }

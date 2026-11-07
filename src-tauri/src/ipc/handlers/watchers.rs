@@ -103,6 +103,7 @@ pub fn spawn_watchers(
     spawn_watcher!(k8s_openapi::api::apps::v1::ReplicaSet, "ReplicaSet", crate::kubernetes::workloads::map_replicaset);
     spawn_watcher!(k8s_openapi::api::batch::v1::Job, "Job", crate::kubernetes::batch::map_job);
     spawn_watcher!(k8s_openapi::api::batch::v1::CronJob, "CronJob", crate::kubernetes::batch::map_cronjob);
+    spawn_watcher!(k8s_openapi::api::autoscaling::v2::HorizontalPodAutoscaler, "HorizontalPodAutoscaler", crate::kubernetes::hpa::map_hpa);
     spawn_watcher!(k8s_openapi::api::core::v1::Namespace, "Namespace", crate::kubernetes::namespaces::map_namespace);
     spawn_watcher!(k8s_openapi::api::core::v1::ConfigMap, "ConfigMap", crate::kubernetes::configmaps::format_configmap);
     spawn_watcher!(k8s_openapi::api::core::v1::Secret, "Secret", crate::kubernetes::secrets::format_secret);

@@ -25,7 +25,8 @@ import {
   Network,
   Server,
   Settings2,
-  ShieldCheck
+  ShieldCheck,
+  TrendingUp
 } from '@lucide/vue'
 
 export interface NavigationTarget {
@@ -328,6 +329,22 @@ export const useSearchStore = defineStore('search', () => {
         iconColorClass: 'text-job',
         action: () =>
           jumpToResource('cronjob', c.name, c.namespace, '/workloads', { tab: 'cronjobs' })
+      })
+    }
+
+    // HPAs
+    for (const h of k8sStore.hpas) {
+      items.push({
+        id: `hpa-${h.namespace}/${h.name}`,
+        title: h.name,
+        subtitle: `${h.namespace} • HPA • ${h.scaleTargetRef.kind}/${h.scaleTargetRef.name}`,
+        category: 'resources',
+        kind: 'HorizontalPodAutoscaler',
+        namespace: h.namespace,
+        status: h.status,
+        icon: TrendingUp,
+        iconColorClass: 'text-hpa',
+        action: () => jumpToResource('hpa', h.name, h.namespace, '/workloads', { tab: 'hpas' })
       })
     }
 

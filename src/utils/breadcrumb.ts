@@ -10,6 +10,7 @@ export const TAB_LABEL_MAP: Record<string, string> = {
   replicasets: 'ReplicaSets',
   jobs: 'Jobs',
   cronjobs: 'CronJobs',
+  hpas: 'HPAs',
   overview: 'Overview',
   services: 'Services',
   endpoints: 'Endpoints',
@@ -75,6 +76,15 @@ export const RESOURCE_BREADCRUMB_MAP: Record<string, ResourceCategoryMetadata> =
     categoryRoute: '/workloads',
     typeLabel: 'CronJobs',
     typeRoute: '/workloads?tab=cronjobs',
+    isClusterScoped: false
+  },
+  [KUBERNETES_RESOURCE_KIND.HorizontalPodAutoscaler]: {
+    kind: KUBERNETES_RESOURCE_KIND.HorizontalPodAutoscaler,
+    categoryId: 'workloads',
+    categoryLabel: 'Workloads',
+    categoryRoute: '/workloads',
+    typeLabel: 'HPAs',
+    typeRoute: '/workloads?tab=hpas',
     isClusterScoped: false
   },
   [KUBERNETES_RESOURCE_KIND.Pod]: {

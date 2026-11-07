@@ -34,7 +34,19 @@ test('getResourceBreadcrumbs - Pod (namespaced workload)', () => {
   ])
 })
 
-test('getResourceBreadcrumbs - DaemonSet, StatefulSet, ReplicaSet, Job, CronJob', () => {
+test('getResourceBreadcrumbs - DaemonSet, StatefulSet, ReplicaSet, Job, CronJob, HPA', () => {
+  const hpaCrumbs = getResourceBreadcrumbs({
+    kind: 'HorizontalPodAutoscaler',
+    namespace: 'prod',
+    name: 'api-hpa'
+  })
+  assert.deepEqual(hpaCrumbs, [
+    { label: 'Workloads', route: '/workloads' },
+    { label: 'HPAs', route: '/workloads?tab=hpas' },
+    { label: 'prod' },
+    { label: 'api-hpa' },
+    { label: 'Edit' }
+  ])
   const daemonSetCrumbs = getResourceBreadcrumbs({
     kind: 'DaemonSet',
     namespace: 'monitoring',

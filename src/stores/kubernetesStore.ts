@@ -17,6 +17,7 @@ import {
   type DaemonSetInfo,
   type DeploymentInfo,
   type EventInfo,
+  type HpaInfo,
   type IngressInfo,
   type JobInfo,
   type KubernetesAction,
@@ -70,6 +71,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const replicaSets = shallowRef<ReplicaSetInfo[]>([])
   const jobs = shallowRef<JobInfo[]>([])
   const cronJobs = shallowRef<CronJobInfo[]>([])
+  const hpas = shallowRef<HpaInfo[]>([])
   const nodes = shallowRef<NodeInfo[]>([])
   const services = shallowRef<ServiceInfo[]>([])
   const ingresses = shallowRef<IngressInfo[]>([])
@@ -88,6 +90,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   const replicaSetsLoading = ref(false)
   const jobsLoading = ref(false)
   const cronJobsLoading = ref(false)
+  const hpasLoading = ref(false)
   const nodesLoading = ref(false)
   const servicesLoading = ref(false)
   const ingressesLoading = ref(false)
@@ -257,6 +260,15 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     cronJobsLoading.value = false
   }
 
+  function setHpas(newHpas: HpaInfo[]) {
+    hpas.value = newHpas
+    hpasLoading.value = false
+  }
+
+  function setHpasLoading(loading: boolean) {
+    hpasLoading.value = loading
+  }
+
   const prevNodeTotalsMap = new Map<string, string>()
 
   function setNodes(newNodes: NodeInfo[]) {
@@ -385,6 +397,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSetsLoading.value = false
     jobsLoading.value = false
     cronJobsLoading.value = false
+    hpasLoading.value = false
     nodesLoading.value = false
     servicesLoading.value = false
     ingressesLoading.value = false
@@ -433,6 +446,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSets.value = []
     jobs.value = []
     cronJobs.value = []
+    hpas.value = []
     nodes.value = []
     services.value = []
     ingresses.value = []
@@ -450,6 +464,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSetsLoading.value = true
     jobsLoading.value = true
     cronJobsLoading.value = true
+    hpasLoading.value = true
     nodesLoading.value = true
     servicesLoading.value = true
     ingressesLoading.value = true
@@ -561,6 +576,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       replicaSetsLoading.value = true
       jobsLoading.value = true
       cronJobsLoading.value = true
+      hpasLoading.value = true
       nodesLoading.value = true
       servicesLoading.value = true
       namespacesLoading.value = true
@@ -575,6 +591,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
         kubernetesService.getReplicaSets(),
         kubernetesService.getJobs(),
         kubernetesService.getCronJobs(),
+        kubernetesService.getHpas(),
         kubernetesService.getNodes(),
         kubernetesService.getServices(),
         fetchIngresses(),
@@ -629,6 +646,12 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       updateResourceBatch(
         cronJobs,
         updates as Array<{ action: KubernetesAction; data: CronJobInfo }>,
+        keyNamespaced
+      ),
+    [KUBERNETES_RESOURCE_KIND.HorizontalPodAutoscaler]: (updates) =>
+      updateResourceBatch(
+        hpas,
+        updates as Array<{ action: KubernetesAction; data: HpaInfo }>,
         keyNamespaced
       ),
     [KUBERNETES_RESOURCE_KIND.Pod]: (updates) =>
@@ -823,6 +846,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSets,
     jobs,
     cronJobs,
+    hpas,
     nodes,
     services,
     configMaps,
@@ -846,6 +870,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     replicaSetsLoading,
     jobsLoading,
     cronJobsLoading,
+    hpasLoading,
     nodesLoading,
     servicesLoading,
     ingresses,
@@ -865,6 +890,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     setReplicaSets,
     setJobs,
     setCronJobs,
+    setHpas,
+    setHpasLoading,
     setNodes,
     setServices,
     setIngresses,
