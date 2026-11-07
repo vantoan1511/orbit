@@ -386,3 +386,56 @@ test('events.off suppresses Tauri callback even if native emitter fires after re
     ;(globalThis as unknown as { window?: unknown }).window = originalWindow
   }
 })
+
+test('app.getConfig returns default version and x64 arch in non-Tauri environment', async () => {
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = undefined
+
+  try {
+    const config = await app.getConfig()
+    assert.ok(typeof config.version === 'string' && config.version.length > 0)
+    assert.equal(config.arch, 'x64')
+  } finally {
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('app.getConfig invokes get_runtime_arch command in Tauri environment', async () => {
+  let invokedCommand = ''
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {
+      invoke: async (cmd: string) => {
+        invokedCommand = cmd
+        return 'arm64'
+      }
+    }
+  }
+
+  try {
+    const config = await app.getConfig()
+    assert.equal(invokedCommand, 'get_runtime_arch')
+    assert.equal(config.arch, 'arm64')
+    assert.ok(typeof config.version === 'string')
+  } finally {
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})
+
+test('app.getConfig falls back to x64 arch when invoke throws error', async () => {
+  const originalWindow = (globalThis as unknown as { window?: unknown }).window
+  ;(globalThis as unknown as { window?: unknown }).window = {
+    __TAURI_INTERNALS__: {
+      invoke: async () => {
+        throw new Error('IPC failed')
+      }
+    }
+  }
+
+  try {
+    const config = await app.getConfig()
+    assert.equal(config.arch, 'x64')
+  } finally {
+    ;(globalThis as unknown as { window?: unknown }).window = originalWindow
+  }
+})

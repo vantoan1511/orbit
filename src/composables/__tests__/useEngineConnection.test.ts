@@ -8,7 +8,7 @@ import {
 
 test('createEngineConnectionManager starts in connected state', () => {
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => true,
     reconnect: () => {},
     restartProcess: async () => {},
@@ -19,10 +19,10 @@ test('createEngineConnectionManager starts in connected state', () => {
   assert.equal(manager.isReconnecting.value, false)
 })
 
-test('createEngineConnectionManager is no-op outside Neutralino environment', async () => {
+test('createEngineConnectionManager is no-op outside Tauri environment', async () => {
   let reconnectCalls = 0
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => false,
+    isTauriEnvironment: () => false,
     probe: async () => false,
     reconnect: () => {
       reconnectCalls++
@@ -42,7 +42,7 @@ test('serverOffline triggers reconnect attempt and transitions to reconnecting',
   let currentTime = 1000
 
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => false,
     reconnect: () => {
       reconnectCalls++
@@ -66,7 +66,7 @@ test('consecutive failures follow backoff sequence [1000, 2000, 4000, 8000, 1500
   let currentTime = 0
 
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => false,
     reconnect: () => {
       reconnectCalls++
@@ -91,7 +91,7 @@ test('successful probe or engineConnected resets state to connected and resets b
   const isHealthy = false
 
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => isHealthy,
     reconnect: () => {
       reconnectCalls++
@@ -114,7 +114,7 @@ test('exceeding MAX_RECONNECT_DURATION_MS transitions state to failed', async ()
   let currentTime = 0
 
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => false,
     reconnect: () => {},
     restartProcess: async () => {},
@@ -135,7 +135,7 @@ test('exceeding MAX_RECONNECT_DURATION_MS transitions state to failed', async ()
 test('retryNow triggers immediate probe and reconnect', async () => {
   let reconnectCalls = 0
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => false,
     reconnect: () => {
       reconnectCalls++
@@ -152,7 +152,7 @@ test('retryNow triggers immediate probe and reconnect', async () => {
 test('restartApp calls restartProcess', async () => {
   let restartCalled = false
   const manager = createEngineConnectionManager({
-    isNeutralinoEnvironment: () => true,
+    isTauriEnvironment: () => true,
     probe: async () => false,
     reconnect: () => {},
     restartProcess: async () => {

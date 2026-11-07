@@ -475,3 +475,133 @@ test('base.css :root and .my-app-dark define complete typography scale design to
     'base.css must map --ui-control-font-size-md to var(--ui-font-size-sm)'
   )
 })
+
+test('Vue templates use v-tooltip directive instead of native HTML or PrimeVue title attributes', () => {
+  const vueFiles = collectVueFiles(path.resolve(process.cwd(), 'src'))
+  const violations: string[] = []
+
+  const PROP_TITLE_COMPONENTS = new Set([
+    'KeyValueEditor',
+    'KeyValueBadgeList',
+    'BaseResourceDrawer',
+    'Card',
+    'Panel',
+    'Dialog',
+    'Drawer',
+    'TabPanel',
+    'ViewLayout',
+    'EmptyState',
+    'SectionHeader',
+    'DetailsCard'
+  ])
+
+  const PRIMEVUE_COMPONENTS = new Set([
+    'Button',
+    'InputText',
+    'InputNumber',
+    'Select',
+    'Textarea',
+    'ToggleSwitch',
+    'Checkbox',
+    'RadioButton',
+    'Tag',
+    'Badge',
+    'Tab',
+    'Column',
+    'DataTable',
+    'Message'
+  ])
+
+  for (const filePath of vueFiles) {
+    const content = fs.readFileSync(filePath, 'utf-8')
+    const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/')
+
+    // Greedy match full template from first <template...> to last </template>
+    const templateMatch = content.match(/<template\b[^>]*>([\s\S]*)<\/template>/)
+    if (!templateMatch) continue
+
+    const templateContent = templateMatch[1]
+    const tagRegex = /<([a-zA-Z0-9_-]+)(\s*[^>]*?)>/gs
+    let tagMatch: RegExpExecArray | null
+
+    while ((tagMatch = tagRegex.exec(templateContent)) !== null) {
+      const tagName = tagMatch[1]
+      const tagAttrs = tagMatch[2]
+
+      if (tagName.toLowerCase() === 'title' || PROP_TITLE_COMPONENTS.has(tagName)) {
+        continue
+      }
+      if (tagAttrs.includes('shift-left-ignore')) {
+        continue
+      }
+
+      const isPrimeVue = PRIMEVUE_COMPONENTS.has(tagName)
+      const isCustomComponent = tagName[0] === tagName[0].toUpperCase() && !isPrimeVue
+
+      if (isCustomComponent) {
+        continue
+      }
+
+      const titleAttrMatch = tagAttrs.match(
+        /(?:(?<=[\s\n])|^|:|v-bind:)title\s*=\s*(['"][^'"]*?['"])/
+      )
+      if (titleAttrMatch) {
+        const offsetInTemplate = tagMatch.index + (titleAttrMatch.index ?? 0)
+        const line = content.slice(0, templateMatch.index! + offsetInTemplate).split('\n').length
+        violations.push(
+          `${relPath}:${line}: native title attribute on <${tagName}> -> ${titleAttrMatch[0].trim()}`
+        )
+      }
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Found native title tooltip attributes in Vue templates:\n${violations.join('\n')}`
+  )
+})
+
+test('UI and composables contain zero legacy Neutralino NL_* globals', () => {
+  const dirs = ['src/components', 'src/views', 'src/composables']
+  const violations: string[] = []
+  const nlGlobalRegex = /\bNL_(?:ARCH|PORT|TOKEN|VERSION|OS|APPID)\b/
+
+  const collectTsAndVueFiles = (d: string): string[] => {
+    const res: string[] = []
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name)
+      if (e.isDirectory()) {
+        if (e.name !== '__tests__') {
+          res.push(...collectTsAndVueFiles(p))
+        }
+      } else if (e.isFile() && (e.name.endsWith('.ts') || e.name.endsWith('.vue'))) {
+        res.push(p)
+      }
+    }
+    return res
+  }
+
+  for (const dir of dirs) {
+    const fullDir = path.resolve(process.cwd(), dir)
+    if (!fs.existsSync(fullDir)) continue
+    const files = collectTsAndVueFiles(fullDir)
+    for (const filePath of files) {
+      const content = fs.readFileSync(filePath, 'utf-8')
+      const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/')
+      const lines = content.split(/\r?\n/)
+      lines.forEach((line, idx) => {
+        if (line.includes('//') && line.trim().startsWith('//')) return
+        if (nlGlobalRegex.test(line)) {
+          violations.push(`${relPath}:${idx + 1}: ${line.trim()}`)
+        }
+      })
+    }
+  }
+
+  assert.deepEqual(
+    violations,
+    [],
+    `Found legacy Neutralino globals in UI/composables:\n${violations.join('\n')}`
+  )
+})

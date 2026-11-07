@@ -136,7 +136,7 @@ const healthSections = computed(() => [
             :key="item.label"
             :style="{ width: item.pct + '%' }"
             :class="item.color"
-            :title="item.label"
+            v-tooltip.top="item.label"
           ></div>
         </div>
       </template>

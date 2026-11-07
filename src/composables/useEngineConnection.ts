@@ -15,7 +15,6 @@ export const MAX_RECONNECT_DURATION_MS = 60000
 
 export interface EngineConnectionDependencies {
   isTauriEnvironment?: () => boolean
-  isNeutralinoEnvironment?: () => boolean
   probe?: (timeoutMs?: number) => Promise<boolean>
   reconnect?: () => void
   restartProcess?: () => Promise<unknown>
@@ -40,8 +39,7 @@ function defaultIsTauri(): boolean {
     typeof globalThis.window !== 'undefined' &&
     Boolean(
       (globalThis.window as unknown as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ ||
-      (globalThis.window as unknown as { __TAURI__?: unknown }).__TAURI__ ||
-      (globalThis.window as unknown as { NL_PORT?: unknown }).NL_PORT
+      (globalThis.window as unknown as { __TAURI__?: unknown }).__TAURI__
     )
   )
 }
@@ -49,7 +47,7 @@ function defaultIsTauri(): boolean {
 export function createEngineConnectionManager(
   deps: EngineConnectionDependencies = {}
 ): EngineConnectionManager {
-  const isEnv = deps.isTauriEnvironment ?? deps.isNeutralinoEnvironment ?? defaultIsTauri
+  const isEnv = deps.isTauriEnvironment ?? defaultIsTauri
   const probeFn = deps.probe ?? nativeProbe
   const reconnectFn = deps.reconnect ?? nativeReconnect
   const restartFn = deps.restartProcess ?? (() => app.restartProcess())

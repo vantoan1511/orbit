@@ -203,7 +203,7 @@ const getTaintEffectSeverity = (effect: string) => {
           <span class="text-muted-color">Machine ID: </span>
           <span
             class="font-medium text-primary font-mono truncate max-w-48 inline-block align-bottom"
-            :title="node.nodeInfo.machineID"
+            v-tooltip.top="node.nodeInfo.machineID"
           >
             {{ node.nodeInfo.machineID }}
           </span>
@@ -212,7 +212,7 @@ const getTaintEffectSeverity = (effect: string) => {
           <span class="text-muted-color">System UUID: </span>
           <span
             class="font-medium text-primary font-mono truncate max-w-48 inline-block align-bottom"
-            :title="node.nodeInfo.systemUUID"
+            v-tooltip.top="node.nodeInfo.systemUUID"
           >
             {{ node.nodeInfo.systemUUID }}
           </span>
@@ -306,7 +306,7 @@ const getTaintEffectSeverity = (effect: string) => {
               <td class="p-2.5 text-muted-color font-mono text-[11px]">{{ cond.reason || '-' }}</td>
               <td
                 class="p-2.5 pr-4 text-muted-color text-[11px] max-w-64 truncate"
-                :title="cond.message || ''"
+                v-tooltip.top="cond.message || ''"
               >
                 {{ cond.message || '-' }}
               </td>

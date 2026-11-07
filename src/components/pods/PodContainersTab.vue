@@ -66,7 +66,7 @@ const isRunning = (status: string) => {
         >
           <div>
             <div class="text-[10px] text-muted-color">Image</div>
-            <div class="font-mono text-primary truncate" :title="c.image">
+            <div class="font-mono text-primary truncate" v-tooltip.top="c.image">
               {{ c.image }}
             </div>
           </div>

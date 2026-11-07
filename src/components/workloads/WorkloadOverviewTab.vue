@@ -263,7 +263,7 @@ const formatEnvValue = (e: EnvVar): string => {
         </div>
         <div v-if="strategy">
           <span class="text-muted-color block mb-0.5">Strategy</span>
-          <span class="font-semibold text-muted-color truncate block" :title="strategy">
+          <span class="font-semibold text-muted-color truncate block" v-tooltip.top="strategy">
             {{ strategy }}
           </span>
         </div>
@@ -283,7 +283,7 @@ const formatEnvValue = (e: EnvVar): string => {
               :key="idx"
               severity="secondary"
               class="font-mono truncate max-w-full"
-              :title="img"
+              v-tooltip.top="img"
               :value="img"
             />
           </div>
@@ -367,7 +367,7 @@ const formatEnvValue = (e: EnvVar): string => {
             severity="secondary"
             class="font-mono text-[11px] truncate max-w-full"
             :value="formatToleration(tol)"
-            :title="formatToleration(tol)"
+            v-tooltip.top="formatToleration(tol)"
           />
         </div>
       </div>
@@ -398,7 +398,7 @@ const formatEnvValue = (e: EnvVar): string => {
               <span class="font-bold font-mono text-primary">{{ c.name }}</span>
               <span
                 class="text-muted-color font-mono truncate max-w-72 text-[11px]"
-                :title="c.image"
+                v-tooltip.top="c.image"
               >
                 {{ c.image }}
               </span>
@@ -467,7 +467,7 @@ const formatEnvValue = (e: EnvVar): string => {
                 class="flex items-center justify-between p-1.5 bg-(--bg-hover)/50 rounded text-[11px] font-mono"
               >
                 <span class="text-muted-color shrink-0 mr-2">{{ e.name }}</span>
-                <span class="text-primary truncate text-right" :title="formatEnvValue(e)">
+                <span class="text-primary truncate text-right" v-tooltip.top="formatEnvValue(e)">
                   {{ formatEnvValue(e) }}
                 </span>
               </div>

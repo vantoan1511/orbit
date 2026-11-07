@@ -103,7 +103,7 @@ Orbit maintains a clean separation of concerns between frontend rendering and ba
 | **UI Components & Theme** | [PrimeVue v4](https://primevue.org/) (Nora Preset)                                          |
 | **Styling**               | [Tailwind CSS v4](https://tailwindcss.com/)                                                 |
 | **State Management**      | [Pinia](https://pinia.vuejs.org/)                                                           |
-| **Editor**                | [Monaco Editor](https://microsoft.github.io/monaco-editor/) via `@guolao/vue-monaco-editor` |
+| **Editor**                | [Monaco Editor](https://microsoft.github.io/monaco-editor/) (`monaco-editor`)               |
 | **Icons**                 | [Lucide Vue](https://lucide.dev/)                                                           |
 | **Build Tool**            | [Vite](https://vite.dev/)                                                                   |
 

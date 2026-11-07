@@ -177,12 +177,24 @@ def check_ipc_and_runtime_imports(file_path: Path, content: str) -> list[Violati
                     suggestion="Orbit has migrated to Tauri v2. Use `@/services/*` instead."
                 )
             )
+        elif re.search(r"\bNL_(?:ARCH|PORT|TOKEN|VERSION|OS|APPID)\b", line):
+            violations.append(
+                Violation(
+                    file=norm_path,
+                    line=idx,
+                    code=line,
+                    rule="Legacy Neutralino global variable in UI/composable",
+                    suggestion="Orbit has migrated to Tauri v2. Use `@/services/nativeService` instead."
+                )
+            )
     return violations
 
 def check_general_hygiene(file_path: Path, content: str) -> list[Violation]:
     """Rule: No merge conflict markers, debugger statements, or leaked secrets."""
     violations = []
     norm_path = file_path.as_posix()
+    if norm_path.endswith("verify_shift_left.py"):
+        return violations
 
     patterns = [
         (re.compile(r"^<{7}\s|^={7}\s*$|^>{7}\s", re.MULTILINE), "Unresolved git merge conflict marker", "Resolve the git merge conflict before proceeding."),
@@ -214,7 +226,7 @@ def check_primevue_elements(file_path: Path, content: str) -> list[Violation]:
     if not norm_path.endswith(".vue"):
         return violations
 
-    template_match = re.search(r"<template\b[^>]*>(.*?)</template>", content, re.DOTALL)
+    template_match = re.search(r"<template\b[^>]*>(.*)</template>", content, re.DOTALL)
     if not template_match:
         return violations
 
@@ -272,7 +284,7 @@ def check_tooltip_directive(file_path: Path, content: str) -> list[Violation]:
     if not norm_path.endswith(".vue"):
         return violations
 
-    template_match = re.search(r"<template\b[^>]*>(.*?)</template>", content, re.DOTALL)
+    template_match = re.search(r"<template\b[^>]*>(.*)</template>", content, re.DOTALL)
     if not template_match:
         return violations
 
@@ -295,6 +307,12 @@ def check_tooltip_directive(file_path: Path, content: str) -> list[Violation]:
         "DetailsCard",
     }
 
+    PRIMEVUE_COMPONENTS = {
+        "Button", "InputText", "InputNumber", "Select", "Textarea",
+        "ToggleSwitch", "Checkbox", "RadioButton", "Tag", "Badge",
+        "Tab", "Column", "DataTable", "Message"
+    }
+
     for m in re.finditer(r"<([a-zA-Z0-9_-]+)(\s*[^>]*?)>", template_content, re.DOTALL):
         tag_name = m.group(1)
         tag_attrs = m.group(2)
@@ -306,19 +324,13 @@ def check_tooltip_directive(file_path: Path, content: str) -> list[Violation]:
         if "shift-left-ignore" in tag_attrs:
             continue
 
-        # Check for title="..." attribute on the tag (exclude dynamic :title on custom components)
-        title_attr = re.search(r"(?<!:)\btitle\s*=\s*(['\"][^'\"]*?['\"])", tag_attrs)
-        if title_attr:
-            # If it's a custom PascalCase component (other than PrimeVue components), title is often a prop
-            PRIMEVUE_COMPONENTS = {
-                "Button", "InputText", "InputNumber", "Select", "Textarea",
-                "ToggleSwitch", "Checkbox", "RadioButton", "Tag", "Badge",
-                "Tab", "Column", "DataTable", "Message"
-            }
-            if tag_name[0].isupper() and tag_name not in PRIMEVUE_COMPONENTS:
-                # Custom component prop
-                continue
+        # If it's a custom PascalCase component (other than PrimeVue components), title is a prop
+        if tag_name[0].isupper() and tag_name not in PRIMEVUE_COMPONENTS:
+            continue
 
+        # Check for title="..." or :title="..." or v-bind:title="..." attribute on the tag
+        title_attr = re.search(r"(?:(?<=[\s\n])|^|:|v-bind:)title\s*=\s*(['\"][^'\"]*?['\"])", tag_attrs)
+        if title_attr:
             # Find the specific line of the title attribute
             attr_pos_in_tag = title_attr.start()
             line_num = content[: template_start_pos + m.start() + attr_pos_in_tag].count("\n") + 1

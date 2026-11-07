@@ -53,6 +53,19 @@ async fn write_text_file(path: String, content: String) -> Result<(), String> {
     tokio::fs::write(&path, content).await.map_err(|e| e.to_string())
 }
 
+pub fn normalize_arch(raw_arch: &str) -> &str {
+    match raw_arch {
+        "x86_64" => "x64",
+        "aarch64" => "arm64",
+        other => other,
+    }
+}
+
+#[tauri::command]
+fn get_runtime_arch() -> String {
+    normalize_arch(std::env::consts::ARCH).to_string()
+}
+
 static GLOBAL_APP_HANDLE: std::sync::RwLock<Option<AppHandle>> = std::sync::RwLock::new(None);
 
 pub fn set_global_app_handle(handle: AppHandle) {
@@ -151,7 +164,7 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![dispatch_engine, write_text_file, read_text_file]);
+        .invoke_handler(tauri::generate_handler![dispatch_engine, write_text_file, read_text_file, get_runtime_arch]);
 
     if let Err(e) = builder.run(tauri::generate_context!()) {
         tracing::error!("error while running tauri application: {}", e);
@@ -163,6 +176,16 @@ mod tests {
     use super::{AppState, KubeManager, write_text_file};
     use std::sync::Arc;
     use tokio::sync::RwLock;
+
+    #[test]
+    fn test_normalize_arch_maps_rust_consts_to_display_labels() {
+        assert_eq!(super::normalize_arch("x86_64"), "x64");
+        assert_eq!(super::normalize_arch("aarch64"), "arm64");
+        assert_eq!(super::normalize_arch("x86"), "x86");
+        assert_eq!(super::normalize_arch("arm"), "arm");
+        let current_arch = super::get_runtime_arch();
+        assert!(!current_arch.is_empty());
+    }
 
     #[tokio::test]
     async fn test_write_text_file_creates_file_and_dirs() {
