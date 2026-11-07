@@ -52,11 +52,11 @@ describe('Build Performance & Release Packaging Contracts', () => {
     const workflowPath = path.resolve('.github/workflows/release.yml')
     const content = fs.readFileSync(workflowPath, 'utf8')
 
-    // In Package Update Zip:
+    // In Find NSIS Installer:
     assert.match(
       content,
       /target\/release\/bundle\/nsis\/\*setup\.exe/,
-      'Package Update Zip must search for *setup.exe to match Tauri output (e.g. Orbit_0.14.7_x64-setup.exe)'
+      'Find NSIS Installer must search for *setup.exe to match Tauri output (e.g. Orbit_0.14.7_x64-setup.exe)'
     )
     assert.ok(
       !content.includes('target/release/bundle/nsis/*_setup.exe'),

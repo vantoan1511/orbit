@@ -47,61 +47,6 @@ jobs:
         run: |
           $version = node -p "require('./package.json').version"
           echo "VERSION=$version" >> $env:GITHUB_ENV
-      - name: Package Update Zip
-        run: |
-          $isLegacyBridge = node -e "const semver = require('semver'); process.exit(semver.lte(process.env.VERSION, '0.14.8') ? 0 : 1)"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "Version $($env:VERSION) is greater than bridge version 0.14.8. Skipping legacy orbit-update.zip packaging."
-            exit 0
-          }
-          New-Item -ItemType Directory -Force -Path dist\update-staging | Out-Null
-          Copy-Item $env:NSIS_INSTALLER_PATH dist\update-staging\orbit-win_x64.exe
-          Compress-Archive -Path dist\update-staging\orbit-win_x64.exe -DestinationPath dist\orbit-update.zip -Force
-          Remove-Item -Recurse -Force dist\update-staging
-          Write-Host "Created orbit-update.zip containing orbit-win_x64.exe ($(Split-Path $env:NSIS_INSTALLER_PATH -Leaf))"
-      - name: Update Manifest
-        run: |
-          $isLegacyBridge = node -e "const semver = require('semver'); process.exit(semver.lte(process.env.VERSION, '0.14.8') ? 0 : 1)"
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "Version $($env:VERSION) > 0.14.8. update-manifest.json is permanently frozen at 0.14.8. Skipping manifest update."
-            exit 0
-          }
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          $max_retries = 5
-          $retry_count = 0
-          $success = $false
-
-          while ($retry_count -lt $max_retries) {
-            git fetch origin main
-            git reset --hard origin/main
-            
-            node scripts/generate-manifest.js
-            git add update-manifest.json
-            
-            if (git diff --cached --quiet) {
-              echo "No changes to commit"
-              $success = $true
-              break
-            }
-            
-            git commit -m "chore: update manifest for v${{ env.VERSION }} [skip ci]"
-            git push origin HEAD:main
-            if ($LASTEXITCODE -eq 0) {
-              $success = $true
-              break
-            }
-            
-            echo "Push failed, retrying in 3 seconds..."
-            Start-Sleep -Seconds 3
-            $retry_count++
-          }
-
-          if (-not $success) {
-            echo "Failed to push after $max_retries retries"
-            exit 1
-          }
       - name: Create and Push Tag
         run: |
           git tag v${{ env.VERSION }}
@@ -115,4 +60,3 @@ jobs:
           files: |
             target/release/bundle/nsis/*setup.exe
             target/release/bundle/msi/*.msi
-            dist/*.zip

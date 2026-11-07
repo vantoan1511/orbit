@@ -51,11 +51,10 @@ Release preparation for Orbit **v${targetVersion}**.
 ## Automated Release Process
 
 Upon merging this PR into \`main\`:
-1. The GitHub Actions \`Release\` workflow will build desktop binaries and packages.
-2. An update zip package and installer executable will be generated.
-3. \`update-manifest.json\` will be updated and committed.
-4. Git tag \`v${targetVersion}\` and GitHub Release notes will be published.
-5. Automated WinGet package submission workflow will be dispatched.
+1. The GitHub Actions \`Release\` workflow will build Windows desktop binaries and installers (\`.exe\` NSIS & \`.msi\`).
+2. Installer elevation level (\`asInvoker\`) will be verified automatically.
+3. Git tag \`v${targetVersion}\` and GitHub Release notes will be published.
+4. Automated WinGet package submission workflow will be dispatched.
 `
 }
 

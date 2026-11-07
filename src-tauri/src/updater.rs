@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod installer_launcher;
 
+/// Update manifest representation for Orbit desktop application.
+/// Orbit v1.0.0 targets Windows (`windows-latest`) exclusively via NSIS (`*setup.exe`) installers.
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct UpdateManifest {
     pub version: String,
@@ -38,7 +40,8 @@ pub struct GithubReleaseItem {
 
 impl UpdateManifest {
     /// Matches Windows setup installer asset from release assets.
-    /// Excludes .msi, .zip, .sig, .tar.gz, etc.
+    /// Orbit v1.0.0 targets Windows (`windows-latest`) exclusively via NSIS (`*setup.exe`) installers,
+    /// excluding `.msi`, `.zip`, `.sig`, and `.tar.gz`.
     pub fn find_windows_installer(assets: &[GithubReleaseAsset]) -> Option<&GithubReleaseAsset> {
         assets.iter().find(|asset| {
             let name = &asset.name;
@@ -416,12 +419,12 @@ mod tests {
     fn test_find_windows_installer_asset() {
         let assets = vec![
             GithubReleaseAsset {
-                name: "Orbit_0.15.0_x64_en-US.msi".to_string(),
+                name: "Orbit_1.0.0_x64_en-US.msi".to_string(),
                 browser_download_url: "https://example.com/msi".to_string(),
                 size: Some(100),
             },
             GithubReleaseAsset {
-                name: "Orbit_0.15.0_x64-setup.exe".to_string(),
+                name: "Orbit_1.0.0_x64-setup.exe".to_string(),
                 browser_download_url: "https://example.com/setup.exe".to_string(),
                 size: Some(200),
             },
@@ -435,7 +438,7 @@ mod tests {
         let matched = UpdateManifest::find_windows_installer(&assets);
         assert!(matched.is_some());
         let asset = matched.unwrap();
-        assert_eq!(asset.name, "Orbit_0.15.0_x64-setup.exe");
+        assert_eq!(asset.name, "Orbit_1.0.0_x64-setup.exe");
         assert_eq!(asset.browser_download_url, "https://example.com/setup.exe");
     }
 
@@ -443,7 +446,7 @@ mod tests {
     fn test_find_windows_installer_asset_missing() {
         let assets = vec![
             GithubReleaseAsset {
-                name: "Orbit_0.15.0_x64_en-US.msi".to_string(),
+                name: "Orbit_1.0.0_x64_en-US.msi".to_string(),
                 browser_download_url: "https://example.com/msi".to_string(),
                 size: Some(100),
             },
@@ -461,11 +464,11 @@ mod tests {
     #[test]
     fn test_manifest_from_github_release_newer_version() {
         let release = GithubReleaseItem {
-            tag_name: Some("v0.15.0".to_string()),
-            body: Some("New cool features".to_string()),
+            tag_name: Some("v1.0.0".to_string()),
+            body: Some("v1.0.0 GA release".to_string()),
             assets: vec![
                 GithubReleaseAsset {
-                    name: "Orbit_0.15.0_x64-setup.exe".to_string(),
+                    name: "Orbit_1.0.0_x64-setup.exe".to_string(),
                     browser_download_url: "https://example.com/setup.exe".to_string(),
                     size: Some(200),
                 },
@@ -476,9 +479,9 @@ mod tests {
         assert!(parsed.is_some());
         let (manifest, has_update) = parsed.unwrap();
         assert!(has_update);
-        assert_eq!(manifest.version, "0.15.0");
+        assert_eq!(manifest.version, "1.0.0");
         assert_eq!(manifest.url, "https://example.com/setup.exe");
-        assert_eq!(manifest.release_notes.as_deref(), Some("New cool features"));
+        assert_eq!(manifest.release_notes.as_deref(), Some("v1.0.0 GA release"));
     }
 
     #[test]

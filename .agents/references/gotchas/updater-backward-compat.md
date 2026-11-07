@@ -35,8 +35,9 @@ When migrating from one desktop app runtime (e.g. Neutralino → Tauri) while ma
    - Spawns the installer via `ShellInstallerLauncher` using Win32 `ShellExecuteExW` (`open` verb).
    - **Critical Safety Guard**: `OrbitEvent::UpdateReady` is emitted strictly after the launcher returns `Ok(())`, and Orbit **only exits** (`std::process::exit(0)`) after a successful launch. If the user declines the Windows UAC elevation prompt or launch fails, Orbit stays running, emits `OrbitEvent::UpdateInstallFailed`, and resets the download state.
 3. **Zero Zip Maintenance for Future Releases**:
-   - CI `.github/workflows/release.yml` gates `Package Update Zip` and `Update Manifest` to versions `<= 0.14.8` via `semver.lte`.
-   - Versions `> 0.14.8` (e.g. `v0.15.0+`) do not package or upload `orbit-update.zip`.
+   - `update-manifest.json` remains permanently pinned at `0.14.8`.
+   - The legacy `Package Update Zip` and `Update Manifest` steps have been retired from `.github/workflows/release.yml`, and `dist/*.zip` has been removed from release uploads.
+   - Future releases (including `v1.0.0+`) do not package or upload `orbit-update.zip`.
 
 ## Elevation & Installer Spawning (os error 740)
 

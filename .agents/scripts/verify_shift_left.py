@@ -140,6 +140,13 @@ def check_branch_safety(branch: str) -> list[str]:
         )
     return violations
 
+def is_ci_environment(env: dict[str, str] | None = None) -> bool:
+    source = env if env is not None else os.environ
+    return (
+        source.get("GITHUB_ACTIONS", "").lower() == "true"
+        or source.get("CI", "").lower() == "true"
+    )
+
 def check_ipc_and_runtime_imports(file_path: Path, content: str) -> list[Violation]:
     """Rule: No direct @tauri-apps/* or legacy @neutralinojs/lib in components, views, or composables."""
     violations = []
@@ -525,23 +532,27 @@ def main():
 
     # 1. Branch Safety Check
     branch = get_current_branch(root)
+    ci_mode = is_ci_environment()
     print(f"Working Directory: {root}")
     print(f"Current Branch:    {COLOR_BOLD}{branch or 'Unknown'}{COLOR_RESET}")
 
-    branch_violations = check_branch_safety(branch)
-    if branch_violations:
-        for bv in branch_violations:
-            print_error(bv)
-        print_error("Shift-Left Pre-Flight failed: Branch safety violation.")
-        sys.exit(1)
+    if ci_mode:
+        print_success("CI environment detected (skipping local branch name check).")
     else:
-        print_success("Branch safety verified (not on main/master).")
+        branch_violations = check_branch_safety(branch)
+        if branch_violations:
+            for bv in branch_violations:
+                print_error(bv)
+            print_error("Shift-Left Pre-Flight failed: Branch safety violation.")
+            sys.exit(1)
+        else:
+            print_success("Branch safety verified (not on main/master).")
 
     # 2. Collect target files
     target_files = []
     if args.files:
         target_files = [Path(f).resolve() for f in args.files if Path(f).exists()]
-    elif args.all:
+    elif args.all or (ci_mode and not args.staged):
         for ext in ("*.vue", "*.ts", "*.js", "*.css", "*.rs"):
             target_files.extend(root.glob(f"src/**/{ext}"))
             target_files.extend(root.glob(f"src-tauri/src/**/{ext}"))
