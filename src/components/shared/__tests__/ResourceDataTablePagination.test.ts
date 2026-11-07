@@ -117,3 +117,25 @@ test('ResourceDataTable and GenericResourceTable wire resourceKind to useVisible
     'PodsDataTable must bind Pod kind'
   )
 })
+
+test('ResourceDataTable wires useTableScrollGuard, binds data-scrolling and passive capture scroll listener, and omits border-collapse', () => {
+  const filePath = path.resolve('src/components/shared/ResourceDataTable.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.match(
+    content,
+    /useTableScrollGuard/,
+    'ResourceDataTable must import and use useTableScrollGuard'
+  )
+  assert.match(
+    content,
+    /@scroll\.capture\.passive="onScroll"/,
+    'ResourceDataTable must attach passive capture scroll listener'
+  )
+  assert.match(content, /:data-scrolling=/, 'ResourceDataTable must bind data-scrolling attribute')
+  assert.doesNotMatch(
+    content,
+    /border-collapse/,
+    'ResourceDataTable must omit border-collapse from tableClass'
+  )
+})

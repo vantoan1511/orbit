@@ -6,7 +6,8 @@ import {
   MAX_EVENTS_RETAINED,
   mergeNodeWatchUpdate,
   resourcesEqual,
-  updateResourceBatch
+  updateResourceBatch,
+  hasPodMetricsChanged
 } from '../kubernetesStoreBatch.ts'
 
 interface TestResource {
@@ -316,4 +317,19 @@ test('mergeNodeWatchUpdate preserves existing CPU, memory, and pod metrics when 
   assert.equal(merged.memPct, 62.1)
   assert.equal(merged.memUsed, '9.94')
   assert.equal(merged.podsCount, 18)
+})
+
+test('hasPodMetricsChanged returns false when cpu, memory, cpuCores, and memoryBytes are identical', () => {
+  const prev = { cpu: '10m', memory: '32Mi', cpuCores: 0.01, memoryBytes: 33554432 }
+  const same = { cpu: '10m', memory: '32Mi', cpuCores: 0.01, memoryBytes: 33554432 }
+  assert.equal(hasPodMetricsChanged(prev, same), false)
+})
+
+test('hasPodMetricsChanged returns true when any metric value changes', () => {
+  const prev = { cpu: '10m', memory: '32Mi', cpuCores: 0.01, memoryBytes: 33554432 }
+  assert.equal(hasPodMetricsChanged(undefined, prev), true)
+  assert.equal(hasPodMetricsChanged(prev, { ...prev, cpu: '20m' }), true)
+  assert.equal(hasPodMetricsChanged(prev, { ...prev, memory: '64Mi' }), true)
+  assert.equal(hasPodMetricsChanged(prev, { ...prev, cpuCores: 0.02 }), true)
+  assert.equal(hasPodMetricsChanged(prev, { ...prev, memoryBytes: 67108864 }), true)
 })

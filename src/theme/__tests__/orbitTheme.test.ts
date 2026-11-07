@@ -728,3 +728,43 @@ test('Noir preset components harmonize typography with centralized design tokens
   assert.equal(toast.summary.fontSize, 'var(--ui-font-size-base)')
   assert.equal(toast.detail.fontSize, 'var(--ui-font-size-xs)')
 })
+
+test('Noir preset configures DataTable css hook for compositor promotion, tag blur suppression, and scroll pointer guard', () => {
+  const components = Noir.components as Record<string, unknown>
+  const datatable = components.datatable as Record<string, unknown>
+  assert.ok(datatable, 'datatable component config must exist')
+  assert.equal(typeof datatable.css, 'function', 'datatable must configure a css hook')
+
+  const stubDt = (p: string) => `var(--p-${p.replace(/\./g, '-')})`
+  const cssOutput = (datatable.css as (opt: { dt: (p: string) => string }) => string)({
+    dt: stubDt
+  })
+
+  assert.ok(
+    cssOutput.includes('.p-datatable-table-container'),
+    'must target .p-datatable-table-container'
+  )
+  assert.ok(
+    cssOutput.includes('overscroll-behavior: contain'),
+    'must configure overscroll-behavior: contain'
+  )
+  assert.ok(
+    cssOutput.includes('will-change: scroll-position'),
+    'must configure will-change: scroll-position'
+  )
+  assert.ok(cssOutput.includes('.p-datatable-tbody > tr'), 'must target .p-datatable-tbody > tr')
+  assert.ok(cssOutput.includes('transition: none'), 'must disable row transitions')
+  assert.ok(cssOutput.includes('.p-datatable .p-tag'), 'must target .p-datatable .p-tag')
+  assert.ok(
+    cssOutput.includes('backdrop-filter: none'),
+    'must disable backdrop-filter on badges/tags inside datatable'
+  )
+  assert.ok(
+    cssOutput.includes('[data-scrolling="true"] .p-datatable-tbody'),
+    'must target scrolling state'
+  )
+  assert.ok(
+    cssOutput.includes('pointer-events: none'),
+    'must disable pointer-events while scrolling'
+  )
+})

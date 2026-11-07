@@ -11,6 +11,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 
 import ResourceTableSkeleton from '@/components/shared/ResourceTableSkeleton.vue'
 import { type TableColumn } from '@/composables/useTableColumns'
+import { useTableScrollGuard } from '@/composables/useTableScrollGuard'
 import { useVisibleResourceKind } from '@/composables/useVisibleResourceKind'
 import { ALLOWED_ROW_OPTIONS } from '@/stores/tableFilterStore'
 import { getResourceCompositeKey, shouldShowSkeleton } from '@/utils/resourceKey'
@@ -80,6 +81,7 @@ const emit = defineEmits<{
 }>()
 
 useVisibleResourceKind(() => props.resourceKind)
+const { isScrolling, onScroll } = useTableScrollGuard()
 
 const rowsPerPage = ref(
   props.rowsPerPageOptions.includes(props.rows) ? props.rows : ALLOWED_ROW_OPTIONS[0]
@@ -385,6 +387,8 @@ const isIndeterminate = computed(() => {
     <!-- Table Container -->
     <div
       class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card) flex-1 min-h-0 flex flex-col"
+      :data-scrolling="isScrolling ? 'true' : undefined"
+      @scroll.capture.passive="onScroll"
     >
       <!-- Loading Skeleton or Data Table -->
       <slot name="loading" v-if="shouldShowSkeleton(loading, data.length)">
@@ -399,7 +403,7 @@ const isIndeterminate = computed(() => {
           :dataKey="dataKey"
           :rowHover="true"
           class="p-datatable-sm cursor-pointer flex-1 min-h-0"
-          tableClass="w-full text-left text-xs border-collapse"
+          tableClass="w-full text-left text-xs"
           :scrollable="true"
           scrollHeight="flex"
           :sortField="sortField"

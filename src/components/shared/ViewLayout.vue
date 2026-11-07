@@ -5,7 +5,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex flex-col gap-6 h-full">
+  <div class="flex flex-col gap-6 h-full flex-1 min-h-0">
     <!-- Header/Title -->
     <div
       v-if="title || $slots.title || $slots.actions || $slots['leading-actions']"

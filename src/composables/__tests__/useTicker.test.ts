@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { useTicker, resetTickerForTesting, getSubscriberCountForTesting } from '../useTicker.ts'
+import {
+  useTicker,
+  resetTickerForTesting,
+  getSubscriberCountForTesting,
+  setTickerPaused,
+  isTickerPausedForTesting
+} from '../useTicker.ts'
 
 test('subscribe -> unsubscribe -> subscribe manages activeSubscribers and interval consistently', () => {
   resetTickerForTesting()
@@ -102,4 +108,29 @@ test('pauses interval when document becomes hidden, resumes on visible', async (
       delete (globalThis as { document?: Document }).document
     }
   }
+})
+
+test('setTickerPaused suppresses timestamp updates while paused and refreshes on resume', async () => {
+  resetTickerForTesting()
+  const { currentTimestamp, subscribe, unsubscribe } = useTicker()
+  subscribe()
+
+  const initialTime = currentTimestamp.value
+  await new Promise((r) => setTimeout(r, 1100))
+  const runningTime = currentTimestamp.value
+  assert.ok(runningTime > initialTime, 'timestamp should advance while running')
+
+  setTickerPaused(true)
+  assert.equal(isTickerPausedForTesting(), true)
+
+  const pausedTime = currentTimestamp.value
+  await new Promise((r) => setTimeout(r, 1100))
+  assert.equal(currentTimestamp.value, pausedTime, 'timestamp must not advance while paused')
+
+  setTickerPaused(false)
+  assert.equal(isTickerPausedForTesting(), false)
+  assert.ok(currentTimestamp.value > pausedTime, 'timestamp updates immediately upon resume')
+
+  unsubscribe()
+  resetTickerForTesting()
 })

@@ -44,6 +44,8 @@ import {
   mergeNodeWatchUpdate,
   resourcesEqual,
   updateResourceBatch,
+  hasPodMetricsChanged,
+  type PodMetricSample,
   type ResourceKeyExtractor
 } from './kubernetesStoreBatch.ts'
 import { createFrameBatcher, type FrameBatcher } from './frameBatcher.ts'
@@ -155,10 +157,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const key = `${pod.namespace}/${pod.name}`
     const cached = podMetricsMap.get(key)
 
-    const cpuCores = typeof pod.cpuCores === 'number' ? pod.cpuCores : cached?.cpuCores
-    const memoryBytes = typeof pod.memoryBytes === 'number' ? pod.memoryBytes : cached?.memoryBytes
-    let cpu = pod.cpu ?? cached?.cpu
-    let memory = pod.memory ?? cached?.memory
+    const cpuCores = cached?.cpuCores !== undefined ? cached.cpuCores : pod.cpuCores
+    const memoryBytes = cached?.memoryBytes !== undefined ? cached.memoryBytes : pod.memoryBytes
+    let cpu = cached?.cpu ?? pod.cpu
+    let memory = cached?.memory ?? pod.memory
     let cpuPct = typeof pod.cpuPct === 'number' ? pod.cpuPct : undefined
     let memoryPct = typeof pod.memoryPct === 'number' ? pod.memoryPct : undefined
 
@@ -189,6 +191,17 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     if (memoryBytes !== undefined && (!memory || memory === '-')) {
       const memMib = memoryBytes / (1024 * 1024)
       memory = formatMemoryMiB(memMib)
+    }
+
+    if (
+      pod.cpu === cpu &&
+      pod.cpuCores === cpuCores &&
+      pod.cpuPct === cpuPct &&
+      pod.memory === memory &&
+      pod.memoryBytes === memoryBytes &&
+      pod.memoryPct === memoryPct
+    ) {
+      return pod
     }
 
     return {
@@ -436,6 +449,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const logsStore = useLogsStore()
     void logsStore.setClusterId(id)
     podMetricsMap.clear()
+    hasDeferredPodMetrics = false
     prevNodeTotalsMap.clear()
     // Clear workloads when cluster changes to prevent stale data
     namespaceList.value = []
@@ -769,6 +783,39 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   const activePortForwards = ref<ActivePortForward[]>([])
+  let hasDeferredPodMetrics = false
+
+  function applyDeferredPodMetrics(changedKeys?: Set<string>): void {
+    if (pods.value.length === 0) {
+      hasDeferredPodMetrics = false
+      return
+    }
+
+    const nodeIndex = getNodeIndex()
+    let changed = false
+    const currentPods = pods.value
+    const newPods = currentPods.map((p) => {
+      const key = `${p.namespace}/${p.name}`
+      if (changedKeys && !changedKeys.has(key)) return p
+      const nextPod = enrichPodWithMetrics(p, nodeIndex)
+      if (nextPod !== p) {
+        changed = true
+      }
+      return nextPod
+    })
+
+    if (changed) {
+      pods.value = newPods
+    }
+    hasDeferredPodMetrics = false
+  }
+
+  function setScrolling(scrolling: boolean) {
+    frameBatcher.setScrolling(scrolling)
+    if (!scrolling && hasDeferredPodMetrics) {
+      applyDeferredPodMetrics()
+    }
+  }
 
   function onPodMetricsUpdated(payload: {
     cluster_id: string | null
@@ -787,29 +834,26 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     const changedKeys = new Set<string>()
     for (const m of payload.metrics) {
       const key = `${m.namespace}/${m.name}`
-      podMetricsMap.set(key, {
+      const prev = podMetricsMap.get(key)
+      const next: PodMetricSample = {
         cpu: m.cpu,
         memory: m.memory,
         cpuCores: m.cpuCores,
         memoryBytes: m.memoryBytes
-      })
-      changedKeys.add(key)
+      }
+      if (hasPodMetricsChanged(prev, next)) {
+        podMetricsMap.set(key, next)
+        changedKeys.add(key)
+      }
     }
-    if (pods.value.length === 0 || changedKeys.size === 0) return
+    if (changedKeys.size === 0) return
 
-    const nodeIndex = getNodeIndex()
-    let changed = false
-    const currentPods = pods.value
-    const newPods = currentPods.map((p) => {
-      const key = `${p.namespace}/${p.name}`
-      if (!changedKeys.has(key)) return p
-      changed = true
-      return enrichPodWithMetrics(p, nodeIndex)
-    })
-
-    if (changed) {
-      pods.value = newPods
+    if (frameBatcher.isScrolling()) {
+      hasDeferredPodMetrics = true
+      return
     }
+
+    applyDeferredPodMetrics(changedKeys)
   }
 
   function onPortForwardStarted(payload: ActivePortForward) {
@@ -932,6 +976,8 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     watcherConnectionState,
     setWatcherConnectionState,
     frameBatcher,
-    registerVisibleKind
+    registerVisibleKind,
+    setScrolling,
+    isScrolling: () => frameBatcher.isScrolling()
   }
 })

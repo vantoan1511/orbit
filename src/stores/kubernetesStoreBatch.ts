@@ -16,6 +16,26 @@ export const keyByUid: ResourceKeyExtractor<{ uid?: string }> = (item) => item.u
 export const keyService: ResourceKeyExtractor<ServiceInfo> = (item) =>
   item.uid || `${item.namespace ?? ''}/${item.name ?? ''}`
 
+export interface PodMetricSample {
+  cpu: string
+  memory: string
+  cpuCores?: number
+  memoryBytes?: number
+}
+
+export function hasPodMetricsChanged(
+  prev: PodMetricSample | undefined,
+  next: PodMetricSample
+): boolean {
+  if (!prev) return true
+  return (
+    prev.cpu !== next.cpu ||
+    prev.memory !== next.memory ||
+    prev.cpuCores !== next.cpuCores ||
+    prev.memoryBytes !== next.memoryBytes
+  )
+}
+
 /**
  * Merges a single Node watch update with the existing Node record.
  * Preserves CPU, memory, and pod metric counts when the incoming watch payload

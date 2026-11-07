@@ -7,6 +7,8 @@ export interface FrameBatcherOptions {
   burstFlushMs?: number
   /** Flush interval for kinds not currently visible. Default 2000. */
   backgroundFlushMs?: number
+  /** Maximum time (ms) to hold visible updates during continuous scrolling. Default 1000. */
+  maxScrollHoldMs?: number
   /** Injectable clock + timers for tests. */
   now?: () => number
   scheduleFrame?: (cb: () => void) => void
@@ -21,6 +23,8 @@ export interface FrameBatcher<T> {
   /** Ref-counted visibility. Returns an unregister fn. Registering flushes that kind immediately. */
   registerVisibleKind(kind: string): () => void
   isBursting(): boolean
+  setScrolling(scrolling: boolean): void
+  isScrolling(): boolean
 }
 
 export function createFrameBatcher<T>(
@@ -34,6 +38,7 @@ export function createFrameBatcher<T>(
   const burstWindowMs = opts.burstWindowMs ?? 250
   const burstFlushMs = opts.burstFlushMs ?? 250
   const backgroundFlushMs = opts.backgroundFlushMs ?? 2000
+  const maxScrollHoldMs = opts.maxScrollHoldMs ?? 1000
 
   const now =
     opts.now ??
@@ -63,6 +68,8 @@ export function createFrameBatcher<T>(
   let frameScheduled = false
   let burstTimerHandle: unknown | null = null
   let backgroundTimerHandle: unknown | null = null
+  let scrolling = false
+  let scrollHoldTimerHandle: unknown | null = null
 
   function isKindVisible(kind: string): boolean {
     return (visibleCounts.get(kind) ?? 0) > 0
@@ -103,8 +110,19 @@ export function createFrameBatcher<T>(
     return false
   }
 
+  function hasPendingVisible(): boolean {
+    for (const [kind, updates] of pending.entries()) {
+      if (isKindVisible(kind) && updates.length > 0) return true
+    }
+    return false
+  }
+
   function flushVisible(): void {
     burstTimerHandle = null
+    if (scrollHoldTimerHandle !== null) {
+      cancelTimeout(scrollHoldTimerHandle)
+      scrollHoldTimerHandle = null
+    }
     const visibleEntries: Array<[string, T[]]> = []
     for (const [kind, updates] of pending.entries()) {
       if (isKindVisible(kind) && updates.length > 0) {
@@ -136,6 +154,12 @@ export function createFrameBatcher<T>(
 
   function flushVisibleOnFrame(): void {
     frameScheduled = false
+    if (scrolling) {
+      if (scrollHoldTimerHandle === null && hasPendingVisible()) {
+        scrollHoldTimerHandle = scheduleTimeout(flushVisible, maxScrollHoldMs)
+      }
+      return
+    }
     if (isBursting()) {
       if (burstTimerHandle === null) {
         burstTimerHandle = scheduleTimeout(flushVisible, burstFlushMs)
@@ -158,7 +182,11 @@ export function createFrameBatcher<T>(
     }
 
     if (isKindVisible(kind)) {
-      if (isBursting()) {
+      if (scrolling) {
+        if (scrollHoldTimerHandle === null) {
+          scrollHoldTimerHandle = scheduleTimeout(flushVisible, maxScrollHoldMs)
+        }
+      } else if (isBursting()) {
         if (burstTimerHandle === null) {
           burstTimerHandle = scheduleTimeout(flushVisible, burstFlushMs)
         }
@@ -207,6 +235,32 @@ export function createFrameBatcher<T>(
       cancelTimeout(backgroundTimerHandle)
       backgroundTimerHandle = null
     }
+    if (scrollHoldTimerHandle !== null) {
+      cancelTimeout(scrollHoldTimerHandle)
+      scrollHoldTimerHandle = null
+    }
+  }
+
+  function setScrolling(nextScrolling: boolean): void {
+    if (scrolling === nextScrolling) return
+    scrolling = nextScrolling
+    if (scrolling) {
+      if (hasPendingVisible() && scrollHoldTimerHandle === null) {
+        scrollHoldTimerHandle = scheduleTimeout(flushVisible, maxScrollHoldMs)
+      }
+    } else {
+      if (scrollHoldTimerHandle !== null) {
+        cancelTimeout(scrollHoldTimerHandle)
+        scrollHoldTimerHandle = null
+      }
+      if (hasPendingVisible()) {
+        flushVisible()
+      }
+    }
+  }
+
+  function isScrolling(): boolean {
+    return scrolling
   }
 
   function registerVisibleKind(kind: string): () => void {
@@ -244,6 +298,8 @@ export function createFrameBatcher<T>(
     flush,
     clear,
     registerVisibleKind,
-    isBursting
+    isBursting,
+    setScrolling,
+    isScrolling
   }
 }
