@@ -60,6 +60,13 @@ export const kubernetesService = {
   },
 
   /**
+   * Request list of horizontal pod autoscalers, optionally filtered by namespace
+   */
+  async getHpas(namespace?: string): Promise<void> {
+    await coreEngine.dispatch('getHpas', { namespace })
+  },
+
+  /**
    * Request list of services, optionally filtered by namespace
    */
   async getServices(namespace?: string): Promise<void> {
@@ -228,6 +235,15 @@ export const kubernetesService = {
     replicas: number
   }): Promise<void> {
     await coreEngine.dispatch('scaleResource', params)
+  },
+
+  async updateHpaReplicas(params: {
+    namespace: string
+    name: string
+    minReplicas: number
+    maxReplicas: number
+  }): Promise<void> {
+    await coreEngine.dispatch('updateHpaReplicas', params)
   },
 
   async updateResourceImages(params: {

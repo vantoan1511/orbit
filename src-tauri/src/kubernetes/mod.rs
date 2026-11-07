@@ -19,6 +19,7 @@ pub mod logs;
 pub mod delete;
 pub mod edit;
 pub mod port_forward;
+pub mod hpa;
 
 pub use configmaps::list_configmaps;
 pub use secrets::list_secrets;
@@ -34,6 +35,7 @@ pub use policies::*;
 pub use logs::{stream_pod_logs, get_workload_pods};
 pub use delete::delete_resource;
 pub use edit::{get_resource_raw, apply_resource, create_resource};
+pub use hpa::{list_hpas, map_hpa, update_hpa_replicas};
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
 pub(crate) fn format_age(creation_timestamp: &Option<k8s_openapi::apimachinery::pkg::apis::meta::v1::Time>) -> String {

@@ -18,6 +18,7 @@ import type {
   ClusterInfo,
   ConfigMapInfo,
   CronJobInfo,
+  HpaInfo,
   DaemonSetInfo,
   DeploymentInfo,
   EventInfo,
@@ -121,6 +122,10 @@ const handleJobsUpdated = (payload: { jobs: JobInfo[] }) => {
 
 const handleCronJobsUpdated = (payload: { cron_jobs: CronJobInfo[] }) => {
   k8sStore.setCronJobs(payload.cron_jobs)
+}
+
+const handleHpasUpdated = (payload: { hpas: HpaInfo[] }) => {
+  k8sStore.setHpas(payload.hpas)
 }
 
 const handleNodesUpdated = (payload: { nodes: NodeInfo[] }) => {
@@ -314,6 +319,7 @@ onMounted(async () => {
     events.on(OrbitEvents.ReplicaSetsUpdated, handleReplicaSetsUpdated),
     events.on(OrbitEvents.JobsUpdated, handleJobsUpdated),
     events.on(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated),
+    events.on(OrbitEvents.HpasUpdated, handleHpasUpdated),
     events.on(OrbitEvents.NodesUpdated, handleNodesUpdated),
     events.on(OrbitEvents.ServicesUpdated, handleServicesUpdated),
     events.on(OrbitEvents.IngressesUpdated, handleIngressesUpdated),
@@ -351,6 +357,7 @@ onUnmounted(() => {
   events.off(OrbitEvents.ReplicaSetsUpdated, handleReplicaSetsUpdated)
   events.off(OrbitEvents.JobsUpdated, handleJobsUpdated)
   events.off(OrbitEvents.CronJobsUpdated, handleCronJobsUpdated)
+  events.off(OrbitEvents.HpasUpdated, handleHpasUpdated)
   events.off(OrbitEvents.NodesUpdated, handleNodesUpdated)
   events.off(OrbitEvents.ServicesUpdated, handleServicesUpdated)
   events.off(OrbitEvents.IngressesUpdated, handleIngressesUpdated)

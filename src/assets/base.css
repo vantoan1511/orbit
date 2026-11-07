@@ -15,6 +15,7 @@
   --color-configmap: #eab308;
   --color-service: #14b8a6;
   --color-ingress: #f43f5e;
+  --color-hpa: #0284c7;
 
   /* Z-Index Scale */
   --z-sticky: 100;
@@ -151,6 +152,7 @@
   --configmap: #eab308;
   --service: #14b8a6;
   --ingress: #f43f5e;
+  --hpa: #0284c7;
 
   /* ===========================
      Core System UI Style Tokens
@@ -304,6 +306,7 @@
   --configmap: #facc15;
   --service: #2dd4bf;
   --ingress: #fb7185;
+  --hpa: #38bdf8;
 
   /* Tailwind Color Overrides */
   --color-deployment: #60a5fa;
@@ -317,6 +320,7 @@
   --color-configmap: #facc15;
   --color-service: #2dd4bf;
   --color-ingress: #fb7185;
+  --color-hpa: #38bdf8;
 
   --ui-card-bg: var(--bg-card);
   --ui-control-bg: var(--input-bg);

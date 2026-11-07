@@ -463,3 +463,65 @@ pub enum ResourceApiScope {
     ClusterScoped,
 }
 
+fn default_hpa_kind() -> String {
+    "HorizontalPodAutoscaler".to_string()
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaTargetRef {
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_version: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaMetricTarget {
+    pub metric_type: String,
+    pub name: String,
+    pub target_type: String,
+    pub target_value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_value: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaConditionInfo {
+    pub r#type: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_transition_time: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaInfo {
+    #[serde(default = "default_hpa_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub scale_target_ref: HpaTargetRef,
+    pub min_replicas: i32,
+    pub max_replicas: i32,
+    pub current_replicas: i32,
+    pub desired_replicas: i32,
+    pub metrics: Vec<HpaMetricTarget>,
+    pub metrics_summary: Vec<String>,
+    pub conditions: Vec<HpaConditionInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_scale_time: Option<String>,
+    pub age: String,
+    pub created: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+

@@ -193,6 +193,7 @@ test('verifies all domain tables have data-component attribute', () => {
     'src/components/workloads/ReplicaSetsTable.vue',
     'src/components/workloads/JobsTable.vue',
     'src/components/workloads/CronJobsTable.vue',
+    'src/components/workloads/HpasTable.vue',
     'src/components/network/ServicesTable.vue',
     'src/components/network/IngressesTable.vue',
     'src/components/network/PortForwardsTable.vue',
@@ -216,6 +217,7 @@ test('verifies all resource drawers have data-component attribute', () => {
   const drawerFiles = [
     'src/components/shared/BaseResourceDrawer.vue',
     'src/components/workloads/WorkloadDetailsDrawer.vue',
+    'src/components/workloads/HpaDetailsDrawer.vue',
     'src/components/policies/PolicyDetailsDrawer.vue',
     'src/components/namespaces/NamespaceDetailsDrawer.vue',
     'src/components/nodes/NodeDetailsDrawer.vue',

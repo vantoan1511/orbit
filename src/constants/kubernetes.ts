@@ -24,7 +24,8 @@ export const KUBERNETES_RESOURCE_KIND = {
   ResourceQuota: 'ResourceQuota',
   LimitRange: 'LimitRange',
   ValidatingWebhookConfiguration: 'ValidatingWebhookConfiguration',
-  MutatingWebhookConfiguration: 'MutatingWebhookConfiguration'
+  MutatingWebhookConfiguration: 'MutatingWebhookConfiguration',
+  HorizontalPodAutoscaler: 'HorizontalPodAutoscaler'
 } as const
 
 export type KubernetesResourceKind =
@@ -238,6 +239,18 @@ export const KUBERNETES_JOB_STATUS = {
 } as const
 
 export type KubernetesJobStatus = (typeof KUBERNETES_JOB_STATUS)[keyof typeof KUBERNETES_JOB_STATUS]
+
+/**
+ * Common Kubernetes HorizontalPodAutoscaler statuses.
+ */
+export const KUBERNETES_HPA_STATUS = {
+  Active: 'Active',
+  ScalingLimited: 'ScalingLimited',
+  Pending: 'Pending',
+  Failed: 'Failed'
+} as const
+
+export type KubernetesHpaStatus = (typeof KUBERNETES_HPA_STATUS)[keyof typeof KUBERNETES_HPA_STATUS]
 
 /**
  * Common Kubernetes Namespace phases.

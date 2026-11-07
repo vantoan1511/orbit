@@ -26,6 +26,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sliders,
+  TrendingUp,
   Webhook
 } from '@lucide/vue'
 
@@ -64,6 +65,7 @@ export const ICON_MAP: Record<string, Component> = {
   ShieldAlert,
   ShieldCheck,
   Sliders,
+  TrendingUp,
   Webhook
 }
 
@@ -176,6 +178,14 @@ export function getTabMetadataForRoute(path: string, query?: Record<string, stri
           iconName: 'Clock',
           icon: Clock,
           iconColorClass: 'text-job',
+          category: 'workloads'
+        }
+      case 'hpas':
+        return {
+          title: 'HPAs',
+          iconName: 'TrendingUp',
+          icon: TrendingUp,
+          iconColorClass: 'text-hpa',
           category: 'workloads'
         }
       case 'deployments':

@@ -35,6 +35,11 @@ test('getTabMetadataForRoute resolves Workloads sub-tabs', () => {
   assert.equal(pods.iconName, 'Box')
   assert.equal(pods.category, 'workloads')
 
+  const hpas = getTabMetadataForRoute('/workloads', { tab: 'hpas' })
+  assert.equal(hpas.title, 'HPAs')
+  assert.equal(hpas.iconName, 'TrendingUp')
+  assert.equal(hpas.category, 'workloads')
+
   const fallbackWorkloads = getTabMetadataForRoute('/workloads')
   assert.equal(fallbackWorkloads.title, 'Deployments')
 })

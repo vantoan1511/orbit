@@ -24,6 +24,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sliders,
+  TrendingUp,
   Webhook
 } from '@lucide/vue'
 import type { MenuItem } from 'primevue/menuitem'
@@ -139,6 +140,12 @@ export const categoryNavItems: Record<Exclude<CategoryId, 'clusters'>, AppSideba
       label: 'CronJobs',
       customIcon: Clock,
       route: '/workloads?tab=cronjobs'
+    },
+    {
+      key: 'workloads-hpas',
+      label: 'HPAs',
+      customIcon: TrendingUp,
+      route: '/workloads?tab=hpas'
     }
   ],
   network: [

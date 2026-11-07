@@ -69,6 +69,10 @@ pub enum OrbitEvent {
     CronJobsUpdated {
         cron_jobs: Vec<crate::kubernetes::models::CronJobInfo>,
     },
+    #[serde(rename = "hpasUpdated")]
+    HpasUpdated {
+        hpas: Vec<crate::kubernetes::models::HpaInfo>,
+    },
     #[serde(rename = "clustersUpdated")]
     ClustersUpdated {
         clusters: Vec<crate::kubernetes::models::ClusterInfo>,
@@ -260,6 +264,7 @@ impl OrbitEvent {
             OrbitEvent::ReplicaSetsUpdated { .. } => "replicaSetsUpdated",
             OrbitEvent::JobsUpdated { .. } => "jobsUpdated",
             OrbitEvent::CronJobsUpdated { .. } => "cronJobsUpdated",
+            OrbitEvent::HpasUpdated { .. } => "hpasUpdated",
             OrbitEvent::ClustersUpdated { .. } => "clustersUpdated",
             OrbitEvent::ActiveClusterChanged { .. } => "activeClusterChanged",
             OrbitEvent::UserProfileUpdated { .. } => "userProfileUpdated",

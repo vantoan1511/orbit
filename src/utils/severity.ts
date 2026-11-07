@@ -7,7 +7,8 @@ import {
   KUBERNETES_RESOURCE_KIND,
   KUBERNETES_SERVICE_TYPE,
   KUBERNETES_VOLUME_STATUS,
-  KUBERNETES_WORKLOAD_STATUS
+  KUBERNETES_WORKLOAD_STATUS,
+  KUBERNETES_HPA_STATUS
 } from '../constants/kubernetes.ts'
 
 export type TagSeverity = 'success' | 'info' | 'warn' | 'danger' | 'secondary' | 'contrast'
@@ -121,12 +122,16 @@ export function getWorkloadStatusBadgeClass(status?: string): string {
     case KUBERNETES_WORKLOAD_STATUS.Running:
     case KUBERNETES_JOB_STATUS.Succeeded:
     case KUBERNETES_JOB_STATUS.Active:
+    case KUBERNETES_HPA_STATUS.Active:
       return 'bg-(--success)'
     case KUBERNETES_WORKLOAD_STATUS.Progressing:
     case KUBERNETES_POD_STATUS.Pending:
+    case KUBERNETES_HPA_STATUS.ScalingLimited:
+    case KUBERNETES_HPA_STATUS.Pending:
       return 'bg-(--warning)'
     case KUBERNETES_WORKLOAD_STATUS.Failed:
     case KUBERNETES_POD_STATUS.CrashLoopBackOff:
+    case KUBERNETES_HPA_STATUS.Failed:
       return 'bg-(--danger)'
     default:
       return 'bg-muted-color'

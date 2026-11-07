@@ -11,6 +11,7 @@ import CreateStatefulSetDialog from '@/components/workloads/CreateStatefulSetDia
 import CronJobsTable from '@/components/workloads/CronJobsTable.vue'
 import DaemonSetsTable from '@/components/workloads/DaemonSetsTable.vue'
 import DeploymentsTable from '@/components/workloads/DeploymentsTable.vue'
+import HpasTable from '@/components/workloads/HpasTable.vue'
 import JobsTable from '@/components/workloads/JobsTable.vue'
 import PodMetricsCards from '@/components/pods/PodMetricsCards.vue'
 import PodsDataTable from '@/components/pods/PodsDataTable.vue'
@@ -133,6 +134,9 @@ const tabs: ResourceTab[] = [
   {
     id: 'cronjobs',
     createAction: { handler: openCreateCronJobDialog }
+  },
+  {
+    id: 'hpas'
   }
 ]
 </script>
@@ -180,6 +184,11 @@ const tabs: ResourceTab[] = [
     <!-- CronJobs Tab -->
     <template #tab-cronjobs>
       <CronJobsTable />
+    </template>
+
+    <!-- HPAs Tab -->
+    <template #tab-hpas>
+      <HpasTable />
     </template>
   </ResourceTabsLayout>
 </template>

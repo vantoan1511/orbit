@@ -245,6 +245,141 @@ pub fn get_cronjobs(
     });
 }
 
+pub fn get_hpas(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let namespace = get_string(&data, "namespace");
+        tracing::debug!(namespace = ?namespace, "Fetching hpas");
+
+        let client = {
+            let r_manager = manager.read().await;
+            r_manager.active_client.clone()
+        };
+        if let Some(ref client) = client {
+            match kubernetes::list_hpas(client, namespace.clone()).await {
+                Ok(hpas) => {
+                    let _ = Bridge::send_event(&writer, &token, &OrbitEvent::HpasUpdated { hpas }).await;
+                }
+                Err(e) => {
+                    tracing::error!(namespace = ?namespace, error = %e, "Failed to list hpas");
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: format!("Failed to list hpas: {}", crate::kubernetes::format_error(&e)),
+                        },
+                    ).await;
+                }
+            }
+        }
+    });
+}
+
+pub fn update_hpa_replicas(
+    data: Option<Value>,
+    writer: Arc<Mutex<WsWriter>>,
+    token: String,
+    manager: Arc<RwLock<KubeManager>>,
+) {
+    tokio::spawn(async move {
+        let namespace = get_string(&data, "namespace").unwrap_or_else(|| "default".to_string());
+        let name = get_string(&data, "name").unwrap_or_default();
+        let min_replicas = get_i64(&data, "minReplicas").unwrap_or(1) as i32;
+        let max_replicas = get_i64(&data, "maxReplicas").unwrap_or(1) as i32;
+
+        if name.is_empty() {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "HPA name is required".to_string(),
+                },
+            )
+            .await;
+            return;
+        }
+
+        if min_replicas < 1 || max_replicas < min_replicas {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: format!(
+                        "Invalid replica bounds: minReplicas ({}) must be >= 1 and <= maxReplicas ({})",
+                        min_replicas, max_replicas
+                    ),
+                },
+            )
+            .await;
+            return;
+        }
+
+        tracing::info!(
+            event = "updateHpaReplicas",
+            namespace = %namespace,
+            name = %name,
+            min_replicas = min_replicas,
+            max_replicas = max_replicas,
+            "Updating HPA replica bounds"
+        );
+
+        let client = {
+            let r_manager = manager.read().await;
+            r_manager.active_client.clone()
+        };
+
+        if let Some(ref client) = client {
+            match crate::kubernetes::update_hpa_replicas(
+                client,
+                &namespace,
+                &name,
+                min_replicas,
+                max_replicas,
+            )
+            .await
+            {
+                Ok(()) => {
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::CommandSucceeded {
+                            message: format!(
+                                "Updated HPA {} replica bounds to min: {}, max: {}",
+                                name, min_replicas, max_replicas
+                            ),
+                        },
+                    )
+                    .await;
+                }
+                Err(e) => {
+                    tracing::error!(
+                        event = "updateHpaReplicas",
+                        namespace = %namespace,
+                        name = %name,
+                        error = %e,
+                        "Failed to update HPA replica bounds"
+                    );
+                    let _ = Bridge::send_event(
+                        &writer,
+                        &token,
+                        &OrbitEvent::ErrorOccurred {
+                            message: format!(
+                                "Failed to update HPA replica bounds: {}",
+                                crate::kubernetes::format_error(&e)
+                            ),
+                        },
+                    )
+                    .await;
+                }
+            }
+        }
+    });
+}
+
 pub fn scale_resource(
     data: Option<Value>,
     writer: Arc<Mutex<WsWriter>>,
@@ -846,6 +981,43 @@ mod tests {
 
         set_cronjob_suspend(
             Some(serde_json::json!({ "name": "", "namespace": "default", "suspend": true })),
+            writer,
+            "token".to_string(),
+            manager,
+        );
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let emitted = mock_emitter.get_emitted_events().await;
+        let err_event = emitted.iter().find(|(name, _)| name == "errorOccurred");
+        assert!(err_event.is_some(), "Expected errorOccurred event when name is empty");
+    }
+
+    #[tokio::test]
+    async fn test_update_hpa_replicas_invalid_bounds_emits_error() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+
+        // Test maxReplicas < minReplicas
+        update_hpa_replicas(
+            Some(serde_json::json!({ "name": "test-hpa", "namespace": "default", "minReplicas": 5, "maxReplicas": 2 })),
+            writer.clone(),
+            "token".to_string(),
+            manager.clone(),
+        );
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        let emitted = mock_emitter.get_emitted_events().await;
+        let err_event = emitted.iter().find(|(name, _)| name == "errorOccurred");
+        assert!(err_event.is_some(), "Expected errorOccurred event when bounds are invalid");
+
+        // Test empty name
+        mock_emitter.emitted.lock().await.clear();
+        update_hpa_replicas(
+            Some(serde_json::json!({ "name": "", "namespace": "default", "minReplicas": 1, "maxReplicas": 5 })),
             writer,
             "token".to_string(),
             manager,

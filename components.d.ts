@@ -61,6 +61,7 @@ declare module 'vue' {
     CreateServiceDialog: typeof import('./src/components/network/CreateServiceDialog.vue')['default']
     CreateStatefulSetDialog: typeof import('./src/components/workloads/CreateStatefulSetDialog.vue')['default']
     CreateStorageClassDialog: typeof import('./src/components/storage/CreateStorageClassDialog.vue')['default']
+    CronJobEditForm: typeof import('./src/components/workloads/CronJobEditForm.vue')['default']
     CronJobsTable: typeof import('./src/components/workloads/CronJobsTable.vue')['default']
     DaemonSetEditForm: typeof import('./src/components/workloads/DaemonSetEditForm.vue')['default']
     DaemonSetsTable: typeof import('./src/components/workloads/DaemonSetsTable.vue')['default']
