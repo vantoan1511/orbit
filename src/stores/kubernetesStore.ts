@@ -111,6 +111,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   const cpuHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
   const memHistory = ref<number[]>([0, 0, 0, 0, 0, 0, 0])
+  const loadedKinds = new Set<string>()
 
   watch(nodes, (newNodes: NodeInfo[]) => {
     let totalCpu = 0
@@ -238,42 +239,50 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setPods(newPods: PodInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Pod)
     const nodeIndex = getNodeIndex()
     pods.value = newPods.map((p) => enrichPodWithMetrics(p, nodeIndex))
     podsLoading.value = false
   }
 
   function setDeployments(newDeployments: DeploymentInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Deployment)
     deployments.value = newDeployments
     deploymentsLoading.value = false
   }
 
   function setStatefulSets(newStatefulSets: StatefulSetInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.StatefulSet)
     statefulSets.value = newStatefulSets
     statefulSetsLoading.value = false
   }
 
   function setDaemonSets(newDaemonSets: DaemonSetInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.DaemonSet)
     daemonSets.value = newDaemonSets
     daemonSetsLoading.value = false
   }
 
   function setReplicaSets(newReplicaSets: ReplicaSetInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.ReplicaSet)
     replicaSets.value = newReplicaSets
     replicaSetsLoading.value = false
   }
 
   function setJobs(newJobs: JobInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Job)
     jobs.value = newJobs
     jobsLoading.value = false
   }
 
   function setCronJobs(newCronJobs: CronJobInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.CronJob)
     cronJobs.value = newCronJobs
     cronJobsLoading.value = false
   }
 
   function setHpas(newHpas: HpaInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.HorizontalPodAutoscaler)
     hpas.value = newHpas
     hpasLoading.value = false
   }
@@ -311,6 +320,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
 
     nodes.value = newNodes
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Node)
     nodesLoading.value = false
 
     if (pods.value.length > 0 && changedNodeNames.size > 0) {
@@ -329,31 +339,37 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setServices(newServices: ServiceInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Service)
     services.value = newServices
     servicesLoading.value = false
   }
 
   function setIngresses(newIngresses: IngressInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Ingress)
     ingresses.value = newIngresses
     ingressesLoading.value = false
   }
 
   function setConfigMaps(newConfigMaps: ConfigMapInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.ConfigMap)
     configMaps.value = newConfigMaps
     configMapsLoading.value = false
   }
 
   function setSecrets(newSecrets: SecretInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Secret)
     secrets.value = newSecrets
     secretsLoading.value = false
   }
 
   function setEvents(newEvents: EventInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Event)
     events.value = newEvents
     eventsLoading.value = false
   }
 
   function setPolicies(newPolicies: PolicyInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Policy)
     policies.value = newPolicies
     policiesLoading.value = false
   }
@@ -375,16 +391,19 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   }
 
   function setPersistentVolumes(newPVs: PersistentVolumeInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.PersistentVolume)
     persistentVolumes.value = newPVs
     persistentVolumesLoading.value = false
   }
 
   function setPersistentVolumeClaims(newPVCs: PersistentVolumeClaimInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim)
     persistentVolumeClaims.value = newPVCs
     persistentVolumeClaimsLoading.value = false
   }
 
   function setStorageClasses(newSCs: StorageClassInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.StorageClass)
     storageClasses.value = newSCs
     storageClassesLoading.value = false
   }
@@ -429,6 +448,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
   })
 
   function setNamespaces(newNamespaces: NamespaceInfo[]) {
+    loadedKinds.add(KUBERNETES_RESOURCE_KIND.Namespace)
     namespaceList.value = newNamespaces
     namespacesLoading.value = false
   }
@@ -439,6 +459,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
 
   function setActiveClusterId(id: string | null) {
     frameBatcher.clear()
+    loadedKinds.clear()
     watcherConnectionState.value = 'connected'
     if (activeClusterId.value === id) return
     activeClusterId.value = id
@@ -622,6 +643,91 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     }
   }
 
+  async function fetchWithLoading(loadingRef: { value: boolean }, fetchFn: () => Promise<void>) {
+    if (loadingRef.value) return
+    loadingRef.value = true
+    try {
+      await fetchFn()
+    } catch (error) {
+      loadingRef.value = false
+      throw error
+    }
+  }
+
+  async function ensureKindLoaded(kind: string): Promise<void> {
+    if (!isEngineReady.value || activeClusterId.value === null) {
+      return
+    }
+    if (loadedKinds.has(kind)) {
+      return
+    }
+
+    switch (kind) {
+      case KUBERNETES_RESOURCE_KIND.Pod:
+        await fetchWithLoading(podsLoading, () => kubernetesService.getPods())
+        break
+      case KUBERNETES_RESOURCE_KIND.Deployment:
+        await fetchWithLoading(deploymentsLoading, () => kubernetesService.getDeployments())
+        break
+      case KUBERNETES_RESOURCE_KIND.StatefulSet:
+        await fetchWithLoading(statefulSetsLoading, () => kubernetesService.getStatefulSets())
+        break
+      case KUBERNETES_RESOURCE_KIND.DaemonSet:
+        await fetchWithLoading(daemonSetsLoading, () => kubernetesService.getDaemonSets())
+        break
+      case KUBERNETES_RESOURCE_KIND.ReplicaSet:
+        await fetchWithLoading(replicaSetsLoading, () => kubernetesService.getReplicaSets())
+        break
+      case KUBERNETES_RESOURCE_KIND.Job:
+        await fetchWithLoading(jobsLoading, () => kubernetesService.getJobs())
+        break
+      case KUBERNETES_RESOURCE_KIND.CronJob:
+        await fetchWithLoading(cronJobsLoading, () => kubernetesService.getCronJobs())
+        break
+      case KUBERNETES_RESOURCE_KIND.HorizontalPodAutoscaler:
+        await fetchWithLoading(hpasLoading, () => kubernetesService.getHpas())
+        break
+      case KUBERNETES_RESOURCE_KIND.Node:
+        await fetchWithLoading(nodesLoading, () => kubernetesService.getNodes())
+        break
+      case KUBERNETES_RESOURCE_KIND.Service:
+        await fetchWithLoading(servicesLoading, () => kubernetesService.getServices())
+        break
+      case KUBERNETES_RESOURCE_KIND.Ingress:
+        if (!ingressesLoading.value) await fetchIngresses()
+        break
+      case KUBERNETES_RESOURCE_KIND.ConfigMap:
+        if (!configMapsLoading.value) await fetchConfigMaps()
+        break
+      case KUBERNETES_RESOURCE_KIND.Secret:
+        if (!secretsLoading.value) await fetchSecrets()
+        break
+      case KUBERNETES_RESOURCE_KIND.Event:
+        if (!eventsLoading.value) await fetchEvents()
+        break
+      case KUBERNETES_RESOURCE_KIND.Policy:
+      case KUBERNETES_RESOURCE_KIND.NetworkPolicy:
+      case KUBERNETES_RESOURCE_KIND.ResourceQuota:
+      case KUBERNETES_RESOURCE_KIND.LimitRange:
+      case KUBERNETES_RESOURCE_KIND.ValidatingWebhookConfiguration:
+      case KUBERNETES_RESOURCE_KIND.MutatingWebhookConfiguration:
+        if (!policiesLoading.value) await fetchPolicies()
+        break
+      case KUBERNETES_RESOURCE_KIND.PersistentVolume:
+        if (!persistentVolumesLoading.value) await fetchPersistentVolumes()
+        break
+      case KUBERNETES_RESOURCE_KIND.PersistentVolumeClaim:
+        if (!persistentVolumeClaimsLoading.value) await fetchPersistentVolumeClaims()
+        break
+      case KUBERNETES_RESOURCE_KIND.StorageClass:
+        if (!storageClassesLoading.value) await fetchStorageClasses()
+        break
+      case KUBERNETES_RESOURCE_KIND.Namespace:
+        await fetchWithLoading(namespacesLoading, () => kubernetesService.getNamespaces())
+        break
+    }
+  }
+
   const resourceUpdaters: Record<
     string,
     (updates: Array<{ action: KubernetesAction; data: KubernetesResourceInfo }>) => void
@@ -779,6 +885,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     if (payload.cluster_id && payload.cluster_id !== activeClusterId.value) {
       return
     }
+    loadedKinds.add(payload.kind)
     frameBatcher.push(payload.kind, payload.updates)
   }
 
@@ -969,6 +1076,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     fetchPersistentVolumeClaims,
     fetchStorageClasses,
     loadInitialData,
+    ensureKindLoaded,
     lastUpdatedAt,
     cpuHistory,
     memHistory,

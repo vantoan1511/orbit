@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { AlertTriangle, CheckCircle2, HelpCircle, LayoutGrid, Server } from '@lucide/vue'
 import { computed } from 'vue'
 import { KubernetesIcon } from 'vue3-simple-icons'
 import StatusCard from './StatusCard.vue'
 
 const store = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 
 const totalNodesCount = computed(() => store.nodes.length)
 const readyNodesCount = computed(() => store.nodes.filter((n) => n.status === 'Ready').length)
@@ -100,7 +104,19 @@ const cards = computed(() => [
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="
+      shouldShowSkeleton(
+        store.nodesLoading || store.namespacesLoading,
+        store.nodes.length + store.namespaceList.length,
+        isHydrated
+      )
+    "
+    :cards="4"
+    grid-class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"
+  />
   <div
+    v-else
     data-component="dashboard-status-summary"
     class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6"
   >

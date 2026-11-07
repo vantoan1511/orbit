@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { computed } from 'vue'
 import { Card } from 'primevue'
 import { Shield, ShieldAlert, ShieldOff, AlertTriangle, FileText } from '@lucide/vue'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const policies = computed(() => k8sStore.policies)
 
 const totalCount = computed(() => policies.value.length)
@@ -25,7 +29,13 @@ const disabledPct = computed(() =>
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(k8sStore.policiesLoading, k8sStore.policies.length, isHydrated)"
+    :cards="5"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  />
   <div
+    v-else
     data-component="policies-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
   >

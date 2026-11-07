@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { KUBERNETES_NAMESPACE_STATUS } from '@/constants/kubernetes'
 import type { NamespaceInfo } from '@/types/kubernetes'
 import { CheckCircle2, FolderOpen, Loader2, Shield, XCircle } from '@lucide/vue'
@@ -8,6 +11,7 @@ import Chart from 'primevue/chart'
 import { computed, onMounted, ref, watch } from 'vue'
 
 const store = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 
 const totalNamespaces = computed(() => store.namespaceList.length)
 
@@ -88,7 +92,13 @@ onMounted(() => {
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(store.namespacesLoading, store.namespaceList.length, isHydrated)"
+    :cards="5"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+  />
   <div
+    v-else
     data-component="namespace-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
   >

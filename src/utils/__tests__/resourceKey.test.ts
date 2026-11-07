@@ -59,3 +59,11 @@ test('shouldShowSkeleton: returns true only when loading and data length is 0', 
   assert.equal(shouldShowSkeleton(false, 0), false)
   assert.equal(shouldShowSkeleton(false, 10), false)
 })
+
+test('shouldShowSkeleton: returns true when isHydrated is false regardless of loading or dataLength', () => {
+  assert.equal(shouldShowSkeleton(false, 0, false), true)
+  assert.equal(shouldShowSkeleton(false, 25, false), true)
+  assert.equal(shouldShowSkeleton(true, 25, false), true)
+  assert.equal(shouldShowSkeleton(false, 25, true), false)
+  assert.equal(shouldShowSkeleton(true, 0, true), true)
+})

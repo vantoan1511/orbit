@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { computed } from 'vue'
 import { Card } from 'primevue'
 import { Bell, CheckCircle, AlertTriangle, XCircle, Info } from '@lucide/vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { KUBERNETES_EVENT_TYPE } from '@/constants/kubernetes'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const events = computed(() => k8sStore.events)
 
 const totalCount = computed(() => events.value.length)
@@ -43,7 +47,13 @@ const otherPct = computed(() =>
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(k8sStore.eventsLoading, k8sStore.events.length, isHydrated)"
+    :cards="5"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+  />
   <div
+    v-else
     data-component="event-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
   >

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { computed } from 'vue'
 import { Card } from 'primevue'
 import { Database, HardDrive, FileSpreadsheet, Layers } from '@lucide/vue'
@@ -7,6 +10,14 @@ import { KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { parseCapacityToGiB, formatStorageGiB } from '@/utils/storageQuantity'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
+
+const isLoading = computed(
+  () => k8sStore.persistentVolumesLoading || k8sStore.persistentVolumeClaimsLoading
+)
+const totalItemsLength = computed(
+  () => k8sStore.persistentVolumes.length + k8sStore.persistentVolumeClaims.length
+)
 
 const metrics = computed(() => {
   const pvs = k8sStore.persistentVolumes
@@ -78,7 +89,13 @@ const metrics = computed(() => {
 </script>
 
 <template>
+  <ResourceMetricsSkeleton
+    v-if="shouldShowSkeleton(isLoading, totalItemsLength, isHydrated)"
+    :cards="5"
+    grid-class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
+  />
   <div
+    v-else
     data-component="storage-metrics-cards"
     class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
   >

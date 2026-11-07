@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ResourceTabsLayout, { type ResourceTab } from '@/components/shared/ResourceTabsLayout.vue'
+import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useDialog } from 'primevue/usedialog'
 import { onMounted } from 'vue'
@@ -46,9 +47,9 @@ const tabs: ResourceTab[] = [
   }
 ]
 
-onMounted(async () => {
-  await k8sStore.fetchConfigMaps()
-  await k8sStore.fetchSecrets()
+onMounted(() => {
+  void k8sStore.ensureKindLoaded(KUBERNETES_RESOURCE_KIND.ConfigMap).catch(() => {})
+  void k8sStore.ensureKindLoaded(KUBERNETES_RESOURCE_KIND.Secret).catch(() => {})
 })
 </script>
 
