@@ -87,7 +87,7 @@ const fetchJobs = async () => {
               :key="img"
               severity="secondary"
               class="font-mono truncate max-w-full"
-              :title="img"
+              v-tooltip.top="img"
               :value="img.split('/').pop()"
             />
           </div>

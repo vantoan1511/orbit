@@ -108,7 +108,7 @@ const handleRefresh = async () => {
             }}</span>
             <span
               class="font-mono text-violet-400 hover:text-violet-300 transition-colors truncate max-w-48"
-              :title="data.objectName"
+              v-tooltip.top="data.objectName"
             >
               {{ data.objectName }}
             </span>
@@ -124,7 +124,7 @@ const handleRefresh = async () => {
         class="p-3 max-w-xs md:max-w-md"
       >
         <template #body="{ data }">
-          <span class="text-muted-color block truncate" :title="data.message">
+          <span class="text-muted-color block truncate" v-tooltip.top="data.message">
             {{ data.message }}
           </span>
         </template>

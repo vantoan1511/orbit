@@ -52,3 +52,30 @@ test('enforces canonical Tauri v2 $schema in tauri.conf.json', () => {
     'tauri.conf.json must point to official Tauri v2 schema'
   )
 })
+
+test('enforces documentation and Winget locale manifest reflect Tauri v2 and direct monaco-editor', () => {
+  const readmePath = path.resolve(process.cwd(), 'README.md')
+  const readmeContent = fs.readFileSync(readmePath, 'utf-8')
+  assert.ok(
+    !readmeContent.includes('@guolao/vue-monaco-editor'),
+    'README.md must not reference legacy @guolao/vue-monaco-editor'
+  )
+  assert.ok(
+    readmeContent.includes('(`monaco-editor`)'),
+    'README.md must reference direct monaco-editor'
+  )
+
+  const wingetLocalePath = path.resolve(
+    process.cwd(),
+    'scripts/winget/vantoan1511.Orbit.locale.en-US.yaml'
+  )
+  const wingetLocaleContent = fs.readFileSync(wingetLocalePath, 'utf-8')
+  assert.ok(
+    !wingetLocaleContent.toLowerCase().includes('neutralino'),
+    'Winget locale manifest must not reference Neutralinojs'
+  )
+  assert.ok(
+    wingetLocaleContent.includes('Tauri v2'),
+    'Winget locale manifest must reference Tauri v2'
+  )
+})

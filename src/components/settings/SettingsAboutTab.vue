@@ -3,22 +3,20 @@ import { app } from '@/services/nativeService'
 import { useUpdaterStore } from '@/stores/updater'
 import { Check, CheckCircle2, Compass, Info, RefreshCw } from '@lucide/vue'
 import Button from 'primevue/button'
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 
 const updaterStore = useUpdaterStore()
 const appVersion = ref('')
-const appArch = computed(() => {
-  if (typeof window !== 'undefined' && 'NL_ARCH' in window) {
-    return (window as unknown as { NL_ARCH: string }).NL_ARCH
-  }
-  return 'x64'
-})
+const appArch = ref('x64')
 
 onMounted(async () => {
   try {
     const config = await app.getConfig()
     if (typeof config.version === 'string') {
       appVersion.value = config.version
+    }
+    if (typeof config.arch === 'string' && config.arch) {
+      appArch.value = config.arch
     }
   } catch (error) {
     console.error('Failed to get app version:', error)

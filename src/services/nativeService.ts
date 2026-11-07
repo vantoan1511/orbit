@@ -483,8 +483,17 @@ export async function probe(timeoutMs = 1500): Promise<boolean> {
  * Safe wrapper for application lifecycle API
  */
 export const app = {
-  async getConfig(): Promise<{ version: string; [key: string]: unknown }> {
-    return { version: VERSION }
+  async getConfig(): Promise<{ version: string; arch: string; [key: string]: unknown }> {
+    let arch = 'x64'
+    if (isTauriEnvironment()) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        arch = await invoke<string>('get_runtime_arch')
+      } catch (e) {
+        console.warn('Failed to resolve runtime architecture via Tauri:', e)
+      }
+    }
+    return { version: VERSION, arch }
   },
   async restartProcess(): Promise<void> {
     if (isTauriEnvironment()) {

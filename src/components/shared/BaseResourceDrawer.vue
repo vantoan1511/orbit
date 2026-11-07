@@ -65,7 +65,7 @@ const emit = defineEmits<{
               <slot name="title">
                 <h3
                   class="text-base font-bold text-primary font-mono truncate max-w-70"
-                  :title="props.title"
+                  v-tooltip.top="props.title"
                 >
                   {{ props.title }}
                 </h3>
