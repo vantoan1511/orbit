@@ -297,6 +297,7 @@ const getPortForwards = (data: T): ActivePortForward[] => {
   <ResourceDataTable
     :data="filteredData"
     :dataKey="dataKey"
+    :resourceKind="kind"
     v-model:selection="selection"
     v-model:searchQuery="searchQuery"
     v-model:columns="tableColumns"

@@ -753,6 +753,10 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
       }
     })
 
+  function registerVisibleKind(kind: string): () => void {
+    return frameBatcher.registerVisibleKind(kind)
+  }
+
   function onResourceBatchUpdated(payload: {
     kind: string
     cluster_id: string | null
@@ -927,6 +931,7 @@ export const useKubernetesStore = defineStore('kubernetes', () => {
     activePortForwards,
     watcherConnectionState,
     setWatcherConnectionState,
-    frameBatcher
+    frameBatcher,
+    registerVisibleKind
   }
 })

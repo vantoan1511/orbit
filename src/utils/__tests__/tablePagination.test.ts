@@ -1,33 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import {
-  VIRTUAL_SCROLL_ROW_THRESHOLD,
-  VIRTUAL_SCROLL_ITEM_SIZE,
-  VIRTUAL_SCROLL_HEIGHT,
-  DEFAULT_VIRTUAL_SCROLLER_OPTIONS,
-  shouldEnableVirtualScroll,
-  sortTableRows,
-  paginateTableRows
-} from '../tableVirtualPagination.ts'
-
-test('shouldEnableVirtualScroll returns false for <= 50 rows and true for > 50 rows (100, 200)', () => {
-  assert.equal(VIRTUAL_SCROLL_ROW_THRESHOLD, 50)
-  assert.equal(VIRTUAL_SCROLL_ITEM_SIZE, 44)
-  assert.equal(VIRTUAL_SCROLL_HEIGHT, '560px')
-  assert.equal(DEFAULT_VIRTUAL_SCROLLER_OPTIONS.itemSize, 44)
-  assert.equal(DEFAULT_VIRTUAL_SCROLLER_OPTIONS.numToleratedItems, 10)
-
-  assert.equal(shouldEnableVirtualScroll(10), false)
-  assert.equal(shouldEnableVirtualScroll(25), false)
-  assert.equal(shouldEnableVirtualScroll(50), false)
-  assert.equal(shouldEnableVirtualScroll(51), true)
-  assert.equal(shouldEnableVirtualScroll(100), true)
-  assert.equal(shouldEnableVirtualScroll(200), true)
-
-  // Custom threshold
-  assert.equal(shouldEnableVirtualScroll(20, 20), false)
-  assert.equal(shouldEnableVirtualScroll(21, 20), true)
-})
+import { sortTableRows, sortTableRowsStable, paginateTableRows } from '../tablePagination.ts'
 
 test('sortTableRows sorts ascending and descending by numeric and string fields without mutating input array', () => {
   const original = [
@@ -115,4 +88,78 @@ test('paginateTableRows slices current page and clamps out-of-range first offset
   const neg = paginateTableRows(items, -10, 25)
   assert.equal(neg.clampedFirst, 0)
   assert.equal(neg.pageRows.length, 25)
+})
+
+test('sortTableRowsStable: unsorted keeps previous positions, appends new rows', () => {
+  // prev [a,b,c], new data [c,a,d,b] -> [a,b,c,d]
+  const previousOrder = new Map<string, number>([
+    ['a', 0],
+    ['b', 1],
+    ['c', 2]
+  ])
+
+  const newData = [
+    { id: 'c', val: 3 },
+    { id: 'a', val: 1 },
+    { id: 'd', val: 4 },
+    { id: 'b', val: 2 }
+  ]
+
+  const result = sortTableRowsStable(newData, null, null, (r) => r.id, previousOrder)
+  assert.deepEqual(
+    result.rows.map((r) => r.id),
+    ['a', 'b', 'c', 'd']
+  )
+  assert.equal(result.order.get('a'), 0)
+  assert.equal(result.order.get('b'), 1)
+  assert.equal(result.order.get('c'), 2)
+  assert.equal(result.order.get('d'), 3)
+})
+
+test('sortTableRowsStable: ties keep previous order', () => {
+  // 3 pods with same status 'Running', previous order p1, p2, p3
+  const previousOrder = new Map<string, number>([
+    ['p1', 0],
+    ['p2', 1],
+    ['p3', 2]
+  ])
+
+  // New data shuffled order [p3, p1, p2]
+  const shuffledData = [
+    { id: 'p3', status: 'Running' },
+    { id: 'p1', status: 'Running' },
+    { id: 'p2', status: 'Running' }
+  ]
+
+  const result = sortTableRowsStable(shuffledData, 'status', 1, (r) => r.id, previousOrder)
+
+  // Because all status values are identical, previous relative order [p1, p2, p3] must be preserved
+  assert.deepEqual(
+    result.rows.map((r) => r.id),
+    ['p1', 'p2', 'p3']
+  )
+})
+
+test('sortTableRowsStable: distinct values still sort correctly and does not mutate input', () => {
+  const original = [
+    { id: '1', score: 10 },
+    { id: '2', score: 50 },
+    { id: '3', score: 20 }
+  ]
+  const copy = [...original]
+
+  const resultAsc = sortTableRowsStable(original, 'score', 1, (r) => r.id)
+  assert.deepEqual(
+    resultAsc.rows.map((r) => r.id),
+    ['1', '3', '2']
+  )
+
+  const resultDesc = sortTableRowsStable(original, 'score', -1, (r) => r.id)
+  assert.deepEqual(
+    resultDesc.rows.map((r) => r.id),
+    ['2', '3', '1']
+  )
+
+  // Input array not mutated
+  assert.deepEqual(original, copy)
 })
