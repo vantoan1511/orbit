@@ -778,6 +778,61 @@ export const Noir = definePreset(Nora, {
         borderRadius: 'var(--ui-radius-control)'
       }
     },
+    toggleswitch: {
+      root: {
+        borderWidth: '1px'
+      },
+      colorScheme: {
+        light: {
+          root: {
+            background: '{surface.300}',
+            disabledBackground: 'var(--bg-hover)',
+            hoverBackground: '{surface.400}',
+            checkedBackground: '{primary.color}',
+            checkedHoverBackground: '{primary.hover.color}',
+            borderColor: 'var(--border)',
+            hoverBorderColor: 'var(--border-strong)',
+            checkedBorderColor: '{primary.color}',
+            checkedHoverBorderColor: '{primary.hover.color}'
+          },
+          handle: {
+            background: '{surface.0}',
+            disabledBackground: 'var(--text-disabled)',
+            hoverBackground: '{surface.0}',
+            checkedBackground: '{primary.contrast.color}',
+            checkedHoverBackground: '{primary.contrast.color}',
+            color: '{text.muted.color}',
+            hoverColor: '{text.color}',
+            checkedColor: '{primary.color}',
+            checkedHoverColor: '{primary.hover.color}'
+          }
+        },
+        dark: {
+          root: {
+            background: '{surface.700}',
+            disabledBackground: 'var(--bg-hover)',
+            hoverBackground: '{surface.600}',
+            checkedBackground: '{primary.color}',
+            checkedHoverBackground: '{primary.hover.color}',
+            borderColor: 'var(--border)',
+            hoverBorderColor: 'var(--border-strong)',
+            checkedBorderColor: '{primary.color}',
+            checkedHoverBorderColor: '{primary.hover.color}'
+          },
+          handle: {
+            background: '{surface.300}',
+            disabledBackground: 'var(--text-disabled)',
+            hoverBackground: '{surface.200}',
+            checkedBackground: '{primary.contrast.color}',
+            checkedHoverBackground: '{primary.contrast.color}',
+            color: '{surface.900}',
+            hoverColor: '{surface.950}',
+            checkedColor: '{primary.color}',
+            checkedHoverColor: '{primary.hover.color}'
+          }
+        }
+      }
+    },
     popover: {
       ...overlays.popover
     },
