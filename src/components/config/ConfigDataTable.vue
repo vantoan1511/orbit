@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { FileText, Lock } from '@lucide/vue'
@@ -15,6 +16,7 @@ const props = defineProps<{
 
 const k8sStore = useKubernetesStore()
 const filterStore = useTableFilterStore()
+const { isHydrated } = useDeferredMount()
 const { configMaps, secrets } = storeToRefs(k8sStore)
 
 const columns = [
@@ -42,6 +44,7 @@ const selectedLabel = computed({
 })
 
 const labels = computed(() => {
+  if (!isHydrated.value) return ['All Labels']
   const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
   const labelKeys = new Set<string>()
   currentList.forEach((item) => {
@@ -51,6 +54,7 @@ const labels = computed(() => {
 })
 
 const filteredItems = computed(() => {
+  if (!isHydrated.value) return []
   const currentList = props.activeTab === 'configmaps' ? configMaps.value : secrets.value
   return currentList.filter((item) => {
     if (selectedLabel.value !== 'All Labels') {

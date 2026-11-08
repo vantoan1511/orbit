@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { kubernetesService } from '@/services/kubernetesService'
 import { os } from '@/services/nativeService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -11,6 +12,7 @@ import { useToast } from 'primevue/usetoast'
 import { computed, ref } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const toast = useToast()
 
 const columns = [
@@ -27,6 +29,7 @@ const selectedKind = ref('All Kinds')
 const kindFilterOptions = ['All Kinds', 'Service', 'Pod', 'Deployment', 'StatefulSet', 'ReplicaSet']
 
 const filteredPortForwards = computed<ActivePortForward[]>(() => {
+  if (!isHydrated.value) return []
   return k8sStore.activePortForwards.filter((pf) => {
     if (
       selectedKind.value !== 'All Kinds' &&

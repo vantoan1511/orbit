@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_SERVICE_TYPE } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { os } from '@/services/nativeService'
@@ -14,6 +15,7 @@ import { computed, ref } from 'vue'
 import ServiceDetailsDrawer from '@/components/services/ServiceDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 
 const handleOpenExternal = async (service: ServiceInfo) => {
   const url = resolveServiceExternalUrl(service)
@@ -36,6 +38,7 @@ const selectedType = ref('All Types')
 const types = ['All Types', ...Object.values(KUBERNETES_SERVICE_TYPE)]
 
 const filteredServices = computed(() => {
+  if (!isHydrated.value) return []
   return k8sStore.services.filter((s) => {
     if (selectedType.value !== 'All Types' && s.type !== selectedType.value) {
       return false

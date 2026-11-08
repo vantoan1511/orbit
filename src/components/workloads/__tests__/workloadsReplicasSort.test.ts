@@ -25,7 +25,9 @@ test('DeploymentsTable configures sortable replicas column with replicasSortKey 
     'DeploymentsTable must declare deploymentRestartsMap using shallowRef'
   )
   assert.ok(
-    /watch\(\s*\(\)\s*=>\s*restartFingerprint\(k8sStore\.pods\)/.test(content),
+    /watch\(\s*\(\)\s*=>\s*(\(?isHydrated\.value\s*\?\s*)?restartFingerprint\(k8sStore\.pods\)/.test(
+      content
+    ),
     'DeploymentsTable must watch restartFingerprint(k8sStore.pods)'
   )
 
@@ -106,7 +108,7 @@ test('StatefulSetsTable configures sortable replicas column with withReplicasSor
 
   // 2. Computes statefulSets with replicasSortKey
   assert.ok(
-    /const\s+statefulSets\s*=\s*computed\(\(\)\s*=>\s*withReplicasSortKey\(\s*k8sStore\.statefulSets\s*\)\)/.test(
+    /const\s+statefulSets\s*=\s*computed\(\(\)\s*=>\s*\{?\s*(?:return\s+)?\(?isHydrated\.value\s*\?\s*withReplicasSortKey\(\s*k8sStore\.statefulSets\s*\)/.test(
       content
     ),
     'statefulSets computed list must call withReplicasSortKey(k8sStore.statefulSets)'
@@ -146,7 +148,7 @@ test('ReplicaSetsTable configures sortable replicas column with withReplicasSort
 
   // 2. Computes replicaSets with replicasSortKey
   assert.ok(
-    /const\s+replicaSets\s*=\s*computed\(\(\)\s*=>\s*withReplicasSortKey\(\s*k8sStore\.replicaSets\s*\)\)/.test(
+    /const\s+replicaSets\s*=\s*computed\(\(\)\s*=>\s*\{?\s*(?:return\s+)?\(?isHydrated\.value\s*\?\s*withReplicasSortKey\(\s*k8sStore\.replicaSets\s*\)/.test(
       content
     ),
     'replicaSets computed list must call withReplicasSortKey(k8sStore.replicaSets)'

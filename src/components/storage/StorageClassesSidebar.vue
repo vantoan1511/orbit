@@ -3,12 +3,16 @@ import { ref, computed, watch } from 'vue'
 import Chart from 'primevue/chart'
 import { Tag } from 'primevue'
 import { Layers, PieChart, Activity } from '@lucide/vue'
-import { useKubernetesStore } from '@/stores/kubernetesStore'
+import ResourceMetricsSkeleton from '@/components/shared/ResourceMetricsSkeleton.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useTheme } from '@/composables/useTheme'
+import { useKubernetesStore } from '@/stores/kubernetesStore'
+import { shouldShowSkeleton } from '@/utils/resourceKey'
 import { parseCapacityToGiB, formatDonutTotalCapacity } from '@/utils/storageQuantity'
 
 const k8sStore = useKubernetesStore()
 const { isDark } = useTheme()
+const { isHydrated } = useDeferredMount()
 const storageClasses = computed(() => k8sStore.storageClasses)
 const pvs = computed(() => k8sStore.persistentVolumes)
 
@@ -18,6 +22,7 @@ const chartOptions = ref()
 
 // Calculate capacity by StorageClass
 const scCapacityData = computed(() => {
+  if (!isHydrated.value) return {}
   const capacityMap: Record<string, number> = {}
 
   // Initialize SCs
@@ -43,6 +48,7 @@ const totalCapacitySummary = computed(() => {
 
 // Count PVs by Status
 const statusCounts = computed(() => {
+  if (!isHydrated.value) return { Bound: 0, Available: 0, Released: 0, Failed: 0 }
   const counts = { Bound: 0, Available: 0, Released: 0, Failed: 0 }
   pvs.value.forEach((pv) => {
     if (pv.status in counts) {
@@ -139,11 +145,29 @@ const updateChart = () => {
   }
 }
 
-watch([scCapacityData, isDark], updateChart, { immediate: true })
+watch(
+  [isHydrated, scCapacityData, isDark],
+  ([hydrated]) => {
+    if (!hydrated) return
+    updateChart()
+  },
+  { immediate: true }
+)
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <ResourceMetricsSkeleton
+    v-if="
+      shouldShowSkeleton(
+        k8sStore.storageClassesLoading || k8sStore.persistentVolumesLoading,
+        k8sStore.storageClasses.length + k8sStore.persistentVolumes.length,
+        isHydrated
+      )
+    "
+    :cards="3"
+    grid-class="flex flex-col gap-6"
+  />
+  <div v-else class="flex flex-col gap-6">
     <!-- Storage Classes Mini List -->
     <div
       class="bg-(--bg-card) border border-(--border) rounded-[var(--ui-radius-card)] p-5 shadow-sm"

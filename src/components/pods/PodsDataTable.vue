@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_POD_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
@@ -8,9 +9,10 @@ import PodDetailsDrawer from './PodDetailsDrawer.vue'
 import { createPodRowDecorator } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const podDecorator = createPodRowDecorator()
 
-const pods = computed(() => podDecorator(k8sStore.pods))
+const pods = computed(() => (isHydrated.value ? podDecorator(k8sStore.pods) : []))
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -16,6 +17,7 @@ import {
 } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const loading = ref(false)
 const inlineEdit = ref<InstanceType<typeof WorkloadInlineEditPopovers> | null>(null)
 
@@ -23,8 +25,9 @@ const deploymentDecorator = createDeploymentRowDecorator()
 const deploymentRestartsMap = shallowRef(new Map<string, number>())
 
 watch(
-  () => restartFingerprint(k8sStore.pods),
-  () => {
+  () => (isHydrated.value ? restartFingerprint(k8sStore.pods) : null),
+  (fp) => {
+    if (fp === null) return
     deploymentRestartsMap.value = computeDeploymentRestarts(k8sStore.pods)
   },
   { immediate: true }
@@ -32,7 +35,9 @@ watch(
 
 // Memoised decorator preserves row reference and computes replicasSortKey, orderedConditions, imageTags
 const deployments = computed(() => {
-  return deploymentDecorator(k8sStore.deployments, deploymentRestartsMap.value)
+  return isHydrated.value
+    ? deploymentDecorator(k8sStore.deployments, deploymentRestartsMap.value)
+    : []
 })
 
 const columns = [

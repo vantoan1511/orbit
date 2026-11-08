@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import PersistentVolumeClaimDetailsDrawer from '@/components/storage/PersistentVolumeClaimDetailsDrawer.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
+const pvcs = computed(() => (isHydrated.value ? k8sStore.persistentVolumeClaims : []))
 
 const columns = [
   { field: 'name', header: 'Name', visible: true },
@@ -37,7 +41,7 @@ const handleRefresh = async () => {
 <template>
   <GenericResourceTable
     data-component="storage-pvc-table"
-    :data="k8sStore.persistentVolumeClaims"
+    :data="pvcs"
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'volume', 'storageClass']"

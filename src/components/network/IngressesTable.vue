@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
+import { computed } from 'vue'
 import IngressDetailsDrawer from './IngressDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
+const ingresses = computed(() => (isHydrated.value ? k8sStore.ingresses : []))
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
@@ -25,7 +29,7 @@ const handleRefresh = async () => {
 <template>
   <GenericResourceTable
     data-component="ingresses-table"
-    :data="k8sStore.ingresses"
+    :data="ingresses"
     :initialColumns="columns"
     :hideStatusFilter="true"
     :hideStatusColumn="true"

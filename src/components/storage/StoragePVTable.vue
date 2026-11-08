@@ -2,6 +2,7 @@
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
 import PersistentVolumeDetailsDrawer from '@/components/storage/PersistentVolumeDetailsDrawer.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_VOLUME_STATUS } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { useTableFilterStore } from '@/stores/tableFilterStore'
@@ -11,6 +12,7 @@ import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
 const filterStore = useTableFilterStore()
+const { isHydrated } = useDeferredMount()
 const STORE_KEY = 'persistentvolume'
 
 const columns = [
@@ -36,11 +38,13 @@ const statuses = [
 ]
 
 const storageClasses = computed(() => {
+  if (!isHydrated.value) return ['All Storage Classes']
   const classes = new Set(k8sStore.persistentVolumes.map((pv) => pv.storageClass))
   return ['All Storage Classes', ...Array.from(classes)]
 })
 
 const filteredPVs = computed(() => {
+  if (!isHydrated.value) return []
   return k8sStore.persistentVolumes.filter((pv) => {
     if (
       selectedStorageClass.value !== 'All Storage Classes' &&
