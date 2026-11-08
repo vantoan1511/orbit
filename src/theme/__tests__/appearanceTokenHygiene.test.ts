@@ -239,7 +239,7 @@ test('verifies all resource drawers have data-component attribute', () => {
   }
 })
 
-test('base.css defines all core design tokens across all 5 UI styles (flat, glass, aero, liquidglass, ios)', () => {
+test('base.css defines all core design tokens across all 6 UI styles (flat, glass, aero, liquidglass, ios, paper)', () => {
   const baseCssPath = path.resolve(process.cwd(), 'src/assets/base.css')
   const content = fs.readFileSync(baseCssPath, 'utf-8')
 
@@ -263,13 +263,25 @@ test('base.css defines all core design tokens across all 5 UI styles (flat, glas
     assert.ok(content.includes(`${token}:`), `base.css must define ${token}`)
   }
 
-  for (const style of ['flat', 'glass', 'aero', 'liquidglass', 'ios']) {
+  for (const style of ['flat', 'glass', 'aero', 'liquidglass', 'ios', 'paper']) {
     assert.ok(
       content.includes(`[data-ui-style='${style}']`) ||
         content.includes(`[data-ui-style="${style}"]`),
       `base.css must define [data-ui-style="${style}"] preset rules`
     )
+    if (style !== 'flat') {
+      assert.ok(
+        content.includes(`.my-app-dark[data-ui-style="${style}"]`) ||
+          content.includes(`[data-ui-style="${style}"].my-app-dark`),
+        `base.css must define dark mode rules for [data-ui-style="${style}"]`
+      )
+    }
   }
+
+  assert.ok(
+    content.includes('[data-ui-style="paper"] .bg-\\(--bg-card\\)'),
+    'base.css must wire paper card background to sheen highlight'
+  )
 })
 
 test('base.css :root defines --ui-control-height-sm|md, font-size-sm|md, padding-x-sm|md and CONTROL_TIERS reference only defined tokens', () => {

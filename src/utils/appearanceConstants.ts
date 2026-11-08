@@ -169,6 +169,12 @@ export const UI_STYLE_DEFINITIONS: readonly UiStyleDefinition[] = [
     id: 'ios',
     name: 'iOS Cupertino',
     description: 'Frosted acrylic materials, smooth rounded cards, and vibrant system aesthetics.'
+  },
+  {
+    id: 'paper',
+    name: 'Editorial Paper',
+    description:
+      'Warm parchment and charcoal matte surfaces, crisp stationery borders, and subtle sheet elevation.'
   }
 ] as const
 
@@ -198,7 +204,7 @@ export function formatUiStyleLabel(style: UiStyle): { name: string; description:
 }
 
 export function isTranslucentStyle(style: UiStyle): boolean {
-  return style !== 'flat'
+  return style !== 'flat' && style !== 'paper'
 }
 
 export interface PrimeVueColorPalette {
@@ -301,6 +307,19 @@ export function getUiStyleTokens(style: UiStyle, isDark: boolean): UiStyleTokens
           : '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
         cardBorder: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
         backdropBlur: 'blur(24px) saturate(190%)'
+      }
+    case 'paper':
+      return {
+        radiusCard: '0.25rem',
+        radiusControl: '0.1875rem',
+        cardSheen: isDark
+          ? 'linear-gradient(180deg, rgba(255, 248, 235, 0.03) 0%, rgba(255, 248, 235, 0.005) 100%)'
+          : 'linear-gradient(180deg, rgba(255, 253, 248, 0.65) 0%, rgba(244, 239, 228, 0.15) 100%)',
+        cardShadow: isDark
+          ? '0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35)'
+          : '0 1px 3px rgba(28, 25, 23, 0.06), 0 1px 2px rgba(28, 25, 23, 0.04)',
+        cardBorder: isDark ? '#2e2a25' : '#dcd5c7',
+        backdropBlur: 'none'
       }
     case 'flat':
     default:

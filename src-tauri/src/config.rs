@@ -166,7 +166,7 @@ impl Configuration {
             Configuration {
                 key: "uiStyle".to_string(),
                 name: "UI Style".to_string(),
-                description: "Visual design aesthetic style (flat, glass, aero, liquidglass, ios).".to_string(),
+                description: "Visual design aesthetic style (flat, glass, aero, liquidglass, ios, paper).".to_string(),
                 datatype: "string".to_string(),
                 default_value: Some(serde_json::json!("flat")),
                 value: None,

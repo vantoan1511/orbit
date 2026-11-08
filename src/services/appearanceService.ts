@@ -28,7 +28,7 @@ const VALID_ACCENT_COLORS: readonly AccentColor[] = [
   'rose',
   'slate'
 ]
-const VALID_UI_STYLES: readonly UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios']
+const VALID_UI_STYLES: readonly UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios', 'paper']
 const VALID_SEMANTIC_PRESETS: readonly SemanticPresetId[] = [
   'default',
   'colorblind',
