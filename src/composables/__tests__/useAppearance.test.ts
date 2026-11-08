@@ -95,6 +95,10 @@ test('setUiStyle updates UI style and persists', async () => {
     await setUiStyle('glass')
     assert.equal(uiStyle.value, 'glass')
     assert.equal(savedStyle, 'glass')
+
+    await setUiStyle('paper')
+    assert.equal(uiStyle.value, 'paper')
+    assert.equal(savedStyle, 'paper')
   } finally {
     appearanceService.saveAppearancePreferences = originalSave
   }

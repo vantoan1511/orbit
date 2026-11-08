@@ -30,9 +30,9 @@ test('ACCENT_COLOR_DEFINITIONS defines all 7 curated accent colors with light an
   }
 })
 
-test('UI_STYLE_DEFINITIONS contains all 5 supported UI styles with names and descriptions', () => {
-  assert.equal(UI_STYLE_DEFINITIONS.length, 5)
-  const expectedStyles: UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios']
+test('UI_STYLE_DEFINITIONS contains all 6 supported UI styles with names and descriptions', () => {
+  assert.equal(UI_STYLE_DEFINITIONS.length, 6)
+  const expectedStyles: UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios', 'paper']
 
   for (const expectedStyle of expectedStyles) {
     const def = UI_STYLE_DEFINITIONS.find((s) => s.id === expectedStyle)
@@ -65,16 +65,17 @@ test('formatUiStyleLabel returns title and description', () => {
   assert.ok(flatInfo.description.length > 0)
 })
 
-test('isTranslucentStyle identifies non-flat styles', () => {
+test('isTranslucentStyle identifies non-flat and non-paper styles', () => {
   assert.equal(isTranslucentStyle('flat'), false)
+  assert.equal(isTranslucentStyle('paper'), false)
   assert.equal(isTranslucentStyle('glass'), true)
   assert.equal(isTranslucentStyle('aero'), true)
   assert.equal(isTranslucentStyle('liquidglass'), true)
   assert.equal(isTranslucentStyle('ios'), true)
 })
 
-test('getUiStyleTokens returns distinct radii, sheens, and shadows for all 5 styles', () => {
-  const styles: UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios']
+test('getUiStyleTokens returns distinct radii, sheens, and shadows for all 6 styles', () => {
+  const styles: UiStyle[] = ['flat', 'glass', 'aero', 'liquidglass', 'ios', 'paper']
 
   for (const style of styles) {
     const lightTokens = getUiStyleTokens(style, false)
@@ -89,6 +90,8 @@ test('getUiStyleTokens returns distinct radii, sheens, and shadows for all 5 sty
   const ios = getUiStyleTokens('ios', false)
   const aero = getUiStyleTokens('aero', false)
   const liquid = getUiStyleTokens('liquidglass', false)
+  const paper = getUiStyleTokens('paper', false)
+  const paperDark = getUiStyleTokens('paper', true)
 
   assert.equal(flat.radiusCard, '0.5rem')
   assert.equal(ios.radiusCard, '1rem')
@@ -97,4 +100,12 @@ test('getUiStyleTokens returns distinct radii, sheens, and shadows for all 5 sty
   assert.ok(aero.cardShadow.includes('inset 0 1px'))
   assert.ok(liquid.cardShadow.includes('inset'))
   assert.ok(liquid.backdropBlur.includes('saturate'))
+
+  assert.equal(paper.radiusCard, '0.25rem')
+  assert.equal(paper.radiusControl, '0.1875rem')
+  assert.equal(paper.backdropBlur, 'none')
+  assert.ok(paper.cardSheen.includes('linear-gradient'))
+  assert.ok(paper.cardShadow.includes('0 1px 3px'))
+  assert.equal(paper.cardBorder, '#dcd5c7')
+  assert.equal(paperDark.cardBorder, '#2e2a25')
 })

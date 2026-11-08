@@ -134,7 +134,7 @@ When using Lucide or custom icons inside PrimeVue `<Button>` components:
 ### 1. Banned: Ad-hoc `.p-*` CSS Selectors
 - **NEVER** write ad-hoc CSS classes or scoped overrides targeting PrimeVue internals (e.g., `.p-button`, `.p-dialog`, `.p-datatable`, `.p-tooltip`, `.p-select`).
 - If a component needs styling, map it to PrimeVue tokens in `src/theme/orbitTheme.ts` via `definePreset` referencing central CSS variables.
-- All styles must naturally adapt across the 5 runtime styles (`flat`, `glass`, `aero`, `liquidglass`, `ios`) via system tokens.
+- All styles must naturally adapt across the 6 runtime styles (`flat`, `glass`, `aero`, `liquidglass`, `ios`, `paper`) via system tokens.
 
 ### 2. Banned: Tailwind Important Modifiers (`!`)
 - **NEVER** use Tailwind important modifiers (e.g. `!bg-...`, `!p-...`, `!border-...`) to force styles over PrimeVue.

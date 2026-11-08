@@ -49,6 +49,31 @@ test('appearanceService.loadAppearancePreferences loads saved preferences', asyn
   }
 })
 
+test('appearanceService.loadAppearancePreferences loads saved paper uiStyle without falling back to flat', async () => {
+  const originalGetData = storage.getData
+
+  const paperPrefs: AppearancePreferences = {
+    themeMode: 'light',
+    accentColor: 'amber',
+    uiStyle: 'paper',
+    semanticColors: { ...DEFAULT_SEMANTIC_COLORS_PREFERENCES }
+  }
+
+  storage.getData = async (key: string) => {
+    if (key === APPEARANCE_STORAGE_KEY) {
+      return JSON.stringify(paperPrefs)
+    }
+    throw new Error('Not found')
+  }
+
+  try {
+    const prefs = await appearanceService.loadAppearancePreferences()
+    assert.equal(prefs.uiStyle, 'paper')
+  } finally {
+    storage.getData = originalGetData
+  }
+})
+
 test('appearanceService.loadAppearancePreferences migrates legacy orbit_theme_preference', async () => {
   const originalGetData = storage.getData
   const originalSetData = storage.setData

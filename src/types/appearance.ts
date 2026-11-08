@@ -2,7 +2,7 @@ export type ThemeMode = 'dark' | 'light' | 'system'
 
 export type AccentColor = 'blue' | 'emerald' | 'violet' | 'cyan' | 'amber' | 'rose' | 'slate'
 
-export type UiStyle = 'flat' | 'glass' | 'aero' | 'liquidglass' | 'ios'
+export type UiStyle = 'flat' | 'glass' | 'aero' | 'liquidglass' | 'ios' | 'paper'
 
 export interface AccentColorPalette {
   accent: string

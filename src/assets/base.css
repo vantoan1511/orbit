@@ -573,6 +573,78 @@
   --ui-backdrop-blur: var(--ui-glass-blur);
 }
 
+/* Editorial Paper */
+[data-ui-style="paper"] {
+  --bg-app: #f6f3ec;
+  --bg-sidebar: #f0ece1;
+  --bg-panel: #f9f6f0;
+  --bg-card: #fcfaf5;
+  --bg-hover: #e8e2d5;
+  --bg-active: #ded7c8;
+  --border: #dcd5c7;
+  --border-strong: #c7beae;
+  --border-subtle: #e8e2d5;
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #78716c;
+  --text-disabled: #a8a29e;
+  --input-bg: #fffdf9;
+  --input-border: #dcd5c7;
+  --shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.05);
+  --shadow: 0 4px 12px rgba(28, 25, 23, 0.08);
+  --ui-radius-card: 0.25rem;
+  --ui-radius-control: 0.1875rem;
+  --ui-card-bg: var(--bg-card);
+  --ui-control-bg: var(--input-bg);
+  --ui-overlay-bg: #fcfaf5;
+  --ui-overlay-blur: none;
+  --ui-dialog-bg: #fcfaf5;
+  --ui-dialog-blur: none;
+  --ui-mask-bg: rgba(28, 25, 23, 0.35);
+  --ui-mask-blur: none;
+  --ui-glass-blur: none;
+  --ui-sheen-highlight: linear-gradient(180deg, rgba(255, 253, 248, 0.65) 0%, rgba(244, 239, 228, 0.15) 100%);
+  --ui-card-sheen: var(--ui-sheen-highlight);
+  --ui-card-shadow: 0 1px 3px rgba(28, 25, 23, 0.06), 0 1px 2px rgba(28, 25, 23, 0.04);
+  --ui-backdrop-blur: none;
+}
+
+[data-ui-style="paper"].my-app-dark,
+.my-app-dark[data-ui-style="paper"] {
+  --bg-app: #141311;
+  --bg-sidebar: #181614;
+  --bg-panel: #161513;
+  --bg-card: #1c1a17;
+  --bg-hover: #292521;
+  --bg-active: #221f1b;
+  --border: #2e2a25;
+  --border-strong: #3d3831;
+  --border-subtle: #24211d;
+  --text-primary: #f0ece1;
+  --text-secondary: #b8b2a6;
+  --text-muted: #8a8377;
+  --text-disabled: #635d53;
+  --input-bg: #24211d;
+  --input-border: #332e29;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+  --ui-radius-card: 0.25rem;
+  --ui-radius-control: 0.1875rem;
+  --ui-card-bg: var(--bg-card);
+  --ui-control-bg: var(--input-bg);
+  --ui-overlay-bg: #1c1a17;
+  --ui-overlay-blur: none;
+  --ui-dialog-bg: #1f1d1a;
+  --ui-dialog-blur: none;
+  --ui-mask-bg: rgba(10, 9, 8, 0.65);
+  --ui-mask-blur: none;
+  --ui-glass-blur: none;
+  --ui-sheen-highlight: linear-gradient(180deg, rgba(255, 248, 235, 0.03) 0%, rgba(255, 248, 235, 0.005) 100%);
+  --ui-card-sheen: var(--ui-sheen-highlight);
+  --ui-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
+  --ui-backdrop-blur: none;
+}
+
 /* Surface token helpers */
 .bg-\(--bg-card\),
 .bg-\(--ui-overlay-bg\),
@@ -587,7 +659,10 @@
 [data-ui-style="aero"] .bg-\(--ui-dialog-bg\),
 [data-ui-style="liquidglass"] .bg-\(--bg-card\),
 [data-ui-style="liquidglass"] .bg-\(--ui-overlay-bg\),
-[data-ui-style="liquidglass"] .bg-\(--ui-dialog-bg\) {
+[data-ui-style="liquidglass"] .bg-\(--ui-dialog-bg\),
+[data-ui-style="paper"] .bg-\(--bg-card\),
+[data-ui-style="paper"] .bg-\(--ui-overlay-bg\),
+[data-ui-style="paper"] .bg-\(--ui-dialog-bg\) {
   background-image: var(--ui-sheen-highlight);
 }
 
