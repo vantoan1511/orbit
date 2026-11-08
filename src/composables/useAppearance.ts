@@ -93,15 +93,27 @@ export function syncAppearanceFromSettings(settings: Configuration[]): void {
   let changed = false
   const updated: AppearancePreferences = { ...preferences.value }
 
-  if (themeModeConfig && typeof themeModeConfig.value === 'string') {
+  if (
+    themeModeConfig &&
+    typeof themeModeConfig.value === 'string' &&
+    themeModeConfig.value !== updated.themeMode
+  ) {
     updated.themeMode = themeModeConfig.value as ThemeMode
     changed = true
   }
-  if (accentColorConfig && typeof accentColorConfig.value === 'string') {
+  if (
+    accentColorConfig &&
+    typeof accentColorConfig.value === 'string' &&
+    accentColorConfig.value !== updated.accentColor
+  ) {
     updated.accentColor = accentColorConfig.value as AccentColor
     changed = true
   }
-  if (uiStyleConfig && typeof uiStyleConfig.value === 'string') {
+  if (
+    uiStyleConfig &&
+    typeof uiStyleConfig.value === 'string' &&
+    uiStyleConfig.value !== updated.uiStyle
+  ) {
     updated.uiStyle = uiStyleConfig.value as UiStyle
     changed = true
   }
@@ -114,7 +126,11 @@ export function syncAppearanceFromSettings(settings: Configuration[]): void {
         // Ignore parse error
       }
     }
-    if (typeof parsedColors === 'object' && parsedColors !== null) {
+    if (
+      typeof parsedColors === 'object' &&
+      parsedColors !== null &&
+      JSON.stringify(parsedColors) !== JSON.stringify(updated.semanticColors)
+    ) {
       updated.semanticColors = parsedColors as SemanticColorsPreferences
       changed = true
     }

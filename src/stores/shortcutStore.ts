@@ -172,7 +172,17 @@ export const useShortcutStore = defineStore('shortcut', () => {
 
   function syncFromConfig(raw: unknown, overrideIsMac?: boolean): void {
     const targetIsMac = overrideIsMac ?? isMac
-    bindings.value = shortcutService.syncFromConfig(raw, targetIsMac)
+    const next = shortcutService.syncFromConfig(raw, targetIsMac)
+    const current = bindings.value
+    const currentKeys = Object.keys(current)
+    const nextKeys = Object.keys(next)
+
+    if (
+      currentKeys.length !== nextKeys.length ||
+      nextKeys.some((k) => current[k as ShortcutActionId] !== next[k as ShortcutActionId])
+    ) {
+      bindings.value = next
+    }
   }
 
   return {

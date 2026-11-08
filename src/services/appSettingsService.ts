@@ -1,4 +1,4 @@
-import type { Configuration, ConfigurationMap } from '@/types/settings'
+import type { Configuration, ConfigurationMap } from '../types/settings.ts'
 import { coreEngine } from './nativeService.ts'
 
 export const appSettingsService = {

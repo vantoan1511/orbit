@@ -148,3 +148,32 @@ test('shortcutStore.syncFromConfig updates bindings from backend configuration',
   assert.equal(store.bindings.quickOpen, 'Ctrl+Shift+F')
   assert.equal(store.isModified('quickOpen'), true)
 })
+
+test('shortcutStore.syncFromConfig preserves bindings object reference when values match', async () => {
+  setActivePinia(createPinia())
+  await storage.removeData(SHORTCUTS_STORAGE_KEY)
+  const store = useShortcutStore()
+  await store.init(false)
+
+  const initialBindingsRef = store.bindings
+
+  // Calling syncFromConfig with empty object (resolves to defaults which are already in bindings)
+  store.syncFromConfig({}, false)
+  assert.equal(
+    store.bindings,
+    initialBindingsRef,
+    'Bindings object reference should be preserved when values match defaults'
+  )
+
+  // Calling syncFromConfig twice with the same custom mapping
+  store.syncFromConfig({ quickOpen: 'Ctrl+Shift+F' }, false)
+  const updatedRef = store.bindings
+  assert.notEqual(updatedRef, initialBindingsRef)
+
+  store.syncFromConfig({ quickOpen: 'Ctrl+Shift+F' }, false)
+  assert.equal(
+    store.bindings,
+    updatedRef,
+    'Bindings object reference should be preserved when custom values are unchanged'
+  )
+})
