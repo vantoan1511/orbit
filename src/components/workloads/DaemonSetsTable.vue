@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -12,10 +13,13 @@ import WorkloadInlineEditPopovers from './WorkloadInlineEditPopovers.vue'
 import { withReplicasSortKey } from '@/utils/workloadMetrics'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const loading = ref(false)
 const inlineEdit = ref<InstanceType<typeof WorkloadInlineEditPopovers> | null>(null)
 
-const daemonSets = computed(() => withReplicasSortKey(k8sStore.daemonSets))
+const daemonSets = computed(() =>
+  isHydrated.value ? withReplicasSortKey(k8sStore.daemonSets) : []
+)
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },

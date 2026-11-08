@@ -13,26 +13,27 @@ import { computed, onMounted, ref, watch } from 'vue'
 const store = useKubernetesStore()
 const { isHydrated } = useDeferredMount()
 
-const totalNamespaces = computed(() => store.namespaceList.length)
+const totalNamespaces = computed(() => (isHydrated.value ? store.namespaceList.length : 0))
 
-const activeCount = computed(
-  () =>
-    store.namespaceList.filter(
-      (n: NamespaceInfo) => n.status === KUBERNETES_NAMESPACE_STATUS.Active
-    ).length
-)
-const terminatingCount = computed(
-  () =>
-    store.namespaceList.filter(
-      (n: NamespaceInfo) => n.status === KUBERNETES_NAMESPACE_STATUS.Terminating
-    ).length
-)
+const activeCount = computed(() => {
+  if (!isHydrated.value) return 0
+  return store.namespaceList.filter(
+    (n: NamespaceInfo) => n.status === KUBERNETES_NAMESPACE_STATUS.Active
+  ).length
+})
+const terminatingCount = computed(() => {
+  if (!isHydrated.value) return 0
+  return store.namespaceList.filter(
+    (n: NamespaceInfo) => n.status === KUBERNETES_NAMESPACE_STATUS.Terminating
+  ).length
+})
 // Placeholder: Namespaces themselves do not have a "failed" status phase in Kubernetes (only Active/Terminating).
 // This is kept for visual alignment with other dashboard pages.
 const failedCount = 0
-const systemCount = computed(
-  () => store.namespaceList.filter((n: NamespaceInfo) => n.isSystem).length
-)
+const systemCount = computed(() => {
+  if (!isHydrated.value) return 0
+  return store.namespaceList.filter((n: NamespaceInfo) => n.isSystem).length
+})
 
 const activeChartData = ref()
 const terminatingChartData = ref()
@@ -55,8 +56,9 @@ const makeDonutData = (value: number, total: number, color: string) => {
 }
 
 watch(
-  [activeCount, terminatingCount, systemCount, totalNamespaces],
-  () => {
+  [isHydrated, activeCount, terminatingCount, systemCount, totalNamespaces],
+  ([hydrated]) => {
+    if (!hydrated) return
     activeChartData.value = makeDonutData(
       activeCount.value,
       totalNamespaces.value,

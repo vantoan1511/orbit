@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_JOB_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const loading = ref(false)
+
+const jobs = computed(() => (isHydrated.value ? k8sStore.jobs : []))
 
 const columns = [
   { field: 'namespace', header: 'Namespace', visible: true },
@@ -42,7 +46,7 @@ const fetchJobs = async () => {
 <template>
   <GenericResourceTable
     data-component="jobs-table"
-    :data="k8sStore.jobs"
+    :data="jobs"
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'images']"

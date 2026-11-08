@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
@@ -22,6 +23,7 @@ const props = withDefaults(
 )
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 
 const columns = [
   { field: 'name', header: 'Name', visible: true },
@@ -46,6 +48,7 @@ watch(
 )
 
 const filteredPolicies = computed(() => {
+  if (!isHydrated.value) return []
   return filterPolicies(k8sStore.policies, props.categoryFilter, selectedType.value)
 })
 

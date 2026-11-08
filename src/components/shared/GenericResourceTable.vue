@@ -19,6 +19,7 @@ import ResourceActionMenu from '@/components/shared/ResourceActionMenu.vue'
 import ResourceDataTable from '@/components/shared/ResourceDataTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { useResourceActionMenu } from '@/composables/useResourceActionMenu'
 import { useResourceFilters } from '@/composables/useResourceFilters'
 import { useTableColumns, type TableColumn } from '@/composables/useTableColumns'
@@ -92,19 +93,25 @@ const emit = defineEmits<{
 
 const k8sStore = useKubernetesStore()
 const filterStore = useTableFilterStore()
+const { isHydrated } = useDeferredMount()
 
-onMounted(() => {
+const ensureTableKindsLoaded = () => {
   if (props.kind) {
     void k8sStore.ensureKindLoaded(props.kind).catch(() => {})
   }
+  if (!props.hideNamespaceFilter) {
+    void k8sStore.ensureKindLoaded(KUBERNETES_RESOURCE_KIND.Namespace).catch(() => {})
+  }
+}
+
+onMounted(() => {
+  ensureTableKindsLoaded()
 })
 
 watch(
-  () => props.kind,
-  (newKind) => {
-    if (newKind) {
-      void k8sStore.ensureKindLoaded(newKind).catch(() => {})
-    }
+  () => [props.kind, props.hideNamespaceFilter] as const,
+  () => {
+    ensureTableKindsLoaded()
   }
 )
 
@@ -120,8 +127,17 @@ const { searchQuery, selectedNamespace, filteredResources } = useResourceFilters
   dataRef,
   props.searchFields as (keyof T)[],
   resolvedStoreKey,
-  hideNamespaceFilterRef
+  hideNamespaceFilterRef,
+  isHydrated
 )
+
+const hydratedNamespaces = computed(() => (isHydrated.value ? k8sStore.namespaces : []))
+const hydratedSelectedNamespace = computed<string[]>({
+  get: () => (isHydrated.value ? selectedNamespace.value : []),
+  set: (val: string[]) => {
+    selectedNamespace.value = val
+  }
+})
 
 // Status filtering
 const storedStatus = filterStore.getFilters(
@@ -159,21 +175,10 @@ const getRowKey = (item: T): string => {
   return getResourceCompositeKey(item)
 }
 
-const storedRowKeys = filterStore.getFilters(
-  resolvedStoreKey,
-  k8sStore.activeClusterId || undefined
-).selectedRowKeys
-if (storedRowKeys.length > 0) {
-  const rowKeySet = new Set(storedRowKeys)
-  const matched = props.data.filter((item) => rowKeySet.has(getRowKey(item)))
-  if (matched.length > 0) {
-    selection.value = matched
-  }
-}
-
 watch(
-  () => props.data,
-  (newData) => {
+  [() => props.data, isHydrated] as const,
+  ([newData, hydrated]) => {
+    if (!hydrated) return
     const keys = filterStore.getFilters(
       resolvedStoreKey,
       k8sStore.activeClusterId || undefined
@@ -185,7 +190,8 @@ watch(
         selection.value = matched
       }
     }
-  }
+  },
+  { immediate: true }
 )
 
 watch(
@@ -206,6 +212,7 @@ watch(selectedNamespace, (newNs) => {
 })
 
 const filteredData = computed(() => {
+  if (!isHydrated.value) return []
   return filteredResources.value.filter((item) => {
     if (
       props.statuses.length > 0 &&
@@ -283,7 +290,7 @@ const EMPTY_PORT_FORWARDS: ActivePortForward[] = []
 
 const portForwardsMap = computed(() => {
   const map = new Map<string, ActivePortForward[]>()
-  if (!props.kind || k8sStore.activePortForwards.length === 0) return map
+  if (!isHydrated.value || !props.kind || k8sStore.activePortForwards.length === 0) return map
   const targetKind = props.kind.toLowerCase()
   for (const pf of k8sStore.activePortForwards) {
     if (pf.kind.toLowerCase() === targetKind) {
@@ -347,8 +354,8 @@ const getPortForwards = (data: T): ActivePortForward[] => {
       <!-- Namespace Filter -->
       <NamespaceFilter
         v-if="!hideNamespaceFilter"
-        v-model="selectedNamespace"
-        :namespaces="k8sStore.namespaces"
+        v-model="hydratedSelectedNamespace"
+        :namespaces="hydratedNamespaces"
       />
 
       <!-- Status Filter -->
@@ -358,7 +365,7 @@ const getPortForwards = (data: T): ActivePortForward[] => {
         :options="statuses"
       />
 
-      <slot name="filters"></slot>
+      <slot name="filters" :isHydrated="isHydrated"></slot>
     </template>
 
     <!-- Actions Left -->

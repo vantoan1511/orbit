@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -9,6 +10,7 @@ import { computed, ref } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const loading = ref(false)
 
 const columns = [
@@ -24,6 +26,7 @@ const selectedSuspend = ref('All Suspend States')
 const suspendOptions = ['All Suspend States', 'Suspended', KUBERNETES_NAMESPACE_STATUS.Active]
 
 const filteredCronJobs = computed(() => {
+  if (!isHydrated.value) return []
   return k8sStore.cronJobs.filter((cj) => {
     if (selectedSuspend.value !== 'All Suspend States') {
       const isSuspended = selectedSuspend.value === 'Suspended'

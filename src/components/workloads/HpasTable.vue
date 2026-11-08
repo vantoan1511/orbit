@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_HPA_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes.ts'
 import { kubernetesService } from '@/services/kubernetesService.ts'
 import { useKubernetesStore } from '@/stores/kubernetesStore.ts'
@@ -18,6 +19,7 @@ import { useRouter } from 'vue-router'
 import HpaDetailsDrawer from './HpaDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const router = useRouter()
 const toast = useToast()
 const loading = ref(false)
@@ -37,6 +39,7 @@ const selectedStatus = ref('All Statuses')
 const statusOptions = ['All Statuses', ...Object.values(KUBERNETES_HPA_STATUS)]
 
 const filteredHpas = computed(() => {
+  if (!isHydrated.value) return []
   return k8sStore.hpas.filter((hpa) => {
     if (selectedStatus.value !== 'All Statuses') {
       if (hpa.status !== selectedStatus.value) return false

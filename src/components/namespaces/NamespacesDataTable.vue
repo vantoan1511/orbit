@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_NAMESPACE_STATUS, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
@@ -9,6 +10,7 @@ import { computed, ref } from 'vue'
 import NamespaceDetailsDrawer from './NamespaceDetailsDrawer.vue'
 
 const store = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const selectedLabel = ref('All Labels')
 
 const columns = [
@@ -27,6 +29,7 @@ const statuses = ['All Statuses', ...Object.values(KUBERNETES_NAMESPACE_STATUS)]
 
 // Collect unique label keys across all namespaces
 const labelOptions = computed(() => {
+  if (!isHydrated.value) return ['All Labels']
   const keys = new Set<string>()
   store.namespaceList.forEach((ns) => {
     Object.keys(ns.labels).forEach((k) => keys.add(k))
@@ -36,6 +39,7 @@ const labelOptions = computed(() => {
 
 // Dynamically map and compute resource counts for each namespace
 const mappedNamespaces = computed(() => {
+  if (!isHydrated.value) return []
   return store.namespaceList.map((ns) => {
     const podsList = store.pods.filter((p) => p.namespace === ns.name)
     const podsCount = podsList.length

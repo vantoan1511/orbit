@@ -2,13 +2,17 @@
 import NodeDetailsDrawer from '@/components/nodes/NodeDetailsDrawer.vue'
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import StatusBadge from '@/components/shared/StatusBadge.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
+const nodes = computed(() => (isHydrated.value ? k8sStore.nodes : []))
 
 const MAX_VISIBLE_LABELS = 2
 
@@ -39,7 +43,7 @@ const handleRefresh = async () => {
   <GenericResourceTable
     data-component="nodes-table"
     :kind="KUBERNETES_RESOURCE_KIND.Node"
-    :data="k8sStore.nodes"
+    :data="nodes"
     :initialColumns="columns"
     :statuses="statuses"
     :searchFields="['name', 'role', 'version']"

@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import StorageClassDetailsDrawer from '@/components/storage/StorageClassDetailsDrawer.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import { computed } from 'vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
+const storageClasses = computed(() => (isHydrated.value ? k8sStore.storageClasses : []))
 
 const columns = [
   { field: 'name', header: 'Name', visible: true },
@@ -29,7 +33,7 @@ const handleRefresh = async () => {
 <template>
   <GenericResourceTable
     data-component="storage-classes-table"
-    :data="k8sStore.storageClasses"
+    :data="storageClasses"
     :initialColumns="columns"
     :hideNamespaceFilter="true"
     :hideNamespaceColumn="true"

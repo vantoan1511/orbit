@@ -1,5 +1,5 @@
-import { useKubernetesStore } from '@/stores/kubernetesStore'
-import { useTableFilterStore } from '@/stores/tableFilterStore'
+import { useKubernetesStore } from '../stores/kubernetesStore.ts'
+import { useTableFilterStore } from '../stores/tableFilterStore.ts'
 import {
   computed,
   onScopeDispose,
@@ -23,7 +23,8 @@ export function useResourceFilters<T extends ResourceItem>(
   resources: Ref<T[]>,
   searchFields: (keyof T)[] = ['name'],
   storeKey?: string,
-  hideNamespaceFilter: MaybeRef<boolean> = false
+  hideNamespaceFilter: MaybeRef<boolean> = false,
+  isHydrated?: Ref<boolean>
 ) {
   const filterStore = storeKey ? useTableFilterStore() : null
   const k8sStore = useKubernetesStore()
@@ -91,9 +92,9 @@ export function useResourceFilters<T extends ResourceItem>(
     )
 
     watch(
-      () => k8sStore.namespaceList,
-      (newList) => {
-        if (shouldHideNamespace.value) return
+      [() => k8sStore.namespaceList, () => (isHydrated ? isHydrated.value : true)] as const,
+      ([newList, hydrated]) => {
+        if (!hydrated || shouldHideNamespace.value) return
         const cluster = k8sStore.activeClusterId || undefined
         const state = filterStore.getFilters(storeKey, cluster)
         if (!state.isNamespaceInitialized && newList.length > 0) {
@@ -129,6 +130,10 @@ export function useResourceFilters<T extends ResourceItem>(
   }
 
   const filteredResources = computed(() => {
+    if (isHydrated && !isHydrated.value) {
+      return []
+    }
+
     const rawQuery = searchQuery.value.trim().toLowerCase()
     const hasQuery = rawQuery.length > 0
 

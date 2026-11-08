@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import TableFilterSelect from '@/components/shared/TableFilterSelect.vue'
+import { useDeferredMount } from '@/composables/useDeferredMount'
 import { KUBERNETES_EVENT_TYPE, KUBERNETES_RESOURCE_KIND } from '@/constants/kubernetes'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
 import { getEventTypeSeverity } from '@/utils/severity'
@@ -10,6 +11,7 @@ import { computed, ref } from 'vue'
 import EventDetailsDrawer from './EventDetailsDrawer.vue'
 
 const k8sStore = useKubernetesStore()
+const { isHydrated } = useDeferredMount()
 const { events } = storeToRefs(k8sStore)
 
 const columns = [
@@ -26,6 +28,7 @@ const selectedType = ref('All Types')
 const types = ['All Types', ...Object.values(KUBERNETES_EVENT_TYPE)]
 
 const filteredEvents = computed(() => {
+  if (!isHydrated.value) return []
   const type = selectedType.value
   if (type === 'All Types') return events.value
   return events.value.filter((e) => e.type === type)
