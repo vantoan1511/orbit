@@ -8,6 +8,7 @@ import {
   createDeploymentRowDecorator,
   createPodRowDecorator,
   getTopConsumers,
+  resolveEditableContainers,
   restartFingerprint,
   withReplicasSortKey
 } from '../workloadMetrics.ts'
@@ -300,4 +301,66 @@ test('createPodRowDecorator memoises PodRow objects via WeakMap and precomputes 
   assert.equal(blankRow.cpuWidthStyle, '0%')
   assert.equal(blankRow.hasMemoryPct, false)
   assert.equal(blankRow.memoryWidthStyle, '0%')
+})
+
+test('resolveEditableContainers returns cloned container entries when containers are present', () => {
+  const originalContainers = [
+    { name: 'app', image: 'nginx:1.25' },
+    { name: 'sidecar', image: 'envoy:v1.28' }
+  ]
+  const resolved = resolveEditableContainers({
+    containers: originalContainers,
+    images: ['nginx:1.25', 'envoy:v1.28']
+  })
+
+  assert.deepEqual(resolved, [
+    { name: 'app', image: 'nginx:1.25' },
+    { name: 'sidecar', image: 'envoy:v1.28' }
+  ])
+
+  // Modifying returned objects must not mutate input
+  resolved[0]!.image = 'nginx:1.26'
+  assert.equal(originalContainers[0]!.image, 'nginx:1.25')
+})
+
+test('resolveEditableContainers falls back to container-{idx} names when containers is empty or undefined', () => {
+  const fromEmpty = resolveEditableContainers({
+    containers: [],
+    images: ['redis:7.2', 'redis-exporter:1.0']
+  })
+  assert.deepEqual(fromEmpty, [
+    { name: 'container-0', image: 'redis:7.2' },
+    { name: 'container-1', image: 'redis-exporter:1.0' }
+  ])
+
+  const fromUndefined = resolveEditableContainers({
+    images: ['fluentd:v1.16']
+  })
+  assert.deepEqual(fromUndefined, [{ name: 'container-0', image: 'fluentd:v1.16' }])
+})
+
+test('resolveEditableContainers returns empty array when both containers and images are missing or empty', () => {
+  assert.deepEqual(resolveEditableContainers({}), [])
+  assert.deepEqual(resolveEditableContainers({ containers: [], images: [] }), [])
+  assert.deepEqual(resolveEditableContainers({ containers: null, images: null }), [])
+})
+
+test('withReplicasSortKey decorates DaemonSet objects with DaemonSetReplicas', () => {
+  const ds = {
+    name: 'node-exporter',
+    replicas: {
+      current: 5,
+      desired: 5,
+      ready: 5,
+      available: 5,
+      upToDate: 5
+    },
+    images: ['quay.io/prometheus/node-exporter:v1.7.0']
+  }
+
+  const [row] = withReplicasSortKey([ds])
+  assert.equal(row.replicasSortKey, 5 * REPLICAS_SORT_MULTIPLIER + 5)
+  assert.equal(row.imageTags.length, 1)
+  assert.equal(row.imageTags[0]!.short, 'node-exporter:v1.7.0')
+  assert.equal(row.imageTags[0]!.full, 'quay.io/prometheus/node-exporter:v1.7.0')
 })

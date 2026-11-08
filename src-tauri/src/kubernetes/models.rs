@@ -114,7 +114,7 @@ fn default_replicaset_kind() -> String { "ReplicaSet".to_string() }
 fn default_job_kind() -> String { "Job".to_string() }
 fn default_cronjob_kind() -> String { "CronJob".to_string() }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerImageInfo {
     pub name: String,
@@ -156,6 +156,8 @@ pub struct StatefulSetInfo {
     pub replicas: Replicas,
     pub age: String,
     pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
 }
@@ -171,6 +173,8 @@ pub struct DaemonSetInfo {
     pub replicas: DaemonSetReplicas,
     pub age: String,
     pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
 }
@@ -186,6 +190,8 @@ pub struct ReplicaSetInfo {
     pub replicas: Replicas,
     pub age: String,
     pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
 }

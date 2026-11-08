@@ -146,6 +146,7 @@ export interface StatefulSetInfo {
   replicas: Replicas
   age: string
   images: string[]
+  containers?: ContainerImageInfo[]
   labels: Record<string, string>
   annotations: Record<string, string>
 }
@@ -158,6 +159,7 @@ export interface DaemonSetInfo {
   replicas: DaemonSetReplicas
   age: string
   images: string[]
+  containers?: ContainerImageInfo[]
   labels: Record<string, string>
   annotations: Record<string, string>
 }
@@ -170,6 +172,7 @@ export interface ReplicaSetInfo {
   replicas: Replicas
   age: string
   images: string[]
+  containers?: ContainerImageInfo[]
   labels: Record<string, string>
   annotations: Record<string, string>
 }

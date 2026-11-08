@@ -271,11 +271,16 @@ pub fn map_statefulset(ss: &StatefulSet) -> models::StatefulSetInfo {
     };
 
     let mut images = Vec::new();
+    let mut containers = Vec::new();
     if let Some(spec) = ss.spec.as_ref() {
         for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
             if let Some(img) = &c.image {
                 images.push(img.clone());
             }
+            containers.push(models::ContainerImageInfo {
+                name: c.name.clone(),
+                image: c.image.clone().unwrap_or_default(),
+            });
         }
     }
 
@@ -290,6 +295,7 @@ pub fn map_statefulset(ss: &StatefulSet) -> models::StatefulSetInfo {
         replicas,
         age,
         images,
+        containers,
         labels,
         annotations,
     }
@@ -337,11 +343,16 @@ pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
     };
 
     let mut images = Vec::new();
+    let mut containers = Vec::new();
     if let Some(spec) = ds.spec.as_ref() {
         for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
             if let Some(img) = &c.image {
                 images.push(img.clone());
             }
+            containers.push(models::ContainerImageInfo {
+                name: c.name.clone(),
+                image: c.image.clone().unwrap_or_default(),
+            });
         }
     }
 
@@ -356,6 +367,7 @@ pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
         replicas,
         age,
         images,
+        containers,
         labels,
         annotations,
     }
@@ -393,11 +405,16 @@ pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
     };
 
     let mut images = Vec::new();
+    let mut containers = Vec::new();
     if let Some(template) = rs.spec.as_ref().and_then(|spec| spec.template.as_ref()) {
         for c in &template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
             if let Some(img) = &c.image {
                 images.push(img.clone());
             }
+            containers.push(models::ContainerImageInfo {
+                name: c.name.clone(),
+                image: c.image.clone().unwrap_or_default(),
+            });
         }
     }
 
@@ -412,6 +429,7 @@ pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
         replicas,
         age,
         images,
+        containers,
         labels,
         annotations,
     }
@@ -568,6 +586,10 @@ pub async fn update_images_resource(
         }
         "DaemonSet" => {
             let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+        }
+        "ReplicaSet" => {
+            let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
             api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
         }
         _ => {
@@ -1243,6 +1265,144 @@ mod tests {
         let mapped = map_replicaset(&rs);
         assert_eq!(mapped.name, "frontend-rs");
         assert_eq!(mapped.kind, "ReplicaSet");
+    }
+
+    #[test]
+    fn test_map_statefulset_containers() {
+        use k8s_openapi::api::apps::v1::StatefulSetSpec;
+        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+
+        let ss = StatefulSet {
+            metadata: ObjectMeta {
+                name: Some("redis-cluster".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            spec: Some(StatefulSetSpec {
+                template: PodTemplateSpec {
+                    spec: Some(PodSpec {
+                        containers: vec![
+                            Container {
+                                name: "redis".to_string(),
+                                image: Some("redis:7.2".to_string()),
+                                ..Default::default()
+                            },
+                            Container {
+                                name: "metrics".to_string(),
+                                image: Some("redis-exporter:1.0".to_string()),
+                                ..Default::default()
+                            },
+                        ],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_statefulset(&ss);
+        assert_eq!(mapped.images, vec!["redis:7.2", "redis-exporter:1.0"]);
+        assert_eq!(
+            mapped.containers,
+            vec![
+                models::ContainerImageInfo {
+                    name: "redis".to_string(),
+                    image: "redis:7.2".to_string(),
+                },
+                models::ContainerImageInfo {
+                    name: "metrics".to_string(),
+                    image: "redis-exporter:1.0".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_map_daemonset_containers() {
+        use k8s_openapi::api::apps::v1::DaemonSetSpec;
+        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+
+        let ds = DaemonSet {
+            metadata: ObjectMeta {
+                name: Some("fluentd".to_string()),
+                namespace: Some("logging".to_string()),
+                ..Default::default()
+            },
+            spec: Some(DaemonSetSpec {
+                template: PodTemplateSpec {
+                    spec: Some(PodSpec {
+                        containers: vec![
+                            Container {
+                                name: "fluentd".to_string(),
+                                image: Some("fluentd:v1.16".to_string()),
+                                ..Default::default()
+                            },
+                        ],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_daemonset(&ds);
+        assert_eq!(mapped.images, vec!["fluentd:v1.16"]);
+        assert_eq!(
+            mapped.containers,
+            vec![
+                models::ContainerImageInfo {
+                    name: "fluentd".to_string(),
+                    image: "fluentd:v1.16".to_string(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_map_replicaset_containers() {
+        use k8s_openapi::api::apps::v1::ReplicaSetSpec;
+        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+
+        let rs = ReplicaSet {
+            metadata: ObjectMeta {
+                name: Some("web-rs".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            spec: Some(ReplicaSetSpec {
+                template: Some(PodTemplateSpec {
+                    spec: Some(PodSpec {
+                        containers: vec![
+                            Container {
+                                name: "web".to_string(),
+                                image: Some("nginx:1.25".to_string()),
+                                ..Default::default()
+                            },
+                        ],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+
+        let mapped = map_replicaset(&rs);
+        assert_eq!(mapped.images, vec!["nginx:1.25"]);
+        assert_eq!(
+            mapped.containers,
+            vec![
+                models::ContainerImageInfo {
+                    name: "web".to_string(),
+                    image: "nginx:1.25".to_string(),
+                },
+            ]
+        );
     }
 
     #[test]
