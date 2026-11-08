@@ -233,3 +233,80 @@ test('syncAppearanceFromSettings updates semanticColors from backend Configurati
   assert.equal(semanticColors.value.success, 'forest')
   assert.equal(semanticColors.value.danger, 'ruby')
 })
+
+test('syncAppearanceFromSettings preserves preferences object reference when settings match or are non-appearance', async () => {
+  const { syncAppearanceFromSettings, useAppearance } = await import('../useAppearance.ts')
+  const { preferences } = useAppearance()
+
+  const currentPrefsRef = preferences.value
+
+  // Call with non-appearance setting
+  syncAppearanceFromSettings([
+    {
+      key: 'launchOnStartup',
+      name: 'Launch on Startup',
+      description: '',
+      datatype: 'boolean',
+      value: true,
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    }
+  ])
+
+  assert.equal(
+    preferences.value,
+    currentPrefsRef,
+    'Preferences reference should be preserved for non-appearance settings'
+  )
+
+  // Call with identical appearance settings
+  syncAppearanceFromSettings([
+    {
+      key: 'themeMode',
+      name: 'Theme Mode',
+      description: '',
+      datatype: 'string',
+      value: currentPrefsRef.themeMode,
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    },
+    {
+      key: 'accentColor',
+      name: 'Accent Color',
+      description: '',
+      datatype: 'string',
+      value: currentPrefsRef.accentColor,
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    },
+    {
+      key: 'uiStyle',
+      name: 'UI Style',
+      description: '',
+      datatype: 'string',
+      value: currentPrefsRef.uiStyle,
+      isConfidential: false,
+      cardinality: '1..1',
+      enable: true
+    },
+    {
+      key: 'semanticColors',
+      name: 'Semantic Colors',
+      description: '',
+      datatype: 'string',
+      value: currentPrefsRef.semanticColors,
+      isConfidential: false,
+      cardinality: '0..1',
+      enable: true
+    }
+  ])
+
+  assert.equal(
+    preferences.value,
+    currentPrefsRef,
+    'Preferences reference should be preserved when appearance values are unchanged'
+  )
+})

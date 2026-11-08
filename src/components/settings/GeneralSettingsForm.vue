@@ -58,6 +58,12 @@ const handleReset = async (config: Configuration) => {
     ? [...config.defaultValue]
     : (config.defaultValue ?? null)
   await handleValueChange(config, defaultVal)
+  toast.add({
+    severity: 'success',
+    summary: 'Settings Reset',
+    detail: `${config.name} reset to default.`,
+    life: 2000
+  })
 }
 
 const handleReloadKubeconfig = async () => {
@@ -86,19 +92,11 @@ const handleReloadKubeconfig = async () => {
 
 const handleValueChange = async (config: Configuration, newValue: unknown) => {
   if (!config.enable) return
-  const isResetting =
-    newValue === null || JSON.stringify(newValue) === JSON.stringify(config.defaultValue)
   if (config.key === CONFIG_KEYS.LAUNCH_ON_STARTUP) {
     await settingsStore.setLaunchOnStartup(Boolean(newValue))
   } else {
     await settingsStore.updateConfigValue(config.key, newValue)
   }
-  toast.add({
-    severity: 'success',
-    summary: isResetting ? 'Settings Reset' : 'Settings Saved',
-    detail: isResetting ? `${config.name} reset to default.` : `${config.name} updated.`,
-    life: 2000
-  })
 }
 
 const handleArrayChange = async (config: Configuration, rawText: string) => {
@@ -108,12 +106,6 @@ const handleArrayChange = async (config: Configuration, rawText: string) => {
     .map((s) => s.trim())
     .filter(Boolean)
   await settingsStore.updateConfigValue(config.key, items)
-  toast.add({
-    severity: 'success',
-    summary: 'Settings Saved',
-    detail: `${config.name} updated.`,
-    life: 2000
-  })
 }
 
 const formatArrayValue = (val: unknown): string => {
@@ -266,20 +258,21 @@ const handleResetAllSettings = () => {
           <span class="text-xs text-primary font-medium select-none">{{ config.name }}</span>
           <div class="flex items-center gap-2">
             <Button
-              v-if="isConfigModified(config)"
               v-tooltip.top="'Reset to default'"
+              data-sizing-exempt="icon-action"
               severity="secondary"
               variant="text"
-              rounded
-              class="shrink-0"
-              :disabled="!config.enable || settingsStore.isSaving"
+              class="w-7 h-7 p-0 shrink-0 transition-opacity"
+              :disabled="!config.enable || !isConfigModified(config)"
               @click="handleReset(config)"
             >
-              <RotateCcw class="w-3.5 h-3.5" />
+              <template #icon>
+                <RotateCcw class="w-3.5 h-3.5" />
+              </template>
             </Button>
             <ToggleSwitch
               :modelValue="Boolean(config.value ?? config.defaultValue ?? false)"
-              :disabled="!config.enable || settingsStore.isSaving"
+              :disabled="!config.enable"
               @update:modelValue="(val: boolean) => handleValueChange(config, val)"
             />
           </div>
@@ -295,29 +288,30 @@ const handleResetAllSettings = () => {
               :options="logRetentionOptions"
               optionLabel="label"
               optionValue="value"
-              :disabled="!config.enable || settingsStore.isSaving"
+              :disabled="!config.enable"
               class="text-xs w-full"
               @update:modelValue="(val: number) => handleValueChange(config, val)"
             />
             <InputNumber
               v-else
               :modelValue="Number(config.value ?? config.defaultValue ?? 0)"
-              :disabled="!config.enable || settingsStore.isSaving"
+              :disabled="!config.enable"
               class="text-xs w-full"
               @update:modelValue="(val: number | null) => handleValueChange(config, val ?? 0)"
             />
           </div>
           <Button
-            v-if="isConfigModified(config)"
             v-tooltip.top="'Reset to default'"
+            data-sizing-exempt="icon-action"
             severity="secondary"
             variant="text"
-            rounded
-            class="shrink-0"
-            :disabled="!config.enable || settingsStore.isSaving"
+            class="w-7 h-7 p-0 shrink-0 transition-opacity"
+            :disabled="!config.enable || !isConfigModified(config)"
             @click="handleReset(config)"
           >
-            <RotateCcw class="w-3.5 h-3.5" />
+            <template #icon>
+              <RotateCcw class="w-3.5 h-3.5" />
+            </template>
           </Button>
         </div>
 
@@ -341,16 +335,17 @@ const handleResetAllSettings = () => {
               />
             </div>
             <Button
-              v-if="isConfigModified(config)"
               v-tooltip.top="'Reset to default'"
+              data-sizing-exempt="icon-action"
               severity="secondary"
               variant="text"
-              rounded
-              class="shrink-0 self-center"
-              :disabled="!config.enable || settingsStore.isSaving"
+              class="w-7 h-7 p-0 shrink-0 self-center transition-opacity"
+              :disabled="!config.enable || !isConfigModified(config)"
               @click="handleReset(config)"
             >
-              <RotateCcw class="w-3.5 h-3.5" />
+              <template #icon>
+                <RotateCcw class="w-3.5 h-3.5" />
+              </template>
             </Button>
             <Button
               severity="secondary"
@@ -367,7 +362,7 @@ const handleResetAllSettings = () => {
           <div v-else class="flex items-center gap-2">
             <InputText
               :modelValue="formatArrayValue(config.value ?? config.defaultValue)"
-              :disabled="!config.enable || settingsStore.isSaving"
+              :disabled="!config.enable"
               class="text-xs w-full flex-1"
               placeholder="Comma-separated values"
               @change="
@@ -375,16 +370,17 @@ const handleResetAllSettings = () => {
               "
             />
             <Button
-              v-if="isConfigModified(config)"
               v-tooltip.top="'Reset to default'"
+              data-sizing-exempt="icon-action"
               severity="secondary"
               variant="text"
-              rounded
-              class="shrink-0"
-              :disabled="!config.enable || settingsStore.isSaving"
+              class="w-7 h-7 p-0 shrink-0 transition-opacity"
+              :disabled="!config.enable || !isConfigModified(config)"
               @click="handleReset(config)"
             >
-              <RotateCcw class="w-3.5 h-3.5" />
+              <template #icon>
+                <RotateCcw class="w-3.5 h-3.5" />
+              </template>
             </Button>
           </div>
         </div>
@@ -393,22 +389,23 @@ const handleResetAllSettings = () => {
         <div v-else class="flex items-center gap-2 max-w-lg">
           <InputText
             :modelValue="String(config.value ?? config.defaultValue ?? '')"
-            :disabled="!config.enable || settingsStore.isSaving"
+            :disabled="!config.enable"
             :type="config.isConfidential ? 'password' : 'text'"
             class="text-xs w-full flex-1"
             @change="(e: Event) => handleValueChange(config, (e.target as HTMLInputElement).value)"
           />
           <Button
-            v-if="isConfigModified(config)"
             v-tooltip.top="'Reset to default'"
+            data-sizing-exempt="icon-action"
             severity="secondary"
             variant="text"
-            rounded
-            class="shrink-0"
-            :disabled="!config.enable || settingsStore.isSaving"
+            class="w-7 h-7 p-0 shrink-0 transition-opacity"
+            :disabled="!config.enable || !isConfigModified(config)"
             @click="handleReset(config)"
           >
-            <RotateCcw class="w-3.5 h-3.5" />
+            <template #icon>
+              <RotateCcw class="w-3.5 h-3.5" />
+            </template>
           </Button>
         </div>
       </div>

@@ -1,7 +1,30 @@
-import { appSettingsService } from '@/services/appSettingsService'
-import { CONFIG_KEYS, type Configuration, type ConfigurationMap } from '@/types/settings'
+import { appSettingsService } from '../services/appSettingsService.ts'
+import { CONFIG_KEYS, type Configuration, type ConfigurationMap } from '../types/settings.ts'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+
+export function isConfigurationEqual(a: Configuration, b: Configuration): boolean {
+  if (a === b) return true
+  if (
+    a.key !== b.key ||
+    a.name !== b.name ||
+    a.description !== b.description ||
+    a.datatype !== b.datatype ||
+    a.enable !== b.enable ||
+    a.isConfidential !== b.isConfidential ||
+    a.cardinality !== b.cardinality
+  ) {
+    return false
+  }
+
+  const aEffective = a.value ?? a.defaultValue
+  const bEffective = b.value ?? b.defaultValue
+  if (JSON.stringify(aEffective) !== JSON.stringify(bEffective)) {
+    return false
+  }
+
+  return JSON.stringify(a.defaultValue) === JSON.stringify(b.defaultValue)
+}
 
 export const useSettingsStore = defineStore('settings', () => {
   const settings = ref<Configuration[]>([])
@@ -18,15 +41,42 @@ export const useSettingsStore = defineStore('settings', () => {
 
   function setSettings(data: Configuration[] | ConfigurationMap) {
     if (Array.isArray(data)) {
-      settings.value = data
+      if (settings.value.length === 0) {
+        settings.value = data
+      } else {
+        const next = data.map((incoming) => {
+          const existing = settingsMap.value.get(incoming.key)
+          if (existing && isConfigurationEqual(existing, incoming)) {
+            return existing
+          }
+          return incoming
+        })
+
+        const hasChanged =
+          settings.value.length !== next.length ||
+          settings.value.some((item, i) => item !== next[i])
+
+        if (hasChanged) {
+          settings.value = next
+        }
+      }
     } else if (data && typeof data === 'object') {
       // If a key-value map was received, update values in existing configuration list immutably
-      settings.value = settings.value.map((item) => {
+      let hasChanged = false
+      const next = settings.value.map((item) => {
         if (Object.prototype.hasOwnProperty.call(data, item.key)) {
-          return { ...item, value: data[item.key] }
+          const nextVal = data[item.key]
+          if (JSON.stringify(item.value) !== JSON.stringify(nextVal)) {
+            hasChanged = true
+            return { ...item, value: nextVal }
+          }
         }
         return item
       })
+
+      if (hasChanged) {
+        settings.value = next
+      }
     }
     isLoading.value = false
     isSaving.value = false
@@ -57,8 +107,10 @@ export const useSettingsStore = defineStore('settings', () => {
     const index = settings.value.findIndex((c) => c.key === key)
     if (index !== -1) {
       const target = settings.value[index]
-      if (target) {
-        settings.value[index] = { ...target, value }
+      if (target && JSON.stringify(target.value) !== JSON.stringify(value)) {
+        const next = [...settings.value]
+        next[index] = { ...target, value }
+        settings.value = next
       }
     }
     isSaving.value = true
@@ -86,8 +138,10 @@ export const useSettingsStore = defineStore('settings', () => {
     const index = settings.value.findIndex((c) => c.key === CONFIG_KEYS.LAUNCH_ON_STARTUP)
     if (index !== -1) {
       const target = settings.value[index]
-      if (target) {
-        settings.value[index] = { ...target, value: enabled }
+      if (target && target.value !== enabled) {
+        const next = [...settings.value]
+        next[index] = { ...target, value: enabled }
+        settings.value = next
       }
     }
     isSaving.value = true
