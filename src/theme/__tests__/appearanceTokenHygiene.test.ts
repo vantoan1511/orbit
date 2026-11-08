@@ -344,7 +344,7 @@ test('Stylesheets and Vue components contain zero ad-hoc .p-* CSS overrides or !
   const violations: string[] = []
 
   const pClassOverrideRegex =
-    /\.p-(?:button|dialog|select|datatable|card|drawer|popover|inputtext|textarea|tag|inputnumber|tooltip)\b/
+    /\.p-(?:button|dialog|select|datatable|card|drawer|popover|inputtext|textarea|tag|inputnumber|tooltip|toggleswitch)\b/
 
   for (const filePath of [...cssFiles, ...vueFiles]) {
     const content = fs.readFileSync(filePath, 'utf-8')

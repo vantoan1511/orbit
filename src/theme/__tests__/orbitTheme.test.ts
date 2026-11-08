@@ -768,3 +768,68 @@ test('Noir preset configures DataTable css hook for compositor promotion, tag bl
     'must disable pointer-events while scrolling'
   )
 })
+
+test('Noir preset configures ToggleSwitch component with visible off-state track, border, and handle tokens in light and dark modes', () => {
+  const components = Noir.components as Record<string, unknown>
+  const toggleswitch = components.toggleswitch as Record<string, unknown>
+  assert.ok(toggleswitch, 'toggleswitch component config must exist')
+
+  const root = toggleswitch.root as Record<string, string>
+  assert.ok(root, 'toggleswitch.root must exist')
+  assert.equal(root.borderWidth, '1px')
+
+  const colorScheme = toggleswitch.colorScheme as Record<
+    string,
+    {
+      root: Record<string, string>
+      handle: Record<string, string>
+    }
+  >
+  assert.ok(colorScheme, 'toggleswitch.colorScheme must exist')
+  assert.ok(colorScheme.light, 'toggleswitch.colorScheme.light must exist')
+  assert.ok(colorScheme.dark, 'toggleswitch.colorScheme.dark must exist')
+
+  // Light mode root (track) tokens
+  assert.equal(colorScheme.light.root.background, '{surface.300}')
+  assert.equal(colorScheme.light.root.hoverBackground, '{surface.400}')
+  assert.equal(colorScheme.light.root.disabledBackground, 'var(--bg-hover)')
+  assert.equal(colorScheme.light.root.checkedBackground, '{primary.color}')
+  assert.equal(colorScheme.light.root.checkedHoverBackground, '{primary.hover.color}')
+  assert.equal(colorScheme.light.root.borderColor, 'var(--border)')
+  assert.equal(colorScheme.light.root.hoverBorderColor, 'var(--border-strong)')
+  assert.equal(colorScheme.light.root.checkedBorderColor, '{primary.color}')
+  assert.equal(colorScheme.light.root.checkedHoverBorderColor, '{primary.hover.color}')
+
+  // Light mode handle (thumb) tokens
+  assert.equal(colorScheme.light.handle.background, '{surface.0}')
+  assert.equal(colorScheme.light.handle.hoverBackground, '{surface.0}')
+  assert.equal(colorScheme.light.handle.disabledBackground, 'var(--text-disabled)')
+  assert.equal(colorScheme.light.handle.checkedBackground, '{primary.contrast.color}')
+  assert.equal(colorScheme.light.handle.checkedHoverBackground, '{primary.contrast.color}')
+  assert.equal(colorScheme.light.handle.color, '{text.muted.color}')
+  assert.equal(colorScheme.light.handle.hoverColor, '{text.color}')
+  assert.equal(colorScheme.light.handle.checkedColor, '{primary.color}')
+  assert.equal(colorScheme.light.handle.checkedHoverColor, '{primary.hover.color}')
+
+  // Dark mode root (track) tokens
+  assert.equal(colorScheme.dark.root.background, '{surface.700}')
+  assert.equal(colorScheme.dark.root.hoverBackground, '{surface.600}')
+  assert.equal(colorScheme.dark.root.disabledBackground, 'var(--bg-hover)')
+  assert.equal(colorScheme.dark.root.checkedBackground, '{primary.color}')
+  assert.equal(colorScheme.dark.root.checkedHoverBackground, '{primary.hover.color}')
+  assert.equal(colorScheme.dark.root.borderColor, 'var(--border)')
+  assert.equal(colorScheme.dark.root.hoverBorderColor, 'var(--border-strong)')
+  assert.equal(colorScheme.dark.root.checkedBorderColor, '{primary.color}')
+  assert.equal(colorScheme.dark.root.checkedHoverBorderColor, '{primary.hover.color}')
+
+  // Dark mode handle (thumb) tokens
+  assert.equal(colorScheme.dark.handle.background, '{surface.300}')
+  assert.equal(colorScheme.dark.handle.hoverBackground, '{surface.200}')
+  assert.equal(colorScheme.dark.handle.disabledBackground, 'var(--text-disabled)')
+  assert.equal(colorScheme.dark.handle.checkedBackground, '{primary.contrast.color}')
+  assert.equal(colorScheme.dark.handle.checkedHoverBackground, '{primary.contrast.color}')
+  assert.equal(colorScheme.dark.handle.color, '{surface.900}')
+  assert.equal(colorScheme.dark.handle.hoverColor, '{surface.950}')
+  assert.equal(colorScheme.dark.handle.checkedColor, '{primary.color}')
+  assert.equal(colorScheme.dark.handle.checkedHoverColor, '{primary.hover.color}')
+})
