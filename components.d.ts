@@ -187,6 +187,7 @@ declare module 'vue' {
     WindowControls: typeof import('./src/components/layout/WindowControls.vue')['default']
     WorkloadDetailsDrawer: typeof import('./src/components/workloads/WorkloadDetailsDrawer.vue')['default']
     WorkloadEventsTab: typeof import('./src/components/workloads/WorkloadEventsTab.vue')['default']
+    WorkloadInlineEditPopovers: typeof import('./src/components/workloads/WorkloadInlineEditPopovers.vue')['default']
     WorkloadMetricsCards: typeof import('./src/components/workloads/WorkloadMetricsCards.vue')['default']
     WorkloadOverviewTab: typeof import('./src/components/workloads/WorkloadOverviewTab.vue')['default']
     WorkloadPodsTab: typeof import('./src/components/workloads/WorkloadPodsTab.vue')['default']

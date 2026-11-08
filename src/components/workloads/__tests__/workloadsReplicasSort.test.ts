@@ -54,7 +54,7 @@ test('DeploymentsTable configures sortable replicas column with replicasSortKey 
 
   // 5. Preserves inline replica scaling click handler
   assert.ok(
-    content.includes('@click.stop="openReplicasEdit($event, data)"'),
+    content.includes('openReplicasEdit($event, data)'),
     'Must preserve openReplicasEdit click handler'
   )
 

@@ -3,15 +3,12 @@ import GenericResourceTable from '@/components/shared/GenericResourceTable.vue'
 import { KUBERNETES_RESOURCE_KIND, KUBERNETES_WORKLOAD_STATUS } from '@/constants/kubernetes'
 import { kubernetesService } from '@/services/kubernetesService'
 import { useKubernetesStore } from '@/stores/kubernetesStore'
-import type { ContainerImageInfo, DeploymentInfo } from '@/types/kubernetes'
 import { Pencil } from '@lucide/vue'
-import Button from 'primevue/button'
 import Column from 'primevue/column'
-import InputNumber from 'primevue/inputnumber'
-import InputText from 'primevue/inputtext'
-import Popover from 'primevue/popover'
+import Tag from 'primevue/tag'
 import { computed, ref, shallowRef, watch } from 'vue'
 import WorkloadDetailsDrawer from './WorkloadDetailsDrawer.vue'
+import WorkloadInlineEditPopovers from './WorkloadInlineEditPopovers.vue'
 import {
   computeDeploymentRestarts,
   createDeploymentRowDecorator,
@@ -20,6 +17,7 @@ import {
 
 const k8sStore = useKubernetesStore()
 const loading = ref(false)
+const inlineEdit = ref<InstanceType<typeof WorkloadInlineEditPopovers> | null>(null)
 
 const deploymentDecorator = createDeploymentRowDecorator()
 const deploymentRestartsMap = shallowRef(new Map<string, number>())
@@ -64,72 +62,6 @@ const fetchDeployments = async () => {
     console.error('Error fetching deployments', e)
   } finally {
     loading.value = false
-  }
-}
-
-// Inline Replicas Edit State
-const replicasPopover = ref<InstanceType<typeof Popover> | null>(null)
-const editingDeployment = ref<DeploymentInfo | null>(null)
-const editReplicasValue = ref<number>(1)
-const isSavingReplicas = ref<boolean>(false)
-
-const openReplicasEdit = (event: Event, deployment: DeploymentInfo) => {
-  editingDeployment.value = deployment
-  editReplicasValue.value = deployment.replicas.desired
-  replicasPopover.value?.toggle(event)
-}
-
-const saveReplicas = async () => {
-  if (!editingDeployment.value) return
-  isSavingReplicas.value = true
-  try {
-    await kubernetesService.scaleResource({
-      namespace: editingDeployment.value.namespace,
-      kind: KUBERNETES_RESOURCE_KIND.Deployment,
-      name: editingDeployment.value.name,
-      replicas: editReplicasValue.value
-    })
-    replicasPopover.value?.hide()
-  } catch (e) {
-    console.error('Error scaling deployment', e)
-  } finally {
-    isSavingReplicas.value = false
-  }
-}
-
-// Inline Images Edit State
-const imagePopover = ref<InstanceType<typeof Popover> | null>(null)
-const editContainers = ref<ContainerImageInfo[]>([])
-const isSavingImages = ref<boolean>(false)
-
-const openImagesEdit = (event: Event, deployment: DeploymentInfo) => {
-  editingDeployment.value = deployment
-  if (deployment.containers && deployment.containers.length > 0) {
-    editContainers.value = deployment.containers.map((c) => ({ ...c }))
-  } else {
-    editContainers.value = deployment.images.map((img, idx) => ({
-      name: `container-${idx}`,
-      image: img
-    }))
-  }
-  imagePopover.value?.toggle(event)
-}
-
-const saveImages = async () => {
-  if (!editingDeployment.value) return
-  isSavingImages.value = true
-  try {
-    await kubernetesService.updateResourceImages({
-      namespace: editingDeployment.value.namespace,
-      kind: KUBERNETES_RESOURCE_KIND.Deployment,
-      name: editingDeployment.value.name,
-      containers: editContainers.value
-    })
-    imagePopover.value?.hide()
-  } catch (e) {
-    console.error('Error updating deployment images', e)
-  } finally {
-    isSavingImages.value = false
   }
 }
 </script>
@@ -182,7 +114,7 @@ const saveImages = async () => {
           <div
             aria-label="Click to edit replicas"
             class="group inline-flex items-center gap-1.5 font-mono text-muted-color px-1.5 py-0.5 rounded-[var(--ui-radius-control)] hover:bg-(--bg-hover) hover:text-primary transition-colors cursor-pointer"
-            @click.stop="openReplicasEdit($event, data)"
+            @click.stop="inlineEdit?.openReplicasEdit($event, data)"
           >
             <span class="font-bold">{{ data.replicas.current }}</span>
             <span class="text-muted-color">/</span>
@@ -246,7 +178,7 @@ const saveImages = async () => {
           <div
             aria-label="Click to edit container images"
             class="group flex items-center gap-1 max-w-full min-w-0 cursor-pointer"
-            @click.stop="openImagesEdit($event, data)"
+            @click.stop="inlineEdit?.openImagesEdit($event, data)"
           >
             <div class="flex flex-wrap gap-1 max-w-full min-w-0">
               <Tag
@@ -276,72 +208,5 @@ const saveImages = async () => {
     </template>
   </GenericResourceTable>
 
-  <!-- Inline Replicas Edit Popover -->
-  <Popover ref="replicasPopover">
-    <div class="flex flex-col gap-3 p-1 min-w-56" @click.stop>
-      <div class="flex flex-col gap-0.5">
-        <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
-          Scale Replicas
-        </span>
-        <span class="text-xs text-muted-color font-mono truncate">
-          {{ editingDeployment?.name }}
-        </span>
-      </div>
-      <div class="flex items-center gap-2">
-        <InputNumber
-          v-model="editReplicasValue"
-          :min="0"
-          :max="1000"
-          showButtons
-          buttonLayout="horizontal"
-          size="small"
-          class="w-full"
-        />
-      </div>
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-(--border)">
-        <Button
-          label="Cancel"
-          severity="secondary"
-          variant="text"
-          size="small"
-          @click="replicasPopover?.hide()"
-        />
-        <Button label="Save" size="small" :loading="isSavingReplicas" @click="saveReplicas" />
-      </div>
-    </div>
-  </Popover>
-
-  <!-- Inline Images Edit Popover -->
-  <Popover ref="imagePopover">
-    <div class="flex flex-col gap-3 p-1 min-w-80" @click.stop>
-      <div class="flex flex-col gap-0.5">
-        <span class="text-xs font-semibold tracking-wider text-muted-color uppercase">
-          Update Images
-        </span>
-        <span class="text-xs text-muted-color font-mono truncate">
-          {{ editingDeployment?.name }}
-        </span>
-      </div>
-      <div class="flex flex-col gap-2 max-h-60 overflow-y-auto">
-        <div
-          v-for="c in editContainers"
-          :key="c.name"
-          class="flex flex-col gap-1 p-2 bg-(--bg-hover)/30 rounded-[var(--ui-radius-control)] border border-(--border)"
-        >
-          <span class="text-xs font-semibold font-mono text-primary">{{ c.name }}</span>
-          <InputText v-model="c.image" size="small" class="w-full font-mono text-xs" />
-        </div>
-      </div>
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-(--border)">
-        <Button
-          label="Cancel"
-          severity="secondary"
-          variant="text"
-          size="small"
-          @click="imagePopover?.hide()"
-        />
-        <Button label="Save" size="small" :loading="isSavingImages" @click="saveImages" />
-      </div>
-    </div>
-  </Popover>
+  <WorkloadInlineEditPopovers ref="inlineEdit" :kind="KUBERNETES_RESOURCE_KIND.Deployment" />
 </template>

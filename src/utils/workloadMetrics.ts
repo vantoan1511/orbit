@@ -1,5 +1,5 @@
 import type { DeploymentCondition } from 'kubernetes-types/apps/v1'
-import type { DeploymentInfo, PodInfo, Replicas } from '../types/kubernetes.ts'
+import type { ContainerImageInfo, DeploymentInfo, PodInfo, Replicas } from '../types/kubernetes.ts'
 
 export const REPLICAS_SORT_MULTIPLIER = 1_000_000
 
@@ -28,6 +28,26 @@ export function formatImageTags(images?: readonly string[]): ImageTagItem[] {
     full: img,
     short: img.split('/').pop() || img
   }))
+}
+
+/**
+ * Resolves an editable copy of containers from a workload.
+ * Falls back to container-{index} names when containers metadata is missing but images are present.
+ */
+export function resolveEditableContainers(workload: {
+  containers?: readonly ContainerImageInfo[] | null
+  images?: readonly string[] | null
+}): ContainerImageInfo[] {
+  if (workload.containers && workload.containers.length > 0) {
+    return workload.containers.map((c) => ({ ...c }))
+  }
+  if (workload.images && workload.images.length > 0) {
+    return workload.images.map((img, idx) => ({
+      name: `container-${idx}`,
+      image: img
+    }))
+  }
+  return []
 }
 
 export interface OrderedDeploymentCondition {
