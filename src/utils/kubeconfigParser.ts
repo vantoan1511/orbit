@@ -154,11 +154,35 @@ export function filterKubeconfigContexts(yamlContent: string, selectedContexts: 
     const activeUsers = new Set(keptContexts.map((c) => c.context?.user).filter(Boolean))
 
     const filteredClusters = Array.isArray(doc.clusters)
-      ? doc.clusters.filter((cl) => cl && activeClusters.has(cl.name))
+      ? doc.clusters
+          .filter((cl) => cl && activeClusters.has(cl.name))
+          .map((cl) => {
+            if (cl.cluster && cl.cluster['certificate-authority-data']) {
+              const ca = normalizeCertData(cl.cluster['certificate-authority-data'])
+              if (ca) {
+                cl.cluster['certificate-authority-data'] = ca
+              }
+            }
+            return cl
+          })
       : []
 
     const filteredUsers = Array.isArray(doc.users)
-      ? doc.users.filter((u) => u && activeUsers.has(u.name))
+      ? doc.users
+          .filter((u) => u && activeUsers.has(u.name))
+          .map((u) => {
+            if (u.user) {
+              if (u.user['client-certificate-data']) {
+                const cert = normalizeCertData(u.user['client-certificate-data'])
+                if (cert) u.user['client-certificate-data'] = cert
+              }
+              if (u.user['client-key-data']) {
+                const key = normalizeCertData(u.user['client-key-data'])
+                if (key) u.user['client-key-data'] = key
+              }
+            }
+            return u
+          })
       : []
 
     let currentContext = doc['current-context']
@@ -182,6 +206,20 @@ export function filterKubeconfigContexts(yamlContent: string, selectedContexts: 
   }
 }
 
+export const DEFAULT_MANUAL_CONFIG: ManualEndpointConfig = {
+  contextName: '',
+  clusterName: '',
+  serverUrl: '',
+  authType: 'token',
+  token: '',
+  clientCertData: '',
+  clientKeyData: '',
+  username: '',
+  password: '',
+  insecureSkipTlsVerify: false,
+  caCertData: ''
+}
+
 /**
  * Normalizes a Kubernetes API server URL by prepending 'https://' if the protocol scheme is omitted.
  */
@@ -196,7 +234,7 @@ export function normalizeServerUrl(rawUrl: string): string {
 
 /**
  * Normalizes certificate/key data by encoding raw PEM content to base64.
- * Returns existing base64 strings unchanged.
+ * Strips all internal whitespace and newlines from base64 strings.
  */
 export function normalizeCertData(data: string | undefined): string | undefined {
   if (!data) return undefined
@@ -205,7 +243,40 @@ export function normalizeCertData(data: string | undefined): string | undefined 
   if (trimmed.startsWith('-----BEGIN ')) {
     return encodeBase64(trimmed)
   }
-  return trimmed
+  return trimmed.replace(/\s+/g, '')
+}
+
+/**
+ * Validates manual endpoint configuration fields per authType.
+ */
+export function validateManualEndpointConfig(config: ManualEndpointConfig): {
+  valid: boolean
+  error: string | null
+} {
+  if (!config.clusterName || !config.clusterName.trim()) {
+    return { valid: false, error: 'Cluster Name is required' }
+  }
+  const normalizedUrl = normalizeServerUrl(config.serverUrl)
+  if (!normalizedUrl) {
+    return { valid: false, error: 'API Server URL is required' }
+  }
+  if (config.authType === 'token') {
+    if (!config.token || !config.token.trim()) {
+      return { valid: false, error: 'Bearer Token is required for Token authentication' }
+    }
+  } else if (config.authType === 'certificate') {
+    if (!config.clientCertData?.trim() || !config.clientKeyData?.trim()) {
+      return {
+        valid: false,
+        error: 'Client Certificate and Client Key are required for Certificate authentication'
+      }
+    }
+  } else if (config.authType === 'basic') {
+    if (!config.username || !config.username.trim()) {
+      return { valid: false, error: 'Username is required for Basic authentication' }
+    }
+  }
+  return { valid: true, error: null }
 }
 
 /**

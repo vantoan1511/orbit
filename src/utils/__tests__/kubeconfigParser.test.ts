@@ -3,7 +3,9 @@ import test from 'node:test'
 import {
   parseKubeconfigYaml,
   filterKubeconfigContexts,
-  buildKubeconfigFromEndpoint
+  buildKubeconfigFromEndpoint,
+  normalizeCertData,
+  validateManualEndpointConfig
 } from '../kubeconfigParser.ts'
 import type { ManualEndpointConfig } from '@/types/cluster'
 
@@ -195,4 +197,116 @@ test('buildKubeconfigFromEndpoint encodes raw PEM strings to base64 for cert and
   // Verify it is base64 encoded
   const expectedCertB64 = Buffer.from(rawPemCert).toString('base64')
   assert.ok(yamlOutput.includes(expectedCertB64))
+})
+
+test('normalizeCertData strips internal whitespace and newlines from base64 strings', () => {
+  const multilineB64 = '  LS0t\n  LS1C\r\n  RUdJTi  '
+  const result = normalizeCertData(multilineB64)
+  assert.equal(result, 'LS0tLS1CRUdJTi')
+})
+
+test('filterKubeconfigContexts normalizes raw PEM and multiline base64 in cluster and user cert data', () => {
+  const testYaml = `
+apiVersion: v1
+kind: Config
+current-context: test-ctx
+clusters:
+- name: test-cluster
+  cluster:
+    server: https://k8s.example.com:6443
+    certificate-authority-data: |
+      -----BEGIN CERTIFICATE-----
+      MIIDXTCCAkW...
+      -----END CERTIFICATE-----
+users:
+- name: test-user
+  user:
+    client-certificate-data: "LS0t\\nLS1C\\nRUdJTi"
+    client-key-data: "LS0t\\nLS1C\\nRUdJTi"
+contexts:
+- name: test-ctx
+  context:
+    cluster: test-cluster
+    user: test-user
+`
+  const filtered = filterKubeconfigContexts(testYaml, ['test-ctx'])
+  assert.ok(!filtered.includes('-----BEGIN CERTIFICATE-----'))
+  assert.ok(!filtered.includes('\nLS1C\n'))
+  assert.ok(filtered.includes('LS0tLS1CRUdJTi'))
+})
+
+test('validateManualEndpointConfig validates required fields per authType', () => {
+  // Empty cluster name
+  const emptyName = validateManualEndpointConfig({
+    contextName: 'ctx',
+    clusterName: '   ',
+    serverUrl: 'https://10.0.0.1:6443',
+    authType: 'none',
+    insecureSkipTlsVerify: true
+  })
+  assert.equal(emptyName.valid, false)
+  assert.equal(emptyName.error, 'Cluster Name is required')
+
+  // Empty server URL
+  const emptyUrl = validateManualEndpointConfig({
+    contextName: 'ctx',
+    clusterName: 'cluster-1',
+    serverUrl: '   ',
+    authType: 'none',
+    insecureSkipTlsVerify: true
+  })
+  assert.equal(emptyUrl.valid, false)
+  assert.equal(emptyUrl.error, 'API Server URL is required')
+
+  // Token missing
+  const missingToken = validateManualEndpointConfig({
+    contextName: 'ctx',
+    clusterName: 'cluster-1',
+    serverUrl: 'https://10.0.0.1:6443',
+    authType: 'token',
+    token: '   ',
+    insecureSkipTlsVerify: true
+  })
+  assert.equal(missingToken.valid, false)
+  assert.equal(missingToken.error, 'Bearer Token is required for Token authentication')
+
+  // Cert/Key missing
+  const missingCert = validateManualEndpointConfig({
+    contextName: 'ctx',
+    clusterName: 'cluster-1',
+    serverUrl: 'https://10.0.0.1:6443',
+    authType: 'certificate',
+    clientCertData: 'cert',
+    clientKeyData: '   ',
+    insecureSkipTlsVerify: true
+  })
+  assert.equal(missingCert.valid, false)
+  assert.equal(
+    missingCert.error,
+    'Client Certificate and Client Key are required for Certificate authentication'
+  )
+
+  // Basic username missing
+  const missingUser = validateManualEndpointConfig({
+    contextName: 'ctx',
+    clusterName: 'cluster-1',
+    serverUrl: 'https://10.0.0.1:6443',
+    authType: 'basic',
+    username: '  ',
+    insecureSkipTlsVerify: true
+  })
+  assert.equal(missingUser.valid, false)
+  assert.equal(missingUser.error, 'Username is required for Basic authentication')
+
+  // Valid token config
+  const validToken = validateManualEndpointConfig({
+    contextName: 'ctx',
+    clusterName: 'cluster-1',
+    serverUrl: 'https://10.0.0.1:6443',
+    authType: 'token',
+    token: 'my-token',
+    insecureSkipTlsVerify: true
+  })
+  assert.equal(validToken.valid, true)
+  assert.equal(validToken.error, null)
 })

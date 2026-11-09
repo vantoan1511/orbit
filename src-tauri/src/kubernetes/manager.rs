@@ -269,13 +269,49 @@ impl KubeManager {
             .map_err(|e| format!("Failed to build client: {}", e))?;
             
         // Test connection
-        let healthy = client.apiserver_version().await.is_ok();
+        let apiserver_res = client.apiserver_version().await;
+        if let Err(e) = apiserver_res {
+            return Err(format!("Failed to connect to cluster API server: {}", e));
+        }
         
         self.active_context = Some(context_name.to_string());
         self.active_client = Some(client);
-        self.active_context_healthy = healthy;
+        self.active_context_healthy = true;
         
         Ok(())
+    }
+
+    /// Merges contexts, clusters, and auth_infos from `new_config` into `self.kubeconfig`.
+    /// Existing entries with matching names are updated (upserted); new entries are appended.
+    pub fn merge_kubeconfig(&mut self, new_config: Kubeconfig) {
+        if let Some(ref mut current) = self.kubeconfig {
+            if let Some(curr_ctx) = new_config.current_context {
+                current.current_context = Some(curr_ctx);
+            }
+            for ctx in new_config.contexts {
+                if let Some(pos) = current.contexts.iter().position(|c| c.name == ctx.name) {
+                    current.contexts[pos] = ctx;
+                } else {
+                    current.contexts.push(ctx);
+                }
+            }
+            for cl in new_config.clusters {
+                if let Some(pos) = current.clusters.iter().position(|c| c.name == cl.name) {
+                    current.clusters[pos] = cl;
+                } else {
+                    current.clusters.push(cl);
+                }
+            }
+            for user in new_config.auth_infos {
+                if let Some(pos) = current.auth_infos.iter().position(|u| u.name == user.name) {
+                    current.auth_infos[pos] = user;
+                } else {
+                    current.auth_infos.push(user);
+                }
+            }
+        } else {
+            self.kubeconfig = Some(new_config);
+        }
     }
 
     /// Read a kubeconfig from `file_path` and merge its contexts, clusters, and auth_infos into `self.kubeconfig`.
@@ -291,27 +327,8 @@ impl KubeManager {
 
         let new_config = Kubeconfig::read_from(file_path)
             .map_err(|e| format!("Failed to read custom kubeconfig: {}", e))?;
-            
-        if let Some(ref mut current) = self.kubeconfig {
-            // Merge clusters, contexts, and auth infos (users)
-            for ctx in new_config.contexts {
-                if !current.contexts.iter().any(|c| c.name == ctx.name) {
-                    current.contexts.push(ctx);
-                }
-            }
-            for cl in new_config.clusters {
-                if !current.clusters.iter().any(|c| c.name == cl.name) {
-                    current.clusters.push(cl);
-                }
-            }
-            for user in new_config.auth_infos {
-                if !current.auth_infos.iter().any(|u| u.name == user.name) {
-                    current.auth_infos.push(user);
-                }
-            }
-        } else {
-            self.kubeconfig = Some(new_config);
-        }
+
+        self.merge_kubeconfig(new_config);
 
         Ok(())
     }
@@ -321,18 +338,6 @@ impl KubeManager {
 
         if let Err(e) = self.config.add_kubeconfig_path(file_path) {
             tracing::warn!(path = %file_path, error = %e, "Failed to persist kubeconfig path");
-        }
-        
-        // Try to switch to the new config's current context if none is active
-        if self.active_context.is_none() {
-            let next_ctx = if let Some(ref config) = self.kubeconfig {
-                config.current_context.clone().or_else(|| config.contexts.first().map(|c| c.name.clone()))
-            } else {
-                None
-            };
-            if let Some(ctx) = next_ctx {
-                let _ = self.switch_context(&ctx).await;
-            }
         }
         
         Ok(())
@@ -590,6 +595,87 @@ users:
         let resolved = KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &remote_cluster)
             .expect("should route remote cluster through proxy");
         assert_eq!(resolved.to_string(), "http://proxy.corp.internal:8443/");
+    }
+
+    #[tokio::test]
+    async fn test_merge_kubeconfig_overwrites_existing_entries_with_same_name() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let yaml1 = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: default-user
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: default-user
+  user:
+    token: old-token
+"#;
+
+        let yaml2 = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.0.99:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: default-user
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: default-user
+  user:
+    token: new-token
+"#;
+
+        let cfg1 = Kubeconfig::from_yaml(yaml1).expect("valid yaml 1");
+        let cfg2 = Kubeconfig::from_yaml(yaml2).expect("valid yaml 2");
+
+        manager.merge_kubeconfig(cfg1);
+        assert_eq!(manager.get_clusters().len(), 1);
+        assert_eq!(
+            manager.get_clusters()[0].server_url,
+            Some("https://127.0.0.1:6443".to_string())
+        );
+
+        manager.merge_kubeconfig(cfg2);
+        assert_eq!(manager.get_clusters().len(), 1);
+        assert_eq!(
+            manager.get_clusters()[0].server_url,
+            Some("https://10.0.0.99:6443".to_string())
+        );
+
+        let user = manager
+            .kubeconfig
+            .as_ref()
+            .unwrap()
+            .auth_infos
+            .iter()
+            .find(|u| u.name == "default-user")
+            .unwrap();
+        assert!(user.auth_info.as_ref().unwrap().token.is_some());
     }
 }
 

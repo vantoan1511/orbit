@@ -37,9 +37,11 @@ import {
   type ManualEndpointConfig
 } from '@/types/cluster'
 import {
+  DEFAULT_MANUAL_CONFIG,
   buildKubeconfigFromEndpoint,
   filterKubeconfigContexts,
-  parseKubeconfigYaml
+  parseKubeconfigYaml,
+  validateManualEndpointConfig
 } from '@/utils/kubeconfigParser'
 
 const props = defineProps<{
@@ -70,21 +72,8 @@ const pastedYaml = ref('')
 const yamlParseError = ref<string | null>(null)
 
 // Tab 3: Manual Endpoint
-const createDefaultManualConfig = (): ManualEndpointConfig => ({
-  contextName: '',
-  clusterName: '',
-  serverUrl: '',
-  authType: 'token',
-  token: '',
-  clientCertData: '',
-  clientKeyData: '',
-  username: '',
-  password: '',
-  insecureSkipTlsVerify: false,
-  caCertData: ''
-})
-
-const manualConfig = ref<ManualEndpointConfig>(createDefaultManualConfig())
+const manualConfig = ref<ManualEndpointConfig>({ ...DEFAULT_MANUAL_CONFIG })
+const submitError = ref<string | null>(null)
 
 // Preview Contexts
 const discoveredContexts = ref<DiscoveredContextInfo[]>([])
@@ -104,18 +93,13 @@ const getTabClass = (tab: 'file' | 'paste' | 'manual'): string =>
 // Reset state
 function resetModalState(): void {
   activeTab.value = 'file'
-  selectedFilePath.value = ''
-  selectedFileSize.value = null
-  fileRawContent.value = ''
-  pastedYaml.value = ''
-  yamlParseError.value = null
-  manualConfig.value = createDefaultManualConfig()
+  selectedFilePath.value = fileRawContent.value = pastedYaml.value = alias.value = ''
+  selectedFileSize.value = yamlParseError.value = submitError.value = selectedColor.value = null
+  tags.value = []
+  manualConfig.value = { ...DEFAULT_MANUAL_CONFIG }
   discoveredContexts.value = []
   selectedContexts.value = []
   showCustomization.value = false
-  alias.value = ''
-  selectedColor.value = null
-  tags.value = []
   switchContext.value = true
   isSubmitting.value = false
 }
@@ -131,10 +115,14 @@ watch(
 
 function updateDiscoveredContexts(contexts: DiscoveredContextInfo[]): void {
   discoveredContexts.value = contexts
-  // By default, exclude contexts that already exist in Orbit
-  selectedContexts.value = contexts
-    .filter((c) => !existingClusterNames.value.has(c.name))
-    .map((c) => c.name)
+  if (activeTab.value === 'manual' || contexts.length === 1) {
+    selectedContexts.value = contexts.map((c) => c.name)
+  } else {
+    const unadded = contexts
+      .filter((c) => !existingClusterNames.value.has(c.name))
+      .map((c) => c.name)
+    selectedContexts.value = unadded.length > 0 ? unadded : contexts.map((c) => c.name)
+  }
 }
 
 // File Selection Handler
@@ -186,12 +174,12 @@ async function processSelectedFile(filePath: string): Promise<void> {
 }
 
 // Drag & Drop handlers
-function handleDragOver(e: DragEvent): void {
+const handleDragOver = (e: DragEvent): void => {
   e.preventDefault()
   isDraggingOver.value = true
 }
 
-function handleDragLeave(e: DragEvent): void {
+const handleDragLeave = (e: DragEvent): void => {
   e.preventDefault()
   isDraggingOver.value = false
 }
@@ -218,6 +206,7 @@ async function handleDrop(e: DragEvent): Promise<void> {
 
 // Paste YAML Watcher
 watch(pastedYaml, (newYaml) => {
+  submitError.value = null
   if (activeTab.value !== 'paste') return
   if (!newYaml.trim()) {
     yamlParseError.value = null
@@ -235,44 +224,40 @@ watch(pastedYaml, (newYaml) => {
   }
 })
 
-// Manual Config Watcher
+// Manual Config Validation & Sync
+const manualValidation = computed(() => validateManualEndpointConfig(manualConfig.value))
+
+function syncManualContexts(): void {
+  const { clusterName, serverUrl, contextName } = manualConfig.value
+  if (clusterName.trim() && serverUrl.trim()) {
+    const generated = buildKubeconfigFromEndpoint({
+      ...manualConfig.value,
+      contextName: contextName.trim() || `${clusterName.trim()}-context`
+    })
+    updateDiscoveredContexts(parseKubeconfigYaml(generated))
+  } else {
+    updateDiscoveredContexts([])
+  }
+}
+
 watch(
   manualConfig,
-  (cfg) => {
-    if (activeTab.value !== 'manual') return
-    if (!cfg.clusterName.trim() || !cfg.serverUrl.trim()) {
-      updateDiscoveredContexts([])
-      return
-    }
-
-    const effectiveContextName = cfg.contextName.trim() || `${cfg.clusterName.trim()}-context`
-    const generatedYaml = buildKubeconfigFromEndpoint({
-      ...cfg,
-      contextName: effectiveContextName
-    })
-    const contexts = parseKubeconfigYaml(generatedYaml)
-    updateDiscoveredContexts(contexts)
+  () => {
+    submitError.value = null
+    if (activeTab.value === 'manual') syncManualContexts()
   },
   { deep: true }
 )
 
 // Active tab switch handling
 watch(activeTab, (tab) => {
+  submitError.value = null
   if (tab === 'file') {
     updateDiscoveredContexts(fileRawContent.value ? parseKubeconfigYaml(fileRawContent.value) : [])
   } else if (tab === 'paste') {
     updateDiscoveredContexts(pastedYaml.value ? parseKubeconfigYaml(pastedYaml.value) : [])
   } else if (tab === 'manual') {
-    const { clusterName, serverUrl, contextName } = manualConfig.value
-    if (clusterName.trim() && serverUrl.trim()) {
-      const generated = buildKubeconfigFromEndpoint({
-        ...manualConfig.value,
-        contextName: contextName.trim() || `${clusterName.trim()}-context`
-      })
-      updateDiscoveredContexts(parseKubeconfigYaml(generated))
-    } else {
-      updateDiscoveredContexts([])
-    }
+    syncManualContexts()
   }
 })
 
@@ -295,12 +280,15 @@ function toggleContextSelection(name: string): void {
 
 // Submission
 const canSubmit = computed(() => {
-  return selectedContexts.value.length > 0 && !isSubmitting.value
+  if (selectedContexts.value.length === 0 || isSubmitting.value) return false
+  if (activeTab.value === 'manual') return manualValidation.value.valid
+  return true
 })
 
 async function handleAddClusterSubmit(): Promise<void> {
   if (!canSubmit.value) return
 
+  submitError.value = null
   isSubmitting.value = true
   try {
     let payloadContent = ''
@@ -341,12 +329,15 @@ async function handleAddClusterSubmit(): Promise<void> {
 
     emit('added')
     emit('update:visible', false)
-  } catch (err) {
+  } catch (err: unknown) {
     console.error('Failed to add cluster:', err)
+    const message = err instanceof Error ? err.message : String(err)
+    submitError.value =
+      message || 'Failed to add the cluster. Verify the API server URL and credentials.'
     toast.add({
       severity: 'error',
       summary: 'Import Failed',
-      detail: 'Failed to add the cluster. Check the kubeconfig configuration.',
+      detail: submitError.value,
       life: 4000
     })
   } finally {
@@ -385,6 +376,18 @@ const handleClose = (): void => emit('update:visible', false)
       </div>
     </template>
     <div class="flex flex-col gap-6">
+      <!-- Inline Error Banner -->
+      <div
+        v-if="submitError"
+        class="p-3 bg-(--danger-soft) border border-(--danger)/30 rounded-[var(--ui-radius-control)] flex items-start gap-2.5 text-xs text-(--danger)"
+      >
+        <AlertCircle class="w-4 h-4 shrink-0 mt-0.5" />
+        <div class="flex-1">
+          <p class="font-medium">Failed to connect or import cluster</p>
+          <p class="text-[11px] opacity-90 mt-0.5">{{ submitError }}</p>
+        </div>
+      </div>
+
       <!-- Input Mode Tabs -->
       <Tabs v-model:value="activeTab" class="w-full">
         <TabList class="bg-transparent border-b border-(--border) px-1 flex gap-2 shrink-0">
@@ -615,6 +618,18 @@ const handleClose = (): void => emit('update:visible', false)
                   Insecure Skip TLS Verification (Self-signed or internal CA)
                 </label>
               </div>
+
+              <p
+                v-if="
+                  manualConfig.clusterName.trim() &&
+                  manualConfig.serverUrl.trim() &&
+                  !manualValidation.valid
+                "
+                class="text-[11px] text-(--warning) flex items-center gap-1.5"
+              >
+                <AlertCircle class="w-3.5 h-3.5 shrink-0" />
+                <span>{{ manualValidation.error }}</span>
+              </p>
             </div>
           </TabPanel>
         </TabPanels>
@@ -681,15 +696,13 @@ const handleClose = (): void => emit('update:visible', false)
                   <span
                     v-if="ctx.isCurrentContext"
                     class="px-1.5 py-0.2 text-[10px] font-medium rounded-[var(--ui-radius-control)] bg-(--accent-soft) text-(--accent)"
+                    >Current</span
                   >
-                    Current
-                  </span>
                   <span
                     v-if="existingClusterNames.has(ctx.name)"
                     class="px-1.5 py-0.5 text-[10px] font-medium rounded-[var(--ui-radius-control)] bg-[var(--warning-soft)] text-[var(--warning)] border border-[var(--warning)]/20"
+                    >Already in Orbit</span
                   >
-                    Already in Orbit
-                  </span>
                 </div>
                 <div class="flex items-center gap-2 text-[11px] text-muted-color truncate">
                   <span class="truncate">{{ ctx.serverUrl || 'No server URL' }}</span>

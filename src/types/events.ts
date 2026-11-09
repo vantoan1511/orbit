@@ -26,6 +26,7 @@ import type {
 
 import type { UserProfileInfo } from './profile'
 import type { Configuration } from './settings'
+import type { ClusterAddFinishedPayload } from './cluster'
 
 export interface ComponentVersion {
   version: string
@@ -212,6 +213,7 @@ export interface OrbitEventMap {
     data?: Record<string, unknown>
     error?: string
   }
+  clusterAddFinished: ClusterAddFinishedPayload
   portForwardStarted: {
     id: string
     namespace: string
@@ -293,6 +295,7 @@ export const OrbitEvents = {
   CommandSucceeded: 'commandSucceeded',
   ResourceRawData: 'resourceRawData',
   ResourceApplyFinished: 'resourceApplyFinished',
+  ClusterAddFinished: 'clusterAddFinished',
   PortForwardStarted: 'portForwardStarted',
   PortForwardStopped: 'portForwardStopped',
   PortForwardsUpdated: 'portForwardsUpdated',

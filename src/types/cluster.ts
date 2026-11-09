@@ -38,11 +38,20 @@ export interface AddClusterCustomization {
 }
 
 export interface AddClusterPayload {
+  requestId?: string
   filePath?: string
   kubeconfigContent?: string
   selectedContexts?: string[]
   metadata?: AddClusterCustomization
   switchContext?: boolean
+}
+
+export interface ClusterAddFinishedPayload {
+  requestId?: string
+  success: boolean
+  addedContexts?: string[]
+  activeClusterId?: string | null
+  error?: string
 }
 
 export interface ManualEndpointConfig {

@@ -199,6 +199,19 @@ pub enum OrbitEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
     },
+    #[serde(rename = "clusterAddFinished")]
+    #[serde(rename_all = "camelCase")]
+    ClusterAddFinished {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        request_id: Option<String>,
+        success: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        added_contexts: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        active_cluster_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
     #[serde(rename = "portForwardStarted")]
     #[serde(rename_all = "camelCase")]
     PortForwardStarted {
@@ -290,6 +303,7 @@ impl OrbitEvent {
             OrbitEvent::UpdateInstallFailed { .. } => "updateInstallFailed",
             OrbitEvent::ResourceRawData { .. } => "resourceRawData",
             OrbitEvent::ResourceApplyFinished { .. } => "resourceApplyFinished",
+            OrbitEvent::ClusterAddFinished { .. } => "clusterAddFinished",
             OrbitEvent::PortForwardStarted { .. } => "portForwardStarted",
             OrbitEvent::PortForwardStopped { .. } => "portForwardStopped",
             OrbitEvent::PortForwardsUpdated { .. } => "portForwardsUpdated",
@@ -417,5 +431,43 @@ mod tests {
         assert!(err_val["data"].get("requestId").is_none());
         assert!(err_val["data"].get("data").is_none());
         assert_eq!(err_evt.event_name(), "resourceApplyFinished");
+    }
+
+    #[test]
+    fn test_cluster_add_finished_serialization() {
+        let evt = OrbitEvent::ClusterAddFinished {
+            request_id: Some("req-123".to_string()),
+            success: true,
+            added_contexts: Some(vec!["ctx-1".to_string(), "ctx-2".to_string()]),
+            active_cluster_id: Some("ctx-1".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&evt).unwrap();
+        let val: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(val["event"], "clusterAddFinished");
+        assert_eq!(val["data"]["requestId"], "req-123");
+        assert_eq!(val["data"]["success"], true);
+        assert_eq!(val["data"]["addedContexts"][0], "ctx-1");
+        assert_eq!(val["data"]["addedContexts"][1], "ctx-2");
+        assert_eq!(val["data"]["activeClusterId"], "ctx-1");
+        assert!(val["data"].get("error").is_none());
+        assert_eq!(evt.event_name(), "clusterAddFinished");
+
+        let err_evt = OrbitEvent::ClusterAddFinished {
+            request_id: None,
+            success: false,
+            added_contexts: None,
+            active_cluster_id: None,
+            error: Some("connection refused".to_string()),
+        };
+        let err_json = serde_json::to_string(&err_evt).unwrap();
+        let err_val: serde_json::Value = serde_json::from_str(&err_json).unwrap();
+        assert_eq!(err_val["event"], "clusterAddFinished");
+        assert_eq!(err_val["data"]["success"], false);
+        assert_eq!(err_val["data"]["error"], "connection refused");
+        assert!(err_val["data"].get("requestId").is_none());
+        assert!(err_val["data"].get("addedContexts").is_none());
+        assert!(err_val["data"].get("activeClusterId").is_none());
+        assert_eq!(err_evt.event_name(), "clusterAddFinished");
     }
 }

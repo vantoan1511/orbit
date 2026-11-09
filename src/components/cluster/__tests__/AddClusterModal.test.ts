@@ -128,3 +128,25 @@ test('AddClusterModal inherits global dialog surface and contains zero hardcoded
     'AddClusterModal must not hardcode bg-black/60 on mask'
   )
 })
+
+test('AddClusterModal integrates manual endpoint validation and displays inline error banner on failure', () => {
+  const filePath = path.resolve(process.cwd(), 'src/components/cluster/AddClusterModal.vue')
+  const content = fs.readFileSync(filePath, 'utf-8')
+
+  assert.ok(
+    content.includes('validateManualEndpointConfig'),
+    'AddClusterModal must import and use validateManualEndpointConfig'
+  )
+  assert.ok(
+    content.includes('submitError'),
+    'AddClusterModal must declare and manage submitError reactive state'
+  )
+  assert.ok(
+    content.includes('bg-(--danger-soft)') || content.includes('var(--danger-soft)'),
+    'AddClusterModal must render inline error banner with semantic danger-soft token'
+  )
+  assert.ok(
+    content.includes('text-(--danger)') || content.includes('var(--danger)'),
+    'AddClusterModal must render inline error banner with semantic danger token'
+  )
+})

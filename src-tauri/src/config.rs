@@ -620,6 +620,19 @@ impl OrbitConfig {
         }
         Ok(())
     }
+
+    /// Remove a custom kubeconfig file path from the configuration and save it.
+    pub fn remove_kubeconfig_path(&mut self, path: &str) -> Result<(), String> {
+        let norm_path = Self::normalize_path(path);
+        let mut paths = self.custom_kubeconfig_paths();
+        let len_before = paths.len();
+        paths.retain(|p| !Self::normalize_path(p).eq_ignore_ascii_case(&norm_path));
+        if paths.len() != len_before {
+            self.values.insert("customKubeconfigPaths".to_string(), serde_json::json!(paths));
+            self.save()?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1157,6 +1170,28 @@ mod tests {
         let updated_proxy = config.proxy_settings();
         assert_eq!(updated_proxy["enabled"], true);
         assert_eq!(updated_proxy["httpProxy"], "http://proxy.corp.internal:8080");
+    }
+
+    #[test]
+    fn test_remove_kubeconfig_path() {
+        let _guard = TestConfigDirGuard::new("remove_kubeconfig");
+        let mut config = OrbitConfig::default();
+        let path1 = "C:\\Users\\test\\.kube\\custom.yaml";
+        let path2 = "C:\\Users\\test\\.kube\\another.yaml";
+
+        config.add_kubeconfig_path(path1).unwrap();
+        config.add_kubeconfig_path(path2).unwrap();
+        assert_eq!(config.custom_kubeconfig_paths().len(), 2);
+
+        // Case-insensitive removal with forward slash normalization
+        let norm_to_remove = "c:/users/test/.kube/custom.yaml";
+        config.remove_kubeconfig_path(norm_to_remove).unwrap();
+        assert_eq!(config.custom_kubeconfig_paths().len(), 1);
+        assert!(!config.custom_kubeconfig_paths().iter().any(|p| p.contains("custom.yaml")));
+
+        // Removing non-existent path is a no-op
+        config.remove_kubeconfig_path("non_existent.yaml").unwrap();
+        assert_eq!(config.custom_kubeconfig_paths().len(), 1);
     }
 }
 

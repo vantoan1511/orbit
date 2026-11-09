@@ -1,6 +1,9 @@
 import type { KubernetesResource } from '@/types/kubernetes'
-import type { AddClusterPayload } from '@/types/cluster'
-import { coreEngine } from './nativeService.ts'
+import type { AddClusterPayload, ClusterAddFinishedPayload } from '@/types/cluster'
+import { coreEngine, events } from './nativeService.ts'
+import { OrbitEvents } from '../types/events.ts'
+
+export const CLUSTER_ADD_TIMEOUT_MS = 15000
 
 export const kubernetesService = {
   /**
@@ -187,11 +190,46 @@ export const kubernetesService = {
   },
 
   /**
-   * Add a new cluster kubeconfig file path or payload
+   * Add a new cluster kubeconfig file path or payload and await backend validation & context switch.
    */
-  async addCluster(payload: string | AddClusterPayload): Promise<void> {
-    const data = typeof payload === 'string' ? { filePath: payload } : payload
-    await coreEngine.dispatch('addCluster', data)
+  async addCluster(payload: string | AddClusterPayload): Promise<ClusterAddFinishedPayload> {
+    const data: AddClusterPayload =
+      typeof payload === 'string' ? { filePath: payload } : { ...payload }
+    if (!data.requestId) {
+      data.requestId = `add-cluster-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    }
+
+    return new Promise<ClusterAddFinishedPayload>((resolve, reject) => {
+      let cleanup = () => {}
+      const timeoutId = setTimeout(() => {
+        cleanup()
+        reject(new Error('Cluster connection timed out waiting for backend confirmation'))
+      }, CLUSTER_ADD_TIMEOUT_MS)
+
+      const handler = (eventPayload: ClusterAddFinishedPayload) => {
+        if (eventPayload && eventPayload.requestId === data.requestId) {
+          clearTimeout(timeoutId)
+          cleanup()
+          if (!eventPayload.success) {
+            reject(new Error(eventPayload.error || 'Failed to add cluster'))
+          } else {
+            resolve(eventPayload)
+          }
+        }
+      }
+
+      cleanup = () => {
+        void events.off(OrbitEvents.ClusterAddFinished, handler)
+      }
+
+      void events.on(OrbitEvents.ClusterAddFinished, handler)
+
+      coreEngine.dispatch('addCluster', data).catch((err) => {
+        clearTimeout(timeoutId)
+        cleanup()
+        reject(err)
+      })
+    })
   },
 
   /**
