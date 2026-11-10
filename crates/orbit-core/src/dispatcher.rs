@@ -24,7 +24,7 @@ impl CoreDispatcher {
             CoreCommand::Initialize => {
                 let mgr = self.manager.read().await;
                 let clusters = mgr.get_clusters();
-                let active_cluster_id = mgr.active_context.clone();
+                let active_cluster_id = mgr.preferred_context_name();
                 let configs = mgr.config.get_configurations();
                 let settings = configs.into_iter()
                     .map(|c| (c.key, c.default_value.unwrap_or(serde_json::Value::Null)))
@@ -49,7 +49,7 @@ impl CoreDispatcher {
                     status: "ready".to_string(),
                     message: "Settings loaded".to_string(),
                     clusters,
-                    active_cluster_id: mgr.active_context.clone(),
+                    active_cluster_id: mgr.preferred_context_name(),
                     settings,
                 });
             }
@@ -88,11 +88,24 @@ impl CoreDispatcher {
             }
             CoreCommand::SwitchCluster { context_name } => {
                 let mut mgr = self.manager.write().await;
+                if let Some(cancel) = mgr.watch_cancel.take() {
+                    let _ = cancel.send(true);
+                }
                 let connected = if let Some(ref name) = context_name {
-                    mgr.switch_context(name).await.is_ok()
+                    match mgr.switch_context(name).await {
+                        Ok(()) => true,
+                        Err(err) => {
+                            tracing::warn!(context = %name, error = %err, "Failed to switch cluster context; clearing active state");
+                            mgr.active_context = None;
+                            mgr.active_client = None;
+                            mgr.active_context_healthy = false;
+                            false
+                        }
+                    }
                 } else {
                     mgr.active_context = None;
                     mgr.active_client = None;
+                    mgr.active_context_healthy = false;
                     false
                 };
                 let active_id = mgr.active_context.clone();
@@ -746,5 +759,48 @@ mod tests {
             }
             other => panic!("expected ErrorOccurred, got {:?}", other),
         }
+    }
+
+    #[tokio::test]
+    async fn test_dispatcher_switch_cluster_failure_clears_active_context() {
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        manager.write().await.active_context = Some("old-ctx".to_string());
+        manager.write().await.active_context_healthy = true;
+        let sink = Arc::new(MockEventSink::new());
+        let dispatcher = CoreDispatcher::new(manager.clone(), sink.clone());
+
+        dispatcher.dispatch(CoreCommand::SwitchCluster {
+            context_name: Some("nonexistent-ctx".to_string()),
+        }).await;
+
+        let events = sink.get_events();
+        let changed = events.iter().find(|e| matches!(e, CoreEvent::ActiveClusterChanged { .. }));
+        match changed {
+            Some(CoreEvent::ActiveClusterChanged { active_cluster_id }) => {
+                assert_eq!(*active_cluster_id, None);
+            }
+            other => panic!("expected ActiveClusterChanged, got {:?}", other),
+        }
+
+        let mgr = manager.read().await;
+        assert_eq!(mgr.active_context, None);
+        assert!(!mgr.active_context_healthy);
+    }
+
+    #[tokio::test]
+    async fn test_dispatcher_switch_cluster_cancels_previous_watchers() {
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let (cancel_tx, mut cancel_rx) = tokio::sync::watch::channel(false);
+        manager.write().await.watch_cancel = Some(cancel_tx);
+
+        let sink = Arc::new(MockEventSink::new());
+        let dispatcher = CoreDispatcher::new(manager.clone(), sink.clone());
+
+        dispatcher.dispatch(CoreCommand::SwitchCluster {
+            context_name: None,
+        }).await;
+
+        assert!(*cancel_rx.borrow_and_update());
+        assert!(manager.read().await.watch_cancel.is_none());
     }
 }

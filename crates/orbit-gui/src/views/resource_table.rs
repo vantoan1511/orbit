@@ -241,12 +241,17 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
             }
         }
         ResourceKind::Deployment => {
-            if store.deployments.is_empty() {
+            let filtered_deploys: Vec<_> = store
+                .deployments
+                .iter()
+                .filter(|d| filter.matches_namespace(&d.namespace))
+                .collect();
+            if filtered_deploys.is_empty() {
                 rows_col = rows_col.push(
                     container(text("No deployments found").size(13).color(palette.text_muted)).padding(24),
                 );
             } else {
-                for deploy in &store.deployments {
+                for deploy in filtered_deploys {
                     let details = crate::views::details_drawer::SelectedResourceDetails {
                         kind: ResourceKind::Deployment,
                         name: deploy.name.clone(),

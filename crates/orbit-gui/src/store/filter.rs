@@ -27,13 +27,17 @@ impl FilterCriteria {
         self
     }
 
+    /// Returns true if `namespace` matches the active namespace filter (or if `self.namespace` is `None` / empty).
+    pub fn matches_namespace(&self, namespace: &str) -> bool {
+        match self.namespace.as_deref() {
+            None | Some("") => true,
+            Some(ns) => ns == namespace,
+        }
+    }
+
     pub fn matches_pod(&self, pod: &PodInfo) -> bool {
         // Namespace filter
-        if self
-            .namespace
-            .as_deref()
-            .is_some_and(|ns| !ns.is_empty() && pod.namespace != ns)
-        {
+        if !self.matches_namespace(&pod.namespace) {
             return false;
         }
 
@@ -124,5 +128,19 @@ mod tests {
         assert!(!filter_pending.matches_pod(&pod1));
         assert!(!filter_pending.matches_pod(&pod2));
         assert!(filter_pending.matches_pod(&pod3));
+    }
+
+    #[test]
+    fn test_matches_namespace_all_vs_specific() {
+        let filter_all = FilterCriteria::default();
+        assert!(filter_all.matches_namespace("kube-system"));
+        assert!(filter_all.matches_namespace("default"));
+
+        let filter_default = FilterCriteria::default().with_namespace(Some("default".into()));
+        assert!(filter_default.matches_namespace("default"));
+        assert!(!filter_default.matches_namespace("kube-system"));
+
+        let filter_empty = FilterCriteria::default().with_namespace(Some("".into()));
+        assert!(filter_empty.matches_namespace("default"));
     }
 }

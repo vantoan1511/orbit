@@ -47,6 +47,29 @@ impl KubeManager {
         manager
     }
 
+    /// Returns `active_context` if set, otherwise the kubeconfig's `current-context`
+    /// (if present in `contexts`), or the first available context name.
+    pub fn preferred_context_name(&self) -> Option<String> {
+        if let Some(ref active) = self.active_context {
+            return Some(active.clone());
+        }
+
+        if let Some(ref config) = self.kubeconfig {
+            if let Some(current) = config
+                .current_context
+                .as_ref()
+                .filter(|curr| config.contexts.iter().any(|c| &c.name == *curr))
+            {
+                return Some(current.clone());
+            }
+            if let Some(first) = config.contexts.first() {
+                return Some(first.name.clone());
+            }
+        }
+
+        None
+    }
+
     pub fn get_clusters(&self) -> Vec<ClusterInfo> {
         let mut clusters = Vec::new();
         let customizations = self.config.cluster_customizations();
@@ -679,6 +702,62 @@ users:
             .find(|u| u.name == "default-user")
             .unwrap();
         assert!(user.auth_info.as_ref().unwrap().token.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_preferred_context_name_uses_current_context_or_first_cluster() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::default(),
+        };
+
+        assert_eq!(manager.preferred_context_name(), None);
+
+        let yaml = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+  name: cluster-1
+- cluster:
+    server: https://127.0.0.2:6443
+  name: cluster-2
+contexts:
+- context:
+    cluster: cluster-1
+    user: user-1
+  name: dev-ctx
+- context:
+    cluster: cluster-2
+    user: user-2
+  name: prod-ctx
+current-context: prod-ctx
+kind: Config
+preferences: {}
+users: []
+"#;
+        let cfg = Kubeconfig::from_yaml(yaml).expect("valid yaml");
+        manager.kubeconfig = Some(cfg);
+
+        // Uses current-context when set and exists
+        assert_eq!(manager.preferred_context_name(), Some("prod-ctx".to_string()));
+
+        // Active context takes highest precedence
+        manager.active_context = Some("custom-active".to_string());
+        assert_eq!(manager.preferred_context_name(), Some("custom-active".to_string()));
+        manager.active_context = None;
+
+        // When current-context is None or unknown, falls back to first available context
+        if let Some(ref mut k) = manager.kubeconfig {
+            k.current_context = None;
+        }
+        assert_eq!(manager.preferred_context_name(), Some("dev-ctx".to_string()));
     }
 }
 

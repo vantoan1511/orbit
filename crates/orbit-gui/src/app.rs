@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use iced::{
-    widget::{button, column, container, row, text},
+    widget::{button, column, container, horizontal_space, pick_list, row, text},
     Element, Length, Subscription, Task,
 };
 
@@ -16,6 +16,15 @@ use crate::views::details_drawer::{details_drawer_view, ResourceAction, Selected
 use crate::views::modals::{modal_view, ActiveModal, SearchResultItem, SearchResultKind};
 use crate::views::resource_table::resource_table_view;
 use crate::views::settings::settings_view;
+
+pub const ALL_NAMESPACES_LABEL: &str = "All Namespaces";
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClusterConnectionStatus {
+    Loading,
+    Connected(String),
+    Disconnected,
+}
 
 static COMMAND_TX: std::sync::OnceLock<tokio::sync::mpsc::Sender<CoreCommand>> =
     std::sync::OnceLock::new();
@@ -48,6 +57,7 @@ pub enum Message {
 pub struct OrbitApp {
     pub is_engine_ready: bool,
     pub is_loading_cluster: bool,
+    pub has_auto_connected: bool,
     pub palette: OrbitPalette,
     pub cluster_store: ClusterStore,
     pub filter: FilterCriteria,
@@ -76,6 +86,7 @@ impl OrbitApp {
         Self {
             is_engine_ready: false,
             is_loading_cluster: false,
+            has_auto_connected: false,
             palette: OrbitPalette::dark(),
             cluster_store: ClusterStore::new(),
             filter: FilterCriteria::default(),
@@ -84,6 +95,63 @@ impl OrbitApp {
             settings: HashMap::new(),
             ui_state: UiStateStore::default(),
             selected_resource: None,
+        }
+    }
+
+    /// Returns selectable cluster context IDs/names from `self.cluster_store.clusters`.
+    pub fn cluster_options(&self) -> Vec<String> {
+        self.cluster_store
+            .clusters
+            .iter()
+            .map(|c| c.id.clone())
+            .collect()
+    }
+
+    /// Returns deduplicated namespace options for the namespace `pick_list`:
+    /// `["All Namespaces", "default", "kube-system"]` plus sorted live namespaces from `self.cluster_store.namespaces`.
+    pub fn namespace_options(&self) -> Vec<String> {
+        let mut options = vec![
+            ALL_NAMESPACES_LABEL.to_string(),
+            "default".to_string(),
+            "kube-system".to_string(),
+        ];
+        let mut live: Vec<String> = self
+            .cluster_store
+            .namespaces
+            .iter()
+            .map(|n| n.name.clone())
+            .collect();
+        live.sort();
+        for ns in live {
+            if !options.contains(&ns) {
+                options.push(ns);
+            }
+        }
+        if let Some(ref current) = self.filter.namespace
+            && !options.contains(current)
+        {
+            options.push(current.clone());
+        }
+        options
+    }
+
+    /// Returns the currently selected label in the namespace `pick_list`
+    /// (`self.filter.namespace.clone().unwrap_or_else(|| ALL_NAMESPACES_LABEL.to_string())`).
+    pub fn selected_namespace_label(&self) -> String {
+        self.filter
+            .namespace
+            .clone()
+            .unwrap_or_else(|| ALL_NAMESPACES_LABEL.to_string())
+    }
+
+    /// Returns the active cluster connection status for the top bar indicator.
+    pub fn cluster_connection_status(&self) -> ClusterConnectionStatus {
+        if self.is_loading_cluster {
+            ClusterConnectionStatus::Loading
+        } else if let Some(ref id) = self.cluster_store.active_cluster_id {
+            ClusterConnectionStatus::Connected(id.clone())
+        } else {
+            ClusterConnectionStatus::Disconnected
         }
     }
 
@@ -165,11 +233,32 @@ impl OrbitApp {
                 CoreEvent::EngineReady { clusters, active_cluster_id, settings, .. } => {
                     self.is_engine_ready = true;
                     self.cluster_store.clusters = clusters;
-                    self.cluster_store.active_cluster_id = active_cluster_id;
                     self.settings = settings;
+
+                    if !self.has_auto_connected {
+                        let target = active_cluster_id.or_else(|| {
+                            self.cluster_store.clusters.first().map(|c| c.id.clone())
+                        });
+                        if let Some(target_id) = target {
+                            self.has_auto_connected = true;
+                            return self.update(Message::SelectCluster(Some(target_id)));
+                        } else {
+                            self.cluster_store.active_cluster_id = None;
+                            self.is_loading_cluster = false;
+                        }
+                    } else {
+                        self.cluster_store.active_cluster_id = active_cluster_id;
+                    }
                 }
                 CoreEvent::ClustersUpdated { clusters } => {
                     self.cluster_store.clusters = clusters;
+                    if !self.has_auto_connected
+                        && self.cluster_store.active_cluster_id.is_none()
+                        && let Some(first) = self.cluster_store.clusters.first().map(|c| c.id.clone())
+                    {
+                        self.has_auto_connected = true;
+                        return self.update(Message::SelectCluster(Some(first)));
+                    }
                 }
                 CoreEvent::ActiveClusterChanged { active_cluster_id } => {
                     self.cluster_store.active_cluster_id = active_cluster_id;
@@ -203,11 +292,15 @@ impl OrbitApp {
             Message::SelectCluster(cluster_id) => {
                 self.cluster_store.clear_cluster_resources();
                 self.cluster_store.active_cluster_id = cluster_id.clone();
+                self.filter.namespace = None;
                 self.is_loading_cluster = true;
                 send_core_command(CoreCommand::SwitchCluster { context_name: cluster_id });
             }
             Message::SelectNamespace(ns) => {
-                self.filter.namespace = ns;
+                self.filter.namespace = match ns {
+                    Some(s) if s == ALL_NAMESPACES_LABEL || s.is_empty() => None,
+                    other => other,
+                };
             }
             Message::SearchFilterChanged(query) => {
                 self.filter.search_query = query.trim().to_lowercase();
@@ -263,12 +356,6 @@ impl OrbitApp {
         // 1. Sidebar Navigation
         let mut nav_col = column![
             text("ORBIT").size(18).color(self.palette.text_primary),
-            text(format!(
-                "Cluster: {}",
-                self.cluster_store.active_cluster_id.as_deref().unwrap_or("Disconnected")
-            ))
-            .size(11)
-            .color(self.palette.text_secondary),
         ]
         .spacing(8);
 
@@ -330,13 +417,55 @@ impl OrbitApp {
             tabs_row = tabs_row.push(tab_btn);
         }
 
+        // Top bar status & pickers
+        let status_indicator = match self.cluster_connection_status() {
+            ClusterConnectionStatus::Loading => row![
+                text("●").size(12).color(self.palette.warning),
+                text("Connecting...").size(12).color(self.palette.text_secondary),
+            ]
+            .spacing(4),
+            ClusterConnectionStatus::Connected(_) => row![
+                text("●").size(12).color(self.palette.success),
+                text("Connected").size(12).color(self.palette.text_primary),
+            ]
+            .spacing(4),
+            ClusterConnectionStatus::Disconnected => row![
+                text("○").size(12).color(self.palette.danger),
+                text("Disconnected").size(12).color(self.palette.text_muted),
+            ]
+            .spacing(4),
+        };
+
+        let cluster_selector = pick_list(
+            self.cluster_options(),
+            self.cluster_store.active_cluster_id.clone(),
+            |c| Message::SelectCluster(Some(c)),
+        )
+        .placeholder("Select Cluster...")
+        .padding(4);
+
+        let namespace_selector = pick_list(
+            self.namespace_options(),
+            Some(self.selected_namespace_label()),
+            |ns| Message::SelectNamespace(Some(ns)),
+        )
+        .padding(4);
+
         let search_btn = button(text("🔍 Search (Ctrl+K)").size(12))
             .on_press(Message::OpenModal(ActiveModal::SearchEverywhere {
                 query: String::new(),
                 selected_index: 0,
             }));
 
-        let tab_bar = row![tabs_row, search_btn]
+        let top_controls = row![
+            status_indicator,
+            cluster_selector,
+            namespace_selector,
+            search_btn,
+        ]
+        .spacing(8);
+
+        let tab_bar = row![tabs_row, horizontal_space(), top_controls]
             .spacing(12)
             .padding(4)
             .width(Length::Fill);
@@ -549,5 +678,142 @@ mod tests {
         assert!(!results.is_empty());
         assert!(results.iter().any(|r| r.title.contains("nginx-ingress-controller")));
         assert!(results.iter().any(|r| r.title.contains("nginx-deployment")));
+    }
+
+    #[test]
+    fn test_engine_ready_auto_connects_to_active_or_first_cluster() {
+        // Case A: EngineReady with active_cluster_id: Some("dev-cluster")
+        let mut app_a = OrbitApp::new();
+        let event_a = CoreEvent::EngineReady {
+            status: "ready".to_string(),
+            message: "Connected".to_string(),
+            clusters: vec![ClusterInfo {
+                id: "dev-cluster".to_string(),
+                name: "dev-cluster".to_string(),
+                status: "healthy".to_string(),
+                ..Default::default()
+            }],
+            active_cluster_id: Some("dev-cluster".to_string()),
+            settings: HashMap::new(),
+        };
+        let _ = app_a.update(Message::CoreEventReceived(event_a));
+        assert_eq!(app_a.cluster_store.active_cluster_id.as_deref(), Some("dev-cluster"));
+        assert!(app_a.is_loading_cluster);
+        assert_eq!(app_a.cluster_connection_status(), ClusterConnectionStatus::Loading);
+
+        // Case B: EngineReady with active_cluster_id: None and clusters: [prod-cluster, dev-cluster]
+        let mut app_b = OrbitApp::new();
+        let event_b = CoreEvent::EngineReady {
+            status: "ready".to_string(),
+            message: "Connected".to_string(),
+            clusters: vec![
+                ClusterInfo {
+                    id: "prod-cluster".to_string(),
+                    name: "prod-cluster".to_string(),
+                    status: "offline".to_string(),
+                    ..Default::default()
+                },
+                ClusterInfo {
+                    id: "dev-cluster".to_string(),
+                    name: "dev-cluster".to_string(),
+                    status: "healthy".to_string(),
+                    ..Default::default()
+                },
+            ],
+            active_cluster_id: None,
+            settings: HashMap::new(),
+        };
+        let _ = app_b.update(Message::CoreEventReceived(event_b));
+        assert_eq!(app_b.cluster_store.active_cluster_id.as_deref(), Some("prod-cluster"));
+        assert!(app_b.is_loading_cluster);
+        assert_eq!(app_b.cluster_connection_status(), ClusterConnectionStatus::Loading);
+    }
+
+    #[test]
+    fn test_clusters_updated_auto_connects_when_disconnected_once() {
+        let mut app = OrbitApp::new();
+        let clusters = vec![ClusterInfo {
+            id: "staging-cluster".to_string(),
+            name: "staging-cluster".to_string(),
+            status: "healthy".to_string(),
+            ..Default::default()
+        }];
+        let _ = app.update(Message::CoreEventReceived(CoreEvent::ClustersUpdated { clusters }));
+        assert_eq!(app.cluster_store.active_cluster_id.as_deref(), Some("staging-cluster"));
+        assert!(app.is_loading_cluster);
+
+        let _ = app.update(Message::CoreEventReceived(CoreEvent::ActiveClusterChanged {
+            active_cluster_id: None,
+        }));
+        assert_eq!(app.cluster_store.active_cluster_id, None);
+        assert!(!app.is_loading_cluster);
+        assert_eq!(app.cluster_connection_status(), ClusterConnectionStatus::Disconnected);
+    }
+
+    #[test]
+    fn test_cluster_and_namespace_options_and_selection_flow() {
+        let mut app = OrbitApp::new();
+        app.cluster_store.clusters = vec![
+            ClusterInfo {
+                id: "prod-cluster".to_string(),
+                name: "prod-cluster".to_string(),
+                ..Default::default()
+            },
+            ClusterInfo {
+                id: "dev-cluster".to_string(),
+                name: "dev-cluster".to_string(),
+                ..Default::default()
+            },
+        ];
+        assert_eq!(app.cluster_options(), vec!["prod-cluster", "dev-cluster"]);
+
+        app.cluster_store.namespaces = vec![
+            orbit_core::kubernetes::models::NamespaceInfo {
+                name: "monitoring".to_string(),
+                status: "Active".to_string(),
+                is_system: false,
+                age: "1d".to_string(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                uid: "u1".to_string(),
+                created: "".to_string(),
+            },
+            orbit_core::kubernetes::models::NamespaceInfo {
+                name: "default".to_string(),
+                status: "Active".to_string(),
+                is_system: false,
+                age: "1d".to_string(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                uid: "u2".to_string(),
+                created: "".to_string(),
+            },
+            orbit_core::kubernetes::models::NamespaceInfo {
+                name: "kube-system".to_string(),
+                status: "Active".to_string(),
+                is_system: true,
+                age: "1d".to_string(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                uid: "u3".to_string(),
+                created: "".to_string(),
+            },
+        ];
+        let ns_options = app.namespace_options();
+        assert_eq!(ns_options, vec!["All Namespaces", "default", "kube-system", "monitoring"]);
+
+        assert_eq!(app.selected_namespace_label(), ALL_NAMESPACES_LABEL);
+
+        let _ = app.update(Message::SelectNamespace(Some("kube-system".into())));
+        assert_eq!(app.selected_namespace_label(), "kube-system");
+        assert_eq!(app.filter.namespace.as_deref(), Some("kube-system"));
+
+        app.filter.namespace = Some("custom-temp".into());
+        assert!(app.namespace_options().contains(&"custom-temp".to_string()));
+        app.filter.namespace = None;
+
+        let _ = app.update(Message::SelectCluster(Some("prod-cluster".into())));
+        assert_eq!(app.selected_namespace_label(), ALL_NAMESPACES_LABEL);
+        assert_eq!(app.filter.namespace, None);
     }
 }
