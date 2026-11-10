@@ -28,20 +28,20 @@ impl OrbitPalette {
     pub fn dark() -> Self {
         Self {
             is_dark: true,
-            bg_app: Color::from_rgb(0.035, 0.035, 0.043),      // #09090b
-            bg_sidebar: Color::from_rgb(0.071, 0.071, 0.082),  // #121215
-            bg_panel: Color::from_rgb(0.094, 0.094, 0.106),    // #18181b
-            bg_card: Color::from_rgb(0.071, 0.071, 0.082),     // #121215
-            bg_hover: Color::from_rgb(0.133, 0.133, 0.149),    // #222226
-            border: Color::from_rgb(0.153, 0.153, 0.165),      // #27272a
+            bg_app: Color::from_rgb8(0x09, 0x09, 0x0b),
+            bg_sidebar: Color::from_rgb8(0x0c, 0x0c, 0x0e),
+            bg_panel: Color::from_rgb8(0x18, 0x18, 0x1b),
+            bg_card: Color::from_rgb8(0x12, 0x12, 0x15),
+            bg_hover: Color::from_rgb8(0x22, 0x22, 0x26),
+            border: Color::from_rgb8(0x27, 0x27, 0x2a),
             text_primary: Color::from_rgb(0.95, 0.96, 0.98),   // #f2f5fa
             text_secondary: Color::from_rgb(0.65, 0.68, 0.74),
             text_muted: Color::from_rgb(0.45, 0.48, 0.54),
-            accent: Color::from_rgb(0.42, 0.66, 1.0),         // #6aa8ff
-            success: Color::from_rgb(0.20, 0.78, 0.44),       // #33c770
-            warning: Color::from_rgb(0.95, 0.77, 0.25),       // #f2c440
-            danger: Color::from_rgb(0.92, 0.30, 0.30),        // #eb4d4d
-            info: Color::from_rgb(0.38, 0.65, 0.98),          // #61a6fa
+            accent: Color::from_rgb8(0x6a, 0xa8, 0xff),
+            success: Color::from_rgb8(0x33, 0xc7, 0x70),
+            warning: Color::from_rgb8(0xf2, 0xc4, 0x40),
+            danger: Color::from_rgb8(0xeb, 0x4d, 0x4d),
+            info: Color::from_rgb8(0x61, 0xa6, 0xfa),
         }
     }
 
@@ -116,9 +116,9 @@ pub fn sidebar_nav_button_style<'a>(
     move |_theme, status| {
         let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         let bg = if is_active {
-            Some(Background::Color(palette.bg_hover))
+            Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23)))
         } else if is_hovered {
-            Some(Background::Color(Color::from_rgba(palette.bg_hover.r, palette.bg_hover.g, palette.bg_hover.b, 0.6)))
+            Some(Background::Color(palette.bg_hover))
         } else {
             None
         };
@@ -129,7 +129,7 @@ pub fn sidebar_nav_button_style<'a>(
         };
         let border = Border {
             color: if is_active { palette.accent } else { Color::TRANSPARENT },
-            width: if is_active { 1.0 } else { 0.0 },
+            width: if is_active { 2.0 } else { 0.0 },
             radius: Radius::from(4.0),
         };
         button::Style {
@@ -148,21 +148,23 @@ pub fn tab_button_style<'a>(
     move |_theme, status| {
         let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         let bg = if is_active {
-            Some(Background::Color(palette.bg_card))
+            Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23)))
         } else if is_hovered {
             Some(Background::Color(palette.bg_hover))
         } else {
             None
         };
-        let text_color = if is_active || is_hovered {
+        let text_color = if is_active {
             palette.text_primary
+        } else if is_hovered {
+            palette.text_secondary
         } else {
             palette.text_muted
         };
         let border = if is_active {
             Border {
-                color: palette.border,
-                width: 1.0,
+                color: palette.accent,
+                width: 2.0,
                 radius: Radius::from(4.0),
             }
         } else {
@@ -172,6 +174,39 @@ pub fn tab_button_style<'a>(
             background: bg,
             text_color,
             border,
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn ghost_action_button_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let bg = if is_hovered {
+            Some(Background::Color(palette.bg_hover))
+        } else {
+            None
+        };
+        let text_color = if is_hovered {
+            palette.text_primary
+        } else {
+            palette.text_secondary
+        };
+        let border_color = if is_hovered {
+            palette.accent
+        } else {
+            palette.border
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border: Border {
+                color: border_color,
+                width: 1.0,
+                radius: Radius::from(4.0),
+            },
             shadow: Shadow::default(),
         }
     }
@@ -447,11 +482,11 @@ mod tests {
         assert!(dark.is_dark);
 
         // Slate/Zinc exact dark tokens
-        assert_eq!(dark.bg_app, Color::from_rgb(0.035, 0.035, 0.043));
-        assert_eq!(dark.bg_sidebar, Color::from_rgb(0.071, 0.071, 0.082));
-        assert_eq!(dark.bg_panel, Color::from_rgb(0.094, 0.094, 0.106));
-        assert_eq!(dark.border, Color::from_rgb(0.153, 0.153, 0.165));
-        assert_eq!(dark.bg_hover, Color::from_rgb(0.133, 0.133, 0.149));
+        assert_eq!(dark.bg_app, Color::from_rgb8(0x09, 0x09, 0x0b));
+        assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0c, 0x0c, 0x0e));
+        assert_eq!(dark.bg_panel, Color::from_rgb8(0x18, 0x18, 0x1b));
+        assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
+        assert_eq!(dark.bg_hover, Color::from_rgb8(0x22, 0x22, 0x26));
 
         // Style helper closures return without panic
         let nav_active = sidebar_nav_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
@@ -491,6 +526,40 @@ mod tests {
         // Status pill elements render without panic
         let _pill: iced::Element<'_, ()> = status_pill(&dark, "Running");
         let _dot_pill: iced::Element<'_, ()> = status_dot_pill(&dark, true, false, "Connected");
+    }
+
+    #[test]
+    fn test_fidelity_polish_palette_and_ghost_button_style() {
+        let dark = OrbitPalette::dark();
+        assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0c, 0x0c, 0x0e));
+        assert_eq!(dark.accent, Color::from_rgb8(0x6a, 0xa8, 0xff));
+        assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
+
+        let ghost_normal = ghost_action_button_style(&dark)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(ghost_normal.border.color, dark.border);
+        assert_eq!(ghost_normal.border.width, 1.0);
+        assert_eq!(ghost_normal.text_color, dark.text_secondary);
+        assert!(ghost_normal.background.is_none());
+
+        let ghost_hovered = ghost_action_button_style(&dark)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
+        assert_eq!(ghost_hovered.border.color, dark.accent);
+        assert_eq!(ghost_hovered.text_color, dark.text_primary);
+        assert_eq!(ghost_hovered.background, Some(Background::Color(dark.bg_hover)));
+
+        let tab_active = tab_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(tab_active.border.color, dark.accent);
+        assert_eq!(tab_active.border.width, 2.0);
+        assert_eq!(tab_active.text_color, dark.text_primary);
+        assert_eq!(tab_active.background, Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23))));
+
+        let tab_inactive = tab_button_style(&dark, false)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(tab_inactive.text_color, dark.text_muted);
+        assert!(tab_inactive.background.is_none());
+
+        let nav_active = sidebar_nav_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(nav_active.border.color, dark.accent);
+        assert_eq!(nav_active.border.width, 2.0);
+        assert_eq!(nav_active.background, Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23))));
     }
 
     #[test]

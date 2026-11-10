@@ -82,8 +82,8 @@ impl OrbitApp {
     pub fn new() -> Self {
         let mut tab_mgr = TabManager::new();
         tab_mgr.open_tab(WorkspaceTab {
-            id: "tab-dashboard".to_string(),
-            title: "Cluster Overview".to_string(),
+            id: "tab-overview".to_string(),
+            title: "Overview".to_string(),
             content: TabContent::Dashboard,
         });
 
@@ -370,14 +370,14 @@ impl OrbitApp {
         .spacing(6);
 
         let nav_items = [
-            ("📊 Overview", TabContent::Dashboard),
-            ("📦 Pods", TabContent::ResourceTable(ResourceKind::Pod)),
-            ("🚀 Deployments", TabContent::ResourceTable(ResourceKind::Deployment)),
-            ("🖥️ Nodes", TabContent::ResourceTable(ResourceKind::Node)),
-            ("🌐 Services", TabContent::ResourceTable(ResourceKind::Service)),
-            ("⚙️ ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
-            ("🔒 Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
-            ("🛠️ Settings", TabContent::Settings),
+            ("Overview", TabContent::Dashboard),
+            ("Pods", TabContent::ResourceTable(ResourceKind::Pod)),
+            ("Deployments", TabContent::ResourceTable(ResourceKind::Deployment)),
+            ("Nodes", TabContent::ResourceTable(ResourceKind::Node)),
+            ("Services", TabContent::ResourceTable(ResourceKind::Service)),
+            ("ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
+            ("Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
+            ("Settings", TabContent::Settings),
         ];
 
         for (label, content) in nav_items {
@@ -385,36 +385,25 @@ impl OrbitApp {
             let tab = WorkspaceTab {
                 id: format!("nav-{}", label.to_lowercase().replace(' ', "-")),
                 title: label.to_string(),
-                content,
+                content: content.clone(),
             };
 
-            let indicator = container(text(""))
-                .width(Length::Fixed(3.0))
-                .height(Length::Fixed(16.0))
-                .style(move |_| container::Style {
-                    background: if is_active {
-                        Some(iced::Background::Color(self.palette.accent))
-                    } else {
-                        None
-                    },
-                    ..Default::default()
-                });
+            let on_press_msg = if let Some(existing) = self.tab_manager.tabs.iter().find(|t| t.content == content) {
+                Message::SelectTab(existing.id.clone())
+            } else {
+                Message::OpenTab(tab)
+            };
 
             let nav_btn = button(
-                row![
-                    indicator,
-                    text(label).size(13).color(if is_active {
-                        self.palette.text_primary
-                    } else {
-                        self.palette.text_secondary
-                    }),
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center),
+                text(label).size(13).color(if is_active {
+                    self.palette.text_primary
+                } else {
+                    self.palette.text_secondary
+                }),
             )
-            .on_press(Message::OpenTab(tab))
+            .on_press(on_press_msg)
             .width(Length::Fill)
-            .padding([6, 8])
+            .padding([8, 12])
             .style(sidebar_nav_button_style(&self.palette, is_active));
 
             nav_col = nav_col.push(nav_btn);
@@ -438,7 +427,7 @@ impl OrbitApp {
                 vertical_space(),
                 column![
                     connection_pill,
-                    button(text(if self.palette.is_dark { "🌙 Dark" } else { "☀️ Light" }).size(12))
+                    button(text(if self.palette.is_dark { "Dark" } else { "Light" }).size(12))
                         .on_press(Message::ToggleTheme)
                         .width(Length::Fill)
                         .padding([6, 8])
@@ -464,7 +453,7 @@ impl OrbitApp {
                     text(tab.title.clone())
                         .size(12)
                         .color(if is_active { self.palette.text_primary } else { self.palette.text_secondary }),
-                    button(text("✕").size(10))
+                    button(text("×").size(11))
                         .style(tab_close_button_style(&self.palette))
                         .padding([2, 4])
                         .on_press(Message::CloseTab(tab_id.clone())),
@@ -912,5 +901,39 @@ mod tests {
             Some(&TabContent::ResourceTable(ResourceKind::Pod))
         );
         let _view = app.view();
+    }
+
+    #[test]
+    fn test_sidebar_click_deduplicates_tabs_and_uses_clean_labels() {
+        let mut app = OrbitApp::new();
+        // Check initial tab is clean "Overview"
+        assert_eq!(app.tab_manager.tabs.len(), 1);
+        assert_eq!(app.tab_manager.tabs[0].id, "tab-overview");
+        assert_eq!(app.tab_manager.tabs[0].title, "Overview");
+
+        let pod_tab = WorkspaceTab {
+            id: "nav-pods".into(),
+            title: "Pods".into(),
+            content: TabContent::ResourceTable(ResourceKind::Pod),
+        };
+
+        // Open Pods once
+        let _ = app.update(Message::OpenTab(pod_tab.clone()));
+        assert_eq!(app.tab_manager.tabs.len(), 2);
+        assert_eq!(app.tab_manager.active_tab().unwrap().title, "Pods");
+
+        // Open Pods second time (duplicate)
+        let _ = app.update(Message::OpenTab(pod_tab));
+        assert_eq!(app.tab_manager.tabs.len(), 2, "Tab count must remain 2 after duplicate open");
+        assert_eq!(app.tab_manager.active_tab().unwrap().title, "Pods");
+
+        // Verify all tab titles contain no emoji glyphs
+        for tab in &app.tab_manager.tabs {
+            assert!(
+                !tab.title.contains('📊') && !tab.title.contains('📦') && !tab.title.contains('🚀'),
+                "Tab title '{}' must not contain emoji",
+                tab.title
+            );
+        }
     }
 }
