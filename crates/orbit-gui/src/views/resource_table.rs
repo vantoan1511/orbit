@@ -19,6 +19,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Memory".into(), width: 100.0, is_numeric: true },
             TableColumn { header: "Node".into(), width: 160.0, is_numeric: false },
             TableColumn { header: "IP".into(), width: 130.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 140.0, is_numeric: false },
         ],
         ResourceKind::Deployment => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -28,6 +29,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Available".into(), width: 100.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
             TableColumn { header: "Images".into(), width: 260.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 120.0, is_numeric: false },
         ],
         ResourceKind::StatefulSet => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -35,6 +37,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Ready".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
             TableColumn { header: "Images".into(), width: 260.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::DaemonSet => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -44,6 +47,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Ready".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Available".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::ReplicaSet => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -52,6 +56,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Current".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Ready".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Job => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -59,6 +64,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Completions".into(), width: 110.0, is_numeric: true },
             TableColumn { header: "Duration".into(), width: 100.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::CronJob => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -68,6 +74,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Active".into(), width: 80.0, is_numeric: true },
             TableColumn { header: "Last Schedule".into(), width: 140.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::HorizontalPodAutoscaler => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
@@ -77,6 +84,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Max Pods".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Replicas".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Node => vec![
             TableColumn { header: "Name".into(), width: 220.0, is_numeric: false },
@@ -86,6 +94,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
             TableColumn { header: "Internal IP".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "OS Image".into(), width: 200.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 120.0, is_numeric: false },
         ],
         ResourceKind::Service => vec![
             TableColumn { header: "Name".into(), width: 220.0, is_numeric: false },
@@ -95,6 +104,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "External IP".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "Ports".into(), width: 150.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Ingress => vec![
             TableColumn { header: "Name".into(), width: 220.0, is_numeric: false },
@@ -104,12 +114,14 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Address".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "Ports".into(), width: 100.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::ConfigMap => vec![
             TableColumn { header: "Name".into(), width: 260.0, is_numeric: false },
             TableColumn { header: "Namespace".into(), width: 140.0, is_numeric: false },
             TableColumn { header: "Data".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Secret => vec![
             TableColumn { header: "Name".into(), width: 260.0, is_numeric: false },
@@ -117,6 +129,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Type".into(), width: 180.0, is_numeric: false },
             TableColumn { header: "Data".into(), width: 90.0, is_numeric: true },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Event => vec![
             TableColumn { header: "Type".into(), width: 90.0, is_numeric: false },
@@ -125,6 +138,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Namespace".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "Message".into(), width: 380.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 80.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::PersistentVolume => vec![
             TableColumn { header: "Name".into(), width: 220.0, is_numeric: false },
@@ -135,6 +149,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Claim".into(), width: 180.0, is_numeric: false },
             TableColumn { header: "StorageClass".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::PersistentVolumeClaim => vec![
             TableColumn { header: "Name".into(), width: 220.0, is_numeric: false },
@@ -145,6 +160,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Access Modes".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "StorageClass".into(), width: 130.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::StorageClass => vec![
             TableColumn { header: "Name".into(), width: 220.0, is_numeric: false },
@@ -153,18 +169,21 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<TableColumn> {
             TableColumn { header: "Volume Binding".into(), width: 160.0, is_numeric: false },
             TableColumn { header: "Allow Expansion".into(), width: 120.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Policy => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
             TableColumn { header: "Namespace".into(), width: 140.0, is_numeric: false },
             TableColumn { header: "Kind".into(), width: 150.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
         ResourceKind::Namespace => vec![
             TableColumn { header: "Name".into(), width: 240.0, is_numeric: false },
             TableColumn { header: "Status".into(), width: 110.0, is_numeric: false },
             TableColumn { header: "Labels".into(), width: 220.0, is_numeric: false },
             TableColumn { header: "Age".into(), width: 90.0, is_numeric: false },
+            TableColumn { header: "Actions".into(), width: 100.0, is_numeric: false },
         ],
     }
 }
@@ -178,11 +197,12 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
 ) -> iced::Element<'a, Message> {
     use iced::widget::{button, column, container, row, scrollable, text};
     use iced::Length;
+    use crate::theme::{action_button_style, header_container_style, status_pill, table_row_style};
 
     let columns = columns_for_kind(kind);
 
     // Header row
-    let mut header_row = row![].spacing(8).padding(8);
+    let mut header_row = row![].spacing(8).padding([8, 12]).align_y(iced::Alignment::Center);
     for col in &columns {
         header_row = header_row.push(
             container(
@@ -193,6 +213,10 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
             .width(Length::Fixed(col.width)),
         );
     }
+
+    let header_container = container(header_row)
+        .width(Length::Fill)
+        .style(header_container_style(palette));
 
     // Rows
     let mut rows_col = column![].spacing(2);
@@ -217,22 +241,38 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                         annotations: pod.annotations.clone().into_iter().collect(),
                     };
 
+                    let actions_cell = row![
+                        button(text("Logs").size(11))
+                            .style(action_button_style(palette, false))
+                            .padding([2, 6])
+                            .on_press(on_select(details.clone())),
+                        button(text("Details").size(11))
+                            .style(action_button_style(palette, false))
+                            .padding([2, 6])
+                            .on_press(on_select(details.clone())),
+                    ]
+                    .spacing(6)
+                    .align_y(iced::Alignment::Center);
+
                     let pod_row = row![
                         container(text(pod.name.clone()).size(13).color(palette.text_primary)).width(Length::Fixed(220.0)),
                         container(text(pod.namespace.clone()).size(12).color(palette.text_secondary)).width(Length::Fixed(140.0)),
-                        container(text(pod.status.clone()).size(12).color(crate::theme::status_color(&pod.status, palette))).width(Length::Fixed(110.0)),
+                        container(status_pill(palette, &pod.status)).width(Length::Fixed(110.0)),
                         container(text(pod.restarts.to_string()).size(12).color(palette.text_muted)).width(Length::Fixed(80.0)),
                         container(text(pod.age.clone()).size(12).color(palette.text_muted)).width(Length::Fixed(80.0)),
-                        container(text(pod.cpu.clone().unwrap_or_else(|| "-".into())).size(12).color(palette.text_muted)).width(Length::Fixed(90.0)),
-                        container(text(pod.memory.clone().unwrap_or_else(|| "-".into())).size(12).color(palette.text_muted)).width(Length::Fixed(100.0)),
+                        container(text(pod.cpu.clone().unwrap_or_else(|| "-".into())).size(12).font(iced::Font::MONOSPACE).color(palette.text_muted)).width(Length::Fixed(90.0)),
+                        container(text(pod.memory.clone().unwrap_or_else(|| "-".into())).size(12).font(iced::Font::MONOSPACE).color(palette.text_muted)).width(Length::Fixed(100.0)),
                         container(text(pod.node.clone().unwrap_or_else(|| "-".into())).size(12).color(palette.text_secondary)).width(Length::Fixed(160.0)),
                         container(text(pod.ip.clone().unwrap_or_else(|| "-".into())).size(12).color(palette.text_muted)).width(Length::Fixed(130.0)),
+                        container(actions_cell).width(Length::Fixed(140.0)),
                     ]
                     .spacing(8)
-                    .padding(6);
+                    .padding([6, 12])
+                    .align_y(iced::Alignment::Center);
 
                     rows_col = rows_col.push(
                         button(pod_row)
+                            .style(table_row_style(palette))
                             .on_press(on_select(details))
                             .padding(0)
                             .width(Length::Fill),
@@ -262,20 +302,39 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                         annotations: deploy.annotations.clone().into_iter().collect(),
                     };
 
+                    let is_ready = deploy.replicas.current == deploy.replicas.desired && deploy.replicas.desired > 0;
+                    let deploy_status_text = if is_ready { "Ready" } else { "Progressing" };
+
+                    let actions_cell = row![
+                        button(text("Scale").size(11))
+                            .style(action_button_style(palette, false))
+                            .padding([2, 6])
+                            .on_press(on_select(details.clone())),
+                        button(text("Details").size(11))
+                            .style(action_button_style(palette, false))
+                            .padding([2, 6])
+                            .on_press(on_select(details.clone())),
+                    ]
+                    .spacing(6)
+                    .align_y(iced::Alignment::Center);
+
                     let deploy_row = row![
                         container(text(deploy.name.clone()).size(13).color(palette.text_primary)).width(Length::Fixed(240.0)),
                         container(text(deploy.namespace.clone()).size(12).color(palette.text_secondary)).width(Length::Fixed(140.0)),
-                        container(text(format!("{}/{}", deploy.replicas.current, deploy.replicas.desired)).size(12).color(palette.text_primary)).width(Length::Fixed(90.0)),
+                        container(status_pill(palette, deploy_status_text)).width(Length::Fixed(90.0)),
                         container(text(deploy.up_to_date.to_string()).size(12).color(palette.text_muted)).width(Length::Fixed(100.0)),
                         container(text(deploy.available.to_string()).size(12).color(palette.text_muted)).width(Length::Fixed(100.0)),
                         container(text(deploy.age.clone()).size(12).color(palette.text_muted)).width(Length::Fixed(90.0)),
                         container(text(deploy.images.join(", ")).size(12).color(palette.text_muted)).width(Length::Fixed(260.0)),
+                        container(actions_cell).width(Length::Fixed(120.0)),
                     ]
                     .spacing(8)
-                    .padding(6);
+                    .padding([6, 12])
+                    .align_y(iced::Alignment::Center);
 
                     rows_col = rows_col.push(
                         button(deploy_row)
+                            .style(table_row_style(palette))
                             .on_press(on_select(details))
                             .padding(0)
                             .width(Length::Fill),
@@ -303,20 +362,32 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     let internal_ip = node.addresses.first().map(|a| a.address.clone()).unwrap_or_else(|| "-".into());
                     let os_img = node.node_info.as_ref().map(|i| i.os_image.clone()).unwrap_or_else(|| "-".into());
 
+                    let actions_cell = row![
+                        button(text("Details").size(11))
+                            .style(action_button_style(palette, false))
+                            .padding([2, 6])
+                            .on_press(on_select(details.clone())),
+                    ]
+                    .spacing(6)
+                    .align_y(iced::Alignment::Center);
+
                     let node_row = row![
                         container(text(node.name.clone()).size(13).color(palette.text_primary)).width(Length::Fixed(220.0)),
-                        container(text(node.status.clone()).size(12).color(crate::theme::status_color(&node.status, palette))).width(Length::Fixed(110.0)),
+                        container(status_pill(palette, &node.status)).width(Length::Fixed(110.0)),
                         container(text(node.role.clone()).size(12).color(palette.text_secondary)).width(Length::Fixed(120.0)),
                         container(text(node.version.clone()).size(12).color(palette.text_muted)).width(Length::Fixed(110.0)),
                         container(text(node.uptime.clone()).size(12).color(palette.text_muted)).width(Length::Fixed(90.0)),
                         container(text(internal_ip).size(12).color(palette.text_muted)).width(Length::Fixed(130.0)),
                         container(text(os_img).size(12).color(palette.text_muted)).width(Length::Fixed(200.0)),
+                        container(actions_cell).width(Length::Fixed(120.0)),
                     ]
                     .spacing(8)
-                    .padding(6);
+                    .padding([6, 12])
+                    .align_y(iced::Alignment::Center);
 
                     rows_col = rows_col.push(
                         button(node_row)
+                            .style(table_row_style(palette))
                             .on_press(on_select(details))
                             .padding(0)
                             .width(Length::Fill),
@@ -332,7 +403,7 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
     }
 
     column![
-        header_row,
+        header_container,
         scrollable(rows_col).width(Length::Fill).height(Length::Fill),
     ]
     .spacing(4)
@@ -344,6 +415,24 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_resource_table_columns_include_actions_column() {
+        let pod_cols = columns_for_kind(ResourceKind::Pod);
+        let last_pod_col = pod_cols.last().expect("Pod columns should not be empty");
+        assert_eq!(last_pod_col.header, "Actions");
+        assert!(last_pod_col.width >= 100.0);
+
+        let deploy_cols = columns_for_kind(ResourceKind::Deployment);
+        let last_deploy_col = deploy_cols.last().expect("Deployment columns should not be empty");
+        assert_eq!(last_deploy_col.header, "Actions");
+        assert!(last_deploy_col.width >= 100.0);
+
+        let node_cols = columns_for_kind(ResourceKind::Node);
+        let last_node_col = node_cols.last().expect("Node columns should not be empty");
+        assert_eq!(last_node_col.header, "Actions");
+        assert!(last_node_col.width >= 100.0);
+    }
 
     #[test]
     fn test_columns_for_all_18_resource_kinds_non_empty() {
@@ -372,8 +461,8 @@ mod tests {
         for kind in all_kinds {
             let cols = columns_for_kind(kind);
             assert!(
-                cols.len() >= 4 && cols.len() <= 9,
-                "Expected between 4 and 9 columns for {:?}, got {}",
+                cols.len() >= 4 && cols.len() <= 10,
+                "Expected between 4 and 10 columns for {:?}, got {}",
                 kind,
                 cols.len()
             );

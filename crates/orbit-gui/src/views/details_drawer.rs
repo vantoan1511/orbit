@@ -93,23 +93,35 @@ pub fn details_drawer_view<'a, Message: 'a + Clone>(
     on_close: Message,
     on_action: impl Fn(ResourceAction, ResourceKind, String, Option<String>) -> Message + 'a,
 ) -> iced::Element<'a, Message> {
-    use iced::widget::{button, column, container, row, scrollable, text};
+    use iced::widget::{button, column, container, horizontal_space, row, scrollable, text};
     use iced::Length;
+    use crate::theme::{action_button_style, drawer_container_style, tab_close_button_style};
 
     let title_bar = row![
         text(format!("{:?}: {}", details.kind, details.name))
-            .size(16)
+            .size(15)
             .color(palette.text_primary),
-        button(text("✕ Close").size(12)).on_press(on_close),
+        horizontal_space(),
+        button(text("✕ Close").size(11))
+            .style(tab_close_button_style(palette))
+            .padding([3, 6])
+            .on_press(on_close),
     ]
-    .spacing(12);
+    .spacing(8)
+    .align_y(iced::Alignment::Center);
 
     let actions = available_actions_for_resource_kind(details.kind);
-    let mut actions_row = row![].spacing(8);
+    let mut actions_row = row![].spacing(6).align_y(iced::Alignment::Center);
     for act in actions {
+        let is_destruct = act == ResourceAction::Delete;
         let label = format!("{:?}", act);
         let msg = on_action(act, details.kind, details.name.clone(), details.namespace.clone());
-        actions_row = actions_row.push(button(text(label).size(11)).on_press(msg));
+        actions_row = actions_row.push(
+            button(text(label).size(11))
+                .style(action_button_style(palette, is_destruct))
+                .padding([3, 8])
+                .on_press(msg),
+        );
     }
 
     let meta_info = column![
@@ -131,7 +143,7 @@ pub fn details_drawer_view<'a, Message: 'a + Clone>(
     container(
         column![
             title_bar,
-            actions_row,
+            scrollable(actions_row).width(Length::Fill),
             meta_info,
             scrollable(labels_col).height(Length::Fill),
         ]
@@ -140,6 +152,7 @@ pub fn details_drawer_view<'a, Message: 'a + Clone>(
     )
     .width(Length::Fixed(360.0))
     .height(Length::Fill)
+    .style(drawer_container_style(palette))
     .into()
 }
 
@@ -190,6 +203,26 @@ mod tests {
                 ResourceAction::Drain,
                 ResourceAction::EditYaml,
             ]
+        );
+    }
+
+    #[test]
+    fn test_details_drawer_rendering() {
+        let palette = crate::theme::OrbitPalette::dark();
+        let details = SelectedResourceDetails {
+            kind: ResourceKind::Pod,
+            name: "test-pod-1".into(),
+            namespace: Some("default".into()),
+            status: "Running".into(),
+            age: "5m".into(),
+            labels: vec![("app".into(), "web".into())],
+            annotations: vec![],
+        };
+        let _drawer: iced::Element<'_, ()> = details_drawer_view(
+            &details,
+            &palette,
+            (),
+            |_act, _kind, _name, _ns| (),
         );
     }
 }

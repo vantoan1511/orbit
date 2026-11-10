@@ -68,7 +68,7 @@ pub fn render_summary_card<'a, Message: 'a>(
     title: &'static str,
     value: String,
     subtitle: String,
-    palette: &OrbitPalette,
+    palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
     container(
         column![
@@ -77,15 +77,16 @@ pub fn render_summary_card<'a, Message: 'a>(
             text(subtitle).size(11).color(palette.text_muted),
         ]
         .spacing(4)
-        .padding(12),
+        .padding(14),
     )
     .width(Length::FillPortion(1))
+    .style(crate::theme::card_container_style(palette))
     .into()
 }
 
 pub fn dashboard_view<'a, Message: 'a>(
     store: &ClusterStore,
-    palette: &OrbitPalette,
+    palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
     let summary = compute_cluster_summary(store);
 
@@ -145,4 +146,19 @@ pub fn dashboard_view<'a, Message: 'a>(
     .padding(24)
     .width(Length::Fill)
     .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_summary_card_styling_and_values() {
+        let palette = OrbitPalette::dark();
+        let store = ClusterStore::default();
+        let summary = compute_cluster_summary(&store);
+        assert_eq!(summary.total_nodes, 0);
+
+        let _card: Element<'_, ()> = render_summary_card("NODES", "3/3".into(), "Ready / Total".into(), &palette);
+    }
 }

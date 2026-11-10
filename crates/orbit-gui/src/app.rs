@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use iced::{
-    widget::{button, column, container, horizontal_space, pick_list, row, text},
+    widget::{button, column, container, horizontal_space, pick_list, row, text, vertical_space},
     Element, Length, Subscription, Task,
 };
 
@@ -10,7 +10,11 @@ use orbit_core::ui_state::UiStateStore;
 
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
-use crate::theme::OrbitPalette;
+use crate::theme::{
+    action_button_style, header_container_style, pick_list_style, search_pill_style,
+    sidebar_container_style, sidebar_nav_button_style, status_dot_pill, tab_button_style,
+    tab_close_button_style, OrbitPalette,
+};
 use crate::views::dashboard::dashboard_view;
 use crate::views::details_drawer::{details_drawer_view, ResourceAction, SelectedResourceDetails};
 use crate::views::modals::{modal_view, ActiveModal, SearchResultItem, SearchResultKind};
@@ -354,51 +358,104 @@ impl OrbitApp {
 
     pub fn view(&self) -> Element<'_, Message> {
         // 1. Sidebar Navigation
+        let active_content = self.tab_manager.active_tab().map(|t| &t.content);
+
         let mut nav_col = column![
-            text("ORBIT").size(18).color(self.palette.text_primary),
+            row![
+                text("ORBIT").size(18).color(self.palette.text_primary),
+                horizontal_space(),
+            ]
+            .padding([4, 6]),
         ]
-        .spacing(8);
+        .spacing(6);
 
         let nav_items = [
-            ("Overview", TabContent::Dashboard),
-            ("Pods", TabContent::ResourceTable(ResourceKind::Pod)),
-            ("Deployments", TabContent::ResourceTable(ResourceKind::Deployment)),
-            ("Nodes", TabContent::ResourceTable(ResourceKind::Node)),
-            ("Services", TabContent::ResourceTable(ResourceKind::Service)),
-            ("ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
-            ("Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
-            ("Settings", TabContent::Settings),
+            ("📊 Overview", TabContent::Dashboard),
+            ("📦 Pods", TabContent::ResourceTable(ResourceKind::Pod)),
+            ("🚀 Deployments", TabContent::ResourceTable(ResourceKind::Deployment)),
+            ("🖥️ Nodes", TabContent::ResourceTable(ResourceKind::Node)),
+            ("🌐 Services", TabContent::ResourceTable(ResourceKind::Service)),
+            ("⚙️ ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
+            ("🔒 Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
+            ("🛠️ Settings", TabContent::Settings),
         ];
 
         for (label, content) in nav_items {
+            let is_active = active_content == Some(&content);
             let tab = WorkspaceTab {
-                id: format!("nav-{}", label.to_lowercase()),
+                id: format!("nav-{}", label.to_lowercase().replace(' ', "-")),
                 title: label.to_string(),
                 content,
             };
-            nav_col = nav_col.push(
-                button(text(label).size(13).color(self.palette.text_primary))
-                    .on_press(Message::OpenTab(tab))
-                    .width(Length::Fill)
-                    .padding(6),
-            );
+
+            let indicator = container(text(""))
+                .width(Length::Fixed(3.0))
+                .height(Length::Fixed(16.0))
+                .style(move |_| container::Style {
+                    background: if is_active {
+                        Some(iced::Background::Color(self.palette.accent))
+                    } else {
+                        None
+                    },
+                    ..Default::default()
+                });
+
+            let nav_btn = button(
+                row![
+                    indicator,
+                    text(label).size(13).color(if is_active {
+                        self.palette.text_primary
+                    } else {
+                        self.palette.text_secondary
+                    }),
+                ]
+                .spacing(8)
+                .align_y(iced::Alignment::Center),
+            )
+            .on_press(Message::OpenTab(tab))
+            .width(Length::Fill)
+            .padding([6, 8])
+            .style(sidebar_nav_button_style(&self.palette, is_active));
+
+            nav_col = nav_col.push(nav_btn);
         }
+
+        let active_cluster_label = self
+            .cluster_store
+            .active_cluster_id
+            .as_deref()
+            .unwrap_or("No Cluster");
+        let (is_conn, is_load) = match self.cluster_connection_status() {
+            ClusterConnectionStatus::Connected(_) => (true, false),
+            ClusterConnectionStatus::Loading => (false, true),
+            ClusterConnectionStatus::Disconnected => (false, false),
+        };
+        let connection_pill = status_dot_pill(&self.palette, is_conn, is_load, active_cluster_label);
 
         let sidebar = container(
             column![
                 nav_col,
-                button(text(if self.palette.is_dark { "🌙 Dark" } else { "☀️ Light" }).size(12))
-                    .on_press(Message::ToggleTheme)
-                    .width(Length::Fill),
+                vertical_space(),
+                column![
+                    connection_pill,
+                    button(text(if self.palette.is_dark { "🌙 Dark" } else { "☀️ Light" }).size(12))
+                        .on_press(Message::ToggleTheme)
+                        .width(Length::Fill)
+                        .padding([6, 8])
+                        .style(action_button_style(&self.palette, false)),
+                ]
+                .spacing(8),
             ]
-            .spacing(16)
-            .padding(12),
+            .spacing(12)
+            .padding(10)
+            .height(Length::Fill),
         )
-        .width(Length::Fixed(180.0))
-        .height(Length::Fill);
+        .width(Length::Fixed(190.0))
+        .height(Length::Fill)
+        .style(sidebar_container_style(&self.palette));
 
         // 2. Document Tab Bar
-        let mut tabs_row = row![].spacing(4).padding(4);
+        let mut tabs_row = row![].spacing(4).padding(2).align_y(iced::Alignment::Center);
         for tab in &self.tab_manager.tabs {
             let is_active = self.tab_manager.active_tab_id.as_deref() == Some(&tab.id);
             let tab_id = tab.id.clone();
@@ -408,10 +465,15 @@ impl OrbitApp {
                         .size(12)
                         .color(if is_active { self.palette.text_primary } else { self.palette.text_secondary }),
                     button(text("✕").size(10))
+                        .style(tab_close_button_style(&self.palette))
+                        .padding([2, 4])
                         .on_press(Message::CloseTab(tab_id.clone())),
                 ]
-                .spacing(8),
+                .spacing(6)
+                .align_y(iced::Alignment::Center),
             )
+            .style(tab_button_style(&self.palette, is_active))
+            .padding([4, 8])
             .on_press(Message::SelectTab(tab_id));
 
             tabs_row = tabs_row.push(tab_btn);
@@ -419,21 +481,15 @@ impl OrbitApp {
 
         // Top bar status & pickers
         let status_indicator = match self.cluster_connection_status() {
-            ClusterConnectionStatus::Loading => row![
-                text("●").size(12).color(self.palette.warning),
-                text("Connecting...").size(12).color(self.palette.text_secondary),
-            ]
-            .spacing(4),
-            ClusterConnectionStatus::Connected(_) => row![
-                text("●").size(12).color(self.palette.success),
-                text("Connected").size(12).color(self.palette.text_primary),
-            ]
-            .spacing(4),
-            ClusterConnectionStatus::Disconnected => row![
-                text("○").size(12).color(self.palette.danger),
-                text("Disconnected").size(12).color(self.palette.text_muted),
-            ]
-            .spacing(4),
+            ClusterConnectionStatus::Loading => {
+                status_dot_pill(&self.palette, false, true, "Connecting...")
+            }
+            ClusterConnectionStatus::Connected(_) => {
+                status_dot_pill(&self.palette, true, false, "Connected")
+            }
+            ClusterConnectionStatus::Disconnected => {
+                status_dot_pill(&self.palette, false, false, "Disconnected")
+            }
         };
 
         let cluster_selector = pick_list(
@@ -442,16 +498,20 @@ impl OrbitApp {
             |c| Message::SelectCluster(Some(c)),
         )
         .placeholder("Select Cluster...")
-        .padding(4);
+        .style(pick_list_style(&self.palette))
+        .padding([4, 8]);
 
         let namespace_selector = pick_list(
             self.namespace_options(),
             Some(self.selected_namespace_label()),
             |ns| Message::SelectNamespace(Some(ns)),
         )
-        .padding(4);
+        .style(pick_list_style(&self.palette))
+        .padding([4, 8]);
 
         let search_btn = button(text("🔍 Search (Ctrl+K)").size(12))
+            .style(search_pill_style(&self.palette))
+            .padding([4, 10])
             .on_press(Message::OpenModal(ActiveModal::SearchEverywhere {
                 query: String::new(),
                 selected_index: 0,
@@ -463,12 +523,18 @@ impl OrbitApp {
             namespace_selector,
             search_btn,
         ]
-        .spacing(8);
+        .spacing(8)
+        .align_y(iced::Alignment::Center);
 
-        let tab_bar = row![tabs_row, horizontal_space(), top_controls]
+        let tab_bar_row = row![tabs_row, horizontal_space(), top_controls]
             .spacing(12)
-            .padding(4)
+            .padding([6, 12])
+            .align_y(iced::Alignment::Center)
             .width(Length::Fill);
+
+        let tab_bar = container(tab_bar_row)
+            .width(Length::Fill)
+            .style(header_container_style(&self.palette));
 
         // 3. Main Tab Content
         let main_workspace: Element<'_, Message> = match self.tab_manager.active_tab().map(|t| &t.content) {
@@ -536,7 +602,15 @@ impl OrbitApp {
         .width(Length::Fill)
         .height(Length::Fill);
 
-        let full_layout = row![sidebar, main_panel].width(Length::Fill).height(Length::Fill);
+        let full_layout = container(
+            row![sidebar, main_panel].width(Length::Fill).height(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |_| container::Style {
+            background: Some(iced::Background::Color(self.palette.bg_app)),
+            ..Default::default()
+        });
 
         // 5. Active Modal Overlay
         if self.active_modal != ActiveModal::None {
@@ -815,5 +889,28 @@ mod tests {
         let _ = app.update(Message::SelectCluster(Some("prod-cluster".into())));
         assert_eq!(app.selected_namespace_label(), ALL_NAMESPACES_LABEL);
         assert_eq!(app.filter.namespace, None);
+    }
+
+    #[test]
+    fn test_top_bar_rendering_uses_custom_styles_and_pills() {
+        let app = OrbitApp::new();
+        assert_eq!(app.cluster_connection_status(), ClusterConnectionStatus::Disconnected);
+        let _view = app.view();
+    }
+
+    #[test]
+    fn test_sidebar_nav_active_item_matching() {
+        let mut app = OrbitApp::new();
+        let pod_tab = WorkspaceTab {
+            id: "nav-pods".into(),
+            title: "Pods".into(),
+            content: TabContent::ResourceTable(ResourceKind::Pod),
+        };
+        let _ = app.update(Message::OpenTab(pod_tab.clone()));
+        assert_eq!(
+            app.tab_manager.active_tab().map(|t| &t.content),
+            Some(&TabContent::ResourceTable(ResourceKind::Pod))
+        );
+        let _view = app.view();
     }
 }
