@@ -1,8 +1,15 @@
 [workspace]
-members = [
-    "src-tauri"
-]
 resolver = "2"
+members = [
+    "crates/orbit-core",
+    "crates/orbit-gui",
+]
+
+[workspace.package]
+version = "0.20.0"
+edition = "2024"
+authors = ["Toan Nguyen"]
+license = "MIT"
 
 [profile.release]
 opt-level = 3          # speed up compilation (3 is faster than 'z')

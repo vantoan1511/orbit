@@ -1,0 +1,685 @@
+use std::collections::HashMap;
+use http::Uri;
+use kube::{Client, config::{Kubeconfig, KubeConfigOptions, Config}};
+use crate::kubernetes::models::{ClusterInfo, UserProfileInfo};
+use crate::config::OrbitConfig;
+
+
+pub struct KubeManager {
+    pub kubeconfig: Option<Kubeconfig>,
+    pub active_context: Option<String>,
+    pub active_client: Option<Client>,
+    pub watch_cancel: Option<tokio::sync::watch::Sender<bool>>,
+    pub active_context_healthy: bool,
+    pub log_cancel: Vec<tokio::sync::oneshot::Sender<()>>,
+    pub port_forward_cancel: HashMap<String, (tokio::sync::oneshot::Sender<()>, tokio::task::JoinHandle<()>)>,
+    pub config: OrbitConfig,
+}
+
+impl KubeManager {
+    pub async fn new() -> Self {
+        let config = OrbitConfig::load();
+
+        let mut manager = Self {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config,
+        };
+        
+        // Try reading default kubeconfig
+        if let Ok(config) = Kubeconfig::read() {
+            manager.kubeconfig = Some(config);
+            // Intentionally do not connect — user must explicitly select a cluster
+        }
+        
+        // Reload persisted custom kubeconfig files
+        for path in manager.config.custom_kubeconfig_paths() {
+            if let Err(e) = manager.merge_kubeconfig_from_path(&path) {
+                tracing::warn!(path = %path, error = %e, "Failed to load persisted kubeconfig");
+            }
+        }
+
+        manager
+    }
+
+    pub fn get_clusters(&self) -> Vec<ClusterInfo> {
+        let mut clusters = Vec::new();
+        let customizations = self.config.cluster_customizations();
+
+        if let Some(ref config) = self.kubeconfig {
+            for ctx in &config.contexts {
+                let status = if Some(&ctx.name) == self.active_context.as_ref() {
+                    if self.active_context_healthy {
+                        "healthy".to_string()
+                    } else {
+                        "offline".to_string()
+                    }
+                } else {
+                    "offline".to_string()
+                };
+
+                let server_url = ctx
+                    .context
+                    .as_ref()
+                    .and_then(|c| config.clusters.iter().find(|cl| cl.name == c.cluster))
+                    .and_then(|cl| cl.cluster.as_ref())
+                    .and_then(|cl| cl.server.clone());
+
+                let custom = customizations.get(&ctx.name);
+
+                clusters.push(ClusterInfo {
+                    id: ctx.name.clone(),
+                    name: ctx.name.clone(),
+                    status,
+                    alias: custom.and_then(|c| c.alias.clone()),
+                    tags: custom.map(|c| c.tags.clone()).unwrap_or_default(),
+                    color: custom.and_then(|c| c.color.clone()),
+                    description: custom.and_then(|c| c.description.clone()),
+                    server_url,
+                });
+            }
+        }
+        clusters
+    }
+
+    pub fn get_user_profile(&self) -> UserProfileInfo {
+        let active_context = self.active_context.clone();
+        let mut user_name = None;
+        let mut cluster_name = None;
+        let mut auth_type = "None".to_string();
+        let mut server_url = None;
+
+        if let (Some(config), Some(ctx_name)) = (&self.kubeconfig, &active_context) {
+            let named_ctx = config.contexts.iter().find(|c| &c.name == ctx_name);
+            let ctx = named_ctx.and_then(|c| c.context.as_ref());
+
+            if let Some(ctx) = ctx {
+                user_name = ctx.user.clone();
+                cluster_name = Some(ctx.cluster.clone());
+
+                if let Some(u_name) = &user_name {
+                    let named_auth = config.auth_infos.iter().find(|a| &a.name == u_name);
+                    let auth = named_auth.and_then(|a| a.auth_info.as_ref());
+                    if let Some(auth) = auth {
+                        if auth.client_certificate.is_some() || auth.client_certificate_data.is_some() {
+                            auth_type = "Certificate".to_string();
+                        } else if auth.token.is_some() || auth.token_file.is_some() {
+                            auth_type = "Token".to_string();
+                        } else if auth.exec.is_some() {
+                            auth_type = "Exec Plugin".to_string();
+                        } else if auth.auth_provider.is_some() {
+                            auth_type = "OIDC".to_string();
+                        } else if auth.username.is_some() {
+                            auth_type = "Basic Auth".to_string();
+                        } else {
+                            auth_type = "Configured".to_string();
+                        }
+                    }
+                }
+
+                if let Some(c_name) = &cluster_name {
+                    let named_cl = config.clusters.iter().find(|cl| &cl.name == c_name);
+                    let cl = named_cl.and_then(|cl| cl.cluster.as_ref());
+                    if let Some(cl) = cl {
+                        server_url = cl.server.clone();
+                    }
+                }
+            }
+        }
+
+        let mut kubeconfig_paths = Vec::new();
+        if let Some(home) = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")) {
+            let mut default_path = std::path::PathBuf::from(home);
+            default_path.push(".kube");
+            default_path.push("config");
+            if default_path.exists() {
+                let norm = OrbitConfig::normalize_path(&default_path.to_string_lossy());
+                kubeconfig_paths.push(norm);
+            }
+        }
+        for path in &self.config.custom_kubeconfig_paths() {
+            let norm = OrbitConfig::normalize_path(path);
+            let is_duplicate = if cfg!(windows) {
+                kubeconfig_paths.iter().any(|p| p.eq_ignore_ascii_case(&norm))
+            } else {
+                kubeconfig_paths.iter().any(|p| p == &norm)
+            };
+            if !is_duplicate {
+                kubeconfig_paths.push(norm);
+            }
+        }
+
+        let k8s_version = if self.active_context.is_some() {
+            if self.active_context_healthy {
+                Some("Connected".to_string())
+            } else {
+                Some("Offline".to_string())
+            }
+        } else {
+            None
+        };
+
+        UserProfileInfo {
+            active_context,
+            user_name,
+            auth_type,
+            cluster_name,
+            server_url,
+            kubeconfig_paths,
+            k8s_version,
+        }
+    }
+
+    pub async fn refresh_active_cluster_health(&mut self) {
+        if let Some(ref client) = self.active_client {
+            self.active_context_healthy = client.apiserver_version().await.is_ok();
+        } else {
+            self.active_context_healthy = false;
+        }
+    }
+
+    /// Resolves outbound proxy URI from given proxy settings configuration.
+    pub fn resolve_proxy_uri(proxy_settings: &serde_json::Value) -> Option<Uri> {
+        if !proxy_settings.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return None;
+        }
+
+        let proxy_str = proxy_settings
+            .get("httpsProxy")
+            .and_then(|v| v.as_str())
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .or_else(|| {
+                proxy_settings
+                    .get("httpProxy")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+            })?;
+
+        proxy_str.parse::<Uri>().ok()
+    }
+
+    /// Checks whether a given host should bypass the proxy according to the `no_proxy` rules.
+    pub fn should_bypass_proxy(no_proxy: &str, target_host: &str) -> bool {
+        let trimmed_host = target_host.trim().to_lowercase();
+        if trimmed_host.is_empty() {
+            return false;
+        }
+
+        for item in no_proxy.split(',') {
+            let item = item.trim().to_lowercase();
+            if item.is_empty() {
+                continue;
+            }
+            if item == "*" {
+                return true;
+            }
+            let item_clean = item.strip_prefix('.').unwrap_or(&item);
+            if trimmed_host == item_clean || trimmed_host.ends_with(&format!(".{}", item_clean)) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Resolves outbound proxy URI from proxy settings, checking if the cluster URL host is in the bypass list.
+    pub fn resolve_proxy_uri_for_cluster(
+        proxy_settings: &serde_json::Value,
+        cluster_url: &Uri,
+    ) -> Option<Uri> {
+        if !proxy_settings.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false) {
+            return None;
+        }
+
+        let should_bypass = match (
+            cluster_url.host(),
+            proxy_settings.get("noProxy").and_then(|v| v.as_str()),
+        ) {
+            (Some(host), Some(no_proxy)) => Self::should_bypass_proxy(no_proxy, host),
+            _ => false,
+        };
+        if should_bypass {
+            return None;
+        }
+
+        Self::resolve_proxy_uri(proxy_settings)
+    }
+
+    pub async fn switch_context(&mut self, context_name: &str) -> Result<(), String> {
+        let config = self.kubeconfig.as_ref().ok_or_else(|| "No kubeconfig loaded".to_string())?;
+        
+        let options = KubeConfigOptions {
+            context: Some(context_name.to_string()),
+            ..Default::default()
+        };
+        
+        let mut client_config = Config::from_custom_kubeconfig(config.clone(), &options)
+            .await
+            .map_err(|e| format!("Failed to create client config: {}", e))?;
+
+        if let Some(proxy_uri) = Self::resolve_proxy_uri_for_cluster(&self.config.proxy_settings(), &client_config.cluster_url) {
+            client_config.proxy_url = Some(proxy_uri);
+        }
+            
+        let client = Client::try_from(client_config)
+            .map_err(|e| format!("Failed to build client: {}", e))?;
+            
+        // Test connection
+        let apiserver_res = client.apiserver_version().await;
+        if let Err(e) = apiserver_res {
+            return Err(format!("Failed to connect to cluster API server: {}", e));
+        }
+        
+        self.active_context = Some(context_name.to_string());
+        self.active_client = Some(client);
+        self.active_context_healthy = true;
+        
+        Ok(())
+    }
+
+    /// Merges contexts, clusters, and auth_infos from `new_config` into `self.kubeconfig`.
+    /// Existing entries with matching names are updated (upserted); new entries are appended.
+    pub fn merge_kubeconfig(&mut self, new_config: Kubeconfig) {
+        if let Some(ref mut current) = self.kubeconfig {
+            if let Some(curr_ctx) = new_config.current_context {
+                current.current_context = Some(curr_ctx);
+            }
+            for ctx in new_config.contexts {
+                if let Some(pos) = current.contexts.iter().position(|c| c.name == ctx.name) {
+                    current.contexts[pos] = ctx;
+                } else {
+                    current.contexts.push(ctx);
+                }
+            }
+            for cl in new_config.clusters {
+                if let Some(pos) = current.clusters.iter().position(|c| c.name == cl.name) {
+                    current.clusters[pos] = cl;
+                } else {
+                    current.clusters.push(cl);
+                }
+            }
+            for user in new_config.auth_infos {
+                if let Some(pos) = current.auth_infos.iter().position(|u| u.name == user.name) {
+                    current.auth_infos[pos] = user;
+                } else {
+                    current.auth_infos.push(user);
+                }
+            }
+        } else {
+            self.kubeconfig = Some(new_config);
+        }
+    }
+
+    /// Read a kubeconfig from `file_path` and merge its contexts, clusters, and auth_infos into `self.kubeconfig`.
+    /// Does not auto-switch context and does not modify persistent configuration.
+    pub fn merge_kubeconfig_from_path(&mut self, file_path: &str) -> Result<(), String> {
+        let path = std::path::Path::new(file_path);
+        if !path.exists() {
+            return Err("Provided kubeconfig path does not exist".to_string());
+        }
+        if !path.is_file() {
+            return Err("Provided kubeconfig path is not a file".to_string());
+        }
+
+        let new_config = Kubeconfig::read_from(file_path)
+            .map_err(|e| format!("Failed to read custom kubeconfig: {}", e))?;
+
+        self.merge_kubeconfig(new_config);
+
+        Ok(())
+    }
+
+    pub async fn add_kubeconfig_file(&mut self, file_path: &str) -> Result<(), String> {
+        self.merge_kubeconfig_from_path(file_path)?;
+
+        if let Err(e) = self.config.add_kubeconfig_path(file_path) {
+            tracing::warn!(path = %file_path, error = %e, "Failed to persist kubeconfig path");
+        }
+        
+        Ok(())
+    }
+
+    /// Validates raw kubeconfig YAML content, persists it to ~/.orbit/kubeconfigs/,
+    /// merges its contexts into the active manager, and registers it in persistent config.
+    pub async fn add_kubeconfig_content(&mut self, content: &str) -> Result<String, String> {
+        // Validate YAML syntax and Kubeconfig schema
+        Kubeconfig::from_yaml(content)
+            .map_err(|e| format!("Invalid kubeconfig content: {}", e))?;
+
+        let config_dir = OrbitConfig::config_dir()
+            .ok_or_else(|| "Could not determine user config directory".to_string())?;
+        let kubeconfigs_dir = config_dir.join("kubeconfigs");
+        if !kubeconfigs_dir.exists() {
+            std::fs::create_dir_all(&kubeconfigs_dir)
+                .map_err(|e| format!("Failed to create kubeconfigs directory: {}", e))?;
+        }
+
+        let file_name = format!("orbit_cluster_{}.yaml", uuid::Uuid::new_v4());
+        let file_path = kubeconfigs_dir.join(file_name);
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        std::fs::write(&file_path, content)
+            .map_err(|e| format!("Failed to write kubeconfig file: {}", e))?;
+
+        self.add_kubeconfig_file(&file_path_str).await?;
+
+        Ok(file_path_str)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_merge_kubeconfig_nonexistent_file() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let result = manager.merge_kubeconfig_from_path("/nonexistent/path/to/kubeconfig");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Provided kubeconfig path does not exist");
+    }
+
+    #[test]
+    fn test_merge_kubeconfig_from_temp_file() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let temp_dir = std::env::temp_dir();
+        let file_path = temp_dir.join("orbit_test_kubeconfig.yaml");
+        let sample_yaml = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-user
+  name: test-context
+current-context: test-context
+kind: Config
+preferences: {}
+users:
+- name: test-user
+  user: {}
+"#;
+        std::fs::write(&file_path, sample_yaml).unwrap();
+
+        let result = manager.merge_kubeconfig_from_path(file_path.to_str().unwrap());
+        assert!(result.is_ok());
+
+        let clusters = manager.get_clusters();
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].name, "test-context");
+        assert_eq!(clusters[0].server_url, Some("https://127.0.0.1:6443".to_string()));
+
+        // Verify custom metadata enrichment
+        manager.config.set_cluster_customization("test-context", crate::kubernetes::models::ClusterCustomization {
+            alias: Some("My Friendly Cluster".to_string()),
+            tags: vec!["production".to_string()],
+            color: Some("#ef4444".to_string()),
+            description: Some("Production node".to_string()),
+        });
+        let enriched = manager.get_clusters();
+        assert_eq!(enriched[0].alias, Some("My Friendly Cluster".to_string()));
+        assert_eq!(enriched[0].tags, vec!["production".to_string()]);
+        assert_eq!(enriched[0].color, Some("#ef4444".to_string()));
+        assert_eq!(enriched[0].description, Some("Production node".to_string()));
+        assert_eq!(enriched[0].server_url, Some("https://127.0.0.1:6443".to_string()));
+
+        let _ = std::fs::remove_file(file_path);
+    }
+
+    #[tokio::test]
+    async fn test_add_kubeconfig_content_creates_managed_file_and_merges() {
+        let _guard = crate::config::TestConfigDirGuard::new("managed_kubeconfig");
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::load(),
+        };
+
+        let sample_yaml = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.0.1:6443
+  name: pasted-cluster
+contexts:
+- context:
+    cluster: pasted-cluster
+    user: pasted-user
+  name: pasted-context
+current-context: pasted-context
+kind: Config
+preferences: {}
+users:
+- name: pasted-user
+  user: {}
+"#;
+
+        let result = manager.add_kubeconfig_content(sample_yaml).await;
+        assert!(result.is_ok(), "add_kubeconfig_content should succeed: {:?}", result.err());
+        let saved_path = result.unwrap();
+        assert!(std::path::Path::new(&saved_path).exists());
+        assert!(saved_path.contains("kubeconfigs"));
+
+        let clusters = manager.get_clusters();
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].name, "pasted-context");
+        assert_eq!(clusters[0].server_url, Some("https://10.0.0.1:6443".to_string()));
+
+        // Check it was added to customKubeconfigPaths
+        let persisted_paths = manager.config.custom_kubeconfig_paths();
+        assert!(persisted_paths.iter().any(|p| p.contains("orbit_cluster_")));
+    }
+
+    #[test]
+    fn test_get_user_profile_default() {
+        let manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let profile = manager.get_user_profile();
+        assert_eq!(profile.active_context, None);
+        assert_eq!(profile.user_name, None);
+        assert_eq!(profile.auth_type, "None");
+        assert_eq!(profile.cluster_name, None);
+        assert_eq!(profile.server_url, None);
+    }
+
+    #[test]
+    fn test_resolve_proxy_uri() {
+        let disabled_cfg = serde_json::json!({
+            "enabled": false,
+            "httpProxy": "http://127.0.0.1:8080",
+            "httpsProxy": "http://127.0.0.1:8443",
+            "noProxy": ""
+        });
+        assert_eq!(KubeManager::resolve_proxy_uri(&disabled_cfg), None);
+
+        let enabled_https = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "http://127.0.0.1:8080",
+            "httpsProxy": "http://proxy.corp.internal:8443",
+            "noProxy": ""
+        });
+        let uri = KubeManager::resolve_proxy_uri(&enabled_https).expect("Should resolve URI");
+        assert_eq!(uri.to_string(), "http://proxy.corp.internal:8443/");
+
+        let enabled_http_fallback = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "http://proxy.corp.internal:8080",
+            "httpsProxy": "",
+            "noProxy": ""
+        });
+        let uri = KubeManager::resolve_proxy_uri(&enabled_http_fallback).expect("Should resolve HTTP fallback");
+        assert_eq!(uri.to_string(), "http://proxy.corp.internal:8080/");
+
+        let invalid_uri = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "not a uri",
+            "httpsProxy": "",
+            "noProxy": ""
+        });
+        assert_eq!(KubeManager::resolve_proxy_uri(&invalid_uri), None);
+    }
+
+    #[test]
+    fn test_should_bypass_proxy() {
+        let no_proxy = "localhost, 127.0.0.1, .cluster.local, internal";
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "localhost"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "127.0.0.1"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "cluster.local"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "minikube.cluster.local"));
+        assert!(KubeManager::should_bypass_proxy(no_proxy, "api.internal"));
+        assert!(!KubeManager::should_bypass_proxy(no_proxy, "example.com"));
+        assert!(!KubeManager::should_bypass_proxy(no_proxy, "10.0.0.1"));
+
+        // Wildcard support
+        assert!(KubeManager::should_bypass_proxy("*", "anyhost.org"));
+        assert!(!KubeManager::should_bypass_proxy("", "localhost"));
+    }
+
+    #[test]
+    fn test_resolve_proxy_uri_for_cluster() {
+        let proxy_cfg = serde_json::json!({
+            "enabled": true,
+            "httpProxy": "http://proxy.corp.internal:8080",
+            "httpsProxy": "http://proxy.corp.internal:8443",
+            "noProxy": "localhost,127.0.0.1,.cluster.local"
+        });
+
+        let local_cluster: Uri = "https://127.0.0.1:6443".parse().expect("valid uri");
+        assert_eq!(KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &local_cluster), None);
+
+        let k8s_local: Uri = "https://minikube.cluster.local:8443".parse().expect("valid uri");
+        assert_eq!(KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &k8s_local), None);
+
+        let remote_cluster: Uri = "https://k8s.cloud.provider.com:6443".parse().expect("valid uri");
+        let resolved = KubeManager::resolve_proxy_uri_for_cluster(&proxy_cfg, &remote_cluster)
+            .expect("should route remote cluster through proxy");
+        assert_eq!(resolved.to_string(), "http://proxy.corp.internal:8443/");
+    }
+
+    #[tokio::test]
+    async fn test_merge_kubeconfig_overwrites_existing_entries_with_same_name() {
+        let mut manager = KubeManager {
+            kubeconfig: None,
+            active_context: None,
+            active_client: None,
+            watch_cancel: None,
+            active_context_healthy: false,
+            log_cancel: Vec::new(),
+            port_forward_cancel: HashMap::new(),
+            config: OrbitConfig::default(),
+        };
+
+        let yaml1 = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: default-user
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: default-user
+  user:
+    token: old-token
+"#;
+
+        let yaml2 = r#"
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://10.0.0.99:6443
+  name: kubernetes
+contexts:
+- context:
+    cluster: kubernetes
+    user: default-user
+  name: default
+current-context: default
+kind: Config
+preferences: {}
+users:
+- name: default-user
+  user:
+    token: new-token
+"#;
+
+        let cfg1 = Kubeconfig::from_yaml(yaml1).expect("valid yaml 1");
+        let cfg2 = Kubeconfig::from_yaml(yaml2).expect("valid yaml 2");
+
+        manager.merge_kubeconfig(cfg1);
+        assert_eq!(manager.get_clusters().len(), 1);
+        assert_eq!(
+            manager.get_clusters()[0].server_url,
+            Some("https://127.0.0.1:6443".to_string())
+        );
+
+        manager.merge_kubeconfig(cfg2);
+        assert_eq!(manager.get_clusters().len(), 1);
+        assert_eq!(
+            manager.get_clusters()[0].server_url,
+            Some("https://10.0.0.99:6443".to_string())
+        );
+
+        let user = manager
+            .kubeconfig
+            .as_ref()
+            .unwrap()
+            .auth_infos
+            .iter()
+            .find(|u| u.name == "default-user")
+            .unwrap();
+        assert!(user.auth_info.as_ref().unwrap().token.is_some());
+    }
+}
+
+

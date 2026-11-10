@@ -407,7 +407,7 @@ def check_design_tokens(file_path: Path, content: str) -> list[Violation]:
     return violations
 
 def check_rust_safety(file_path: Path, content: str) -> list[Violation]:
-    """Rule: No unwrap(), expect(), or panic! in production Rust backend code."""
+    """Rule: No unwrap(), expect(), or panic! in production Rust backend code, and no legacy tauri imports."""
     violations = []
     norm_path = file_path.as_posix()
     if not norm_path.endswith(".rs"):
@@ -438,6 +438,18 @@ def check_rust_safety(file_path: Path, content: str) -> list[Violation]:
 
         if "shift-left-ignore" in line or stripped.startswith("//"):
             continue
+
+        # Check for banned tauri imports/references
+        if re.search(r"\btauri::|\buse\s+tauri\b", line):
+            violations.append(
+                Violation(
+                    file=norm_path,
+                    line=idx,
+                    code=line,
+                    rule="Banned Tauri dependency in native Rust workspace",
+                    suggestion="Orbit has migrated to pure Rust + Iced architecture. Remove Tauri dependencies."
+                )
+            )
 
         # Look for .unwrap(), .expect(...), panic!(...)
         if re.search(r"\.unwrap\(\)", line):
@@ -519,11 +531,10 @@ def main():
     parser.add_argument("--staged", action="store_true", help="Scan git staged files only")
     parser.add_argument("--all", action="store_true", help="Scan all source files in repository")
     parser.add_argument("--files", nargs="*", help="Scan explicit list of files")
-    parser.add_argument("--type-check", action="store_true", help="Run vue-tsc type checking")
-    parser.add_argument("--lint", action="store_true", help="Run eslint")
-    parser.add_argument("--test", action="store_true", help="Run frontend unit tests")
-    parser.add_argument("--cargo-test", action="store_true", help="Run rust cargo test")
-    parser.add_argument("--all-checks", action="store_true", help="Run pattern scanner + lint + type-check + tests")
+    parser.add_argument("--cargo-check", action="store_true", help="Run cargo check --workspace --all-targets")
+    parser.add_argument("--cargo-test", action="store_true", help="Run cargo test --workspace")
+    parser.add_argument("--cargo-clippy", action="store_true", help="Run cargo clippy --workspace --all-targets -- -D warnings")
+    parser.add_argument("--all-checks", action="store_true", help="Run pattern scanner + cargo check + cargo test + cargo clippy")
 
     args = parser.parse_args()
     root = get_repo_root()
@@ -553,9 +564,8 @@ def main():
     if args.files:
         target_files = [Path(f).resolve() for f in args.files if Path(f).exists()]
     elif args.all or (ci_mode and not args.staged):
-        for ext in ("*.vue", "*.ts", "*.js", "*.css", "*.rs"):
-            target_files.extend(root.glob(f"src/**/{ext}"))
-            target_files.extend(root.glob(f"src-tauri/src/**/{ext}"))
+        for ext in ("*.rs", "*.toml"):
+            target_files.extend(root.glob(f"crates/**/{ext}"))
     elif args.staged:
         target_files = get_changed_files(root, staged_only=True)
     else: # changed
@@ -590,18 +600,14 @@ def main():
 
     # 4. Optional Tool Commands
     commands_passed = True
-    if args.lint or args.all_checks:
-        commands_passed = run_command_check("ESLint", ["npm", "run", "lint"], root) and commands_passed
+    if args.cargo_check or args.all_checks:
+        commands_passed = run_command_check("Cargo Check", ["cargo", "check", "--workspace", "--all-targets"], root) and commands_passed
 
-    if args.type_check or args.all_checks:
-        commands_passed = run_command_check("Type Check", ["npm", "run", "type-check"], root) and commands_passed
-
-    if args.test or args.all_checks:
-        commands_passed = run_command_check("Frontend Tests", ["npm", "test"], root) and commands_passed
+    if args.cargo_clippy or args.all_checks:
+        commands_passed = run_command_check("Cargo Clippy", ["cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"], root) and commands_passed
 
     if args.cargo_test or args.all_checks:
-        cargo_path = "src-tauri/Cargo.toml"
-        commands_passed = run_command_check("Rust Tests", ["cargo", "test", "--manifest-path", cargo_path], root) and commands_passed
+        commands_passed = run_command_check("Cargo Test", ["cargo", "test", "--workspace"], root) and commands_passed
 
     if not commands_passed:
         print_error("\nOne or more validation commands failed.")

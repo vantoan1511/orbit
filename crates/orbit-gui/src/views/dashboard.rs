@@ -1,0 +1,148 @@
+use iced::{
+    widget::{column, container, row, text},
+    Element, Length,
+};
+
+use crate::store::ClusterStore;
+use crate::theme::OrbitPalette;
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClusterSummary {
+    pub total_nodes: usize,
+    pub ready_nodes: usize,
+    pub total_pods: usize,
+    pub running_pods: usize,
+    pub failed_pods: usize,
+    pub total_deployments: usize,
+    pub total_services: usize,
+    pub total_namespaces: usize,
+    pub warning_events: usize,
+}
+
+pub fn compute_cluster_summary(store: &ClusterStore) -> ClusterSummary {
+    let total_nodes = store.nodes.len();
+    let ready_nodes = store
+        .nodes
+        .iter()
+        .filter(|n| n.status.eq_ignore_ascii_case("ready"))
+        .count();
+
+    let total_pods = store.pods.len();
+    let running_pods = store
+        .pods
+        .iter()
+        .filter(|p| p.status.eq_ignore_ascii_case("running"))
+        .count();
+    let failed_pods = store
+        .pods
+        .iter()
+        .filter(|p| {
+            let s = p.status.to_ascii_lowercase();
+            s.contains("fail") || s.contains("crash") || s.contains("error")
+        })
+        .count();
+
+    let total_deployments = store.deployments.len();
+    let total_services = store.services.len();
+    let total_namespaces = store.namespaces.len();
+    let warning_events = store
+        .events
+        .iter()
+        .filter(|e| e.r#type.eq_ignore_ascii_case("warning"))
+        .count();
+
+    ClusterSummary {
+        total_nodes,
+        ready_nodes,
+        total_pods,
+        running_pods,
+        failed_pods,
+        total_deployments,
+        total_services,
+        total_namespaces,
+        warning_events,
+    }
+}
+
+pub fn render_summary_card<'a, Message: 'a>(
+    title: &'static str,
+    value: String,
+    subtitle: String,
+    palette: &OrbitPalette,
+) -> Element<'a, Message> {
+    container(
+        column![
+            text(title).size(12).color(palette.text_secondary),
+            text(value).size(24).color(palette.text_primary),
+            text(subtitle).size(11).color(palette.text_muted),
+        ]
+        .spacing(4)
+        .padding(12),
+    )
+    .width(Length::FillPortion(1))
+    .into()
+}
+
+pub fn dashboard_view<'a, Message: 'a>(
+    store: &ClusterStore,
+    palette: &OrbitPalette,
+) -> Element<'a, Message> {
+    let summary = compute_cluster_summary(store);
+
+    let card_nodes = render_summary_card(
+        "NODES",
+        format!("{}/{}", summary.ready_nodes, summary.total_nodes),
+        "Ready / Total".to_string(),
+        palette,
+    );
+
+    let card_pods = render_summary_card(
+        "PODS",
+        format!("{}/{}", summary.running_pods, summary.total_pods),
+        format!("{} failed / degraded", summary.failed_pods),
+        palette,
+    );
+
+    let card_deploy = render_summary_card(
+        "DEPLOYMENTS",
+        summary.total_deployments.to_string(),
+        "Total active".to_string(),
+        palette,
+    );
+
+    let card_services = render_summary_card(
+        "SERVICES",
+        summary.total_services.to_string(),
+        "Cluster endpoints".to_string(),
+        palette,
+    );
+
+    let card_namespaces = render_summary_card(
+        "NAMESPACES",
+        summary.total_namespaces.to_string(),
+        "Configured scopes".to_string(),
+        palette,
+    );
+
+    let card_events = render_summary_card(
+        "WARNING EVENTS",
+        summary.warning_events.to_string(),
+        "Past 1 hour".to_string(),
+        palette,
+    );
+
+    let row1 = row![card_nodes, card_pods, card_deploy].spacing(16);
+    let row2 = row![card_services, card_namespaces, card_events].spacing(16);
+
+    column![
+        text("Cluster Health & Workload Overview")
+            .size(18)
+            .color(palette.text_primary),
+        row1,
+        row2,
+    ]
+    .spacing(20)
+    .padding(24)
+    .width(Length::Fill)
+    .into()
+}
