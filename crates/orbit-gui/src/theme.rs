@@ -470,30 +470,7 @@ pub fn card_container_style<'a>(
 }
 
 pub fn status_pill<'a, Message: 'a>(palette: &'a OrbitPalette, status: &str) -> Element<'a, Message> {
-    let color = palette.status_color(status);
-    let border_color = Color::from_rgba(color.r, color.g, color.b, 0.35);
-    let fill_color = Color::from_rgba(color.r, color.g, color.b, 0.12);
-
-    container(
-        row![
-            text("●").size(10).color(color),
-            text(status.to_string()).size(11).color(palette.text_primary),
-        ]
-        .spacing(4)
-        .align_y(iced::Alignment::Center)
-        .padding([2, 6]),
-    )
-    .style(move |_theme| container::Style {
-        text_color: Some(palette.text_primary),
-        background: Some(Background::Color(fill_color)),
-        border: Border {
-            color: border_color,
-            width: 1.0,
-            radius: Radius::from(10.0),
-        },
-        shadow: Shadow::default(),
-    })
-    .into()
+    crate::components::badge::status_dot_pill(status, status, crate::components::badge::BadgeSize::Small, palette)
 }
 
 pub fn status_dot_pill<'a, Message: 'a>(

@@ -1,4 +1,5 @@
 pub mod app;
+pub mod components;
 pub mod icons;
 pub mod os;
 pub mod state;

@@ -52,6 +52,8 @@ pub fn tab_content_icon(content: &TabContent) -> Icon {
         TabContent::Settings => Icon::Settings,
         TabContent::YamlEditor { .. } => Icon::FileCode,
         TabContent::LogViewer { .. } => Icon::Terminal,
+        #[cfg(debug_assertions)]
+        TabContent::Showcase => Icon::Palette,
     }
 }
 
@@ -131,5 +133,14 @@ mod tests {
         let _el: Element<'_, ()> = button_icon(Icon::Minus, 12);
         let _el: Element<'_, ()> = button_icon(Icon::Square, 12);
         let _el: Element<'_, ()> = button_icon(Icon::X, 12);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_showcase_tab_icon_mapping() {
+        assert_eq!(
+            char::from(tab_content_icon(&TabContent::Showcase)),
+            char::from(Icon::Palette)
+        );
     }
 }

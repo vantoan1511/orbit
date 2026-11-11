@@ -15,6 +15,8 @@ pub enum TabContent {
         namespace: Option<String>,
     },
     Settings,
+    #[cfg(debug_assertions)]
+    Showcase,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -142,5 +144,29 @@ mod tests {
         mgr.close_tab("tab-pods");
         assert_eq!(mgr.tabs.len(), 0);
         assert_eq!(mgr.active_tab_id, None);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_showcase_tab_open_deduplication() {
+        let mut mgr = TabManager::new();
+        let tab = WorkspaceTab {
+            id: "tab-showcase".to_string(),
+            title: "UI Showcase".to_string(),
+            content: TabContent::Showcase,
+        };
+        mgr.open_tab(tab.clone());
+        assert_eq!(mgr.tabs.len(), 1);
+        assert_eq!(mgr.active_tab_id.as_deref(), Some("tab-showcase"));
+
+        // Opening duplicate focuses existing
+        let tab2 = WorkspaceTab {
+            id: "tab-showcase-2".to_string(),
+            title: "UI Showcase".to_string(),
+            content: TabContent::Showcase,
+        };
+        mgr.open_tab(tab2);
+        assert_eq!(mgr.tabs.len(), 1);
+        assert_eq!(mgr.active_tab_id.as_deref(), Some("tab-showcase"));
     }
 }

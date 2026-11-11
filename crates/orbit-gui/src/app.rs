@@ -74,6 +74,8 @@ pub enum Message {
     UpdateSetting(String, serde_json::Value),
     UpdateShellInput(String),
     ResetSettingsToDefaults,
+    #[cfg(debug_assertions)]
+    ShowcaseMessage(crate::views::showcase::ShowcaseMessage),
 }
 
 pub struct OrbitApp {
@@ -93,6 +95,8 @@ pub struct OrbitApp {
     pub cluster_filter: String,
     pub selected_cluster_tag: Option<String>,
     pub last_titlebar_click: Option<std::time::Instant>,
+    #[cfg(debug_assertions)]
+    pub showcase_state: crate::views::showcase::ShowcaseState,
 }
 
 impl Default for OrbitApp {
@@ -127,6 +131,8 @@ impl OrbitApp {
             cluster_filter: String::new(),
             selected_cluster_tag: None,
             last_titlebar_click: None,
+            #[cfg(debug_assertions)]
+            showcase_state: crate::views::showcase::ShowcaseState::default(),
         }
     }
 
@@ -263,6 +269,8 @@ impl OrbitApp {
             ("ConfigMaps", "Config > ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
             ("Secrets", "Config > Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
             ("Settings", "App preferences & configuration", TabContent::Settings),
+            #[cfg(debug_assertions)]
+            ("UI Showcase", "Component library & design playground (Dev)", TabContent::Showcase),
         ];
 
         for (title, sub, content) in nav_targets {
@@ -547,6 +555,10 @@ impl OrbitApp {
                 self.settings_state.feedback_message =
                     Some("Default settings restored".to_string());
             }
+            #[cfg(debug_assertions)]
+            Message::ShowcaseMessage(msg) => {
+                self.showcase_state.update(msg);
+            }
         }
         Task::none()
     }
@@ -800,6 +812,13 @@ impl OrbitApp {
                     Message::UpdateSetting,
                     Message::UpdateShellInput,
                     Message::ResetSettingsToDefaults,
+                ),
+                #[cfg(debug_assertions)]
+                Some(TabContent::Showcase) => crate::views::showcase::showcase_view(
+                    &self.showcase_state,
+                    &self.palette,
+                    Message::ShowcaseMessage,
+                    Message::ToggleTheme,
                 ),
                 _ => container(Self::empty_state_view(&self.palette))
                     .width(Length::Fill)
@@ -1409,5 +1428,26 @@ mod tests {
             app.settings_state.feedback_message,
             Some("Default settings restored".to_string())
         );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_showcase_tab_opens_and_renders_in_app() {
+        let mut app = OrbitApp::new();
+        let _ = app.update(Message::OpenTab(WorkspaceTab {
+            id: "tab-showcase".to_string(),
+            title: "UI Showcase".to_string(),
+            content: TabContent::Showcase,
+        }));
+        assert_eq!(app.tab_manager.active_tab_id.as_deref(), Some("tab-showcase"));
+        {
+            let _view = app.view();
+        }
+
+        assert_eq!(app.showcase_state.sample_counter, 5);
+        let _ = app.update(Message::ShowcaseMessage(
+            crate::views::showcase::ShowcaseMessage::IncrementCounter,
+        ));
+        assert_eq!(app.showcase_state.sample_counter, 6);
     }
 }

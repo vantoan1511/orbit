@@ -2,14 +2,18 @@ use std::collections::HashMap;
 use std::fmt;
 use iced::{
     widget::{
-        button, column, container, horizontal_space, pick_list, row, scrollable, text,
+        column, container, horizontal_space, pick_list, row, scrollable, text,
         text_input, toggler,
     },
     Element, Length,
 };
+use crate::components::{
+    button::ghost_button,
+    card::section_card,
+    form_row::form_row,
+};
 use crate::theme::{
-    card_container_style, divider_style, ghost_action_button_style, pick_list_style,
-    text_input_style, toggler_style, OrbitPalette,
+    pick_list_style, text_input_style, toggler_style, OrbitPalette,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,62 +186,6 @@ pub fn update_notification_pref(
     serde_json::Value::Object(map)
 }
 
-fn setting_row<'a, Message: 'a + Clone>(
-    label: &'a str,
-    description: &'a str,
-    control: Element<'a, Message>,
-    palette: &'a OrbitPalette,
-) -> Element<'a, Message> {
-    let text_col = column![
-        text(label).size(13).color(palette.text_primary),
-        text(description).size(11).color(palette.text_muted),
-    ]
-    .spacing(2)
-    .width(Length::FillPortion(3));
-
-    let control_col = container(control)
-        .width(Length::FillPortion(2))
-        .align_x(iced::alignment::Horizontal::Right);
-
-    row![text_col, control_col]
-        .spacing(12)
-        .align_y(iced::Alignment::Center)
-        .padding([10, 0])
-        .into()
-}
-
-fn setting_divider<'a, Message: 'a>(palette: &'a OrbitPalette) -> Element<'a, Message> {
-    container(column![])
-        .style(divider_style(palette))
-        .width(Length::Fill)
-        .height(Length::Fixed(1.0))
-        .into()
-}
-
-fn settings_card<'a, Message: 'a + Clone>(
-    title: &'a str,
-    subtitle: &'a str,
-    rows: Vec<Element<'a, Message>>,
-    palette: &'a OrbitPalette,
-) -> Element<'a, Message> {
-    let header = column![
-        text(title).size(14).color(palette.text_primary),
-        text(subtitle).size(12).color(palette.text_secondary),
-    ]
-    .spacing(2);
-
-    let mut content = column![header].spacing(4);
-    for row_el in rows {
-        content = content.push(setting_divider(palette)).push(row_el);
-    }
-
-    container(content)
-        .style(card_container_style(palette))
-        .padding(16)
-        .width(Length::Fill)
-        .into()
-}
-
 pub fn settings_view<'a, Message: 'a + Clone>(
     values: &'a HashMap<String, serde_json::Value>,
     state: &'a SettingsViewState,
@@ -269,17 +217,17 @@ pub fn settings_view<'a, Message: 'a + Clone>(
     .padding([4, 8])
     .width(Length::Fixed(140.0));
 
-    let card_appearance = settings_card(
+    let card_appearance = section_card(
         "Appearance & Theme",
         "Customize interface theme and primary accent colors",
         vec![
-            setting_row(
+            form_row(
                 "Theme Mode",
                 "Choose between Dark, Light, or System appearance",
                 theme_picker.into(),
                 palette,
             ),
-            setting_row(
+            form_row(
                 "Accent Color",
                 "Select highlight color for tabs, active indicators, and focus outlines",
                 accent_picker.into(),
@@ -308,23 +256,23 @@ pub fn settings_view<'a, Message: 'a + Clone>(
         .style(toggler_style(palette))
         .size(18);
 
-    let card_system = settings_card(
+    let card_system = section_card(
         "System & Window Behavior",
         "Configure startup, window closing, and update checks",
         vec![
-            setting_row(
+            form_row(
                 "Launch on Startup",
                 "Automatically start Orbit minimized to the system tray when logging in",
                 launch_tog.into(),
                 palette,
             ),
-            setting_row(
+            form_row(
                 "Close to System Tray",
                 "Keep Orbit running in the background tray when window is closed",
                 tray_tog.into(),
                 palette,
             ),
-            setting_row(
+            form_row(
                 "Automatically Check for Updates",
                 "Periodically query for new releases and security patches",
                 updates_tog.into(),
@@ -365,17 +313,17 @@ pub fn settings_view<'a, Message: 'a + Clone>(
         .padding([6, 8])
         .width(Length::Fixed(220.0));
 
-    let card_workloads = settings_card(
+    let card_workloads = section_card(
         "Workloads & Cluster",
         "Manage application logging capacity and default shell preferences",
         vec![
-            setting_row(
+            form_row(
                 "Log Retention Limit",
                 "Maximum number of rotating log files retained per session",
                 retention_picker.into(),
                 palette,
             ),
-            setting_row(
+            form_row(
                 "Default Terminal Shell",
                 "Custom executable path for container exec and terminal sessions",
                 shell_input.into(),
@@ -421,23 +369,23 @@ pub fn settings_view<'a, Message: 'a + Clone>(
         .style(toggler_style(palette))
         .size(18);
 
-    let card_notifications = settings_card(
+    let card_notifications = section_card(
         "Notifications",
         "Configure toast alerts and event notification popups",
         vec![
-            setting_row(
+            form_row(
                 "Enable Toast Popups",
                 "Display non-intrusive notification bubbles in the bottom-right corner",
                 toasts_tog.into(),
                 palette,
             ),
-            setting_row(
+            form_row(
                 "Notify on Errors & Crashes",
                 "Surface alerts when pod crashes or cluster connection failures occur",
                 errors_tog.into(),
                 palette,
             ),
-            setting_row(
+            form_row(
                 "Notify on Updates",
                 "Surface banner notifications when a new version of Orbit is discovered",
                 updates_notif_tog.into(),
@@ -460,10 +408,7 @@ pub fn settings_view<'a, Message: 'a + Clone>(
         row![].into()
     };
 
-    let reset_btn = button(text("Reset to Defaults").size(12))
-        .style(ghost_action_button_style(palette))
-        .padding([6, 12])
-        .on_press(on_reset);
+    let reset_btn = ghost_button("Reset to Defaults", Some(on_reset), palette);
 
     let footer = row![feedback_el, horizontal_space(), reset_btn]
         .align_y(iced::Alignment::Center)

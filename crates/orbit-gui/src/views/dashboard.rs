@@ -1,9 +1,9 @@
 use iced::{
-    widget::{column, container, row, text},
-    Color, Element, Length,
+    widget::{column, row, text},
+    Element, Length,
 };
 
-use crate::icons::{icon, Icon};
+use crate::icons::Icon;
 use crate::store::ClusterStore;
 use crate::theme::OrbitPalette;
 
@@ -72,34 +72,7 @@ pub fn render_summary_card<'a, Message: 'a>(
     watermark_icon: Option<Icon>,
     palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
-    let text_col = column![
-        text(title).size(12).color(palette.text_secondary),
-        text(value).size(24).color(palette.text_primary),
-        text(subtitle).size(11).color(palette.text_muted),
-    ]
-    .spacing(4)
-    .width(Length::Fill);
-
-    let card_content = if let Some(ic) = watermark_icon {
-        let watermark_color = Color::from_rgba(
-            palette.text_primary.r,
-            palette.text_primary.g,
-            palette.text_primary.b,
-            0.18,
-        );
-        let icon_el = icon(ic, 24, watermark_color);
-        row![text_col, icon_el]
-            .spacing(8)
-            .align_y(iced::Alignment::Start)
-    } else {
-        row![text_col]
-    };
-
-    container(card_content)
-        .padding(14)
-        .width(Length::FillPortion(1))
-        .style(crate::theme::card_container_style(palette))
-        .into()
+    crate::components::card::metric_card(title, value, subtitle, watermark_icon, palette)
 }
 
 pub fn dashboard_view<'a, Message: 'a>(

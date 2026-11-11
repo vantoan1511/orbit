@@ -235,6 +235,24 @@ pub fn activity_bar_view<'a>(
 
     cat_col = cat_col.push(vertical_space());
 
+    #[cfg(debug_assertions)]
+    {
+        let showcase_btn = button(
+            container(icon(Icon::Palette, 16, palette.accent))
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
+        )
+        .style(activity_bar_item_style(palette, false))
+        .width(Length::Fixed(36.0))
+        .height(Length::Fixed(36.0))
+        .on_press(Message::OpenTab(WorkspaceTab {
+            id: "tab-showcase".to_string(),
+            title: "UI Showcase".to_string(),
+            content: TabContent::Showcase,
+        }));
+        cat_col = cat_col.push(showcase_btn);
+    }
+
     // Utility buttons
     let settings_btn = button(
         container(icon(Icon::Settings, 16, palette.text_secondary))
