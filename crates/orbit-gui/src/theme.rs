@@ -148,24 +148,34 @@ pub fn tab_button_style<'a>(
     move |_theme, status| {
         let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
         let bg = if is_active {
-            Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23)))
+            if palette.is_dark {
+                Some(Background::Color(Color::from_rgb8(0x27, 0x27, 0x2a)))
+            } else {
+                Some(Background::Color(Color::from_rgb8(0xe4, 0xe4, 0xe7)))
+            }
         } else if is_hovered {
             Some(Background::Color(palette.bg_hover))
         } else {
             None
         };
-        let text_color = if is_active {
+        let text_color = if is_active || is_hovered {
             palette.text_primary
-        } else if is_hovered {
-            palette.text_secondary
         } else {
             palette.text_muted
         };
         let border = if is_active {
-            Border {
-                color: palette.accent,
-                width: 2.0,
-                radius: Radius::from(4.0),
+            if palette.is_dark {
+                Border {
+                    color: palette.accent,
+                    width: 2.0,
+                    radius: Radius::from(4.0),
+                }
+            } else {
+                Border {
+                    color: palette.border,
+                    width: 1.0,
+                    radius: Radius::from(4.0),
+                }
             }
         } else {
             Border::default()
@@ -174,6 +184,51 @@ pub fn tab_button_style<'a>(
             background: bg,
             text_color,
             border,
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn titlebar_container_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        background: Some(Background::Color(palette.bg_sidebar)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::default(),
+        },
+        text_color: Some(palette.text_primary),
+        ..Default::default()
+    }
+}
+
+pub fn window_control_button_style<'a>(
+    palette: &'a OrbitPalette,
+    is_close: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let (bg, text_color) = if is_hovered {
+            if is_close {
+                (
+                    Some(Background::Color(Color::from_rgb8(0xe8, 0x11, 0x23))),
+                    Color::WHITE,
+                )
+            } else {
+                (
+                    Some(Background::Color(palette.bg_hover)),
+                    palette.text_primary,
+                )
+            }
+        } else {
+            (None, palette.text_secondary)
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border: Border::default(),
             shadow: Shadow::default(),
         }
     }
@@ -856,7 +911,7 @@ mod tests {
         assert_eq!(tab_active.border.color, dark.accent);
         assert_eq!(tab_active.border.width, 2.0);
         assert_eq!(tab_active.text_color, dark.text_primary);
-        assert_eq!(tab_active.background, Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23))));
+        assert_eq!(tab_active.background, Some(Background::Color(Color::from_rgb8(0x27, 0x27, 0x2a))));
 
         let tab_inactive = tab_button_style(&dark, false)(&iced::Theme::Dark, iced::widget::button::Status::Active);
         assert_eq!(tab_inactive.text_color, dark.text_muted);
@@ -912,5 +967,53 @@ mod tests {
             let color = resource_kind_color(kind);
             assert_eq!(color.a, 1.0, "Resource color for {:?} must be opaque", kind);
         }
+    }
+
+    #[test]
+    fn test_adaptive_tab_button_style_light_and_dark() {
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        let dark_active = tab_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(dark_active.background, Some(Background::Color(Color::from_rgb8(0x27, 0x27, 0x2a))));
+        assert_eq!(dark_active.text_color, dark.text_primary);
+        assert_eq!(dark_active.border.color, dark.accent);
+        assert_eq!(dark_active.border.width, 2.0);
+
+        let light_active = tab_button_style(&light, true)(&iced::Theme::Light, iced::widget::button::Status::Active);
+        assert_eq!(light_active.background, Some(Background::Color(Color::from_rgb8(0xe4, 0xe4, 0xe7))));
+        assert_eq!(light_active.text_color, light.text_primary);
+        assert_eq!(light_active.border.color, light.border);
+        assert_eq!(light_active.border.width, 1.0);
+
+        let light_inactive = tab_button_style(&light, false)(&iced::Theme::Light, iced::widget::button::Status::Active);
+        assert!(light_inactive.background.is_none());
+        assert_eq!(light_inactive.text_color, light.text_muted);
+
+        let light_hovered = tab_button_style(&light, false)(&iced::Theme::Light, iced::widget::button::Status::Hovered);
+        assert_eq!(light_hovered.background, Some(Background::Color(light.bg_hover)));
+        assert_eq!(light_hovered.text_color, light.text_primary);
+    }
+
+    #[test]
+    fn test_titlebar_and_window_control_styles() {
+        let dark = OrbitPalette::dark();
+        let titlebar = titlebar_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(titlebar.background, Some(Background::Color(dark.bg_sidebar)));
+        assert_eq!(titlebar.border.color, dark.border);
+        assert_eq!(titlebar.border.width, 1.0);
+        assert_eq!(titlebar.text_color, Some(dark.text_primary));
+
+        let min_normal = window_control_button_style(&dark, false)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert!(min_normal.background.is_none());
+        assert_eq!(min_normal.text_color, dark.text_secondary);
+
+        let min_hover = window_control_button_style(&dark, false)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
+        assert_eq!(min_hover.background, Some(Background::Color(dark.bg_hover)));
+        assert_eq!(min_hover.text_color, dark.text_primary);
+
+        let close_hover = window_control_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
+        assert_eq!(close_hover.background, Some(Background::Color(Color::from_rgb8(0xe8, 0x11, 0x23))));
+        assert_eq!(close_hover.text_color, Color::WHITE);
     }
 }

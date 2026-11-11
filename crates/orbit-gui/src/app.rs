@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use iced::{
-    widget::{button, column, container, horizontal_space, pick_list, row, text},
+    widget::{button, column, container, horizontal_space, mouse_area, pick_list, row, text},
     Element, Length, Subscription, Task,
 };
 
@@ -15,7 +15,7 @@ use crate::theme::{
     action_button_style, empty_state_container_style, header_badge_style,
     header_container_style, pick_list_style, search_pill_style, status_dot_pill,
     tab_button_style, tab_close_button_style, tab_plus_button_style, tab_strip_container_style,
-    OrbitPalette,
+    titlebar_container_style, window_control_button_style, OrbitPalette,
 };
 use crate::views::dashboard::dashboard_view;
 use crate::views::details_drawer::{details_drawer_view, ResourceAction, SelectedResourceDetails};
@@ -28,6 +28,7 @@ use crate::views::resource_table::resource_table_view;
 use crate::views::settings::settings_view;
 
 pub const ALL_NAMESPACES_LABEL: &str = "All Namespaces";
+pub const DOUBLE_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(300);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClusterConnectionStatus {
@@ -66,6 +67,10 @@ pub enum Message {
     ClusterFilterChanged(String),
     SelectClusterTag(Option<String>),
     OpenNewTabAction,
+    WindowMinimize,
+    WindowToggleMaximize,
+    WindowClose,
+    TitlebarPressed,
 }
 
 pub struct OrbitApp {
@@ -83,6 +88,7 @@ pub struct OrbitApp {
     pub active_category: Option<SidebarCategory>,
     pub cluster_filter: String,
     pub selected_cluster_tag: Option<String>,
+    pub last_titlebar_click: Option<std::time::Instant>,
 }
 
 impl Default for OrbitApp {
@@ -115,6 +121,7 @@ impl OrbitApp {
             active_category: Some(SidebarCategory::Workloads),
             cluster_filter: String::new(),
             selected_cluster_tag: None,
+            last_titlebar_click: None,
         }
     }
 
@@ -451,8 +458,84 @@ impl OrbitApp {
                     selected_index: 0,
                 };
             }
+            Message::TitlebarPressed => {
+                let now = std::time::Instant::now();
+                if self.last_titlebar_click.is_some_and(|last| {
+                    now.duration_since(last) < DOUBLE_CLICK_TIMEOUT
+                }) {
+                    self.last_titlebar_click = None;
+                    return iced::window::get_latest().and_then(iced::window::toggle_maximize);
+                } else {
+                    self.last_titlebar_click = Some(now);
+                    return iced::window::get_latest().and_then(iced::window::drag);
+                }
+            }
+            Message::WindowMinimize => {
+                return iced::window::get_latest().and_then(|id| iced::window::minimize(id, true));
+            }
+            Message::WindowToggleMaximize => {
+                return iced::window::get_latest().and_then(iced::window::toggle_maximize);
+            }
+            Message::WindowClose => {
+                return iced::window::get_latest().and_then(iced::window::close);
+            }
         }
         Task::none()
+    }
+
+    pub fn titlebar_view(&self) -> Element<'_, Message> {
+        let logo_and_title = row![
+            icon(Icon::Boxes, 14, self.palette.accent),
+            text("Orbit")
+                .size(12)
+                .font(iced::Font {
+                    weight: iced::font::Weight::Semibold,
+                    ..Default::default()
+                })
+                .color(self.palette.text_primary),
+        ]
+        .spacing(6)
+        .padding([0, 10])
+        .align_y(iced::Alignment::Center);
+
+        let drag_area = mouse_area(
+            container(horizontal_space())
+                .width(Length::Fill)
+                .height(Length::Fill),
+        )
+        .on_press(Message::TitlebarPressed);
+
+        let window_btn = |glyph: &'static str, size: u16, width: f32, is_close: bool, msg: Message| {
+            button(
+                container(text(glyph).size(size))
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill),
+            )
+            .width(Length::Fixed(width))
+            .height(Length::Fixed(32.0))
+            .padding(0)
+            .style(window_control_button_style(&self.palette, is_close))
+            .on_press(msg)
+        };
+
+        let controls = row![
+            window_btn("—", 11, 36.0, false, Message::WindowMinimize),
+            window_btn("□", 12, 36.0, false, Message::WindowToggleMaximize),
+            window_btn("✕", 11, 40.0, true, Message::WindowClose),
+        ]
+        .spacing(0)
+        .align_y(iced::Alignment::Center);
+
+        container(
+            row![logo_and_title, drag_area, controls]
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_y(iced::Alignment::Center),
+        )
+        .width(Length::Fill)
+        .height(Length::Fixed(32.0))
+        .style(titlebar_container_style(&self.palette))
+        .into()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
@@ -706,9 +789,14 @@ impl OrbitApp {
         .height(Length::Fill);
 
         let full_layout = container(
-            row![activity_bar, sub_sidebar, main_panel]
-                .width(Length::Fill)
-                .height(Length::Fill),
+            column![
+                self.titlebar_view(),
+                row![activity_bar, sub_sidebar, main_panel]
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+            ]
+            .width(Length::Fill)
+            .height(Length::Fill),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -1133,5 +1221,38 @@ mod tests {
 
         // Verify view renders empty state without panic
         let _view = app.view();
+    }
+
+    #[test]
+    fn test_window_control_messages_and_double_click_detection() {
+        let mut app = OrbitApp::new();
+        assert!(app.last_titlebar_click.is_none());
+
+        // First click -> records timestamp
+        let _ = app.update(Message::TitlebarPressed);
+        assert!(app.last_titlebar_click.is_some());
+
+        // Second rapid click -> detects double-click and resets
+        let _ = app.update(Message::TitlebarPressed);
+        assert!(app.last_titlebar_click.is_none());
+
+        // Window control messages execute without panic
+        let _ = app.update(Message::WindowMinimize);
+        let _ = app.update(Message::WindowToggleMaximize);
+        let _ = app.update(Message::WindowClose);
+    }
+
+    #[test]
+    fn test_view_renders_titlebar_and_window_controls() {
+        let mut app = OrbitApp::new();
+        {
+            let _dark_view = app.view();
+        }
+
+        let _ = app.update(Message::ToggleTheme);
+        assert!(!app.palette.is_dark);
+        {
+            let _light_view = app.view();
+        }
     }
 }

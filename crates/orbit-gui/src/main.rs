@@ -10,6 +10,8 @@ fn main() -> iced::Result {
         .window(iced::window::Settings {
             size: iced::Size::new(1280.0, 800.0),
             visible: !hidden,
+            decorations: false,
+            transparent: true,
             ..Default::default()
         })
         .run()
