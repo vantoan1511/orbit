@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use iced::{
-    widget::{button, column, container, horizontal_space, pick_list, row, text, vertical_space},
+    widget::{button, column, container, horizontal_space, pick_list, row, text},
     Element, Length, Subscription, Task,
 };
 
@@ -12,13 +12,18 @@ use crate::icons::{icon, tab_content_icon, Icon};
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
 use crate::theme::{
-    action_button_style, header_container_style, pick_list_style, search_pill_style,
-    sidebar_container_style, sidebar_nav_button_style, status_dot_pill, tab_button_style,
-    tab_close_button_style, OrbitPalette,
+    action_button_style, empty_state_container_style, header_badge_style,
+    header_container_style, pick_list_style, search_pill_style, status_dot_pill,
+    tab_button_style, tab_close_button_style, tab_plus_button_style, tab_strip_container_style,
+    OrbitPalette,
 };
 use crate::views::dashboard::dashboard_view;
 use crate::views::details_drawer::{details_drawer_view, ResourceAction, SelectedResourceDetails};
 use crate::views::modals::{modal_view, ActiveModal, SearchResultItem, SearchResultKind};
+use crate::views::navigation::{
+    activity_bar_view, get_cluster_display_name, is_local_cluster, sub_sidebar_view,
+    SidebarCategory,
+};
 use crate::views::resource_table::resource_table_view;
 use crate::views::settings::settings_view;
 
@@ -57,6 +62,10 @@ pub enum Message {
     ToggleTheme,
     SearchEverywhereQueryChanged(String),
     SearchEverywhereSelect(usize),
+    ToggleCategory(SidebarCategory),
+    ClusterFilterChanged(String),
+    SelectClusterTag(Option<String>),
+    OpenNewTabAction,
 }
 
 pub struct OrbitApp {
@@ -71,6 +80,9 @@ pub struct OrbitApp {
     pub settings: HashMap<String, serde_json::Value>,
     pub ui_state: UiStateStore,
     pub selected_resource: Option<SelectedResourceDetails>,
+    pub active_category: Option<SidebarCategory>,
+    pub cluster_filter: String,
+    pub selected_cluster_tag: Option<String>,
 }
 
 impl Default for OrbitApp {
@@ -100,7 +112,65 @@ impl OrbitApp {
             settings: HashMap::new(),
             ui_state: UiStateStore::default(),
             selected_resource: None,
+            active_category: Some(SidebarCategory::Workloads),
+            cluster_filter: String::new(),
+            selected_cluster_tag: None,
         }
+    }
+
+    pub fn k8s_version_label(&self) -> String {
+        if let Some(node) = self.cluster_store.nodes.first()
+            && !node.version.is_empty()
+        {
+            return format!("K8S {}", node.version);
+        }
+        "K8S —".to_string()
+    }
+
+    pub fn active_cluster_is_local(&self) -> bool {
+        if let Some(active_id) = &self.cluster_store.active_cluster_id
+            && let Some(cluster) = self.cluster_store.clusters.iter().find(|c| &c.id == active_id)
+        {
+            return is_local_cluster(cluster);
+        }
+        false
+    }
+
+    pub fn active_cluster_display_name(&self) -> &str {
+        if let Some(active_id) = &self.cluster_store.active_cluster_id
+            && let Some(cluster) = self.cluster_store.clusters.iter().find(|c| &c.id == active_id)
+        {
+            return get_cluster_display_name(cluster);
+        }
+        "No Cluster"
+    }
+
+    pub fn empty_state_view<'a>(palette: &'a OrbitPalette) -> Element<'a, Message> {
+        let icon_el = icon(Icon::Boxes, 36, palette.text_secondary);
+        let title = text("No Open Tabs").size(18).color(palette.text_primary);
+        let desc = text("Select a resource from the sidebar or open a new tab to start inspecting your cluster.")
+            .size(13)
+            .color(palette.text_secondary);
+        let action_btn = button(
+            row![
+                icon(Icon::Plus, 14, palette.text_primary),
+                text("Open New Tab").size(13).color(palette.text_primary),
+            ]
+            .spacing(6)
+            .align_y(iced::Alignment::Center)
+            .padding([8, 14]),
+        )
+        .style(action_button_style(palette, false))
+        .on_press(Message::OpenNewTabAction);
+
+        let content = column![icon_el, title, desc, action_btn]
+            .spacing(16)
+            .align_x(iced::Alignment::Center)
+            .padding(32);
+
+        container(content)
+            .style(empty_state_container_style(palette))
+            .into()
     }
 
     /// Returns selectable cluster context IDs/names from `self.cluster_store.clusters`.
@@ -185,12 +255,17 @@ impl OrbitApp {
 
         for (title, sub, content) in nav_targets {
             if title.to_lowercase().contains(&q) || sub.to_lowercase().contains(&q) {
+                let tab_id = if content == TabContent::Dashboard {
+                    "tab-overview".to_string()
+                } else {
+                    format!("tab-{}", title.to_lowercase())
+                };
                 results.push(SearchResultItem {
                     title: title.to_string(),
                     subtitle: sub.to_string(),
                     kind: SearchResultKind::Navigation,
                     target_tab: Some(WorkspaceTab {
-                        id: format!("nav-{}", title.to_lowercase()),
+                        id: tab_id,
                         title: title.to_string(),
                         content,
                     }),
@@ -353,119 +428,157 @@ impl OrbitApp {
                 }
                 self.active_modal = ActiveModal::None;
             }
+            Message::ToggleCategory(cat) => {
+                if self.active_category == Some(cat) {
+                    self.active_category = None;
+                } else {
+                    self.active_category = Some(cat);
+                }
+            }
+            Message::ClusterFilterChanged(query) => {
+                self.cluster_filter = query;
+            }
+            Message::SelectClusterTag(tag) => {
+                if self.selected_cluster_tag == tag {
+                    self.selected_cluster_tag = None;
+                } else {
+                    self.selected_cluster_tag = tag;
+                }
+            }
+            Message::OpenNewTabAction => {
+                self.active_modal = ActiveModal::SearchEverywhere {
+                    query: String::new(),
+                    selected_index: 0,
+                };
+            }
         }
         Task::none()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        // 1. Sidebar Navigation
-        let active_content = self.tab_manager.active_tab().map(|t| &t.content);
+        // 1. Dual-Rail Activity Bar & Collapsible Sub-Sidebar
+        let activity_bar = activity_bar_view(&self.palette, self.active_category);
 
-        let mut nav_col = column![
-            row![
-                text("ORBIT").size(18).color(self.palette.text_primary),
-                horizontal_space(),
-            ]
-            .padding([4, 6]),
-        ]
-        .spacing(6);
-
-        let nav_items = [
-            ("Overview", TabContent::Dashboard),
-            ("Pods", TabContent::ResourceTable(ResourceKind::Pod)),
-            ("Deployments", TabContent::ResourceTable(ResourceKind::Deployment)),
-            ("Nodes", TabContent::ResourceTable(ResourceKind::Node)),
-            ("Services", TabContent::ResourceTable(ResourceKind::Service)),
-            ("ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
-            ("Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
-            ("Settings", TabContent::Settings),
-        ];
-
-        for (label, content) in nav_items {
-            let is_active = active_content == Some(&content);
-            let tab = WorkspaceTab {
-                id: format!("nav-{}", label.to_lowercase().replace(' ', "-")),
-                title: label.to_string(),
-                content: content.clone(),
-            };
-
-            let on_press_msg = if let Some(existing) = self.tab_manager.tabs.iter().find(|t| t.content == content) {
-                Message::SelectTab(existing.id.clone())
-            } else {
-                Message::OpenTab(tab)
-            };
-
-            let item_icon = tab_content_icon(&content);
-            let icon_color = if is_active {
-                self.palette.text_primary
-            } else {
-                self.palette.text_secondary
-            };
-
-            let nav_btn = button(
-                row![
-                    icon(item_icon, 16, icon_color),
-                    text(label).size(13).color(icon_color),
-                ]
-                .spacing(8)
-                .align_y(iced::Alignment::Center),
+        let sub_sidebar: Element<'_, Message> = if let Some(cat) = self.active_category {
+            sub_sidebar_view(
+                &self.palette,
+                cat,
+                &self.cluster_store.clusters,
+                self.cluster_store.active_cluster_id.as_deref(),
+                &self.cluster_filter,
+                self.selected_cluster_tag.as_deref(),
+                self.tab_manager.active_tab().map(|t| &t.content),
             )
-            .on_press(on_press_msg)
-            .width(Length::Fill)
-            .padding([8, 12])
-            .style(sidebar_nav_button_style(&self.palette, is_active));
+        } else {
+            horizontal_space().width(Length::Fixed(0.0)).into()
+        };
 
-            nav_col = nav_col.push(nav_btn);
-        }
-
-        let active_cluster_label = self
-            .cluster_store
-            .active_cluster_id
-            .as_deref()
-            .unwrap_or("No Cluster");
+        // 2. Desktop Top Header
         let (is_conn, is_load) = match self.cluster_connection_status() {
             ClusterConnectionStatus::Connected(_) => (true, false),
             ClusterConnectionStatus::Loading => (false, true),
             ClusterConnectionStatus::Disconnected => (false, false),
         };
-        let connection_pill = status_dot_pill(&self.palette, is_conn, is_load, active_cluster_label);
+        let connection_pill = status_dot_pill(
+            &self.palette,
+            is_conn,
+            is_load,
+            if is_conn {
+                "Connected"
+            } else if is_load {
+                "Connecting..."
+            } else {
+                "Disconnected"
+            },
+        );
 
-        let (theme_icon, theme_label) = if self.palette.is_dark {
-            (Icon::Moon, "Dark")
-        } else {
-            (Icon::Sun, "Light")
-        };
+        let cluster_name = text(self.active_cluster_display_name())
+            .size(12)
+            .color(self.palette.text_primary);
 
-        let sidebar = container(
-            column![
-                nav_col,
-                vertical_space(),
-                column![
-                    connection_pill,
-                    button(
-                        row![
-                            icon(theme_icon, 14, self.palette.text_secondary),
-                            text(theme_label).size(12).color(self.palette.text_secondary),
-                        ]
-                        .spacing(6)
-                        .align_y(iced::Alignment::Center),
-                    )
-                    .on_press(Message::ToggleTheme)
-                    .width(Length::Fill)
-                    .padding([6, 8])
-                    .style(action_button_style(&self.palette, false)),
-                ]
-                .spacing(8),
+        let divider = text("|").size(12).color(self.palette.border);
+
+        let version_badge = container(
+            row![
+                icon(Icon::Cpu, 11, self.palette.text_secondary),
+                text(self.k8s_version_label())
+                    .size(11)
+                    .color(self.palette.text_secondary),
             ]
-            .spacing(12)
-            .padding(10)
-            .height(Length::Fill),
+            .spacing(4)
+            .align_y(iced::Alignment::Center)
+            .padding([2, 6]),
         )
-        .width(Length::Fixed(190.0))
-        .height(Length::Fill)
-        .style(sidebar_container_style(&self.palette));
+        .style(header_badge_style(&self.palette));
 
-        // 2. Document Tab Bar
+        let mut left_badges = row![
+            connection_pill,
+            cluster_name,
+            divider,
+            version_badge,
+        ]
+        .spacing(8)
+        .align_y(iced::Alignment::Center);
+
+        if self.cluster_store.active_cluster_id.is_some() {
+            let is_local = self.active_cluster_is_local();
+            let local_pill = container(
+                text(if is_local { "Local" } else { "Remote" })
+                    .size(10)
+                    .color(if is_local {
+                        self.palette.info
+                    } else {
+                        self.palette.accent
+                    }),
+            )
+            .padding([2, 6])
+            .style(header_badge_style(&self.palette));
+
+            left_badges = left_badges.push(local_pill);
+        }
+
+        let search_pill = button(
+            row![
+                icon(Icon::Search, 12, self.palette.text_secondary),
+                text("Search everywhere... (Ctrl+K)")
+                    .size(12)
+                    .color(self.palette.text_secondary),
+            ]
+            .spacing(8)
+            .align_y(iced::Alignment::Center),
+        )
+        .style(search_pill_style(&self.palette))
+        .padding([4, 16])
+        .on_press(Message::OpenModal(ActiveModal::SearchEverywhere {
+            query: String::new(),
+            selected_index: 0,
+        }));
+
+        let namespace_selector = pick_list(
+            self.namespace_options(),
+            Some(self.selected_namespace_label()),
+            |ns| Message::SelectNamespace(Some(ns)),
+        )
+        .style(pick_list_style(&self.palette))
+        .padding([4, 8]);
+
+        let desktop_header_row = row![
+            left_badges,
+            horizontal_space(),
+            search_pill,
+            horizontal_space(),
+            namespace_selector,
+        ]
+        .spacing(12)
+        .padding([6, 12])
+        .align_y(iced::Alignment::Center)
+        .width(Length::Fill);
+
+        let desktop_header = container(desktop_header_row)
+            .width(Length::Fill)
+            .style(header_container_style(&self.palette));
+
+        // 3. Document Tab Bar Strip
         let mut tabs_row = row![].spacing(4).padding(2).align_y(iced::Alignment::Center);
         for tab in &self.tab_manager.tabs {
             let is_active = self.tab_manager.active_tab_id.as_deref() == Some(&tab.id);
@@ -496,84 +609,49 @@ impl OrbitApp {
             tabs_row = tabs_row.push(tab_btn);
         }
 
-        // Top bar status & pickers
-        let status_indicator = match self.cluster_connection_status() {
-            ClusterConnectionStatus::Loading => {
-                status_dot_pill(&self.palette, false, true, "Connecting...")
-            }
-            ClusterConnectionStatus::Connected(_) => {
-                status_dot_pill(&self.palette, true, false, "Connected")
-            }
-            ClusterConnectionStatus::Disconnected => {
-                status_dot_pill(&self.palette, false, false, "Disconnected")
-            }
-        };
-
-        let cluster_selector = pick_list(
-            self.cluster_options(),
-            self.cluster_store.active_cluster_id.clone(),
-            |c| Message::SelectCluster(Some(c)),
+        let plus_tab_btn = button(
+            container(icon(Icon::Plus, 12, self.palette.text_secondary))
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
         )
-        .placeholder("Select Cluster...")
-        .style(pick_list_style(&self.palette))
-        .padding([4, 8]);
+        .style(tab_plus_button_style(&self.palette))
+        .width(Length::Fixed(24.0))
+        .height(Length::Fixed(24.0))
+        .on_press(Message::OpenNewTabAction);
 
-        let namespace_selector = pick_list(
-            self.namespace_options(),
-            Some(self.selected_namespace_label()),
-            |ns| Message::SelectNamespace(Some(ns)),
-        )
-        .style(pick_list_style(&self.palette))
-        .padding([4, 8]);
+        tabs_row = tabs_row.push(plus_tab_btn);
 
-        let search_btn = button(
-            row![
-                icon(Icon::Search, 12, self.palette.text_secondary),
-                text("Search (Ctrl+K)").size(12).color(self.palette.text_secondary),
-            ]
-            .spacing(6)
-            .align_y(iced::Alignment::Center),
-        )
-        .style(search_pill_style(&self.palette))
-        .padding([4, 10])
-        .on_press(Message::OpenModal(ActiveModal::SearchEverywhere {
-            query: String::new(),
-            selected_index: 0,
-        }));
-
-        let top_controls = row![
-            status_indicator,
-            cluster_selector,
-            namespace_selector,
-            search_btn,
-        ]
-        .spacing(8)
-        .align_y(iced::Alignment::Center);
-
-        let tab_bar_row = row![tabs_row, horizontal_space(), top_controls]
-            .spacing(12)
-            .padding([6, 12])
-            .align_y(iced::Alignment::Center)
-            .width(Length::Fill);
-
-        let tab_bar = container(tab_bar_row)
+        let tab_strip = container(tabs_row)
             .width(Length::Fill)
-            .style(header_container_style(&self.palette));
+            .padding([2, 8])
+            .style(tab_strip_container_style(&self.palette));
 
-        // 3. Main Tab Content
-        let main_workspace: Element<'_, Message> = match self.tab_manager.active_tab().map(|t| &t.content) {
-            Some(TabContent::Dashboard) => dashboard_view(&self.cluster_store, &self.palette),
-            Some(TabContent::ResourceTable(kind)) => {
-                resource_table_view(*kind, &self.cluster_store, &self.filter, &self.palette, |d| {
-                    Message::SelectResource(Some(d))
-                })
+        // 4. Main Workspace (or Empty State)
+        let main_workspace: Element<'_, Message> = if self.tab_manager.tabs.is_empty() {
+            container(Self::empty_state_view(&self.palette))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
+                .into()
+        } else {
+            match self.tab_manager.active_tab().map(|t| &t.content) {
+                Some(TabContent::Dashboard) => dashboard_view(&self.cluster_store, &self.palette),
+                Some(TabContent::ResourceTable(kind)) => {
+                    resource_table_view(*kind, &self.cluster_store, &self.filter, &self.palette, |d| {
+                        Message::SelectResource(Some(d))
+                    })
+                }
+                Some(TabContent::Settings) => {
+                    settings_view(&self.settings, &self.palette, Message::SendCommand(CoreCommand::Initialize))
+                }
+                _ => container(Self::empty_state_view(&self.palette))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                    .into(),
             }
-            Some(TabContent::Settings) => {
-                settings_view(&self.settings, &self.palette, Message::SendCommand(CoreCommand::Initialize))
-            }
-            _ => container(text("Select a view from the sidebar").size(14).color(self.palette.text_muted))
-                .padding(32)
-                .into(),
         };
 
         let content_with_drawer: Element<'_, Message> = if let Some(ref details) = self.selected_resource {
@@ -594,7 +672,7 @@ impl OrbitApp {
             main_workspace
         };
 
-        // 4. Status Bar
+        // 5. Status Bar
         let status_bar = row![
             text(format!(
                 "Cluster: {}",
@@ -616,18 +694,21 @@ impl OrbitApp {
         .padding(6);
 
         let main_panel = column![
-            tab_bar,
+            desktop_header,
+            tab_strip,
             container(content_with_drawer)
                 .width(Length::Fill)
                 .height(Length::Fill),
             status_bar,
         ]
-        .spacing(4)
+        .spacing(0)
         .width(Length::Fill)
         .height(Length::Fill);
 
         let full_layout = container(
-            row![sidebar, main_panel].width(Length::Fill).height(Length::Fill),
+            row![activity_bar, sub_sidebar, main_panel]
+                .width(Length::Fill)
+                .height(Length::Fill),
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -989,6 +1070,68 @@ mod tests {
                 namespace: Some("default".into()),
             },
         }));
+        let _view = app.view();
+    }
+
+    #[test]
+    fn test_active_cluster_badges_format_k8s_version_and_local_tag() {
+        use orbit_core::kubernetes::models::{ClusterInfo, NodeInfo};
+
+        let mut app = OrbitApp::new();
+        assert_eq!(app.k8s_version_label(), "K8S —");
+        assert!(!app.active_cluster_is_local());
+
+        let local_cluster = ClusterInfo {
+            id: "c-local".to_string(),
+            name: "docker-desktop".to_string(),
+            status: "Connected".to_string(),
+            alias: Some("Dev Desktop".to_string()),
+            server_url: Some("https://localhost:6443".to_string()),
+            ..Default::default()
+        };
+        app.cluster_store.clusters = vec![local_cluster];
+        app.cluster_store.active_cluster_id = Some("c-local".to_string());
+        app.cluster_store.nodes = vec![NodeInfo {
+            name: "node-1".to_string(),
+            version: "v1.32.1".to_string(),
+            ..Default::default()
+        }];
+
+        assert_eq!(app.k8s_version_label(), "K8S v1.32.1");
+        assert!(app.active_cluster_is_local());
+        assert_eq!(app.active_cluster_display_name(), "Dev Desktop");
+    }
+
+    #[test]
+    fn test_dual_rail_category_toggle_collapses_and_expands_sidebar() {
+        let mut app = OrbitApp::new();
+        assert_eq!(app.active_category, Some(SidebarCategory::Workloads));
+
+        // Click same category -> collapses to None
+        let _ = app.update(Message::ToggleCategory(SidebarCategory::Workloads));
+        assert_eq!(app.active_category, None);
+
+        // Click different category -> expands to Some(Clusters)
+        let _ = app.update(Message::ToggleCategory(SidebarCategory::Clusters));
+        assert_eq!(app.active_category, Some(SidebarCategory::Clusters));
+
+        // Click again -> collapses to None
+        let _ = app.update(Message::ToggleCategory(SidebarCategory::Clusters));
+        assert_eq!(app.active_category, None);
+    }
+
+    #[test]
+    fn test_empty_state_rendered_when_all_tabs_closed() {
+        let mut app = OrbitApp::new();
+        assert_eq!(app.tab_manager.tabs.len(), 1);
+        let tab_id = app.tab_manager.tabs[0].id.clone();
+
+        // Close the only open tab
+        let _ = app.update(Message::CloseTab(tab_id));
+        assert!(app.tab_manager.tabs.is_empty());
+        assert_eq!(app.tab_manager.active_tab(), None);
+
+        // Verify view renders empty state without panic
         let _view = app.view();
     }
 }

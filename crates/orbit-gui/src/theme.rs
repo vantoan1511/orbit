@@ -472,6 +472,274 @@ pub fn status_dot_pill<'a, Message: 'a>(
     .into()
 }
 
+pub fn activity_bar_container_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_sidebar)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::default(),
+        },
+        shadow: Shadow::default(),
+    }
+}
+
+pub fn activity_bar_item_style<'a>(
+    palette: &'a OrbitPalette,
+    is_active: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let bg = if is_active {
+            if palette.is_dark {
+                Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23)))
+            } else {
+                Some(Background::Color(Color::from_rgba(
+                    palette.accent.r,
+                    palette.accent.g,
+                    palette.accent.b,
+                    0.15,
+                )))
+            }
+        } else if is_hovered {
+            Some(Background::Color(palette.bg_hover))
+        } else {
+            None
+        };
+        let text_color = if is_active {
+            palette.accent
+        } else if is_hovered {
+            palette.text_primary
+        } else {
+            palette.text_secondary
+        };
+        let border = if is_active {
+            Border {
+                color: palette.accent,
+                width: 1.5,
+                radius: Radius::from(6.0),
+            }
+        } else {
+            Border::default()
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border,
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn sub_sidebar_container_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_sidebar)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::default(),
+        },
+        shadow: Shadow::default(),
+    }
+}
+
+pub fn sub_sidebar_item_style<'a>(
+    palette: &'a OrbitPalette,
+    is_active: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let bg = if is_active {
+            if palette.is_dark {
+                Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23)))
+            } else {
+                Some(Background::Color(Color::from_rgba(
+                    palette.accent.r,
+                    palette.accent.g,
+                    palette.accent.b,
+                    0.15,
+                )))
+            }
+        } else if is_hovered {
+            Some(Background::Color(palette.bg_hover))
+        } else {
+            None
+        };
+        let text_color = if is_active || is_hovered {
+            palette.text_primary
+        } else {
+            palette.text_secondary
+        };
+        let border = Border {
+            color: if is_active { palette.accent } else { Color::TRANSPARENT },
+            width: if is_active { 1.5 } else { 0.0 },
+            radius: Radius::from(4.0),
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border,
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn cluster_card_style<'a>(
+    palette: &'a OrbitPalette,
+    is_active: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let bg = if is_active {
+            if palette.is_dark {
+                Some(Background::Color(Color::from_rgb8(0x1a, 0x1a, 0x20)))
+            } else {
+                Some(Background::Color(Color::from_rgba(
+                    palette.accent.r,
+                    palette.accent.g,
+                    palette.accent.b,
+                    0.10,
+                )))
+            }
+        } else if is_hovered {
+            Some(Background::Color(palette.bg_hover))
+        } else {
+            Some(Background::Color(palette.bg_card))
+        };
+        let text_color = palette.text_primary;
+        let border = Border {
+            color: if is_active {
+                palette.accent
+            } else if is_hovered {
+                palette.border
+            } else {
+                Color::from_rgba(palette.border.r, palette.border.g, palette.border.b, 0.6)
+            },
+            width: if is_active { 1.5 } else { 1.0 },
+            radius: Radius::from(6.0),
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border,
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn cluster_tag_pill_style<'a>(
+    palette: &'a OrbitPalette,
+    is_selected: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let bg = if is_selected {
+            Some(Background::Color(Color::from_rgba(palette.accent.r, palette.accent.g, palette.accent.b, 0.2)))
+        } else if is_hovered {
+            Some(Background::Color(palette.bg_hover))
+        } else {
+            Some(Background::Color(palette.bg_card))
+        };
+        let text_color = if is_selected {
+            palette.accent
+        } else if is_hovered {
+            palette.text_primary
+        } else {
+            palette.text_muted
+        };
+        let border = Border {
+            color: if is_selected { palette.accent } else { palette.border },
+            width: 1.0,
+            radius: Radius::from(10.0),
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border,
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn header_badge_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_card)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::from(4.0),
+        },
+        shadow: Shadow::default(),
+    }
+}
+
+pub fn tab_plus_button_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let bg = if is_hovered {
+            Some(Background::Color(palette.bg_hover))
+        } else {
+            None
+        };
+        let text_color = if is_hovered {
+            palette.text_primary
+        } else {
+            palette.text_muted
+        };
+        button::Style {
+            background: bg,
+            text_color,
+            border: Border {
+                color: if is_hovered { palette.border } else { Color::TRANSPARENT },
+                width: 1.0,
+                radius: Radius::from(4.0),
+            },
+            shadow: Shadow::default(),
+        }
+    }
+}
+
+pub fn empty_state_container_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_card)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::from(8.0),
+        },
+        shadow: Shadow::default(),
+    }
+}
+
+pub fn tab_strip_container_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_sidebar)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::default(),
+        },
+        shadow: Shadow::default(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -526,6 +794,44 @@ mod tests {
         // Status pill elements render without panic
         let _pill: iced::Element<'_, ()> = status_pill(&dark, "Running");
         let _dot_pill: iced::Element<'_, ()> = status_dot_pill(&dark, true, false, "Connected");
+
+        // Dual-rail navigation & header styles test
+        let act_bar = activity_bar_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(act_bar.background, Some(Background::Color(dark.bg_sidebar)));
+
+        let act_item_active = activity_bar_item_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(act_item_active.text_color, dark.accent);
+
+        let sub_bar = sub_sidebar_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(sub_bar.background, Some(Background::Color(dark.bg_sidebar)));
+
+        let sub_item = sub_sidebar_item_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(sub_item.border.color, dark.accent);
+
+        let clus_card = cluster_card_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(clus_card.border.color, dark.accent);
+
+        let tag_pill = cluster_tag_pill_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert_eq!(tag_pill.border.color, dark.accent);
+
+        let badge = header_badge_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(badge.background, Some(Background::Color(dark.bg_card)));
+
+        let tab_plus = tab_plus_button_style(&dark)(&iced::Theme::Dark, iced::widget::button::Status::Active);
+        assert!(tab_plus.background.is_none());
+
+        let empty = empty_state_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(empty.background, Some(Background::Color(dark.bg_card)));
+
+        let tab_strip = tab_strip_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(tab_strip.background, Some(Background::Color(dark.bg_sidebar)));
+
+        // Light palette active style adapts cleanly (no near-black background on dark text)
+        let light = OrbitPalette::light();
+        let act_item_light = activity_bar_item_style(&light, true)(&iced::Theme::Light, iced::widget::button::Status::Active);
+        assert_ne!(act_item_light.background, Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23))));
+        let sub_item_light = sub_sidebar_item_style(&light, true)(&iced::Theme::Light, iced::widget::button::Status::Active);
+        assert_ne!(sub_item_light.background, Some(Background::Color(Color::from_rgb8(0x1f, 0x1f, 0x23))));
     }
 
     #[test]

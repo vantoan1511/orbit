@@ -229,7 +229,7 @@ pub struct CronJobInfo {
     pub annotations: std::collections::BTreeMap<String, String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeResources {
     pub cpu: String,
@@ -238,7 +238,7 @@ pub struct NodeResources {
     pub ephemeral_storage: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeInfo {
     pub name: String,
