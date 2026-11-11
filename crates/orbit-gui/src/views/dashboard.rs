@@ -1,8 +1,9 @@
 use iced::{
     widget::{column, container, row, text},
-    Element, Length,
+    Color, Element, Length,
 };
 
+use crate::icons::{icon, Icon};
 use crate::store::ClusterStore;
 use crate::theme::OrbitPalette;
 
@@ -68,20 +69,37 @@ pub fn render_summary_card<'a, Message: 'a>(
     title: &'static str,
     value: String,
     subtitle: String,
+    watermark_icon: Option<Icon>,
     palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
-    container(
-        column![
-            text(title).size(12).color(palette.text_secondary),
-            text(value).size(24).color(palette.text_primary),
-            text(subtitle).size(11).color(palette.text_muted),
-        ]
-        .spacing(4)
-        .padding(14),
-    )
-    .width(Length::FillPortion(1))
-    .style(crate::theme::card_container_style(palette))
-    .into()
+    let text_col = column![
+        text(title).size(12).color(palette.text_secondary),
+        text(value).size(24).color(palette.text_primary),
+        text(subtitle).size(11).color(palette.text_muted),
+    ]
+    .spacing(4)
+    .width(Length::Fill);
+
+    let card_content = if let Some(ic) = watermark_icon {
+        let watermark_color = Color::from_rgba(
+            palette.text_primary.r,
+            palette.text_primary.g,
+            palette.text_primary.b,
+            0.18,
+        );
+        let icon_el = icon(ic, 24, watermark_color);
+        row![text_col, icon_el]
+            .spacing(8)
+            .align_y(iced::Alignment::Start)
+    } else {
+        row![text_col]
+    };
+
+    container(card_content)
+        .padding(14)
+        .width(Length::FillPortion(1))
+        .style(crate::theme::card_container_style(palette))
+        .into()
 }
 
 pub fn dashboard_view<'a, Message: 'a>(
@@ -94,6 +112,7 @@ pub fn dashboard_view<'a, Message: 'a>(
         "NODES",
         format!("{}/{}", summary.ready_nodes, summary.total_nodes),
         "Ready / Total".to_string(),
+        Some(Icon::Server),
         palette,
     );
 
@@ -101,6 +120,7 @@ pub fn dashboard_view<'a, Message: 'a>(
         "PODS",
         format!("{}/{}", summary.running_pods, summary.total_pods),
         format!("{} failed / degraded", summary.failed_pods),
+        Some(Icon::Box),
         palette,
     );
 
@@ -108,6 +128,7 @@ pub fn dashboard_view<'a, Message: 'a>(
         "DEPLOYMENTS",
         summary.total_deployments.to_string(),
         "Total active".to_string(),
+        Some(Icon::Layers),
         palette,
     );
 
@@ -115,6 +136,7 @@ pub fn dashboard_view<'a, Message: 'a>(
         "SERVICES",
         summary.total_services.to_string(),
         "Cluster endpoints".to_string(),
+        Some(Icon::Network),
         palette,
     );
 
@@ -122,6 +144,7 @@ pub fn dashboard_view<'a, Message: 'a>(
         "NAMESPACES",
         summary.total_namespaces.to_string(),
         "Configured scopes".to_string(),
+        Some(Icon::Folder),
         palette,
     );
 
@@ -129,6 +152,7 @@ pub fn dashboard_view<'a, Message: 'a>(
         "WARNING EVENTS",
         summary.warning_events.to_string(),
         "Past 1 hour".to_string(),
+        Some(Icon::TriangleAlert),
         palette,
     );
 
@@ -159,6 +183,12 @@ mod tests {
         let summary = compute_cluster_summary(&store);
         assert_eq!(summary.total_nodes, 0);
 
-        let _card: Element<'_, ()> = render_summary_card("NODES", "3/3".into(), "Ready / Total".into(), &palette);
+        let _card: Element<'_, ()> = render_summary_card(
+            "NODES",
+            "3/3".into(),
+            "Ready / Total".into(),
+            Some(Icon::Server),
+            &palette,
+        );
     }
 }

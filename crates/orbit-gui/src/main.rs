@@ -6,6 +6,7 @@ fn main() -> iced::Result {
 
     iced::application("Orbit", OrbitApp::update, OrbitApp::view)
         .subscription(OrbitApp::subscription)
+        .font(orbit_gui::icons::LUCIDE_FONT_BYTES)
         .window(iced::window::Settings {
             size: iced::Size::new(1280.0, 800.0),
             visible: !hidden,

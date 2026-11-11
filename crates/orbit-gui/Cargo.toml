@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 orbit-core = { path = "../orbit-core" }
 iced = { version = "0.13.1", features = ["tokio", "highlighter", "advanced", "canvas"] }
+lucide-icons = { version = "1.72", features = ["iced"] }
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

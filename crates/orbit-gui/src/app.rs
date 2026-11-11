@@ -8,6 +8,7 @@ use orbit_core::command::{CoreCommand, ResourceKind};
 use orbit_core::events::CoreEvent;
 use orbit_core::ui_state::UiStateStore;
 
+use crate::icons::{icon, tab_content_icon, Icon};
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
 use crate::theme::{
@@ -394,12 +395,20 @@ impl OrbitApp {
                 Message::OpenTab(tab)
             };
 
+            let item_icon = tab_content_icon(&content);
+            let icon_color = if is_active {
+                self.palette.text_primary
+            } else {
+                self.palette.text_secondary
+            };
+
             let nav_btn = button(
-                text(label).size(13).color(if is_active {
-                    self.palette.text_primary
-                } else {
-                    self.palette.text_secondary
-                }),
+                row![
+                    icon(item_icon, 16, icon_color),
+                    text(label).size(13).color(icon_color),
+                ]
+                .spacing(8)
+                .align_y(iced::Alignment::Center),
             )
             .on_press(on_press_msg)
             .width(Length::Fill)
@@ -421,17 +430,30 @@ impl OrbitApp {
         };
         let connection_pill = status_dot_pill(&self.palette, is_conn, is_load, active_cluster_label);
 
+        let (theme_icon, theme_label) = if self.palette.is_dark {
+            (Icon::Moon, "Dark")
+        } else {
+            (Icon::Sun, "Light")
+        };
+
         let sidebar = container(
             column![
                 nav_col,
                 vertical_space(),
                 column![
                     connection_pill,
-                    button(text(if self.palette.is_dark { "Dark" } else { "Light" }).size(12))
-                        .on_press(Message::ToggleTheme)
-                        .width(Length::Fill)
-                        .padding([6, 8])
-                        .style(action_button_style(&self.palette, false)),
+                    button(
+                        row![
+                            icon(theme_icon, 14, self.palette.text_secondary),
+                            text(theme_label).size(12).color(self.palette.text_secondary),
+                        ]
+                        .spacing(6)
+                        .align_y(iced::Alignment::Center),
+                    )
+                    .on_press(Message::ToggleTheme)
+                    .width(Length::Fill)
+                    .padding([6, 8])
+                    .style(action_button_style(&self.palette, false)),
                 ]
                 .spacing(8),
             ]
@@ -448,11 +470,17 @@ impl OrbitApp {
         for tab in &self.tab_manager.tabs {
             let is_active = self.tab_manager.active_tab_id.as_deref() == Some(&tab.id);
             let tab_id = tab.id.clone();
+            let tab_icon = tab_content_icon(&tab.content);
+            let tab_color = if is_active {
+                self.palette.text_primary
+            } else {
+                self.palette.text_secondary
+            };
+
             let tab_btn = button(
                 row![
-                    text(tab.title.clone())
-                        .size(12)
-                        .color(if is_active { self.palette.text_primary } else { self.palette.text_secondary }),
+                    icon(tab_icon, 12, tab_color),
+                    text(tab.title.clone()).size(12).color(tab_color),
                     button(text("×").size(11))
                         .style(tab_close_button_style(&self.palette))
                         .padding([2, 4])
@@ -498,13 +526,20 @@ impl OrbitApp {
         .style(pick_list_style(&self.palette))
         .padding([4, 8]);
 
-        let search_btn = button(text("🔍 Search (Ctrl+K)").size(12))
-            .style(search_pill_style(&self.palette))
-            .padding([4, 10])
-            .on_press(Message::OpenModal(ActiveModal::SearchEverywhere {
-                query: String::new(),
-                selected_index: 0,
-            }));
+        let search_btn = button(
+            row![
+                icon(Icon::Search, 12, self.palette.text_secondary),
+                text("Search (Ctrl+K)").size(12).color(self.palette.text_secondary),
+            ]
+            .spacing(6)
+            .align_y(iced::Alignment::Center),
+        )
+        .style(search_pill_style(&self.palette))
+        .padding([4, 10])
+        .on_press(Message::OpenModal(ActiveModal::SearchEverywhere {
+            query: String::new(),
+            selected_index: 0,
+        }));
 
         let top_controls = row![
             status_indicator,
@@ -935,5 +970,25 @@ mod tests {
                 tab.title
             );
         }
+    }
+
+    #[test]
+    fn test_sidebar_and_tab_icons_rendering() {
+        let mut app = OrbitApp::new();
+        let _ = app.update(Message::OpenTab(WorkspaceTab {
+            id: "tab-settings".into(),
+            title: "Settings".into(),
+            content: TabContent::Settings,
+        }));
+        let _ = app.update(Message::OpenTab(WorkspaceTab {
+            id: "tab-yaml".into(),
+            title: "YAML".into(),
+            content: TabContent::YamlEditor {
+                kind: "Pod".into(),
+                name: "my-pod".into(),
+                namespace: Some("default".into()),
+            },
+        }));
+        let _view = app.view();
     }
 }
