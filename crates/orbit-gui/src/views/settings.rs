@@ -89,7 +89,7 @@ impl fmt::Display for LogRetentionOption {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct SettingsViewState {
-    pub terminal_shell_input: String,
+    pub terminal_shell_input: Option<String>,
     pub feedback_message: Option<String>,
 }
 
@@ -346,13 +346,12 @@ pub fn settings_view<'a, Message: 'a + Clone>(
     .padding([4, 8])
     .width(Length::Fixed(140.0));
 
-    let shell_val = if !state.terminal_shell_input.is_empty() {
-        &state.terminal_shell_input
-    } else {
-        values
+    let shell_val = match &state.terminal_shell_input {
+        Some(val) => val.as_str(),
+        None => values
             .get("defaultTerminalShell")
             .and_then(|v| v.as_str())
-            .unwrap_or("")
+            .unwrap_or(""),
     };
 
     let shell_input = text_input("e.g. pwsh.exe, /bin/zsh", shell_val)
@@ -606,7 +605,7 @@ mod tests {
 
         let mut populated_state = SettingsViewState::default();
         populated_state.feedback_message = Some("Settings saved".to_string());
-        populated_state.terminal_shell_input = "pwsh.exe".to_string();
+        populated_state.terminal_shell_input = Some("pwsh.exe".to_string());
 
         {
             let light_view: Element<'_, TestMsg> = settings_view(

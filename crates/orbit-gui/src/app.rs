@@ -338,9 +338,9 @@ impl OrbitApp {
                         self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
                     }
                     if let Some(shell) = self.settings.get("defaultTerminalShell").and_then(|v| v.as_str())
-                        && self.settings_state.terminal_shell_input.is_empty()
+                        && self.settings_state.terminal_shell_input.is_none()
                     {
-                        self.settings_state.terminal_shell_input = shell.to_string();
+                        self.settings_state.terminal_shell_input = Some(shell.to_string());
                     }
 
                     if !self.has_auto_connected {
@@ -440,6 +440,9 @@ impl OrbitApp {
                 } else {
                     OrbitPalette::dark()
                 };
+                if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
+                    self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
+                }
             }
             Message::SearchEverywhereQueryChanged(query) => {
                 self.active_modal = ActiveModal::SearchEverywhere {
@@ -501,7 +504,7 @@ impl OrbitApp {
                 return iced::window::get_latest().and_then(iced::window::close);
             }
             Message::UpdateShellInput(val) => {
-                self.settings_state.terminal_shell_input = val;
+                self.settings_state.terminal_shell_input = Some(val);
             }
             Message::UpdateSetting(key, val) => {
                 self.settings.insert(key.clone(), val.clone());
@@ -511,6 +514,9 @@ impl OrbitApp {
                     } else {
                         OrbitPalette::dark()
                     };
+                    if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
+                        self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
+                    }
                 } else if key == "accentColor" {
                     let accent_str = val.as_str().unwrap_or("blue");
                     self.palette.accent = accent_color_from_name(accent_str, self.palette.is_dark);
@@ -532,14 +538,12 @@ impl OrbitApp {
                         reset_map.insert(def.key, default_val);
                     }
                 }
+                if let Some(enabled) = reset_map.get("launchOnStartup").and_then(|v| v.as_bool()) {
+                    send_core_command(CoreCommand::SetLaunchOnStartup { enabled });
+                }
                 send_core_command(CoreCommand::UpdateAppSettings { values: reset_map });
                 self.palette = OrbitPalette::dark();
-                self.settings_state.terminal_shell_input = self
-                    .settings
-                    .get("defaultTerminalShell")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
+                self.settings_state.terminal_shell_input = None;
                 self.settings_state.feedback_message =
                     Some("Default settings restored".to_string());
             }
@@ -1355,7 +1359,28 @@ mod tests {
 
         // Update terminal shell input
         let _ = app.update(Message::UpdateShellInput("pwsh.exe".to_string()));
-        assert_eq!(app.settings_state.terminal_shell_input, "pwsh.exe");
+        assert_eq!(
+            app.settings_state.terminal_shell_input,
+            Some("pwsh.exe".to_string())
+        );
+
+        // Clearing terminal shell input allows empty string
+        let _ = app.update(Message::UpdateShellInput("".to_string()));
+        assert_eq!(
+            app.settings_state.terminal_shell_input,
+            Some("".to_string())
+        );
+
+        // Switching themeMode preserves configured accent color
+        let _ = app.update(Message::UpdateSetting(
+            "themeMode".to_string(),
+            serde_json::json!("dark"),
+        ));
+        assert!(app.palette.is_dark);
+        assert_eq!(
+            app.palette.accent,
+            accent_color_from_name("emerald", true)
+        );
 
         // Verify view renders with settings tab active
         app.tab_manager.open_tab(WorkspaceTab {
@@ -1373,11 +1398,13 @@ mod tests {
             "themeMode".to_string(),
             serde_json::json!("light"),
         ));
+        let _ = app.update(Message::UpdateShellInput("custom-shell".to_string()));
         assert!(!app.palette.is_dark);
 
         let _ = app.update(Message::ResetSettingsToDefaults);
         assert!(app.palette.is_dark);
         assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("dark")));
+        assert_eq!(app.settings_state.terminal_shell_input, None);
         assert_eq!(
             app.settings_state.feedback_message,
             Some("Default settings restored".to_string())
