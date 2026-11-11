@@ -8,7 +8,7 @@ use orbit_core::command::{CoreCommand, ResourceKind};
 use orbit_core::events::CoreEvent;
 use orbit_core::ui_state::UiStateStore;
 
-use crate::icons::{icon, tab_content_icon, Icon};
+use crate::icons::{button_icon, icon, tab_content_icon, Icon};
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
 use crate::theme::{
@@ -505,13 +505,13 @@ impl OrbitApp {
         )
         .on_press(Message::TitlebarPressed);
 
-        let window_btn = |glyph: &'static str, size: u16, width: f32, is_close: bool, msg: Message| {
+        let window_btn = |icon_variant: Icon, is_close: bool, msg: Message| {
             button(
-                container(text(glyph).size(size))
+                container(button_icon(icon_variant, 12))
                     .center_x(Length::Fill)
                     .center_y(Length::Fill),
             )
-            .width(Length::Fixed(width))
+            .width(Length::Fixed(44.0))
             .height(Length::Fixed(32.0))
             .padding(0)
             .style(window_control_button_style(&self.palette, is_close))
@@ -519,9 +519,9 @@ impl OrbitApp {
         };
 
         let controls = row![
-            window_btn("—", 11, 36.0, false, Message::WindowMinimize),
-            window_btn("□", 12, 36.0, false, Message::WindowToggleMaximize),
-            window_btn("✕", 11, 40.0, true, Message::WindowClose),
+            window_btn(Icon::Minus, false, Message::WindowMinimize),
+            window_btn(Icon::Square, false, Message::WindowToggleMaximize),
+            window_btn(Icon::X, true, Message::WindowClose),
         ]
         .spacing(0)
         .align_y(iced::Alignment::Center);

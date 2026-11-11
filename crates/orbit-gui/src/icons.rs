@@ -14,6 +14,13 @@ pub fn icon<'a, Message: 'a>(icon: Icon, size: u16, color: Color) -> Element<'a,
         .into()
 }
 
+pub fn button_icon<'a, Message: 'a>(icon: Icon, size: u16) -> Element<'a, Message> {
+    text(char::from(icon))
+        .font(LUCIDE_FONT)
+        .size(size)
+        .into()
+}
+
 pub fn resource_kind_icon(kind: ResourceKind) -> Icon {
     match kind {
         ResourceKind::Namespace => Icon::Folder,
@@ -112,5 +119,17 @@ mod tests {
             })),
             char::from(Icon::Terminal)
         );
+    }
+
+    #[test]
+    fn test_window_control_icons() {
+        let _ = char::from(Icon::Minus);
+        let _ = char::from(Icon::Square);
+        let _ = char::from(Icon::Copy);
+        let _ = char::from(Icon::X);
+
+        let _el: Element<'_, ()> = button_icon(Icon::Minus, 12);
+        let _el: Element<'_, ()> = button_icon(Icon::Square, 12);
+        let _el: Element<'_, ()> = button_icon(Icon::X, 12);
     }
 }

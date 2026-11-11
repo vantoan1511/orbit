@@ -213,12 +213,17 @@ pub fn window_control_button_style<'a>(
         let (bg, text_color) = if is_hovered {
             if is_close {
                 (
-                    Some(Background::Color(Color::from_rgb8(0xe8, 0x11, 0x23))),
+                    Some(Background::Color(Color::from_rgb8(0xe1, 0x1d, 0x48))),
                     Color::WHITE,
                 )
             } else {
+                let hover_bg = if palette.is_dark {
+                    Color::from_rgb8(0x27, 0x27, 0x2a)
+                } else {
+                    Color::from_rgb8(0xe4, 0xe4, 0xe7)
+                };
                 (
-                    Some(Background::Color(palette.bg_hover)),
+                    Some(Background::Color(hover_bg)),
                     palette.text_primary,
                 )
             }
@@ -998,6 +1003,8 @@ mod tests {
     #[test]
     fn test_titlebar_and_window_control_styles() {
         let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
         let titlebar = titlebar_container_style(&dark)(&iced::Theme::Dark);
         assert_eq!(titlebar.background, Some(Background::Color(dark.bg_sidebar)));
         assert_eq!(titlebar.border.color, dark.border);
@@ -1008,12 +1015,16 @@ mod tests {
         assert!(min_normal.background.is_none());
         assert_eq!(min_normal.text_color, dark.text_secondary);
 
-        let min_hover = window_control_button_style(&dark, false)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
-        assert_eq!(min_hover.background, Some(Background::Color(dark.bg_hover)));
-        assert_eq!(min_hover.text_color, dark.text_primary);
+        let min_hover_dark = window_control_button_style(&dark, false)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
+        assert_eq!(min_hover_dark.background, Some(Background::Color(Color::from_rgb8(0x27, 0x27, 0x2a))));
+        assert_eq!(min_hover_dark.text_color, dark.text_primary);
+
+        let min_hover_light = window_control_button_style(&light, false)(&iced::Theme::Light, iced::widget::button::Status::Hovered);
+        assert_eq!(min_hover_light.background, Some(Background::Color(Color::from_rgb8(0xe4, 0xe4, 0xe7))));
+        assert_eq!(min_hover_light.text_color, light.text_primary);
 
         let close_hover = window_control_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
-        assert_eq!(close_hover.background, Some(Background::Color(Color::from_rgb8(0xe8, 0x11, 0x23))));
+        assert_eq!(close_hover.background, Some(Background::Color(Color::from_rgb8(0xe1, 0x1d, 0x48))));
         assert_eq!(close_hover.text_color, Color::WHITE);
     }
 }
