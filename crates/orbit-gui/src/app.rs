@@ -12,7 +12,7 @@ use crate::icons::{button_icon, icon, tab_content_icon, Icon};
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
 use crate::theme::{
-    action_button_style, empty_state_container_style, header_badge_style,
+    accent_color_from_name, action_button_style, empty_state_container_style, header_badge_style,
     header_container_style, pick_list_style, search_pill_style, status_dot_pill,
     tab_button_style, tab_close_button_style, tab_plus_button_style, tab_strip_container_style,
     titlebar_container_style, window_control_button_style, OrbitPalette,
@@ -25,7 +25,7 @@ use crate::views::navigation::{
     SidebarCategory,
 };
 use crate::views::resource_table::resource_table_view;
-use crate::views::settings::settings_view;
+use crate::views::settings::{settings_view, SettingsViewState};
 
 pub const ALL_NAMESPACES_LABEL: &str = "All Namespaces";
 pub const DOUBLE_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(300);
@@ -71,6 +71,9 @@ pub enum Message {
     WindowToggleMaximize,
     WindowClose,
     TitlebarPressed,
+    UpdateSetting(String, serde_json::Value),
+    UpdateShellInput(String),
+    ResetSettingsToDefaults,
 }
 
 pub struct OrbitApp {
@@ -83,6 +86,7 @@ pub struct OrbitApp {
     pub tab_manager: TabManager,
     pub active_modal: ActiveModal,
     pub settings: HashMap<String, serde_json::Value>,
+    pub settings_state: SettingsViewState,
     pub ui_state: UiStateStore,
     pub selected_resource: Option<SelectedResourceDetails>,
     pub active_category: Option<SidebarCategory>,
@@ -116,6 +120,7 @@ impl OrbitApp {
             tab_manager: tab_mgr,
             active_modal: ActiveModal::None,
             settings: HashMap::new(),
+            settings_state: SettingsViewState::default(),
             ui_state: UiStateStore::default(),
             selected_resource: None,
             active_category: Some(SidebarCategory::Workloads),
@@ -322,6 +327,22 @@ impl OrbitApp {
                     self.cluster_store.clusters = clusters;
                     self.settings = settings;
 
+                    if let Some(theme) = self.settings.get("themeMode").and_then(|v| v.as_str()) {
+                        self.palette = if theme == "light" {
+                            OrbitPalette::light()
+                        } else {
+                            OrbitPalette::dark()
+                        };
+                    }
+                    if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
+                        self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
+                    }
+                    if let Some(shell) = self.settings.get("defaultTerminalShell").and_then(|v| v.as_str())
+                        && self.settings_state.terminal_shell_input.is_empty()
+                    {
+                        self.settings_state.terminal_shell_input = shell.to_string();
+                    }
+
                     if !self.has_auto_connected {
                         let target = active_cluster_id.or_else(|| {
                             self.cluster_store.clusters.first().map(|c| c.id.clone())
@@ -478,6 +499,49 @@ impl OrbitApp {
             }
             Message::WindowClose => {
                 return iced::window::get_latest().and_then(iced::window::close);
+            }
+            Message::UpdateShellInput(val) => {
+                self.settings_state.terminal_shell_input = val;
+            }
+            Message::UpdateSetting(key, val) => {
+                self.settings.insert(key.clone(), val.clone());
+                if key == "themeMode" {
+                    self.palette = if val == "light" {
+                        OrbitPalette::light()
+                    } else {
+                        OrbitPalette::dark()
+                    };
+                } else if key == "accentColor" {
+                    let accent_str = val.as_str().unwrap_or("blue");
+                    self.palette.accent = accent_color_from_name(accent_str, self.palette.is_dark);
+                } else if key == "launchOnStartup" {
+                    let enabled = val.as_bool().unwrap_or(false);
+                    send_core_command(CoreCommand::SetLaunchOnStartup { enabled });
+                }
+                send_core_command(CoreCommand::UpdateAppSettings {
+                    values: [(key, val)].into_iter().collect(),
+                });
+                self.settings_state.feedback_message = Some("Settings saved".to_string());
+            }
+            Message::ResetSettingsToDefaults => {
+                let defs = orbit_core::config::Configuration::system_definitions();
+                let mut reset_map = HashMap::new();
+                for def in defs {
+                    if let Some(default_val) = def.default_value {
+                        self.settings.insert(def.key.clone(), default_val.clone());
+                        reset_map.insert(def.key, default_val);
+                    }
+                }
+                send_core_command(CoreCommand::UpdateAppSettings { values: reset_map });
+                self.palette = OrbitPalette::dark();
+                self.settings_state.terminal_shell_input = self
+                    .settings
+                    .get("defaultTerminalShell")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                self.settings_state.feedback_message =
+                    Some("Default settings restored".to_string());
             }
         }
         Task::none()
@@ -725,9 +789,14 @@ impl OrbitApp {
                         Message::SelectResource(Some(d))
                     })
                 }
-                Some(TabContent::Settings) => {
-                    settings_view(&self.settings, &self.palette, Message::SendCommand(CoreCommand::Initialize))
-                }
+                Some(TabContent::Settings) => settings_view(
+                    &self.settings,
+                    &self.settings_state,
+                    &self.palette,
+                    Message::UpdateSetting,
+                    Message::UpdateShellInput,
+                    Message::ResetSettingsToDefaults,
+                ),
                 _ => container(Self::empty_state_view(&self.palette))
                     .width(Length::Fill)
                     .height(Length::Fill)
@@ -1254,5 +1323,64 @@ mod tests {
         {
             let _light_view = app.view();
         }
+    }
+
+    #[test]
+    fn test_app_settings_update_palette_and_auto_saves() {
+        let mut app = OrbitApp::new();
+        assert!(app.palette.is_dark);
+
+        // Update theme mode to light
+        let _ = app.update(Message::UpdateSetting(
+            "themeMode".to_string(),
+            serde_json::json!("light"),
+        ));
+        assert!(!app.palette.is_dark);
+        assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("light")));
+        assert_eq!(
+            app.settings_state.feedback_message,
+            Some("Settings saved".to_string())
+        );
+
+        // Update accent color to emerald
+        let _ = app.update(Message::UpdateSetting(
+            "accentColor".to_string(),
+            serde_json::json!("emerald"),
+        ));
+        assert_eq!(
+            app.palette.accent,
+            accent_color_from_name("emerald", app.palette.is_dark)
+        );
+        assert_eq!(app.settings.get("accentColor"), Some(&serde_json::json!("emerald")));
+
+        // Update terminal shell input
+        let _ = app.update(Message::UpdateShellInput("pwsh.exe".to_string()));
+        assert_eq!(app.settings_state.terminal_shell_input, "pwsh.exe");
+
+        // Verify view renders with settings tab active
+        app.tab_manager.open_tab(WorkspaceTab {
+            id: "tab-settings".to_string(),
+            title: "Settings".to_string(),
+            content: TabContent::Settings,
+        });
+        let _settings_view = app.view();
+    }
+
+    #[test]
+    fn test_app_reset_settings_to_defaults() {
+        let mut app = OrbitApp::new();
+        let _ = app.update(Message::UpdateSetting(
+            "themeMode".to_string(),
+            serde_json::json!("light"),
+        ));
+        assert!(!app.palette.is_dark);
+
+        let _ = app.update(Message::ResetSettingsToDefaults);
+        assert!(app.palette.is_dark);
+        assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("dark")));
+        assert_eq!(
+            app.settings_state.feedback_message,
+            Some("Default settings restored".to_string())
+        );
     }
 }

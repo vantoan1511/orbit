@@ -1,6 +1,6 @@
 use iced::{
     border::Radius,
-    widget::{button, container, pick_list, row, text},
+    widget::{button, container, pick_list, row, text, text_input, toggler},
     Background, Border, Color, Element, Shadow, Theme,
 };
 use orbit_core::command::ResourceKind;
@@ -800,6 +800,106 @@ pub fn tab_strip_container_style<'a>(
     }
 }
 
+pub fn accent_color_from_name(name: &str, is_dark: bool) -> Color {
+    match name.to_ascii_lowercase().as_str() {
+        "emerald" => {
+            if is_dark {
+                Color::from_rgb8(0x34, 0xd3, 0x99)
+            } else {
+                Color::from_rgb8(0x10, 0xb9, 0x81)
+            }
+        }
+        "rose" => {
+            if is_dark {
+                Color::from_rgb8(0xfb, 0x71, 0x85)
+            } else {
+                Color::from_rgb8(0xf4, 0x3f, 0x5e)
+            }
+        }
+        "amber" => {
+            if is_dark {
+                Color::from_rgb8(0xfb, 0xbf, 0x24)
+            } else {
+                Color::from_rgb8(0xf5, 0x9e, 0x0b)
+            }
+        }
+        _ => {
+            if is_dark {
+                Color::from_rgb8(0x6a, 0xa8, 0xff)
+            } else {
+                Color::from_rgb8(0x4f, 0x8c, 0xff)
+            }
+        }
+    }
+}
+
+pub fn divider_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        background: Some(Background::Color(palette.border)),
+        ..Default::default()
+    }
+}
+
+pub fn toggler_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme, toggler::Status) -> toggler::Style + 'a {
+    move |_theme, status| {
+        let is_toggled = match status {
+            toggler::Status::Active { is_toggled } => is_toggled,
+            toggler::Status::Hovered { is_toggled } => is_toggled,
+            toggler::Status::Disabled => false,
+        };
+        let bg = if is_toggled {
+            palette.accent
+        } else {
+            palette.bg_hover
+        };
+        let fg = if is_toggled {
+            palette.text_primary
+        } else {
+            palette.text_muted
+        };
+        toggler::Style {
+            background: bg,
+            background_border_width: 0.0,
+            background_border_color: Color::TRANSPARENT,
+            foreground: fg,
+            foreground_border_width: 0.0,
+            foreground_border_color: Color::TRANSPARENT,
+        }
+    }
+}
+
+pub fn text_input_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme, text_input::Status) -> text_input::Style + 'a {
+    move |_theme, status| {
+        let is_focused = matches!(
+            status,
+            text_input::Status::Focused | text_input::Status::Hovered
+        );
+        let border_color = if is_focused {
+            palette.accent
+        } else {
+            palette.border
+        };
+        text_input::Style {
+            background: Background::Color(palette.bg_card),
+            border: Border {
+                color: border_color,
+                width: 1.0,
+                radius: Radius::from(4.0),
+            },
+            icon: palette.text_muted,
+            placeholder: palette.text_muted,
+            value: palette.text_primary,
+            selection: Color::from_rgba(palette.accent.r, palette.accent.g, palette.accent.b, 0.3),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1026,5 +1126,53 @@ mod tests {
         let close_hover = window_control_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
         assert_eq!(close_hover.background, Some(Background::Color(Color::from_rgb8(0xe1, 0x1d, 0x48))));
         assert_eq!(close_hover.text_color, Color::WHITE);
+    }
+
+    #[test]
+    fn test_settings_widget_styles_and_accent_palette_mappings() {
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        // Accent color helper tests
+        let dark_blue = accent_color_from_name("blue", true);
+        let dark_emerald = accent_color_from_name("emerald", true);
+        let dark_rose = accent_color_from_name("rose", true);
+        let dark_amber = accent_color_from_name("amber", true);
+
+        assert_eq!(dark_blue, Color::from_rgb8(0x6a, 0xa8, 0xff));
+        assert_eq!(dark_emerald, Color::from_rgb8(0x34, 0xd3, 0x99));
+        assert_eq!(dark_rose, Color::from_rgb8(0xfb, 0x71, 0x85));
+        assert_eq!(dark_amber, Color::from_rgb8(0xfb, 0xbf, 0x24));
+
+        let light_blue = accent_color_from_name("blue", false);
+        let light_emerald = accent_color_from_name("emerald", false);
+        let light_rose = accent_color_from_name("rose", false);
+        let light_amber = accent_color_from_name("amber", false);
+
+        assert_eq!(light_blue, Color::from_rgb8(0x4f, 0x8c, 0xff));
+        assert_eq!(light_emerald, Color::from_rgb8(0x10, 0xb9, 0x81));
+        assert_eq!(light_rose, Color::from_rgb8(0xf4, 0x3f, 0x5e));
+        assert_eq!(light_amber, Color::from_rgb8(0xf5, 0x9e, 0x0b));
+
+        // Unknown color falls back to blue
+        assert_eq!(accent_color_from_name("other", true), dark_blue);
+        assert_eq!(accent_color_from_name("other", false), light_blue);
+
+        // Divider style tests
+        let div = divider_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(div.background, Some(Background::Color(dark.border)));
+        let div_light = divider_style(&light)(&iced::Theme::Light);
+        assert_eq!(div_light.background, Some(Background::Color(light.border)));
+
+        // Toggler style tests
+        let tog_active = toggler_style(&dark)(&iced::Theme::Dark, iced::widget::toggler::Status::Active { is_toggled: true });
+        let tog_inactive = toggler_style(&dark)(&iced::Theme::Dark, iced::widget::toggler::Status::Active { is_toggled: false });
+        assert_eq!(tog_active.background, dark.accent);
+        assert_eq!(tog_inactive.background, dark.bg_hover);
+
+        // Text input style tests
+        let ti_active = text_input_style(&dark)(&iced::Theme::Dark, iced::widget::text_input::Status::Active);
+        assert_eq!(ti_active.background, Background::Color(dark.bg_card));
+        assert_eq!(ti_active.border.color, dark.border);
     }
 }
