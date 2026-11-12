@@ -287,11 +287,7 @@ pub fn activity_bar_view<'a>(
     .style(activity_bar_item_style(palette, false))
     .width(Length::Fixed(36.0))
     .height(Length::Fixed(36.0))
-    .on_press(Message::OpenTab(WorkspaceTab {
-        id: "tab-events".to_string(),
-        title: "Events".to_string(),
-        content: TabContent::ResourceTable(ResourceKind::Event),
-    }));
+    .on_press(Message::OpenResource(ResourceKind::Event, "Events".to_string()));
 
     cat_col = cat_col
         .push(settings_btn)
@@ -474,11 +470,16 @@ pub fn sub_sidebar_view<'a>(
                 )
                 .style(sub_sidebar_item_style(palette, is_active))
                 .width(Length::Fill)
-                .on_press(Message::OpenTab(WorkspaceTab {
-                    id: format!("tab-{}", item.label.to_lowercase().replace(' ', "-")),
-                    title: item.label.to_string(),
-                    content: item.content.clone(),
-                }));
+                .on_press(match &item.content {
+                    TabContent::ResourceTable(kind) => {
+                        Message::OpenResource(*kind, item.label.to_string())
+                    }
+                    _ => Message::OpenTab(WorkspaceTab {
+                        id: format!("tab-{}", item.label.to_lowercase().replace(' ', "-")),
+                        title: item.label.to_string(),
+                        content: item.content.clone(),
+                    }),
+                });
 
                 sub_col = sub_col.push(btn);
             }

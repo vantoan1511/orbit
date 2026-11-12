@@ -28,10 +28,10 @@ impl OrbitPalette {
     pub fn dark() -> Self {
         Self {
             is_dark: true,
-            bg_app: Color::from_rgb8(0x09, 0x09, 0x0b),
+            bg_app: Color::from_rgba8(12, 12, 15, 0.75),
             bg_sidebar: Color::from_rgb8(0x0c, 0x0c, 0x0e),
             bg_panel: Color::from_rgb8(0x18, 0x18, 0x1b),
-            bg_card: Color::from_rgb8(0x12, 0x12, 0x15),
+            bg_card: Color::from_rgba8(26, 26, 32, 0.80),
             bg_hover: Color::from_rgb8(0x22, 0x22, 0x26),
             border: Color::from_rgb8(0x27, 0x27, 0x2a),
             text_primary: Color::from_rgb(0.95, 0.96, 0.98),   // #f2f5fa
@@ -48,12 +48,12 @@ impl OrbitPalette {
     pub fn light() -> Self {
         Self {
             is_dark: false,
-            bg_app: Color::from_rgb(0.98, 0.98, 0.99),
-            bg_sidebar: Color::from_rgb(0.94, 0.95, 0.97),
-            bg_panel: Color::from_rgb(1.0, 1.0, 1.0),
-            bg_card: Color::from_rgb(1.0, 1.0, 1.0),
-            bg_hover: Color::from_rgb(0.92, 0.93, 0.96),
-            border: Color::from_rgb8(0xe4, 0xe4, 0xe7),
+            bg_app: Color::from_rgba8(245, 245, 248, 0.80),
+            bg_sidebar: Color::from_rgb8(236, 238, 243),
+            bg_panel: Color::from_rgb8(240, 242, 246),
+            bg_card: Color::from_rgba8(255, 255, 255, 0.70),
+            bg_hover: Color::from_rgb8(226, 228, 235),
+            border: Color::from_rgb8(0xd4, 0xd4, 0xd8),
             text_primary: Color::from_rgb(0.08, 0.09, 0.11),
             text_secondary: Color::from_rgb(0.35, 0.38, 0.44),
             text_muted: Color::from_rgb(0.55, 0.58, 0.65),
@@ -65,12 +65,20 @@ impl OrbitPalette {
         }
     }
 
+    pub fn card_border(&self) -> Color {
+        if self.is_dark {
+            Color::from_rgba(1.0, 1.0, 1.0, 0.08)
+        } else {
+            self.border
+        }
+    }
+
     pub fn card_shadow(&self) -> Shadow {
         Shadow {
             color: if self.is_dark {
                 Color::from_rgba(0.0, 0.0, 0.0, 0.30)
             } else {
-                Color::from_rgba(0.0, 0.0, 0.0, 0.04)
+                Color::from_rgba(0.0, 0.0, 0.0, 0.07)
             },
             offset: Vector::new(0.0, 2.0),
             blur_radius: 8.0,
@@ -211,7 +219,7 @@ pub fn tab_button_style<'a>(
             if palette.is_dark {
                 Some(Background::Color(Color::from_rgb8(0x27, 0x27, 0x2a)))
             } else {
-                Some(Background::Color(Color::from_rgb8(0xe4, 0xe4, 0xe7)))
+                Some(Background::Color(palette.border))
             }
         } else if is_hovered {
             Some(Background::Color(palette.bg_hover))
@@ -280,7 +288,7 @@ pub fn window_control_button_style<'a>(
                 let hover_bg = if palette.is_dark {
                     Color::from_rgb8(0x27, 0x27, 0x2a)
                 } else {
-                    Color::from_rgb8(0xe4, 0xe4, 0xe7)
+                    palette.border
                 };
                 (
                     Some(Background::Color(hover_bg)),
@@ -521,7 +529,7 @@ pub fn card_container_style<'a>(
         text_color: Some(palette.text_primary),
         background: Some(Background::Color(palette.bg_card)),
         border: Border {
-            color: palette.border,
+            color: palette.card_border(),
             width: 1.0,
             radius: Radius::from(8.0),
         },
@@ -1024,9 +1032,10 @@ mod tests {
         assert!(dark.is_dark);
 
         // Slate/Zinc exact dark tokens
-        assert_eq!(dark.bg_app, Color::from_rgb8(0x09, 0x09, 0x0b));
+        assert_eq!(dark.bg_app, Color::from_rgba8(12, 12, 15, 0.75));
         assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0c, 0x0c, 0x0e));
         assert_eq!(dark.bg_panel, Color::from_rgb8(0x18, 0x18, 0x1b));
+        assert_eq!(dark.bg_card, Color::from_rgba8(26, 26, 32, 0.80));
         assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
         assert_eq!(dark.bg_hover, Color::from_rgb8(0x22, 0x22, 0x26));
 
@@ -1200,7 +1209,7 @@ mod tests {
         assert_eq!(dark_active.border.width, 2.0);
 
         let light_active = tab_button_style(&light, true)(&iced::Theme::Light, iced::widget::button::Status::Active);
-        assert_eq!(light_active.background, Some(Background::Color(Color::from_rgb8(0xe4, 0xe4, 0xe7))));
+        assert_eq!(light_active.background, Some(Background::Color(light.border)));
         assert_eq!(light_active.text_color, light.text_primary);
         assert_eq!(light_active.border.color, light.border);
         assert_eq!(light_active.border.width, 1.0);
@@ -1234,7 +1243,7 @@ mod tests {
         assert_eq!(min_hover_dark.text_color, dark.text_primary);
 
         let min_hover_light = window_control_button_style(&light, false)(&iced::Theme::Light, iced::widget::button::Status::Hovered);
-        assert_eq!(min_hover_light.background, Some(Background::Color(Color::from_rgb8(0xe4, 0xe4, 0xe7))));
+        assert_eq!(min_hover_light.background, Some(Background::Color(light.border)));
         assert_eq!(min_hover_light.text_color, light.text_primary);
 
         let close_hover = window_control_button_style(&dark, true)(&iced::Theme::Dark, iced::widget::button::Status::Hovered);
@@ -1307,13 +1316,44 @@ mod tests {
     }
 
     #[test]
+    fn test_dark_surfaces_are_translucent() {
+        let dark = OrbitPalette::dark();
+        assert_eq!(dark.bg_app, Color::from_rgba8(12, 12, 15, 0.75));
+        assert_eq!(dark.bg_card, Color::from_rgba8(26, 26, 32, 0.80));
+    }
+
+    #[test]
+    fn test_light_surfaces_match_spec_and_have_hierarchy() {
+        let light = OrbitPalette::light();
+        assert_eq!(light.bg_app, Color::from_rgba8(245, 245, 248, 0.80));
+        assert_eq!(light.bg_card, Color::from_rgba8(255, 255, 255, 0.70));
+        assert_eq!(light.border, Color::from_rgb8(0xd4, 0xd4, 0xd8));
+        assert_ne!(light.bg_card, light.bg_panel);
+        assert_ne!(light.bg_panel, light.bg_app);
+        assert_ne!(light.bg_card, light.bg_app);
+    }
+
+    #[test]
+    fn test_text_colors_opaque() {
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        assert_eq!(dark.text_primary.a, 1.0);
+        assert_eq!(dark.text_secondary.a, 1.0);
+        assert_eq!(dark.text_muted.a, 1.0);
+        assert_eq!(light.text_primary.a, 1.0);
+        assert_eq!(light.text_secondary.a, 1.0);
+        assert_eq!(light.text_muted.a, 1.0);
+    }
+
+    #[test]
     fn test_depth_elevation_shadows_and_radii() {
         let dark = OrbitPalette::dark();
         let light = OrbitPalette::light();
 
         // Standardized border colors
         assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
-        assert_eq!(light.border, Color::from_rgb8(0xe4, 0xe4, 0xe7));
+        assert_eq!(light.border, Color::from_rgb8(0xd4, 0xd4, 0xd8));
 
         // Shadows
         assert_eq!(dark.card_shadow().blur_radius, 8.0);

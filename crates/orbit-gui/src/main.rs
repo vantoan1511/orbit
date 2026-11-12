@@ -1,4 +1,4 @@
-use orbit_gui::app::OrbitApp;
+use orbit_gui::app::{backdrop_task, OrbitApp};
 
 fn main() -> iced::Result {
     let hidden = orbit_gui::tray::is_hidden_launch(std::env::args());
@@ -14,5 +14,9 @@ fn main() -> iced::Result {
             transparent: true,
             ..Default::default()
         })
-        .run()
+        .run_with(|| {
+            let app = OrbitApp::new();
+            let is_dark = app.palette.is_dark;
+            (app, backdrop_task(is_dark))
+        })
 }

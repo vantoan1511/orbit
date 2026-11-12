@@ -23,7 +23,10 @@ tray-icon = "0.19"
 muda = "0.15"
 single-instance = "0.3"
 
+raw-window-handle = "0.6"
+
 [target.'cfg(windows)'.dependencies]
+window-vibrancy = "0.5"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_Shell",

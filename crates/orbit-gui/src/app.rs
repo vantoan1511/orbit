@@ -46,6 +46,16 @@ pub fn send_core_command(cmd: CoreCommand) {
     }
 }
 
+pub fn backdrop_task(is_dark: bool) -> Task<Message> {
+    iced::window::get_latest()
+        .and_then(move |id| {
+            iced::window::run_with_handle(id, move |h| {
+                crate::os::apply_backdrop(&h, is_dark)
+            })
+        })
+        .map(Message::BackdropApplied)
+}
+
 #[derive(Debug, Clone)]
 pub enum Message {
     CoreEventReceived(CoreEvent),
@@ -54,6 +64,7 @@ pub enum Message {
     SelectNamespace(Option<String>),
     SearchFilterChanged(String),
     OpenTab(WorkspaceTab),
+    OpenResource(ResourceKind, String),
     CloseTab(String),
     SelectTab(String),
     OpenModal(ActiveModal),
@@ -74,6 +85,7 @@ pub enum Message {
     UpdateSetting(String, serde_json::Value),
     UpdateShellInput(String),
     ResetSettingsToDefaults,
+    BackdropApplied(Result<crate::os::BackdropKind, String>),
     #[cfg(debug_assertions)]
     ShowcaseMessage(crate::views::showcase::ShowcaseMessage),
 }
@@ -335,12 +347,18 @@ impl OrbitApp {
                     self.cluster_store.clusters = clusters;
                     self.settings = settings;
 
+                    let mut tasks = Vec::new();
+
                     if let Some(theme) = self.settings.get("themeMode").and_then(|v| v.as_str()) {
+                        let prev_is_dark = self.palette.is_dark;
                         self.palette = if theme == "light" {
                             OrbitPalette::light()
                         } else {
                             OrbitPalette::dark()
                         };
+                        if self.palette.is_dark != prev_is_dark {
+                            tasks.push(backdrop_task(self.palette.is_dark));
+                        }
                     }
                     if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
                         self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
@@ -357,13 +375,18 @@ impl OrbitApp {
                         });
                         if let Some(target_id) = target {
                             self.has_auto_connected = true;
-                            return self.update(Message::SelectCluster(Some(target_id)));
+                            tasks.push(self.update(Message::SelectCluster(Some(target_id))));
+                            return Task::batch(tasks);
                         } else {
                             self.cluster_store.active_cluster_id = None;
                             self.is_loading_cluster = false;
                         }
                     } else {
                         self.cluster_store.active_cluster_id = active_cluster_id;
+                    }
+
+                    if !tasks.is_empty() {
+                        return Task::batch(tasks);
                     }
                 }
                 CoreEvent::ClustersUpdated { clusters } => {
@@ -424,6 +447,9 @@ impl OrbitApp {
             Message::OpenTab(tab) => {
                 self.tab_manager.open_tab(tab);
             }
+            Message::OpenResource(kind, title) => {
+                self.tab_manager.open_resource(kind, title);
+            }
             Message::CloseTab(tab_id) => {
                 self.tab_manager.close_tab(&tab_id);
             }
@@ -451,6 +477,17 @@ impl OrbitApp {
                 if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
                     self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
                 }
+                return backdrop_task(self.palette.is_dark);
+            }
+            Message::BackdropApplied(res) => {
+                match res {
+                    Ok(kind) => {
+                        tracing::info!("Window backdrop applied: {kind:?}");
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to apply window backdrop: {e}");
+                    }
+                }
             }
             Message::SearchEverywhereQueryChanged(query) => {
                 self.active_modal = ActiveModal::SearchEverywhere {
@@ -462,7 +499,14 @@ impl OrbitApp {
                 if let ActiveModal::SearchEverywhere { ref query, .. } = self.active_modal {
                     let results = self.search_everywhere(query);
                     if let Some(tab) = results.get(idx).and_then(|item| item.target_tab.as_ref()) {
-                        self.tab_manager.open_tab(tab.clone());
+                        match &tab.content {
+                            TabContent::ResourceTable(kind) => {
+                                self.tab_manager.open_resource(*kind, tab.title.clone());
+                            }
+                            _ => {
+                                self.tab_manager.open_tab(tab.clone());
+                            }
+                        }
                     }
                 }
                 self.active_modal = ActiveModal::None;
@@ -533,9 +577,12 @@ impl OrbitApp {
                     send_core_command(CoreCommand::SetLaunchOnStartup { enabled });
                 }
                 send_core_command(CoreCommand::UpdateAppSettings {
-                    values: [(key, val)].into_iter().collect(),
+                    values: [(key.clone(), val)].into_iter().collect(),
                 });
                 self.settings_state.feedback_message = Some("Settings saved".to_string());
+                if key == "themeMode" {
+                    return backdrop_task(self.palette.is_dark);
+                }
             }
             Message::ResetSettingsToDefaults => {
                 let defs = orbit_core::config::Configuration::system_definitions();
@@ -550,10 +597,14 @@ impl OrbitApp {
                     send_core_command(CoreCommand::SetLaunchOnStartup { enabled });
                 }
                 send_core_command(CoreCommand::UpdateAppSettings { values: reset_map });
+                let was_light = !self.palette.is_dark;
                 self.palette = OrbitPalette::dark();
                 self.settings_state.terminal_shell_input = None;
                 self.settings_state.feedback_message =
                     Some("Default settings restored".to_string());
+                if was_light {
+                    return backdrop_task(true);
+                }
             }
             #[cfg(debug_assertions)]
             Message::ShowcaseMessage(msg) => {
@@ -583,6 +634,8 @@ impl OrbitApp {
                                 .into_iter()
                                 .collect(),
                         });
+                        self.showcase_state.update(msg);
+                        return backdrop_task(self.palette.is_dark);
                     }
                     _ => {}
                 }
@@ -1236,19 +1289,13 @@ mod tests {
         assert_eq!(app.tab_manager.tabs[0].id, "tab-overview");
         assert_eq!(app.tab_manager.tabs[0].title, "Overview");
 
-        let pod_tab = WorkspaceTab {
-            id: "nav-pods".into(),
-            title: "Pods".into(),
-            content: TabContent::ResourceTable(ResourceKind::Pod),
-        };
-
-        // Open Pods once
-        let _ = app.update(Message::OpenTab(pod_tab.clone()));
+        // Open Pods once via OpenResource
+        let _ = app.update(Message::OpenResource(ResourceKind::Pod, "Pods".into()));
         assert_eq!(app.tab_manager.tabs.len(), 2);
         assert_eq!(app.tab_manager.active_tab().unwrap().title, "Pods");
 
         // Open Pods second time (duplicate)
-        let _ = app.update(Message::OpenTab(pod_tab));
+        let _ = app.update(Message::OpenResource(ResourceKind::Pod, "Pods".into()));
         assert_eq!(app.tab_manager.tabs.len(), 2, "Tab count must remain 2 after duplicate open");
         assert_eq!(app.tab_manager.active_tab().unwrap().title, "Pods");
 
@@ -1260,6 +1307,38 @@ mod tests {
                 tab.title
             );
         }
+    }
+
+    #[test]
+    fn test_sidebar_clicks_never_exceed_four_tabs() {
+        let mut app = OrbitApp::new();
+        let kinds = [
+            (ResourceKind::Pod, "Pods"),
+            (ResourceKind::Deployment, "Deployments"),
+            (ResourceKind::Service, "Services"),
+            (ResourceKind::ConfigMap, "ConfigMaps"),
+            (ResourceKind::Secret, "Secrets"),
+            (ResourceKind::Ingress, "Ingresses"),
+            (ResourceKind::Node, "Nodes"),
+            (ResourceKind::Job, "Jobs"),
+            (ResourceKind::DaemonSet, "DaemonSets"),
+            (ResourceKind::StatefulSet, "StatefulSets"),
+        ];
+
+        for (kind, title) in kinds {
+            let _ = app.update(Message::OpenResource(kind, title.into()));
+            assert!(app.tab_manager.tabs.len() <= 4);
+        }
+
+        // Overview + single Resources tab
+        assert_eq!(app.tab_manager.tabs.len(), 2);
+        assert_eq!(app.tab_manager.tabs[0].id, "tab-overview");
+        assert_eq!(app.tab_manager.tabs[1].id, crate::state::tabs::RESOURCES_TAB_ID);
+        assert_eq!(app.tab_manager.tabs[1].title, "StatefulSets");
+        assert_eq!(
+            app.tab_manager.active_tab().map(|t| &t.content),
+            Some(&TabContent::ResourceTable(ResourceKind::StatefulSet))
+        );
     }
 
     #[test]
@@ -1498,5 +1577,25 @@ mod tests {
         ));
         assert!(!app.palette.is_dark);
         assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("light")));
+    }
+
+    #[test]
+    fn test_toggle_theme_returns_backdrop_task() {
+        let mut app = OrbitApp::new();
+        assert!(app.palette.is_dark);
+
+        // Toggle to light mode
+        let _task = app.update(Message::ToggleTheme);
+        assert!(!app.palette.is_dark);
+
+        // Toggle back to dark mode
+        let _task = app.update(Message::ToggleTheme);
+        assert!(app.palette.is_dark);
+
+        // Verify BackdropApplied handler logs and never panics on Ok or Err
+        let _ = app.update(Message::BackdropApplied(Ok(crate::os::BackdropKind::Mica)));
+        let _ = app.update(Message::BackdropApplied(Ok(crate::os::BackdropKind::Acrylic)));
+        let _ = app.update(Message::BackdropApplied(Ok(crate::os::BackdropKind::None)));
+        let _ = app.update(Message::BackdropApplied(Err("simulated backdrop error".to_string())));
     }
 }

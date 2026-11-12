@@ -19,11 +19,20 @@ pub enum TabContent {
     Showcase,
 }
 
+pub const MAX_OPEN_TABS: usize = 4;
+pub const RESOURCES_TAB_ID: &str = "tab-resources";
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceTab {
     pub id: String,
     pub title: String,
     pub content: TabContent,
+}
+
+impl WorkspaceTab {
+    pub fn pinned(&self) -> bool {
+        matches!(self.content, TabContent::Dashboard)
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -43,9 +52,35 @@ impl TabManager {
             return;
         }
 
+        while self.tabs.len() >= MAX_OPEN_TABS {
+            if let Some(pos) = self
+                .tabs
+                .iter()
+                .position(|t| !t.pinned() && self.active_tab_id.as_deref() != Some(&t.id))
+            {
+                self.tabs.remove(pos);
+            } else {
+                break;
+            }
+        }
+
         let new_id = tab.id.clone();
         self.tabs.push(tab);
         self.active_tab_id = Some(new_id);
+    }
+
+    pub fn open_resource(&mut self, kind: ResourceKind, title: String) {
+        if let Some(tab) = self.tabs.iter_mut().find(|t| t.id == RESOURCES_TAB_ID) {
+            tab.content = TabContent::ResourceTable(kind);
+            tab.title = title;
+            self.active_tab_id = Some(RESOURCES_TAB_ID.to_string());
+        } else {
+            self.open_tab(WorkspaceTab {
+                id: RESOURCES_TAB_ID.to_string(),
+                title,
+                content: TabContent::ResourceTable(kind),
+            });
+        }
     }
 
     pub fn select_tab(&mut self, tab_id: &str) {
@@ -83,6 +118,31 @@ impl TabManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_open_resource_reuses_single_tab() {
+        let mut mgr = TabManager::new();
+        mgr.open_resource(ResourceKind::Pod, "Pods".to_string());
+        assert_eq!(mgr.tabs.len(), 1);
+        assert_eq!(mgr.tabs[0].id, RESOURCES_TAB_ID);
+        assert_eq!(mgr.tabs[0].title, "Pods");
+        assert_eq!(mgr.tabs[0].content, TabContent::ResourceTable(ResourceKind::Pod));
+        assert_eq!(mgr.active_tab_id.as_deref(), Some(RESOURCES_TAB_ID));
+
+        mgr.open_resource(ResourceKind::Deployment, "Deployments".to_string());
+        assert_eq!(mgr.tabs.len(), 1);
+        assert_eq!(mgr.tabs[0].id, RESOURCES_TAB_ID);
+        assert_eq!(mgr.tabs[0].title, "Deployments");
+        assert_eq!(mgr.tabs[0].content, TabContent::ResourceTable(ResourceKind::Deployment));
+        assert_eq!(mgr.active_tab_id.as_deref(), Some(RESOURCES_TAB_ID));
+
+        mgr.open_resource(ResourceKind::Service, "Services".to_string());
+        assert_eq!(mgr.tabs.len(), 1);
+        assert_eq!(mgr.tabs[0].id, RESOURCES_TAB_ID);
+        assert_eq!(mgr.tabs[0].title, "Services");
+        assert_eq!(mgr.tabs[0].content, TabContent::ResourceTable(ResourceKind::Service));
+        assert_eq!(mgr.active_tab_id.as_deref(), Some(RESOURCES_TAB_ID));
+    }
 
     #[test]
     fn test_tab_manager_open_deduplicates_existing_tab_and_close_selects_neighbor() {
@@ -168,5 +228,116 @@ mod tests {
         mgr.open_tab(tab2);
         assert_eq!(mgr.tabs.len(), 1);
         assert_eq!(mgr.active_tab_id.as_deref(), Some("tab-showcase"));
+    }
+
+    #[test]
+    fn test_open_tab_caps_at_four_and_evicts_oldest_unpinned() {
+        let mut mgr = TabManager::new();
+        // Open Overview (pinned)
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-overview".to_string(),
+            title: "Overview".to_string(),
+            content: TabContent::Dashboard,
+        });
+        // Open Settings
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-settings".to_string(),
+            title: "Settings".to_string(),
+            content: TabContent::Settings,
+        });
+        // Open Logs(a)
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-logs-a".to_string(),
+            title: "Logs: nginx-a".to_string(),
+            content: TabContent::LogViewer {
+                namespace: "default".to_string(),
+                pod: "nginx-a".to_string(),
+                container: None,
+            },
+        });
+        // Open Yaml(a)
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-yaml-a".to_string(),
+            title: "YAML: pod-a".to_string(),
+            content: TabContent::YamlEditor {
+                kind: "Pod".to_string(),
+                name: "pod-a".to_string(),
+                namespace: Some("default".to_string()),
+            },
+        });
+        assert_eq!(mgr.tabs.len(), 4);
+
+        // Open Logs(b) - 5th tab
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-logs-b".to_string(),
+            title: "Logs: nginx-b".to_string(),
+            content: TabContent::LogViewer {
+                namespace: "default".to_string(),
+                pod: "nginx-b".to_string(),
+                container: None,
+            },
+        });
+
+        assert_eq!(mgr.tabs.len(), 4);
+        assert!(mgr.tabs.iter().any(|t| t.id == "tab-overview"));
+        assert!(!mgr.tabs.iter().any(|t| t.id == "tab-settings"));
+        assert_eq!(mgr.active_tab_id.as_deref(), Some("tab-logs-b"));
+    }
+
+    #[test]
+    fn test_active_and_overview_never_evicted() {
+        let mut mgr = TabManager::new();
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-overview".to_string(),
+            title: "Overview".to_string(),
+            content: TabContent::Dashboard,
+        });
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-a".to_string(),
+            title: "Tab A".to_string(),
+            content: TabContent::Settings,
+        });
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-b".to_string(),
+            title: "Tab B".to_string(),
+            content: TabContent::LogViewer {
+                namespace: "default".to_string(),
+                pod: "pod-b".to_string(),
+                container: None,
+            },
+        });
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-c".to_string(),
+            title: "Tab C".to_string(),
+            content: TabContent::YamlEditor {
+                kind: "Pod".to_string(),
+                name: "pod-c".to_string(),
+                namespace: Some("default".to_string()),
+            },
+        });
+        assert_eq!(mgr.tabs.len(), 4);
+
+        // Select Tab A so it becomes active
+        mgr.select_tab("tab-a");
+        assert_eq!(mgr.active_tab_id.as_deref(), Some("tab-a"));
+
+        // Open Tab D: active (tab-a) and Overview must not be evicted; tab-b is oldest unpinned & non-active
+        mgr.open_tab(WorkspaceTab {
+            id: "tab-d".to_string(),
+            title: "Tab D".to_string(),
+            content: TabContent::LogViewer {
+                namespace: "default".to_string(),
+                pod: "pod-d".to_string(),
+                container: None,
+            },
+        });
+
+        assert_eq!(mgr.tabs.len(), 4);
+        assert!(mgr.tabs.iter().any(|t| t.id == "tab-overview"));
+        assert!(mgr.tabs.iter().any(|t| t.id == "tab-a"));
+        assert!(!mgr.tabs.iter().any(|t| t.id == "tab-b"));
+        assert!(mgr.tabs.iter().any(|t| t.id == "tab-c"));
+        assert!(mgr.tabs.iter().any(|t| t.id == "tab-d"));
+        assert_eq!(mgr.active_tab_id.as_deref(), Some("tab-d"));
     }
 }
