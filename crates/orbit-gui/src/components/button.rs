@@ -41,10 +41,7 @@ impl ButtonSize {
     }
 
     pub fn radius(&self) -> f32 {
-        match self {
-            Self::Small | Self::Medium => 4.0,
-            Self::Large => 6.0,
-        }
+        6.0
     }
 }
 
@@ -83,14 +80,24 @@ pub fn button_style<'a>(
             };
         }
 
-        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let is_pressed = matches!(status, button::Status::Pressed);
+        let is_hovered = matches!(status, button::Status::Hovered);
+        let pressed_bg = palette.pressed_bg();
 
         match variant {
             ButtonVariant::Primary => {
-                let bg = if is_hovered {
-                    Color::from_rgba(palette.accent.r, palette.accent.g, palette.accent.b, 0.85)
+                let (bg, shadow) = if is_pressed {
+                    (
+                        Color::from_rgba(palette.accent.r, palette.accent.g, palette.accent.b, 0.75),
+                        palette.primary_button_shadow(true),
+                    )
+                } else if is_hovered {
+                    (
+                        Color::from_rgba(palette.accent.r, palette.accent.g, palette.accent.b, 0.90),
+                        palette.primary_button_shadow(false),
+                    )
                 } else {
-                    palette.accent
+                    (palette.accent, palette.primary_button_shadow(false))
                 };
                 button::Style {
                     background: Some(Background::Color(bg)),
@@ -100,11 +107,13 @@ pub fn button_style<'a>(
                         width: 1.0,
                         radius,
                     },
-                    shadow: Shadow::default(),
+                    shadow,
                 }
             }
             ButtonVariant::Secondary => {
-                let (bg, border_color) = if is_hovered {
+                let (bg, border_color) = if is_pressed {
+                    (pressed_bg, palette.accent)
+                } else if is_hovered {
                     (palette.bg_hover, palette.accent)
                 } else {
                     (palette.bg_card, palette.border)
@@ -121,7 +130,9 @@ pub fn button_style<'a>(
                 }
             }
             ButtonVariant::Outline => {
-                let (bg, border_color) = if is_hovered {
+                let (bg, border_color) = if is_pressed {
+                    (Some(Background::Color(pressed_bg)), palette.accent)
+                } else if is_hovered {
                     (Some(Background::Color(palette.bg_hover)), palette.accent)
                 } else {
                     (None, palette.border)
@@ -138,7 +149,17 @@ pub fn button_style<'a>(
                 }
             }
             ButtonVariant::Ghost => {
-                let (bg, text_color, border) = if is_hovered {
+                let (bg, text_color, border) = if is_pressed {
+                    (
+                        Some(Background::Color(pressed_bg)),
+                        palette.text_primary,
+                        Border {
+                            color: palette.accent,
+                            width: 1.0,
+                            radius,
+                        },
+                    )
+                } else if is_hovered {
                     (
                         Some(Background::Color(palette.bg_hover)),
                         palette.text_primary,
@@ -166,13 +187,34 @@ pub fn button_style<'a>(
                 }
             }
             ButtonVariant::Destructive => {
-                let (bg, text_color, border_color) = if is_hovered {
-                    (palette.danger, Color::WHITE, palette.danger)
+                let (bg, text_color, border_color, shadow) = if is_pressed {
+                    (
+                        Color::from_rgba(palette.danger.r, palette.danger.g, palette.danger.b, 0.75),
+                        Color::WHITE,
+                        palette.danger,
+                        Shadow {
+                            color: Color::from_rgba(palette.danger.r, palette.danger.g, palette.danger.b, 0.20),
+                            offset: iced::Vector::new(0.0, 1.0),
+                            blur_radius: 2.0,
+                        },
+                    )
+                } else if is_hovered {
+                    (
+                        palette.danger,
+                        Color::WHITE,
+                        palette.danger,
+                        Shadow {
+                            color: Color::from_rgba(palette.danger.r, palette.danger.g, palette.danger.b, 0.35),
+                            offset: iced::Vector::new(0.0, 2.0),
+                            blur_radius: 4.0,
+                        },
+                    )
                 } else {
                     (
                         Color::from_rgba(palette.danger.r, palette.danger.g, palette.danger.b, 0.15),
                         palette.danger,
                         Color::from_rgba(palette.danger.r, palette.danger.g, palette.danger.b, 0.35),
+                        Shadow::default(),
                     )
                 };
                 button::Style {
@@ -183,11 +225,13 @@ pub fn button_style<'a>(
                         width: 1.0,
                         radius,
                     },
-                    shadow: Shadow::default(),
+                    shadow,
                 }
             }
             ButtonVariant::IconOnly => {
-                let (bg, text_color, border_color) = if is_hovered {
+                let (bg, text_color, border_color) = if is_pressed {
+                    (Some(Background::Color(pressed_bg)), palette.text_primary, palette.accent)
+                } else if is_hovered {
                     (Some(Background::Color(palette.bg_hover)), palette.text_primary, palette.accent)
                 } else {
                     (None, palette.text_secondary, palette.border)
@@ -404,5 +448,55 @@ mod tests {
         assert_eq!(disabled.background, None);
 
         let _outline: Element<'_, ()> = outline_button("outline", Some(()), &palette);
+    }
+
+    #[test]
+    fn test_button_micro_interactions_and_standardized_radius() {
+        let palette = OrbitPalette::dark();
+
+        // 1. Standardized 6.0px radii for all sizes
+        assert_eq!(ButtonSize::Small.radius(), 6.0);
+        assert_eq!(ButtonSize::Medium.radius(), 6.0);
+        assert_eq!(ButtonSize::Large.radius(), 6.0);
+
+        // 2. Primary button micro-interactions
+        let primary_style = button_style(ButtonVariant::Primary, ButtonSize::Medium, &palette, false);
+        let normal = primary_style(&Theme::Dark, button::Status::Active);
+        let hovered = primary_style(&Theme::Dark, button::Status::Hovered);
+        let pressed = primary_style(&Theme::Dark, button::Status::Pressed);
+
+        assert_eq!(normal.shadow.blur_radius, 6.0);
+        assert_eq!(normal.shadow.offset.y, 2.0);
+        assert_eq!(hovered.shadow.blur_radius, 6.0);
+        assert_eq!(pressed.shadow.blur_radius, 3.0);
+        assert_eq!(pressed.shadow.offset.y, 1.0);
+
+        // Pressed background has deeper/different tint than normal
+        assert_ne!(pressed.background, normal.background);
+
+        // 3. Secondary & Outline micro-interactions
+        let sec_style = button_style(ButtonVariant::Secondary, ButtonSize::Medium, &palette, false);
+        let sec_hovered = sec_style(&Theme::Dark, button::Status::Hovered);
+        let sec_pressed = sec_style(&Theme::Dark, button::Status::Pressed);
+
+        if let (Some(Background::Color(h_bg)), Some(Background::Color(p_bg))) =
+            (sec_hovered.background, sec_pressed.background)
+        {
+            assert!(p_bg.r < h_bg.r);
+        } else {
+            panic!("Secondary hovered and pressed must have solid backgrounds");
+        }
+
+        let out_style = button_style(ButtonVariant::Outline, ButtonSize::Medium, &palette, false);
+        let out_hovered = out_style(&Theme::Dark, button::Status::Hovered);
+        let out_pressed = out_style(&Theme::Dark, button::Status::Pressed);
+
+        if let (Some(Background::Color(h_bg)), Some(Background::Color(p_bg))) =
+            (out_hovered.background, out_pressed.background)
+        {
+            assert!(p_bg.r < h_bg.r);
+        } else {
+            panic!("Outline hovered and pressed must have solid backgrounds");
+        }
     }
 }

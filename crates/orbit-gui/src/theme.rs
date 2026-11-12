@@ -1,7 +1,7 @@
 use iced::{
     border::Radius,
     widget::{button, container, pick_list, row, text, text_input, toggler},
-    Background, Border, Color, Element, Shadow, Theme,
+    Background, Border, Color, Element, Shadow, Theme, Vector,
 };
 use orbit_core::command::ResourceKind;
 
@@ -53,7 +53,7 @@ impl OrbitPalette {
             bg_panel: Color::from_rgb(1.0, 1.0, 1.0),
             bg_card: Color::from_rgb(1.0, 1.0, 1.0),
             bg_hover: Color::from_rgb(0.92, 0.93, 0.96),
-            border: Color::from_rgb(0.85, 0.87, 0.91),
+            border: Color::from_rgb8(0xe4, 0xe4, 0xe7),
             text_primary: Color::from_rgb(0.08, 0.09, 0.11),
             text_secondary: Color::from_rgb(0.35, 0.38, 0.44),
             text_muted: Color::from_rgb(0.55, 0.58, 0.65),
@@ -62,6 +62,66 @@ impl OrbitPalette {
             warning: Color::from_rgb(0.85, 0.65, 0.15),
             danger: Color::from_rgb(0.85, 0.25, 0.25),
             info: Color::from_rgb(0.25, 0.55, 0.90),
+        }
+    }
+
+    pub fn card_shadow(&self) -> Shadow {
+        Shadow {
+            color: if self.is_dark {
+                Color::from_rgba(0.0, 0.0, 0.0, 0.30)
+            } else {
+                Color::from_rgba(0.0, 0.0, 0.0, 0.04)
+            },
+            offset: Vector::new(0.0, 2.0),
+            blur_radius: 8.0,
+        }
+    }
+
+    pub fn modal_shadow(&self) -> Shadow {
+        Shadow {
+            color: if self.is_dark {
+                Color::from_rgba(0.0, 0.0, 0.0, 0.45)
+            } else {
+                Color::from_rgba(0.0, 0.0, 0.0, 0.12)
+            },
+            offset: Vector::new(0.0, 12.0),
+            blur_radius: 32.0,
+        }
+    }
+
+    pub fn primary_button_shadow(&self, is_pressed: bool) -> Shadow {
+        if is_pressed {
+            Shadow {
+                color: Color::from_rgba(self.accent.r, self.accent.g, self.accent.b, 0.15),
+                offset: Vector::new(0.0, 1.0),
+                blur_radius: 3.0,
+            }
+        } else {
+            Shadow {
+                color: Color::from_rgba(self.accent.r, self.accent.g, self.accent.b, 0.35),
+                offset: Vector::new(0.0, 2.0),
+                blur_radius: 6.0,
+            }
+        }
+    }
+
+    pub fn segmented_pill_shadow(&self) -> Shadow {
+        Shadow {
+            color: if self.is_dark {
+                Color::from_rgba(0.0, 0.0, 0.0, 0.35)
+            } else {
+                Color::from_rgba(0.0, 0.0, 0.0, 0.08)
+            },
+            offset: Vector::new(0.0, 1.0),
+            blur_radius: 3.0,
+        }
+    }
+
+    pub fn pressed_bg(&self) -> Color {
+        if self.is_dark {
+            Color::from_rgb8(0x18, 0x18, 0x1c)
+        } else {
+            Color::from_rgb8(0xe2, 0xe4, 0xe9)
         }
     }
 
@@ -463,9 +523,76 @@ pub fn card_container_style<'a>(
         border: Border {
             color: palette.border,
             width: 1.0,
-            radius: Radius::from(6.0),
+            radius: Radius::from(8.0),
         },
-        shadow: Shadow::default(),
+        shadow: palette.card_shadow(),
+    }
+}
+
+pub fn panel_container_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_panel)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::from(8.0),
+        },
+        shadow: palette.card_shadow(),
+    }
+}
+
+pub fn modal_dialog_style<'a>(
+    palette: &'a OrbitPalette,
+) -> impl Fn(&Theme) -> container::Style + 'a {
+    move |_theme| container::Style {
+        text_color: Some(palette.text_primary),
+        background: Some(Background::Color(palette.bg_panel)),
+        border: Border {
+            color: palette.border,
+            width: 1.0,
+            radius: Radius::from(8.0),
+        },
+        shadow: palette.modal_shadow(),
+    }
+}
+
+pub fn segmented_button_style<'a>(
+    palette: &'a OrbitPalette,
+    is_selected: bool,
+) -> impl Fn(&Theme, button::Status) -> button::Style + 'a {
+    move |_theme, status| {
+        let is_hovered = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        if is_selected {
+            button::Style {
+                background: Some(Background::Color(palette.bg_card)),
+                text_color: palette.text_primary,
+                border: Border {
+                    color: palette.border,
+                    width: 1.0,
+                    radius: Radius::from(6.0),
+                },
+                shadow: palette.segmented_pill_shadow(),
+            }
+        } else {
+            let bg = if is_hovered {
+                Some(Background::Color(palette.bg_hover))
+            } else {
+                None
+            };
+            button::Style {
+                background: bg,
+                text_color: if is_hovered { palette.text_primary } else { palette.text_secondary },
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: Radius::from(6.0),
+                },
+                shadow: Shadow::default(),
+            }
+        }
     }
 }
 
@@ -758,7 +885,7 @@ pub fn empty_state_container_style<'a>(
             width: 1.0,
             radius: Radius::from(8.0),
         },
-        shadow: Shadow::default(),
+        shadow: palette.card_shadow(),
     }
 }
 
@@ -867,21 +994,17 @@ pub fn text_input_style<'a>(
     palette: &'a OrbitPalette,
 ) -> impl Fn(&Theme, text_input::Status) -> text_input::Style + 'a {
     move |_theme, status| {
-        let is_focused = matches!(
-            status,
-            text_input::Status::Focused | text_input::Status::Hovered
-        );
-        let border_color = if is_focused {
-            palette.accent
-        } else {
-            palette.border
+        let (border_color, border_width) = match status {
+            text_input::Status::Focused => (palette.accent, 2.0),
+            text_input::Status::Hovered => (palette.text_secondary, 1.0),
+            text_input::Status::Active | text_input::Status::Disabled => (palette.border, 1.0),
         };
         text_input::Style {
             background: Background::Color(palette.bg_card),
             border: Border {
                 color: border_color,
-                width: 1.0,
-                radius: Radius::from(4.0),
+                width: border_width,
+                radius: Radius::from(6.0),
             },
             icon: palette.text_muted,
             placeholder: palette.text_muted,
@@ -1181,5 +1304,59 @@ mod tests {
             color_to_hex(Color::from_rgb8(0x18, 0x18, 0x1b)),
             "#18181b"
         );
+    }
+
+    #[test]
+    fn test_depth_elevation_shadows_and_radii() {
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        // Standardized border colors
+        assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
+        assert_eq!(light.border, Color::from_rgb8(0xe4, 0xe4, 0xe7));
+
+        // Shadows
+        assert_eq!(dark.card_shadow().blur_radius, 8.0);
+        assert_eq!(dark.card_shadow().offset.y, 2.0);
+        assert_eq!(light.card_shadow().blur_radius, 8.0);
+        assert_eq!(light.card_shadow().offset.y, 2.0);
+
+        assert_eq!(dark.modal_shadow().blur_radius, 32.0);
+        assert_eq!(dark.modal_shadow().offset.y, 12.0);
+        assert_eq!(light.modal_shadow().blur_radius, 32.0);
+        assert_eq!(light.modal_shadow().offset.y, 12.0);
+
+        assert_eq!(dark.primary_button_shadow(false).blur_radius, 6.0);
+        assert_eq!(dark.primary_button_shadow(false).offset.y, 2.0);
+        assert_eq!(dark.primary_button_shadow(true).blur_radius, 3.0);
+        assert_eq!(dark.primary_button_shadow(true).offset.y, 1.0);
+
+        assert_eq!(dark.segmented_pill_shadow().blur_radius, 3.0);
+        assert_eq!(dark.segmented_pill_shadow().offset.y, 1.0);
+
+        // Container styles
+        let card = card_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(card.border.radius, Radius::from(8.0));
+        assert_eq!(card.shadow, dark.card_shadow());
+
+        let empty = empty_state_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(empty.border.radius, Radius::from(8.0));
+        assert_eq!(empty.shadow, dark.card_shadow());
+
+        // Text input focus ring & radius
+        let ti_focused = text_input_style(&dark)(&iced::Theme::Dark, iced::widget::text_input::Status::Focused);
+        assert_eq!(ti_focused.border.width, 2.0);
+        assert_eq!(ti_focused.border.color, dark.accent);
+        assert_eq!(ti_focused.border.radius, Radius::from(6.0));
+
+        let ti_hovered = text_input_style(&dark)(&iced::Theme::Dark, iced::widget::text_input::Status::Hovered);
+        assert_eq!(ti_hovered.border.width, 1.0);
+        assert_eq!(ti_hovered.border.color, dark.text_secondary);
+        assert_eq!(ti_hovered.border.radius, Radius::from(6.0));
+
+        let ti_active = text_input_style(&dark)(&iced::Theme::Dark, iced::widget::text_input::Status::Active);
+        assert_eq!(ti_active.border.width, 1.0);
+        assert_eq!(ti_active.border.color, dark.border);
+        assert_eq!(ti_active.border.radius, Radius::from(6.0));
     }
 }

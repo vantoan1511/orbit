@@ -23,6 +23,9 @@ use crate::theme::{
     text_input_style, toggler_style, OrbitPalette,
 };
 
+pub use crate::theme::panel_container_style as preview_card_style;
+pub use crate::theme::segmented_button_style;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShowcaseSection {
     All,
@@ -160,15 +163,7 @@ fn preview_box_card<'a, Message: 'a>(
     container(card_content)
         .padding(16)
         .width(Length::Fill)
-        .style(move |_| container::Style {
-            background: Some(iced::Background::Color(palette.bg_panel)),
-            border: iced::Border {
-                color: palette.border,
-                width: 1.0,
-                radius: iced::border::Radius::from(6.0),
-            },
-            ..Default::default()
-        })
+        .style(preview_card_style(palette))
         .into()
 }
 
@@ -522,7 +517,7 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             border: iced::Border {
                 color: palette.border,
                 width: 1.0,
-                radius: iced::border::Radius::from(4.0),
+                radius: iced::border::Radius::from(6.0),
             },
             ..Default::default()
         });
@@ -589,33 +584,22 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
         let btn = button(
             text(seg)
                 .size(11)
-                .color(if is_selected { Color::WHITE } else { palette.text_secondary }),
+                .color(if is_selected { palette.text_primary } else { palette.text_secondary }),
         )
         .padding([4, 10])
-        .style(move |_theme, _status| button::Style {
-            background: if is_selected {
-                Some(iced::Background::Color(palette.accent))
-            } else {
-                None
-            },
-            border: iced::Border {
-                radius: iced::border::Radius::from(4.0),
-                ..Default::default()
-            },
-            ..Default::default()
-        })
+        .style(segmented_button_style(palette, is_selected))
         .on_press(on_showcase_msg(ShowcaseMessage::SegmentSelected(seg_str)));
         segment_row = segment_row.push(btn);
     }
 
     let segmented_control = container(segment_row)
-        .padding(2)
+        .padding(3)
         .style(move |_| container::Style {
-            background: Some(iced::Background::Color(palette.bg_hover)),
+            background: Some(iced::Background::Color(palette.bg_sidebar)),
             border: iced::Border {
                 color: palette.border,
                 width: 1.0,
-                radius: iced::border::Radius::from(6.0),
+                radius: iced::border::Radius::from(8.0),
             },
             ..Default::default()
         });
@@ -931,5 +915,31 @@ mod tests {
             let _dark_el: Element<'_, ()> = showcase_view(&s, &dark_palette, |_| (), ());
             let _light_el: Element<'_, ()> = showcase_view(&s, &light_palette, |_| (), ());
         }
+    }
+
+    #[test]
+    fn test_segmented_tab_surface_pill_and_preview_card_elevation() {
+        let dark = OrbitPalette::dark();
+
+        // 1. Preview card style
+        let card = preview_card_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(card.border.radius, iced::border::Radius::from(8.0));
+        assert_eq!(card.shadow, dark.card_shadow());
+
+        // 2. Segmented tab active & inactive button styles
+        let active_seg = segmented_button_style(&dark, true)(&iced::Theme::Dark, button::Status::Active);
+        assert_eq!(active_seg.background, Some(iced::Background::Color(dark.bg_card)));
+        assert_eq!(active_seg.text_color, dark.text_primary);
+        assert_eq!(active_seg.border.radius, iced::border::Radius::from(6.0));
+        assert_eq!(active_seg.shadow, dark.segmented_pill_shadow());
+
+        let inactive_seg = segmented_button_style(&dark, false)(&iced::Theme::Dark, button::Status::Active);
+        assert!(inactive_seg.background.is_none());
+        assert_eq!(inactive_seg.text_color, dark.text_secondary);
+        assert_eq!(inactive_seg.border.radius, iced::border::Radius::from(6.0));
+
+        let inactive_hover = segmented_button_style(&dark, false)(&iced::Theme::Dark, button::Status::Hovered);
+        assert_eq!(inactive_hover.background, Some(iced::Background::Color(dark.bg_hover)));
+        assert_eq!(inactive_hover.text_color, dark.text_primary);
     }
 }

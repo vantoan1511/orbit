@@ -81,7 +81,7 @@ pub fn badge<'a, Message: 'a>(
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: Radius::from(9999.0),
+                    radius: Radius::from(999.0),
                 },
                 ..Default::default()
             });
@@ -101,7 +101,7 @@ pub fn badge<'a, Message: 'a>(
             border: Border {
                 color: border_color,
                 width: 1.0,
-                radius: Radius::from(9999.0),
+                radius: Radius::from(999.0),
             },
             ..Default::default()
         })

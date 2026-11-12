@@ -65,7 +65,7 @@ pub fn alert_banner<'a, Message: 'a>(
             border: Border {
                 color: border_color,
                 width: 1.0,
-                radius: Radius::from(6.0),
+                radius: Radius::from(8.0),
             },
             ..Default::default()
         })
@@ -214,5 +214,13 @@ mod tests {
                 palette,
             );
         }
+    }
+
+    #[test]
+    fn test_card_elevation_and_radii() {
+        let palette = OrbitPalette::dark();
+        let card_style = card_container_style(&palette)(&iced::Theme::Dark);
+        assert_eq!(card_style.border.radius, Radius::from(8.0));
+        assert_eq!(card_style.shadow, palette.card_shadow());
     }
 }

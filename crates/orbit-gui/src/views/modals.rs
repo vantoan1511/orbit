@@ -1,5 +1,6 @@
 use orbit_core::command::ResourceKind;
 use crate::state::tabs::WorkspaceTab;
+use crate::theme::modal_dialog_style;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AddClusterModalMode {
@@ -108,6 +109,7 @@ pub fn modal_view<'a, Message: 'a + Clone>(
                 .spacing(12)
                 .padding(16),
             )
+            .style(modal_dialog_style(palette))
             .width(Length::Fixed(560.0));
 
             Some(
@@ -139,6 +141,7 @@ pub fn modal_view<'a, Message: 'a + Clone>(
                 .spacing(16)
                 .padding(20),
             )
+            .style(modal_dialog_style(palette))
             .width(Length::Fixed(440.0));
 
             Some(
@@ -165,6 +168,7 @@ pub fn modal_view<'a, Message: 'a + Clone>(
                 .spacing(16)
                 .padding(20),
             )
+            .style(modal_dialog_style(palette))
             .width(Length::Fixed(440.0));
 
             Some(
@@ -185,6 +189,7 @@ pub fn modal_view<'a, Message: 'a + Clone>(
                 .spacing(16)
                 .padding(20),
             )
+            .style(modal_dialog_style(palette))
             .width(Length::Fixed(400.0));
 
             Some(
@@ -196,5 +201,19 @@ pub fn modal_view<'a, Message: 'a + Clone>(
                     .into(),
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_modal_dialog_elevation_and_radius() {
+        let dark = crate::theme::OrbitPalette::dark();
+        let modal = modal_dialog_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(modal.border.radius, iced::border::Radius::from(8.0));
+        assert_eq!(modal.shadow, dark.modal_shadow());
+        assert_eq!(modal.background, Some(iced::Background::Color(dark.bg_panel)));
     }
 }
