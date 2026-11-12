@@ -557,6 +557,35 @@ impl OrbitApp {
             }
             #[cfg(debug_assertions)]
             Message::ShowcaseMessage(msg) => {
+                match &msg {
+                    crate::views::showcase::ShowcaseMessage::SetAccentColor(accent) => {
+                        self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
+                        self.settings.insert("accentColor".to_string(), serde_json::json!(accent));
+                        send_core_command(CoreCommand::UpdateAppSettings {
+                            values: [("accentColor".to_string(), serde_json::json!(accent))]
+                                .into_iter()
+                                .collect(),
+                        });
+                    }
+                    crate::views::showcase::ShowcaseMessage::ToggleTheme => {
+                        self.palette = if self.palette.is_dark {
+                            OrbitPalette::light()
+                        } else {
+                            OrbitPalette::dark()
+                        };
+                        let theme_str = if self.palette.is_dark { "dark" } else { "light" };
+                        self.settings.insert("themeMode".to_string(), serde_json::json!(theme_str));
+                        if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
+                            self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
+                        }
+                        send_core_command(CoreCommand::UpdateAppSettings {
+                            values: [("themeMode".to_string(), serde_json::json!(theme_str))]
+                                .into_iter()
+                                .collect(),
+                        });
+                    }
+                    _ => {}
+                }
                 self.showcase_state.update(msg);
             }
         }
@@ -1449,5 +1478,25 @@ mod tests {
             crate::views::showcase::ShowcaseMessage::IncrementCounter,
         ));
         assert_eq!(app.showcase_state.sample_counter, 6);
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    fn test_app_showcase_live_accent_and_theme_mutation() {
+        let mut app = OrbitApp::new();
+        assert!(app.palette.is_dark);
+
+        let emerald = accent_color_from_name("emerald", app.palette.is_dark);
+        let _ = app.update(Message::ShowcaseMessage(
+            crate::views::showcase::ShowcaseMessage::SetAccentColor("emerald".to_string()),
+        ));
+        assert_eq!(app.palette.accent, emerald);
+        assert_eq!(app.settings.get("accentColor"), Some(&serde_json::json!("emerald")));
+
+        let _ = app.update(Message::ShowcaseMessage(
+            crate::views::showcase::ShowcaseMessage::ToggleTheme,
+        ));
+        assert!(!app.palette.is_dark);
+        assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("light")));
     }
 }

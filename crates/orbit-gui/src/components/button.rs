@@ -10,6 +10,7 @@ use crate::theme::OrbitPalette;
 pub enum ButtonVariant {
     Primary,
     Secondary,
+    Outline,
     Ghost,
     Destructive,
     IconOnly,
@@ -57,7 +58,7 @@ pub fn button_style<'a>(
         let radius = Radius::from(size.radius());
         if is_disabled {
             let bg = match variant {
-                ButtonVariant::Ghost => None,
+                ButtonVariant::Ghost | ButtonVariant::Outline => None,
                 _ => Some(Background::Color(Color::from_rgba(
                     palette.bg_hover.r,
                     palette.bg_hover.g,
@@ -110,6 +111,23 @@ pub fn button_style<'a>(
                 };
                 button::Style {
                     background: Some(Background::Color(bg)),
+                    text_color: palette.text_primary,
+                    border: Border {
+                        color: border_color,
+                        width: 1.0,
+                        radius,
+                    },
+                    shadow: Shadow::default(),
+                }
+            }
+            ButtonVariant::Outline => {
+                let (bg, border_color) = if is_hovered {
+                    (Some(Background::Color(palette.bg_hover)), palette.accent)
+                } else {
+                    (None, palette.border)
+                };
+                button::Style {
+                    background: bg,
                     text_color: palette.text_primary,
                     border: Border {
                         color: border_color,
@@ -240,6 +258,20 @@ pub fn secondary_button<'a, Message: 'a + Clone>(
     )
 }
 
+pub fn outline_button<'a, Message: 'a + Clone>(
+    label: impl Into<String>,
+    on_press: Option<Message>,
+    palette: &'a OrbitPalette,
+) -> Element<'a, Message> {
+    custom_button(
+        text(label.into()).size(ButtonSize::Medium.text_size()),
+        ButtonVariant::Outline,
+        ButtonSize::Medium,
+        on_press,
+        palette,
+    )
+}
+
 pub fn ghost_button<'a, Message: 'a + Clone>(
     label: impl Into<String>,
     on_press: Option<Message>,
@@ -287,6 +319,7 @@ mod tests {
         let variants = [
             ButtonVariant::Primary,
             ButtonVariant::Secondary,
+            ButtonVariant::Outline,
             ButtonVariant::Ghost,
             ButtonVariant::Destructive,
             ButtonVariant::IconOnly,
@@ -307,6 +340,11 @@ mod tests {
                     assert_eq!(hovered.text_color, Color::WHITE);
                 }
                 ButtonVariant::Secondary => {
+                    assert_eq!(normal.text_color, palette.text_primary);
+                    assert_eq!(normal.border.color, palette.border);
+                    assert_eq!(hovered.border.color, palette.accent);
+                }
+                ButtonVariant::Outline => {
                     assert_eq!(normal.text_color, palette.text_primary);
                     assert_eq!(normal.border.color, palette.border);
                     assert_eq!(hovered.border.color, palette.accent);
@@ -343,5 +381,28 @@ mod tests {
         let _ghost: Element<'_, ()> = ghost_button("edit", Some(()), &palette);
         let _destr: Element<'_, ()> = destructive_button("delete", Some(()), &palette);
         let _ico: Element<'_, ()> = icon_button(text("X"), ButtonSize::Small, Some(()), &palette);
+    }
+
+    #[test]
+    fn test_outline_button_styling() {
+        let palette = OrbitPalette::dark();
+        let style_fn = button_style(ButtonVariant::Outline, ButtonSize::Medium, &palette, false);
+        let normal = style_fn(&Theme::Dark, button::Status::Active);
+        let hovered = style_fn(&Theme::Dark, button::Status::Hovered);
+
+        assert_eq!(normal.background, None);
+        assert_eq!(normal.text_color, palette.text_primary);
+        assert_eq!(normal.border.color, palette.border);
+
+        assert_eq!(hovered.background, Some(Background::Color(palette.bg_hover)));
+        assert_eq!(hovered.text_color, palette.text_primary);
+        assert_eq!(hovered.border.color, palette.accent);
+
+        let disabled_style_fn = button_style(ButtonVariant::Outline, ButtonSize::Medium, &palette, true);
+        let disabled = disabled_style_fn(&Theme::Dark, button::Status::Active);
+        assert_eq!(disabled.text_color, palette.text_muted);
+        assert_eq!(disabled.background, None);
+
+        let _outline: Element<'_, ()> = outline_button("outline", Some(()), &palette);
     }
 }

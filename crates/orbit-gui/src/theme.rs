@@ -786,6 +786,13 @@ pub fn accent_color_from_name(name: &str, is_dark: bool) -> Color {
                 Color::from_rgb8(0x10, 0xb9, 0x81)
             }
         }
+        "violet" => {
+            if is_dark {
+                Color::from_rgb8(0xa7, 0x8b, 0xfa)
+            } else {
+                Color::from_rgb8(0x8b, 0x5c, 0xf6)
+            }
+        }
         "rose" => {
             if is_dark {
                 Color::from_rgb8(0xfb, 0x71, 0x85)
@@ -808,6 +815,13 @@ pub fn accent_color_from_name(name: &str, is_dark: bool) -> Color {
             }
         }
     }
+}
+
+pub fn color_to_hex(color: Color) -> String {
+    let r = (color.r * 255.0).round().clamp(0.0, 255.0) as u8;
+    let g = (color.g * 255.0).round().clamp(0.0, 255.0) as u8;
+    let b = (color.b * 255.0).round().clamp(0.0, 255.0) as u8;
+    format!("#{r:02x}{g:02x}{b:02x}")
 }
 
 pub fn divider_style<'a>(
@@ -1151,5 +1165,21 @@ mod tests {
         let ti_active = text_input_style(&dark)(&iced::Theme::Dark, iced::widget::text_input::Status::Active);
         assert_eq!(ti_active.background, Background::Color(dark.bg_card));
         assert_eq!(ti_active.border.color, dark.border);
+    }
+
+    #[test]
+    fn test_violet_accent_and_hex_formatter() {
+        assert_eq!(
+            accent_color_from_name("violet", true),
+            Color::from_rgb8(0xa7, 0x8b, 0xfa)
+        );
+        assert_eq!(
+            accent_color_from_name("violet", false),
+            Color::from_rgb8(0x8b, 0x5c, 0xf6)
+        );
+        assert_eq!(
+            color_to_hex(Color::from_rgb8(0x18, 0x18, 0x1b)),
+            "#18181b"
+        );
     }
 }

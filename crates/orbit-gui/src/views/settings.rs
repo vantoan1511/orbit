@@ -41,12 +41,19 @@ impl fmt::Display for ThemeModeOption {
 pub enum AccentColorOption {
     Blue,
     Emerald,
+    Violet,
     Rose,
     Amber,
 }
 
 impl AccentColorOption {
-    pub const ALL: &'static [Self] = &[Self::Blue, Self::Emerald, Self::Rose, Self::Amber];
+    pub const ALL: &'static [Self] = &[
+        Self::Blue,
+        Self::Emerald,
+        Self::Violet,
+        Self::Rose,
+        Self::Amber,
+    ];
 }
 
 impl fmt::Display for AccentColorOption {
@@ -54,6 +61,7 @@ impl fmt::Display for AccentColorOption {
         match self {
             Self::Blue => write!(f, "Blue"),
             Self::Emerald => write!(f, "Emerald"),
+            Self::Violet => write!(f, "Violet"),
             Self::Rose => write!(f, "Rose"),
             Self::Amber => write!(f, "Amber"),
         }
@@ -116,6 +124,7 @@ pub fn theme_mode_to_json(opt: ThemeModeOption) -> serde_json::Value {
 pub fn parse_accent_color(val: Option<&serde_json::Value>) -> AccentColorOption {
     match val.and_then(|v| v.as_str()) {
         Some("emerald") => AccentColorOption::Emerald,
+        Some("violet") => AccentColorOption::Violet,
         Some("rose") => AccentColorOption::Rose,
         Some("amber") => AccentColorOption::Amber,
         _ => AccentColorOption::Blue,
@@ -126,6 +135,7 @@ pub fn accent_color_to_json(opt: AccentColorOption) -> serde_json::Value {
     match opt {
         AccentColorOption::Blue => serde_json::json!("blue"),
         AccentColorOption::Emerald => serde_json::json!("emerald"),
+        AccentColorOption::Violet => serde_json::json!("violet"),
         AccentColorOption::Rose => serde_json::json!("rose"),
         AccentColorOption::Amber => serde_json::json!("amber"),
     }
@@ -458,6 +468,7 @@ mod tests {
         assert_eq!(theme_mode_to_json(ThemeModeOption::System), serde_json::json!("system"));
 
         assert_eq!(parse_accent_color(Some(&serde_json::json!("emerald"))), AccentColorOption::Emerald);
+        assert_eq!(parse_accent_color(Some(&serde_json::json!("violet"))), AccentColorOption::Violet);
         assert_eq!(parse_accent_color(Some(&serde_json::json!("rose"))), AccentColorOption::Rose);
         assert_eq!(parse_accent_color(Some(&serde_json::json!("amber"))), AccentColorOption::Amber);
         assert_eq!(parse_accent_color(Some(&serde_json::json!("blue"))), AccentColorOption::Blue);
@@ -465,6 +476,7 @@ mod tests {
 
         assert_eq!(accent_color_to_json(AccentColorOption::Blue), serde_json::json!("blue"));
         assert_eq!(accent_color_to_json(AccentColorOption::Emerald), serde_json::json!("emerald"));
+        assert_eq!(accent_color_to_json(AccentColorOption::Violet), serde_json::json!("violet"));
         assert_eq!(accent_color_to_json(AccentColorOption::Rose), serde_json::json!("rose"));
         assert_eq!(accent_color_to_json(AccentColorOption::Amber), serde_json::json!("amber"));
 
