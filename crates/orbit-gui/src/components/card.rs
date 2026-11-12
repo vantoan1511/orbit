@@ -1,12 +1,13 @@
 use iced::{
+    Background, Border, Color, Element, Font, Length,
     border::Radius,
+    font::Weight,
     widget::{column, container, row, text},
-    Background, Border, Color, Element, Length,
 };
 
-use crate::icons::{icon, Icon};
-use crate::theme::{card_container_style, OrbitPalette};
 use super::form_row::form_divider;
+use crate::icons::{Icon, icon};
+use crate::theme::{OrbitPalette, card_container_style};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertLevel {
@@ -48,7 +49,9 @@ pub fn alert_banner<'a, Message: 'a>(
 
     let icon_el = icon(level.icon(), 16, accent_color);
     let title_el = text(title.into()).size(13).color(palette.text_primary);
-    let desc_el = text(description.into()).size(12).color(palette.text_secondary);
+    let desc_el = text(description.into())
+        .size(12)
+        .color(palette.text_secondary);
 
     let text_col = column![title_el, desc_el].spacing(2).width(Length::Fill);
 
@@ -83,6 +86,10 @@ pub fn container_card<'a, Message: 'a>(
         .into()
 }
 
+pub fn metric_label(label: &str) -> String {
+    label.to_uppercase()
+}
+
 pub fn metric_card<'a, Message: 'a>(
     title: impl Into<String>,
     value: impl Into<String>,
@@ -90,22 +97,29 @@ pub fn metric_card<'a, Message: 'a>(
     watermark_icon: Option<Icon>,
     palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
+    let title_str = title.into();
     let text_col = column![
-        text(title.into()).size(12).color(palette.text_secondary),
-        text(value.into()).size(24).color(palette.text_primary),
+        text(metric_label(&title_str))
+            .size(10)
+            .color(palette.text_secondary)
+            .font(Font {
+                weight: Weight::Semibold,
+                ..Default::default()
+            }),
+        text(value.into())
+            .size(24)
+            .color(palette.text_primary)
+            .font(Font {
+                weight: Weight::Bold,
+                ..Default::default()
+            }),
         text(subtitle.into()).size(11).color(palette.text_muted),
     ]
-    .spacing(4)
+    .spacing(6)
     .width(Length::Fill);
 
     let card_content = if let Some(ic) = watermark_icon {
-        let watermark_color = Color::from_rgba(
-            palette.text_primary.r,
-            palette.text_primary.g,
-            palette.text_primary.b,
-            0.18,
-        );
-        let icon_el = icon(ic, 24, watermark_color);
+        let icon_el = icon(ic, 20, palette.icon_watermark());
         row![text_col, icon_el]
             .spacing(8)
             .align_y(iced::Alignment::Start)
@@ -114,7 +128,7 @@ pub fn metric_card<'a, Message: 'a>(
     };
 
     container(card_content)
-        .padding(14)
+        .padding(16)
         .width(Length::FillPortion(1))
         .style(card_container_style(palette))
         .into()
@@ -149,6 +163,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_icon_watermark_visible_opacity() {
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        for palette in [&dark, &light] {
+            let a = palette.icon_watermark().a;
+            assert!(
+                (0.40..=0.50).contains(&a),
+                "watermark alpha {} out of [0.40, 0.50]",
+                a
+            );
+        }
+    }
+
+    #[test]
+    fn test_metric_label_uppercased() {
+        assert_eq!(metric_label("Nodes"), "NODES");
+        assert_eq!(metric_label("Active Pods"), "ACTIVE PODS");
+        assert_eq!(metric_label("deployments"), "DEPLOYMENTS");
+    }
+
+    #[test]
     fn test_metric_card_rendering() {
         let palette = OrbitPalette::dark();
         let _card_with_icon: Element<'_, ()> = metric_card(
@@ -158,28 +194,16 @@ mod tests {
             Some(Icon::Server),
             &palette,
         );
-        let _card_no_icon: Element<'_, ()> = metric_card(
-            "DEPLOYMENTS",
-            "12",
-            "Active",
-            None,
-            &palette,
-        );
+        let _card_no_icon: Element<'_, ()> =
+            metric_card("DEPLOYMENTS", "12", "Active", None, &palette);
     }
 
     #[test]
     fn test_section_card_rendering() {
         let palette = OrbitPalette::dark();
-        let rows: Vec<Element<'_, ()>> = vec![
-            text("Row 1").into(),
-            text("Row 2").into(),
-        ];
-        let _section: Element<'_, ()> = section_card(
-            "Section Title",
-            "Section Subtitle",
-            rows,
-            &palette,
-        );
+        let rows: Vec<Element<'_, ()>> = vec![text("Row 1").into(), text("Row 2").into()];
+        let _section: Element<'_, ()> =
+            section_card("Section Title", "Section Subtitle", rows, &palette);
         let _container: Element<'_, ()> = container_card(text("Content"), &palette);
     }
 
@@ -189,38 +213,37 @@ mod tests {
         let light = OrbitPalette::light();
 
         for palette in [&dark, &light] {
-            let _info: Element<'_, ()> = alert_banner(
-                AlertLevel::Info,
-                "Note",
-                "Cluster state synced",
-                palette,
-            );
-            let _success: Element<'_, ()> = alert_banner(
-                AlertLevel::Success,
-                "Success",
-                "Deployment scaled",
-                palette,
-            );
-            let _warning: Element<'_, ()> = alert_banner(
-                AlertLevel::Warning,
-                "Warning",
-                "High memory usage",
-                palette,
-            );
-            let _danger: Element<'_, ()> = alert_banner(
-                AlertLevel::Danger,
-                "Error",
-                "Pod crashed",
-                palette,
-            );
+            let _info: Element<'_, ()> =
+                alert_banner(AlertLevel::Info, "Note", "Cluster state synced", palette);
+            let _success: Element<'_, ()> =
+                alert_banner(AlertLevel::Success, "Success", "Deployment scaled", palette);
+            let _warning: Element<'_, ()> =
+                alert_banner(AlertLevel::Warning, "Warning", "High memory usage", palette);
+            let _danger: Element<'_, ()> =
+                alert_banner(AlertLevel::Danger, "Error", "Pod crashed", palette);
         }
     }
 
     #[test]
     fn test_card_elevation_and_radii() {
-        let palette = OrbitPalette::dark();
-        let card_style = card_container_style(&palette)(&iced::Theme::Dark);
-        assert_eq!(card_style.border.radius, Radius::from(8.0));
-        assert_eq!(card_style.shadow, palette.card_shadow());
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        let card_dark = card_container_style(&dark)(&iced::Theme::Dark);
+        assert_eq!(card_dark.border.radius, Radius::from(8.0));
+        assert_eq!(card_dark.border.width, 1.0);
+        assert_eq!(card_dark.shadow, dark.card_shadow());
+
+        let card_light = card_container_style(&light)(&iced::Theme::Light);
+        assert_eq!(card_light.border.radius, Radius::from(8.0));
+        assert_eq!(card_light.border.width, 1.0);
+        assert_eq!(card_light.border.color, light.border);
+        assert_eq!(card_light.shadow, light.card_shadow());
+        assert_eq!(card_light.shadow.blur_radius, 3.0);
+        if let Some(iced::Background::Color(bg)) = card_light.background {
+            assert_eq!(bg.a, 1.0);
+        } else {
+            panic!("Expected background color for light card");
+        }
     }
 }

@@ -1,26 +1,26 @@
 #![cfg(debug_assertions)]
 
 use iced::{
-    widget::{
-        button, column, container, horizontal_space, pick_list, row, scrollable, text,
-        text_input, toggler,
-    },
     Alignment, Color, Element, Length,
+    widget::{
+        button, column, container, horizontal_space, pick_list, row, scrollable, text, text_input,
+        toggler,
+    },
 };
 use orbit_core::command::ResourceKind;
 
 use crate::components::{
-    badge::{badge, resource_kind_badge, status_dot_pill, status_pill, BadgeSize, BadgeVariant},
+    badge::{BadgeSize, BadgeVariant, badge, resource_kind_badge, status_dot_pill, status_pill},
     button::{
-        custom_button, destructive_button, ghost_button, icon_button, outline_button,
-        primary_button, secondary_button, ButtonSize, ButtonVariant,
+        ButtonSize, ButtonVariant, custom_button, destructive_button, ghost_button, icon_button,
+        outline_button, primary_button, secondary_button,
     },
-    card::{alert_banner, AlertLevel},
+    card::{AlertLevel, alert_banner},
 };
-use crate::icons::{icon, Icon};
+use crate::icons::{Icon, icon};
 use crate::theme::{
-    accent_color_from_name, color_to_hex, ghost_action_button_style, pick_list_style,
-    text_input_style, toggler_style, OrbitPalette,
+    OrbitPalette, accent_color_from_name, color_to_hex, ghost_action_button_style, pick_list_style,
+    text_input_style, toggler_style,
 };
 
 pub use crate::theme::panel_container_style as preview_card_style;
@@ -151,10 +151,12 @@ fn preview_box_card<'a, Message: 'a>(
     ]
     .spacing(2);
 
-    let divider = container(horizontal_space()).height(1).style(move |_| container::Style {
-        background: Some(iced::Background::Color(palette.border)),
-        ..Default::default()
-    });
+    let divider = container(horizontal_space())
+        .height(1)
+        .style(move |_| container::Style {
+            background: Some(iced::Background::Color(palette.border)),
+            ..Default::default()
+        });
 
     let card_content = column![header, divider, content.into()]
         .spacing(12)
@@ -234,13 +236,21 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
     .align_y(Alignment::Center);
 
     // 2. Interactive Live Playground Bar
-    let theme_icon = if palette.is_dark { Icon::Sun } else { Icon::Moon };
+    let theme_icon = if palette.is_dark {
+        Icon::Sun
+    } else {
+        Icon::Moon
+    };
     let theme_btn = button(
         row![
             icon(theme_icon, 14, palette.text_primary),
-            text(if palette.is_dark { "Light Mode" } else { "Dark Mode" })
-                .size(12)
-                .color(palette.text_primary),
+            text(if palette.is_dark {
+                "Light Mode"
+            } else {
+                "Dark Mode"
+            })
+            .size(12)
+            .color(palette.text_primary),
         ]
         .spacing(6)
         .align_y(Alignment::Center),
@@ -263,7 +273,11 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             .style(move |_| container::Style {
                 background: Some(iced::Background::Color(accent_color)),
                 border: iced::Border {
-                    color: if is_active { palette.text_primary } else { Color::TRANSPARENT },
+                    color: if is_active {
+                        palette.text_primary
+                    } else {
+                        Color::TRANSPARENT
+                    },
                     width: if is_active { 2.0 } else { 0.0 },
                     radius: iced::border::Radius::from(8.0),
                 },
@@ -275,7 +289,11 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             .style(move |_theme, _status| button::Style {
                 background: None,
                 border: iced::Border {
-                    color: if is_active { palette.text_primary } else { palette.border },
+                    color: if is_active {
+                        palette.text_primary
+                    } else {
+                        palette.border
+                    },
                     width: 1.0,
                     radius: iced::border::Radius::from(10.0),
                 },
@@ -330,7 +348,11 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
         let is_active = state.active_section == *sec;
         let btn = custom_button(
             text(sec.label()).size(12),
-            if is_active { ButtonVariant::Primary } else { ButtonVariant::Ghost },
+            if is_active {
+                ButtonVariant::Primary
+            } else {
+                ButtonVariant::Ghost
+            },
             ButtonSize::Small,
             Some(on_showcase_msg(ShowcaseMessage::SelectSection(*sec))),
             palette,
@@ -348,8 +370,12 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
         token_chip("bg_panel", palette.bg_panel, palette),
         token_chip("bg_card", palette.bg_card, palette),
         token_chip("bg_hover", palette.bg_hover, palette),
+        token_chip("bg_selected", palette.bg_selected, palette),
+        token_chip("bg_input", palette.bg_input, palette),
         token_chip("border", palette.border, palette),
-        text("Semantic Colors").size(12).color(palette.text_secondary),
+        text("Semantic Colors")
+            .size(12)
+            .color(palette.text_secondary),
         token_chip("accent", palette.accent, palette),
         token_chip("success", palette.success, palette),
         token_chip("warning", palette.warning, palette),
@@ -370,27 +396,37 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
     let variants_row = row![
         primary_button(
             "Primary",
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("primary".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "primary".into()
+            ))),
             palette,
         ),
         secondary_button(
             "Secondary",
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("secondary".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "secondary".into()
+            ))),
             palette,
         ),
         outline_button(
             "Outline",
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("outline".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "outline".into()
+            ))),
             palette,
         ),
         ghost_button(
             "Ghost",
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("ghost".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "ghost".into()
+            ))),
             palette,
         ),
         destructive_button(
             "Destructive",
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("destructive".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "destructive".into()
+            ))),
             palette,
         ),
     ]
@@ -407,7 +443,9 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             .align_y(Alignment::Center),
             ButtonVariant::Secondary,
             ButtonSize::Medium,
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("revert_icon".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "revert_icon".into()
+            ))),
             palette,
         ),
         custom_button(
@@ -419,13 +457,17 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             .align_y(Alignment::Center),
             ButtonVariant::Outline,
             ButtonSize::Medium,
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("add_icon".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "add_icon".into()
+            ))),
             palette,
         ),
         icon_button(
             icon(Icon::Search, 14, palette.text_secondary),
             ButtonSize::Medium,
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("search_icon".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "search_icon".into()
+            ))),
             palette,
         ),
     ]
@@ -437,21 +479,27 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             text("Small (24px)").size(ButtonSize::Small.text_size()),
             ButtonVariant::Secondary,
             ButtonSize::Small,
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("small".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "small".into()
+            ))),
             palette,
         ),
         custom_button(
             text("Medium (32px)").size(ButtonSize::Medium.text_size()),
             ButtonVariant::Secondary,
             ButtonSize::Medium,
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("medium".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "medium".into()
+            ))),
             palette,
         ),
         custom_button(
             text("Large (38px)").size(ButtonSize::Large.text_size()),
             ButtonVariant::Secondary,
             ButtonSize::Large,
-            Some(on_showcase_msg(ShowcaseMessage::TriggerAction("large".into()))),
+            Some(on_showcase_msg(ShowcaseMessage::TriggerAction(
+                "large".into()
+            ))),
             palette,
         ),
     ]
@@ -475,7 +523,9 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
         with_icons_row,
         text("Size Scale").size(12).color(palette.text_secondary),
         sizes_row,
-        text("Disabled States").size(12).color(palette.text_secondary),
+        text("Disabled States")
+            .size(12)
+            .color(palette.text_secondary),
         disabled_row,
     ]
     .spacing(10)
@@ -581,11 +631,11 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
     for seg in segments {
         let is_selected = state.sample_selected_segment == seg;
         let seg_str = seg.to_string();
-        let btn = button(
-            text(seg)
-                .size(11)
-                .color(if is_selected { palette.text_primary } else { palette.text_secondary }),
-        )
+        let btn = button(text(seg).size(11).color(if is_selected {
+            palette.text_primary
+        } else {
+            palette.text_secondary
+        }))
         .padding([4, 10])
         .style(segmented_button_style(palette, is_selected))
         .on_press(on_showcase_msg(ShowcaseMessage::SegmentSelected(seg_str)));
@@ -605,9 +655,13 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
         });
 
     let forms_content = column![
-        text("Search Box with Clear Button").size(12).color(palette.text_secondary),
+        text("Search Box with Clear Button")
+            .size(12)
+            .color(palette.text_secondary),
         search_container,
-        text("Text Input with Focus Ring").size(12).color(palette.text_secondary),
+        text("Text Input with Focus Ring")
+            .size(12)
+            .color(palette.text_secondary),
         input_field,
         row![
             column![
@@ -617,22 +671,34 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
             .spacing(4),
             horizontal_space(),
             column![
-                text("Dropdown Picker").size(12).color(palette.text_secondary),
+                text("Dropdown Picker")
+                    .size(12)
+                    .color(palette.text_secondary),
                 picker,
             ]
             .spacing(4),
         ]
         .align_y(Alignment::Center),
-        text("Segmented Tab Selector").size(12).color(palette.text_secondary),
+        text("Segmented Tab Selector")
+            .size(12)
+            .color(palette.text_secondary),
         segmented_control,
         row![
-            row![tog1, text("Telemetry Stream").size(12).color(palette.text_primary)]
-                .spacing(8)
-                .align_y(Alignment::Center),
+            row![
+                tog1,
+                text("Telemetry Stream")
+                    .size(12)
+                    .color(palette.text_primary)
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
             horizontal_space(),
-            row![tog2, text("Compact Density").size(12).color(palette.text_primary)]
-                .spacing(8)
-                .align_y(Alignment::Center),
+            row![
+                tog2,
+                text("Compact Density").size(12).color(palette.text_primary)
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
         ]
         .align_y(Alignment::Center),
     ]
@@ -648,18 +714,47 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
 
     // Card 4: Badges & Kubernetes Statuses
     let badge_variants_row = row![
-        badge("Success", BadgeVariant::Success, BadgeSize::Small, false, palette),
-        badge("Warning", BadgeVariant::Warning, BadgeSize::Small, false, palette),
-        badge("Danger", BadgeVariant::Danger, BadgeSize::Small, false, palette),
+        badge(
+            "Success",
+            BadgeVariant::Success,
+            BadgeSize::Small,
+            false,
+            palette
+        ),
+        badge(
+            "Warning",
+            BadgeVariant::Warning,
+            BadgeSize::Small,
+            false,
+            palette
+        ),
+        badge(
+            "Danger",
+            BadgeVariant::Danger,
+            BadgeSize::Small,
+            false,
+            palette
+        ),
         badge("Info", BadgeVariant::Info, BadgeSize::Small, false, palette),
-        badge("Neutral", BadgeVariant::Neutral, BadgeSize::Small, false, palette),
+        badge(
+            "Neutral",
+            BadgeVariant::Neutral,
+            BadgeSize::Small,
+            false,
+            palette
+        ),
     ]
     .spacing(6)
     .align_y(Alignment::Center);
 
     let dot_pills_row = row![
         status_dot_pill("Ready (running)", "running", BadgeSize::Small, palette),
-        status_dot_pill("Degraded (crashloop)", "crashloopbackoff", BadgeSize::Small, palette),
+        status_dot_pill(
+            "Degraded (crashloop)",
+            "crashloopbackoff",
+            BadgeSize::Small,
+            palette
+        ),
         status_dot_pill("Pending (waiting)", "pending", BadgeSize::Small, palette),
         status_pill("Active", BadgeSize::Small, palette),
         status_pill("Completed", BadgeSize::Small, palette),
@@ -687,11 +782,17 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
     .align_y(Alignment::Center);
 
     let badges_content = column![
-        text("Semantic Variants").size(12).color(palette.text_secondary),
+        text("Semantic Variants")
+            .size(12)
+            .color(palette.text_secondary),
         badge_variants_row,
-        text("Status Indicators").size(12).color(palette.text_secondary),
+        text("Status Indicators")
+            .size(12)
+            .color(palette.text_secondary),
         dot_pills_row,
-        text("Kubernetes Resource Kinds").size(12).color(palette.text_secondary),
+        text("Kubernetes Resource Kinds")
+            .size(12)
+            .color(palette.text_secondary),
         resource_badges_row_1,
         resource_badges_row_2,
     ]
@@ -712,7 +813,13 @@ pub fn showcase_view<'a, Message: 'a + Clone>(
                 .size(12)
                 .color(palette.text_primary),
             horizontal_space(),
-            badge("BASH", BadgeVariant::Neutral, BadgeSize::Small, false, palette),
+            badge(
+                "BASH",
+                BadgeVariant::Neutral,
+                BadgeSize::Small,
+                false,
+                palette
+            ),
         ]
         .align_y(Alignment::Center)
         .width(Length::Fill),
@@ -927,19 +1034,28 @@ mod tests {
         assert_eq!(card.shadow, dark.card_shadow());
 
         // 2. Segmented tab active & inactive button styles
-        let active_seg = segmented_button_style(&dark, true)(&iced::Theme::Dark, button::Status::Active);
-        assert_eq!(active_seg.background, Some(iced::Background::Color(dark.bg_card)));
+        let active_seg =
+            segmented_button_style(&dark, true)(&iced::Theme::Dark, button::Status::Active);
+        assert_eq!(
+            active_seg.background,
+            Some(iced::Background::Color(dark.bg_card))
+        );
         assert_eq!(active_seg.text_color, dark.text_primary);
         assert_eq!(active_seg.border.radius, iced::border::Radius::from(6.0));
         assert_eq!(active_seg.shadow, dark.segmented_pill_shadow());
 
-        let inactive_seg = segmented_button_style(&dark, false)(&iced::Theme::Dark, button::Status::Active);
+        let inactive_seg =
+            segmented_button_style(&dark, false)(&iced::Theme::Dark, button::Status::Active);
         assert!(inactive_seg.background.is_none());
         assert_eq!(inactive_seg.text_color, dark.text_secondary);
         assert_eq!(inactive_seg.border.radius, iced::border::Radius::from(6.0));
 
-        let inactive_hover = segmented_button_style(&dark, false)(&iced::Theme::Dark, button::Status::Hovered);
-        assert_eq!(inactive_hover.background, Some(iced::Background::Color(dark.bg_hover)));
+        let inactive_hover =
+            segmented_button_style(&dark, false)(&iced::Theme::Dark, button::Status::Hovered);
+        assert_eq!(
+            inactive_hover.background,
+            Some(iced::Background::Color(dark.bg_hover))
+        );
         assert_eq!(inactive_hover.text_color, dark.text_primary);
     }
 }

@@ -1,21 +1,21 @@
-use std::collections::BTreeSet;
 use iced::{
+    Alignment, Element, Length,
     widget::{
         button, column, container, horizontal_space, row, scrollable, text, text_input,
         vertical_space,
     },
-    Alignment, Element, Length,
 };
 use orbit_core::command::ResourceKind;
 use orbit_core::kubernetes::models::ClusterInfo;
+use std::collections::BTreeSet;
 
 use crate::app::Message;
-use crate::icons::{icon, Icon};
+use crate::icons::{Icon, icon};
 use crate::state::tabs::{TabContent, WorkspaceTab};
 use crate::theme::{
-    activity_bar_container_style, activity_bar_item_style, cluster_card_style,
-    cluster_tag_pill_style, ghost_action_button_style, sub_sidebar_container_style,
-    sub_sidebar_item_style, OrbitPalette,
+    OrbitPalette, activity_bar_container_style, activity_bar_item_style, cluster_card_style,
+    cluster_tag_pill_style, ghost_action_button_style, selection_indicator,
+    sub_sidebar_container_style, sub_sidebar_item_style,
 };
 use crate::views::modals::{ActiveModal, AddClusterModalMode};
 
@@ -200,6 +200,10 @@ pub fn activity_bar_view<'a>(
         content: TabContent::Dashboard,
     }));
 
+    let logo_item = row![selection_indicator(palette, false), logo_btn]
+        .spacing(4)
+        .align_y(Alignment::Center);
+
     let categories = [
         (SidebarCategory::Clusters, Icon::Server),
         (SidebarCategory::Workloads, Icon::Boxes),
@@ -208,7 +212,7 @@ pub fn activity_bar_view<'a>(
         (SidebarCategory::Config, Icon::FileCode),
     ];
 
-    let mut cat_col = column![logo_btn].spacing(6).align_x(Alignment::Center);
+    let mut cat_col = column![logo_item].spacing(6).align_x(Alignment::Start);
 
     for (cat, cat_icon) in categories {
         let is_active = active_category == Some(cat);
@@ -217,7 +221,7 @@ pub fn activity_bar_view<'a>(
                 cat_icon,
                 18,
                 if is_active {
-                    palette.accent
+                    palette.text_primary
                 } else {
                     palette.text_secondary
                 },
@@ -230,7 +234,11 @@ pub fn activity_bar_view<'a>(
         .height(Length::Fixed(36.0))
         .on_press(Message::ToggleCategory(cat));
 
-        cat_col = cat_col.push(btn);
+        let item_row = row![selection_indicator(palette, is_active), btn]
+            .spacing(4)
+            .align_y(Alignment::Center);
+
+        cat_col = cat_col.push(item_row);
     }
 
     cat_col = cat_col.push(vertical_space());
@@ -250,7 +258,10 @@ pub fn activity_bar_view<'a>(
             title: "UI Showcase".to_string(),
             content: TabContent::Showcase,
         }));
-        cat_col = cat_col.push(showcase_btn);
+        let showcase_item = row![selection_indicator(palette, false), showcase_btn]
+            .spacing(4)
+            .align_y(Alignment::Center);
+        cat_col = cat_col.push(showcase_item);
     }
 
     // Utility buttons
@@ -268,7 +279,11 @@ pub fn activity_bar_view<'a>(
         content: TabContent::Settings,
     }));
 
-    let theme_icon = if palette.is_dark { Icon::Sun } else { Icon::Moon };
+    let theme_icon = if palette.is_dark {
+        Icon::Sun
+    } else {
+        Icon::Moon
+    };
     let theme_btn = button(
         container(icon(theme_icon, 16, palette.text_secondary))
             .center_x(Length::Fill)
@@ -287,14 +302,27 @@ pub fn activity_bar_view<'a>(
     .style(activity_bar_item_style(palette, false))
     .width(Length::Fixed(36.0))
     .height(Length::Fixed(36.0))
-    .on_press(Message::OpenResource(ResourceKind::Event, "Events".to_string()));
+    .on_press(Message::OpenResource(
+        ResourceKind::Event,
+        "Events".to_string(),
+    ));
+
+    let settings_item = row![selection_indicator(palette, false), settings_btn]
+        .spacing(4)
+        .align_y(Alignment::Center);
+    let theme_item = row![selection_indicator(palette, false), theme_btn]
+        .spacing(4)
+        .align_y(Alignment::Center);
+    let notif_item = row![selection_indicator(palette, false), notif_btn]
+        .spacing(4)
+        .align_y(Alignment::Center);
 
     cat_col = cat_col
-        .push(settings_btn)
-        .push(theme_btn)
-        .push(notif_btn);
+        .push(settings_item)
+        .push(theme_item)
+        .push(notif_item);
 
-    container(cat_col.padding([10, 6]))
+    container(cat_col.padding([10, 2]))
         .width(Length::Fixed(50.0))
         .height(Length::Fill)
         .style(activity_bar_container_style(palette))
@@ -313,9 +341,7 @@ pub fn sub_sidebar_view<'a>(
     match category {
         SidebarCategory::Clusters => {
             let header = row![
-                text("CLUSTERS")
-                    .size(11)
-                    .color(palette.text_secondary),
+                text("CLUSTERS").size(11).color(palette.text_secondary),
                 horizontal_space(),
                 text(format!("{}", clusters.len()))
                     .size(10)
@@ -330,10 +356,12 @@ pub fn sub_sidebar_view<'a>(
                 .width(Length::Fill);
 
             let all_tags = extract_all_cluster_tags(clusters);
-            let mut tag_row = row![button(text("#all").size(10))
-                .style(cluster_tag_pill_style(palette, selected_tag.is_none()))
-                .padding([2, 6])
-                .on_press(Message::SelectClusterTag(None))]
+            let mut tag_row = row![
+                button(text("#all").size(10))
+                    .style(cluster_tag_pill_style(palette, selected_tag.is_none()))
+                    .padding([2, 6])
+                    .on_press(Message::SelectClusterTag(None))
+            ]
             .spacing(4);
 
             for tag in all_tags.iter().take(5) {
@@ -408,7 +436,9 @@ pub fn sub_sidebar_view<'a>(
             .width(Length::Fill)
             .padding(6)
             .on_press(Message::OpenModal(ActiveModal::AddCluster {
-                mode: AddClusterModalMode::FilePath { path: String::new() },
+                mode: AddClusterModalMode::FilePath {
+                    path: String::new(),
+                },
                 error: None,
             }));
 
@@ -440,12 +470,8 @@ pub fn sub_sidebar_view<'a>(
                 _ => "",
             };
 
-            let header = container(
-                text(cat_title)
-                    .size(11)
-                    .color(palette.text_secondary),
-            )
-            .padding([4, 4]);
+            let header =
+                container(text(cat_title).size(11).color(palette.text_secondary)).padding([4, 4]);
 
             let mut sub_col = column![header].spacing(4);
 
@@ -457,7 +483,7 @@ pub fn sub_sidebar_view<'a>(
                             item.icon,
                             14,
                             if is_active {
-                                palette.accent
+                                palette.text_primary
                             } else {
                                 palette.text_secondary
                             },
@@ -481,7 +507,12 @@ pub fn sub_sidebar_view<'a>(
                     }),
                 });
 
-                sub_col = sub_col.push(btn);
+                let nav_row = row![selection_indicator(palette, is_active), btn,]
+                    .spacing(4)
+                    .align_y(Alignment::Center)
+                    .width(Length::Fill);
+
+                sub_col = sub_col.push(nav_row);
             }
 
             container(sub_col.padding([12, 8]))

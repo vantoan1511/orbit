@@ -1,31 +1,32 @@
-use std::collections::HashMap;
 use iced::{
-    widget::{button, column, container, horizontal_space, mouse_area, pick_list, row, text},
     Element, Length, Subscription, Task,
+    widget::{button, column, container, horizontal_space, mouse_area, pick_list, row, text},
 };
+use std::collections::HashMap;
 
 use orbit_core::command::{CoreCommand, ResourceKind};
 use orbit_core::events::CoreEvent;
 use orbit_core::ui_state::UiStateStore;
 
-use crate::icons::{button_icon, icon, tab_content_icon, Icon};
+use crate::icons::{Icon, button_icon, icon, tab_content_icon};
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
 use crate::theme::{
-    accent_color_from_name, action_button_style, empty_state_container_style, header_badge_style,
-    header_container_style, pick_list_style, search_pill_style, status_dot_pill,
-    tab_button_style, tab_close_button_style, tab_plus_button_style, tab_strip_container_style,
-    titlebar_container_style, window_control_button_style, OrbitPalette,
+    OrbitPalette, accent_color_from_name, action_button_style, divider_style,
+    empty_state_container_style, header_badge_style, header_container_style, pick_list_style,
+    search_pill_style, status_dot_pill, tab_button_style, tab_close_button_style,
+    tab_plus_button_style, tab_strip_container_style, titlebar_container_style,
+    window_control_button_style,
 };
 use crate::views::dashboard::dashboard_view;
-use crate::views::details_drawer::{details_drawer_view, ResourceAction, SelectedResourceDetails};
-use crate::views::modals::{modal_view, ActiveModal, SearchResultItem, SearchResultKind};
+use crate::views::details_drawer::{ResourceAction, SelectedResourceDetails, details_drawer_view};
+use crate::views::modals::{ActiveModal, SearchResultItem, SearchResultKind, modal_view};
 use crate::views::navigation::{
-    activity_bar_view, get_cluster_display_name, is_local_cluster, sub_sidebar_view,
-    SidebarCategory,
+    SidebarCategory, activity_bar_view, get_cluster_display_name, is_local_cluster,
+    sub_sidebar_view,
 };
 use crate::views::resource_table::resource_table_view;
-use crate::views::settings::{settings_view, SettingsViewState};
+use crate::views::settings::{SettingsViewState, settings_view};
 
 pub const ALL_NAMESPACES_LABEL: &str = "All Namespaces";
 pub const DOUBLE_CLICK_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(300);
@@ -49,9 +50,7 @@ pub fn send_core_command(cmd: CoreCommand) {
 pub fn backdrop_task(is_dark: bool) -> Task<Message> {
     iced::window::get_latest()
         .and_then(move |id| {
-            iced::window::run_with_handle(id, move |h| {
-                crate::os::apply_backdrop(&h, is_dark)
-            })
+            iced::window::run_with_handle(id, move |h| crate::os::apply_backdrop(&h, is_dark))
         })
         .map(Message::BackdropApplied)
 }
@@ -159,7 +158,11 @@ impl OrbitApp {
 
     pub fn active_cluster_is_local(&self) -> bool {
         if let Some(active_id) = &self.cluster_store.active_cluster_id
-            && let Some(cluster) = self.cluster_store.clusters.iter().find(|c| &c.id == active_id)
+            && let Some(cluster) = self
+                .cluster_store
+                .clusters
+                .iter()
+                .find(|c| &c.id == active_id)
         {
             return is_local_cluster(cluster);
         }
@@ -168,7 +171,11 @@ impl OrbitApp {
 
     pub fn active_cluster_display_name(&self) -> &str {
         if let Some(active_id) = &self.cluster_store.active_cluster_id
-            && let Some(cluster) = self.cluster_store.clusters.iter().find(|c| &c.id == active_id)
+            && let Some(cluster) = self
+                .cluster_store
+                .clusters
+                .iter()
+                .find(|c| &c.id == active_id)
         {
             return get_cluster_display_name(cluster);
         }
@@ -270,19 +277,67 @@ impl OrbitApp {
 
         // 1. Navigation items
         let nav_targets = [
-            ("Dashboard", "Cluster overview & health", TabContent::Dashboard),
-            ("Pods", "Workloads > Pods list", TabContent::ResourceTable(ResourceKind::Pod)),
-            ("Deployments", "Workloads > Deployments list", TabContent::ResourceTable(ResourceKind::Deployment)),
-            ("StatefulSets", "Workloads > StatefulSets list", TabContent::ResourceTable(ResourceKind::StatefulSet)),
-            ("DaemonSets", "Workloads > DaemonSets list", TabContent::ResourceTable(ResourceKind::DaemonSet)),
-            ("Nodes", "Infrastructure > Nodes", TabContent::ResourceTable(ResourceKind::Node)),
-            ("Services", "Network > Services", TabContent::ResourceTable(ResourceKind::Service)),
-            ("Ingresses", "Network > Ingresses", TabContent::ResourceTable(ResourceKind::Ingress)),
-            ("ConfigMaps", "Config > ConfigMaps", TabContent::ResourceTable(ResourceKind::ConfigMap)),
-            ("Secrets", "Config > Secrets", TabContent::ResourceTable(ResourceKind::Secret)),
-            ("Settings", "App preferences & configuration", TabContent::Settings),
+            (
+                "Dashboard",
+                "Cluster overview & health",
+                TabContent::Dashboard,
+            ),
+            (
+                "Pods",
+                "Workloads > Pods list",
+                TabContent::ResourceTable(ResourceKind::Pod),
+            ),
+            (
+                "Deployments",
+                "Workloads > Deployments list",
+                TabContent::ResourceTable(ResourceKind::Deployment),
+            ),
+            (
+                "StatefulSets",
+                "Workloads > StatefulSets list",
+                TabContent::ResourceTable(ResourceKind::StatefulSet),
+            ),
+            (
+                "DaemonSets",
+                "Workloads > DaemonSets list",
+                TabContent::ResourceTable(ResourceKind::DaemonSet),
+            ),
+            (
+                "Nodes",
+                "Infrastructure > Nodes",
+                TabContent::ResourceTable(ResourceKind::Node),
+            ),
+            (
+                "Services",
+                "Network > Services",
+                TabContent::ResourceTable(ResourceKind::Service),
+            ),
+            (
+                "Ingresses",
+                "Network > Ingresses",
+                TabContent::ResourceTable(ResourceKind::Ingress),
+            ),
+            (
+                "ConfigMaps",
+                "Config > ConfigMaps",
+                TabContent::ResourceTable(ResourceKind::ConfigMap),
+            ),
+            (
+                "Secrets",
+                "Config > Secrets",
+                TabContent::ResourceTable(ResourceKind::Secret),
+            ),
+            (
+                "Settings",
+                "App preferences & configuration",
+                TabContent::Settings,
+            ),
             #[cfg(debug_assertions)]
-            ("UI Showcase", "Component library & design playground (Dev)", TabContent::Showcase),
+            (
+                "UI Showcase",
+                "Component library & design playground (Dev)",
+                TabContent::Showcase,
+            ),
         ];
 
         for (title, sub, content) in nav_targets {
@@ -325,7 +380,10 @@ impl OrbitApp {
             if deploy.name.to_lowercase().contains(&q) {
                 results.push(SearchResultItem {
                     title: deploy.name.clone(),
-                    subtitle: format!("Deployment · {} · {}/{}", deploy.namespace, deploy.replicas.current, deploy.replicas.desired),
+                    subtitle: format!(
+                        "Deployment · {} · {}/{}",
+                        deploy.namespace, deploy.replicas.current, deploy.replicas.desired
+                    ),
                     kind: SearchResultKind::Resource(ResourceKind::Deployment),
                     target_tab: Some(WorkspaceTab {
                         id: format!("tab-deploy-{}", deploy.name),
@@ -342,7 +400,12 @@ impl OrbitApp {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::CoreEventReceived(event) => match event {
-                CoreEvent::EngineReady { clusters, active_cluster_id, settings, .. } => {
+                CoreEvent::EngineReady {
+                    clusters,
+                    active_cluster_id,
+                    settings,
+                    ..
+                } => {
                     self.is_engine_ready = true;
                     self.cluster_store.clusters = clusters;
                     self.settings = settings;
@@ -360,19 +423,22 @@ impl OrbitApp {
                             tasks.push(backdrop_task(self.palette.is_dark));
                         }
                     }
-                    if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
+                    if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str())
+                    {
                         self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
                     }
-                    if let Some(shell) = self.settings.get("defaultTerminalShell").and_then(|v| v.as_str())
+                    if let Some(shell) = self
+                        .settings
+                        .get("defaultTerminalShell")
+                        .and_then(|v| v.as_str())
                         && self.settings_state.terminal_shell_input.is_none()
                     {
                         self.settings_state.terminal_shell_input = Some(shell.to_string());
                     }
 
                     if !self.has_auto_connected {
-                        let target = active_cluster_id.or_else(|| {
-                            self.cluster_store.clusters.first().map(|c| c.id.clone())
-                        });
+                        let target = active_cluster_id
+                            .or_else(|| self.cluster_store.clusters.first().map(|c| c.id.clone()));
                         if let Some(target_id) = target {
                             self.has_auto_connected = true;
                             tasks.push(self.update(Message::SelectCluster(Some(target_id))));
@@ -393,7 +459,8 @@ impl OrbitApp {
                     self.cluster_store.clusters = clusters;
                     if !self.has_auto_connected
                         && self.cluster_store.active_cluster_id.is_none()
-                        && let Some(first) = self.cluster_store.clusters.first().map(|c| c.id.clone())
+                        && let Some(first) =
+                            self.cluster_store.clusters.first().map(|c| c.id.clone())
                     {
                         self.has_auto_connected = true;
                         return self.update(Message::SelectCluster(Some(first)));
@@ -433,7 +500,9 @@ impl OrbitApp {
                 self.cluster_store.active_cluster_id = cluster_id.clone();
                 self.filter.namespace = None;
                 self.is_loading_cluster = true;
-                send_core_command(CoreCommand::SwitchCluster { context_name: cluster_id });
+                send_core_command(CoreCommand::SwitchCluster {
+                    context_name: cluster_id,
+                });
             }
             Message::SelectNamespace(ns) => {
                 self.filter.namespace = match ns {
@@ -479,16 +548,14 @@ impl OrbitApp {
                 }
                 return backdrop_task(self.palette.is_dark);
             }
-            Message::BackdropApplied(res) => {
-                match res {
-                    Ok(kind) => {
-                        tracing::info!("Window backdrop applied: {kind:?}");
-                    }
-                    Err(e) => {
-                        tracing::warn!("Failed to apply window backdrop: {e}");
-                    }
+            Message::BackdropApplied(res) => match res {
+                Ok(kind) => {
+                    tracing::info!("Window backdrop applied: {kind:?}");
                 }
-            }
+                Err(e) => {
+                    tracing::warn!("Failed to apply window backdrop: {e}");
+                }
+            },
             Message::SearchEverywhereQueryChanged(query) => {
                 self.active_modal = ActiveModal::SearchEverywhere {
                     query,
@@ -536,9 +603,10 @@ impl OrbitApp {
             }
             Message::TitlebarPressed => {
                 let now = std::time::Instant::now();
-                if self.last_titlebar_click.is_some_and(|last| {
-                    now.duration_since(last) < DOUBLE_CLICK_TIMEOUT
-                }) {
+                if self
+                    .last_titlebar_click
+                    .is_some_and(|last| now.duration_since(last) < DOUBLE_CLICK_TIMEOUT)
+                {
                     self.last_titlebar_click = None;
                     return iced::window::get_latest().and_then(iced::window::toggle_maximize);
                 } else {
@@ -566,7 +634,8 @@ impl OrbitApp {
                     } else {
                         OrbitPalette::dark()
                     };
-                    if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
+                    if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str())
+                    {
                         self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
                     }
                 } else if key == "accentColor" {
@@ -611,7 +680,8 @@ impl OrbitApp {
                 match &msg {
                     crate::views::showcase::ShowcaseMessage::SetAccentColor(accent) => {
                         self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
-                        self.settings.insert("accentColor".to_string(), serde_json::json!(accent));
+                        self.settings
+                            .insert("accentColor".to_string(), serde_json::json!(accent));
                         send_core_command(CoreCommand::UpdateAppSettings {
                             values: [("accentColor".to_string(), serde_json::json!(accent))]
                                 .into_iter()
@@ -624,10 +694,18 @@ impl OrbitApp {
                         } else {
                             OrbitPalette::dark()
                         };
-                        let theme_str = if self.palette.is_dark { "dark" } else { "light" };
-                        self.settings.insert("themeMode".to_string(), serde_json::json!(theme_str));
-                        if let Some(accent) = self.settings.get("accentColor").and_then(|v| v.as_str()) {
-                            self.palette.accent = accent_color_from_name(accent, self.palette.is_dark);
+                        let theme_str = if self.palette.is_dark {
+                            "dark"
+                        } else {
+                            "light"
+                        };
+                        self.settings
+                            .insert("themeMode".to_string(), serde_json::json!(theme_str));
+                        if let Some(accent) =
+                            self.settings.get("accentColor").and_then(|v| v.as_str())
+                        {
+                            self.palette.accent =
+                                accent_color_from_name(accent, self.palette.is_dark);
                         }
                         send_core_command(CoreCommand::UpdateAppSettings {
                             values: [("themeMode".to_string(), serde_json::json!(theme_str))]
@@ -756,14 +834,9 @@ impl OrbitApp {
         )
         .style(header_badge_style(&self.palette));
 
-        let mut left_badges = row![
-            connection_pill,
-            cluster_name,
-            divider,
-            version_badge,
-        ]
-        .spacing(8)
-        .align_y(iced::Alignment::Center);
+        let mut left_badges = row![connection_pill, cluster_name, divider, version_badge,]
+            .spacing(8)
+            .align_y(iced::Alignment::Center);
 
         if self.cluster_store.active_cluster_id.is_some() {
             let is_local = self.active_cluster_is_local();
@@ -784,10 +857,10 @@ impl OrbitApp {
 
         let search_pill = button(
             row![
-                icon(Icon::Search, 12, self.palette.text_secondary),
-                text("Search everywhere... (Ctrl+K)")
+                icon(Icon::Search, 12, self.palette.text_muted),
+                text("Search resources... (Ctrl+K)")
                     .size(12)
-                    .color(self.palette.text_secondary),
+                    .color(self.palette.text_muted),
             ]
             .spacing(8)
             .align_y(iced::Alignment::Center),
@@ -824,21 +897,19 @@ impl OrbitApp {
             .style(header_container_style(&self.palette));
 
         // 3. Document Tab Bar Strip
-        let mut tabs_row = row![].spacing(4).padding(2).align_y(iced::Alignment::Center);
+        let mut tabs_row = row![]
+            .spacing(4)
+            .padding(2)
+            .align_y(iced::Alignment::Center);
         for tab in &self.tab_manager.tabs {
             let is_active = self.tab_manager.active_tab_id.as_deref() == Some(&tab.id);
             let tab_id = tab.id.clone();
             let tab_icon = tab_content_icon(&tab.content);
-            let tab_color = if is_active {
-                self.palette.text_primary
-            } else {
-                self.palette.text_secondary
-            };
 
             let tab_btn = button(
                 row![
-                    icon(tab_icon, 12, tab_color),
-                    text(tab.title.clone()).size(12).color(tab_color),
+                    button_icon(tab_icon, 12),
+                    text(tab.title.clone()).size(12),
                     button(text("×").size(11))
                         .style(tab_close_button_style(&self.palette))
                         .padding([2, 4])
@@ -882,11 +953,13 @@ impl OrbitApp {
         } else {
             match self.tab_manager.active_tab().map(|t| &t.content) {
                 Some(TabContent::Dashboard) => dashboard_view(&self.cluster_store, &self.palette),
-                Some(TabContent::ResourceTable(kind)) => {
-                    resource_table_view(*kind, &self.cluster_store, &self.filter, &self.palette, |d| {
-                        Message::SelectResource(Some(d))
-                    })
-                }
+                Some(TabContent::ResourceTable(kind)) => resource_table_view(
+                    *kind,
+                    &self.cluster_store,
+                    &self.filter,
+                    &self.palette,
+                    |d| Message::SelectResource(Some(d)),
+                ),
                 Some(TabContent::Settings) => settings_view(
                     &self.settings,
                     &self.settings_state,
@@ -911,29 +984,35 @@ impl OrbitApp {
             }
         };
 
-        let content_with_drawer: Element<'_, Message> = if let Some(ref details) = self.selected_resource {
-            row![
-                container(main_workspace).width(Length::Fill).height(Length::Fill),
-                details_drawer_view(
-                    details,
-                    &self.palette,
-                    Message::SelectResource(None),
-                    Message::ExecuteResourceAction,
-                ),
-            ]
-            .spacing(8)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
-        } else {
-            main_workspace
-        };
+        let content_with_drawer: Element<'_, Message> =
+            if let Some(ref details) = self.selected_resource {
+                row![
+                    container(main_workspace)
+                        .width(Length::Fill)
+                        .height(Length::Fill),
+                    details_drawer_view(
+                        details,
+                        &self.palette,
+                        Message::SelectResource(None),
+                        Message::ExecuteResourceAction,
+                    ),
+                ]
+                .spacing(8)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
+            } else {
+                main_workspace
+            };
 
         // 5. Status Bar
         let status_bar = row![
             text(format!(
                 "Cluster: {}",
-                self.cluster_store.active_cluster_id.as_deref().unwrap_or("Disconnected")
+                self.cluster_store
+                    .active_cluster_id
+                    .as_deref()
+                    .unwrap_or("Disconnected")
             ))
             .size(11)
             .color(self.palette.text_muted),
@@ -950,9 +1029,21 @@ impl OrbitApp {
         .spacing(20)
         .padding(6);
 
+        let header_divider = container(horizontal_space())
+            .width(Length::Fill)
+            .height(Length::Fixed(1.0))
+            .style(divider_style(&self.palette));
+
+        let tab_strip_divider = container(horizontal_space())
+            .width(Length::Fill)
+            .height(Length::Fixed(1.0))
+            .style(divider_style(&self.palette));
+
         let main_panel = column![
             desktop_header,
+            header_divider,
             tab_strip,
+            tab_strip_divider,
             container(content_with_drawer)
                 .width(Length::Fill)
                 .height(Length::Fill),
@@ -981,11 +1072,12 @@ impl OrbitApp {
 
         // 5. Active Modal Overlay
         if self.active_modal != ActiveModal::None {
-            let search_results = if let ActiveModal::SearchEverywhere { ref query, .. } = self.active_modal {
-                self.search_everywhere(query)
-            } else {
-                Vec::new()
-            };
+            let search_results =
+                if let ActiveModal::SearchEverywhere { ref query, .. } = self.active_modal {
+                    self.search_everywhere(query)
+                } else {
+                    Vec::new()
+                };
 
             if let Some(modal_el) = modal_view(
                 &self.active_modal,
@@ -1076,7 +1168,10 @@ mod tests {
         assert!(app.is_engine_ready);
         assert_eq!(app.cluster_store.clusters.len(), 2);
         assert!(!app.settings.is_empty());
-        assert_eq!(app.cluster_store.active_cluster_id.as_deref(), Some("dev-cluster"));
+        assert_eq!(
+            app.cluster_store.active_cluster_id.as_deref(),
+            Some("dev-cluster")
+        );
     }
 
     #[test]
@@ -1094,7 +1189,10 @@ mod tests {
 
         assert!(app.cluster_store.pods.is_empty());
         assert!(app.is_loading_cluster);
-        assert_eq!(app.cluster_store.active_cluster_id.as_deref(), Some("prod-cluster"));
+        assert_eq!(
+            app.cluster_store.active_cluster_id.as_deref(),
+            Some("prod-cluster")
+        );
     }
 
     #[test]
@@ -1110,14 +1208,21 @@ mod tests {
             name: "nginx-deployment".to_string(),
             namespace: "default".to_string(),
             available: 2,
-            replicas: orbit_core::kubernetes::models::Replicas { current: 2, desired: 2 },
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 2,
+                desired: 2,
+            },
             ..Default::default()
         });
 
         let results = app.search_everywhere("nginx");
 
         assert!(!results.is_empty());
-        assert!(results.iter().any(|r| r.title.contains("nginx-ingress-controller")));
+        assert!(
+            results
+                .iter()
+                .any(|r| r.title.contains("nginx-ingress-controller"))
+        );
         assert!(results.iter().any(|r| r.title.contains("nginx-deployment")));
     }
 
@@ -1138,9 +1243,15 @@ mod tests {
             settings: HashMap::new(),
         };
         let _ = app_a.update(Message::CoreEventReceived(event_a));
-        assert_eq!(app_a.cluster_store.active_cluster_id.as_deref(), Some("dev-cluster"));
+        assert_eq!(
+            app_a.cluster_store.active_cluster_id.as_deref(),
+            Some("dev-cluster")
+        );
         assert!(app_a.is_loading_cluster);
-        assert_eq!(app_a.cluster_connection_status(), ClusterConnectionStatus::Loading);
+        assert_eq!(
+            app_a.cluster_connection_status(),
+            ClusterConnectionStatus::Loading
+        );
 
         // Case B: EngineReady with active_cluster_id: None and clusters: [prod-cluster, dev-cluster]
         let mut app_b = OrbitApp::new();
@@ -1165,9 +1276,15 @@ mod tests {
             settings: HashMap::new(),
         };
         let _ = app_b.update(Message::CoreEventReceived(event_b));
-        assert_eq!(app_b.cluster_store.active_cluster_id.as_deref(), Some("prod-cluster"));
+        assert_eq!(
+            app_b.cluster_store.active_cluster_id.as_deref(),
+            Some("prod-cluster")
+        );
         assert!(app_b.is_loading_cluster);
-        assert_eq!(app_b.cluster_connection_status(), ClusterConnectionStatus::Loading);
+        assert_eq!(
+            app_b.cluster_connection_status(),
+            ClusterConnectionStatus::Loading
+        );
     }
 
     #[test]
@@ -1179,16 +1296,26 @@ mod tests {
             status: "healthy".to_string(),
             ..Default::default()
         }];
-        let _ = app.update(Message::CoreEventReceived(CoreEvent::ClustersUpdated { clusters }));
-        assert_eq!(app.cluster_store.active_cluster_id.as_deref(), Some("staging-cluster"));
+        let _ = app.update(Message::CoreEventReceived(CoreEvent::ClustersUpdated {
+            clusters,
+        }));
+        assert_eq!(
+            app.cluster_store.active_cluster_id.as_deref(),
+            Some("staging-cluster")
+        );
         assert!(app.is_loading_cluster);
 
-        let _ = app.update(Message::CoreEventReceived(CoreEvent::ActiveClusterChanged {
-            active_cluster_id: None,
-        }));
+        let _ = app.update(Message::CoreEventReceived(
+            CoreEvent::ActiveClusterChanged {
+                active_cluster_id: None,
+            },
+        ));
         assert_eq!(app.cluster_store.active_cluster_id, None);
         assert!(!app.is_loading_cluster);
-        assert_eq!(app.cluster_connection_status(), ClusterConnectionStatus::Disconnected);
+        assert_eq!(
+            app.cluster_connection_status(),
+            ClusterConnectionStatus::Disconnected
+        );
     }
 
     #[test]
@@ -1241,7 +1368,10 @@ mod tests {
             },
         ];
         let ns_options = app.namespace_options();
-        assert_eq!(ns_options, vec!["All Namespaces", "default", "kube-system", "monitoring"]);
+        assert_eq!(
+            ns_options,
+            vec!["All Namespaces", "default", "kube-system", "monitoring"]
+        );
 
         assert_eq!(app.selected_namespace_label(), ALL_NAMESPACES_LABEL);
 
@@ -1261,7 +1391,10 @@ mod tests {
     #[test]
     fn test_top_bar_rendering_uses_custom_styles_and_pills() {
         let app = OrbitApp::new();
-        assert_eq!(app.cluster_connection_status(), ClusterConnectionStatus::Disconnected);
+        assert_eq!(
+            app.cluster_connection_status(),
+            ClusterConnectionStatus::Disconnected
+        );
         let _view = app.view();
     }
 
@@ -1296,7 +1429,11 @@ mod tests {
 
         // Open Pods second time (duplicate)
         let _ = app.update(Message::OpenResource(ResourceKind::Pod, "Pods".into()));
-        assert_eq!(app.tab_manager.tabs.len(), 2, "Tab count must remain 2 after duplicate open");
+        assert_eq!(
+            app.tab_manager.tabs.len(),
+            2,
+            "Tab count must remain 2 after duplicate open"
+        );
         assert_eq!(app.tab_manager.active_tab().unwrap().title, "Pods");
 
         // Verify all tab titles contain no emoji glyphs
@@ -1333,7 +1470,10 @@ mod tests {
         // Overview + single Resources tab
         assert_eq!(app.tab_manager.tabs.len(), 2);
         assert_eq!(app.tab_manager.tabs[0].id, "tab-overview");
-        assert_eq!(app.tab_manager.tabs[1].id, crate::state::tabs::RESOURCES_TAB_ID);
+        assert_eq!(
+            app.tab_manager.tabs[1].id,
+            crate::state::tabs::RESOURCES_TAB_ID
+        );
         assert_eq!(app.tab_manager.tabs[1].title, "StatefulSets");
         assert_eq!(
             app.tab_manager.active_tab().map(|t| &t.content),
@@ -1467,7 +1607,10 @@ mod tests {
             serde_json::json!("light"),
         ));
         assert!(!app.palette.is_dark);
-        assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("light")));
+        assert_eq!(
+            app.settings.get("themeMode"),
+            Some(&serde_json::json!("light"))
+        );
         assert_eq!(
             app.settings_state.feedback_message,
             Some("Settings saved".to_string())
@@ -1482,7 +1625,10 @@ mod tests {
             app.palette.accent,
             accent_color_from_name("emerald", app.palette.is_dark)
         );
-        assert_eq!(app.settings.get("accentColor"), Some(&serde_json::json!("emerald")));
+        assert_eq!(
+            app.settings.get("accentColor"),
+            Some(&serde_json::json!("emerald"))
+        );
 
         // Update terminal shell input
         let _ = app.update(Message::UpdateShellInput("pwsh.exe".to_string()));
@@ -1504,10 +1650,7 @@ mod tests {
             serde_json::json!("dark"),
         ));
         assert!(app.palette.is_dark);
-        assert_eq!(
-            app.palette.accent,
-            accent_color_from_name("emerald", true)
-        );
+        assert_eq!(app.palette.accent, accent_color_from_name("emerald", true));
 
         // Verify view renders with settings tab active
         app.tab_manager.open_tab(WorkspaceTab {
@@ -1530,7 +1673,10 @@ mod tests {
 
         let _ = app.update(Message::ResetSettingsToDefaults);
         assert!(app.palette.is_dark);
-        assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("dark")));
+        assert_eq!(
+            app.settings.get("themeMode"),
+            Some(&serde_json::json!("dark"))
+        );
         assert_eq!(app.settings_state.terminal_shell_input, None);
         assert_eq!(
             app.settings_state.feedback_message,
@@ -1547,7 +1693,10 @@ mod tests {
             title: "UI Showcase".to_string(),
             content: TabContent::Showcase,
         }));
-        assert_eq!(app.tab_manager.active_tab_id.as_deref(), Some("tab-showcase"));
+        assert_eq!(
+            app.tab_manager.active_tab_id.as_deref(),
+            Some("tab-showcase")
+        );
         {
             let _view = app.view();
         }
@@ -1570,13 +1719,19 @@ mod tests {
             crate::views::showcase::ShowcaseMessage::SetAccentColor("emerald".to_string()),
         ));
         assert_eq!(app.palette.accent, emerald);
-        assert_eq!(app.settings.get("accentColor"), Some(&serde_json::json!("emerald")));
+        assert_eq!(
+            app.settings.get("accentColor"),
+            Some(&serde_json::json!("emerald"))
+        );
 
         let _ = app.update(Message::ShowcaseMessage(
             crate::views::showcase::ShowcaseMessage::ToggleTheme,
         ));
         assert!(!app.palette.is_dark);
-        assert_eq!(app.settings.get("themeMode"), Some(&serde_json::json!("light")));
+        assert_eq!(
+            app.settings.get("themeMode"),
+            Some(&serde_json::json!("light"))
+        );
     }
 
     #[test]
@@ -1594,8 +1749,12 @@ mod tests {
 
         // Verify BackdropApplied handler logs and never panics on Ok or Err
         let _ = app.update(Message::BackdropApplied(Ok(crate::os::BackdropKind::Mica)));
-        let _ = app.update(Message::BackdropApplied(Ok(crate::os::BackdropKind::Acrylic)));
+        let _ = app.update(Message::BackdropApplied(Ok(
+            crate::os::BackdropKind::Acrylic,
+        )));
         let _ = app.update(Message::BackdropApplied(Ok(crate::os::BackdropKind::None)));
-        let _ = app.update(Message::BackdropApplied(Err("simulated backdrop error".to_string())));
+        let _ = app.update(Message::BackdropApplied(Err(
+            "simulated backdrop error".to_string()
+        )));
     }
 }
