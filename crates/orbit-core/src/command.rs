@@ -1,0 +1,85 @@
+use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ResourceKind {
+    Namespace,
+    Pod,
+    Deployment,
+    StatefulSet,
+    DaemonSet,
+    ReplicaSet,
+    Job,
+    CronJob,
+    HorizontalPodAutoscaler,
+    Node,
+    Service,
+    Ingress,
+    ConfigMap,
+    Secret,
+    Event,
+    PersistentVolume,
+    PersistentVolumeClaim,
+    StorageClass,
+    Policy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum AddClusterMode {
+    FilePath { path: String },
+    RawYaml { yaml: String },
+    ManualEndpoint {
+        name: String,
+        server_url: String,
+        bearer_token: String,
+        insecure_skip_tls_verify: bool,
+        ca_cert_pem: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum CoreCommand {
+    Initialize,
+    Ping,
+    GetAppSettings,
+    UpdateAppSettings { values: HashMap<String, serde_json::Value> },
+    SetLaunchOnStartup { enabled: bool },
+    GetClusters,
+    GetUserProfile,
+    SwitchCluster { context_name: Option<String> },
+    RestartWatchers,
+    AddCluster { mode: AddClusterMode, request_id: Option<String> },
+    UpdateClusterMetadata { cluster_id: String, customization: crate::config::ClusterCustomization },
+    RefreshResourceList { kind: ResourceKind, namespace: Option<String> },
+    GetResourceRaw { kind: String, name: String, namespace: Option<String>, request_id: Option<String> },
+    ApplyResource { kind: String, name: String, namespace: Option<String>, yaml: String, request_id: Option<String> },
+    CreateResource { yaml: String, namespace: Option<String>, request_id: Option<String> },
+    DeleteResource { kind: String, name: String, namespace: Option<String>, sub_kind: Option<String> },
+    ScaleResource { kind: String, name: String, namespace: String, replicas: i32 },
+    UpdateHpaReplicas { name: String, namespace: String, min_replicas: Option<i32>, max_replicas: i32 },
+    UpdateResourceImages { kind: String, name: String, namespace: String, containers: Vec<crate::kubernetes::workloads::ContainerImageUpdate> },
+    RedeployResource { kind: String, name: String, namespace: String },
+    RestartPod { name: String, namespace: String },
+    RollbackDeployment { name: String, namespace: String, revision: Option<i64> },
+    TriggerCronJob { name: String, namespace: String },
+    SetCronJobSuspend { name: String, namespace: String, suspend: bool },
+    CloneDeployment { source_name: String, source_namespace: String, target_name: String, target_namespace: String },
+    CloneIngress { source_name: String, source_namespace: String, target_name: String, target_namespace: String },
+    CordonNode { name: String },
+    UncordonNode { name: String },
+    DrainNode { name: String },
+    StreamLogs {
+        namespace: String,
+        pod: Option<String>,
+        workload_kind: Option<String>,
+        workload_name: Option<String>,
+        container: Option<String>,
+        tail_lines: Option<i64>,
+    },
+    StopLogs,
+    GetPortForwards,
+    StartPortForward { namespace: String, kind: String, name: String, local_port: u16, remote_port: u16 },
+    StopPortForward { id: String },
+    CheckForUpdates,
+    ApplyUpdate { download_url: String },
+}
