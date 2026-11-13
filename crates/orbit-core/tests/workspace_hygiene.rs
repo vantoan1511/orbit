@@ -54,3 +54,16 @@ fn test_shift_left_scanner_passes_on_pure_rust_workspace() {
         "verify_shift_left.py --all must pass cleanly with exit code 0"
     );
 }
+
+#[test]
+fn test_legacy_iced_gui_crate_removed() {
+    let root = repo_root();
+    assert!(
+        !root.join("crates/orbit-gui").exists(),
+        "Legacy Iced GUI crate crates/orbit-gui should be removed"
+    );
+    assert!(
+        root.join("crates/orbit-gpui/Cargo.toml").exists(),
+        "Primary GPUI crate crates/orbit-gpui/Cargo.toml must exist"
+    );
+}

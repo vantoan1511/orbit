@@ -1,15 +1,19 @@
 mod app;
 mod bridge;
+mod icons;
+mod resources;
 mod state;
 mod theme;
 
 use crate::app::OrbitGpuiApp;
+use crate::icons::register_lucide_font;
 use gpui::{
     App, AppContext, Application, Bounds, TitlebarOptions, WindowBounds, WindowOptions, px, size,
 };
 
 fn main() {
     Application::new().run(|cx: &mut App| {
+        register_lucide_font(cx);
         let bounds = Bounds::centered(None, size(px(1100.0), px(720.0)), cx);
         let options = WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(bounds)),

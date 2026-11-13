@@ -1,17 +1,23 @@
 use gpui::{Rgba, rgb};
 
 pub const BG_APP_HEX: u32 = 0x09090b;
+pub const BG_SIDEBAR_HEX: u32 = 0x111114;
 pub const BG_CARD_HEX: u32 = 0x18181b;
 pub const BORDER_HEX: u32 = 0x27272a;
 pub const BG_HOVER_HEX: u32 = 0x27272a;
 pub const TEXT_PRIMARY_HEX: u32 = 0xf4f4f5;
 pub const TEXT_MUTED_HEX: u32 = 0xa1a1aa;
+pub const ACCENT_HEX: u32 = 0x6aa8ff;
 pub const STATUS_SUCCESS_HEX: u32 = 0x22c55e;
 pub const STATUS_WARNING_HEX: u32 = 0xeab308;
 pub const STATUS_DANGER_HEX: u32 = 0xef4444;
 
 pub fn bg_app() -> Rgba {
     rgb(BG_APP_HEX)
+}
+
+pub fn bg_sidebar() -> Rgba {
+    rgb(BG_SIDEBAR_HEX)
 }
 
 pub fn bg_card() -> Rgba {
@@ -34,6 +40,10 @@ pub fn text_muted() -> Rgba {
     rgb(TEXT_MUTED_HEX)
 }
 
+pub fn accent() -> Rgba {
+    rgb(ACCENT_HEX)
+}
+
 pub fn status_success() -> Rgba {
     rgb(STATUS_SUCCESS_HEX)
 }
@@ -48,7 +58,7 @@ pub fn status_danger() -> Rgba {
 
 pub fn status_color_hex(status: &str) -> u32 {
     match status {
-        "Running" | "Succeeded" | "Completed" => STATUS_SUCCESS_HEX,
+        "Running" | "Succeeded" | "Completed" | "Ready" | "Active" => STATUS_SUCCESS_HEX,
         "Pending" | "ContainerCreating" | "Terminating" => STATUS_WARNING_HEX,
         "CrashLoopBackOff" | "Error" | "Failed" | "ImagePullBackOff" | "ErrImagePull" => {
             STATUS_DANGER_HEX

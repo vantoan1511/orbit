@@ -2,9 +2,9 @@
 resolver = "2"
 members = [
     "crates/orbit-core",
-    "crates/orbit-gui",
     "crates/orbit-gpui",
 ]
+default-members = ["crates/orbit-gpui"]
 
 [workspace.package]
 version = "0.20.0"
