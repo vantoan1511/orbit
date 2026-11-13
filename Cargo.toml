@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/orbit-core",
     "crates/orbit-gui",
+    "crates/orbit-gpui",
 ]
 
 [workspace.package]
