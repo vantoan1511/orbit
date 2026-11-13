@@ -4,7 +4,7 @@ use crate::resources::{
 use orbit_core::command::{CoreCommand, ResourceKind};
 use orbit_core::events::{CoreEvent, TypedResourceBatch, WatchAction};
 use orbit_core::kubernetes::models::ClusterInfo;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActivityCategory {
@@ -66,11 +66,18 @@ pub fn sub_nav_items(category: ActivityCategory) -> Vec<SubNavItem> {
                 resource_kind: Some(ResourceKind::StatefulSet),
             },
         ],
-        ActivityCategory::Network => vec![SubNavItem {
-            label: "Services",
-            view: ActiveView::Resource(ResourceKind::Service),
-            resource_kind: Some(ResourceKind::Service),
-        }],
+        ActivityCategory::Network => vec![
+            SubNavItem {
+                label: "Services",
+                view: ActiveView::Resource(ResourceKind::Service),
+                resource_kind: Some(ResourceKind::Service),
+            },
+            SubNavItem {
+                label: "Ingresses",
+                view: ActiveView::Resource(ResourceKind::Ingress),
+                resource_kind: Some(ResourceKind::Ingress),
+            },
+        ],
         ActivityCategory::Storage => Vec::new(),
         ActivityCategory::Config => vec![
             SubNavItem {
@@ -108,6 +115,11 @@ pub struct OrbitGpuiState {
     pub clusters: Vec<ClusterInfo>,
     pub active_cluster_id: Option<String>,
     pub cluster_dropdown_open: bool,
+    pub namespaces: Vec<String>,
+    pub selected_namespace: Option<String>,
+    pub namespace_dropdown_open: bool,
+    pub search_query: String,
+    pub search_focused: bool,
     pub resources: HashMap<ResourceKind, Vec<ResourceRow>>,
     pub selected_resource: Option<SelectedResource>,
     pub raw_yaml: Option<String>,
@@ -130,6 +142,11 @@ impl OrbitGpuiState {
             clusters: Vec::new(),
             active_cluster_id: None,
             cluster_dropdown_open: false,
+            namespaces: Vec::new(),
+            selected_namespace: None,
+            namespace_dropdown_open: false,
+            search_query: String::new(),
+            search_focused: false,
             resources: HashMap::new(),
             selected_resource: None,
             raw_yaml: None,
@@ -183,10 +200,50 @@ impl OrbitGpuiState {
 
     pub fn toggle_cluster_dropdown(&mut self) {
         self.cluster_dropdown_open = !self.cluster_dropdown_open;
+        if self.cluster_dropdown_open {
+            self.namespace_dropdown_open = false;
+        }
     }
 
     pub fn close_cluster_dropdown(&mut self) {
         self.cluster_dropdown_open = false;
+    }
+
+    pub fn toggle_namespace_dropdown(&mut self) {
+        self.namespace_dropdown_open = !self.namespace_dropdown_open;
+        if self.namespace_dropdown_open {
+            self.cluster_dropdown_open = false;
+        }
+    }
+
+    pub fn close_namespace_dropdown(&mut self) {
+        self.namespace_dropdown_open = false;
+    }
+
+    pub fn select_namespace(&mut self, ns: Option<String>) {
+        self.selected_namespace = ns;
+        self.namespace_dropdown_open = false;
+    }
+
+    pub fn set_search_query(&mut self, query: String) {
+        self.search_query = query;
+    }
+
+    pub fn clear_search_query(&mut self) {
+        self.search_query.clear();
+    }
+
+    pub fn begin_cluster_switch(&mut self, cluster_id: String) -> CoreCommand {
+        self.cluster_dropdown_open = false;
+        self.namespace_dropdown_open = false;
+        self.resources.clear();
+        self.namespaces.clear();
+        self.selected_namespace = None;
+        self.close_drawer();
+        self.cluster_status = ClusterStatus::Connecting;
+        CoreCommand::SwitchCluster {
+            context_name: Some(cluster_id),
+        }
     }
 
     pub fn select_row(&mut self, row: &ResourceRow) -> CoreCommand {
@@ -212,6 +269,7 @@ impl OrbitGpuiState {
         self.raw_yaml_loading = false;
     }
 
+    #[cfg(test)]
     pub fn rows_for_active_view(&self) -> &[ResourceRow] {
         match self.active_view {
             ActiveView::Resource(kind) => self
@@ -234,11 +292,63 @@ impl OrbitGpuiState {
         self.resources.get(&kind).map(|v| v.len()).unwrap_or(0)
     }
 
+    fn row_matches_filters(&self, row: &ResourceRow, search_lower: &str) -> bool {
+        if let Some(selected_ns) = &self.selected_namespace
+            && let Some(row_ns) = &row.namespace
+            && row_ns != selected_ns
+        {
+            return false;
+        }
+
+        if !search_lower.is_empty() {
+            let name_matches = row.name.to_lowercase().contains(search_lower);
+            let label_matches = row.labels.iter().any(|(k, v)| {
+                k.to_lowercase().contains(search_lower) || v.to_lowercase().contains(search_lower)
+            });
+            if !name_matches && !label_matches {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn filtered_rows_for_kind(&self, kind: ResourceKind) -> Vec<&ResourceRow> {
+        let Some(rows) = self.resources.get(&kind) else {
+            return Vec::new();
+        };
+        let search_lower = self.search_query.to_lowercase();
+        rows.iter()
+            .filter(|row| self.row_matches_filters(row, &search_lower))
+            .collect()
+    }
+
+    pub fn filtered_rows_for_active_view(&self) -> Vec<&ResourceRow> {
+        match self.active_view {
+            ActiveView::Resource(kind) => self.filtered_rows_for_kind(kind),
+            _ => Vec::new(),
+        }
+    }
+
+    pub fn filtered_resource_count(&self, kind: ResourceKind) -> usize {
+        self.filtered_rows_for_kind(kind).len()
+    }
+
     pub fn fallback_to_mock(&mut self) {
         self.cluster_status = ClusterStatus::MockFallback;
+        let mut ns_set: BTreeSet<String> = ["default".to_string(), "kube-system".to_string()]
+            .into_iter()
+            .collect();
         for kind in SUPPORTED_RESOURCE_KINDS {
-            self.resources.insert(kind, mock_rows_for_kind(kind));
+            let rows = mock_rows_for_kind(kind);
+            for row in &rows {
+                if let Some(ns) = &row.namespace {
+                    ns_set.insert(ns.clone());
+                }
+            }
+            self.resources.insert(kind, rows);
         }
+        self.namespaces = ns_set.into_iter().collect();
     }
 
     pub fn apply_core_event(&mut self, event: &CoreEvent) {
@@ -272,6 +382,8 @@ impl OrbitGpuiState {
                     Some(id) => {
                         if self.cluster_status != ClusterStatus::Connected(id.clone()) {
                             self.resources.clear();
+                            self.namespaces.clear();
+                            self.selected_namespace = None;
                             self.close_drawer();
                         }
                         self.cluster_status = ClusterStatus::Connected(id.clone());
@@ -313,6 +425,20 @@ impl OrbitGpuiState {
 
     fn apply_resource_batch(&mut self, batch: &TypedResourceBatch) {
         match batch {
+            TypedResourceBatch::Namespaces(actions) => {
+                let mut ns_set: BTreeSet<String> = self.namespaces.iter().cloned().collect();
+                for action in actions {
+                    match action {
+                        WatchAction::Applied(ns) => {
+                            ns_set.insert(ns.name.clone());
+                        }
+                        WatchAction::Deleted(ns) => {
+                            ns_set.remove(&ns.name);
+                        }
+                    }
+                }
+                self.namespaces = ns_set.into_iter().collect();
+            }
             TypedResourceBatch::Pods(actions) => {
                 apply_watch_actions(&mut self.resources, ResourceKind::Pod, actions, |p| {
                     (p.name.as_str(), Some(p.namespace.as_str()))
@@ -341,6 +467,11 @@ impl OrbitGpuiState {
             TypedResourceBatch::Services(actions) => {
                 apply_watch_actions(&mut self.resources, ResourceKind::Service, actions, |s| {
                     (s.name.as_str(), Some(s.namespace.as_str()))
+                });
+            }
+            TypedResourceBatch::Ingresses(actions) => {
+                apply_watch_actions(&mut self.resources, ResourceKind::Ingress, actions, |i| {
+                    (i.name.as_str(), Some(i.namespace.as_str()))
                 });
             }
             TypedResourceBatch::ConfigMaps(actions) => {
@@ -408,7 +539,8 @@ fn apply_watch_actions<T>(
 mod tests {
     use super::*;
     use orbit_core::kubernetes::models::{
-        ConfigMapInfo, DeploymentInfo, NodeInfo, PodInfo, Replicas, SecretInfo, ServiceInfo,
+        ConfigMapInfo, DeploymentInfo, IngressInfo, NamespaceInfo, NodeInfo, PodInfo, Replicas,
+        SecretInfo, ServiceInfo,
     };
     use std::collections::BTreeMap;
 
@@ -648,5 +780,159 @@ mod tests {
         state.close_drawer();
         assert!(state.selected_resource.is_none());
         assert!(state.raw_yaml.is_none());
+    }
+
+    #[test]
+    fn test_namespace_batch_and_filtering_keeps_cluster_scoped_nodes() {
+        let mut state = OrbitGpuiState::new();
+        state.apply_core_event(&CoreEvent::ActiveClusterChanged {
+            active_cluster_id: Some("prod".to_string()),
+        });
+
+        let make_ns = |name: &str| NamespaceInfo {
+            name: name.to_string(),
+            status: "Active".to_string(),
+            is_system: name == "kube-system",
+            age: "10d".to_string(),
+            labels: BTreeMap::new(),
+            annotations: BTreeMap::new(),
+            uid: String::new(),
+            created: String::new(),
+        };
+
+        state.apply_core_event(&CoreEvent::ResourceBatchUpdated(
+            TypedResourceBatch::Namespaces(vec![
+                WatchAction::Applied(make_ns("production")),
+                WatchAction::Applied(make_ns("default")),
+                WatchAction::Applied(make_ns("kube-system")),
+                WatchAction::Applied(make_ns("default")),
+            ]),
+        ));
+        assert_eq!(
+            state.namespaces,
+            vec![
+                "default".to_string(),
+                "kube-system".to_string(),
+                "production".to_string()
+            ]
+        );
+
+        state.apply_core_event(&CoreEvent::ResourceBatchUpdated(
+            TypedResourceBatch::Pods(vec![
+                WatchAction::Applied(make_pod("pod-default", "default", "Running", 0)),
+                WatchAction::Applied(make_pod("pod-prod", "production", "Running", 0)),
+            ]),
+        ));
+        state.apply_core_event(&CoreEvent::ResourceBatchUpdated(
+            TypedResourceBatch::Nodes(vec![WatchAction::Applied(NodeInfo {
+                name: "node-1".to_string(),
+                status: "Ready".to_string(),
+                ..Default::default()
+            })]),
+        ));
+
+        state.select_namespace(Some("production".to_string()));
+        assert_eq!(state.selected_namespace.as_deref(), Some("production"));
+        assert!(!state.namespace_dropdown_open);
+
+        let filtered_pods = state.filtered_rows_for_kind(ResourceKind::Pod);
+        assert_eq!(filtered_pods.len(), 1);
+        assert_eq!(filtered_pods[0].name, "pod-prod");
+
+        // Cluster-scoped nodes (namespace: None) are always kept
+        let filtered_nodes = state.filtered_rows_for_kind(ResourceKind::Node);
+        assert_eq!(filtered_nodes.len(), 1);
+        assert_eq!(filtered_nodes[0].name, "node-1");
+
+        // Deleting a namespace removes it from namespaces
+        state.apply_core_event(&CoreEvent::ResourceBatchUpdated(
+            TypedResourceBatch::Namespaces(vec![WatchAction::Deleted(make_ns("production"))]),
+        ));
+        assert_eq!(
+            state.namespaces,
+            vec!["default".to_string(), "kube-system".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_search_filter_matches_name_and_labels_case_insensitively_and_persists_across_views() {
+        let mut state = OrbitGpuiState::new();
+        let mut pod1 = make_pod("api-gateway-1", "production", "Running", 0);
+        pod1.labels.insert("app".to_string(), "OrbitAPI".to_string());
+        let mut pod2 = make_pod("worker-2", "production", "Running", 0);
+        pod2.labels.insert("tier".to_string(), "backend".to_string());
+
+        state.apply_core_event(&CoreEvent::ResourceBatchUpdated(
+            TypedResourceBatch::Pods(vec![
+                WatchAction::Applied(pod1),
+                WatchAction::Applied(pod2),
+            ]),
+        ));
+
+        // Match by label value case-insensitively
+        state.set_search_query("orbitapi".to_string());
+        let pods = state.filtered_rows_for_active_view();
+        assert_eq!(pods.len(), 1);
+        assert_eq!(pods[0].name, "api-gateway-1");
+
+        // Switch view -> search_query persists
+        state.select_resource_kind(ResourceKind::Deployment);
+        assert_eq!(state.search_query, "orbitapi");
+
+        state.clear_search_query();
+        assert!(state.search_query.is_empty());
+        assert_eq!(state.filtered_resource_count(ResourceKind::Pod), 2);
+    }
+
+    #[test]
+    fn test_begin_cluster_switch_clears_state_and_sets_connecting() {
+        let mut state = OrbitGpuiState::new();
+        state.fallback_to_mock();
+        state.select_namespace(Some("production".to_string()));
+        let row = state.rows_for_active_view()[0].clone();
+        let _ = state.select_row(&row);
+        state.cluster_dropdown_open = true;
+
+        let cmd = state.begin_cluster_switch("staging-cluster".to_string());
+        assert_eq!(state.cluster_status, ClusterStatus::Connecting);
+        assert!(state.resources.is_empty());
+        assert!(state.namespaces.is_empty());
+        assert!(state.selected_namespace.is_none());
+        assert!(state.selected_resource.is_none());
+        assert!(!state.cluster_dropdown_open);
+
+        match cmd {
+            CoreCommand::SwitchCluster { context_name } => {
+                assert_eq!(context_name.as_deref(), Some("staging-cluster"));
+            }
+            other => panic!("expected SwitchCluster, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_ingresses_in_network_sub_nav_and_batch_update() {
+        let network_items = sub_nav_items(ActivityCategory::Network);
+        assert!(network_items
+            .iter()
+            .any(|item| item.label == "Ingresses" && item.resource_kind == Some(ResourceKind::Ingress)));
+
+        let mut state = OrbitGpuiState::new();
+        state.apply_core_event(&CoreEvent::ResourceBatchUpdated(
+            TypedResourceBatch::Ingresses(vec![WatchAction::Applied(IngressInfo {
+                name: "web-ingress".to_string(),
+                namespace: "default".to_string(),
+                class_name: Some("nginx".to_string()),
+                hosts: "app.example.com".to_string(),
+                address: "10.0.0.20".to_string(),
+                ports: "80, 443".to_string(),
+                age: "1d".to_string(),
+                created: String::new(),
+                uid: String::new(),
+                labels: BTreeMap::new(),
+                annotations: BTreeMap::new(),
+                rules_summary: vec![],
+            })]),
+        ));
+        assert_eq!(state.resource_count(ResourceKind::Ingress), 1);
     }
 }

@@ -1,23 +1,32 @@
 use orbit_core::command::ResourceKind;
 use orbit_core::kubernetes::models::{
-    ConfigMapInfo, DaemonSetInfo, DeploymentInfo, NodeInfo, PodInfo, SecretInfo, ServiceInfo,
-    StatefulSetInfo,
+    ConfigMapInfo, DaemonSetInfo, DeploymentInfo, IngressInfo, NodeInfo, PodInfo, SecretInfo,
+    ServiceInfo, StatefulSetInfo,
 };
 use std::collections::BTreeMap;
 
-pub const SUPPORTED_RESOURCE_KINDS: [ResourceKind; 8] = [
+pub const SUPPORTED_RESOURCE_KINDS: [ResourceKind; 9] = [
     ResourceKind::Pod,
     ResourceKind::Deployment,
     ResourceKind::DaemonSet,
     ResourceKind::StatefulSet,
     ResourceKind::Node,
     ResourceKind::Service,
+    ResourceKind::Ingress,
     ResourceKind::ConfigMap,
     ResourceKind::Secret,
 ];
 
 fn map_labels(labels: &BTreeMap<String, String>) -> Vec<(String, String)> {
     labels.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+}
+
+fn or_dash(value: &str) -> String {
+    if value.is_empty() {
+        "-".to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -145,6 +154,7 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<ColumnDef> {
             ColumnDef::fixed("STATUS", 110.0, false),
             ColumnDef::fixed("ROLE", 120.0, false),
             ColumnDef::fixed("VERSION", 110.0, false),
+            ColumnDef::fixed("INTERNAL IP", 120.0, false),
             ColumnDef::fixed("CPU", 90.0, true),
             ColumnDef::fixed("MEMORY", 90.0, true),
             ColumnDef::fixed("AGE", 64.0, true),
@@ -155,6 +165,15 @@ pub fn columns_for_kind(kind: ResourceKind) -> Vec<ColumnDef> {
             ColumnDef::fixed("TYPE", 110.0, false),
             ColumnDef::fixed("CLUSTER IP", 120.0, false),
             ColumnDef::fixed("PORTS", 150.0, false),
+            ColumnDef::fixed("AGE", 64.0, true),
+        ],
+        ResourceKind::Ingress => vec![
+            ColumnDef::flex("NAME"),
+            ColumnDef::fixed("NAMESPACE", 130.0, false),
+            ColumnDef::fixed("CLASS", 110.0, false),
+            ColumnDef::fixed("HOSTS", 180.0, false),
+            ColumnDef::fixed("ADDRESS", 130.0, false),
+            ColumnDef::fixed("PORTS", 110.0, false),
             ColumnDef::fixed("AGE", 64.0, true),
         ],
         ResourceKind::ConfigMap => vec![
@@ -329,10 +348,17 @@ impl From<&NodeInfo> for ResourceRow {
     fn from(node: &NodeInfo) -> Self {
         let cpu = format!("{} / {}", node.cpu_used, node.cpu_total);
         let mem = format!("{} / {}", node.mem_used, node.mem_total);
+        let internal_ip = node
+            .addresses
+            .iter()
+            .find(|addr| addr.type_ == "InternalIP")
+            .map(|addr| addr.address.clone())
+            .unwrap_or_else(|| "-".to_string());
         let details = vec![
             ("Status".to_string(), node.status.clone()),
             ("Role".to_string(), node.role.clone()),
             ("Version".to_string(), node.version.clone()),
+            ("Internal IP".to_string(), internal_ip.clone()),
             ("CPU".to_string(), cpu.clone()),
             ("Memory".to_string(), mem.clone()),
             (
@@ -352,6 +378,7 @@ impl From<&NodeInfo> for ResourceRow {
                 node.status.clone(),
                 node.role.clone(),
                 node.version.clone(),
+                internal_ip,
                 cpu,
                 mem,
                 node.uptime.clone(),
@@ -394,6 +421,44 @@ impl From<&ServiceInfo> for ResourceRow {
             ],
             details,
             labels: map_labels(&svc.labels),
+        }
+    }
+}
+
+impl From<&IngressInfo> for ResourceRow {
+    fn from(ing: &IngressInfo) -> Self {
+        let class_name = ing.class_name.clone().unwrap_or_else(|| "-".to_string());
+        let hosts = or_dash(&ing.hosts);
+        let address = or_dash(&ing.address);
+        let ports = or_dash(&ing.ports);
+        let mut details = vec![
+            ("Namespace".to_string(), ing.namespace.clone()),
+            ("Class".to_string(), class_name.clone()),
+            ("Hosts".to_string(), hosts.clone()),
+            ("Address".to_string(), address.clone()),
+            ("Ports".to_string(), ports.clone()),
+            ("Age".to_string(), ing.age.clone()),
+        ];
+        if !ing.rules_summary.is_empty() {
+            details.push(("Rules".to_string(), ing.rules_summary.join(", ")));
+        }
+
+        Self {
+            kind: ResourceKind::Ingress,
+            name: ing.name.clone(),
+            namespace: Some(ing.namespace.clone()),
+            status: "Active".to_string(),
+            cells: vec![
+                ing.name.clone(),
+                ing.namespace.clone(),
+                class_name,
+                hosts,
+                address,
+                ports,
+                ing.age.clone(),
+            ],
+            details,
+            labels: map_labels(&ing.labels),
         }
     }
 }
@@ -604,11 +669,15 @@ pub fn mock_rows_for_kind(kind: ResourceKind) -> Vec<ResourceRow> {
                 "Ready".to_string(),
                 "control-plane".to_string(),
                 "v1.31.2".to_string(),
+                "172.18.0.2".to_string(),
                 "280m / 4".to_string(),
                 "1.8Gi / 8Gi".to_string(),
                 "30d".to_string(),
             ],
-            details: vec![("Version".to_string(), "v1.31.2".to_string())],
+            details: vec![
+                ("Version".to_string(), "v1.31.2".to_string()),
+                ("Internal IP".to_string(), "172.18.0.2".to_string()),
+            ],
             labels: vec![("kubernetes.io/os".to_string(), "linux".to_string())],
         }],
         ResourceKind::Service => vec![ResourceRow {
@@ -625,6 +694,27 @@ pub fn mock_rows_for_kind(kind: ResourceKind) -> Vec<ResourceRow> {
                 "14d".to_string(),
             ],
             details: vec![("Cluster IP".to_string(), "10.96.42.18".to_string())],
+            labels: vec![("app".to_string(), "orbit-api-gateway".to_string())],
+        }],
+        ResourceKind::Ingress => vec![ResourceRow {
+            kind,
+            name: "orbit-gateway-ingress".to_string(),
+            namespace: Some("production".to_string()),
+            status: "Active".to_string(),
+            cells: vec![
+                "orbit-gateway-ingress".to_string(),
+                "production".to_string(),
+                "nginx".to_string(),
+                "api.orbit.local".to_string(),
+                "192.168.64.2".to_string(),
+                "80, 443".to_string(),
+                "14d".to_string(),
+            ],
+            details: vec![
+                ("Namespace".to_string(), "production".to_string()),
+                ("Class".to_string(), "nginx".to_string()),
+                ("Hosts".to_string(), "api.orbit.local".to_string()),
+            ],
             labels: vec![("app".to_string(), "orbit-api-gateway".to_string())],
         }],
         ResourceKind::ConfigMap => vec![ResourceRow {
@@ -664,11 +754,12 @@ pub fn mock_rows_for_kind(kind: ResourceKind) -> Vec<ResourceRow> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use orbit_core::kubernetes::models::{DaemonSetReplicas, Replicas};
+    use orbit_core::kubernetes::models::{DaemonSetReplicas, IngressInfo, NodeAddress, Replicas};
     use std::collections::BTreeMap;
 
     #[test]
     fn test_columns_match_cell_counts_for_all_supported_kinds() {
+        assert!(SUPPORTED_RESOURCE_KINDS.contains(&ResourceKind::Ingress));
         for kind in SUPPORTED_RESOURCE_KINDS {
             let cols = columns_for_kind(kind);
             let rows = mock_rows_for_kind(kind);
@@ -770,12 +861,18 @@ mod tests {
             mem_used: "1Gi".to_string(),
             mem_total: "8Gi".to_string(),
             uptime: "10d".to_string(),
+            addresses: vec![NodeAddress {
+                type_: "InternalIP".to_string(),
+                address: "10.0.0.5".to_string(),
+            }],
             ..Default::default()
         };
+        let node_row = ResourceRow::from(&node);
         assert_eq!(
-            ResourceRow::from(&node).cells.len(),
+            node_row.cells.len(),
             columns_for_kind(ResourceKind::Node).len()
         );
+        assert!(node_row.cells.contains(&"10.0.0.5".to_string()));
 
         let svc = ServiceInfo {
             name: "svc1".to_string(),
@@ -841,5 +938,23 @@ mod tests {
             ResourceRow::from(&sec).cells.len(),
             columns_for_kind(ResourceKind::Secret).len()
         );
+
+        let ing = IngressInfo {
+            name: "ing1".to_string(),
+            namespace: "default".to_string(),
+            class_name: Some("nginx".to_string()),
+            hosts: "example.com".to_string(),
+            address: "10.0.0.10".to_string(),
+            ports: "80, 443".to_string(),
+            age: "2d".to_string(),
+            created: "".to_string(),
+            uid: "".to_string(),
+            labels: BTreeMap::new(),
+            annotations: BTreeMap::new(),
+            rules_summary: vec![],
+        };
+        let ing_cols = columns_for_kind(ResourceKind::Ingress);
+        assert_eq!(ing_cols.len(), 7);
+        assert_eq!(ResourceRow::from(&ing).cells.len(), ing_cols.len());
     }
 }
