@@ -1,0 +1,533 @@
+use k8s_openapi::api::apps::v1::DeploymentCondition;
+use k8s_openapi::api::core::v1::{NodeAddress, NodeCondition, NodeSystemInfo, ServicePort, Taint};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PodContainer {
+    pub name: String,
+    pub image: String,
+    pub status: String,
+    pub ready: String,
+    pub restarts: i32,
+    pub ports: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PodInfo {
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub age: String,
+    pub cpu: Option<String>,
+    pub memory: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_cores: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_pct: Option<f64>,
+    pub node: Option<String>,
+    pub restarts: i32,
+    pub images: Vec<String>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    pub ip: Option<String>,
+    #[serde(rename = "nodeIP")]
+    pub node_ip: Option<String>,
+    #[serde(rename = "controlledBy")]
+    pub controlled_by: Option<String>,
+    #[serde(rename = "qosClass")]
+    pub qos_class: Option<String>,
+    pub containers: Vec<PodContainer>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterCustomization {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+pub type ClusterCustomizationMap = std::collections::HashMap<String, ClusterCustomization>;
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterInfo {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alias: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserProfileInfo {
+    pub active_context: Option<String>,
+    pub user_name: Option<String>,
+    pub auth_type: String,
+    pub cluster_name: Option<String>,
+    pub server_url: Option<String>,
+    pub kubeconfig_paths: Vec<String>,
+    pub k8s_version: Option<String>,
+}
+
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+pub struct Replicas {
+    pub current: i32,
+    pub desired: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DaemonSetReplicas {
+    pub desired: i32,
+    pub current: i32,
+    pub ready: i32,
+    pub up_to_date: i32,
+    pub available: i32,
+}
+
+fn default_deployment_kind() -> String { "Deployment".to_string() }
+fn default_statefulset_kind() -> String { "StatefulSet".to_string() }
+fn default_daemonset_kind() -> String { "DaemonSet".to_string() }
+fn default_replicaset_kind() -> String { "ReplicaSet".to_string() }
+fn default_job_kind() -> String { "Job".to_string() }
+fn default_cronjob_kind() -> String { "CronJob".to_string() }
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerImageInfo {
+    pub name: String,
+    pub image: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DeploymentInfo {
+    #[serde(default = "default_deployment_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub conditions: Option<Vec<DeploymentCondition>>,
+    pub replicas: Replicas,
+    pub available: i32,
+    pub up_to_date: i32,
+    pub age: String,
+    pub images: Vec<String>,
+    pub containers: Vec<ContainerImageInfo>,
+    pub strategy: Option<String>,
+    pub min_ready_seconds: i32,
+    pub revision_history: Option<i32>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub ports: Vec<i32>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StatefulSetInfo {
+    #[serde(default = "default_statefulset_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub replicas: Replicas,
+    pub age: String,
+    pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DaemonSetInfo {
+    #[serde(default = "default_daemonset_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub replicas: DaemonSetReplicas,
+    pub age: String,
+    pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplicaSetInfo {
+    #[serde(default = "default_replicaset_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub replicas: Replicas,
+    pub age: String,
+    pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct JobInfo {
+    #[serde(default = "default_job_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub completions: String,
+    pub duration: Option<String>,
+    pub age: String,
+    pub images: Vec<String>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CronJobInfo {
+    #[serde(default = "default_cronjob_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub schedule: String,
+    pub suspend: bool,
+    pub active: i32,
+    pub last_schedule: Option<String>,
+    pub age: String,
+    pub images: Vec<String>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeResources {
+    pub cpu: String,
+    pub memory: String,
+    pub pods: String,
+    pub ephemeral_storage: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeInfo {
+    pub name: String,
+    pub status: String,
+    pub role: String,
+    pub version: String,
+    pub cpu_pct: f64,
+    pub cpu_used: String,
+    pub cpu_total: String,
+    pub mem_pct: f64,
+    pub mem_used: String,
+    pub mem_total: String,
+    pub pods_count: i32,
+    pub pods_limit: i32,
+    pub uptime: String,
+    pub created_at: Option<String>,
+    pub labels: Vec<String>,
+    pub labels_map: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    pub is_cordoned: bool,
+    pub node_info: Option<NodeSystemInfo>,
+    pub addresses: Vec<NodeAddress>,
+    pub conditions: Vec<NodeCondition>,
+    pub taints: Vec<Taint>,
+    pub capacity: Option<NodeResources>,
+    pub allocatable: Option<NodeResources>,
+    pub images_count: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceEvent {
+    pub r#type: String,
+    pub reason: String,
+    pub message: String,
+    pub age: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceInfo {
+    pub name: String,
+    pub namespace: String,
+    pub r#type: String,
+    pub cluster_ip: String,
+    pub external_ip: String,
+    pub ports: String,
+    pub endpoints: String,
+    pub age: String,
+    pub session_affinity: String,
+    pub internal_traffic_policy: Option<String>,
+    pub created: String,
+    pub uid: String,
+    pub selector: std::collections::BTreeMap<String, String>,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub ports_list: Vec<ServicePort>,
+    pub endpoints_list: Vec<String>,
+    pub events: Vec<ServiceEvent>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct IngressInfo {
+    pub name: String,
+    pub namespace: String,
+    pub class_name: Option<String>,
+    pub hosts: String,
+    pub address: String,
+    pub ports: String,
+    pub age: String,
+    pub created: String,
+    pub uid: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    pub rules_summary: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct UsedByPod {
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub mount_type: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigMapInfo {
+    pub name: String,
+    pub namespace: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: i32,
+    pub created: String,
+    pub age: String,
+    pub resource_version: String,
+    pub immutable: bool,
+    pub keys_count: i32,
+    pub size: String,
+    pub mounted_pods: i32,
+    pub used_by: Vec<UsedByPod>,
+    pub data: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretInfo {
+    pub name: String,
+    pub namespace: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: i32,
+    pub r#type: String,
+    pub created: String,
+    pub age: String,
+    pub resource_version: String,
+    pub immutable: bool,
+    pub keys_count: i32,
+    pub size: String,
+    pub mounted_pods: i32,
+    pub used_by: Vec<UsedByPod>,
+    pub data: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistentVolumeInfo {
+    pub name: String,
+    pub capacity: String,
+    pub access_mode: String,
+    pub reclaim_policy: String,
+    pub status: String,
+    pub storage_class: String,
+    pub age: String,
+    pub volume_mode: String,
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistentVolumeClaimInfo {
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub volume: String,
+    pub capacity: String,
+    pub access_mode: String,
+    pub storage_class: String,
+    pub age: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageClassInfo {
+    pub name: String,
+    pub provisioner: String,
+    pub reclaim_policy: String,
+    pub volume_binding_mode: String,
+    pub allow_volume_expansion: bool,
+    pub age: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct NamespaceInfo {
+    pub name: String,
+    pub status: String,
+    pub is_system: bool,
+    pub age: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+    pub uid: String,
+    pub created: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EventInfo {
+    pub uid: String,
+    pub time: String,
+    pub r#type: String,
+    pub reason: String,
+    pub object_name: String,
+    pub object_kind: String,
+    pub message: String,
+    pub namespace: String,
+    pub source: String,
+    pub first_seen: String,
+    pub last_seen: String,
+    pub count: i32,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PolicyInfo {
+    pub uid: String,
+    pub name: String,
+    pub r#type: String,
+    pub scope: String,
+    pub namespace: String,
+    pub status: String,
+    pub mode: String,
+    pub violations: i32,
+    pub last_updated: String,
+    pub description: String,
+    pub rules: String,
+    pub kind: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PodMetricItem {
+    pub name: String,
+    pub namespace: String,
+    pub cpu: String,
+    pub memory: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_cores: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ResourceApiScope {
+    Namespaced,
+    ClusterScoped,
+}
+
+fn default_hpa_kind() -> String {
+    "HorizontalPodAutoscaler".to_string()
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaTargetRef {
+    pub kind: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_version: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaMetricTarget {
+    pub metric_type: String,
+    pub name: String,
+    pub target_type: String,
+    pub target_value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_value: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaConditionInfo {
+    pub r#type: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_transition_time: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HpaInfo {
+    #[serde(default = "default_hpa_kind")]
+    pub kind: String,
+    pub name: String,
+    pub namespace: String,
+    pub status: String,
+    pub scale_target_ref: HpaTargetRef,
+    pub min_replicas: i32,
+    pub max_replicas: i32,
+    pub current_replicas: i32,
+    pub desired_replicas: i32,
+    pub metrics: Vec<HpaMetricTarget>,
+    pub metrics_summary: Vec<String>,
+    pub conditions: Vec<HpaConditionInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_scale_time: Option<String>,
+    pub age: String,
+    pub created: String,
+    pub labels: std::collections::BTreeMap<String, String>,
+    pub annotations: std::collections::BTreeMap<String, String>,
+}
+
+
