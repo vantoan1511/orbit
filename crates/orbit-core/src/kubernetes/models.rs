@@ -1,5 +1,6 @@
 use k8s_openapi::api::apps::v1::DeploymentCondition;
-use k8s_openapi::api::core::v1::{NodeAddress, NodeCondition, NodeSystemInfo, ServicePort, Taint};
+use k8s_openapi::api::core::v1::{NodeCondition, NodeSystemInfo, ServicePort, Taint};
+pub use k8s_openapi::api::core::v1::NodeAddress;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]

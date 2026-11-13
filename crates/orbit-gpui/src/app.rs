@@ -11,8 +11,9 @@ use crate::state::{
 use crate::theme;
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, Context, Div, FontWeight, InteractiveElement, IntoElement, ParentElement, Render,
-    Rgba, StatefulInteractiveElement, Styled, Window, WindowControlArea, div, px,
+    AnyElement, Context, Div, FocusHandle, FontWeight, InteractiveElement, IntoElement,
+    KeyDownEvent, ParentElement, Render, Rgba, StatefulInteractiveElement, Styled, Window,
+    WindowControlArea, div, px,
 };
 use lucide_icons::Icon;
 use orbit_core::command::{CoreCommand, ResourceKind};
@@ -22,12 +23,14 @@ use tokio::sync::mpsc;
 pub struct OrbitGpuiApp {
     state: OrbitGpuiState,
     command_tx: mpsc::Sender<CoreCommand>,
+    search_focus_handle: FocusHandle,
 }
 
 impl OrbitGpuiApp {
     pub fn new(cx: &mut Context<Self>) -> Self {
         let mut bridge = start_core_bridge();
         let command_tx = bridge.command_tx;
+        let search_focus_handle = cx.focus_handle();
 
         cx.spawn(async move |this, cx| {
             while let Some(event) = bridge.event_rx.recv().await {
@@ -45,6 +48,7 @@ impl OrbitGpuiApp {
         Self {
             state: OrbitGpuiState::new(),
             command_tx,
+            search_focus_handle,
         }
     }
 
@@ -112,9 +116,53 @@ impl OrbitGpuiApp {
             .bg(theme::bg_app())
             .border_b_1()
             .border_color(theme::border())
-            .child(self.render_cluster_pill(dot_color, status_label, cx))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_2()
+                    .child(self.render_cluster_pill(dot_color, status_label, cx))
+                    .child(self.render_namespace_pill(cx)),
+            )
             .child(self.render_drag_title())
             .child(self.render_window_controls(cx))
+    }
+
+    fn render_namespace_pill(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let ns_label = self
+            .state
+            .selected_namespace
+            .clone()
+            .unwrap_or_else(|| "All Namespaces".to_string());
+
+        div()
+            .id("namespace-switcher-btn")
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap_2()
+            .px_2()
+            .py_1()
+            .rounded_md()
+            .cursor_pointer()
+            .bg(theme::bg_card())
+            .border_1()
+            .border_color(theme::border())
+            .hover(|s| s.bg(theme::bg_hover()))
+            .on_click(cx.listener(|app, _, _, cx| {
+                app.state.toggle_namespace_dropdown();
+                cx.notify();
+            }))
+            .child(Self::lucide_icon(Icon::Layers, 12.0, theme::text_muted()))
+            .child(
+                div()
+                    .text_xs()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(theme::text_primary())
+                    .child(ns_label),
+            )
+            .child(Self::lucide_icon(Icon::ChevronDown, 12.0, theme::text_muted()))
     }
 
     fn render_cluster_pill(
@@ -251,6 +299,91 @@ impl OrbitGpuiApp {
         menu
     }
 
+    fn render_namespace_dropdown(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let mut ordered_namespaces = Vec::new();
+        for priority in ["default", "kube-system"] {
+            if self.state.namespaces.iter().any(|ns| ns == priority) {
+                ordered_namespaces.push(priority.to_string());
+            }
+        }
+        for ns in &self.state.namespaces {
+            if ns != "default" && ns != "kube-system" {
+                ordered_namespaces.push(ns.clone());
+            }
+        }
+
+        let mut menu = div()
+            .id("namespace-dropdown")
+            .absolute()
+            .top_10()
+            .left(px(180.0))
+            .w_56()
+            .max_h_80()
+            .overflow_y_scroll()
+            .py_1()
+            .flex()
+            .flex_col()
+            .bg(theme::bg_card())
+            .border_1()
+            .border_color(theme::border())
+            .rounded_md()
+            .shadow_md()
+            .child(div().px_3().py_1().child(Self::eyebrow_label("NAMESPACE")));
+
+        let all_active = self.state.selected_namespace.is_none();
+        menu = menu.child(self.render_namespace_option("ns-opt-all", "All Namespaces", None, all_active, cx));
+
+        for (idx, ns) in ordered_namespaces.into_iter().enumerate() {
+            let is_active = self.state.selected_namespace.as_deref() == Some(ns.as_str());
+            let label = ns.clone();
+            menu = menu.child(self.render_namespace_option(
+                ("ns-opt", idx),
+                &label,
+                Some(ns),
+                is_active,
+                cx,
+            ));
+        }
+
+        menu
+    }
+
+    fn render_namespace_option(
+        &self,
+        id: impl Into<gpui::ElementId>,
+        label: &str,
+        value: Option<String>,
+        is_active: bool,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        div()
+            .id(id)
+            .px_3()
+            .py_1p5()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .cursor_pointer()
+            .when(is_active, |s| s.bg(theme::bg_hover()))
+            .hover(|s| s.bg(theme::bg_hover()))
+            .on_click(cx.listener(move |app, _, _, cx| {
+                app.state.select_namespace(value.clone());
+                cx.notify();
+            }))
+            .child(
+                div()
+                    .text_xs()
+                    .font_weight(if is_active {
+                        FontWeight::SEMIBOLD
+                    } else {
+                        FontWeight::NORMAL
+                    })
+                    .text_color(theme::text_primary())
+                    .child(label.to_string()),
+            )
+    }
+
     fn render_cluster_option(
         &self,
         idx: usize,
@@ -278,10 +411,8 @@ impl OrbitGpuiApp {
             .when(is_active, |s| s.bg(theme::bg_hover()))
             .hover(|s| s.bg(theme::bg_hover()))
             .on_click(cx.listener(move |app, _, _, cx| {
-                app.state.close_cluster_dropdown();
-                app.send_command(CoreCommand::SwitchCluster {
-                    context_name: Some(cluster_id.clone()),
-                });
+                let cmd = app.state.begin_cluster_switch(cluster_id.clone());
+                app.send_command(cmd);
                 cx.notify();
             }))
             .child(
@@ -441,7 +572,9 @@ impl OrbitGpuiApp {
             .resource_kind
             .map(resource_icon)
             .unwrap_or(Icon::LayoutDashboard);
-        let count = item.resource_kind.map(|k| self.state.resource_count(k));
+        let count = item
+            .resource_kind
+            .map(|k| self.state.filtered_resource_count(k));
 
         div()
             .id(("subnav", idx))
@@ -575,7 +708,7 @@ impl OrbitGpuiApp {
 
     fn render_resource_table(&self, kind: ResourceKind, cx: &mut Context<Self>) -> impl IntoElement {
         let columns = columns_for_kind(kind);
-        let rows_data = self.state.rows_for_active_view();
+        let rows_data = self.state.filtered_rows_for_active_view();
 
         let header_row = columns.iter().fold(
             div()
@@ -603,12 +736,17 @@ impl OrbitGpuiApp {
             .overflow_y_scroll();
 
         if rows_data.is_empty() {
+            let empty_msg = if self.state.cluster_status == ClusterStatus::Connecting {
+                format!("Loading {} from cluster...", kind_display_name(kind))
+            } else {
+                format!("No {} found.", kind_display_name(kind))
+            };
             body = body.child(
                 div()
                     .p_6()
                     .text_xs()
                     .text_color(theme::text_muted())
-                    .child(format!("No {} found.", kind_display_name(kind))),
+                    .child(empty_msg),
             );
         } else {
             for (idx, row) in rows_data.iter().enumerate() {
@@ -630,12 +768,17 @@ impl OrbitGpuiApp {
             .rounded_lg()
             .shadow_sm()
             .overflow_hidden()
-            .child(self.render_table_toolbar(kind, rows_data.len()))
+            .child(self.render_table_toolbar(kind, rows_data.len(), cx))
             .child(header_row)
             .child(body)
     }
 
-    fn render_table_toolbar(&self, kind: ResourceKind, count: usize) -> impl IntoElement {
+    fn render_table_toolbar(
+        &self,
+        kind: ResourceKind,
+        count: usize,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         div()
             .w_full()
             .px_4()
@@ -644,6 +787,7 @@ impl OrbitGpuiApp {
             .flex_row()
             .items_center()
             .justify_between()
+            .gap_3()
             .border_b_1()
             .border_color(theme::border())
             .child(
@@ -663,10 +807,89 @@ impl OrbitGpuiApp {
             )
             .child(
                 div()
-                    .text_xs()
-                    .text_color(theme::text_muted())
-                    .child(format!("{count} items")),
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_3()
+                    .child(self.render_search_input(cx))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(theme::text_muted())
+                            .child(format!("{count} items")),
+                    ),
             )
+    }
+
+    fn render_search_input(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let has_query = !self.state.search_query.is_empty();
+        let search_display = if has_query {
+            self.state.search_query.clone()
+        } else {
+            "Filter by name or label...".to_string()
+        };
+
+        div()
+            .id("resource-search-input")
+            .track_focus(&self.search_focus_handle)
+            .w_56()
+            .px_2p5()
+            .py_1()
+            .flex()
+            .flex_row()
+            .items_center()
+            .justify_between()
+            .gap_2()
+            .rounded_md()
+            .bg(theme::bg_app())
+            .border_1()
+            .border_color(if self.state.search_focused {
+                theme::accent()
+            } else {
+                theme::border()
+            })
+            .cursor_text()
+            .on_click(cx.listener(|app, _, window, cx| {
+                app.state.search_focused = true;
+                window.focus(&app.search_focus_handle);
+                cx.notify();
+            }))
+            .child(
+                div()
+                    .flex()
+                    .flex_row()
+                    .items_center()
+                    .gap_1p5()
+                    .overflow_hidden()
+                    .child(Self::lucide_icon(Icon::Search, 12.0, theme::text_muted()))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(if has_query {
+                                theme::text_primary()
+                            } else {
+                                theme::text_muted()
+                            })
+                            .child(search_display),
+                    ),
+            )
+            .when(has_query, |el| {
+                el.child(
+                    div()
+                        .id("search-clear-btn")
+                        .px_1()
+                        .rounded_sm()
+                        .cursor_pointer()
+                        .text_xs()
+                        .text_color(theme::text_muted())
+                        .hover(|s| s.text_color(theme::text_primary()))
+                        .on_click(cx.listener(|app, _, _, cx| {
+                            app.state.clear_search_query();
+                            cx.notify();
+                        }))
+                        .child("×"),
+                )
+            })
     }
 
     fn render_table_row(
@@ -925,10 +1148,56 @@ impl OrbitGpuiApp {
                     .child(description.to_string()),
             )
     }
+    fn handle_key_down(
+        &mut self,
+        event: &KeyDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if event.keystroke.key == "escape" {
+            if self.state.cluster_dropdown_open || self.state.namespace_dropdown_open {
+                self.state.close_cluster_dropdown();
+                self.state.close_namespace_dropdown();
+                cx.notify();
+                return;
+            }
+            if self.search_focus_handle.is_focused(window) {
+                self.state.clear_search_query();
+                self.state.search_focused = false;
+                cx.notify();
+                return;
+            }
+        }
+
+        if !self.search_focus_handle.is_focused(window) {
+            return;
+        }
+
+        if event.keystroke.key == "backspace" {
+            let mut query = self.state.search_query.clone();
+            query.pop();
+            self.state.set_search_query(query);
+            cx.notify();
+            return;
+        }
+
+        if let Some(ch) = &event.keystroke.key_char
+            && !event.keystroke.modifiers.control
+            && !event.keystroke.modifiers.alt
+            && !event.keystroke.modifiers.platform
+            && !ch.chars().any(|c| c.is_control())
+        {
+            let mut query = self.state.search_query.clone();
+            query.push_str(ch);
+            self.state.set_search_query(query);
+            cx.notify();
+        }
+    }
 }
 
 impl Render for OrbitGpuiApp {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.state.search_focused = self.search_focus_handle.is_focused(window);
         let main_content = match self.state.active_view {
             ActiveView::Overview => self.render_overview(cx).into_any_element(),
             ActiveView::Resource(kind) => self.render_resource_table(kind, cx).into_any_element(),
@@ -950,6 +1219,7 @@ impl Render for OrbitGpuiApp {
             .flex_col()
             .bg(theme::bg_app())
             .text_color(theme::text_primary())
+            .on_key_down(cx.listener(Self::handle_key_down))
             .child(self.render_header(cx))
             .child(
                 div()
@@ -975,8 +1245,27 @@ impl Render for OrbitGpuiApp {
                         el.child(self.render_details_drawer(&sel, cx))
                     }),
             )
+            .when(
+                self.state.cluster_dropdown_open || self.state.namespace_dropdown_open,
+                |el| {
+                    el.child(
+                        div()
+                            .id("dropdown-backdrop")
+                            .absolute()
+                            .inset_0()
+                            .on_click(cx.listener(|app, _, _, cx| {
+                                app.state.close_cluster_dropdown();
+                                app.state.close_namespace_dropdown();
+                                cx.notify();
+                            })),
+                    )
+                },
+            )
             .when(self.state.cluster_dropdown_open, |el| {
                 el.child(self.render_cluster_dropdown(cx))
+            })
+            .when(self.state.namespace_dropdown_open, |el| {
+                el.child(self.render_namespace_dropdown(cx))
             })
     }
 }
