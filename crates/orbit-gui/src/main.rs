@@ -5,8 +5,18 @@ fn main() -> iced::Result {
     let _instance = single_instance::SingleInstance::new("orbit-desktop-instance");
 
     iced::application("Orbit", OrbitApp::update, OrbitApp::view)
+        .settings(iced::Settings {
+            default_font: orbit_gui::theme::FONT_UI,
+            default_text_size: iced::Pixels(orbit_gui::theme::Typography::BODY as f32),
+            ..Default::default()
+        })
         .subscription(OrbitApp::subscription)
         .font(orbit_gui::icons::LUCIDE_FONT_BYTES)
+        .font(orbit_gui::theme::FONT_UI_BYTES)
+        .font(orbit_gui::theme::FONT_UI_MEDIUM_BYTES)
+        .font(orbit_gui::theme::FONT_UI_SEMIBOLD_BYTES)
+        .font(orbit_gui::theme::FONT_UI_BOLD_BYTES)
+        .font(orbit_gui::theme::FONT_MONO_BYTES)
         .window(iced::window::Settings {
             size: iced::Size::new(1280.0, 800.0),
             visible: !hidden,

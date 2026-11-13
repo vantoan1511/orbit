@@ -4,7 +4,7 @@ use iced::{
 };
 
 use crate::state::log_session::LogSessionState;
-use crate::theme::OrbitPalette;
+use crate::theme::{FONT_MONO, OrbitPalette, Typography};
 
 #[derive(Debug, Clone)]
 pub struct LogViewerAction {
@@ -28,15 +28,18 @@ pub fn log_viewer_view<'a, Message: 'a + Clone>(
     let container_name = session.container.as_deref().unwrap_or("all containers");
     let toolbar = row![
         text(format!("Pod: {} ({})", session.pod, container_name))
-            .size(13)
+            .size(Typography::BODY)
             .color(palette.text_primary),
-        button(text(if session.is_paused { "▶ Resume" } else { "⏸ Pause" }).size(11))
+        button(text(if session.is_paused { "▶ Resume" } else { "⏸ Pause" }).size(Typography::CAPTION))
             .on_press(on_toggle_pause),
         text_input("Filter logs...", &session.search_query)
             .on_input(on_search)
-            .size(12)
+            .size(Typography::SECONDARY)
             .width(Length::Fixed(240.0)),
-        text(format!("{} lines", session.len())).size(11).color(palette.text_muted),
+        text(format!("{} lines", session.len()))
+            .size(Typography::CAPTION)
+            .font(FONT_MONO)
+            .color(palette.text_muted),
     ]
     .spacing(12)
     .padding(8);
@@ -48,7 +51,8 @@ pub fn log_viewer_view<'a, Message: 'a + Clone>(
             let color = if is_err { palette.danger } else { palette.text_primary };
             log_lines_col = log_lines_col.push(
                 text(formatted.to_string())
-                    .size(11)
+                    .size(Typography::SECONDARY)
+                    .font(FONT_MONO)
                     .color(color),
             );
         }

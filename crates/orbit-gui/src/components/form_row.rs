@@ -3,7 +3,7 @@ use iced::{
     Element, Length,
 };
 
-use crate::theme::{divider_style, OrbitPalette};
+use crate::theme::{OrbitPalette, Typography, divider_style};
 
 pub fn form_divider<'a, Message: 'a>(palette: &'a OrbitPalette) -> Element<'a, Message> {
     container(column![])
@@ -21,13 +21,19 @@ pub fn form_row<'a, Message: 'a + Clone>(
 ) -> Element<'a, Message> {
     let desc_str = description.into();
     let mut text_col = column![
-        text(label.into()).size(13).color(palette.text_primary),
+        text(label.into())
+            .size(Typography::BODY)
+            .color(palette.text_primary),
     ]
     .spacing(2)
     .width(Length::FillPortion(3));
 
     if !desc_str.is_empty() {
-        text_col = text_col.push(text(desc_str).size(11).color(palette.text_muted));
+        text_col = text_col.push(
+            text(desc_str)
+                .size(Typography::SECONDARY)
+                .color(palette.text_muted),
+        );
     }
 
     let control_col = container(control)

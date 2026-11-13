@@ -1,13 +1,13 @@
 use iced::{
-    Background, Border, Color, Element, Font, Length,
+    Background, Border, Color, Element, Length,
     border::Radius,
-    font::Weight,
     widget::{column, container, row, text},
 };
 
-use super::form_row::form_divider;
 use crate::icons::{Icon, icon};
-use crate::theme::{OrbitPalette, card_container_style};
+use crate::theme::{
+    FONT_UI_BOLD, FONT_UI_SEMIBOLD, OrbitPalette, Typography, card_container_style,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertLevel {
@@ -44,13 +44,15 @@ pub fn alert_banner<'a, Message: 'a>(
     palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
     let accent_color = level.color(palette);
-    let border_color = Color::from_rgba(accent_color.r, accent_color.g, accent_color.b, 0.4);
     let bg_color = Color::from_rgba(accent_color.r, accent_color.g, accent_color.b, 0.08);
 
     let icon_el = icon(level.icon(), 16, accent_color);
-    let title_el = text(title.into()).size(13).color(palette.text_primary);
+    let title_el = text(title.into())
+        .size(Typography::BODY)
+        .font(FONT_UI_SEMIBOLD)
+        .color(palette.text_primary);
     let desc_el = text(description.into())
-        .size(12)
+        .size(Typography::SECONDARY)
         .color(palette.text_secondary);
 
     let text_col = column![title_el, desc_el].spacing(2).width(Length::Fill);
@@ -66,8 +68,8 @@ pub fn alert_banner<'a, Message: 'a>(
         .style(move |_theme| container::Style {
             background: Some(Background::Color(bg_color)),
             border: Border {
-                color: border_color,
-                width: 1.0,
+                color: Color::TRANSPARENT,
+                width: 0.0,
                 radius: Radius::from(8.0),
             },
             ..Default::default()
@@ -100,20 +102,16 @@ pub fn metric_card<'a, Message: 'a>(
     let title_str = title.into();
     let text_col = column![
         text(metric_label(&title_str))
-            .size(10)
+            .size(Typography::CAPTION)
             .color(palette.text_secondary)
-            .font(Font {
-                weight: Weight::Semibold,
-                ..Default::default()
-            }),
+            .font(FONT_UI_SEMIBOLD),
         text(value.into())
-            .size(24)
+            .size(Typography::METRIC)
             .color(palette.text_primary)
-            .font(Font {
-                weight: Weight::Bold,
-                ..Default::default()
-            }),
-        text(subtitle.into()).size(11).color(palette.text_muted),
+            .font(FONT_UI_BOLD),
+        text(subtitle.into())
+            .size(Typography::SECONDARY)
+            .color(palette.text_muted),
     ]
     .spacing(6)
     .width(Length::Fill);
@@ -141,14 +139,19 @@ pub fn section_card<'a, Message: 'a + Clone>(
     palette: &'a OrbitPalette,
 ) -> Element<'a, Message> {
     let header = column![
-        text(title.into()).size(14).color(palette.text_primary),
-        text(subtitle.into()).size(12).color(palette.text_secondary),
+        text(title.into())
+            .size(Typography::SUBHEADING)
+            .font(FONT_UI_SEMIBOLD)
+            .color(palette.text_primary),
+        text(subtitle.into())
+            .size(Typography::SECONDARY)
+            .color(palette.text_secondary),
     ]
     .spacing(2);
 
-    let mut content = column![header].spacing(4);
+    let mut content = column![header].spacing(6);
     for row_el in rows {
-        content = content.push(form_divider(palette)).push(row_el);
+        content = content.push(row_el);
     }
 
     container(content)
@@ -231,13 +234,15 @@ mod tests {
 
         let card_dark = card_container_style(&dark)(&iced::Theme::Dark);
         assert_eq!(card_dark.border.radius, Radius::from(8.0));
-        assert_eq!(card_dark.border.width, 1.0);
+        assert_eq!(card_dark.border.width, 0.0);
+        assert_eq!(card_dark.border.color, Color::TRANSPARENT);
+        assert_eq!(card_dark.background, Some(Background::Color(dark.bg_card)));
         assert_eq!(card_dark.shadow, dark.card_shadow());
 
         let card_light = card_container_style(&light)(&iced::Theme::Light);
         assert_eq!(card_light.border.radius, Radius::from(8.0));
-        assert_eq!(card_light.border.width, 1.0);
-        assert_eq!(card_light.border.color, light.border);
+        assert_eq!(card_light.border.width, 0.0);
+        assert_eq!(card_light.border.color, Color::TRANSPARENT);
         assert_eq!(card_light.shadow, light.card_shadow());
         assert_eq!(card_light.shadow.blur_radius, 3.0);
         if let Some(iced::Background::Color(bg)) = card_light.background {

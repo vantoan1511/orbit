@@ -13,9 +13,10 @@ use crate::app::Message;
 use crate::icons::{Icon, icon};
 use crate::state::tabs::{TabContent, WorkspaceTab};
 use crate::theme::{
-    OrbitPalette, activity_bar_container_style, activity_bar_item_style, cluster_card_style,
-    cluster_tag_pill_style, ghost_action_button_style, selection_indicator,
-    sub_sidebar_container_style, sub_sidebar_item_style,
+    FONT_UI_SEMIBOLD, OrbitPalette, Typography, activity_bar_container_style,
+    activity_bar_item_style, cluster_card_style, cluster_tag_pill_style,
+    ghost_action_button_style, selection_indicator, sub_sidebar_container_style,
+    sub_sidebar_item_style,
 };
 use crate::views::modals::{ActiveModal, AddClusterModalMode};
 
@@ -341,23 +342,26 @@ pub fn sub_sidebar_view<'a>(
     match category {
         SidebarCategory::Clusters => {
             let header = row![
-                text("CLUSTERS").size(11).color(palette.text_secondary),
+                text("CLUSTERS")
+                    .size(Typography::CAPTION)
+                    .font(FONT_UI_SEMIBOLD)
+                    .color(palette.text_secondary),
                 horizontal_space(),
                 text(format!("{}", clusters.len()))
-                    .size(10)
+                    .size(Typography::CAPTION)
                     .color(palette.text_muted),
             ]
             .padding([4, 4]);
 
             let search_input = text_input("Filter clusters or tags...", cluster_query)
                 .on_input(Message::ClusterFilterChanged)
-                .size(12)
+                .size(Typography::BODY)
                 .padding(6)
                 .width(Length::Fill);
 
             let all_tags = extract_all_cluster_tags(clusters);
             let mut tag_row = row![
-                button(text("#all").size(10))
+                button(text("#all").size(Typography::CAPTION))
                     .style(cluster_tag_pill_style(palette, selected_tag.is_none()))
                     .padding([2, 6])
                     .on_press(Message::SelectClusterTag(None))
@@ -367,7 +371,7 @@ pub fn sub_sidebar_view<'a>(
             for tag in all_tags.iter().take(5) {
                 let is_sel = selected_tag == Some(tag.as_str());
                 tag_row = tag_row.push(
-                    button(text(format!("#{}", tag)).size(10))
+                    button(text(format!("#{}", tag)).size(Typography::CAPTION))
                         .style(cluster_tag_pill_style(palette, is_sel))
                         .padding([2, 6])
                         .on_press(Message::SelectClusterTag(Some(tag.clone()))),
@@ -395,13 +399,14 @@ pub fn sub_sidebar_view<'a>(
                 let subtitle = cluster.server_url.as_deref().unwrap_or(&cluster.name);
 
                 let card_content = row![
-                    text("●").size(10).color(status_color),
+                    text("●").size(Typography::CAPTION).color(status_color),
                     column![
                         text(display_name.to_string())
-                            .size(12)
+                            .size(Typography::BODY)
+                            .font(FONT_UI_SEMIBOLD)
                             .color(palette.text_primary),
                         text(subtitle.to_string())
-                            .size(10)
+                            .size(Typography::SECONDARY)
                             .color(palette.text_muted),
                     ]
                     .spacing(2)
@@ -427,7 +432,9 @@ pub fn sub_sidebar_view<'a>(
             let add_cluster_btn = button(
                 row![
                     icon(Icon::Plus, 12, palette.accent),
-                    text("+ Add cluster").size(12).color(palette.accent),
+                    text("+ Add cluster")
+                        .size(Typography::BODY)
+                        .color(palette.accent),
                 ]
                 .spacing(6)
                 .align_y(Alignment::Center),
@@ -470,8 +477,13 @@ pub fn sub_sidebar_view<'a>(
                 _ => "",
             };
 
-            let header =
-                container(text(cat_title).size(11).color(palette.text_secondary)).padding([4, 4]);
+            let header = container(
+                text(cat_title)
+                    .size(Typography::CAPTION)
+                    .font(FONT_UI_SEMIBOLD)
+                    .color(palette.text_secondary),
+            )
+            .padding([4, 4]);
 
             let mut sub_col = column![header].spacing(4);
 
@@ -488,7 +500,7 @@ pub fn sub_sidebar_view<'a>(
                                 palette.text_secondary
                             },
                         ),
-                        text(item.label).size(12),
+                        text(item.label).size(Typography::BODY),
                     ]
                     .spacing(8)
                     .align_y(Alignment::Center)

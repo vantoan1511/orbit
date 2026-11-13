@@ -12,11 +12,11 @@ use crate::icons::{Icon, button_icon, icon, tab_content_icon};
 use crate::state::tabs::{TabContent, TabManager, WorkspaceTab};
 use crate::store::{ClusterStore, FilterCriteria};
 use crate::theme::{
-    OrbitPalette, accent_color_from_name, action_button_style, divider_style,
-    empty_state_container_style, header_badge_style, header_container_style, pick_list_style,
-    search_pill_style, status_dot_pill, tab_button_style, tab_close_button_style,
-    tab_plus_button_style, tab_strip_container_style, titlebar_container_style,
-    window_control_button_style,
+    FONT_MONO, FONT_UI_SEMIBOLD, OrbitPalette, Typography, accent_color_from_name,
+    action_button_style, divider_style, empty_state_container_style, header_badge_style,
+    header_container_style, pick_list_style, search_pill_style, status_dot_pill, tab_button_style,
+    tab_close_button_style, tab_plus_button_style, tab_strip_container_style,
+    titlebar_container_style, window_control_button_style,
 };
 use crate::views::dashboard::dashboard_view;
 use crate::views::details_drawer::{ResourceAction, SelectedResourceDetails, details_drawer_view};
@@ -816,16 +816,20 @@ impl OrbitApp {
         );
 
         let cluster_name = text(self.active_cluster_display_name())
-            .size(12)
+            .size(Typography::BODY)
+            .font(FONT_UI_SEMIBOLD)
             .color(self.palette.text_primary);
 
-        let divider = text("|").size(12).color(self.palette.border);
+        let divider = text("|")
+            .size(Typography::BODY)
+            .color(self.palette.border);
 
         let version_badge = container(
             row![
-                icon(Icon::Cpu, 11, self.palette.text_secondary),
+                icon(Icon::Cpu, 12, self.palette.text_secondary),
                 text(self.k8s_version_label())
-                    .size(11)
+                    .size(Typography::CAPTION)
+                    .font(FONT_MONO)
                     .color(self.palette.text_secondary),
             ]
             .spacing(4)
@@ -842,7 +846,7 @@ impl OrbitApp {
             let is_local = self.active_cluster_is_local();
             let local_pill = container(
                 text(if is_local { "Local" } else { "Remote" })
-                    .size(10)
+                    .size(Typography::CAPTION)
                     .color(if is_local {
                         self.palette.info
                     } else {
@@ -857,9 +861,9 @@ impl OrbitApp {
 
         let search_pill = button(
             row![
-                icon(Icon::Search, 12, self.palette.text_muted),
+                icon(Icon::Search, 13, self.palette.text_muted),
                 text("Search resources... (Ctrl+K)")
-                    .size(12)
+                    .size(Typography::BODY)
                     .color(self.palette.text_muted),
             ]
             .spacing(8)
@@ -898,7 +902,7 @@ impl OrbitApp {
 
         // 3. Document Tab Bar Strip
         let mut tabs_row = row![]
-            .spacing(4)
+            .spacing(6)
             .padding(2)
             .align_y(iced::Alignment::Center);
         for tab in &self.tab_manager.tabs {
@@ -908,9 +912,9 @@ impl OrbitApp {
 
             let tab_btn = button(
                 row![
-                    button_icon(tab_icon, 12),
-                    text(tab.title.clone()).size(12),
-                    button(text("×").size(11))
+                    button_icon(tab_icon, 13),
+                    text(tab.title.clone()).size(Typography::BODY),
+                    button(button_icon(Icon::X, 12))
                         .style(tab_close_button_style(&self.palette))
                         .padding([2, 4])
                         .on_press(Message::CloseTab(tab_id.clone())),
@@ -919,7 +923,7 @@ impl OrbitApp {
                 .align_y(iced::Alignment::Center),
             )
             .style(tab_button_style(&self.palette, is_active))
-            .padding([4, 8])
+            .padding([6, 10])
             .on_press(Message::SelectTab(tab_id));
 
             tabs_row = tabs_row.push(tab_btn);
@@ -997,7 +1001,7 @@ impl OrbitApp {
                         Message::ExecuteResourceAction,
                     ),
                 ]
-                .spacing(8)
+                .spacing(0)
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .into()
@@ -1006,7 +1010,8 @@ impl OrbitApp {
             };
 
         // 5. Status Bar
-        let status_bar = row![
+        let status_bar_bg = self.palette.bg_app;
+        let status_bar_row = row![
             text(format!(
                 "Cluster: {}",
                 self.cluster_store
@@ -1014,20 +1019,27 @@ impl OrbitApp {
                     .as_deref()
                     .unwrap_or("Disconnected")
             ))
-            .size(11)
+            .size(Typography::SECONDARY)
             .color(self.palette.text_muted),
             text(format!(
                 "Namespace: {}",
                 self.filter.namespace.as_deref().unwrap_or("All Namespaces")
             ))
-            .size(11)
+            .size(Typography::SECONDARY)
             .color(self.palette.text_muted),
             text(format!("Pods: {}", self.cluster_store.pods.len()))
-                .size(11)
+                .size(Typography::SECONDARY)
+                .font(FONT_MONO)
                 .color(self.palette.text_muted),
         ]
         .spacing(20)
-        .padding(6);
+        .padding([6, 12]);
+        let status_bar = container(status_bar_row)
+            .width(Length::Fill)
+            .style(move |_theme| container::Style {
+                background: Some(iced::Background::Color(status_bar_bg)),
+                ..Default::default()
+            });
 
         let header_divider = container(horizontal_space())
             .width(Length::Fill)
@@ -1756,5 +1768,24 @@ mod tests {
         let _ = app.update(Message::BackdropApplied(Err(
             "simulated backdrop error".to_string()
         )));
+    }
+
+    #[test]
+    fn test_tab_bar_and_shell_chrome_rendering() {
+        let app = OrbitApp::new();
+        let _view = app.view();
+
+        let active_tab = tab_button_style(&app.palette, true)(
+            &iced::Theme::Dark,
+            iced::widget::button::Status::Active,
+        );
+        let inactive_tab = tab_button_style(&app.palette, false)(
+            &iced::Theme::Dark,
+            iced::widget::button::Status::Active,
+        );
+        assert_ne!(active_tab.background, inactive_tab.background);
+        assert_eq!(active_tab.background, Some(iced::Background::Color(app.palette.bg_card)));
+        assert_eq!(active_tab.border.width, 0.0);
+        assert_eq!(inactive_tab.border.width, 0.0);
     }
 }

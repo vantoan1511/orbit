@@ -209,7 +209,10 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
     on_select: impl Fn(crate::views::details_drawer::SelectedResourceDetails) -> Message + 'a + Copy,
 ) -> iced::Element<'a, Message> {
     use iced::widget::{button, column, container, row, scrollable, text};
-    use crate::theme::{ghost_action_button_style, header_container_style, status_pill, table_row_style};
+    use crate::theme::{
+        FONT_MONO, FONT_UI_SEMIBOLD, Typography, ghost_action_button_style, status_pill,
+        table_row_style,
+    };
 
     let columns = columns_for_kind(kind);
 
@@ -219,16 +222,21 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
         header_row = header_row.push(
             container(
                 text(col.header.to_uppercase())
-                    .size(11)
+                    .size(Typography::SECONDARY)
+                    .font(FONT_UI_SEMIBOLD)
                     .color(palette.text_muted),
             )
             .width(col.width),
         );
     }
 
+    let header_bg = palette.bg_card;
     let header_container = container(header_row)
         .width(Length::Fill)
-        .style(header_container_style(palette));
+        .style(move |_theme| container::Style {
+            background: Some(iced::Background::Color(header_bg)),
+            ..Default::default()
+        });
 
     // Rows
     let mut rows_col = column![].spacing(2);
@@ -238,8 +246,12 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
             let filtered_pods: Vec<_> = store.pods.iter().filter(|p| filter.matches_pod(p)).collect();
             if filtered_pods.is_empty() {
                 rows_col = rows_col.push(
-                    container(text("No pods found matching filter criteria").size(13).color(palette.text_muted))
-                        .padding(24),
+                    container(
+                        text("No pods found matching filter criteria")
+                            .size(Typography::BODY)
+                            .color(palette.text_muted),
+                    )
+                    .padding(24),
                 );
             } else {
                 for pod in filtered_pods {
@@ -254,11 +266,11 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     };
 
                     let actions_cell = row![
-                        button(text("Logs").size(11))
+                        button(text("Logs").size(Typography::CAPTION))
                             .style(ghost_action_button_style(palette))
                             .padding([2, 6])
                             .on_press(on_select(details.clone())),
-                        button(text("Details").size(11))
+                        button(text("Details").size(Typography::CAPTION))
                             .style(ghost_action_button_style(palette))
                             .padding([2, 6])
                             .on_press(on_select(details.clone())),
@@ -267,15 +279,15 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     .align_y(iced::Alignment::Center);
 
                     let pod_row = row![
-                        container(text(pod.name.clone()).size(13).font(iced::Font::MONOSPACE).color(palette.text_primary)).width(columns[0].width),
-                        container(text(pod.namespace.clone()).size(12).font(iced::Font::MONOSPACE).color(palette.text_secondary)).width(columns[1].width),
+                        container(text(pod.name.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_primary)).width(columns[0].width),
+                        container(text(pod.namespace.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_secondary)).width(columns[1].width),
                         container(status_pill(palette, &pod.status)).width(columns[2].width),
-                        container(text(pod.restarts.to_string()).size(12).color(palette.text_muted)).width(columns[3].width),
-                        container(text(pod.age.clone()).size(12).color(palette.text_muted)).width(columns[4].width),
-                        container(text(pod.cpu.clone().unwrap_or_else(|| "-".into())).size(12).font(iced::Font::MONOSPACE).color(palette.text_muted)).width(columns[5].width),
-                        container(text(pod.memory.clone().unwrap_or_else(|| "-".into())).size(12).font(iced::Font::MONOSPACE).color(palette.text_muted)).width(columns[6].width),
-                        container(text(truncate_ellipsis(pod.node.as_deref().unwrap_or("-"), 24)).size(12).color(palette.text_secondary)).width(columns[7].width),
-                        container(text(pod.ip.clone().unwrap_or_else(|| "-".into())).size(12).color(palette.text_muted)).width(columns[8].width),
+                        container(text(pod.restarts.to_string()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[3].width),
+                        container(text(pod.age.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[4].width),
+                        container(text(pod.cpu.clone().unwrap_or_else(|| "-".into())).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[5].width),
+                        container(text(pod.memory.clone().unwrap_or_else(|| "-".into())).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[6].width),
+                        container(text(truncate_ellipsis(pod.node.as_deref().unwrap_or("-"), 24)).size(Typography::BODY).color(palette.text_secondary)).width(columns[7].width),
+                        container(text(pod.ip.clone().unwrap_or_else(|| "-".into())).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[8].width),
                         container(actions_cell).width(columns[9].width),
                     ]
                     .spacing(8)
@@ -300,7 +312,7 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                 .collect();
             if filtered_deploys.is_empty() {
                 rows_col = rows_col.push(
-                    container(text("No deployments found").size(13).color(palette.text_muted)).padding(24),
+                    container(text("No deployments found").size(Typography::BODY).color(palette.text_muted)).padding(24),
                 );
             } else {
                 for deploy in filtered_deploys {
@@ -318,11 +330,11 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     let deploy_status_text = if is_ready { "Ready" } else { "Progressing" };
 
                     let actions_cell = row![
-                        button(text("Scale").size(11))
+                        button(text("Scale").size(Typography::CAPTION))
                             .style(ghost_action_button_style(palette))
                             .padding([2, 6])
                             .on_press(on_select(details.clone())),
-                        button(text("Details").size(11))
+                        button(text("Details").size(Typography::CAPTION))
                             .style(ghost_action_button_style(palette))
                             .padding([2, 6])
                             .on_press(on_select(details.clone())),
@@ -331,13 +343,13 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     .align_y(iced::Alignment::Center);
 
                     let deploy_row = row![
-                        container(text(deploy.name.clone()).size(13).font(iced::Font::MONOSPACE).color(palette.text_primary)).width(columns[0].width),
-                        container(text(deploy.namespace.clone()).size(12).font(iced::Font::MONOSPACE).color(palette.text_secondary)).width(columns[1].width),
+                        container(text(deploy.name.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_primary)).width(columns[0].width),
+                        container(text(deploy.namespace.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_secondary)).width(columns[1].width),
                         container(status_pill(palette, deploy_status_text)).width(columns[2].width),
-                        container(text(deploy.up_to_date.to_string()).size(12).color(palette.text_muted)).width(columns[3].width),
-                        container(text(deploy.available.to_string()).size(12).color(palette.text_muted)).width(columns[4].width),
-                        container(text(deploy.age.clone()).size(12).color(palette.text_muted)).width(columns[5].width),
-                        container(text(truncate_ellipsis(&deploy.images.join(", "), 36)).size(12).color(palette.text_muted)).width(columns[6].width),
+                        container(text(deploy.up_to_date.to_string()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[3].width),
+                        container(text(deploy.available.to_string()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[4].width),
+                        container(text(deploy.age.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[5].width),
+                        container(text(truncate_ellipsis(&deploy.images.join(", "), 36)).size(Typography::BODY).color(palette.text_muted)).width(columns[6].width),
                         container(actions_cell).width(columns[7].width),
                     ]
                     .spacing(8)
@@ -357,7 +369,7 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
         ResourceKind::Node => {
             if store.nodes.is_empty() {
                 rows_col = rows_col.push(
-                    container(text("No nodes found").size(13).color(palette.text_muted)).padding(24),
+                    container(text("No nodes found").size(Typography::BODY).color(palette.text_muted)).padding(24),
                 );
             } else {
                 for node in &store.nodes {
@@ -375,7 +387,7 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     let os_img = node.node_info.as_ref().map(|i| i.os_image.clone()).unwrap_or_else(|| "-".into());
 
                     let actions_cell = row![
-                        button(text("Details").size(11))
+                        button(text("Details").size(Typography::CAPTION))
                             .style(ghost_action_button_style(palette))
                             .padding([2, 6])
                             .on_press(on_select(details.clone())),
@@ -384,13 +396,13 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
                     .align_y(iced::Alignment::Center);
 
                     let node_row = row![
-                        container(text(node.name.clone()).size(13).font(iced::Font::MONOSPACE).color(palette.text_primary)).width(columns[0].width),
+                        container(text(node.name.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_primary)).width(columns[0].width),
                         container(status_pill(palette, &node.status)).width(columns[1].width),
-                        container(text(node.role.clone()).size(12).color(palette.text_secondary)).width(columns[2].width),
-                        container(text(node.version.clone()).size(12).color(palette.text_muted)).width(columns[3].width),
-                        container(text(node.uptime.clone()).size(12).color(palette.text_muted)).width(columns[4].width),
-                        container(text(internal_ip).size(12).font(iced::Font::MONOSPACE).color(palette.text_muted)).width(columns[5].width),
-                        container(text(truncate_ellipsis(&os_img, 32)).size(12).color(palette.text_muted)).width(columns[6].width),
+                        container(text(node.role.clone()).size(Typography::BODY).color(palette.text_secondary)).width(columns[2].width),
+                        container(text(node.version.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[3].width),
+                        container(text(node.uptime.clone()).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[4].width),
+                        container(text(internal_ip).size(Typography::BODY).font(FONT_MONO).color(palette.text_muted)).width(columns[5].width),
+                        container(text(truncate_ellipsis(&os_img, 32)).size(Typography::BODY).color(palette.text_muted)).width(columns[6].width),
                         container(actions_cell).width(columns[7].width),
                     ]
                     .spacing(8)
@@ -409,7 +421,7 @@ pub fn resource_table_view<'a, Message: 'a + Clone>(
         }
         _ => {
             rows_col = rows_col.push(
-                container(text(format!("{:?} resources view", kind)).size(13).color(palette.text_muted)).padding(24),
+                container(text(format!("{:?} resources view", kind)).size(Typography::BODY).color(palette.text_muted)).padding(24),
             );
         }
     }
@@ -495,5 +507,38 @@ mod tests {
                 assert!(matches!(col.width, Length::FillPortion(_) | Length::Fixed(_)));
             }
         }
+    }
+
+    #[test]
+    fn test_table_and_drawer_typography_rendering() {
+        let palette = crate::theme::OrbitPalette::dark();
+        let mut store = crate::store::ClusterStore::default();
+        store.pods.push(orbit_core::kubernetes::models::PodInfo {
+            name: "api-server-0".into(),
+            namespace: "default".into(),
+            status: "Running".into(),
+            restarts: 0,
+            age: "2d".into(),
+            cpu: Some("25m".into()),
+            memory: Some("128Mi".into()),
+            node: Some("node-1".into()),
+            ip: Some("10.0.0.12".into()),
+            ..Default::default()
+        });
+        store.deployments.push(orbit_core::kubernetes::models::DeploymentInfo {
+            name: "web-frontend".into(),
+            namespace: "prod".into(),
+            replicas: orbit_core::kubernetes::models::Replicas { current: 3, desired: 3 },
+            up_to_date: 3,
+            available: 3,
+            age: "14d".into(),
+            ..Default::default()
+        });
+        let filter = crate::store::FilterCriteria::default();
+
+        let _pod_table: iced::Element<'_, ()> =
+            resource_table_view(ResourceKind::Pod, &store, &filter, &palette, |_| ());
+        let _deploy_table: iced::Element<'_, ()> =
+            resource_table_view(ResourceKind::Deployment, &store, &filter, &palette, |_| ());
     }
 }

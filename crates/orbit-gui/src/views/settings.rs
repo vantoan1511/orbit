@@ -300,7 +300,7 @@ pub fn settings_view<'a, Message: 'a + Clone>(
         move |opt| on_update("maxLogFiles".to_string(), serde_json::json!(log_retention_to_u64(opt))),
     )
     .style(pick_list_style(palette))
-    .text_size(12)
+    .text_size(crate::theme::Typography::BODY)
     .padding([4, 8])
     .width(Length::Fixed(140.0));
 
@@ -319,7 +319,8 @@ pub fn settings_view<'a, Message: 'a + Clone>(
             serde_json::json!(shell_val),
         ))
         .style(text_input_style(palette))
-        .size(12)
+        .font(crate::theme::FONT_MONO)
+        .size(crate::theme::Typography::BODY)
         .padding([6, 8])
         .width(Length::Fixed(220.0));
 
@@ -408,8 +409,12 @@ pub fn settings_view<'a, Message: 'a + Clone>(
     // Action Footer
     let feedback_el: Element<'a, Message> = if let Some(msg) = &state.feedback_message {
         row![
-            text("●").size(10).color(palette.success),
-            text(msg.clone()).size(12).color(palette.success),
+            text("●")
+                .size(crate::theme::Typography::CAPTION)
+                .color(palette.success),
+            text(msg.clone())
+                .size(crate::theme::Typography::SECONDARY)
+                .color(palette.success),
         ]
         .spacing(6)
         .align_y(iced::Alignment::Center)
@@ -426,9 +431,12 @@ pub fn settings_view<'a, Message: 'a + Clone>(
 
     // Page Header
     let page_header = column![
-        text("Preferences").size(20).color(palette.text_primary),
+        text("Preferences")
+            .size(crate::theme::Typography::HEADING)
+            .font(crate::theme::FONT_UI_SEMIBOLD)
+            .color(palette.text_primary),
         text("Configure your Orbit desktop environment and cluster preferences")
-            .size(12)
+            .size(crate::theme::Typography::SECONDARY)
             .color(palette.text_secondary),
     ]
     .spacing(4);

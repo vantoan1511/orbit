@@ -95,14 +95,19 @@ pub fn details_drawer_view<'a, Message: 'a + Clone>(
 ) -> iced::Element<'a, Message> {
     use iced::widget::{button, column, container, horizontal_space, row, scrollable, text};
     use iced::Length;
-    use crate::theme::{action_button_style, drawer_container_style, tab_close_button_style};
+    use crate::icons::{Icon, button_icon};
+    use crate::theme::{
+        FONT_MONO, FONT_UI_SEMIBOLD, Typography, action_button_style, drawer_container_style,
+        tab_close_button_style,
+    };
 
     let title_bar = row![
         text(format!("{:?}: {}", details.kind, details.name))
-            .size(15)
+            .size(Typography::SUBHEADING)
+            .font(FONT_UI_SEMIBOLD)
             .color(palette.text_primary),
         horizontal_space(),
-        button(text("✕ Close").size(11))
+        button(button_icon(Icon::X, 13))
             .style(tab_close_button_style(palette))
             .padding([3, 6])
             .on_press(on_close),
@@ -117,7 +122,7 @@ pub fn details_drawer_view<'a, Message: 'a + Clone>(
         let label = format!("{:?}", act);
         let msg = on_action(act, details.kind, details.name.clone(), details.namespace.clone());
         actions_row = actions_row.push(
-            button(text(label).size(11))
+            button(text(label).size(Typography::CAPTION))
                 .style(action_button_style(palette, is_destruct))
                 .padding([3, 8])
                 .on_press(msg),
@@ -125,18 +130,55 @@ pub fn details_drawer_view<'a, Message: 'a + Clone>(
     }
 
     let meta_info = column![
-        text(format!("Namespace: {}", details.namespace.as_deref().unwrap_or("Cluster-scoped"))).size(12).color(palette.text_secondary),
-        text(format!("Status: {}", details.status)).size(12).color(palette.text_secondary),
-        text(format!("Age: {}", details.age)).size(12).color(palette.text_muted),
+        text("METADATA")
+            .size(Typography::CAPTION)
+            .font(FONT_UI_SEMIBOLD)
+            .color(palette.text_muted),
+        row![
+            text("Namespace: ").size(Typography::SECONDARY).color(palette.text_secondary),
+            text(details.namespace.as_deref().unwrap_or("Cluster-scoped"))
+                .size(Typography::SECONDARY)
+                .font(FONT_MONO)
+                .color(palette.text_primary),
+        ],
+        row![
+            text("Status: ").size(Typography::SECONDARY).color(palette.text_secondary),
+            text(&details.status)
+                .size(Typography::SECONDARY)
+                .font(FONT_MONO)
+                .color(palette.text_primary),
+        ],
+        row![
+            text("Age: ").size(Typography::SECONDARY).color(palette.text_secondary),
+            text(&details.age)
+                .size(Typography::SECONDARY)
+                .font(FONT_MONO)
+                .color(palette.text_muted),
+        ],
     ]
     .spacing(4);
 
-    let mut labels_col = column![text("Labels").size(13).color(palette.text_primary)].spacing(4);
+    let mut labels_col = column![
+        text("LABELS")
+            .size(Typography::CAPTION)
+            .font(FONT_UI_SEMIBOLD)
+            .color(palette.text_muted)
+    ]
+    .spacing(4);
     if details.labels.is_empty() {
-        labels_col = labels_col.push(text("No labels").size(11).color(palette.text_muted));
+        labels_col = labels_col.push(
+            text("No labels")
+                .size(Typography::SECONDARY)
+                .color(palette.text_muted),
+        );
     } else {
         for (k, v) in &details.labels {
-            labels_col = labels_col.push(text(format!("{}: {}", k, v)).size(11).color(palette.text_secondary));
+            labels_col = labels_col.push(
+                text(format!("{}: {}", k, v))
+                    .size(Typography::SECONDARY)
+                    .font(FONT_MONO)
+                    .color(palette.text_secondary),
+            );
         }
     }
 
@@ -224,5 +266,29 @@ mod tests {
             (),
             |_act, _kind, _name, _ns| (),
         );
+    }
+
+    #[test]
+    fn test_table_and_drawer_typography_rendering() {
+        let dark = crate::theme::OrbitPalette::dark();
+        let light = crate::theme::OrbitPalette::light();
+        let deploy_details = SelectedResourceDetails {
+            kind: ResourceKind::Deployment,
+            name: "web-frontend".into(),
+            namespace: Some("prod".into()),
+            status: "Active".into(),
+            age: "14d".into(),
+            labels: vec![("app".into(), "web".into()), ("tier".into(), "frontend".into())],
+            annotations: vec![("deployment.kubernetes.io/revision".into(), "4".into())],
+        };
+
+        for palette in [&dark, &light] {
+            let _drawer: iced::Element<'_, ()> = details_drawer_view(
+                &deploy_details,
+                palette,
+                (),
+                |_act, _kind, _name, _ns| (),
+            );
+        }
     }
 }

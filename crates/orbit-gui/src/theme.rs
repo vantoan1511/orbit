@@ -5,6 +5,34 @@ use iced::{
 };
 use orbit_core::command::ResourceKind;
 
+pub const FONT_UI_BYTES: &[u8] = include_bytes!("../assets/fonts/Inter-Regular.ttf");
+pub const FONT_UI_MEDIUM_BYTES: &[u8] = include_bytes!("../assets/fonts/Inter-Medium.ttf");
+pub const FONT_UI_SEMIBOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Inter-SemiBold.ttf");
+pub const FONT_UI_BOLD_BYTES: &[u8] = include_bytes!("../assets/fonts/Inter-Bold.ttf");
+pub const FONT_MONO_BYTES: &[u8] = include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf");
+
+pub const FONT_UI: iced::Font = iced::Font::with_name("Inter");
+pub const FONT_UI_SEMIBOLD: iced::Font = iced::Font {
+    weight: iced::font::Weight::Semibold,
+    ..FONT_UI
+};
+pub const FONT_UI_BOLD: iced::Font = iced::Font {
+    weight: iced::font::Weight::Bold,
+    ..FONT_UI
+};
+pub const FONT_MONO: iced::Font = iced::Font::with_name("JetBrains Mono");
+
+pub struct Typography;
+
+impl Typography {
+    pub const CAPTION: u16 = 11;
+    pub const SECONDARY: u16 = 12;
+    pub const BODY: u16 = 13;
+    pub const SUBHEADING: u16 = 14;
+    pub const HEADING: u16 = 16;
+    pub const METRIC: u16 = 24;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OrbitPalette {
     pub is_dark: bool,
@@ -31,13 +59,13 @@ impl OrbitPalette {
         Self {
             is_dark: true,
             bg_app: Color::from_rgb8(0x09, 0x09, 0x0b),
-            bg_sidebar: Color::from_rgb8(0x0c, 0x0c, 0x0e),
-            bg_panel: Color::from_rgb8(0x11, 0x11, 0x13),
-            bg_card: Color::from_rgb8(0x18, 0x18, 0x1b),
-            bg_hover: Color::from_rgb8(0x1f, 0x1f, 0x23),
-            bg_selected: Color::from_rgb8(0x27, 0x27, 0x2a),
-            bg_input: Color::from_rgb8(0x18, 0x18, 0x1b),
-            border: Color::from_rgb8(0x27, 0x27, 0x2a),
+            bg_sidebar: Color::from_rgb8(0x0f, 0x0f, 0x12),
+            bg_panel: Color::from_rgb8(0x14, 0x14, 0x18),
+            bg_card: Color::from_rgb8(0x1c, 0x1c, 0x22),
+            bg_hover: Color::from_rgb8(0x24, 0x24, 0x2c),
+            bg_selected: Color::from_rgb8(0x2c, 0x2c, 0x36),
+            bg_input: Color::from_rgb8(0x1c, 0x1c, 0x22),
+            border: Color::from_rgba(1.0, 1.0, 1.0, 0.07),
             text_primary: Color::from_rgb8(0xfa, 0xfa, 0xfa),
             text_secondary: Color::from_rgb8(0xa1, 0xa1, 0xaa),
             text_muted: Color::from_rgb8(0x71, 0x71, 0x7a),
@@ -52,13 +80,13 @@ impl OrbitPalette {
     pub fn light() -> Self {
         Self {
             is_dark: false,
-            bg_app: Color::from_rgb8(0xf9, 0xfa, 0xfb),
-            bg_sidebar: Color::from_rgb8(0xf9, 0xfa, 0xfb),
-            bg_panel: Color::WHITE,
+            bg_app: Color::from_rgb8(0xf1, 0xf3, 0xf6),
+            bg_sidebar: Color::from_rgb8(0xf6, 0xf7, 0xf9),
+            bg_panel: Color::from_rgb8(0xfb, 0xfc, 0xfd),
             bg_card: Color::WHITE,
-            bg_hover: Color::from_rgb8(0xf4, 0xf4, 0xf5),
-            bg_selected: Color::from_rgb8(0xf4, 0xf4, 0xf5),
-            bg_input: Color::from_rgb8(0xf4, 0xf4, 0xf5),
+            bg_hover: Color::from_rgb8(0xec, 0xee, 0xf2),
+            bg_selected: Color::from_rgb8(0xe3, 0xe6, 0xec),
+            bg_input: Color::from_rgb8(0xf1, 0xf3, 0xf6),
             border: Color::from_rgb8(0xe4, 0xe4, 0xe7),
             text_primary: Color::from_rgb8(0x09, 0x09, 0x0b),
             text_secondary: Color::from_rgb8(0x71, 0x71, 0x7a),
@@ -72,11 +100,7 @@ impl OrbitPalette {
     }
 
     pub fn card_border(&self) -> Color {
-        if self.is_dark {
-            Color::from_rgba(1.0, 1.0, 1.0, 0.08)
-        } else {
-            self.border
-        }
+        Color::TRANSPARENT
     }
 
     pub fn card_shadow(&self) -> Shadow {
@@ -539,8 +563,8 @@ pub fn drawer_container_style<'a>(
         text_color: Some(palette.text_primary),
         background: Some(Background::Color(palette.bg_sidebar)),
         border: Border {
-            color: palette.border,
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: Radius::default(),
         },
         shadow: Shadow::default(),
@@ -554,8 +578,8 @@ pub fn card_container_style<'a>(
         text_color: Some(palette.text_primary),
         background: Some(Background::Color(palette.bg_card)),
         border: Border {
-            color: palette.card_border(),
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: Radius::from(8.0),
         },
         shadow: palette.card_shadow(),
@@ -569,8 +593,8 @@ pub fn panel_container_style<'a>(
         text_color: Some(palette.text_primary),
         background: Some(Background::Color(palette.bg_panel)),
         border: Border {
-            color: palette.border,
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: Radius::from(8.0),
         },
         shadow: palette.card_shadow(),
@@ -705,8 +729,8 @@ pub fn activity_bar_container_style<'a>(
         text_color: Some(palette.text_primary),
         background: Some(Background::Color(palette.bg_sidebar)),
         border: Border {
-            color: palette.border,
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: Radius::default(),
         },
         shadow: Shadow::default(),
@@ -727,8 +751,8 @@ pub fn sub_sidebar_container_style<'a>(
         text_color: Some(palette.text_primary),
         background: Some(Background::Color(palette.bg_sidebar)),
         border: Border {
-            color: palette.border,
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: Radius::default(),
         },
         shadow: Shadow::default(),
@@ -759,12 +783,10 @@ pub fn cluster_card_style<'a>(
         let border = Border {
             color: if is_active {
                 palette.accent
-            } else if is_hovered {
-                palette.border
             } else {
-                Color::from_rgba(palette.border.r, palette.border.g, palette.border.b, 0.6)
+                Color::TRANSPARENT
             },
-            width: 1.0,
+            width: if is_active { 1.0 } else { 0.0 },
             radius: Radius::from(6.0),
         };
         button::Style {
@@ -802,12 +824,8 @@ pub fn cluster_tag_pill_style<'a>(
             palette.text_muted
         };
         let border = Border {
-            color: if is_selected {
-                palette.accent
-            } else {
-                palette.border
-            },
-            width: 1.0,
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: Radius::from(10.0),
         };
         button::Style {
@@ -1088,17 +1106,17 @@ mod tests {
         let light = OrbitPalette::light();
         let dark = OrbitPalette::dark();
 
-        assert_eq!(light.bg_app, Color::from_rgb8(0xf9, 0xfa, 0xfb));
+        assert_eq!(light.bg_app, Color::from_rgb8(0xf1, 0xf3, 0xf6));
         assert_eq!(light.bg_card, Color::WHITE);
         assert_eq!(light.bg_card.a, 1.0);
         assert_eq!(light.border, Color::from_rgb8(0xe4, 0xe4, 0xe7));
         assert_eq!(light.text_primary, Color::from_rgb8(0x09, 0x09, 0x0b));
         assert_eq!(light.text_secondary, Color::from_rgb8(0x71, 0x71, 0x7a));
         assert_eq!(light.text_muted, Color::from_rgb8(0xa1, 0xa1, 0xaa));
-        assert_eq!(light.bg_selected, Color::from_rgb8(0xf4, 0xf4, 0xf5));
-        assert_eq!(dark.bg_selected, Color::from_rgb8(0x27, 0x27, 0x2a));
-        assert_eq!(light.bg_input, Color::from_rgb8(0xf4, 0xf4, 0xf5));
-        assert_eq!(dark.bg_input, Color::from_rgb8(0x18, 0x18, 0x1b));
+        assert_eq!(light.bg_selected, Color::from_rgb8(0xe3, 0xe6, 0xec));
+        assert_eq!(dark.bg_selected, Color::from_rgb8(0x2c, 0x2c, 0x36));
+        assert_eq!(light.bg_input, Color::from_rgb8(0xf1, 0xf3, 0xf6));
+        assert_eq!(dark.bg_input, Color::from_rgb8(0x1c, 0x1c, 0x22));
     }
 
     #[test]
@@ -1125,13 +1143,13 @@ mod tests {
 
         // Slate/Zinc exact dark tokens
         assert_eq!(dark.bg_app, Color::from_rgb8(0x09, 0x09, 0x0b));
-        assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0c, 0x0c, 0x0e));
-        assert_eq!(dark.bg_panel, Color::from_rgb8(0x11, 0x11, 0x13));
-        assert_eq!(dark.bg_card, Color::from_rgb8(0x18, 0x18, 0x1b));
-        assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
-        assert_eq!(dark.bg_hover, Color::from_rgb8(0x1f, 0x1f, 0x23));
-        assert_eq!(dark.bg_selected, Color::from_rgb8(0x27, 0x27, 0x2a));
-        assert_eq!(dark.bg_input, Color::from_rgb8(0x18, 0x18, 0x1b));
+        assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0f, 0x0f, 0x12));
+        assert_eq!(dark.bg_panel, Color::from_rgb8(0x14, 0x14, 0x18));
+        assert_eq!(dark.bg_card, Color::from_rgb8(0x1c, 0x1c, 0x22));
+        assert_eq!(dark.border, Color::from_rgba(1.0, 1.0, 1.0, 0.07));
+        assert_eq!(dark.bg_hover, Color::from_rgb8(0x24, 0x24, 0x2c));
+        assert_eq!(dark.bg_selected, Color::from_rgb8(0x2c, 0x2c, 0x36));
+        assert_eq!(dark.bg_input, Color::from_rgb8(0x1c, 0x1c, 0x22));
 
         // Style helper closures return without panic
         let nav_active = sidebar_nav_button_style(&dark, true)(
@@ -1242,7 +1260,8 @@ mod tests {
             &iced::Theme::Dark,
             iced::widget::button::Status::Active,
         );
-        assert_eq!(tag_pill.border.color, dark.accent);
+        assert_eq!(tag_pill.border.width, 0.0);
+        assert_eq!(tag_pill.text_color, dark.accent);
 
         let badge = header_badge_style(&dark)(&iced::Theme::Dark);
         assert_eq!(badge.background, None);
@@ -1282,9 +1301,9 @@ mod tests {
     #[test]
     fn test_fidelity_polish_palette_and_ghost_button_style() {
         let dark = OrbitPalette::dark();
-        assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0c, 0x0c, 0x0e));
+        assert_eq!(dark.bg_sidebar, Color::from_rgb8(0x0f, 0x0f, 0x12));
         assert_eq!(dark.accent, Color::from_rgb8(0x6a, 0xa8, 0xff));
-        assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
+        assert_eq!(dark.border, Color::from_rgba(1.0, 1.0, 1.0, 0.07));
 
         let ghost_normal = ghost_action_button_style(&dark)(
             &iced::Theme::Dark,
@@ -1568,13 +1587,13 @@ mod tests {
     fn test_dark_surfaces_match_spec_and_are_opaque() {
         let dark = OrbitPalette::dark();
         assert_eq!(dark.bg_app, Color::from_rgb8(0x09, 0x09, 0x0b));
-        assert_eq!(dark.bg_card, Color::from_rgb8(0x18, 0x18, 0x1b));
+        assert_eq!(dark.bg_card, Color::from_rgb8(0x1c, 0x1c, 0x22));
     }
 
     #[test]
     fn test_light_surfaces_match_spec_and_have_hierarchy() {
         let light = OrbitPalette::light();
-        assert_eq!(light.bg_app, Color::from_rgb8(0xf9, 0xfa, 0xfb));
+        assert_eq!(light.bg_app, Color::from_rgb8(0xf1, 0xf3, 0xf6));
         assert_eq!(light.bg_card, Color::WHITE);
         assert_eq!(light.border, Color::from_rgb8(0xe4, 0xe4, 0xe7));
         assert_ne!(light.bg_card, light.bg_app);
@@ -1600,7 +1619,7 @@ mod tests {
         let light = OrbitPalette::light();
 
         // Standardized border colors
-        assert_eq!(dark.border, Color::from_rgb8(0x27, 0x27, 0x2a));
+        assert_eq!(dark.border, Color::from_rgba(1.0, 1.0, 1.0, 0.07));
         assert_eq!(light.border, Color::from_rgb8(0xe4, 0xe4, 0xe7));
 
         // Shadows
@@ -1653,5 +1672,83 @@ mod tests {
         assert_eq!(ti_active.border.width, 1.0);
         assert_eq!(ti_active.border.color, dark.border);
         assert_eq!(ti_active.border.radius, Radius::from(6.0));
+    }
+
+    #[test]
+    fn test_typography_scale_and_embedded_fonts_non_empty() {
+        let fonts = [
+            FONT_UI_BYTES,
+            FONT_UI_MEDIUM_BYTES,
+            FONT_UI_SEMIBOLD_BYTES,
+            FONT_UI_BOLD_BYTES,
+            FONT_MONO_BYTES,
+        ];
+        for bytes in fonts {
+            assert!(!bytes.is_empty(), "embedded font bytes must not be empty");
+            assert!(bytes.len() >= 4, "font header must be at least 4 bytes");
+            let header = &bytes[..4];
+            let is_ttf = header == [0x00, 0x01, 0x00, 0x00];
+            let is_otf = header == b"OTTO";
+            assert!(is_ttf || is_otf, "font must have valid TTF or OTF header");
+        }
+
+        assert_eq!(Typography::CAPTION, 11);
+        assert_eq!(Typography::SECONDARY, 12);
+        assert_eq!(Typography::BODY, 13);
+        assert_eq!(Typography::SUBHEADING, 14);
+        assert_eq!(Typography::HEADING, 16);
+        assert_eq!(Typography::METRIC, 24);
+    }
+
+    #[test]
+    fn test_tonal_surface_separation_and_borderless_containers() {
+        let dark = OrbitPalette::dark();
+        let light = OrbitPalette::light();
+
+        for palette in [&dark, &light] {
+            assert_ne!(palette.bg_app, palette.bg_sidebar);
+            assert_ne!(palette.bg_sidebar, palette.bg_panel);
+            assert_ne!(palette.bg_panel, palette.bg_card);
+
+            let theme = if palette.is_dark {
+                iced::Theme::Dark
+            } else {
+                iced::Theme::Light
+            };
+
+            assert_eq!(activity_bar_container_style(palette)(&theme).border.width, 0.0);
+            assert_eq!(sub_sidebar_container_style(palette)(&theme).border.width, 0.0);
+            assert_eq!(drawer_container_style(palette)(&theme).border.width, 0.0);
+            assert_eq!(card_container_style(palette)(&theme).border.width, 0.0);
+            assert_eq!(panel_container_style(palette)(&theme).border.width, 0.0);
+            assert_eq!(
+                tab_button_style(palette, true)(&theme, iced::widget::button::Status::Active)
+                    .border
+                    .width,
+                0.0
+            );
+            assert_eq!(
+                cluster_card_style(palette, false)(&theme, iced::widget::button::Status::Active)
+                    .border
+                    .width,
+                0.0
+            );
+            assert_eq!(
+                cluster_tag_pill_style(palette, false)(
+                    &theme,
+                    iced::widget::button::Status::Active
+                )
+                .border
+                .width,
+                0.0
+            );
+            assert_eq!(header_badge_style(palette)(&theme).border.width, 0.0);
+            assert_eq!(
+                search_pill_style(palette)(&theme, iced::widget::button::Status::Active)
+                    .border
+                    .width,
+                0.0
+            );
+        }
     }
 }

@@ -5,7 +5,7 @@ use iced::{
 };
 use orbit_core::command::ResourceKind;
 
-use crate::theme::{resource_kind_color, OrbitPalette};
+use crate::theme::{resource_kind_color, OrbitPalette, Typography};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BadgeVariant {
@@ -39,8 +39,8 @@ pub enum BadgeSize {
 impl BadgeSize {
     pub fn text_size(&self) -> u16 {
         match self {
-            Self::Small => 10,
-            Self::Medium => 12,
+            Self::Small => Typography::CAPTION,
+            Self::Medium => Typography::SECONDARY,
         }
     }
 
@@ -68,7 +68,6 @@ pub fn badge<'a, Message: 'a>(
 ) -> Element<'a, Message> {
     let color = variant.color(palette);
     let bg_color = Color::from_rgba(color.r, color.g, color.b, 0.12);
-    let border_color = Color::from_rgba(color.r, color.g, color.b, 0.35);
 
     let mut content = row![].spacing(5).align_y(iced::Alignment::Center);
 
@@ -99,8 +98,8 @@ pub fn badge<'a, Message: 'a>(
         .style(move |_theme| container::Style {
             background: Some(Background::Color(bg_color)),
             border: Border {
-                color: border_color,
-                width: 1.0,
+                color: Color::TRANSPARENT,
+                width: 0.0,
                 radius: Radius::from(999.0),
             },
             ..Default::default()

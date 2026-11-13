@@ -134,7 +134,8 @@ pub fn dashboard_view<'a, Message: 'a>(
 
     column![
         text("Cluster Health & Workload Overview")
-            .size(18)
+            .size(crate::theme::Typography::HEADING)
+            .font(crate::theme::FONT_UI_SEMIBOLD)
             .color(palette.text_primary),
         row1,
         row2,

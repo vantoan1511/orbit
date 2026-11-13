@@ -70,13 +70,15 @@ pub fn modal_view<'a, Message: 'a + Clone>(
 ) -> Option<iced::Element<'a, Message>> {
     use iced::widget::{button, column, container, row, scrollable, text, text_input};
     use iced::Length;
+    use crate::icons::{Icon, button_icon};
+    use crate::theme::{FONT_UI_SEMIBOLD, Typography};
 
     match modal {
         ActiveModal::None => None,
         ActiveModal::SearchEverywhere { query, .. } => {
             let input = text_input("Search resources, tabs, commands (e.g. nginx, pods)...", query)
                 .on_input(on_search_input)
-                .size(14)
+                .size(Typography::SUBHEADING)
                 .padding(10)
                 .width(Length::Fill);
 
@@ -84,8 +86,8 @@ pub fn modal_view<'a, Message: 'a + Clone>(
             for (idx, item) in search_results.into_iter().enumerate() {
                 let row_item = button(
                     row![
-                        text(item.title).size(13).color(palette.text_primary),
-                        text(item.subtitle).size(11).color(palette.text_muted),
+                        text(item.title).size(Typography::BODY).color(palette.text_primary),
+                        text(item.subtitle).size(Typography::CAPTION).color(palette.text_muted),
                     ]
                     .spacing(12)
                     .padding(6),
@@ -99,8 +101,11 @@ pub fn modal_view<'a, Message: 'a + Clone>(
             let dialog = container(
                 column![
                     row![
-                        text("Search Everywhere (Ctrl+K)").size(15).color(palette.text_primary),
-                        button(text("✕ Close").size(11)).on_press(on_close),
+                        text("Search Everywhere (Ctrl+K)")
+                            .size(Typography::SUBHEADING)
+                            .font(FONT_UI_SEMIBOLD)
+                            .color(palette.text_primary),
+                        button(button_icon(Icon::X, 13)).on_press(on_close),
                     ]
                     .spacing(12),
                     input,
@@ -131,10 +136,13 @@ pub fn modal_view<'a, Message: 'a + Clone>(
 
             let dialog = container(
                 column![
-                    text("Confirm Resource Deletion").size(16).color(palette.danger),
-                    text(desc).size(13).color(palette.text_primary),
+                    text("Confirm Resource Deletion")
+                        .size(Typography::HEADING)
+                        .font(FONT_UI_SEMIBOLD)
+                        .color(palette.danger),
+                    text(desc).size(Typography::BODY).color(palette.text_primary),
                     row![
-                        button(text("Cancel").size(12)).on_press(on_close),
+                        button(text("Cancel").size(Typography::SECONDARY)).on_press(on_close),
                     ]
                     .spacing(12),
                 ]
@@ -156,12 +164,15 @@ pub fn modal_view<'a, Message: 'a + Clone>(
         ActiveModal::Scale { kind, name, current_replicas, target_replicas, .. } => {
             let dialog = container(
                 column![
-                    text(format!("Scale {:?} '{}'", kind, name)).size(16).color(palette.text_primary),
+                    text(format!("Scale {:?} '{}'", kind, name))
+                        .size(Typography::HEADING)
+                        .font(FONT_UI_SEMIBOLD)
+                        .color(palette.text_primary),
                     text(format!("Current: {} replicas · Target: {} replicas", current_replicas, target_replicas))
-                        .size(13)
+                        .size(Typography::BODY)
                         .color(palette.text_secondary),
                     row![
-                        button(text("Close").size(12)).on_press(on_close),
+                        button(text("Close").size(Typography::SECONDARY)).on_press(on_close),
                     ]
                     .spacing(12),
                 ]
@@ -183,8 +194,11 @@ pub fn modal_view<'a, Message: 'a + Clone>(
         _ => {
             let dialog = container(
                 column![
-                    text("Action Modal").size(16).color(palette.text_primary),
-                    button(text("Close").size(12)).on_press(on_close),
+                    text("Action Modal")
+                        .size(Typography::HEADING)
+                        .font(FONT_UI_SEMIBOLD)
+                        .color(palette.text_primary),
+                    button(text("Close").size(Typography::SECONDARY)).on_press(on_close),
                 ]
                 .spacing(16)
                 .padding(20),
