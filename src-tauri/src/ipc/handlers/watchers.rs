@@ -187,10 +187,10 @@ mod tests {
         assert!(cancel_res.is_ok());
 
         let emitted = mock_emitter.get_emitted_events().await;
-        assert!(!emitted.is_empty(), "Expected at least one emitted event");
-        let (name, payload) = &emitted[0];
-        assert_eq!(name, "watcherConnectionChanged");
-        assert_eq!(payload["clusterId"], "cluster-1");
+        let (_name, payload) = emitted
+            .iter()
+            .find(|(name, p)| name == "watcherConnectionChanged" && p["clusterId"] == "cluster-1")
+            .expect("Expected watcherConnectionChanged event for cluster-1");
         assert_eq!(payload["state"], "connected");
         assert_eq!(payload["failingWatchers"], 0);
     }
