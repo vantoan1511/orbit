@@ -1,0 +1,33 @@
+name: Task / Feature
+description: A small, business-oriented unit of work for a sprint
+title: ""
+labels: []
+body:
+  - type: input
+    id: epic
+    attributes:
+      label: Parent Epic
+      description: Link the parent epic (if applicable)
+      placeholder: "Part of #367"
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is this ticket delivering and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria
+      description: Clear, testable conditions for "Done"
+      value: |
+        - [ ] 
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Technical Notes / Dependencies
+      description: Optional implementation hints, links, or blockers
