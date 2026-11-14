@@ -1,4 +1,5 @@
 mod bridge;
+pub mod components;
 pub mod icons;
 pub mod navigation;
 mod state;
