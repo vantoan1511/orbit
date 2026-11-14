@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { getThemeModeTooltip, useAppearance } from '@/composables/useAppearance'
+import { appSettingsService } from '@/services/appSettingsService'
 import { os } from '@/services/nativeService'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useTabsStore } from '@/stores/tabsStore'
-import { Bell, Laptop, Moon, Settings, Sun, User } from '@lucide/vue'
+import { CONFIG_KEYS } from '@/types/settings'
+import { Bell, Laptop, Moon, Settings, Sparkles, Sun, User } from '@lucide/vue'
 import { Button } from 'primevue'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -33,10 +36,15 @@ const isCategoryDisabled = (cat: SidebarCategory): boolean => {
 
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
+const settingsStore = useSettingsStore()
 const tabsStore = useTabsStore()
 const route = useRoute()
 const router = useRouter()
 const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
+
+const isExperienceFeaturesEnabled = computed(() =>
+  Boolean(settingsStore.getConfigValue(CONFIG_KEYS.ENABLE_EXPERIENCE_FEATURES, false))
+)
 
 const isSettingsActive = computed(() => {
   if (route.path !== '/settings') return false
@@ -88,6 +96,20 @@ const isSettingsActive = computed(() => {
 
     <!-- Bottom Activity Actions -->
     <div class="flex flex-col gap-2 items-center w-full px-1">
+      <!-- New UI (GPUI Preview) -->
+      <Button
+        v-if="isExperienceFeaturesEnabled"
+        v-tooltip.right="'New UI (GPUI)'"
+        variant="text"
+        severity="secondary"
+        :class="getActivityBarItemClass(false, false)"
+        @click="appSettingsService.launchGpuiShell()"
+      >
+        <template #icon>
+          <Sparkles class="w-5 h-5" />
+        </template>
+      </Button>
+
       <!-- Settings Link -->
       <Button
         v-tooltip.right="'Settings'"

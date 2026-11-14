@@ -1,11 +1,127 @@
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use serde_json::Value;
+use tauri::Manager;
 use tokio::sync::{Mutex, RwLock};
 use crate::config::{Configuration, OrbitConfig};
 use crate::ipc::bridge::{Bridge, WsWriter};
+use crate::get_global_app_handle;
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::manager::KubeManager;
+
+static GPUI_RUNNING: AtomicBool = AtomicBool::new(false);
+
+fn gpui_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "orbit-gpui.exe"
+    } else {
+        "orbit-gpui"
+    }
+}
+
+pub fn resolve_gpui_binary_candidates(current_exe: &Path) -> Vec<PathBuf> {
+    let bin = gpui_binary_name();
+    let mut candidates = Vec::new();
+    if let Some(dir) = current_exe.parent() {
+        candidates.push(dir.join(bin));
+    }
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if let Some(workspace_root) = manifest_dir.parent() {
+        candidates.push(workspace_root.join("target").join("debug").join(bin));
+        candidates.push(workspace_root.join("target").join("release").join(bin));
+    }
+    candidates
+}
+
+fn find_gpui_binary() -> Option<PathBuf> {
+    let current_exe = std::env::current_exe().ok()?;
+    resolve_gpui_binary_candidates(&current_exe)
+        .into_iter()
+        .find(|p| p.is_file())
+}
+
+pub fn launch_gpui_shell(writer: Arc<Mutex<WsWriter>>, token: String) {
+    if !OrbitConfig::load().enable_experience_features() {
+        tracing::warn!("Ignoring launchGpuiShell because enableExperienceFeatures is disabled");
+        tokio::spawn(async move {
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "Experience Features must be enabled in Settings to launch the GPUI shell.".to_string(),
+                },
+            )
+            .await;
+        });
+        return;
+    }
+
+    if GPUI_RUNNING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        tracing::debug!("GPUI shell is already running; ignoring duplicate launch request");
+        return;
+    }
+
+    tokio::spawn(async move {
+        let Some(binary_path) = find_gpui_binary() else {
+            GPUI_RUNNING.store(false, Ordering::SeqCst);
+            tracing::error!("Could not locate orbit-gpui binary");
+            let _ = Bridge::send_event(
+                &writer,
+                &token,
+                &OrbitEvent::ErrorOccurred {
+                    message: "Could not locate orbit-gpui binary. Build it with `cargo build -p orbit-gpui`.".to_string(),
+                },
+            )
+            .await;
+            return;
+        };
+
+        let mut cmd = tokio::process::Command::new(&binary_path);
+        match cmd.spawn() {
+            Ok(mut child) => {
+                if let Some(app_handle) = get_global_app_handle()
+                    && let Some(window) = app_handle.get_webview_window("main")
+                    && let Err(err) = window.hide()
+                {
+                    tracing::warn!(error = %err, "Failed to hide main window while GPUI shell runs");
+                }
+
+                if let Err(err) = child.wait().await {
+                    tracing::error!(error = %err, "Failed while waiting for orbit-gpui process exit");
+                }
+                GPUI_RUNNING.store(false, Ordering::SeqCst);
+
+                if let Some(app_handle) = get_global_app_handle()
+                    && let Some(window) = app_handle.get_webview_window("main")
+                {
+                    if let Err(err) = window.show() {
+                        tracing::warn!(error = %err, "Failed to show main window after GPUI shell exit");
+                    }
+                    if let Err(err) = window.set_focus() {
+                        tracing::warn!(error = %err, "Failed to focus main window after GPUI shell exit");
+                    }
+                }
+            }
+            Err(err) => {
+                GPUI_RUNNING.store(false, Ordering::SeqCst);
+                tracing::error!(error = %err, path = %binary_path.display(), "Failed to spawn orbit-gpui");
+                let _ = Bridge::send_event(
+                    &writer,
+                    &token,
+                    &OrbitEvent::ErrorOccurred {
+                        message: format!("Failed to launch GPUI shell: {err}"),
+                    },
+                )
+                .await;
+            }
+        }
+    });
+}
 
 pub fn get_app_settings(
     writer: Arc<Mutex<WsWriter>>,
@@ -395,6 +511,16 @@ mod tests {
             }
         }
         assert!(found, "manager.config must be updated in memory");
+    }
+
+    #[test]
+    fn test_gpui_binary_name_and_candidate_paths() {
+        let exe_path = PathBuf::from("D:/Projects/orbit/target/debug/orbit-app.exe");
+        let candidates = resolve_gpui_binary_candidates(&exe_path);
+        assert!(!candidates.is_empty());
+        assert_eq!(candidates[0], PathBuf::from("D:/Projects/orbit/target/debug").join(gpui_binary_name()));
+        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("debug").join(gpui_binary_name()))));
+        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("release").join(gpui_binary_name()))));
     }
 }
 

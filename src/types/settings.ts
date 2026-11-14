@@ -18,7 +18,8 @@ export const CONFIG_KEYS = {
   SEMANTIC_COLORS: 'semanticColors',
   CLUSTER_CUSTOMIZATIONS: 'clusterCustomizations',
   NOTIFICATION_PREFERENCES: 'notificationPreferences',
-  PROXY_SETTINGS: 'proxySettings'
+  PROXY_SETTINGS: 'proxySettings',
+  ENABLE_EXPERIENCE_FEATURES: 'enableExperienceFeatures'
 } as const
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
