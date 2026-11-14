@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 gpui = "0.2.2"
 orbit-core = { path = "../crates/orbit-core" }
+serde_json = "1.0"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
 tracing = "0.1"
 

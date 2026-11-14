@@ -5366,6 +5366,7 @@ dependencies = [
  "gpui",
  "kube",
  "orbit-core",
+ "serde_json",
  "tokio",
  "tracing",
 ]
