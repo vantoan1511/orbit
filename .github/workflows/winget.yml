@@ -99,6 +99,6 @@ jobs:
         with:
           identifier: ${{ env.PACKAGE_IDENTIFIER }}
           release-tag: ${{ steps.resolve-tag.outputs.tag }}
-          installers-regex: 'Orbit-Setup-.*\.exe$'
+          installers-regex: 'Orbit_.*-setup\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
           fork-user: ${{ github.repository_owner }}
