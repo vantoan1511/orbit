@@ -1,3 +1,5 @@
+use lucide_icons::Icon;
+
 use crate::theme::K8sResourceKind;
 
 pub const ACTIVITY_BAR_WIDTH: f32 = 56.0;
@@ -56,16 +58,16 @@ impl SidebarCategory {
         }
     }
 
-    pub const fn badge_code(self) -> &'static str {
+    pub const fn icon(self) -> Icon {
         match self {
-            Self::Clusters => "CL",
-            Self::Core => "OV",
-            Self::Workloads => "WL",
-            Self::Network => "NW",
-            Self::Storage => "ST",
-            Self::Config => "CF",
-            Self::Security => "SC",
-            Self::Logs => "LG",
+            Self::Clusters => Icon::Server,
+            Self::Core => Icon::LayoutDashboard,
+            Self::Workloads => Icon::Boxes,
+            Self::Network => Icon::Network,
+            Self::Storage => Icon::HardDrive,
+            Self::Config => Icon::Settings2,
+            Self::Security => Icon::ShieldCheck,
+            Self::Logs => Icon::FileText,
         }
     }
 
@@ -293,6 +295,40 @@ impl WorkspaceView {
         }
     }
 
+    pub const fn icon(self) -> Icon {
+        match self {
+            Self::Overview => Icon::LayoutDashboard,
+            Self::Nodes => Icon::Server,
+            Self::Namespaces => Icon::FolderOpen,
+            Self::Events => Icon::Activity,
+            Self::WorkloadsOverview => Icon::Boxes,
+            Self::Pods => Icon::Box,
+            Self::Deployments => Icon::Layers,
+            Self::StatefulSets => Icon::Database,
+            Self::DaemonSets => Icon::Ghost,
+            Self::ReplicaSets => Icon::Copy,
+            Self::Jobs => Icon::Hammer,
+            Self::CronJobs => Icon::Clock,
+            Self::Hpas => Icon::TrendingUp,
+            Self::Services => Icon::Network,
+            Self::Ingresses => Icon::Globe,
+            Self::PortForward => Icon::Cable,
+            Self::StorageOverview => Icon::HardDrive,
+            Self::PersistentVolumes => Icon::Archive,
+            Self::PersistentVolumeClaims => Icon::FileDown,
+            Self::StorageClasses => Icon::Settings2,
+            Self::ConfigMaps => Icon::FileJson,
+            Self::Secrets => Icon::KeyRound,
+            Self::SecurityOverview => Icon::ShieldCheck,
+            Self::NetworkPolicies => Icon::Network,
+            Self::PodSecurity => Icon::ShieldAlert,
+            Self::ResourceQuotas => Icon::Sliders,
+            Self::AdmissionWebhooks => Icon::Webhook,
+            Self::Logs => Icon::FileText,
+            Self::Settings => Icon::Settings,
+        }
+    }
+
     pub const fn resource_kind(self) -> Option<K8sResourceKind> {
         match self {
             Self::Nodes => Some(K8sResourceKind::Node),
@@ -497,6 +533,72 @@ mod tests {
         assert_eq!(
             WorkspaceView::Settings.breadcrumb(),
             ("Orbit", "Settings")
+        );
+    }
+
+    #[test]
+    fn test_sidebar_categories_and_workspace_views_map_lucide_icons() {
+        use lucide_icons::Icon;
+
+        assert_eq!(
+            char::from(SidebarCategory::Clusters.icon()),
+            char::from(Icon::Server)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Core.icon()),
+            char::from(Icon::LayoutDashboard)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Workloads.icon()),
+            char::from(Icon::Boxes)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Network.icon()),
+            char::from(Icon::Network)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Storage.icon()),
+            char::from(Icon::HardDrive)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Config.icon()),
+            char::from(Icon::Settings2)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Security.icon()),
+            char::from(Icon::ShieldCheck)
+        );
+        assert_eq!(
+            char::from(SidebarCategory::Logs.icon()),
+            char::from(Icon::FileText)
+        );
+
+        for category in SidebarCategory::ALL {
+            for view in category.nav_items() {
+                assert_ne!(char::from(view.icon()), '\0');
+            }
+        }
+        assert_ne!(char::from(WorkspaceView::Settings.icon()), '\0');
+
+        assert_eq!(
+            char::from(WorkspaceView::Pods.icon()),
+            char::from(Icon::Box)
+        );
+        assert_eq!(
+            char::from(WorkspaceView::Deployments.icon()),
+            char::from(Icon::Layers)
+        );
+        assert_eq!(
+            char::from(WorkspaceView::Services.icon()),
+            char::from(Icon::Network)
+        );
+        assert_eq!(
+            char::from(WorkspaceView::Secrets.icon()),
+            char::from(Icon::KeyRound)
+        );
+        assert_eq!(
+            char::from(WorkspaceView::Settings.icon()),
+            char::from(Icon::Settings)
         );
     }
 

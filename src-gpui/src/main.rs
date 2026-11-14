@@ -1,4 +1,5 @@
 mod bridge;
+pub mod icons;
 pub mod navigation;
 mod state;
 pub mod theme;
@@ -8,11 +9,13 @@ use gpui::{
     KeyDownEvent, MouseButton, MouseMoveEvent, Rgba, SharedString, Window,
     WindowAppearance, WindowBounds, WindowDecorations, WindowOptions, div, prelude::*, px, size,
 };
+use lucide_icons::Icon;
 use orbit_core::config::OrbitConfig;
 use orbit_core::kubernetes::models::ClusterInfo;
 use tokio::sync::mpsc;
 
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
+use crate::icons::{render_icon, theme_mode_icon};
 use crate::navigation::{
     ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView,
 };
@@ -97,6 +100,32 @@ fn apply_theme(updated: OrbitTheme, window: &mut Window, cx: &mut App) {
     let bg = updated.style.window_background;
     cx.set_global(updated);
     window.set_background_appearance(bg);
+}
+
+pub fn nav_item_icon_color(view: WorkspaceView, is_active: bool, theme: &OrbitTheme) -> Rgba {
+    view.resource_kind()
+        .map(|kind| theme.k8s_color(kind))
+        .unwrap_or(if is_active {
+            theme.accent.accent
+        } else {
+            theme.text.muted
+        })
+}
+
+pub const fn sidebar_toggle_icon(is_collapsed: bool) -> Icon {
+    if is_collapsed {
+        Icon::PanelLeftOpen
+    } else {
+        Icon::PanelLeftClose
+    }
+}
+
+pub const fn dropdown_chevron_icon(is_open: bool) -> Icon {
+    if is_open {
+        Icon::ChevronUp
+    } else {
+        Icon::ChevronDown
+    }
 }
 
 pub fn apply_cluster_event(
@@ -271,20 +300,15 @@ impl OrbitShell {
                                 .bg(theme.accent.accent),
                         )
                     })
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .font_weight(if is_selected_category {
-                                FontWeight::BOLD
-                            } else {
-                                FontWeight::MEDIUM
-                            })
-                            .text_color(if is_selected_category {
-                                theme.accent.accent
-                            } else {
-                                theme.text.secondary
-                            })
-                            .child(category.badge_code()),
-                    ),
+                    .child(render_icon(
+                        category.icon(),
+                        px(18.0),
+                        if is_selected_category {
+                            theme.accent.accent
+                        } else {
+                            theme.text.secondary
+                        },
+                    )),
             );
         }
 
@@ -342,16 +366,15 @@ impl OrbitShell {
                                 this.sidebar.select_view(WorkspaceView::Settings);
                                 cx.notify();
                             }))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(if is_settings {
-                                        theme.accent.accent
-                                    } else {
-                                        theme.text.secondary
-                                    })
-                                    .child("SET"),
-                            ),
+                            .child(render_icon(
+                                Icon::Settings,
+                                px(18.0),
+                                if is_settings {
+                                    theme.accent.accent
+                                } else {
+                                    theme.text.secondary
+                                },
+                            )),
                     )
                     .child(
                         div()
@@ -367,16 +390,11 @@ impl OrbitShell {
                             .on_click(cx.listener(|this, _event, window, cx| {
                                 this.cycle_theme_mode(window, cx);
                             }))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.text.muted)
-                                    .child(match theme.mode {
-                                        ThemeMode::Dark => "DRK",
-                                        ThemeMode::Light => "LGT",
-                                        ThemeMode::System => "SYS",
-                                    }),
-                            ),
+                            .child(render_icon(
+                                theme_mode_icon(theme.mode),
+                                px(18.0),
+                                theme.text.muted,
+                            )),
                     ),
             )
             .into_any_element()
@@ -478,14 +496,7 @@ impl OrbitShell {
 
         for (idx, item) in category.nav_items().iter().copied().enumerate() {
             let is_active = self.sidebar.active_view == item;
-            let dot_color = item
-                .resource_kind()
-                .map(|kind| theme.k8s_color(kind))
-                .unwrap_or(if is_active {
-                    theme.accent.accent
-                } else {
-                    theme.text.muted
-                });
+            let icon_color = nav_item_icon_color(item, is_active, &theme);
 
             list = list.child(
                 div()
@@ -509,14 +520,7 @@ impl OrbitShell {
                             .flex()
                             .items_center()
                             .gap_2()
-                            .child(
-                                div()
-                                    .w(px(7.0))
-                                    .h(px(7.0))
-                                    .rounded_full()
-                                    .flex_shrink_0()
-                                    .bg(dot_color),
-                            )
+                            .child(render_icon(item.icon(), px(15.0), icon_color))
                             .child(
                                 apply_text_step(div(), theme.typography.size_xs)
                                     .font_weight(if is_active {
@@ -589,11 +593,11 @@ impl OrbitShell {
                                     this.sidebar.toggle_collapse();
                                     cx.notify();
                                 }))
-                                .child(
-                                    apply_text_step(div(), theme.typography.size_xs)
-                                        .text_color(theme.text.secondary)
-                                        .child("<<"),
-                                ),
+                                .child(render_icon(
+                                    Icon::PanelLeftClose,
+                                    px(14.0),
+                                    theme.text.secondary,
+                                )),
                         ),
                 )
                 .child(
@@ -628,10 +632,11 @@ impl OrbitShell {
     fn render_header(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
         let presentation = format_cluster_status(&self.state, &theme);
-        let cluster_chevron = if self.state.dropdown_open { "^" } else { "v" };
-        let style_chevron = if self.style_dropdown_open { "^" } else { "v" };
+        let cluster_chevron = dropdown_chevron_icon(self.state.dropdown_open);
+        let style_chevron = dropdown_chevron_icon(self.style_dropdown_open);
         let control_hover = theme.surface.control_hover;
         let (cat_label, view_label) = self.sidebar.active_view.breadcrumb();
+        let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
 
         div()
             .id("orbit-header-toolbar")
@@ -663,12 +668,11 @@ impl OrbitShell {
                                 this.sidebar.toggle_collapse();
                                 cx.notify();
                             }))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.text.secondary)
-                                    .child(if self.sidebar.is_collapsed { ">>" } else { "<<" }),
-                            ),
+                            .child(render_icon(
+                                sidebar_toggle_icon(self.sidebar.is_collapsed),
+                                px(14.0),
+                                theme.text.secondary,
+                            )),
                     )
                     .child(
                         theme
@@ -702,11 +706,11 @@ impl OrbitShell {
                                     .text_color(theme.text.muted)
                                     .child(presentation.status_label),
                             )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.secondary)
-                                    .child(cluster_chevron),
-                            ),
+                            .child(render_icon(
+                                cluster_chevron,
+                                px(13.0),
+                                theme.text.secondary,
+                            )),
                     )
                     .child(
                         div()
@@ -718,11 +722,11 @@ impl OrbitShell {
                                     .text_color(theme.text.muted)
                                     .child(cat_label),
                             )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.muted)
-                                    .child("/"),
-                            )
+                            .child(render_icon(
+                                Icon::ChevronRight,
+                                px(12.0),
+                                theme.text.muted,
+                            ))
                             .child(
                                 apply_text_step(div(), theme.typography.size_xs)
                                     .font_weight(FontWeight::SEMIBOLD)
@@ -749,6 +753,11 @@ impl OrbitShell {
                             .on_click(cx.listener(|this, _event, window, cx| {
                                 this.cycle_theme_mode(window, cx);
                             }))
+                            .child(render_icon(
+                                theme_mode_icon(theme.mode),
+                                px(13.0),
+                                theme.text.secondary,
+                            ))
                             .child(
                                 apply_text_step(div(), theme.typography.size_xs)
                                     .text_color(theme.text.muted)
@@ -787,17 +796,18 @@ impl OrbitShell {
                                     .text_color(theme.text.primary)
                                     .child(theme.style.ui_style.label()),
                             )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.secondary)
-                                    .child(style_chevron),
-                            ),
+                            .child(render_icon(
+                                style_chevron,
+                                px(13.0),
+                                theme.text.secondary,
+                            )),
                     )
                     .child(
                         theme
                             .style_control(div().id("refresh-clusters-btn"))
                             .flex()
                             .items_center()
+                            .gap_1p5()
                             .h(theme.typography.control_height_sm)
                             .px(theme.typography.control_padding_x_md)
                             .hover(move |style| style.bg(control_hover))
@@ -806,6 +816,11 @@ impl OrbitShell {
                                 this.dispatch_command(ClusterBridgeCommand::RefreshClusters);
                                 cx.notify();
                             }))
+                            .child(render_icon(
+                                Icon::RefreshCw,
+                                px(13.0),
+                                theme.text.secondary,
+                            ))
                             .child(
                                 apply_text_step(div(), theme.typography.size_sm)
                                     .font_weight(FontWeight::MEDIUM)
@@ -814,9 +829,35 @@ impl OrbitShell {
                     )
                     .child(
                         theme
+                            .style_control(div().id("header-settings-btn"))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(theme.typography.control_height_sm)
+                            .h(theme.typography.control_height_sm)
+                            .when(is_settings, |el| el.bg(theme.accent.soft))
+                            .hover(move |style| style.bg(control_hover))
+                            .cursor_pointer()
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.sidebar.select_view(WorkspaceView::Settings);
+                                cx.notify();
+                            }))
+                            .child(render_icon(
+                                Icon::Settings,
+                                px(14.0),
+                                if is_settings {
+                                    theme.accent.accent
+                                } else {
+                                    theme.text.secondary
+                                },
+                            )),
+                    )
+                    .child(
+                        theme
                             .style_control(div().id("switch-to-old-ui"))
                             .flex()
                             .items_center()
+                            .gap_1p5()
                             .h(theme.typography.control_height_sm)
                             .px(theme.typography.control_padding_x_md)
                             .hover(move |style| style.bg(control_hover))
@@ -824,6 +865,11 @@ impl OrbitShell {
                             .on_click(cx.listener(|_this, _event, _window, cx| {
                                 cx.quit();
                             }))
+                            .child(render_icon(
+                                Icon::LogOut,
+                                px(13.0),
+                                theme.text.secondary,
+                            ))
                             .child(
                                 apply_text_step(div(), theme.typography.size_sm)
                                     .font_weight(FontWeight::MEDIUM)
@@ -860,10 +906,21 @@ impl OrbitShell {
                         .items_center()
                         .gap_2()
                         .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.semantic.danger.solid)
-                                .child("KUBECONFIG ERROR"),
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_1p5()
+                                .child(render_icon(
+                                    Icon::CircleAlert,
+                                    px(13.0),
+                                    theme.semantic.danger.solid,
+                                ))
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_xs)
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(theme.semantic.danger.solid)
+                                        .child("KUBECONFIG ERROR"),
+                                ),
                         )
                         .child(
                             apply_text_step(div(), theme.typography.size_xs)
@@ -874,6 +931,9 @@ impl OrbitShell {
                 .child(
                     div()
                         .id("dismiss-error-banner-btn")
+                        .flex()
+                        .items_center()
+                        .gap_1()
                         .px_2()
                         .py_1()
                         .rounded(theme.style.radius_control)
@@ -884,6 +944,7 @@ impl OrbitShell {
                             this.state.dismiss_error_banner();
                             cx.notify();
                         }))
+                        .child(render_icon(Icon::X, px(12.0), theme.text.secondary))
                         .child(
                             apply_text_step(div(), theme.typography.size_xs).child("Dismiss"),
                         ),
@@ -986,10 +1047,21 @@ impl OrbitShell {
                         )
                         .when(is_active, |el| {
                             el.child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme.accent.accent)
-                                    .child("Active"),
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .child(render_icon(
+                                        Icon::Check,
+                                        px(12.0),
+                                        theme.accent.accent,
+                                    ))
+                                    .child(
+                                        apply_text_step(div(), theme.typography.size_xs)
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(theme.accent.accent)
+                                            .child("Active"),
+                                    ),
                             )
                         }),
                 );
@@ -1085,20 +1157,26 @@ impl OrbitShell {
                             .text_color(theme.text.primary)
                             .child(style.label()),
                     )
-                    .child(
+                    .child(if is_active {
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .child(render_icon(Icon::Check, px(12.0), theme.accent.accent))
+                            .child(
+                                apply_text_step(div(), theme.typography.size_2xs)
+                                    .text_color(theme.accent.accent)
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child("Active"),
+                            )
+                            .into_any_element()
+                    } else {
                         apply_text_step(div(), theme.typography.size_2xs)
-                            .text_color(if is_active {
-                                theme.accent.accent
-                            } else {
-                                theme.text.muted
-                            })
-                            .font_weight(if is_active {
-                                FontWeight::SEMIBOLD
-                            } else {
-                                FontWeight::NORMAL
-                            })
-                            .child(if is_active { "Active" } else { badge }),
-                    ),
+                            .text_color(theme.text.muted)
+                            .font_weight(FontWeight::NORMAL)
+                            .child(badge)
+                            .into_any_element()
+                    }),
             );
         }
 
@@ -1211,7 +1289,7 @@ impl OrbitShell {
                                 .bg(theme.surface.bg_panel)
                                 .border_1()
                                 .border_color(theme.border.default)
-                                .child(div().w(px(7.0)).h(px(7.0)).rounded_full().bg(color))
+                                .child(render_icon(view.icon(), px(12.0), color))
                                 .child(
                                     apply_text_step(div(), theme.typography.size_2xs)
                                         .font_weight(FontWeight::SEMIBOLD)
@@ -1669,6 +1747,8 @@ impl OrbitShell {
             ClusterConnectionState::Connected { k8s_version, .. } => k8s_version.clone(),
             _ => None,
         };
+        let control_hover = theme.surface.control_hover;
+        let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
 
         div()
             .id("orbit-footer-status-bar")
@@ -1687,15 +1767,39 @@ impl OrbitShell {
                     .items_center()
                     .gap_3()
                     .child(
-                        apply_text_step(div(), theme.typography.size_2xs)
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.text.secondary)
-                            .child(format!("{cat_label} > {view_label}")),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .child(
+                                apply_text_step(div(), theme.typography.size_2xs)
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(theme.text.secondary)
+                                    .child(cat_label),
+                            )
+                            .child(render_icon(
+                                Icon::ChevronRight,
+                                px(11.0),
+                                theme.text.muted,
+                            ))
+                            .child(
+                                apply_text_step(div(), theme.typography.size_2xs)
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .text_color(theme.text.secondary)
+                                    .child(view_label),
+                            ),
                     )
                     .child(
-                        apply_text_step(div(), theme.typography.size_2xs)
-                            .text_color(theme.text.muted)
-                            .child(sidebar_status),
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .child(render_icon(Icon::PanelLeft, px(11.0), theme.text.muted))
+                            .child(
+                                apply_text_step(div(), theme.typography.size_2xs)
+                                    .text_color(theme.text.muted)
+                                    .child(sidebar_status),
+                            ),
                     ),
             )
             .child(
@@ -1727,7 +1831,54 @@ impl OrbitShell {
                                 .text_color(theme.text.muted)
                                 .child(format!("• {ver}")),
                         )
-                    }),
+                    })
+                    .child(
+                        div()
+                            .id("footer-refresh-btn")
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(20.0))
+                            .h(px(18.0))
+                            .rounded(theme.style.radius_control)
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(control_hover))
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.dispatch_command(ClusterBridgeCommand::RefreshClusters);
+                                cx.notify();
+                            }))
+                            .child(render_icon(
+                                Icon::RefreshCw,
+                                px(12.0),
+                                theme.text.secondary,
+                            )),
+                    )
+                    .child(
+                        div()
+                            .id("footer-settings-btn")
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(20.0))
+                            .h(px(18.0))
+                            .rounded(theme.style.radius_control)
+                            .cursor_pointer()
+                            .when(is_settings, |el| el.bg(theme.accent.soft))
+                            .hover(move |style| style.bg(control_hover))
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.sidebar.select_view(WorkspaceView::Settings);
+                                cx.notify();
+                            }))
+                            .child(render_icon(
+                                Icon::Settings,
+                                px(12.0),
+                                if is_settings {
+                                    theme.accent.accent
+                                } else {
+                                    theme.text.secondary
+                                },
+                            )),
+                    ),
             )
             .into_any_element()
     }
@@ -1768,14 +1919,25 @@ impl OrbitShell {
                             .items_center()
                             .gap_2()
                             .child(
-                                apply_text_step(div(), theme.typography.size_xs)
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1p5()
                                     .px_2p5()
                                     .py_1()
                                     .rounded(theme.style.radius_control)
                                     .bg(theme.semantic.danger.soft)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme.semantic.danger.solid)
-                                    .child(badge),
+                                    .child(render_icon(
+                                        Icon::CircleAlert,
+                                        px(13.0),
+                                        theme.semantic.danger.solid,
+                                    ))
+                                    .child(
+                                        apply_text_step(div(), theme.typography.size_xs)
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(theme.semantic.danger.solid)
+                                            .child(badge),
+                                    ),
                             ),
                     )
                     .child(
@@ -1820,6 +1982,7 @@ impl OrbitShell {
                                         .style_control(div().id("retry-cluster-connection-btn"))
                                         .flex()
                                         .items_center()
+                                        .gap_1p5()
                                         .h(theme.typography.control_height_sm)
                                         .px(theme.typography.control_padding_x_md)
                                         .hover(move |style| style.bg(control_hover))
@@ -1827,6 +1990,11 @@ impl OrbitShell {
                                         .on_click(cx.listener(|this, _event, _window, cx| {
                                             this.reconnect_cluster(cx);
                                         }))
+                                        .child(render_icon(
+                                            Icon::RotateCcw,
+                                            px(13.0),
+                                            theme.text.secondary,
+                                        ))
                                         .child(
                                             apply_text_step(div(), theme.typography.size_sm)
                                                 .font_weight(FontWeight::MEDIUM)
@@ -1839,6 +2007,7 @@ impl OrbitShell {
                                     .style_control(div().id("open-cluster-switcher-btn"))
                                     .flex()
                                     .items_center()
+                                    .gap_1p5()
                                     .h(theme.typography.control_height_sm)
                                     .px(theme.typography.control_padding_x_md)
                                     .hover(move |style| style.bg(control_hover))
@@ -1848,6 +2017,11 @@ impl OrbitShell {
                                         this.state.dropdown_open = true;
                                         cx.notify();
                                     }))
+                                    .child(render_icon(
+                                        Icon::Server,
+                                        px(13.0),
+                                        theme.text.secondary,
+                                    ))
                                     .child(
                                         apply_text_step(div(), theme.typography.size_sm)
                                             .font_weight(FontWeight::MEDIUM)
@@ -1933,6 +2107,10 @@ fn main() {
     let config = OrbitConfig::load();
 
     Application::new().run(move |cx: &mut App| {
+        if let Err(err) = crate::icons::register_lucide_font(cx) {
+            tracing::warn!(error = %err, "Failed to register embedded Lucide icon font");
+        }
+
         cx.on_window_closed(|cx| {
             if cx.windows().is_empty() {
                 cx.quit();
@@ -1959,7 +2137,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::{AccentColor, SemanticColorsPreference};
+    use crate::theme::{AccentColor, K8sResourceKind, SemanticColorsPreference};
     use gpui::WindowBackgroundAppearance;
 
     #[test]
@@ -2195,5 +2373,65 @@ mod tests {
         ));
         assert_eq!(connect_sidebar.active_category, SidebarCategory::Core);
         assert_eq!(connect_sidebar.active_view, WorkspaceView::Overview);
+    }
+
+    #[test]
+    fn test_navigation_icon_colors_resolve_resource_kinds_and_theme_foregrounds() {
+        for (mode, appearance) in [
+            (ThemeMode::Dark, WindowAppearance::Dark),
+            (ThemeMode::Light, WindowAppearance::Light),
+        ] {
+            let theme = OrbitTheme::resolve(
+                mode,
+                UiStyle::Flat,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                appearance,
+            );
+            assert_eq!(
+                nav_item_icon_color(WorkspaceView::Deployments, false, &theme),
+                theme.k8s_color(K8sResourceKind::Deployment)
+            );
+            assert_eq!(
+                nav_item_icon_color(WorkspaceView::Pods, true, &theme),
+                theme.k8s_color(K8sResourceKind::Pod)
+            );
+            assert_eq!(
+                nav_item_icon_color(WorkspaceView::Services, false, &theme),
+                theme.k8s_color(K8sResourceKind::Service)
+            );
+            assert_eq!(
+                nav_item_icon_color(WorkspaceView::Overview, true, &theme),
+                theme.accent.accent
+            );
+            assert_eq!(
+                nav_item_icon_color(WorkspaceView::Overview, false, &theme),
+                theme.text.muted
+            );
+            assert_eq!(
+                nav_item_icon_color(WorkspaceView::Logs, false, &theme),
+                theme.text.muted
+            );
+        }
+    }
+
+    #[test]
+    fn test_header_and_status_icon_mapping() {
+        assert_eq!(
+            char::from(sidebar_toggle_icon(true)),
+            char::from(Icon::PanelLeftOpen)
+        );
+        assert_eq!(
+            char::from(sidebar_toggle_icon(false)),
+            char::from(Icon::PanelLeftClose)
+        );
+        assert_eq!(
+            char::from(dropdown_chevron_icon(true)),
+            char::from(Icon::ChevronUp)
+        );
+        assert_eq!(
+            char::from(dropdown_chevron_icon(false)),
+            char::from(Icon::ChevronDown)
+        );
     }
 }
