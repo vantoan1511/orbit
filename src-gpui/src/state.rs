@@ -1,5 +1,6 @@
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{ClusterInfo, UserProfileInfo};
+use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClusterConnectionState {
@@ -32,6 +33,7 @@ pub enum ClusterBridgeCommand {
     SwitchCluster { cluster_id: String },
     ReconnectActiveCluster,
     RefreshClusters,
+    LoadOverview { cluster_id: String, generation: u64 },
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +57,93 @@ pub enum ClusterBridgeEvent {
         message: String,
         clusters: Vec<ClusterInfo>,
     },
+    OverviewLoaded {
+        cluster_id: String,
+        generation: u64,
+        summary: ClusterOverviewSummary,
+    },
+    OverviewLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum OverviewLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClusterOverviewState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: OverviewLoadStatus,
+    pub summary: Option<ClusterOverviewSummary>,
+    pub error_message: Option<String>,
+}
+
+impl ClusterOverviewState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = OverviewLoadStatus::Loading;
+        self.summary = None;
+        self.error_message = None;
+        ClusterBridgeCommand::LoadOverview {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = OverviewLoadStatus::Loading;
+        self.error_message = None;
+        Some(ClusterBridgeCommand::LoadOverview {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = OverviewLoadStatus::Idle;
+        self.summary = None;
+        self.error_message = None;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        summary: ClusterOverviewSummary,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = OverviewLoadStatus::Loaded;
+            self.summary = Some(summary);
+            self.error_message = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = OverviewLoadStatus::Error;
+            self.error_message = Some(message);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -216,6 +305,8 @@ impl ClusterSwitcherState {
                 };
                 self.error_banner_dismissed = false;
             }
+            ClusterBridgeEvent::OverviewLoaded { .. }
+            | ClusterBridgeEvent::OverviewLoadFailed { .. } => {}
         }
     }
 
@@ -423,5 +514,72 @@ mod tests {
         assert_eq!(state.cluster_display_name("dev-ctx"), "dev-ctx");
         assert_eq!(state.cluster_display_name("staging-ctx"), "staging-ctx");
         assert_eq!(state.cluster_display_name("unknown-ctx"), "unknown-ctx");
+    }
+
+    #[test]
+    fn test_cluster_overview_state_tracks_generation_clears_on_switch_and_ignores_stale_responses()
+    {
+        use orbit_core::kubernetes::overview::{ClusterOverallHealth, NodeHealthSummary};
+
+        let mut overview = ClusterOverviewState::default();
+        let summary_a = ClusterOverviewSummary {
+            k8s_version: Some("v1.31.1".to_string()),
+            overall_health: ClusterOverallHealth::Healthy,
+            nodes: NodeHealthSummary {
+                total: 3,
+                ready: 3,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let summary_b = ClusterOverviewSummary {
+            k8s_version: Some("v1.30.2".to_string()),
+            overall_health: ClusterOverallHealth::Degraded,
+            nodes: NodeHealthSummary {
+                total: 2,
+                ready: 1,
+                not_ready: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let cmd_a = overview.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd_a,
+            ClusterBridgeCommand::LoadOverview {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(overview.status, OverviewLoadStatus::Loading);
+        assert!(overview.summary.is_none());
+
+        assert!(overview.apply_loaded("ctx-a", 1, summary_a.clone()));
+        assert_eq!(overview.status, OverviewLoadStatus::Loaded);
+        assert_eq!(overview.summary, Some(summary_a.clone()));
+
+        let cmd_b = overview.begin_load_for_cluster("ctx-b");
+        assert_eq!(
+            cmd_b,
+            ClusterBridgeCommand::LoadOverview {
+                cluster_id: "ctx-b".to_string(),
+                generation: 2,
+            }
+        );
+        assert_eq!(overview.generation, 2);
+        assert!(overview.summary.is_none());
+
+        assert!(!overview.apply_loaded("ctx-a", 1, summary_a));
+        assert!(overview.summary.is_none());
+
+        assert!(overview.apply_loaded("ctx-b", 2, summary_b.clone()));
+        assert_eq!(overview.summary, Some(summary_b));
+
+        overview.reset_for_disconnected();
+        assert_eq!(overview.generation, 3);
+        assert!(overview.cluster_id.is_none());
+        assert!(overview.summary.is_none());
+        assert_eq!(overview.status, OverviewLoadStatus::Idle);
     }
 }

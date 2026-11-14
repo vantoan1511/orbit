@@ -433,6 +433,14 @@ impl KubeManager {
 
     /// Validates raw kubeconfig YAML content, persists it to ~/.orbit/kubeconfigs/,
     /// merges its contexts into the active manager, and registers it in persistent config.
+    pub fn active_client_for_context(&self, cluster_id: &str) -> Option<Client> {
+        if self.active_context.as_deref() == Some(cluster_id) && self.active_context_healthy {
+            self.active_client.clone()
+        } else {
+            None
+        }
+    }
+
     pub async fn add_kubeconfig_content(&mut self, content: &str) -> Result<String, String> {
         // Validate YAML syntax and Kubeconfig schema
         Kubeconfig::from_yaml(content)
@@ -728,6 +736,12 @@ users:
         let mut manager = KubeManager::new_from_kubeconfig(None, OrbitConfig::default());
         let result = manager.reconnect_active_cluster().await;
         assert_eq!(result, Err("No active cluster selected".to_string()));
+    }
+
+    #[test]
+    fn test_active_client_for_context_returns_none_when_disconnected_or_mismatched() {
+        let manager = KubeManager::new_empty(OrbitConfig::default());
+        assert!(manager.active_client_for_context("any-ctx").is_none());
     }
 }
 
