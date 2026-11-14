@@ -241,6 +241,19 @@ impl Configuration {
                 is_confidential: false,
                 cardinality: "0..1".to_string(),
                 enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
+                key: "enableExperienceFeatures".to_string(),
+                name: "Experience Features".to_string(),
+                description: "Enable experimental preview features such as the native GPUI desktop shell.".to_string(),
+                datatype: "boolean".to_string(),
+                default_value: Some(serde_json::json!(false)),
+                value: None,
+                is_confidential: false,
+                cardinality: "1..1".to_string(),
+                enable: true,
                 created_at: Some(created),
                 last_updated_at: None,
             },
@@ -304,6 +317,14 @@ impl OrbitConfig {
         let mut path = Self::config_dir()?;
         path.push("config.json");
         Some(path)
+    }
+
+    /// Returns whether experimental experience features (e.g., GPUI preview shell) are enabled.
+    pub fn enable_experience_features(&self) -> bool {
+        self.values
+            .get("enableExperienceFeatures")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false)
     }
 
     /// Load the configuration from disk, or return default if it does not exist or fails to parse.
@@ -668,6 +689,20 @@ mod tests {
         let config = OrbitConfig::default();
         assert!(config.custom_kubeconfig_paths().is_empty());
         assert_eq!(config.max_log_files(), 10);
+    }
+
+    #[test]
+    fn test_enable_experience_features_in_system_definitions() {
+        let defs = Configuration::system_definitions();
+        let entry = defs
+            .iter()
+            .find(|c| c.key == "enableExperienceFeatures")
+            .expect("enableExperienceFeatures should be defined in system_definitions");
+        assert_eq!(entry.datatype, "boolean");
+        assert_eq!(entry.default_value, Some(serde_json::json!(false)));
+        assert!(entry.enable);
+        assert_eq!(entry.cardinality, "1..1");
+        assert!(!OrbitConfig::default().enable_experience_features());
     }
 
     #[test]

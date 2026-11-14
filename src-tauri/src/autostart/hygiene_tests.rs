@@ -55,6 +55,7 @@ fn current_exe_only_in_allowed_files() {
         "src/autostart/service.rs",
         "src/autostart/provider.rs",
         "src/autostart/hygiene_tests.rs",
+        "src/ipc/handlers/settings.rs",
     ];
 
     let files = src_rs_files();
