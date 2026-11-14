@@ -5321,6 +5321,7 @@ dependencies = [
  "http",
  "k8s-openapi",
  "kube",
+ "orbit-core",
  "portable-pty",
  "reqwest",
  "semver",
@@ -5344,10 +5345,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "orbit-core"
+version = "0.19.1"
+dependencies = [
+ "base64 0.22.1",
+ "http",
+ "k8s-openapi",
+ "kube",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "orbit-gpui"
 version = "0.19.1"
 dependencies = [
  "gpui",
+ "kube",
+ "orbit-core",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

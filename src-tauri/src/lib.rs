@@ -220,16 +220,9 @@ mod tests {
 
     #[test]
     fn test_app_state_creation() {
-        let km = Arc::new(RwLock::new(KubeManager {
-            kubeconfig: None,
-            active_context: None,
-            active_client: None,
-            watch_cancel: None,
-            active_context_healthy: false,
-            log_cancel: Vec::new(),
-            port_forward_cancel: std::collections::HashMap::new(),
-            config: crate::config::OrbitConfig::load(),
-        }));
+        let km = Arc::new(RwLock::new(KubeManager::new_empty(
+            crate::config::OrbitConfig::load(),
+        )));
         let state = AppState { kube_manager: km };
         assert!(state.kube_manager.blocking_read().active_context.is_none());
     }

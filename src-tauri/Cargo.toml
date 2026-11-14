@@ -13,6 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+orbit-core = { path = "../crates/orbit-core" }
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
@@ -46,4 +47,7 @@ windows-sys = { version = "0.61", features = [
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Registry",
 ] }
+
+[dev-dependencies]
+orbit-core = { path = "../crates/orbit-core", features = ["test-utils"] }
 

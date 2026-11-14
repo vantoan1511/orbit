@@ -5,3 +5,9 @@ edition = "2024"
 
 [dependencies]
 gpui = "0.2.2"
+orbit-core = { path = "../crates/orbit-core" }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
+tracing = "0.1"
+
+[dev-dependencies]
+kube = { version = "0.98.0", default-features = false }
