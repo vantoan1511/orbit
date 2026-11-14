@@ -1,0 +1,20 @@
+[package]
+name = "orbit-core"
+version = "0.19.1"
+description = "Shared Kubernetes and configuration core for Orbit"
+authors = ["Toan Nguyen"]
+edition = "2024"
+
+[features]
+test-utils = []
+
+[dependencies]
+base64 = "0.22.1"
+http = "1"
+k8s-openapi = { version = "0.24.0", features = ["latest"] }
+kube = { version = "0.98.0", features = ["runtime", "derive", "client", "ws"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
+tracing = "0.1"
+uuid = { version = "1.0", features = ["v4"] }
