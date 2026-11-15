@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, DeploymentInfo, NamespaceInfo, NodeInfo, UserProfileInfo,
+    ClusterInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
@@ -44,6 +44,7 @@ pub enum ClusterBridgeCommand {
     LoadNamespaces { cluster_id: String, generation: u64 },
     LoadDeployments { cluster_id: String, generation: u64 },
     LoadNodes { cluster_id: String, generation: u64 },
+    LoadEvents { cluster_id: String, generation: u64 },
     SaveNamespaceSelection { cluster_id: String, namespaces: Vec<String> },
 }
 
@@ -104,6 +105,16 @@ pub enum ClusterBridgeEvent {
         nodes: Vec<NodeInfo>,
     },
     NodesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    EventsLoaded {
+        cluster_id: String,
+        generation: u64,
+        events: Vec<EventInfo>,
+    },
+    EventsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -626,6 +637,134 @@ impl NodesState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EventsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EventTypeFilter {
+    #[default]
+    All,
+    Normal,
+    Warning,
+}
+
+impl EventTypeFilter {
+    pub fn matches(self, event_type: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Normal => event_type.eq_ignore_ascii_case("normal"),
+            Self::Warning => event_type.eq_ignore_ascii_case("warning"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct EventsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: EventsLoadStatus,
+    pub events: Vec<EventInfo>,
+    pub type_filter: EventTypeFilter,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl EventsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = EventsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.events.clear();
+            self.type_filter = EventTypeFilter::All;
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.events.is_empty();
+        ClusterBridgeCommand::LoadEvents {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = EventsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.events.is_empty();
+        Some(ClusterBridgeCommand::LoadEvents {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = EventsLoadStatus::Idle;
+        self.events.clear();
+        self.type_filter = EventTypeFilter::All;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = EventsLoadStatus::Idle;
+        self.events.clear();
+        self.type_filter = EventTypeFilter::All;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        events: Vec<EventInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = EventsLoadStatus::Loaded;
+            self.events = events;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = EventsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == EventsLoadStatus::Idle
+    }
+
+    pub fn set_type_filter(&mut self, filter: EventTypeFilter) {
+        self.type_filter = filter;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ClusterSwitcherState {
     pub clusters: Vec<ClusterInfo>,
@@ -792,7 +931,9 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::DeploymentsLoaded { .. }
             | ClusterBridgeEvent::DeploymentsLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
-            | ClusterBridgeEvent::NodesLoadFailed { .. } => {}
+            | ClusterBridgeEvent::NodesLoadFailed { .. }
+            | ClusterBridgeEvent::EventsLoaded { .. }
+            | ClusterBridgeEvent::EventsLoadFailed { .. } => {}
         }
     }
 
@@ -1409,5 +1550,116 @@ mod tests {
         view_state.reset_for_disconnected();
         assert!(view_state.table.selected_row_key.is_none());
         assert!(!view_state.table.loading);
+    }
+
+    fn sample_event(uid: &str, event_type: &str, reason: &str, namespace: &str) -> EventInfo {
+        EventInfo {
+            uid: uid.to_string(),
+            time: "2m".to_string(),
+            r#type: event_type.to_string(),
+            reason: reason.to_string(),
+            object_name: "api-pod".to_string(),
+            object_kind: "Pod".to_string(),
+            message: "Event message".to_string(),
+            namespace: namespace.to_string(),
+            source: "kubelet".to_string(),
+            first_seen: "Nov 15, 2026, 07:00 PM".to_string(),
+            last_seen: "Nov 15, 2026, 07:05 PM".to_string(),
+            count: 1,
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_events_state_lifecycle_and_generation_guard() {
+        let mut state = EventsState::default();
+        assert!(state.needs_load_for_cluster("cluster-a"));
+
+        let cmd = state.begin_load_for_cluster("cluster-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadEvents {
+                cluster_id: "cluster-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, EventsLoadStatus::Loading);
+        assert!(state.table.loading);
+        assert!(!state.needs_load_for_cluster("cluster-a"));
+
+        // Stale cluster or generation is ignored.
+        assert!(!state.apply_loaded(
+            "cluster-b",
+            1,
+            vec![sample_event("ev-wrong-cluster", "Normal", "Scheduled", "default")],
+        ));
+        assert!(!state.apply_loaded(
+            "cluster-a",
+            0,
+            vec![sample_event("ev-stale-gen", "Normal", "Scheduled", "default")],
+        ));
+        assert!(!state.apply_failed("cluster-a", 0, "stale error".to_string()));
+        assert!(state.events.is_empty());
+
+        // Matching load succeeds.
+        assert!(state.apply_loaded(
+            "cluster-a",
+            1,
+            vec![sample_event("ev-1", "Warning", "BackOff", "default")],
+        ));
+        assert_eq!(state.status, EventsLoadStatus::Loaded);
+        assert!(!state.table.loading);
+        assert!(state.error_message.is_none());
+        assert_eq!(state.events.len(), 1);
+        assert_eq!(state.events[0].uid, "ev-1");
+
+        // Refresh keeps existing rows while loading and handles failure.
+        let refresh_cmd = state.begin_refresh().expect("refresh command");
+        assert_eq!(
+            refresh_cmd,
+            ClusterBridgeCommand::LoadEvents {
+                cluster_id: "cluster-a".to_string(),
+                generation: 2,
+            }
+        );
+        assert_eq!(state.status, EventsLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert!(state.apply_failed("cluster-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, EventsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+    }
+
+    #[test]
+    fn test_events_state_cluster_switch_and_disconnect_reset() {
+        let mut state = EventsState::default();
+        let _ = state.begin_load_for_cluster("cluster-a");
+        assert!(state.apply_loaded(
+            "cluster-a",
+            1,
+            vec![sample_event("ev-1", "Warning", "BackOff", "default")],
+        ));
+        state.set_type_filter(EventTypeFilter::Warning);
+        state.table.selected_row_key = Some("ev-1".to_string());
+        assert_eq!(state.type_filter, EventTypeFilter::Warning);
+
+        state.reset_for_cluster("cluster-b");
+        assert_eq!(state.cluster_id.as_deref(), Some("cluster-b"));
+        assert_eq!(state.status, EventsLoadStatus::Idle);
+        assert!(state.events.is_empty());
+        assert_eq!(state.type_filter, EventTypeFilter::All);
+        assert!(state.table.selected_row_key.is_none());
+        assert!(state.needs_load_for_cluster("cluster-b"));
+
+        let gen_before = state.generation;
+        state.set_type_filter(EventTypeFilter::Normal);
+        state.table.selected_row_key = Some("ev-2".to_string());
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert_eq!(state.status, EventsLoadStatus::Idle);
+        assert!(state.events.is_empty());
+        assert_eq!(state.type_filter, EventTypeFilter::All);
+        assert!(state.table.selected_row_key.is_none());
+        assert!(state.generation > gen_before);
     }
 }
