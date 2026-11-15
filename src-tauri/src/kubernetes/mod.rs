@@ -38,26 +38,7 @@ pub use edit::{get_resource_raw, apply_resource, create_resource};
 pub use hpa::{list_hpas, map_hpa, update_hpa_replicas};
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
-pub(crate) fn format_age(creation_timestamp: &Option<k8s_openapi::apimachinery::pkg::apis::meta::v1::Time>) -> String {
-    if let Some(creation) = creation_timestamp {
-        let now = chrono::Utc::now();
-        let duration = now.signed_duration_since(creation.0);
-        let seconds = duration.num_seconds();
-        if seconds < 0 {
-            "0s".to_string()
-        } else if seconds < 60 {
-            format!("{}s", seconds)
-        } else if seconds < 3600 {
-            format!("{}m", duration.num_minutes())
-        } else if seconds < 86400 {
-            format!("{}h", duration.num_hours())
-        } else {
-            format!("{}d", duration.num_days())
-        }
-    } else {
-        "Unknown".to_string()
-    }
-}
+pub(crate) use orbit_core::kubernetes::namespaces::format_age;
 
 /// Formats a byte count into a human-readable size string.
 pub(crate) fn format_size(bytes: usize) -> String {

@@ -23,7 +23,7 @@ use crate::navigation::{
 };
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
-    ClusterSwitcherState,
+    ClusterSwitcherState, NamespaceFilterState, NamespaceLoadStatus,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -131,26 +131,62 @@ pub const fn dropdown_chevron_icon(is_open: bool) -> Icon {
     }
 }
 
-pub fn apply_cluster_event_with_overview(
+pub struct NamespaceTriggerPresentation {
+    pub label: String,
+    pub is_loading: bool,
+    pub is_error: bool,
+    pub is_filtered: bool,
+    pub indicator_color: Rgba,
+}
+
+pub fn namespace_trigger_presentation(
+    namespaces: &NamespaceFilterState,
+    theme: &OrbitTheme,
+) -> NamespaceTriggerPresentation {
+    let is_loading = namespaces.status == NamespaceLoadStatus::Loading;
+    let is_error = namespaces.status == NamespaceLoadStatus::Error;
+    let is_filtered = !namespaces.is_all_namespaces();
+    let indicator_color = if is_error {
+        theme.semantic.danger.solid
+    } else if is_loading {
+        theme.semantic.warning.solid
+    } else if is_filtered {
+        theme.accent.accent
+    } else {
+        theme.text.secondary
+    };
+
+    NamespaceTriggerPresentation {
+        label: namespaces.summary_label(),
+        is_loading,
+        is_error,
+        is_filtered,
+        indicator_color,
+    }
+}
+
+pub fn apply_cluster_event_with_workspace(
     state: &mut ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
     overview: &mut ClusterOverviewState,
+    namespaces: &mut NamespaceFilterState,
     event: ClusterBridgeEvent,
-) -> Option<ClusterBridgeCommand> {
+) -> Vec<ClusterBridgeCommand> {
+    let mut commands = Vec::new();
     match event {
         ClusterBridgeEvent::ClusterConnected { .. } => {
             state.apply_event(event);
             sidebar.on_cluster_connected();
-            state
-                .active_cluster_id
-                .as_deref()
-                .map(|id| overview.begin_load_for_cluster(id))
+            if let Some(id) = state.active_cluster_id.as_deref() {
+                commands.push(overview.begin_load_for_cluster(id));
+                commands.push(namespaces.begin_load_for_cluster(id));
+            }
         }
         ClusterBridgeEvent::ClusterUnreachable { .. }
         | ClusterBridgeEvent::ConnectionError { .. } => {
             state.apply_event(event);
             overview.reset_for_disconnected();
-            None
+            namespaces.reset_for_disconnected();
         }
         ClusterBridgeEvent::OverviewLoaded {
             cluster_id,
@@ -158,7 +194,6 @@ pub fn apply_cluster_event_with_overview(
             summary,
         } => {
             overview.apply_loaded(&cluster_id, generation, summary);
-            None
         }
         ClusterBridgeEvent::OverviewLoadFailed {
             cluster_id,
@@ -166,20 +201,42 @@ pub fn apply_cluster_event_with_overview(
             message,
         } => {
             overview.apply_failed(&cluster_id, generation, message);
-            None
+        }
+        ClusterBridgeEvent::NamespacesLoaded {
+            cluster_id,
+            generation,
+            namespaces: loaded_namespaces,
+        } => {
+            let (_applied, pruned) =
+                namespaces.apply_loaded(&cluster_id, generation, loaded_namespaces);
+            if let Some(pruned_selection) = pruned {
+                commands.push(ClusterBridgeCommand::SaveNamespaceSelection {
+                    cluster_id,
+                    namespaces: pruned_selection,
+                });
+            }
+        }
+        ClusterBridgeEvent::NamespacesLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            namespaces.apply_failed(&cluster_id, generation, message);
         }
         other @ ClusterBridgeEvent::ContextsLoaded { .. } => {
             state.apply_event(other);
-            None
         }
     }
+    commands
 }
 
 pub struct OrbitShell {
     state: ClusterSwitcherState,
     sidebar: SidebarLayoutState,
     overview: ClusterOverviewState,
+    namespaces: NamespaceFilterState,
     focus_handle: FocusHandle,
+    namespace_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
     style_dropdown_open: bool,
 }
@@ -191,7 +248,7 @@ impl OrbitShell {
     pub const HEADER_HEIGHT: f32 = 48.0;
     pub const FOOTER_HEIGHT: f32 = 26.0;
 
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(config: &OrbitConfig, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let ClusterBridge {
             command_tx,
             mut event_rx,
@@ -201,10 +258,11 @@ impl OrbitShell {
             while let Some(event) = event_rx.recv().await {
                 if this
                     .update(cx, |shell, cx| {
-                        if let Some(cmd) = apply_cluster_event_with_overview(
+                        for cmd in apply_cluster_event_with_workspace(
                             &mut shell.state,
                             &mut shell.sidebar,
                             &mut shell.overview,
+                            &mut shell.namespaces,
                             event,
                         ) {
                             shell.dispatch_command(cmd);
@@ -234,7 +292,9 @@ impl OrbitShell {
             state: ClusterSwitcherState::new(),
             sidebar: SidebarLayoutState::new(),
             overview: ClusterOverviewState::default(),
+            namespaces: NamespaceFilterState::from_config(config),
             focus_handle: cx.focus_handle(),
+            namespace_search_focus: cx.focus_handle(),
             command_tx,
             style_dropdown_open: false,
         }
@@ -251,9 +311,13 @@ impl OrbitShell {
         if matches!(
             self.state.connection_state,
             ClusterConnectionState::Connected { .. }
-        ) && let Some(cmd) = self.overview.begin_refresh()
-        {
-            self.dispatch_command(cmd);
+        ) {
+            if let Some(cmd) = self.overview.begin_refresh() {
+                self.dispatch_command(cmd);
+            }
+            if let Some(cmd) = self.namespaces.begin_refresh() {
+                self.dispatch_command(cmd);
+            }
         }
         cx.notify();
     }
@@ -262,6 +326,7 @@ impl OrbitShell {
         if let Some(cmd) = self.state.begin_switch(cluster_id) {
             self.dispatch_command(cmd);
         }
+        self.namespaces.close_dropdown();
         self.style_dropdown_open = false;
         cx.notify();
     }
@@ -270,6 +335,7 @@ impl OrbitShell {
         if let Some(cmd) = self.state.begin_reconnect() {
             self.dispatch_command(cmd);
         }
+        self.namespaces.close_dropdown();
         cx.notify();
     }
 
@@ -742,6 +808,7 @@ impl OrbitShell {
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.style_dropdown_open = false;
+                                this.namespaces.close_dropdown();
                                 this.state.toggle_dropdown();
                                 cx.notify();
                             }))
@@ -767,6 +834,70 @@ impl OrbitShell {
                                 px(13.0),
                                 theme.text.secondary,
                             )),
+                    )
+                    .when(
+                        matches!(
+                            self.state.connection_state,
+                            ClusterConnectionState::Connected { .. }
+                        ),
+                        |el| {
+                            let ns_pres = namespace_trigger_presentation(&self.namespaces, &theme);
+                            let ns_chevron = dropdown_chevron_icon(self.namespaces.dropdown_open);
+                            el.child(
+                                theme
+                                    .style_control(div().id("namespace-selector-btn"))
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .h(theme.typography.control_height_sm)
+                                    .px(theme.typography.control_padding_x_md)
+                                    .hover(move |style| style.bg(control_hover))
+                                    .cursor_pointer()
+                                    .on_click(cx.listener(|this, _event, window, cx| {
+                                        this.state.close_dropdown();
+                                        this.style_dropdown_open = false;
+                                        this.namespaces.toggle_dropdown();
+                                        if this.namespaces.dropdown_open {
+                                            this.namespace_search_focus.focus(window);
+                                        }
+                                        cx.notify();
+                                    }))
+                                    .child(render_icon(
+                                        Icon::Layers,
+                                        px(13.0),
+                                        ns_pres.indicator_color,
+                                    ))
+                                    .child(
+                                        apply_text_step(div(), theme.typography.size_sm)
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(if ns_pres.is_filtered {
+                                                theme.text.primary
+                                            } else {
+                                                theme.text.secondary
+                                            })
+                                            .child(ns_pres.label),
+                                    )
+                                    .when(ns_pres.is_loading, |el| {
+                                        el.child(
+                                            apply_text_step(div(), theme.typography.size_xs)
+                                                .text_color(theme.text.muted)
+                                                .child("…"),
+                                        )
+                                    })
+                                    .when(ns_pres.is_error, |el| {
+                                        el.child(render_icon(
+                                            Icon::TriangleAlert,
+                                            px(12.0),
+                                            theme.semantic.danger.solid,
+                                        ))
+                                    })
+                                    .child(render_icon(
+                                        ns_chevron,
+                                        px(13.0),
+                                        theme.text.secondary,
+                                    )),
+                            )
+                        },
                     )
                     .child(
                         div()
@@ -838,6 +969,7 @@ impl OrbitShell {
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.state.close_dropdown();
+                                this.namespaces.close_dropdown();
                                 this.style_dropdown_open = !this.style_dropdown_open;
                                 cx.notify();
                             }))
@@ -1169,6 +1301,378 @@ impl OrbitShell {
                                 )),
                         )
                         .child(list),
+                )
+                .into_any_element(),
+        )
+    }
+
+    fn render_namespace_search_input(
+        &self,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let control_hover = theme.surface.control_hover;
+        let has_query = !self.namespaces.search_query.is_empty();
+        let search_text = if has_query {
+            self.namespaces.search_query.clone()
+        } else {
+            "Filter namespaces...".to_string()
+        };
+
+        div()
+            .id("namespace-search-input")
+            .track_focus(&self.namespace_search_focus)
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap_2()
+            .px_3()
+            .py_2()
+            .border_b_1()
+            .border_color(theme.border.default)
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .flex_1()
+                    .min_w(px(0.0))
+                    .child(render_icon(Icon::Search, px(13.0), theme.text.muted))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .text_color(if has_query {
+                                theme.text.primary
+                            } else {
+                                theme.text.muted
+                            })
+                            .child(search_text),
+                    ),
+            )
+            .when(has_query, |el| {
+                el.child(
+                    div()
+                        .id("namespace-search-clear-btn")
+                        .cursor_pointer()
+                        .p_0p5()
+                        .rounded(theme.style.radius_control)
+                        .hover(move |style| style.bg(control_hover))
+                        .on_click(cx.listener(|this, _event, _window, cx| {
+                            this.namespaces.search_query.clear();
+                            cx.notify();
+                        }))
+                        .child(render_icon(Icon::X, px(12.0), theme.text.muted)),
+                )
+            })
+            .into_any_element()
+    }
+
+    fn render_namespace_all_option(
+        &self,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let control_hover = theme.surface.control_hover;
+        let is_all = self.namespaces.is_all_namespaces();
+
+        div()
+            .id("namespace-option-all")
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap_2()
+            .px_2p5()
+            .py_1p5()
+            .rounded(theme.style.radius_control)
+            .cursor_pointer()
+            .when(is_all, |el| el.bg(theme.accent.soft))
+            .hover(move |style| style.bg(control_hover))
+            .on_click(cx.listener(|this, _event, _window, cx| {
+                if let Some(cleared) = this.namespaces.select_all_namespaces()
+                    && let Some(cluster_id) = this.namespaces.cluster_id.clone()
+                {
+                    this.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
+                        cluster_id,
+                        namespaces: cleared,
+                    });
+                }
+                cx.notify();
+            }))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(render_icon(
+                        Icon::Layers,
+                        px(13.0),
+                        if is_all {
+                            theme.accent.accent
+                        } else {
+                            theme.text.secondary
+                        },
+                    ))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_sm)
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(theme.text.primary)
+                            .child("All Namespaces"),
+                    ),
+            )
+            .when(is_all, |el| {
+                el.child(render_icon(Icon::Check, px(13.0), theme.accent.accent))
+            })
+            .into_any_element()
+    }
+
+    fn render_namespace_option_row(
+        &self,
+        idx: usize,
+        ns: &orbit_core::kubernetes::models::NamespaceInfo,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let control_hover = theme.surface.control_hover;
+        let ns_name = ns.name.clone();
+        let is_selected = self
+            .namespaces
+            .active_selection()
+            .iter()
+            .any(|s| s == &ns_name);
+        let non_active_status = (ns.status != "Active").then(|| ns.status.clone());
+        let cluster_id = self.namespaces.cluster_id.clone();
+
+        div()
+            .id(("namespace-option-row", idx))
+            .flex()
+            .items_center()
+            .justify_between()
+            .gap_2()
+            .px_2p5()
+            .py_1p5()
+            .rounded(theme.style.radius_control)
+            .cursor_pointer()
+            .when(is_selected, |el| el.bg(theme.accent.soft))
+            .hover(move |style| style.bg(control_hover))
+            .on_click(cx.listener(move |this, _event, _window, cx| {
+                if let Some(updated) = this.namespaces.toggle_namespace(&ns_name)
+                    && let Some(cid) = cluster_id.clone()
+                {
+                    this.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
+                        cluster_id: cid,
+                        namespaces: updated,
+                    });
+                }
+                cx.notify();
+            }))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .min_w(px(0.0))
+                    .child(
+                        div()
+                            .w(px(14.0))
+                            .h(px(14.0))
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .rounded(theme.style.radius_control)
+                            .border_1()
+                            .border_color(if is_selected {
+                                theme.accent.accent
+                            } else {
+                                theme.border.strong
+                            })
+                            .when(is_selected, |el| {
+                                el.bg(theme.accent.accent).child(render_icon(
+                                    Icon::Check,
+                                    px(10.0),
+                                    theme.text.on_accent,
+                                ))
+                            }),
+                    )
+                    .child(
+                        apply_text_step(div(), theme.typography.size_sm)
+                            .font_weight(if is_selected {
+                                FontWeight::MEDIUM
+                            } else {
+                                FontWeight::NORMAL
+                            })
+                            .text_color(theme.text.primary)
+                            .child(ns.name.clone()),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1p5()
+                    .when_some(non_active_status, |el, phase| {
+                        el.child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .text_color(theme.semantic.warning.solid)
+                                .child(phase),
+                        )
+                    })
+                    .when(ns.is_system, |el| {
+                        el.child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .px_1p5()
+                                .py_0p5()
+                                .rounded(theme.style.radius_control)
+                                .bg(theme.surface.bg_hover)
+                                .text_color(theme.text.muted)
+                                .child("system"),
+                        )
+                    }),
+            )
+            .into_any_element()
+    }
+
+    fn render_namespace_list_body(
+        &self,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let control_hover = theme.surface.control_hover;
+        let filtered = self.namespaces.filtered_namespaces();
+        let mut list = div()
+            .id("namespace-dropdown-scroll-list")
+            .flex()
+            .flex_col()
+            .gap_0p5()
+            .p_1p5()
+            .max_h(px(300.0))
+            .overflow_y_scroll()
+            .child(self.render_namespace_all_option(theme, cx));
+
+        if self.namespaces.status == NamespaceLoadStatus::Loading
+            && self.namespaces.namespaces.is_empty()
+        {
+            return list
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .px_3()
+                        .py_3()
+                        .text_color(theme.text.muted)
+                        .child("Loading namespaces..."),
+                )
+                .into_any_element();
+        }
+
+        if self.namespaces.status == NamespaceLoadStatus::Error {
+            let err_msg = self
+                .namespaces
+                .error_message
+                .clone()
+                .unwrap_or_else(|| "Failed to load namespaces.".to_string());
+            return list
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .gap_2()
+                        .px_2p5()
+                        .py_2()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.semantic.danger.soft)
+                        .child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .flex_1()
+                                .text_color(theme.semantic.danger.solid)
+                                .child(err_msg),
+                        )
+                        .child(
+                            theme
+                                .style_control(div().id("namespace-retry-btn"))
+                                .px_2()
+                                .py_1()
+                                .cursor_pointer()
+                                .hover(move |style| style.bg(control_hover))
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    if let Some(cmd) = this.namespaces.begin_refresh() {
+                                        this.dispatch_command(cmd);
+                                    }
+                                    cx.notify();
+                                }))
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_xs)
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(theme.text.primary)
+                                        .child("Retry"),
+                                ),
+                        ),
+                )
+                .into_any_element();
+        }
+
+        if filtered.is_empty() {
+            let empty_msg = if self.namespaces.search_query.trim().is_empty() {
+                "No namespaces found in this cluster.".to_string()
+            } else {
+                format!(
+                    "No namespaces match \"{}\".",
+                    self.namespaces.search_query.trim()
+                )
+            };
+            return list
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .px_3()
+                        .py_3()
+                        .text_color(theme.text.muted)
+                        .child(empty_msg),
+                )
+                .into_any_element();
+        }
+
+        for (idx, ns) in filtered.into_iter().enumerate() {
+            list = list.child(self.render_namespace_option_row(idx, ns, theme, cx));
+        }
+
+        list.into_any_element()
+    }
+
+    fn render_namespace_dropdown_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !self.namespaces.dropdown_open {
+            return None;
+        }
+
+        let theme = OrbitTheme::get(cx).clone();
+        let dropdown_left = if self.sidebar.is_collapsed {
+            ACTIVITY_BAR_WIDTH + 240.0
+        } else {
+            ACTIVITY_BAR_WIDTH + self.sidebar.panel_width + 240.0
+        };
+
+        Some(
+            div()
+                .absolute()
+                .inset_0()
+                .child(
+                    div()
+                        .id("namespace-dropdown-backdrop")
+                        .absolute()
+                        .inset_0()
+                        .on_click(cx.listener(|this, _event, _window, cx| {
+                            this.namespaces.close_dropdown();
+                            cx.notify();
+                        })),
+                )
+                .child(
+                    theme
+                        .style_overlay(div().id("namespace-dropdown-menu"))
+                        .absolute()
+                        .top(px(Self::HEADER_HEIGHT + 4.0))
+                        .left(px(dropdown_left))
+                        .w(px(320.0))
+                        .on_click(|_event, _window, cx| {
+                            cx.stop_propagation();
+                        })
+                        .child(self.render_namespace_search_input(&theme, cx))
+                        .child(self.render_namespace_list_body(&theme, cx)),
                 )
                 .into_any_element(),
         )
@@ -1760,6 +2264,15 @@ impl Render for OrbitShell {
             .id("orbit-shell-root")
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+                if this.namespaces.dropdown_open
+                    && this.namespaces.handle_search_key(
+                        &event.keystroke.key,
+                        event.keystroke.key_char.as_deref(),
+                    )
+                {
+                    cx.notify();
+                    return;
+                }
                 let toggle_pressed = (event.keystroke.modifiers.control
                     || event.keystroke.modifiers.platform)
                     && event.keystroke.key.eq_ignore_ascii_case("b");
@@ -1815,6 +2328,9 @@ impl Render for OrbitShell {
             .when_some(self.render_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
+            .when_some(self.render_namespace_dropdown_overlay(cx), |el, overlay| {
+                el.child(overlay)
+            })
             .when_some(self.render_style_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
@@ -1844,7 +2360,7 @@ fn main() {
         if let Err(err) = cx.open_window(options, move |window, cx| {
             let resolved_theme = OrbitTheme::from_config(&config_for_window, window.appearance());
             apply_theme(resolved_theme, window, cx);
-            cx.new(|cx| OrbitShell::new(window, cx))
+            cx.new(|cx| OrbitShell::new(&config_for_window, window, cx))
         }) {
             eprintln!("Failed to open Orbit GPUI window: {err}");
             cx.quit();
@@ -2084,10 +2600,12 @@ mod tests {
             },
         };
         let mut throwaway_overview = ClusterOverviewState::default();
-        apply_cluster_event_with_overview(
+        let mut throwaway_namespaces = NamespaceFilterState::default();
+        apply_cluster_event_with_workspace(
             &mut switcher,
             &mut connect_sidebar,
             &mut throwaway_overview,
+            &mut throwaway_namespaces,
             event,
         );
 
@@ -2160,14 +2678,20 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_cluster_event_dispatches_overview_load_on_connect_and_resets_on_unreachable() {
+    fn test_apply_cluster_event_dispatches_overview_and_namespaces_on_connect_and_resets_on_unreachable() {
         use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
-        use orbit_core::kubernetes::models::UserProfileInfo;
+        use orbit_core::kubernetes::models::{NamespaceInfo, UserProfileInfo};
         use orbit_core::kubernetes::overview::{ClusterOverallHealth, ClusterOverviewSummary};
 
         let mut switcher = ClusterSwitcherState::new();
         let mut sidebar = SidebarLayoutState::new();
         let mut overview = ClusterOverviewState::default();
+        let mut config = OrbitConfig::default();
+        config.update_selected_namespaces_for_cluster(
+            "prod-ctx",
+            vec!["default".to_string(), "stale-ns".to_string()],
+        );
+        let mut namespaces = NamespaceFilterState::from_config(&config);
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -2188,39 +2712,82 @@ mod tests {
             },
         };
 
-        let cmd =
-            apply_cluster_event_with_overview(&mut switcher, &mut sidebar, &mut overview, connect_event);
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            connect_event,
+        );
         assert_eq!(
-            cmd,
-            Some(ClusterBridgeCommand::LoadOverview {
-                cluster_id: "prod-ctx".to_string(),
-                generation: 1,
-            })
+            cmds,
+            vec![
+                ClusterBridgeCommand::LoadOverview {
+                    cluster_id: "prod-ctx".to_string(),
+                    generation: 1,
+                },
+                ClusterBridgeCommand::LoadNamespaces {
+                    cluster_id: "prod-ctx".to_string(),
+                    generation: 1,
+                },
+            ]
         );
         assert_eq!(overview.status, crate::state::OverviewLoadStatus::Loading);
+        assert_eq!(namespaces.status, NamespaceLoadStatus::Loading);
 
         let summary = ClusterOverviewSummary {
             k8s_version: Some("v1.31.1".to_string()),
             overall_health: ClusterOverallHealth::Healthy,
             ..Default::default()
         };
-        let loaded_cmd = apply_cluster_event_with_overview(
+        let loaded_overview_cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut namespaces,
             ClusterBridgeEvent::OverviewLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
                 summary: summary.clone(),
             },
         );
-        assert!(loaded_cmd.is_none());
+        assert!(loaded_overview_cmds.is_empty());
         assert_eq!(overview.summary, Some(summary));
 
-        let unreachable_cmd = apply_cluster_event_with_overview(
+        let loaded_ns_cmds = apply_cluster_event_with_workspace(
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut namespaces,
+            ClusterBridgeEvent::NamespacesLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                namespaces: vec![NamespaceInfo {
+                    name: "default".to_string(),
+                    status: "Active".to_string(),
+                    is_system: true,
+                    age: "1d".to_string(),
+                    labels: Default::default(),
+                    annotations: Default::default(),
+                    uid: "uid-default".to_string(),
+                    created: "2026-01-01T00:00:00Z".to_string(),
+                }],
+            },
+        );
+        assert_eq!(
+            loaded_ns_cmds,
+            vec![ClusterBridgeCommand::SaveNamespaceSelection {
+                cluster_id: "prod-ctx".to_string(),
+                namespaces: vec!["default".to_string()],
+            }]
+        );
+        assert_eq!(namespaces.namespaces.len(), 1);
+
+        let unreachable_cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -2240,8 +2807,71 @@ mod tests {
                 },
             },
         );
-        assert!(unreachable_cmd.is_none());
+        assert!(unreachable_cmds.is_empty());
         assert!(overview.summary.is_none());
         assert_eq!(overview.status, crate::state::OverviewLoadStatus::Idle);
+        assert!(namespaces.namespaces.is_empty());
+        assert_eq!(namespaces.status, NamespaceLoadStatus::Idle);
+        assert_eq!(
+            namespaces.selected_by_cluster.get("prod-ctx"),
+            Some(&vec!["default".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_namespace_trigger_presentation_covers_loading_error_and_selection_counts() {
+        use orbit_core::kubernetes::models::NamespaceInfo;
+
+        let theme = OrbitTheme::from_config(&OrbitConfig::default(), WindowAppearance::Dark);
+        let mut ns_state = NamespaceFilterState::default();
+
+        ns_state.begin_load_for_cluster("prod-ctx");
+        let loading_pres = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(loading_pres.is_loading);
+        assert!(!loading_pres.is_error);
+        assert_eq!(loading_pres.label, "All Namespaces");
+        assert_eq!(loading_pres.indicator_color, theme.semantic.warning.solid);
+
+        ns_state.apply_failed("prod-ctx", 1, "forbidden".to_string());
+        let error_pres = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(error_pres.is_error);
+        assert!(!error_pres.is_loading);
+        assert_eq!(error_pres.indicator_color, theme.semantic.danger.solid);
+
+        ns_state.apply_loaded(
+            "prod-ctx",
+            1,
+            ["default", "payments", "monitoring"]
+                .into_iter()
+                .map(|name| NamespaceInfo {
+                    name: name.to_string(),
+                    status: "Active".to_string(),
+                    is_system: name != "payments",
+                    age: "1d".to_string(),
+                    labels: Default::default(),
+                    annotations: Default::default(),
+                    uid: format!("uid-{name}"),
+                    created: "2026-01-01T00:00:00Z".to_string(),
+                })
+                .collect(),
+        );
+
+        let all_pres = namespace_trigger_presentation(&ns_state, &theme);
+        assert_eq!(all_pres.label, "All Namespaces");
+        assert!(!all_pres.is_filtered);
+        assert_eq!(all_pres.indicator_color, theme.text.secondary);
+
+        ns_state.toggle_namespace("default");
+        let single_pres = namespace_trigger_presentation(&ns_state, &theme);
+        assert_eq!(single_pres.label, "default");
+        assert!(single_pres.is_filtered);
+        assert_eq!(single_pres.indicator_color, theme.accent.accent);
+
+        ns_state.toggle_namespace("payments");
+        ns_state.toggle_namespace("monitoring");
+        let multi_pres = namespace_trigger_presentation(&ns_state, &theme);
+        assert_eq!(multi_pres.label, "default +2");
+        assert!(multi_pres.is_filtered);
+        assert_eq!(multi_pres.indicator_color, theme.accent.accent);
     }
 }

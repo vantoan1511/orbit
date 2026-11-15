@@ -1,5 +1,8 @@
+use std::collections::HashSet;
+
+use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
-use orbit_core::kubernetes::models::{ClusterInfo, UserProfileInfo};
+use orbit_core::kubernetes::models::{ClusterInfo, NamespaceInfo, UserProfileInfo};
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,6 +37,8 @@ pub enum ClusterBridgeCommand {
     ReconnectActiveCluster,
     RefreshClusters,
     LoadOverview { cluster_id: String, generation: u64 },
+    LoadNamespaces { cluster_id: String, generation: u64 },
+    SaveNamespaceSelection { cluster_id: String, namespaces: Vec<String> },
 }
 
 #[derive(Debug, Clone)]
@@ -67,6 +72,229 @@ pub enum ClusterBridgeEvent {
         generation: u64,
         message: String,
     },
+    NamespacesLoaded {
+        cluster_id: String,
+        generation: u64,
+        namespaces: Vec<NamespaceInfo>,
+    },
+    NamespacesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NamespaceLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NamespaceFilterState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: NamespaceLoadStatus,
+    pub namespaces: Vec<NamespaceInfo>,
+    pub error_message: Option<String>,
+    pub selected_by_cluster: SelectedNamespacesMap,
+    pub dropdown_open: bool,
+    pub search_query: String,
+}
+
+impl NamespaceFilterState {
+    pub fn from_config(config: &OrbitConfig) -> Self {
+        Self {
+            selected_by_cluster: config.selected_namespaces_map(),
+            ..Default::default()
+        }
+    }
+
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = NamespaceLoadStatus::Loading;
+        self.namespaces.clear();
+        self.error_message = None;
+        self.dropdown_open = false;
+        self.search_query.clear();
+        ClusterBridgeCommand::LoadNamespaces {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = NamespaceLoadStatus::Loading;
+        self.error_message = None;
+        Some(ClusterBridgeCommand::LoadNamespaces {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = NamespaceLoadStatus::Idle;
+        self.namespaces.clear();
+        self.error_message = None;
+        self.dropdown_open = false;
+        self.search_query.clear();
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        namespaces: Vec<NamespaceInfo>,
+    ) -> (bool, Option<Vec<String>>) {
+        if self.cluster_id.as_deref() != Some(cluster_id) || self.generation != generation {
+            return (false, None);
+        }
+        self.status = NamespaceLoadStatus::Loaded;
+        self.error_message = None;
+
+        let valid_names: HashSet<&str> = namespaces.iter().map(|ns| ns.name.as_str()).collect();
+        let mut pruned_selection = None;
+        if let Some(current) = self.selected_by_cluster.get(cluster_id).cloned() {
+            let filtered: Vec<String> = current
+                .iter()
+                .filter(|name| valid_names.contains(name.as_str()))
+                .cloned()
+                .collect();
+            if filtered.len() != current.len() {
+                if filtered.is_empty() {
+                    self.selected_by_cluster.remove(cluster_id);
+                } else {
+                    self.selected_by_cluster
+                        .insert(cluster_id.to_string(), filtered.clone());
+                }
+                pruned_selection = Some(filtered);
+            }
+        }
+
+        self.namespaces = namespaces;
+        (true, pruned_selection)
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id) || self.generation != generation {
+            return false;
+        }
+        self.status = NamespaceLoadStatus::Error;
+        self.error_message = Some(message);
+        true
+    }
+
+    pub fn active_selection(&self) -> &[String] {
+        self.cluster_id
+            .as_deref()
+            .and_then(|id| self.selected_by_cluster.get(id))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    pub fn is_all_namespaces(&self) -> bool {
+        self.active_selection().is_empty()
+    }
+
+    pub fn select_all_namespaces(&mut self) -> Option<Vec<String>> {
+        let cluster_id = self.cluster_id.as_deref()?;
+        if self.selected_by_cluster.remove(cluster_id).is_some() {
+            Some(Vec::new())
+        } else {
+            None
+        }
+    }
+
+    pub fn toggle_namespace(&mut self, name: &str) -> Option<Vec<String>> {
+        let cluster_id = self.cluster_id.clone()?;
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let entry = self.selected_by_cluster.entry(cluster_id.clone()).or_default();
+        if let Some(pos) = entry.iter().position(|n| n == trimmed) {
+            entry.remove(pos);
+        } else {
+            entry.push(trimmed.to_string());
+        }
+
+        let updated = entry.clone();
+        if updated.is_empty() {
+            self.selected_by_cluster.remove(&cluster_id);
+        }
+        Some(updated)
+    }
+
+    pub fn filtered_namespaces(&self) -> Vec<&NamespaceInfo> {
+        let query = self.search_query.trim().to_lowercase();
+        if query.is_empty() {
+            self.namespaces.iter().collect()
+        } else {
+            self.namespaces
+                .iter()
+                .filter(|ns| ns.name.to_lowercase().contains(&query))
+                .collect()
+        }
+    }
+
+    pub fn matches_resource_namespace(&self, resource_namespace: Option<&str>) -> bool {
+        let selected = self.active_selection();
+        if selected.is_empty() {
+            return true;
+        }
+        match resource_namespace {
+            Some(ns) => selected.iter().any(|s| s == ns),
+            None => false,
+        }
+    }
+
+    pub fn summary_label(&self) -> String {
+        let selected = self.active_selection();
+        match selected.len() {
+            0 => "All Namespaces".to_string(),
+            1 => selected[0].clone(),
+            n => format!("{} +{}", selected[0], n - 1),
+        }
+    }
+
+    pub fn toggle_dropdown(&mut self) {
+        self.dropdown_open = !self.dropdown_open;
+        if !self.dropdown_open {
+            self.search_query.clear();
+        }
+    }
+
+    pub fn close_dropdown(&mut self) {
+        self.dropdown_open = false;
+        self.search_query.clear();
+    }
+
+    pub fn handle_search_key(&mut self, key: &str, key_char: Option<&str>) -> bool {
+        if key == "backspace" {
+            self.search_query.pop();
+            return true;
+        }
+        if key == "escape" {
+            self.close_dropdown();
+            return true;
+        }
+        if let Some(ch) = key_char
+            && !ch.chars().any(char::is_control)
+        {
+            self.search_query.push_str(ch);
+            return true;
+        }
+        false
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -306,7 +534,9 @@ impl ClusterSwitcherState {
                 self.error_banner_dismissed = false;
             }
             ClusterBridgeEvent::OverviewLoaded { .. }
-            | ClusterBridgeEvent::OverviewLoadFailed { .. } => {}
+            | ClusterBridgeEvent::OverviewLoadFailed { .. }
+            | ClusterBridgeEvent::NamespacesLoaded { .. }
+            | ClusterBridgeEvent::NamespacesLoadFailed { .. } => {}
         }
     }
 
@@ -581,5 +811,126 @@ mod tests {
         assert!(overview.cluster_id.is_none());
         assert!(overview.summary.is_none());
         assert_eq!(overview.status, OverviewLoadStatus::Idle);
+    }
+
+    fn sample_namespace(name: &str, is_system: bool) -> NamespaceInfo {
+        NamespaceInfo {
+            name: name.to_string(),
+            status: "Active".to_string(),
+            is_system,
+            age: "1d".to_string(),
+            labels: Default::default(),
+            annotations: Default::default(),
+            uid: format!("uid-{name}"),
+            created: "2026-01-01T00:00:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_namespace_filter_state_tracks_generation_persists_per_cluster_and_prunes_stale_names() {
+        let mut config = OrbitConfig::default();
+        config.update_selected_namespaces_for_cluster(
+            "ctx-a",
+            vec!["default".to_string(), "deleted-ns".to_string()],
+        );
+        config.update_selected_namespaces_for_cluster("ctx-b", vec!["kube-system".to_string()]);
+
+        let mut ns_state = NamespaceFilterState::from_config(&config);
+        assert_eq!(
+            ns_state.selected_by_cluster.get("ctx-a"),
+            Some(&vec!["default".to_string(), "deleted-ns".to_string()])
+        );
+        assert_eq!(
+            ns_state.selected_by_cluster.get("ctx-b"),
+            Some(&vec!["kube-system".to_string()])
+        );
+
+        let cmd_a = ns_state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd_a,
+            ClusterBridgeCommand::LoadNamespaces {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(ns_state.status, NamespaceLoadStatus::Loading);
+
+        let ns_list = vec![
+            sample_namespace("default", true),
+            sample_namespace("kube-system", true),
+            sample_namespace("payments", false),
+        ];
+        let (applied, pruned) = ns_state.apply_loaded("ctx-a", 1, ns_list.clone());
+        assert!(applied);
+        assert_eq!(pruned, Some(vec!["default".to_string()]));
+        assert_eq!(ns_state.active_selection(), &["default".to_string()]);
+
+        let cmd_b = ns_state.begin_load_for_cluster("ctx-b");
+        assert_eq!(
+            cmd_b,
+            ClusterBridgeCommand::LoadNamespaces {
+                cluster_id: "ctx-b".to_string(),
+                generation: 2,
+            }
+        );
+        assert_eq!(ns_state.apply_loaded("ctx-a", 1, ns_list), (false, None));
+        assert_eq!(ns_state.active_selection(), &["kube-system".to_string()]);
+        assert_eq!(
+            ns_state.selected_by_cluster.get("ctx-a"),
+            Some(&vec!["default".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_namespace_filter_state_multi_select_search_and_resource_matching() {
+        let mut ns_state = NamespaceFilterState::default();
+        ns_state.begin_load_for_cluster("ctx-a");
+        let ns_list = vec![
+            sample_namespace("default", true),
+            sample_namespace("kube-system", true),
+            sample_namespace("monitoring", true),
+            sample_namespace("payments", false),
+        ];
+        ns_state.apply_loaded("ctx-a", 1, ns_list);
+
+        assert!(ns_state.is_all_namespaces());
+        assert_eq!(ns_state.summary_label(), "All Namespaces");
+        assert!(ns_state.matches_resource_namespace(Some("payments")));
+        assert!(ns_state.matches_resource_namespace(None));
+
+        assert_eq!(
+            ns_state.toggle_namespace("payments"),
+            Some(vec!["payments".to_string()])
+        );
+        assert_eq!(ns_state.summary_label(), "payments");
+        assert!(ns_state.matches_resource_namespace(Some("payments")));
+        assert!(!ns_state.matches_resource_namespace(Some("default")));
+        assert!(!ns_state.matches_resource_namespace(None));
+
+        assert_eq!(
+            ns_state.toggle_namespace("default"),
+            Some(vec!["payments".to_string(), "default".to_string()])
+        );
+        assert_eq!(ns_state.summary_label(), "payments +1");
+        assert!(ns_state.matches_resource_namespace(Some("payments")));
+        assert!(ns_state.matches_resource_namespace(Some("default")));
+
+        assert_eq!(ns_state.select_all_namespaces(), Some(Vec::new()));
+        assert!(ns_state.is_all_namespaces());
+        assert_eq!(ns_state.summary_label(), "All Namespaces");
+
+        assert!(ns_state.handle_search_key("p", Some("P")));
+        assert!(ns_state.handle_search_key("a", Some("a")));
+        assert!(ns_state.handle_search_key("y", Some("y")));
+        assert!(ns_state.handle_search_key("z", Some("z")));
+        assert!(ns_state.handle_search_key("backspace", None));
+        assert_eq!(ns_state.search_query, "Pay");
+
+        let filtered: Vec<&str> = ns_state
+            .filtered_namespaces()
+            .into_iter()
+            .map(|ns| ns.name.as_str())
+            .collect();
+        assert_eq!(filtered, vec!["payments"]);
     }
 }

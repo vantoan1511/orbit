@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use orbit_core::kubernetes::manager::KubeManager;
+use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use tokio::sync::{RwLock, mpsc};
 
@@ -114,6 +115,59 @@ pub async fn handle_bridge_command(
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
                 });
+            }
+        }
+        ClusterBridgeCommand::LoadNamespaces {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_namespaces(&client).await {
+                        Ok(namespaces) => {
+                            let _ = tx.send(ClusterBridgeEvent::NamespacesLoaded {
+                                cluster_id,
+                                generation,
+                                namespaces,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::NamespacesLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::NamespacesLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::SaveNamespaceSelection {
+            cluster_id,
+            namespaces,
+        } => {
+            let mut guard = manager.write().await;
+            if let Err(err) = guard
+                .config
+                .set_selected_namespaces_for_cluster(&cluster_id, namespaces)
+            {
+                tracing::warn!(
+                    cluster_id = %cluster_id,
+                    error = %err,
+                    "Failed to persist selected namespaces"
+                );
             }
         }
     }
@@ -292,5 +346,61 @@ users:
             }
             other => panic!("Expected OverviewLoadFailed, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_namespaces_without_active_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadNamespaces {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 5,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected NamespacesLoadFailed event");
+        match event {
+            ClusterBridgeEvent::NamespacesLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 5);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected NamespacesLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_save_namespace_selection_persists_to_config() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_ns_bridge");
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::load())));
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveNamespaceSelection {
+                cluster_id: "ctx-a".to_string(),
+                namespaces: vec!["payments".to_string()],
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let reloaded = OrbitConfig::load();
+        assert_eq!(
+            reloaded.selected_namespaces_for_cluster("ctx-a"),
+            vec!["payments".to_string()]
+        );
     }
 }

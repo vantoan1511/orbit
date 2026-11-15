@@ -20,6 +20,7 @@ test('CONFIG_KEYS defines all well-known configuration keys', () => {
   assert.equal(CONFIG_KEYS.UI_STYLE, 'uiStyle')
   assert.equal(CONFIG_KEYS.NOTIFICATION_PREFERENCES, 'notificationPreferences')
   assert.equal(CONFIG_KEYS.PROXY_SETTINGS, 'proxySettings')
+  assert.equal(CONFIG_KEYS.SELECTED_NAMESPACES, 'selectedNamespaces')
 })
 
 test('isGeneralConfigKey filters out specialized keys', async () => {
@@ -31,6 +32,7 @@ test('isGeneralConfigKey filters out specialized keys', async () => {
   assert.ok(SPECIALIZED_CONFIG_KEYS.includes('uiStyle'))
   assert.ok(SPECIALIZED_CONFIG_KEYS.includes('notificationPreferences'))
   assert.ok(SPECIALIZED_CONFIG_KEYS.includes('proxySettings'))
+  assert.ok(SPECIALIZED_CONFIG_KEYS.includes('selectedNamespaces'))
 
   assert.equal(isGeneralConfigKey('maxLogFiles'), true)
   assert.equal(isGeneralConfigKey('customKubeconfigPaths'), true)
@@ -43,6 +45,7 @@ test('isGeneralConfigKey filters out specialized keys', async () => {
   assert.equal(isGeneralConfigKey('uiStyle'), false)
   assert.equal(isGeneralConfigKey('notificationPreferences'), false)
   assert.equal(isGeneralConfigKey('proxySettings'), false)
+  assert.equal(isGeneralConfigKey('selectedNamespaces'), false)
 })
 
 test('DEFAULT_NOTIFICATION_PREFERENCES and DEFAULT_PROXY_SETTINGS define canonical defaults', () => {

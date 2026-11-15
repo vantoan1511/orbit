@@ -40,12 +40,10 @@ pub struct HealthBreakdownSection {
     pub error: Option<String>,
 }
 
+pub type NavigateCallback = Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>;
+
 pub fn health_percentage(healthy: usize, total: usize) -> u8 {
-    if total == 0 {
-        0
-    } else {
-        ((healthy.min(total) * 100) / total) as u8
-    }
+    (healthy.min(total) * 100).checked_div(total).unwrap_or(0) as u8
 }
 
 pub fn cluster_health_presentation(
@@ -212,7 +210,7 @@ pub fn render_overview_view(
     active_cluster: Option<&ClusterInfo>,
     overview: &ClusterOverviewState,
     theme: &OrbitTheme,
-    on_navigate: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
+    on_navigate: NavigateCallback,
     on_refresh: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let version_label = overview
@@ -392,7 +390,7 @@ fn render_status_bar(
 fn render_metric_cards(
     summary: &ClusterOverviewSummary,
     theme: &OrbitTheme,
-    on_navigate: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
+    on_navigate: NavigateCallback,
 ) -> AnyElement {
     let hover_bg = theme.surface.bg_hover;
     let mut row = div().flex().flex_wrap().gap_3();
