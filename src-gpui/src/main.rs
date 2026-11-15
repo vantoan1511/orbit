@@ -23,7 +23,7 @@ use crate::navigation::{
 };
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
-    ClusterSwitcherState, NamespaceFilterState, NamespaceLoadStatus,
+    ClusterSwitcherState, DeploymentsState, NamespaceFilterState, NamespaceLoadStatus,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -165,11 +165,28 @@ pub fn namespace_trigger_presentation(
     }
 }
 
+pub fn select_workspace_view_with_state(
+    state: &ClusterSwitcherState,
+    sidebar: &mut SidebarLayoutState,
+    deployments: &mut DeploymentsState,
+    view: WorkspaceView,
+) -> Option<ClusterBridgeCommand> {
+    sidebar.select_view(view);
+    if view == WorkspaceView::Deployments
+        && let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state
+        && deployments.needs_load_for_cluster(cluster_id)
+    {
+        return Some(deployments.begin_load_for_cluster(cluster_id));
+    }
+    None
+}
+
 pub fn apply_cluster_event_with_workspace(
     state: &mut ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
     overview: &mut ClusterOverviewState,
     namespaces: &mut NamespaceFilterState,
+    deployments: &mut DeploymentsState,
     event: ClusterBridgeEvent,
 ) -> Vec<ClusterBridgeCommand> {
     let mut commands = Vec::new();
@@ -180,6 +197,11 @@ pub fn apply_cluster_event_with_workspace(
             if let Some(id) = state.active_cluster_id.as_deref() {
                 commands.push(overview.begin_load_for_cluster(id));
                 commands.push(namespaces.begin_load_for_cluster(id));
+                if sidebar.active_view == WorkspaceView::Deployments {
+                    commands.push(deployments.begin_load_for_cluster(id));
+                } else {
+                    deployments.reset_for_cluster(id);
+                }
             }
         }
         ClusterBridgeEvent::ClusterUnreachable { .. }
@@ -187,6 +209,7 @@ pub fn apply_cluster_event_with_workspace(
             state.apply_event(event);
             overview.reset_for_disconnected();
             namespaces.reset_for_disconnected();
+            deployments.reset_for_disconnected();
         }
         ClusterBridgeEvent::OverviewLoaded {
             cluster_id,
@@ -223,6 +246,20 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             namespaces.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::DeploymentsLoaded {
+            cluster_id,
+            generation,
+            deployments: loaded_deployments,
+        } => {
+            deployments.apply_loaded(&cluster_id, generation, loaded_deployments);
+        }
+        ClusterBridgeEvent::DeploymentsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            deployments.apply_failed(&cluster_id, generation, message);
+        }
         other @ ClusterBridgeEvent::ContextsLoaded { .. } => {
             state.apply_event(other);
         }
@@ -235,6 +272,7 @@ pub struct OrbitShell {
     sidebar: SidebarLayoutState,
     overview: ClusterOverviewState,
     namespaces: NamespaceFilterState,
+    deployments: DeploymentsState,
     focus_handle: FocusHandle,
     namespace_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
@@ -263,6 +301,7 @@ impl OrbitShell {
                             &mut shell.sidebar,
                             &mut shell.overview,
                             &mut shell.namespaces,
+                            &mut shell.deployments,
                             event,
                         ) {
                             shell.dispatch_command(cmd);
@@ -293,6 +332,7 @@ impl OrbitShell {
             sidebar: SidebarLayoutState::new(),
             overview: ClusterOverviewState::default(),
             namespaces: NamespaceFilterState::from_config(config),
+            deployments: DeploymentsState::default(),
             focus_handle: cx.focus_handle(),
             namespace_search_focus: cx.focus_handle(),
             command_tx,
@@ -306,16 +346,34 @@ impl OrbitShell {
         }
     }
 
+    fn select_workspace_view(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        if let Some(cmd) = select_workspace_view_with_state(
+            &self.state,
+            &mut self.sidebar,
+            &mut self.deployments,
+            view,
+        ) {
+            self.dispatch_command(cmd);
+        }
+        cx.notify();
+    }
+
     fn refresh_workspace(&mut self, cx: &mut Context<Self>) {
         self.dispatch_command(ClusterBridgeCommand::RefreshClusters);
-        if matches!(
-            self.state.connection_state,
-            ClusterConnectionState::Connected { .. }
-        ) {
+        if let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state {
             if let Some(cmd) = self.overview.begin_refresh() {
                 self.dispatch_command(cmd);
             }
             if let Some(cmd) = self.namespaces.begin_refresh() {
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Deployments
+                || self.deployments.cluster_id.is_some()
+            {
+                let cmd = self
+                    .deployments
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.deployments.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
         }
@@ -634,8 +692,7 @@ impl OrbitShell {
                     .when(is_active, |el| el.bg(theme.accent.soft))
                     .hover(move |style| style.bg(hover_bg))
                     .on_click(cx.listener(move |this, _event, _window, cx| {
-                        this.sidebar.select_view(item);
-                        cx.notify();
+                        this.select_workspace_view(item, cx);
                     }))
                     .child(
                         div()
@@ -1941,6 +1998,47 @@ impl OrbitShell {
     ) -> AnyElement {
         let version_label = k8s_version.unwrap_or("Connected").to_string();
 
+        if self.sidebar.active_view == WorkspaceView::Deployments {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.deployments.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.deployments.table.selected_row_key = Some(row_key.to_string());
+                    cx.notify();
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::deployments::render_deployments_view(
+                &self.deployments,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view != WorkspaceView::Overview {
             let view = self.sidebar.active_view;
             return theme
@@ -1998,8 +2096,7 @@ impl OrbitShell {
         let on_navigate =
             std::rc::Rc::new(move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
                 nav_entity.update(cx, |shell, cx| {
-                    shell.sidebar.select_view(view);
-                    cx.notify();
+                    shell.select_workspace_view(view, cx);
                 });
             });
         let refresh_entity = cx.entity().clone();
@@ -2093,10 +2190,20 @@ impl OrbitShell {
             }
         };
 
-        div()
-            .id("orbit-workspace-scroll")
-            .flex_1()
-            .overflow_y_scroll()
+        let fill_viewport = self.sidebar.active_view == WorkspaceView::Deployments
+            && matches!(
+                self.state.connection_state,
+                ClusterConnectionState::Connected { .. }
+            );
+
+        let container = div().id("orbit-workspace-scroll").flex_1();
+        let container = if fill_viewport {
+            container.min_h(px(0.0)).overflow_hidden()
+        } else {
+            container.overflow_y_scroll()
+        };
+
+        container
             .p_6()
             .bg(theme.surface.bg_app)
             .flex()
@@ -2601,11 +2708,13 @@ mod tests {
         };
         let mut throwaway_overview = ClusterOverviewState::default();
         let mut throwaway_namespaces = NamespaceFilterState::default();
+        let mut throwaway_deployments = DeploymentsState::default();
         apply_cluster_event_with_workspace(
             &mut switcher,
             &mut connect_sidebar,
             &mut throwaway_overview,
             &mut throwaway_namespaces,
+            &mut throwaway_deployments,
             event,
         );
 
@@ -2692,6 +2801,7 @@ mod tests {
             vec!["default".to_string(), "stale-ns".to_string()],
         );
         let mut namespaces = NamespaceFilterState::from_config(&config);
+        let mut deployments = DeploymentsState::default();
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -2717,6 +2827,7 @@ mod tests {
             &mut sidebar,
             &mut overview,
             &mut namespaces,
+            &mut deployments,
             connect_event,
         );
         assert_eq!(
@@ -2745,6 +2856,7 @@ mod tests {
             &mut sidebar,
             &mut overview,
             &mut namespaces,
+            &mut deployments,
             ClusterBridgeEvent::OverviewLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -2759,6 +2871,7 @@ mod tests {
             &mut sidebar,
             &mut overview,
             &mut namespaces,
+            &mut deployments,
             ClusterBridgeEvent::NamespacesLoaded {
                 cluster_id: "prod-ctx".to_string(),
                 generation: 1,
@@ -2788,6 +2901,7 @@ mod tests {
             &mut sidebar,
             &mut overview,
             &mut namespaces,
+            &mut deployments,
             ClusterBridgeEvent::ClusterUnreachable {
                 outcome: ClusterSwitchOutcome {
                     context_name: "prod-ctx".to_string(),
@@ -2873,5 +2987,247 @@ mod tests {
         assert_eq!(multi_pres.label, "default +2");
         assert!(multi_pres.is_filtered);
         assert_eq!(multi_pres.indicator_color, theme.accent.accent);
+    }
+
+    #[test]
+    fn test_select_view_deployments_triggers_load_when_connected_and_idle() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.1".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut deployments = DeploymentsState::default();
+
+        // Navigating to Pods does not trigger Deployments load.
+        assert_eq!(
+            select_workspace_view_with_state(
+                &switcher,
+                &mut sidebar,
+                &mut deployments,
+                WorkspaceView::Pods
+            ),
+            None
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Pods);
+
+        // Navigating to Deployments while connected & Idle triggers LoadDeployments once.
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut deployments,
+            WorkspaceView::Deployments,
+        );
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadDeployments {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
+        assert_eq!(
+            deployments.status,
+            crate::state::DeploymentsLoadStatus::Loading
+        );
+
+        // Navigating away and back while already loading does not re-trigger.
+        select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut deployments,
+            WorkspaceView::Overview,
+        );
+        assert_eq!(
+            select_workspace_view_with_state(
+                &switcher,
+                &mut sidebar,
+                &mut deployments,
+                WorkspaceView::Deployments
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn test_apply_cluster_event_resets_deployments_on_connect_and_disconnect() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+
+        // Connect while on Overview: DeploymentsState resets for cluster without eager load.
+        let connect_event = ClusterBridgeEvent::ClusterConnected {
+            outcome: ClusterSwitchOutcome {
+                context_name: "prod-ctx".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.1".to_string()),
+                error_message: None,
+            },
+            clusters: vec![],
+            profile: UserProfileInfo {
+                active_context: Some("prod-ctx".to_string()),
+                user_name: None,
+                auth_type: "None".to_string(),
+                cluster_name: Some("prod-cluster".to_string()),
+                server_url: Some("https://10.0.0.10:6443".to_string()),
+                kubeconfig_paths: vec![],
+                k8s_version: Some("v1.31.1".to_string()),
+            },
+        };
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut deployments,
+            connect_event.clone(),
+        );
+        assert!(!cmds
+            .iter()
+            .any(|c| matches!(c, ClusterBridgeCommand::LoadDeployments { .. })));
+        assert_eq!(deployments.cluster_id.as_deref(), Some("prod-ctx"));
+        assert_eq!(deployments.status, crate::state::DeploymentsLoadStatus::Idle);
+
+        // Connect while already on Deployments: fires LoadDeployments eagerly.
+        sidebar.select_view(WorkspaceView::Deployments);
+        let cmds_on_deployments = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut deployments,
+            connect_event,
+        );
+        assert!(cmds_on_deployments.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+
+        // Disconnect resets DeploymentsState.
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut deployments,
+            ClusterBridgeEvent::ClusterUnreachable {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: false,
+                    k8s_version: None,
+                    error_message: Some("timeout".to_string()),
+                },
+                clusters: vec![],
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: None,
+                    server_url: None,
+                    kubeconfig_paths: vec![],
+                    k8s_version: None,
+                },
+            },
+        );
+        assert!(deployments.cluster_id.is_none());
+        assert_eq!(deployments.status, crate::state::DeploymentsLoadStatus::Idle);
+    }
+
+    #[test]
+    fn test_apply_cluster_event_handles_deployments_loaded_and_failed() {
+        use orbit_core::kubernetes::models::{DeploymentInfo, Replicas};
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+
+        deployments.begin_load_for_cluster("prod-ctx");
+        let current_gen = deployments.generation;
+
+        let dep = DeploymentInfo {
+            kind: "Deployment".to_string(),
+            name: "api".to_string(),
+            namespace: "default".to_string(),
+            status: "Running".to_string(),
+            conditions: None,
+            replicas: Replicas {
+                current: 2,
+                desired: 2,
+            },
+            available: 2,
+            up_to_date: 2,
+            age: "1h".to_string(),
+            images: vec!["api:v1".to_string()],
+            containers: Vec::new(),
+            strategy: Some("RollingUpdate".to_string()),
+            min_ready_seconds: 0,
+            revision_history: Some(10),
+            labels: Default::default(),
+            annotations: Default::default(),
+            ports: vec![],
+        };
+
+        // Stale generation ignored.
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut deployments,
+            ClusterBridgeEvent::DeploymentsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: current_gen + 10,
+                deployments: vec![dep.clone()],
+            },
+        );
+        assert!(deployments.deployments.is_empty());
+
+        // Matching generation updates state.
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut deployments,
+            ClusterBridgeEvent::DeploymentsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: current_gen,
+                deployments: vec![dep],
+            },
+        );
+        assert_eq!(
+            deployments.status,
+            crate::state::DeploymentsLoadStatus::Loaded
+        );
+        assert_eq!(deployments.deployments.len(), 1);
+
+        // Refresh + failure updates error state.
+        deployments.begin_refresh();
+        let refresh_gen = deployments.generation;
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut deployments,
+            ClusterBridgeEvent::DeploymentsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: refresh_gen,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(
+            deployments.status,
+            crate::state::DeploymentsLoadStatus::Error
+        );
+        assert_eq!(deployments.error_message.as_deref(), Some("forbidden"));
     }
 }
