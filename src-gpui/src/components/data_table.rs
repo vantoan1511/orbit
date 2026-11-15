@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, ClickEvent, Div, ElementId, FontWeight, InteractiveElement, IntoElement,
-    Pixels, SharedString, StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div,
-    prelude::*, px, uniform_list,
+    MouseButton, MouseDownEvent, Pixels, SharedString, StatefulInteractiveElement, Styled,
+    UniformListScrollHandle, Window, div, prelude::*, px, uniform_list,
 };
 use lucide_icons::Icon;
 
@@ -239,6 +239,8 @@ pub fn apply_column_alignment<E: Styled>(el: E, align: ColumnAlign) -> E {
 
 pub type SortCallback = Rc<dyn Fn(SharedString, &ClickEvent, &mut Window, &mut App)>;
 pub type RowClickCallback = Rc<dyn Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App)>;
+pub type RowContextMenuCallback =
+    Rc<dyn Fn(usize, SharedString, &MouseDownEvent, &mut Window, &mut App)>;
 
 pub struct DataTableCallbacks<K, C>
 where
@@ -249,6 +251,7 @@ where
     pub render_cell: C,
     pub on_sort: Option<SortCallback>,
     pub on_row_click: Option<RowClickCallback>,
+    pub on_row_context_menu: Option<RowContextMenuCallback>,
 }
 
 impl<K, C> DataTableCallbacks<K, C>
@@ -262,6 +265,7 @@ where
             render_cell,
             on_sort: None,
             on_row_click: None,
+            on_row_context_menu: None,
         }
     }
 
@@ -278,6 +282,14 @@ where
         callback: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     ) -> Self {
         self.on_row_click = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_row_context_menu(
+        mut self,
+        callback: impl 'static + Fn(usize, SharedString, &MouseDownEvent, &mut Window, &mut App),
+    ) -> Self {
+        self.on_row_context_menu = Some(Rc::new(callback));
         self
     }
 }
@@ -495,6 +507,7 @@ where
             let row_key_fn = Rc::new(callbacks.row_key);
             let render_cell_fn = Rc::new(callbacks.render_cell);
             let on_row_click = callbacks.on_row_click.clone();
+            let on_row_context_menu = callbacks.on_row_context_menu.clone();
             let selected_key = state.selected_row_key.clone();
             let theme_snapshot = theme.clone();
             let list_id = SharedString::from(format!("{table_id_str}-rows"));
@@ -546,6 +559,17 @@ where
                             row_el = row_el.on_click(move |event, window, cx| {
                                 click_cb(row_idx, row_key_for_click.clone(), event, window, cx);
                             });
+                        }
+
+                        if let Some(ctx_cb) = on_row_context_menu.clone() {
+                            let row_key_for_ctx = key_shared.clone();
+                            row_el = row_el.on_mouse_down(
+                                MouseButton::Right,
+                                move |event, window, cx| {
+                                    cx.stop_propagation();
+                                    ctx_cb(row_idx, row_key_for_ctx.clone(), event, window, cx);
+                                },
+                            );
                         }
 
                         for col in cols.iter() {
@@ -755,5 +779,19 @@ mod tests {
             state.sort_indicator_for_column(&col_name).map(char::from),
             Some(char::from(Icon::ArrowDown))
         );
+    }
+
+    #[test]
+    fn test_data_table_callbacks_accept_optional_row_context_menu_handler() {
+        let default_callbacks =
+            DataTableCallbacks::new(|idx| format!("row-{idx}"), |_, _, _| div().into_any_element());
+        assert!(default_callbacks.on_row_context_menu.is_none());
+
+        let with_ctx = DataTableCallbacks::new(
+            |idx| format!("row-{idx}"),
+            |_, _, _| div().into_any_element(),
+        )
+        .on_row_context_menu(|_, _, _, _, _| {});
+        assert!(with_ctx.on_row_context_menu.is_some());
     }
 }
