@@ -413,6 +413,8 @@ pub fn build_event_context_menu_entries(
     on_copy_message: impl 'static + Fn(&mut Window, &mut App),
     on_filter_namespace: impl 'static + Fn(&mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    on_view_details: impl 'static + Fn(&mut Window, &mut App),
+    on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -439,7 +441,12 @@ pub fn build_event_context_menu_entries(
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-details", "View Details")
                 .icon(Icon::Info)
-                .disabled(true),
+                .on_select(on_view_details),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("view-yaml", "View YAML")
+                .icon(Icon::FileCode)
+                .on_select(on_view_yaml),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -690,6 +697,78 @@ pub fn render_events_view(
         .child(toolbar)
         .when_some(error_banner, |el, banner| el.child(banner))
         .child(body)
+        .into_any_element()
+}
+
+pub fn render_event_drawer_overview(event: &EventInfo, theme: &OrbitTheme) -> AnyElement {
+    let summary = crate::views::render_drawer_key_values(
+        vec![
+            ("Type", event.r#type.clone(), false),
+            ("Reason", event.reason.clone(), false),
+            (
+                "Involved Object",
+                format!("{}/{}", event.object_kind, event.object_name),
+                true,
+            ),
+            (
+                "Namespace",
+                if event.namespace.is_empty() {
+                    "-".to_string()
+                } else {
+                    event.namespace.clone()
+                },
+                true,
+            ),
+            ("Source", event.source.clone(), true),
+            ("Count", event.count.to_string(), true),
+            ("First Seen", event.first_seen.clone(), true),
+            ("Last Seen", event.last_seen.clone(), true),
+            ("UID", event.uid.clone(), true),
+        ],
+        theme,
+    );
+
+    let message_box = crate::views::render_drawer_section(
+        "MESSAGE",
+        div()
+            .w_full()
+            .p_3()
+            .rounded(theme.style.radius_control)
+            .bg(theme.surface.bg_panel)
+            .border_1()
+            .border_color(theme.border.default)
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .text_color(theme.text.primary)
+                    .child(event.message.clone()),
+            )
+            .into_any_element(),
+        theme,
+    );
+
+    div()
+        .id("event-drawer-overview")
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .p_4()
+        .flex()
+        .flex_col()
+        .gap_5()
+        .child(message_box)
+        .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
+        .child(crate::views::render_drawer_kv_badges(
+            "LABELS",
+            &event.labels,
+            "No labels",
+            theme,
+        ))
+        .child(crate::views::render_drawer_kv_badges(
+            "ANNOTATIONS",
+            &event.annotations,
+            "No annotations",
+            theme,
+        ))
         .into_any_element()
 }
 

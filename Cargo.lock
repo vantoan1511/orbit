@@ -5361,6 +5361,7 @@ dependencies = [
  "kube",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tokio",
  "tracing",
  "uuid",

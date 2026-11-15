@@ -19,7 +19,9 @@ use tokio::sync::mpsc;
 
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
-    ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, render_context_menu_overlay,
+    ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, ResourceDrawerProps,
+    ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
+    YamlLoadStatus, render_context_menu_overlay, render_resource_drawer, render_yaml_viewer,
 };
 use crate::icons::{render_icon, theme_mode_icon};
 use crate::navigation::{
@@ -27,8 +29,8 @@ use crate::navigation::{
 };
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
-    ClusterSwitcherState, DeploymentsState, EventTypeFilter, EventsState, NamespaceFilterState,
-    NamespaceLoadStatus, NamespacesViewState, NodesState,
+    ClusterSwitcherState, DeploymentsState, EventTypeFilter, EventsLoadStatus, EventsState,
+    NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -325,8 +327,58 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             events.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::ResourceYamlLoaded { .. }
+        | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
     }
     commands
+}
+
+pub fn apply_drawer_lifecycle_for_event(
+    drawer: &mut ResourceDrawerState,
+    event: &ClusterBridgeEvent,
+) {
+    match event {
+        ClusterBridgeEvent::ClusterConnected { .. }
+        | ClusterBridgeEvent::ClusterUnreachable { .. }
+        | ClusterBridgeEvent::ConnectionError { .. } => {
+            drawer.reset_for_context_change();
+        }
+        ClusterBridgeEvent::ResourceYamlLoaded {
+            cluster_id,
+            generation,
+            kind,
+            namespace,
+            name,
+            yaml,
+        } => {
+            drawer.apply_yaml_loaded(
+                cluster_id,
+                *generation,
+                kind,
+                namespace.as_deref(),
+                name,
+                yaml.clone(),
+            );
+        }
+        ClusterBridgeEvent::ResourceYamlLoadFailed {
+            cluster_id,
+            generation,
+            kind,
+            namespace,
+            name,
+            message,
+        } => {
+            drawer.apply_yaml_failed(
+                cluster_id,
+                *generation,
+                kind,
+                namespace.as_deref(),
+                name,
+                message.clone(),
+            );
+        }
+        _ => {}
+    }
 }
 
 pub struct OrbitShell {
@@ -338,6 +390,7 @@ pub struct OrbitShell {
     deployments: DeploymentsState,
     nodes: NodesState,
     events: EventsState,
+    drawer: ResourceDrawerState,
     focus_handle: FocusHandle,
     namespace_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
@@ -362,6 +415,7 @@ impl OrbitShell {
             while let Some(event) = event_rx.recv().await {
                 if this
                     .update(cx, |shell, cx| {
+                        apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
                         for cmd in apply_cluster_event_with_workspace(
                             &mut shell.state,
                             &mut shell.sidebar,
@@ -375,6 +429,7 @@ impl OrbitShell {
                         ) {
                             shell.dispatch_command(cmd);
                         }
+                        shell.reconcile_drawer_target_exists();
                         cx.notify();
                     })
                     .is_err()
@@ -405,6 +460,7 @@ impl OrbitShell {
             deployments: DeploymentsState::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
+            drawer: ResourceDrawerState::default(),
             focus_handle: cx.focus_handle(),
             namespace_search_focus: cx.focus_handle(),
             command_tx,
@@ -453,6 +509,9 @@ impl OrbitShell {
     }
 
     fn select_workspace_view(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        if view != self.sidebar.active_view {
+            self.drawer.reset_for_context_change();
+        }
         if let Some(cmd) = select_workspace_view_with_state(
             &self.state,
             &mut self.sidebar,
@@ -465,6 +524,407 @@ impl OrbitShell {
             self.dispatch_command(cmd);
         }
         cx.notify();
+    }
+
+    fn active_cluster_id(&self) -> Option<&str> {
+        self.state.active_cluster_id.as_deref()
+    }
+
+    fn open_resource_drawer(
+        &mut self,
+        target: ResourceDrawerTarget,
+        initial_tab: ResourceDrawerTabId,
+        cx: &mut Context<Self>,
+    ) {
+        let cluster_id = self.active_cluster_id().map(str::to_string);
+        if matches!(
+            target,
+            ResourceDrawerTarget::Deployment { .. } | ResourceDrawerTarget::Node { .. }
+        ) {
+            if let Some(cid) = cluster_id.as_deref() {
+                if self.events.needs_load_for_cluster(cid) {
+                    let cmd = self.events.begin_load_for_cluster(cid);
+                    self.dispatch_command(cmd);
+                }
+            }
+        }
+        if let Some(cmd) =
+            self.drawer
+                .open_or_switch(cluster_id.as_deref(), target, initial_tab)
+        {
+            self.dispatch_command(cmd);
+        }
+        cx.notify();
+    }
+
+    fn select_drawer_tab(&mut self, tab: ResourceDrawerTabId, cx: &mut Context<Self>) {
+        let cluster_id = self.active_cluster_id().map(str::to_string);
+        if let Some(cmd) = self.drawer.select_tab(cluster_id.as_deref(), tab) {
+            self.dispatch_command(cmd);
+        }
+        cx.notify();
+    }
+
+    fn retry_drawer_yaml(&mut self, cx: &mut Context<Self>) {
+        let cluster_id = self.active_cluster_id().map(str::to_string);
+        if let Some(cmd) = self.drawer.retry_yaml(cluster_id.as_deref()) {
+            self.dispatch_command(cmd);
+        }
+        cx.notify();
+    }
+
+    fn copy_drawer_yaml(&mut self, yaml: String, cx: &mut Context<Self>) {
+        cx.write_to_clipboard(ClipboardItem::new_string(yaml));
+        self.drawer.yaml_copied = true;
+        cx.notify();
+    }
+
+    fn dismiss_resource_drawer(&mut self, cx: &mut Context<Self>) {
+        if self.drawer.is_open {
+            self.drawer.close();
+            cx.notify();
+        }
+    }
+
+    fn find_event_for_target(
+        &self,
+        uid: &str,
+        reason: &str,
+        namespace: &str,
+    ) -> Option<&orbit_core::kubernetes::models::EventInfo> {
+        self.events.events.iter().find(|ev| {
+            if !uid.is_empty() && !ev.uid.is_empty() {
+                ev.uid == uid
+            } else {
+                ev.namespace == namespace && ev.reason == reason
+            }
+        })
+    }
+
+    fn reconcile_drawer_target_exists(&mut self) {
+        let Some(target) = self.drawer.target.as_ref() else {
+            return;
+        };
+        if !self.drawer.is_open {
+            return;
+        }
+        let exists = match target {
+            ResourceDrawerTarget::Deployment { name, namespace } => self
+                .deployments
+                .deployments
+                .iter()
+                .any(|d| d.name == *name && d.namespace == *namespace),
+            ResourceDrawerTarget::Node { name } => {
+                self.nodes.nodes.iter().any(|n| n.name == *name)
+            }
+            ResourceDrawerTarget::Namespace { name } => {
+                self.namespaces.namespaces.iter().any(|ns| ns.name == *name)
+            }
+            ResourceDrawerTarget::Event {
+                uid,
+                reason,
+                namespace,
+            } => self.find_event_for_target(uid, reason, namespace).is_some(),
+        };
+        if !exists {
+            self.drawer.close();
+        }
+    }
+
+    fn render_live_yaml_tab(
+        &self,
+        subtitle: impl Into<SharedString>,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let copy_yaml = self.drawer.yaml_content.clone();
+        let copy_entity = cx.entity().clone();
+        let on_copy = copy_yaml.map(|yaml| {
+            std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
+                copy_entity.update(cx, |shell, cx| {
+                    shell.copy_drawer_yaml(yaml.clone(), cx);
+                });
+            }) as std::rc::Rc<dyn Fn(&mut Window, &mut App)>
+        });
+        let retry_entity = cx.entity().clone();
+        let on_retry = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
+            retry_entity.update(cx, |shell, cx| {
+                shell.retry_drawer_yaml(cx);
+            });
+        });
+        render_yaml_viewer(
+            self.drawer.yaml_status,
+            self.drawer.yaml_content.as_deref(),
+            self.drawer.yaml_error.as_deref(),
+            self.drawer.yaml_copied,
+            subtitle,
+            theme,
+            on_copy,
+            Some(on_retry),
+        )
+    }
+
+    fn build_drawer_target_content(
+        &self,
+        target: &ResourceDrawerTarget,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> Option<(
+        SharedString,
+        SharedString,
+        Option<SharedString>,
+        Option<SharedString>,
+        Option<SharedString>,
+        Vec<ResourceDrawerTabDef>,
+        AnyElement,
+    )> {
+        let events_loading = self.events.status == EventsLoadStatus::Loading;
+
+        match target {
+            ResourceDrawerTarget::Deployment { name, namespace } => {
+                let dep = self
+                    .deployments
+                    .deployments
+                    .iter()
+                    .find(|d| d.name == *name && d.namespace == *namespace)?;
+                let matched_events =
+                    views::deployments::filter_events_for_deployment(&self.events.events, dep);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::deployments::render_deployment_drawer_overview(dep, theme)
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::deployments::render_deployment_drawer_events(
+                            &self.events.events,
+                            events_loading,
+                            dep,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(format!("{}/{}", dep.namespace, dep.name), theme, cx)
+                    }
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(dep.name.clone()),
+                    SharedString::from("Deployment"),
+                    Some(SharedString::from(dep.namespace.clone())),
+                    Some(SharedString::from(dep.age.clone())),
+                    Some(SharedString::from(dep.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::Node { name } => {
+                let node = self.nodes.nodes.iter().find(|n| n.name == *name)?;
+                let matched_events =
+                    views::nodes::filter_events_for_node(&self.events.events, node);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::nodes::render_node_drawer_overview(node, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::nodes::render_node_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        node,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(node.name.clone(), theme, cx)
+                    }
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(node.name.clone()),
+                    SharedString::from("Node"),
+                    None,
+                    Some(SharedString::from(node.uptime.clone())),
+                    Some(SharedString::from(node.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::Namespace { name } => {
+                let ns = self
+                    .namespaces
+                    .namespaces
+                    .iter()
+                    .find(|n| n.name == *name)?;
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(ns.name.clone(), theme, cx)
+                    }
+                    _ => views::namespaces::render_namespace_drawer_overview(ns, theme),
+                };
+                Some((
+                    SharedString::from(ns.name.clone()),
+                    SharedString::from("Namespace"),
+                    None,
+                    Some(SharedString::from(ns.age.clone())),
+                    Some(SharedString::from(ns.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::Event {
+                uid,
+                reason,
+                namespace,
+            } => {
+                let ev = self.find_event_for_target(uid, reason, namespace)?;
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Yaml => {
+                        let formatted = orbit_core::kubernetes::raw::format_event_yaml(ev);
+                        let copy_yaml = formatted.clone();
+                        let copy_entity = cx.entity().clone();
+                        let on_copy = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
+                            copy_entity.update(cx, |shell, cx| {
+                                shell.copy_drawer_yaml(copy_yaml.clone(), cx);
+                            });
+                        });
+                        render_yaml_viewer(
+                            YamlLoadStatus::Loaded,
+                            Some(&formatted),
+                            None,
+                            self.drawer.yaml_copied,
+                            format!("{}/{}", ev.object_kind, ev.object_name),
+                            theme,
+                            Some(on_copy),
+                            None,
+                        )
+                    }
+                    _ => views::events::render_event_drawer_overview(ev, theme),
+                };
+                Some((
+                    SharedString::from(ev.reason.clone()),
+                    SharedString::from("Event"),
+                    if ev.namespace.is_empty() {
+                        None
+                    } else {
+                        Some(SharedString::from(ev.namespace.clone()))
+                    },
+                    Some(SharedString::from(ev.time.clone())),
+                    Some(SharedString::from(ev.r#type.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+        }
+    }
+
+    fn render_active_drawer(
+        &self,
+        window_width: f32,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if !self.drawer.is_open {
+            return None;
+        }
+        let target = self.drawer.target.as_ref()?;
+        let (title, kind, namespace, age, status, tabs, body) =
+            self.build_drawer_target_content(target, theme, cx)?;
+
+        let tab_entity = cx.entity().clone();
+        let on_select_tab = std::rc::Rc::new(
+            move |tab: ResourceDrawerTabId, _w: &mut Window, cx: &mut App| {
+                tab_entity.update(cx, |shell, cx| {
+                    shell.select_drawer_tab(tab.clone(), cx);
+                });
+            },
+        );
+        let close_entity = cx.entity().clone();
+        let on_close = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
+            close_entity.update(cx, |shell, cx| {
+                shell.dismiss_resource_drawer(cx);
+            });
+        });
+        let resize_entity = cx.entity().clone();
+        let on_start_resize = std::rc::Rc::new(move |_w: &mut Window, cx: &mut App| {
+            resize_entity.update(cx, |shell, cx| {
+                shell.drawer.start_resize();
+                cx.notify();
+            });
+        });
+
+        render_resource_drawer(
+            true,
+            Some(ResourceDrawerProps {
+                title,
+                kind,
+                namespace,
+                age,
+                status,
+                tabs,
+                active_tab: self.drawer.active_tab.clone(),
+                width: self.drawer.width,
+                window_width,
+                on_select_tab,
+                on_close,
+                on_start_resize,
+                body,
+            }),
+            theme,
+        )
     }
 
     fn refresh_workspace(&mut self, cx: &mut Context<Self>) {
@@ -2148,7 +2608,23 @@ impl OrbitShell {
                                      cx: &mut App| {
                 row_entity.update(cx, |shell, cx| {
                     shell.events.table.selected_row_key = Some(row_key.to_string());
-                    cx.notify();
+                    if let Some(ev) = shell.events.events.iter().find(|e| {
+                        if !e.uid.is_empty() {
+                            e.uid == row_key.as_ref()
+                        } else {
+                            format!("{}/{}/{}", e.namespace, e.reason, e.object_name)
+                                == row_key.as_ref()
+                        }
+                    }) {
+                        let target = ResourceDrawerTarget::Event {
+                            uid: ev.uid.clone(),
+                            reason: ev.reason.clone(),
+                            namespace: ev.namespace.clone(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
                 });
             };
 
@@ -2169,6 +2645,11 @@ impl OrbitShell {
                 let object_name = ev.object_name.clone();
                 let message = ev.message.clone();
                 let namespace = ev.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Event {
+                    uid: ev.uid.clone(),
+                    reason: ev.reason.clone(),
+                    namespace: ev.namespace.clone(),
+                };
                 let anchor = event.position;
                 let copy_obj = move |_w: &mut Window, cx: &mut App| {
                     cx.write_to_clipboard(ClipboardItem::new_string(object_name.clone()));
@@ -2188,12 +2669,35 @@ impl OrbitShell {
                         shell.refresh_workspace(cx);
                     });
                 };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
                 let entries = views::events::build_event_context_menu_entries(
                     ev,
                     copy_obj,
                     copy_msg,
                     filter_ns,
                     refresh_cb,
+                    view_details,
+                    view_yaml,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.events.table.selected_row_key = Some(row_key.to_string());
@@ -2240,7 +2744,15 @@ impl OrbitShell {
                                      cx: &mut App| {
                 row_entity.update(cx, |shell, cx| {
                     shell.deployments.table.selected_row_key = Some(row_key.to_string());
-                    cx.notify();
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Deployment {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
                 });
             };
 
@@ -2252,6 +2764,10 @@ impl OrbitShell {
                                             cx: &mut App| {
                 let name = deployment.name.clone();
                 let namespace = deployment.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Deployment {
+                    name: deployment.name.clone(),
+                    namespace: deployment.namespace.clone(),
+                };
                 let anchor = event.position;
                 let copy_name = move |_w: &mut Window, cx: &mut App| {
                     cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
@@ -2268,11 +2784,34 @@ impl OrbitShell {
                         shell.refresh_workspace(cx);
                     });
                 };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
                 let entries = views::deployments::build_deployment_context_menu_entries(
                     deployment,
                     copy_name,
                     filter_ns,
                     refresh_cb,
+                    view_details,
+                    view_yaml,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.deployments.table.selected_row_key = Some(row_key.to_string());
@@ -2318,7 +2857,10 @@ impl OrbitShell {
                                      cx: &mut App| {
                 row_entity.update(cx, |shell, cx| {
                     shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
-                    cx.notify();
+                    let target = ResourceDrawerTarget::Namespace {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
                 });
             };
 
@@ -2330,6 +2872,9 @@ impl OrbitShell {
                                             cx: &mut App| {
                 let name = ns.name.clone();
                 let filter_name = ns.name.clone();
+                let drawer_target = ResourceDrawerTarget::Namespace {
+                    name: ns.name.clone(),
+                };
                 let anchor = event.position;
                 let copy_name = move |_w: &mut Window, cx: &mut App| {
                     cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
@@ -2346,11 +2891,34 @@ impl OrbitShell {
                         shell.refresh_workspace(cx);
                     });
                 };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
                 let entries = views::namespaces::build_namespace_context_menu_entries(
                     ns,
                     copy_name,
                     filter_ns,
                     refresh_cb,
+                    view_details,
+                    view_yaml,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
@@ -2396,7 +2964,10 @@ impl OrbitShell {
                                      cx: &mut App| {
                 row_entity.update(cx, |shell, cx| {
                     shell.nodes.table.selected_row_key = Some(row_key.to_string());
-                    cx.notify();
+                    let target = ResourceDrawerTarget::Node {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
                 });
             };
 
@@ -2407,6 +2978,9 @@ impl OrbitShell {
                                             _window: &mut Window,
                                             cx: &mut App| {
                 let name = node.name.clone();
+                let drawer_target = ResourceDrawerTarget::Node {
+                    name: node.name.clone(),
+                };
                 let anchor = event.position;
                 let copy_name = move |_w: &mut Window, cx: &mut App| {
                     cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
@@ -2417,8 +2991,34 @@ impl OrbitShell {
                         shell.refresh_workspace(cx);
                     });
                 };
-                let entries =
-                    views::nodes::build_node_context_menu_entries(node, copy_name, refresh_cb);
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::nodes::build_node_context_menu_entries(
+                    node,
+                    copy_name,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.nodes.table.selected_row_key = Some(row_key.to_string());
                     shell.open_context_menu(anchor, entries, cx);
@@ -2522,7 +3122,7 @@ impl OrbitShell {
         )
     }
 
-    fn render_workspace(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_workspace(&self, window_width: f32, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
 
         let body = if self.sidebar.active_view == WorkspaceView::Settings {
@@ -2611,14 +3211,25 @@ impl OrbitShell {
             container.overflow_y_scroll()
         };
 
-        container
+        let workspace_main = container
             .p_6()
             .bg(theme.surface.bg_app)
             .flex()
             .flex_col()
             .gap_6()
             .child(self.render_workspace_view_header(&theme))
-            .child(body)
+            .child(body);
+
+        let drawer = self.render_active_drawer(window_width, &theme, cx);
+
+        div()
+            .flex_1()
+            .min_h(px(0.0))
+            .min_w(px(0.0))
+            .flex()
+            .overflow_hidden()
+            .child(workspace_main)
+            .when_some(drawer, |el, panel| el.child(panel))
             .into_any_element()
     }
 
@@ -2830,6 +3441,10 @@ impl Render for OrbitShell {
                     cx.notify();
                     return;
                 }
+                if event.keystroke.key.eq_ignore_ascii_case("escape") && this.drawer.is_open {
+                    this.dismiss_resource_drawer(cx);
+                    return;
+                }
                 let toggle_pressed = (event.keystroke.modifiers.control
                     || event.keystroke.modifiers.platform)
                     && event.keystroke.key.eq_ignore_ascii_case("b");
@@ -2838,18 +3453,39 @@ impl Render for OrbitShell {
                     cx.notify();
                 }
             }))
-            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _window, cx| {
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _event, _window, cx| {
+                    this.dismiss_resource_drawer(cx);
+                }),
+            )
+            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, window, cx| {
                 if this.sidebar.is_resizing {
                     this.sidebar
                         .update_resize_from_window_x(f32::from(event.position.x));
+                    cx.notify();
+                }
+                if this.drawer.is_resizing {
+                    this.drawer.update_resize_from_window_x(
+                        f32::from(window.viewport_size().width),
+                        f32::from(event.position.x),
+                    );
                     cx.notify();
                 }
             }))
             .on_mouse_up(
                 MouseButton::Left,
                 cx.listener(|this, _event, _window, cx| {
+                    let mut changed = false;
                     if this.sidebar.is_resizing {
                         this.sidebar.end_resize();
+                        changed = true;
+                    }
+                    if this.drawer.is_resizing {
+                        this.drawer.stop_resize();
+                        changed = true;
+                    }
+                    if changed {
                         cx.notify();
                     }
                 }),
@@ -2878,7 +3514,7 @@ impl Render for OrbitShell {
                             .overflow_hidden()
                             .child(self.render_header(cx))
                             .when_some(self.render_error_banner(cx), |el, banner| el.child(banner))
-                            .child(self.render_workspace(cx)),
+                            .child(self.render_workspace(f32::from(viewport.width), cx)),
                     ),
             )
             .child(self.render_footer(cx))
@@ -4419,6 +5055,8 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
+            |_, _| {},
         );
         assert!(dep_entries
             .iter()
@@ -4430,6 +5068,14 @@ mod tests {
         assert!(dep_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "filter-namespace" && !item.disabled
+        )));
+        assert!(dep_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-details" && !item.disabled
+        )));
+        assert!(dep_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-yaml" && !item.disabled
         )));
         assert!(dep_entries.iter().any(|e| matches!(
             e,
@@ -4463,13 +5109,27 @@ mod tests {
             allocatable: None,
             images_count: 0,
         };
-        let node_entries = views::nodes::build_node_context_menu_entries(&node, |_, _| {}, |_, _| {});
+        let node_entries = views::nodes::build_node_context_menu_entries(
+            &node,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
         assert!(node_entries
             .iter()
             .any(|e| matches!(e, ContextMenuEntry::Separator)));
         assert!(node_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-name" && !item.disabled
+        )));
+        assert!(node_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-details" && !item.disabled
+        )));
+        assert!(node_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-yaml" && !item.disabled
         )));
         assert!(node_entries.iter().any(|e| matches!(
             e,
@@ -4491,6 +5151,8 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
+            |_, _| {},
         );
         assert!(ns_entries
             .iter()
@@ -4498,6 +5160,14 @@ mod tests {
         assert!(ns_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "filter-namespace" && !item.disabled
+        )));
+        assert!(ns_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-details" && !item.disabled
+        )));
+        assert!(ns_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-yaml" && !item.disabled
         )));
         assert!(ns_entries.iter().any(|e| matches!(
             e,
@@ -4526,6 +5196,8 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
+            |_, _| {},
         );
         assert!(ev_entries
             .iter()
@@ -4540,7 +5212,91 @@ mod tests {
         )));
         assert!(ev_entries.iter().any(|e| matches!(
             e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-details" && !item.disabled
+        )));
+        assert!(ev_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "view-yaml" && !item.disabled
+        )));
+        assert!(ev_entries.iter().any(|e| matches!(
+            e,
             ContextMenuEntry::Item(item) if item.danger && item.disabled
         )));
+    }
+
+    #[test]
+    fn test_resource_drawer_dismissal_preserves_table_selection_and_filters() {
+        let mut deployments = DeploymentsState::default();
+        deployments.table.selected_row_key = Some("default/api".to_string());
+        deployments.table.toggle_sort("name");
+        let mut namespaces = NamespaceFilterState::default();
+        namespaces.selected_by_cluster.insert(
+            "c1".to_string(),
+            vec!["default".to_string()],
+        );
+
+        let mut drawer = ResourceDrawerState::default();
+        let _ = drawer.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Deployment {
+                name: "api".to_string(),
+                namespace: "default".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(drawer.is_open);
+
+        drawer.close();
+        assert!(!drawer.is_open);
+        assert_eq!(
+            deployments.table.selected_row_key.as_deref(),
+            Some("default/api")
+        );
+        assert!(deployments.table.sort.is_some());
+        assert_eq!(
+            namespaces.selected_by_cluster.get("c1"),
+            Some(&vec!["default".to_string()])
+        );
+    }
+
+    #[test]
+    fn test_workspace_view_change_and_cluster_disconnect_close_drawer() {
+        let mut drawer = ResourceDrawerState::default();
+        let _ = drawer.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Node {
+                name: "node-1".to_string(),
+            },
+            ResourceDrawerTabId::Yaml,
+        );
+        let gen_open = drawer.yaml_generation;
+        assert!(drawer.is_open);
+
+        // Simulate disconnect / unreachable event
+        apply_drawer_lifecycle_for_event(
+            &mut drawer,
+            &ClusterBridgeEvent::ConnectionError {
+                cluster_id: Some("c1".to_string()),
+                message: "lost connection".to_string(),
+                clusters: Vec::new(),
+            },
+        );
+        assert!(!drawer.is_open);
+        assert!(drawer.target.is_none());
+        assert!(drawer.yaml_generation > gen_open);
+
+        // Reopen and simulate view switch reset
+        let _ = drawer.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Namespace {
+                name: "default".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        let gen_reopen = drawer.yaml_generation;
+        assert!(drawer.is_open);
+        drawer.reset_for_context_change();
+        assert!(!drawer.is_open);
+        assert!(drawer.yaml_generation > gen_reopen);
     }
 }

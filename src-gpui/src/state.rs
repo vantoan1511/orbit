@@ -45,6 +45,13 @@ pub enum ClusterBridgeCommand {
     LoadDeployments { cluster_id: String, generation: u64 },
     LoadNodes { cluster_id: String, generation: u64 },
     LoadEvents { cluster_id: String, generation: u64 },
+    LoadResourceYaml {
+        cluster_id: String,
+        generation: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+    },
     SaveNamespaceSelection { cluster_id: String, namespaces: Vec<String> },
 }
 
@@ -117,6 +124,22 @@ pub enum ClusterBridgeEvent {
     EventsLoadFailed {
         cluster_id: String,
         generation: u64,
+        message: String,
+    },
+    ResourceYamlLoaded {
+        cluster_id: String,
+        generation: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        yaml: String,
+    },
+    ResourceYamlLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
         message: String,
     },
 }
@@ -933,7 +956,9 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
-            | ClusterBridgeEvent::EventsLoadFailed { .. } => {}
+            | ClusterBridgeEvent::EventsLoadFailed { .. }
+            | ClusterBridgeEvent::ResourceYamlLoaded { .. }
+            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
         }
     }
 
