@@ -1,4 +1,5 @@
 pub mod deployments;
+pub mod namespaces;
 pub mod nodes;
 pub mod offline;
 pub mod overview;
