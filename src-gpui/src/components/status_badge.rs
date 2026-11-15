@@ -30,7 +30,8 @@ pub fn classify_status(status: &str) -> SemanticStatus {
         "healthy" | "running" | "connected" | "ready" | "active" | "bound" | "available"
         | "completed" | "succeeded" | "normal" | "enforced" => SemanticStatus::Success,
         "pending" | "degraded" | "progressing" | "containercreating" | "podinitializing"
-        | "released" | "warning" | "scalinglimited" | "suspended" | "paused" | "connecting" => {
+        | "released" | "warning" | "scalinglimited" | "suspended" | "paused" | "connecting"
+        | "cordoned" => {
             SemanticStatus::Warning
         }
         "failed" | "error" | "crashloopbackoff" | "terminating" | "notready" | "lost"
@@ -347,5 +348,11 @@ mod tests {
         assert_eq!(pill_neutral.dot_color, dark_default.text.muted);
         assert_eq!(pill_neutral.text_color, dark_default.text.secondary);
         assert_eq!(pill_neutral.bg_color, Some(dark_default.surface.control_bg));
+    }
+
+    #[test]
+    fn test_classify_status_maps_cordoned_to_warning() {
+        assert_eq!(classify_status("Cordoned"), SemanticStatus::Warning);
+        assert_eq!(classify_status("cordoned"), SemanticStatus::Warning);
     }
 }

@@ -1,11 +1,77 @@
 pub mod deployments;
+pub mod nodes;
 pub mod offline;
 pub mod overview;
 pub mod welcome;
 
-use gpui::{AnyElement, FontWeight, div, prelude::*};
+use std::rc::Rc;
 
+use gpui::{AnyElement, App, FontWeight, Window, div, prelude::*, px};
+use lucide_icons::Icon;
+
+use crate::icons::render_icon;
 use crate::theme::{OrbitTheme, apply_text_step};
+
+pub fn parse_age_seconds(age: &str) -> u64 {
+    let trimmed = age.trim();
+    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("unknown") {
+        return u64::MAX;
+    }
+
+    let (num_str, multiplier) = if let Some(n) = trimmed.strip_suffix('s') {
+        (n, 1_u64)
+    } else if let Some(n) = trimmed.strip_suffix('m') {
+        (n, 60_u64)
+    } else if let Some(n) = trimmed.strip_suffix('h') {
+        (n, 3_600_u64)
+    } else if let Some(n) = trimmed.strip_suffix('d') {
+        (n, 86_400_u64)
+    } else {
+        return u64::MAX;
+    };
+
+    num_str
+        .trim()
+        .parse::<u64>()
+        .map(|v| v.saturating_mul(multiplier))
+        .unwrap_or(u64::MAX)
+}
+
+pub fn render_action_button(
+    id: &'static str,
+    icon: Icon,
+    label: &'static str,
+    disabled: bool,
+    theme: &OrbitTheme,
+    on_click: Rc<dyn Fn(&mut Window, &mut App)>,
+) -> AnyElement {
+    let hover_bg = theme.surface.control_hover;
+    div()
+        .id(id)
+        .h(px(28.0))
+        .px_2p5()
+        .rounded(theme.style.radius_control)
+        .border_1()
+        .border_color(theme.border.default)
+        .bg(theme.surface.bg_card)
+        .flex()
+        .items_center()
+        .gap_1p5()
+        .when(disabled, |el| el.opacity(0.6))
+        .when(!disabled, |el| {
+            el.cursor_pointer()
+                .hover(move |style| style.bg(hover_bg))
+                .on_click(move |_, window, cx| on_click(window, cx))
+        })
+        .child(render_icon(icon, px(13.0), theme.text.secondary))
+        .child(
+            apply_text_step(div(), theme.typography.size_xs)
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(theme.text.primary)
+                .child(label),
+        )
+        .into_any_element()
+}
 
 pub fn render_detail_row(
     label: &'static str,

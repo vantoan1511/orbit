@@ -10,26 +10,7 @@ use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::models::PodMetricItem;
 use crate::kubernetes::nodes::{parse_cpu_quantity, parse_memory_quantity};
-
-/// Formats a float up to `max_decimals` places, stripping unnecessary trailing zeros and decimal point.
-pub fn format_decimal(val: f64, max_decimals: usize) -> String {
-    if !val.is_finite() || val.abs() == 0.0 {
-        return "0".to_string();
-    }
-    let formatted = format!("{:.prec$}", val, prec = max_decimals);
-    if formatted.contains('.') {
-        let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
-        if trimmed == "-0" || trimmed.is_empty() {
-            "0".to_string()
-        } else {
-            trimmed.to_string()
-        }
-    } else if formatted == "-0" {
-        "0".to_string()
-    } else {
-        formatted
-    }
-}
+pub use orbit_core::kubernetes::nodes::format_decimal;
 
 pub fn format_memory_mib(mib: f64) -> String {
     format!("{}Mi", format_decimal(mib, 2))

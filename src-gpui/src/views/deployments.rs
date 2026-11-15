@@ -12,6 +12,7 @@ use crate::components::{StatusBadgeVariant, render_status_badge_from_str, resour
 use crate::icons::render_icon;
 use crate::state::{DeploymentsLoadStatus, DeploymentsState, NamespaceFilterState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+pub use crate::views::{parse_age_seconds, render_action_button};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeploymentsPresentationMode {
@@ -54,31 +55,6 @@ pub fn format_images_summary(images: &[String]) -> (String, usize) {
     let short = format_short_image(first).to_string();
     let extra = images.len().saturating_sub(1);
     (short, extra)
-}
-
-pub fn parse_age_seconds(age: &str) -> u64 {
-    let trimmed = age.trim();
-    if trimmed.is_empty() || trimmed.eq_ignore_ascii_case("unknown") {
-        return u64::MAX;
-    }
-
-    let (num_str, multiplier) = if let Some(n) = trimmed.strip_suffix('s') {
-        (n, 1_u64)
-    } else if let Some(n) = trimmed.strip_suffix('m') {
-        (n, 60_u64)
-    } else if let Some(n) = trimmed.strip_suffix('h') {
-        (n, 3_600_u64)
-    } else if let Some(n) = trimmed.strip_suffix('d') {
-        (n, 86_400_u64)
-    } else {
-        return u64::MAX;
-    };
-
-    num_str
-        .trim()
-        .parse::<u64>()
-        .map(|v| v.saturating_mul(multiplier))
-        .unwrap_or(u64::MAX)
 }
 
 fn compare_deployments_by_col(a: &DeploymentInfo, b: &DeploymentInfo, col_id: &str) -> Ordering {
@@ -279,42 +255,6 @@ fn render_deployment_cell(
             .into_any_element(),
         _ => div().into_any_element(),
     }
-}
-
-fn render_action_button(
-    id: &'static str,
-    icon: Icon,
-    label: &'static str,
-    disabled: bool,
-    theme: &OrbitTheme,
-    on_click: Rc<dyn Fn(&mut Window, &mut App)>,
-) -> AnyElement {
-    let hover_bg = theme.surface.control_hover;
-    div()
-        .id(id)
-        .h(px(28.0))
-        .px_2p5()
-        .rounded(theme.style.radius_control)
-        .border_1()
-        .border_color(theme.border.default)
-        .bg(theme.surface.bg_card)
-        .flex()
-        .items_center()
-        .gap_1p5()
-        .when(disabled, |el| el.opacity(0.6))
-        .when(!disabled, |el| {
-            el.cursor_pointer()
-                .hover(move |style| style.bg(hover_bg))
-                .on_click(move |_, window, cx| on_click(window, cx))
-        })
-        .child(render_icon(icon, px(13.0), theme.text.secondary))
-        .child(
-            apply_text_step(div(), theme.typography.size_xs)
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(theme.text.primary)
-                .child(label),
-        )
-        .into_any_element()
 }
 
 #[allow(clippy::too_many_arguments)]
