@@ -1,3 +1,4 @@
+pub mod deployments;
 pub mod offline;
 pub mod overview;
 pub mod welcome;

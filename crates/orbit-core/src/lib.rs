@@ -5,4 +5,5 @@ pub mod kubernetes {
     pub mod models;
     pub mod namespaces;
     pub mod overview;
+    pub mod workloads;
 }

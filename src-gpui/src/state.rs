@@ -2,8 +2,10 @@ use std::collections::HashSet;
 
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
-use orbit_core::kubernetes::models::{ClusterInfo, NamespaceInfo, UserProfileInfo};
+use orbit_core::kubernetes::models::{ClusterInfo, DeploymentInfo, NamespaceInfo, UserProfileInfo};
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
+
+use crate::components::data_table::DataTableState;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClusterConnectionState {
@@ -38,6 +40,7 @@ pub enum ClusterBridgeCommand {
     RefreshClusters,
     LoadOverview { cluster_id: String, generation: u64 },
     LoadNamespaces { cluster_id: String, generation: u64 },
+    LoadDeployments { cluster_id: String, generation: u64 },
     SaveNamespaceSelection { cluster_id: String, namespaces: Vec<String> },
 }
 
@@ -78,6 +81,16 @@ pub enum ClusterBridgeEvent {
         namespaces: Vec<NamespaceInfo>,
     },
     NamespacesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    DeploymentsLoaded {
+        cluster_id: String,
+        generation: u64,
+        deployments: Vec<DeploymentInfo>,
+    },
+    DeploymentsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -374,6 +387,109 @@ impl ClusterOverviewState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DeploymentsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DeploymentsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: DeploymentsLoadStatus,
+    pub deployments: Vec<DeploymentInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl DeploymentsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = DeploymentsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.deployments.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.deployments.is_empty();
+        ClusterBridgeCommand::LoadDeployments {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = DeploymentsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.deployments.is_empty();
+        Some(ClusterBridgeCommand::LoadDeployments {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = DeploymentsLoadStatus::Idle;
+        self.deployments.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = DeploymentsLoadStatus::Idle;
+        self.deployments.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        deployments: Vec<DeploymentInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = DeploymentsLoadStatus::Loaded;
+            self.deployments = deployments;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = DeploymentsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == DeploymentsLoadStatus::Idle
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ClusterSwitcherState {
     pub clusters: Vec<ClusterInfo>,
@@ -536,7 +652,9 @@ impl ClusterSwitcherState {
             ClusterBridgeEvent::OverviewLoaded { .. }
             | ClusterBridgeEvent::OverviewLoadFailed { .. }
             | ClusterBridgeEvent::NamespacesLoaded { .. }
-            | ClusterBridgeEvent::NamespacesLoadFailed { .. } => {}
+            | ClusterBridgeEvent::NamespacesLoadFailed { .. }
+            | ClusterBridgeEvent::DeploymentsLoaded { .. }
+            | ClusterBridgeEvent::DeploymentsLoadFailed { .. } => {}
         }
     }
 
@@ -932,5 +1050,105 @@ mod tests {
             .map(|ns| ns.name.as_str())
             .collect();
         assert_eq!(filtered, vec!["payments"]);
+    }
+
+    fn sample_deployment(name: &str, namespace: &str) -> DeploymentInfo {
+        DeploymentInfo {
+            kind: "Deployment".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            conditions: None,
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 2,
+                desired: 2,
+            },
+            available: 2,
+            up_to_date: 2,
+            age: "1h".to_string(),
+            images: vec!["nginx:1.25".to_string()],
+            containers: Vec::new(),
+            strategy: Some("RollingUpdate".to_string()),
+            min_ready_seconds: 0,
+            revision_history: Some(10),
+            labels: Default::default(),
+            annotations: Default::default(),
+            ports: vec![80],
+        }
+    }
+
+    #[test]
+    fn test_deployments_state_generation_guard_and_reset() {
+        let mut state = DeploymentsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd_a = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd_a,
+            ClusterBridgeCommand::LoadDeployments {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, DeploymentsLoadStatus::Loading);
+        assert!(state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Stale cluster or generation is ignored.
+        assert!(!state.apply_loaded(
+            "ctx-b",
+            1,
+            vec![sample_deployment("wrong-cluster", "default")],
+        ));
+        assert!(!state.apply_loaded(
+            "ctx-a",
+            99,
+            vec![sample_deployment("wrong-gen", "default")],
+        ));
+        assert!(state.deployments.is_empty());
+
+        // Matching (cluster_id, generation) succeeds.
+        assert!(state.apply_loaded(
+            "ctx-a",
+            1,
+            vec![sample_deployment("api", "default")],
+        ));
+        assert_eq!(state.status, DeploymentsLoadStatus::Loaded);
+        assert!(!state.table.loading);
+        assert_eq!(state.deployments.len(), 1);
+        assert_eq!(state.deployments[0].name, "api");
+
+        // Refresh keeps existing rows while loading.
+        state.table.selected_row_key = Some("default/api".to_string());
+        let refresh_cmd = state.begin_refresh().expect("refresh command");
+        assert_eq!(
+            refresh_cmd,
+            ClusterBridgeCommand::LoadDeployments {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            }
+        );
+        assert_eq!(state.status, DeploymentsLoadStatus::Loading);
+        assert_eq!(state.deployments.len(), 1);
+
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, DeploymentsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+
+        // Reset for new cluster clears rows, selection, and returns to Idle.
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert_eq!(state.status, DeploymentsLoadStatus::Idle);
+        assert!(state.deployments.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(state.needs_load_for_cluster("ctx-b"));
+
+        // Disconnect clears cluster_id and invalidates in-flight replies.
+        let gen_before_disconnect = state.generation;
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert_eq!(state.status, DeploymentsLoadStatus::Idle);
+        assert!(state.generation > gen_before_disconnect);
     }
 }
