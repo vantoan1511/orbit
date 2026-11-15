@@ -4,6 +4,7 @@ pub mod icons;
 pub mod navigation;
 mod state;
 pub mod theme;
+pub mod views;
 
 use gpui::{
     AnyElement, App, Application, Bounds, Context, CursorStyle, FocusHandle, FontWeight,
@@ -21,7 +22,8 @@ use crate::navigation::{
     ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView,
 };
 use crate::state::{
-    ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterSwitcherState,
+    ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
+    ClusterSwitcherState,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -129,21 +131,54 @@ pub const fn dropdown_chevron_icon(is_open: bool) -> Icon {
     }
 }
 
-pub fn apply_cluster_event(
+pub fn apply_cluster_event_with_overview(
     state: &mut ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
+    overview: &mut ClusterOverviewState,
     event: ClusterBridgeEvent,
-) {
-    let connected = matches!(event, ClusterBridgeEvent::ClusterConnected { .. });
-    state.apply_event(event);
-    if connected {
-        sidebar.on_cluster_connected();
+) -> Option<ClusterBridgeCommand> {
+    match event {
+        ClusterBridgeEvent::ClusterConnected { .. } => {
+            state.apply_event(event);
+            sidebar.on_cluster_connected();
+            state
+                .active_cluster_id
+                .as_deref()
+                .map(|id| overview.begin_load_for_cluster(id))
+        }
+        ClusterBridgeEvent::ClusterUnreachable { .. }
+        | ClusterBridgeEvent::ConnectionError { .. } => {
+            state.apply_event(event);
+            overview.reset_for_disconnected();
+            None
+        }
+        ClusterBridgeEvent::OverviewLoaded {
+            cluster_id,
+            generation,
+            summary,
+        } => {
+            overview.apply_loaded(&cluster_id, generation, summary);
+            None
+        }
+        ClusterBridgeEvent::OverviewLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            overview.apply_failed(&cluster_id, generation, message);
+            None
+        }
+        other @ ClusterBridgeEvent::ContextsLoaded { .. } => {
+            state.apply_event(other);
+            None
+        }
     }
 }
 
 pub struct OrbitShell {
     state: ClusterSwitcherState,
     sidebar: SidebarLayoutState,
+    overview: ClusterOverviewState,
     focus_handle: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
     style_dropdown_open: bool,
@@ -166,7 +201,14 @@ impl OrbitShell {
             while let Some(event) = event_rx.recv().await {
                 if this
                     .update(cx, |shell, cx| {
-                        apply_cluster_event(&mut shell.state, &mut shell.sidebar, event);
+                        if let Some(cmd) = apply_cluster_event_with_overview(
+                            &mut shell.state,
+                            &mut shell.sidebar,
+                            &mut shell.overview,
+                            event,
+                        ) {
+                            shell.dispatch_command(cmd);
+                        }
                         cx.notify();
                     })
                     .is_err()
@@ -191,6 +233,7 @@ impl OrbitShell {
         Self {
             state: ClusterSwitcherState::new(),
             sidebar: SidebarLayoutState::new(),
+            overview: ClusterOverviewState::default(),
             focus_handle: cx.focus_handle(),
             command_tx,
             style_dropdown_open: false,
@@ -201,6 +244,18 @@ impl OrbitShell {
         if let Err(err) = self.command_tx.send(cmd) {
             tracing::warn!(error = %err, "Failed to send command to cluster bridge");
         }
+    }
+
+    fn refresh_workspace(&mut self, cx: &mut Context<Self>) {
+        self.dispatch_command(ClusterBridgeCommand::RefreshClusters);
+        if matches!(
+            self.state.connection_state,
+            ClusterConnectionState::Connected { .. }
+        ) && let Some(cmd) = self.overview.begin_refresh()
+        {
+            self.dispatch_command(cmd);
+        }
+        cx.notify();
     }
 
     fn select_cluster(&mut self, cluster_id: &str, cx: &mut Context<Self>) {
@@ -814,8 +869,7 @@ impl OrbitShell {
                             .hover(move |style| style.bg(control_hover))
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.dispatch_command(ClusterBridgeCommand::RefreshClusters);
-                                cx.notify();
+                                this.refresh_workspace(cx);
                             }))
                             .child(render_icon(
                                 Icon::RefreshCw,
@@ -1221,36 +1275,6 @@ impl OrbitShell {
         )
     }
 
-    fn render_detail_row(
-        label: &'static str,
-        value: String,
-        mono: bool,
-        theme: &OrbitTheme,
-    ) -> AnyElement {
-        let mut value_el = apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary);
-        if mono {
-            value_el = value_el.font(theme.typography.mono_font(FontWeight::MEDIUM));
-        }
-
-        div()
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_4()
-            .py_1p5()
-            .border_b_1()
-            .border_color(theme.border.default)
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .text_color(theme.text.muted)
-                    .child(label),
-            )
-            .child(value_el.child(value))
-            .into_any_element()
-    }
-
     fn render_workspace_view_header(&self, theme: &OrbitTheme) -> AnyElement {
         let view = self.sidebar.active_view;
         let (cat_label, _) = view.breadcrumb();
@@ -1329,124 +1353,30 @@ impl OrbitShell {
                     .font_weight(FontWeight::SEMIBOLD)
                     .child("Appearance & Shell Preferences"),
             )
-            .child(Self::render_detail_row(
+            .child(views::render_detail_row(
                 "Theme Mode",
                 theme.mode.label().to_string(),
                 false,
                 theme,
             ))
-            .child(Self::render_detail_row(
+            .child(views::render_detail_row(
                 "UI Style",
                 theme.style.ui_style.label().to_string(),
                 false,
                 theme,
             ))
-            .child(Self::render_detail_row(
+            .child(views::render_detail_row(
                 "Accent Color",
                 format!("{:?}", theme.accent_id),
                 false,
                 theme,
             ))
-            .child(Self::render_detail_row(
+            .child(views::render_detail_row(
                 "Sidebar Layout",
                 sidebar_state,
                 true,
                 theme,
             ))
-            .into_any_element()
-    }
-
-    fn render_disconnected_workspace(&self, theme: &OrbitTheme, cx: &mut Context<Self>) -> AnyElement {
-        let control_hover = theme.surface.control_hover;
-        let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
-        let mut container = div()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .p_6()
-            .w_full()
-            .max_w(px(720.0))
-            .child(
-                apply_text_step(div(), theme.typography.size_base)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Select a Kubernetes Cluster"),
-            )
-            .child(
-                apply_text_step(div(), theme.typography.size_sm)
-                    .text_color(theme.text.secondary)
-                    .child(
-                        "Contexts are loaded in a disconnected state. Choose a cluster from the header switcher or below to connect.",
-                    ),
-            );
-
-        if self.state.clusters.is_empty() {
-            container = container.child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .p_4()
-                    .rounded(theme.style.radius_control)
-                    .bg(theme.surface.bg_app)
-                    .border_1()
-                    .border_color(theme.border.default)
-                    .text_color(theme.text.muted)
-                    .child("No kubeconfig contexts found. Add a kubeconfig in ~/.kube/config or via Orbit settings."),
-            );
-        } else {
-            let mut list = div().flex().flex_col().gap_2();
-            for (idx, cluster) in self.state.clusters.iter().enumerate() {
-                let cluster_id = cluster.id.clone();
-                let display = cluster_display_label(cluster);
-                let dot_color = cluster_dot_color(cluster, theme);
-
-                list = list.child(
-                    div()
-                        .id(("workspace-cluster-row", idx))
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .px_4()
-                        .py_2p5()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.surface.bg_app)
-                        .hover(move |style| style.bg(control_hover))
-                        .border_1()
-                        .border_color(theme.border.default)
-                        .cursor_pointer()
-                        .on_click(cx.listener(move |this, _event, _window, cx| {
-                            this.select_cluster(&cluster_id, cx);
-                        }))
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2p5()
-                                .child(div().w(px(8.0)).h(px(8.0)).rounded_full().bg(dot_color))
-                                .child(
-                                    apply_text_step(div(), theme.typography.size_sm)
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .child(display),
-                                ),
-                        )
-                        .when_some(cluster.server_url.clone(), |el, url| {
-                            el.child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .font(mono_font.clone())
-                                    .text_color(theme.text.muted)
-                                    .child(url),
-                            )
-                        }),
-                );
-            }
-            container = container.child(list);
-        }
-
-        theme
-            .style_card(div())
-            .flex_1()
-            .flex()
-            .items_center()
-            .justify_center()
-            .bg(theme.surface.bg_panel)
-            .child(container)
             .into_any_element()
     }
 
@@ -1503,6 +1433,7 @@ impl OrbitShell {
         display_name: &str,
         k8s_version: Option<&str>,
         theme: &OrbitTheme,
+        cx: &mut Context<Self>,
     ) -> AnyElement {
         let version_label = k8s_version.unwrap_or("Connected").to_string();
 
@@ -1538,19 +1469,19 @@ impl OrbitShell {
                                 .child(format!("{display_name} • {version_label}")),
                         ),
                 )
-                .child(Self::render_detail_row(
+                .child(views::render_detail_row(
                     "View ID",
                     view.id().to_string(),
                     true,
                     theme,
                 ))
-                .child(Self::render_detail_row(
+                .child(views::render_detail_row(
                     "Active Context",
                     cluster_id.to_string(),
                     true,
                     theme,
                 ))
-                .child(Self::render_detail_row(
+                .child(views::render_detail_row(
                     "Kubernetes Version",
                     version_label,
                     true,
@@ -1559,106 +1490,32 @@ impl OrbitShell {
                 .into_any_element();
         }
 
-        let profile = self.state.active_profile.as_ref();
-        let active_cluster = self.state.active_cluster();
-        let server_url = profile
-            .and_then(|p| p.server_url.clone())
-            .or_else(|| active_cluster.and_then(|c| c.server_url.clone()))
-            .unwrap_or_else(|| "Unknown".to_string());
-        let user_name = profile
-            .and_then(|p| p.user_name.clone())
-            .unwrap_or_else(|| "None".to_string());
-        let auth_type = profile
-            .map(|p| p.auth_type.clone())
-            .unwrap_or_else(|| "None".to_string());
-        let kubeconfigs = profile
-            .map(|p| p.kubeconfig_paths.join(", "))
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "None".to_string());
-        let description = active_cluster.and_then(|c| c.description.clone());
-        let tags = active_cluster
-            .map(|c| c.tags.join(", "))
-            .filter(|s| !s.is_empty());
+        let nav_entity = cx.entity().clone();
+        let on_navigate =
+            std::rc::Rc::new(move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
+                nav_entity.update(cx, |shell, cx| {
+                    shell.sidebar.select_view(view);
+                    cx.notify();
+                });
+            });
+        let refresh_entity = cx.entity().clone();
+        let on_refresh = move |_window: &mut Window, cx: &mut App| {
+            refresh_entity.update(cx, |shell, cx| {
+                shell.refresh_workspace(cx);
+            });
+        };
 
-        let mut card = div()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .p_6()
-            .w_full()
-            .max_w(px(720.0))
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .child(
-                                apply_text_step(div(), theme.typography.size_lg)
-                                    .font_weight(FontWeight::BOLD)
-                                    .child(display_name.to_string()),
-                            )
-                            .when_some(description, |el, desc| {
-                                el.child(
-                                    apply_text_step(div(), theme.typography.size_xs)
-                                        .text_color(theme.text.secondary)
-                                        .child(desc),
-                                )
-                            }),
-                    )
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2p5()
-                            .py_1()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.semantic.success.soft)
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme.semantic.success.solid)
-                            .child(format!("Connected • {version_label}")),
-                    ),
-            )
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .child(Self::render_detail_row(
-                        "Context",
-                        cluster_id.to_string(),
-                        true,
-                        theme,
-                    ))
-                    .child(Self::render_detail_row(
-                        "Kubernetes Version",
-                        version_label,
-                        true,
-                        theme,
-                    ))
-                    .child(Self::render_detail_row("API Server", server_url, true, theme))
-                    .child(Self::render_detail_row("User", user_name, false, theme))
-                    .child(Self::render_detail_row("Auth Type", auth_type, false, theme))
-                    .child(Self::render_detail_row(
-                        "Kubeconfig Paths",
-                        kubeconfigs,
-                        true,
-                        theme,
-                    )),
-            );
-
-        if let Some(tag_str) = tags {
-            card = card.child(Self::render_detail_row("Tags", tag_str, false, theme));
-        }
-
-        theme
-            .style_card(div())
-            .w_full()
-            .max_w(px(720.0))
-            .bg(theme.surface.bg_panel)
-            .child(card)
-            .into_any_element()
+        views::overview::render_overview_view(
+            cluster_id,
+            display_name,
+            k8s_version,
+            self.state.active_profile.as_ref(),
+            self.state.active_cluster(),
+            &self.overview,
+            theme,
+            on_navigate,
+            on_refresh,
+        )
     }
 
     fn render_workspace(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -1669,7 +1526,26 @@ impl OrbitShell {
         } else {
             match &self.state.connection_state {
                 ClusterConnectionState::Disconnected => {
-                    self.render_disconnected_workspace(&theme, cx)
+                    let select_entity = cx.entity().clone();
+                    let on_select =
+                        std::rc::Rc::new(move |cid: String, _window: &mut Window, cx: &mut App| {
+                            select_entity.update(cx, |shell, cx| {
+                                shell.select_cluster(&cid, cx);
+                            });
+                        });
+                    let refresh_entity = cx.entity().clone();
+                    let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                        refresh_entity.update(cx, |shell, cx| {
+                            shell.refresh_workspace(cx);
+                        });
+                    };
+                    views::welcome::render_welcome_view(
+                        &self.state.clusters,
+                        self.state.kubeconfig_error.as_deref(),
+                        &theme,
+                        on_select,
+                        on_refresh,
+                    )
                 }
                 ClusterConnectionState::Connecting {
                     cluster_id,
@@ -1684,39 +1560,31 @@ impl OrbitShell {
                     display_name,
                     k8s_version.as_deref(),
                     &theme,
-                ),
-                ClusterConnectionState::Unreachable {
-                    cluster_id,
-                    display_name,
-                    server_url,
-                    error_message,
-                } => self.render_error_card(
-                    "CLUSTER UNREACHABLE",
-                    display_name.clone(),
-                    Some(cluster_id.clone()),
-                    server_url.clone(),
-                    error_message.clone(),
-                    true,
                     cx,
                 ),
-                ClusterConnectionState::Error {
-                    cluster_id,
-                    display_name,
-                    error_message,
-                } => {
-                    let title = display_name
-                        .clone()
-                        .or_else(|| cluster_id.clone())
-                        .unwrap_or_else(|| "Cluster Connection Failed".to_string());
-                    self.render_error_card(
-                        "CONNECTION ERROR",
-                        title,
-                        cluster_id.clone(),
-                        None,
-                        error_message.clone(),
-                        cluster_id.is_some(),
-                        cx,
-                    )
+                ClusterConnectionState::Unreachable { .. }
+                | ClusterConnectionState::Error { .. } => {
+                    if let Some(model) =
+                        views::offline::offline_view_model(&self.state.connection_state)
+                    {
+                        let retry_entity = cx.entity().clone();
+                        let on_retry = move |_window: &mut Window, cx: &mut App| {
+                            retry_entity.update(cx, |shell, cx| {
+                                shell.reconnect_cluster(cx);
+                            });
+                        };
+                        let switch_entity = cx.entity().clone();
+                        let on_switch = move |_window: &mut Window, cx: &mut App| {
+                            switch_entity.update(cx, |shell, cx| {
+                                shell.style_dropdown_open = false;
+                                shell.state.dropdown_open = true;
+                                cx.notify();
+                            });
+                        };
+                        views::offline::render_offline_view(&model, &theme, on_retry, on_switch)
+                    } else {
+                        div().into_any_element()
+                    }
                 }
             }
         };
@@ -1845,8 +1713,7 @@ impl OrbitShell {
                             .cursor_pointer()
                             .hover(move |style| style.bg(control_hover))
                             .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.dispatch_command(ClusterBridgeCommand::RefreshClusters);
-                                cx.notify();
+                                this.refresh_workspace(cx);
                             }))
                             .child(render_icon(
                                 Icon::RefreshCw,
@@ -1879,156 +1746,6 @@ impl OrbitShell {
                                     theme.text.secondary
                                 },
                             )),
-                    ),
-            )
-            .into_any_element()
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn render_error_card(
-        &self,
-        badge: &'static str,
-        title: String,
-        cluster_id: Option<String>,
-        server_url: Option<String>,
-        error_message: String,
-        can_retry: bool,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let theme = OrbitTheme::get(cx).clone();
-        let control_hover = theme.surface.control_hover;
-        let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
-
-        theme
-            .style_card(div())
-            .flex_1()
-            .flex()
-            .items_center()
-            .justify_center()
-            .bg(theme.surface.bg_panel)
-            .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_4()
-                    .p_6()
-                    .w_full()
-                    .max_w(px(640.0))
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_1p5()
-                                    .px_2p5()
-                                    .py_1()
-                                    .rounded(theme.style.radius_control)
-                                    .bg(theme.semantic.danger.soft)
-                                    .child(render_icon(
-                                        Icon::CircleAlert,
-                                        px(13.0),
-                                        theme.semantic.danger.solid,
-                                    ))
-                                    .child(
-                                        apply_text_step(div(), theme.typography.size_xs)
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(theme.semantic.danger.solid)
-                                            .child(badge),
-                                    ),
-                            ),
-                    )
-                    .child(
-                        apply_text_step(div(), theme.typography.size_lg)
-                            .font_weight(FontWeight::BOLD)
-                            .child(title),
-                    )
-                    .when_some(cluster_id, |el, id| {
-                        el.child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font(mono_font.clone())
-                                .text_color(theme.text.muted)
-                                .child(format!("Context: {id}")),
-                        )
-                    })
-                    .when_some(server_url, |el, url| {
-                        el.child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font(mono_font.clone())
-                                .text_color(theme.text.secondary)
-                                .child(format!("Server: {url}")),
-                        )
-                    })
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .p_3()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.semantic.danger.soft)
-                            .border_1()
-                            .border_color(theme.semantic.danger.solid)
-                            .text_color(theme.text.primary)
-                            .child(error_message),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_3()
-                            .when(can_retry, |el| {
-                                el.child(
-                                    theme
-                                        .style_control(div().id("retry-cluster-connection-btn"))
-                                        .flex()
-                                        .items_center()
-                                        .gap_1p5()
-                                        .h(theme.typography.control_height_sm)
-                                        .px(theme.typography.control_padding_x_md)
-                                        .hover(move |style| style.bg(control_hover))
-                                        .cursor_pointer()
-                                        .on_click(cx.listener(|this, _event, _window, cx| {
-                                            this.reconnect_cluster(cx);
-                                        }))
-                                        .child(render_icon(
-                                            Icon::RotateCcw,
-                                            px(13.0),
-                                            theme.text.secondary,
-                                        ))
-                                        .child(
-                                            apply_text_step(div(), theme.typography.size_sm)
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .child("Retry / Reconnect"),
-                                        ),
-                                )
-                            })
-                            .child(
-                                theme
-                                    .style_control(div().id("open-cluster-switcher-btn"))
-                                    .flex()
-                                    .items_center()
-                                    .gap_1p5()
-                                    .h(theme.typography.control_height_sm)
-                                    .px(theme.typography.control_padding_x_md)
-                                    .hover(move |style| style.bg(control_hover))
-                                    .cursor_pointer()
-                                    .on_click(cx.listener(|this, _event, _window, cx| {
-                                        this.style_dropdown_open = false;
-                                        this.state.dropdown_open = true;
-                                        cx.notify();
-                                    }))
-                                    .child(render_icon(
-                                        Icon::Server,
-                                        px(13.0),
-                                        theme.text.secondary,
-                                    ))
-                                    .child(
-                                        apply_text_step(div(), theme.typography.size_sm)
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .child("Choose Another Cluster"),
-                                    ),
-                            ),
                     ),
             )
             .into_any_element()
@@ -2366,7 +2083,13 @@ mod tests {
                 k8s_version: Some("v1.31.2".to_string()),
             },
         };
-        apply_cluster_event(&mut switcher, &mut connect_sidebar, event);
+        let mut throwaway_overview = ClusterOverviewState::default();
+        apply_cluster_event_with_overview(
+            &mut switcher,
+            &mut connect_sidebar,
+            &mut throwaway_overview,
+            event,
+        );
 
         assert!(matches!(
             switcher.connection_state,
@@ -2434,5 +2157,91 @@ mod tests {
             char::from(dropdown_chevron_icon(false)),
             char::from(Icon::ChevronDown)
         );
+    }
+
+    #[test]
+    fn test_apply_cluster_event_dispatches_overview_load_on_connect_and_resets_on_unreachable() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+        use orbit_core::kubernetes::overview::{ClusterOverallHealth, ClusterOverviewSummary};
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+
+        let connect_event = ClusterBridgeEvent::ClusterConnected {
+            outcome: ClusterSwitchOutcome {
+                context_name: "prod-ctx".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.1".to_string()),
+                error_message: None,
+            },
+            clusters: vec![],
+            profile: UserProfileInfo {
+                active_context: Some("prod-ctx".to_string()),
+                user_name: None,
+                auth_type: "None".to_string(),
+                cluster_name: Some("prod-cluster".to_string()),
+                server_url: Some("https://10.0.0.10:6443".to_string()),
+                kubeconfig_paths: vec![],
+                k8s_version: Some("v1.31.1".to_string()),
+            },
+        };
+
+        let cmd =
+            apply_cluster_event_with_overview(&mut switcher, &mut sidebar, &mut overview, connect_event);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadOverview {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+        assert_eq!(overview.status, crate::state::OverviewLoadStatus::Loading);
+
+        let summary = ClusterOverviewSummary {
+            k8s_version: Some("v1.31.1".to_string()),
+            overall_health: ClusterOverallHealth::Healthy,
+            ..Default::default()
+        };
+        let loaded_cmd = apply_cluster_event_with_overview(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            ClusterBridgeEvent::OverviewLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                summary: summary.clone(),
+            },
+        );
+        assert!(loaded_cmd.is_none());
+        assert_eq!(overview.summary, Some(summary));
+
+        let unreachable_cmd = apply_cluster_event_with_overview(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            ClusterBridgeEvent::ClusterUnreachable {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: false,
+                    k8s_version: None,
+                    error_message: Some("timeout".to_string()),
+                },
+                clusters: vec![],
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("prod-cluster".to_string()),
+                    server_url: Some("https://10.0.0.10:6443".to_string()),
+                    kubeconfig_paths: vec![],
+                    k8s_version: None,
+                },
+            },
+        );
+        assert!(unreachable_cmd.is_none());
+        assert!(overview.summary.is_none());
+        assert_eq!(overview.status, crate::state::OverviewLoadStatus::Idle);
     }
 }

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use orbit_core::kubernetes::manager::KubeManager;
+use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use tokio::sync::{RwLock, mpsc};
 
 use crate::state::{ClusterBridgeCommand, ClusterBridgeEvent};
@@ -84,6 +85,35 @@ pub async fn handle_bridge_command(
                         clusters,
                     });
                 }
+            }
+        }
+        ClusterBridgeCommand::LoadOverview {
+            cluster_id,
+            generation,
+        } => {
+            let (client, k8s_version) = {
+                let guard = manager.read().await;
+                let client = guard.active_client_for_context(&cluster_id);
+                let k8s_version = guard.get_user_profile().k8s_version;
+                (client, k8s_version)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    let summary = fetch_cluster_overview(&client, k8s_version).await;
+                    let _ = tx.send(ClusterBridgeEvent::OverviewLoaded {
+                        cluster_id,
+                        generation,
+                        summary,
+                    });
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::OverviewLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
             }
         }
     }
@@ -228,6 +258,39 @@ users:
                 );
             }
             other => panic!("Expected ConnectionError, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_overview_without_active_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadOverview {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 7,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected OverviewLoadFailed event");
+        match event {
+            ClusterBridgeEvent::OverviewLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 7);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected OverviewLoadFailed, got {other:?}"),
         }
     }
 }
