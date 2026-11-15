@@ -1,10 +1,14 @@
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, FontWeight, SharedString, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, App, FontWeight, InteractiveElement, MouseButton, SharedString,
+    StatefulInteractiveElement, Window, div, prelude::*, px,
+};
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::ClusterInfo;
 
 use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::theme::{OrbitTheme, apply_text_step};
 
 #[derive(Debug, Clone)]
@@ -310,6 +314,166 @@ fn render_walkthrough_grid(theme: &OrbitTheme) -> AnyElement {
     grid.into_any_element()
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct QuickStartTabItem {
+    pub view: WorkspaceView,
+    pub title: &'static str,
+    pub description: &'static str,
+}
+
+pub fn empty_tabs_quick_start_items() -> [QuickStartTabItem; 6] {
+    [
+        QuickStartTabItem {
+            view: WorkspaceView::Overview,
+            title: "Cluster Overview",
+            description: "Inspect cluster summary, node readiness, and resource health.",
+        },
+        QuickStartTabItem {
+            view: WorkspaceView::Pods,
+            title: "Pods",
+            description: "Browse running pods, restarts, and container status.",
+        },
+        QuickStartTabItem {
+            view: WorkspaceView::Deployments,
+            title: "Deployments",
+            description: "Monitor rollout replicas, images, and availability.",
+        },
+        QuickStartTabItem {
+            view: WorkspaceView::Nodes,
+            title: "Nodes",
+            description: "Check cluster node capacity, conditions, and kubelet info.",
+        },
+        QuickStartTabItem {
+            view: WorkspaceView::Services,
+            title: "Services",
+            description: "Inspect ClusterIP, NodePort, and LoadBalancer endpoints.",
+        },
+        QuickStartTabItem {
+            view: WorkspaceView::Events,
+            title: "Events",
+            description: "Track recent cluster warnings and scheduling events.",
+        },
+    ]
+}
+
+pub fn render_empty_tabs_workspace(
+    cluster_name: &str,
+    theme: &OrbitTheme,
+    on_open_view: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
+    on_open_picker: impl Fn(&mut Window, &mut App) + 'static,
+) -> AnyElement {
+    let mut grid = div().flex().flex_wrap().gap_3();
+    for item in empty_tabs_quick_start_items() {
+        let on_pick = on_open_view.clone();
+        let view = item.view;
+        let icon_color = view
+            .resource_kind()
+            .map(|k| theme.k8s_color(k))
+            .unwrap_or(theme.accent.accent);
+
+        grid = grid.child(
+            theme
+                .style_card(div())
+                .id(SharedString::from(format!("empty-tab-card-{}", view.id())))
+                .flex_1()
+                .min_w(px(220.0))
+                .p_4()
+                .flex()
+                .flex_col()
+                .gap_1p5()
+                .cursor_pointer()
+                .hover(|s| s.bg(theme.surface.bg_hover))
+                .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    on_pick(view, window, cx);
+                })
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(render_icon(view.icon(), px(15.0), icon_color))
+                        .child(
+                            apply_text_step(div(), theme.typography.size_sm)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(theme.text.primary)
+                                .child(item.title),
+                        ),
+                )
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .text_color(theme.text.secondary)
+                        .child(item.description),
+                ),
+        );
+    }
+
+    div()
+        .flex()
+        .flex_col()
+        .gap_6()
+        .child(
+            theme
+                .style_card(div())
+                .p_6()
+                .bg(theme.surface.bg_panel)
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap_4()
+                .child(
+                    div()
+                        .flex()
+                        .flex_col()
+                        .gap_1p5()
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .child(render_icon(Icon::Layers, px(18.0), theme.accent.accent))
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_lg)
+                                        .font_weight(FontWeight::BOLD)
+                                        .text_color(theme.text.primary)
+                                        .child("No Open Tabs"),
+                                ),
+                        )
+                        .child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .text_color(theme.text.secondary)
+                                .child(format!(
+                                    "Connected to {cluster_name}. Open a resource view below or use the sidebar to start."
+                                )),
+                        ),
+                )
+                .child(
+                    div()
+                        .id("empty-tabs-open-new-btn")
+                        .px_3()
+                        .py_1p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.accent.accent)
+                        .flex()
+                        .items_center()
+                        .gap_1p5()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(theme.accent.hover))
+                        .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                            on_open_picker(window, cx);
+                        })
+                        .child(render_icon(Icon::Plus, px(14.0), theme.surface.bg_app))
+                        .child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(theme.surface.bg_app)
+                                .child("Open New Tab"),
+                        ),
+                ),
+        )
+        .child(grid)
+        .into_any_element()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,5 +501,21 @@ mod tests {
         assert!(!populated_prompt.is_empty);
         assert_eq!(populated_prompt.cluster_count, 2);
         assert!(populated_prompt.heading.contains('2'));
+    }
+
+    #[test]
+    fn test_empty_tabs_quick_start_items_cover_core_workflows() {
+        let items = empty_tabs_quick_start_items();
+        let views: Vec<_> = items.iter().map(|item| item.view).collect();
+        assert!(views.contains(&crate::navigation::WorkspaceView::Overview));
+        assert!(views.contains(&crate::navigation::WorkspaceView::Pods));
+        assert!(views.contains(&crate::navigation::WorkspaceView::Deployments));
+        assert!(views.contains(&crate::navigation::WorkspaceView::Nodes));
+        assert!(views.contains(&crate::navigation::WorkspaceView::Services));
+        assert!(views.contains(&crate::navigation::WorkspaceView::Events));
+        for item in items {
+            assert!(!item.title.trim().is_empty());
+            assert!(!item.description.trim().is_empty());
+        }
     }
 }

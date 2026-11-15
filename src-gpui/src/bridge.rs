@@ -340,6 +340,23 @@ pub async fn handle_bridge_command(
                 );
             }
         }
+        ClusterBridgeCommand::SaveWorkspaceTabs {
+            cluster_id,
+            open_tabs,
+            active_tab,
+        } => {
+            let mut guard = manager.write().await;
+            if let Err(err) = guard
+                .config
+                .set_workspace_tabs_for_cluster(&cluster_id, open_tabs, active_tab)
+            {
+                tracing::warn!(
+                    cluster_id = %cluster_id,
+                    error = %err,
+                    "Failed to persist workspace tabs"
+                );
+            }
+        }
     }
 }
 
@@ -571,6 +588,39 @@ users:
         assert_eq!(
             reloaded.selected_namespaces_for_cluster("ctx-a"),
             vec!["payments".to_string()]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_save_workspace_tabs_persists_to_config() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_tabs_bridge");
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::load())));
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveWorkspaceTabs {
+                cluster_id: "ctx-a".to_string(),
+                open_tabs: vec![
+                    "core-overview".to_string(),
+                    "workloads-deployments".to_string(),
+                ],
+                active_tab: Some("workloads-deployments".to_string()),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let reloaded = OrbitConfig::load();
+        assert_eq!(
+            reloaded.workspace_tabs_for_cluster("ctx-a"),
+            Some(orbit_core::config::PersistedClusterTabs {
+                open_tabs: vec![
+                    "core-overview".to_string(),
+                    "workloads-deployments".to_string(),
+                ],
+                active_tab: Some("workloads-deployments".to_string()),
+            })
         );
     }
 

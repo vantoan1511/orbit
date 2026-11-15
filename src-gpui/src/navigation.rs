@@ -162,6 +162,42 @@ pub enum WorkspaceView {
 }
 
 impl WorkspaceView {
+    pub const ALL: [WorkspaceView; 29] = [
+        Self::Overview,
+        Self::Nodes,
+        Self::Namespaces,
+        Self::Events,
+        Self::WorkloadsOverview,
+        Self::Pods,
+        Self::Deployments,
+        Self::StatefulSets,
+        Self::DaemonSets,
+        Self::ReplicaSets,
+        Self::Jobs,
+        Self::CronJobs,
+        Self::Hpas,
+        Self::Services,
+        Self::Ingresses,
+        Self::PortForward,
+        Self::StorageOverview,
+        Self::PersistentVolumes,
+        Self::PersistentVolumeClaims,
+        Self::StorageClasses,
+        Self::ConfigMaps,
+        Self::Secrets,
+        Self::SecurityOverview,
+        Self::NetworkPolicies,
+        Self::PodSecurity,
+        Self::ResourceQuotas,
+        Self::AdmissionWebhooks,
+        Self::Logs,
+        Self::Settings,
+    ];
+
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|view| view.id() == id)
+    }
+
     pub const fn id(self) -> &'static str {
         match self {
             Self::Overview => "core-overview",
@@ -407,6 +443,15 @@ impl SidebarLayoutState {
         self.active_view = view;
         if let Some(category) = view.category() {
             self.active_category = category;
+        }
+    }
+
+    pub fn sync_for_view(&mut self, view: Option<WorkspaceView>) {
+        match view {
+            Some(v) => self.select_view(v),
+            None => {
+                self.active_view = WorkspaceView::Overview;
+            }
         }
     }
 
@@ -677,5 +722,32 @@ mod tests {
         collapsed.on_cluster_connected();
         assert!(collapsed.is_collapsed);
         assert_eq!(collapsed.active_category, SidebarCategory::Clusters);
+    }
+
+    #[test]
+    fn test_workspace_view_id_roundtrip_and_sidebar_sync_for_view() {
+        assert_eq!(WorkspaceView::ALL.len(), 29);
+        for view in WorkspaceView::ALL {
+            assert_eq!(
+                WorkspaceView::from_id(view.id()),
+                Some(view),
+                "from_id failed for {:?}",
+                view
+            );
+        }
+        assert_eq!(WorkspaceView::from_id("unknown"), None);
+
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.sync_for_view(Some(WorkspaceView::Deployments));
+        assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
+        assert_eq!(sidebar.active_category, SidebarCategory::Workloads);
+
+        sidebar.sync_for_view(Some(WorkspaceView::Settings));
+        assert_eq!(sidebar.active_view, WorkspaceView::Settings);
+        assert_eq!(sidebar.active_category, SidebarCategory::Workloads);
+
+        sidebar.sync_for_view(None);
+        assert_eq!(sidebar.active_view, WorkspaceView::Overview);
+        assert_eq!(sidebar.active_category, SidebarCategory::Workloads);
     }
 }

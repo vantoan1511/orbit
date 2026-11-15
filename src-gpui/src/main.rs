@@ -21,7 +21,9 @@ use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, ResourceDrawerProps,
     ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
-    YamlLoadStatus, render_context_menu_overlay, render_resource_drawer, render_yaml_viewer,
+    TabBarCallbacks, TabContextMenuCallbacks, YamlLoadStatus, build_tab_context_menu_entries,
+    render_context_menu_overlay, render_resource_drawer, render_tab_resource_picker_overlay,
+    render_workspace_tab_bar, render_yaml_viewer,
 };
 use crate::icons::{render_icon, theme_mode_icon};
 use crate::navigation::{
@@ -30,7 +32,8 @@ use crate::navigation::{
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, DeploymentsState, EventTypeFilter, EventsLoadStatus, EventsState,
-    NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState,
+    NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState, TabDropPosition,
+    WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -182,21 +185,164 @@ pub fn select_workspace_view_with_state(
     view: WorkspaceView,
 ) -> Option<ClusterBridgeCommand> {
     sidebar.select_view(view);
-    if let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state {
-        if view == WorkspaceView::Namespaces && namespaces.needs_load_for_cluster(cluster_id) {
-            return Some(namespaces.begin_load_for_cluster(cluster_id));
-        }
-        if view == WorkspaceView::Deployments && deployments.needs_load_for_cluster(cluster_id) {
-            return Some(deployments.begin_load_for_cluster(cluster_id));
-        }
-        if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
-            return Some(nodes.begin_load_for_cluster(cluster_id));
-        }
-        if view == WorkspaceView::Events && events.needs_load_for_cluster(cluster_id) {
-            return Some(events.begin_load_for_cluster(cluster_id));
-        }
+    load_command_for_active_view(state, namespaces, deployments, nodes, events, Some(view))
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn select_workspace_view_with_tabs(
+    state: &ClusterSwitcherState,
+    sidebar: &mut SidebarLayoutState,
+    namespaces: &mut NamespaceFilterState,
+    deployments: &mut DeploymentsState,
+    nodes: &mut NodesState,
+    events: &mut EventsState,
+    tabs: &mut WorkspaceTabsState,
+    view: WorkspaceView,
+) -> Vec<ClusterBridgeCommand> {
+    let mut commands = Vec::new();
+    tabs.open_tab(view);
+    if let Some(cmd) = select_workspace_view_with_state(
+        state,
+        sidebar,
+        namespaces,
+        deployments,
+        nodes,
+        events,
+        view,
+    ) {
+        commands.push(cmd);
+    }
+    if let Some(save_cmd) = tabs.persistence_command() {
+        commands.push(save_cmd);
+    }
+    commands
+}
+
+fn load_command_for_active_view(
+    state: &ClusterSwitcherState,
+    namespaces: &mut NamespaceFilterState,
+    deployments: &mut DeploymentsState,
+    nodes: &mut NodesState,
+    events: &mut EventsState,
+    view: Option<WorkspaceView>,
+) -> Option<ClusterBridgeCommand> {
+    let view = view?;
+    let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state else {
+        return None;
+    };
+    if view == WorkspaceView::Namespaces && namespaces.needs_load_for_cluster(cluster_id) {
+        return Some(namespaces.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::Deployments && deployments.needs_load_for_cluster(cluster_id) {
+        return Some(deployments.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
+        return Some(nodes.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::Events && events.needs_load_for_cluster(cluster_id) {
+        return Some(events.begin_load_for_cluster(cluster_id));
     }
     None
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn apply_cluster_event_with_tabs(
+    state: &mut ClusterSwitcherState,
+    sidebar: &mut SidebarLayoutState,
+    overview: &mut ClusterOverviewState,
+    namespaces: &mut NamespaceFilterState,
+    namespaces_view: &mut NamespacesViewState,
+    deployments: &mut DeploymentsState,
+    nodes: &mut NodesState,
+    events: &mut EventsState,
+    tabs: &mut WorkspaceTabsState,
+    event: ClusterBridgeEvent,
+) -> Vec<ClusterBridgeCommand> {
+    let is_connected = matches!(&event, ClusterBridgeEvent::ClusterConnected { .. });
+    let mut commands = apply_cluster_event_with_workspace(
+        state,
+        sidebar,
+        overview,
+        namespaces,
+        namespaces_view,
+        deployments,
+        nodes,
+        events,
+        event,
+    );
+
+    if is_connected {
+        if let Some(id) = state.active_cluster_id.clone() {
+            let restored = tabs.activate_cluster(&id);
+            sidebar.sync_for_view(restored);
+            if let Some(load_cmd) = load_command_for_active_view(
+                state,
+                namespaces,
+                deployments,
+                nodes,
+                events,
+                restored,
+            ) {
+                if !commands.contains(&load_cmd) {
+                    commands.push(load_cmd);
+                }
+            }
+        }
+    }
+
+    commands
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn handle_tab_shortcut_with_state(
+    state: &ClusterSwitcherState,
+    sidebar: &mut SidebarLayoutState,
+    namespaces: &mut NamespaceFilterState,
+    deployments: &mut DeploymentsState,
+    nodes: &mut NodesState,
+    events: &mut EventsState,
+    tabs: &mut WorkspaceTabsState,
+    key: &str,
+    ctrl: bool,
+    shift: bool,
+    platform: bool,
+) -> (bool, Vec<ClusterBridgeCommand>) {
+    if !(ctrl || platform) {
+        return (false, Vec::new());
+    }
+
+    let handled = if key.eq_ignore_ascii_case("tab") {
+        if shift {
+            tabs.activate_prev_tab();
+        } else {
+            tabs.activate_next_tab();
+        }
+        true
+    } else if key.eq_ignore_ascii_case("w") {
+        tabs.close_active_tab();
+        true
+    } else {
+        false
+    };
+
+    if !handled {
+        return (false, Vec::new());
+    }
+
+    let active = tabs.active_tab();
+    sidebar.sync_for_view(active);
+
+    let mut commands = Vec::new();
+    if let Some(cmd) =
+        load_command_for_active_view(state, namespaces, deployments, nodes, events, active)
+    {
+        commands.push(cmd);
+    }
+    if let Some(save_cmd) = tabs.persistence_command() {
+        commands.push(save_cmd);
+    }
+
+    (true, commands)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -391,8 +537,10 @@ pub struct OrbitShell {
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
+    tabs: WorkspaceTabsState,
     focus_handle: FocusHandle,
     namespace_search_focus: FocusHandle,
+    picker_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
     style_dropdown_open: bool,
     context_menu: ContextMenuState,
@@ -416,7 +564,7 @@ impl OrbitShell {
                 if this
                     .update(cx, |shell, cx| {
                         apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
-                        for cmd in apply_cluster_event_with_workspace(
+                        for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
                             &mut shell.sidebar,
                             &mut shell.overview,
@@ -425,6 +573,7 @@ impl OrbitShell {
                             &mut shell.deployments,
                             &mut shell.nodes,
                             &mut shell.events,
+                            &mut shell.tabs,
                             event,
                         ) {
                             shell.dispatch_command(cmd);
@@ -461,8 +610,10 @@ impl OrbitShell {
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
+            tabs: WorkspaceTabsState::from_config(config),
             focus_handle: cx.focus_handle(),
             namespace_search_focus: cx.focus_handle(),
+            picker_search_focus: cx.focus_handle(),
             command_tx,
             style_dropdown_open: false,
             context_menu: ContextMenuState::new(),
@@ -512,17 +663,105 @@ impl OrbitShell {
         if view != self.sidebar.active_view {
             self.drawer.reset_for_context_change();
         }
-        if let Some(cmd) = select_workspace_view_with_state(
+        for cmd in select_workspace_view_with_tabs(
             &self.state,
             &mut self.sidebar,
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.nodes,
             &mut self.events,
+            &mut self.tabs,
             view,
         ) {
             self.dispatch_command(cmd);
         }
+        cx.notify();
+    }
+
+    fn persist_tabs(&self) {
+        if let Some(cmd) = self.tabs.persistence_command() {
+            self.dispatch_command(cmd);
+        }
+    }
+
+    fn sync_active_tab_view(&mut self, prev_view: WorkspaceView) {
+        let active = self.tabs.active_tab();
+        self.sidebar.sync_for_view(active);
+        if self.sidebar.active_view != prev_view {
+            self.drawer.reset_for_context_change();
+        }
+        if let Some(cmd) = load_command_for_active_view(
+            &self.state,
+            &mut self.namespaces,
+            &mut self.deployments,
+            &mut self.nodes,
+            &mut self.events,
+            active,
+        ) {
+            self.dispatch_command(cmd);
+        }
+        self.persist_tabs();
+    }
+
+    fn activate_tab(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        let prev_view = self.sidebar.active_view;
+        self.tabs.set_active_tab(view);
+        self.sync_active_tab_view(prev_view);
+        cx.notify();
+    }
+
+    fn close_tab(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        let prev_view = self.sidebar.active_view;
+        self.tabs.close_tab(view);
+        self.sync_active_tab_view(prev_view);
+        cx.notify();
+    }
+
+    fn close_other_tabs(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        let prev_view = self.sidebar.active_view;
+        self.tabs.close_other_tabs(view);
+        self.sync_active_tab_view(prev_view);
+        cx.notify();
+    }
+
+    fn close_tabs_to_right(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        let prev_view = self.sidebar.active_view;
+        self.tabs.close_tabs_to_right(view);
+        self.sync_active_tab_view(prev_view);
+        cx.notify();
+    }
+
+    fn close_all_tabs(&mut self, cx: &mut Context<Self>) {
+        let prev_view = self.sidebar.active_view;
+        self.tabs.close_all_tabs();
+        self.sync_active_tab_view(prev_view);
+        cx.notify();
+    }
+
+    fn move_tab_left(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        self.tabs.move_tab_left(view);
+        self.persist_tabs();
+        cx.notify();
+    }
+
+    fn move_tab_right(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        self.tabs.move_tab_right(view);
+        self.persist_tabs();
+        cx.notify();
+    }
+
+    fn reorder_tab_drop(
+        &mut self,
+        from_idx: usize,
+        hover_idx: usize,
+        pos: TabDropPosition,
+        cx: &mut Context<Self>,
+    ) {
+        let to_idx = calculate_tab_drop_index(from_idx, hover_idx, pos);
+        self.tabs.reorder_tab(from_idx, to_idx);
+        self.tabs.drop_target = None;
+        self.tabs.dragging_index = None;
+        self.persist_tabs();
         cx.notify();
     }
 
@@ -1052,8 +1291,13 @@ impl OrbitShell {
                     .when(is_active, |el| el.bg(theme.accent.soft))
                     .hover(move |style| style.bg(hover_bg))
                     .on_click(cx.listener(move |this, _event, _window, cx| {
+                        let prev_view = this.sidebar.active_view;
                         this.sidebar.toggle_category(category);
-                        cx.notify();
+                        if this.sidebar.active_view != prev_view {
+                            this.select_workspace_view(this.sidebar.active_view, cx);
+                        } else {
+                            cx.notify();
+                        }
                     }))
                     .when(is_selected_category, |el| {
                         el.child(
@@ -1130,8 +1374,7 @@ impl OrbitShell {
                             .when(is_settings, |el| el.bg(theme.accent.soft))
                             .hover(move |style| style.bg(hover_bg))
                             .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.sidebar.select_view(WorkspaceView::Settings);
-                                cx.notify();
+                                this.select_workspace_view(WorkspaceView::Settings, cx);
                             }))
                             .child(render_icon(
                                 Icon::Settings,
@@ -1673,8 +1916,7 @@ impl OrbitShell {
                             .hover(move |style| style.bg(control_hover))
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.sidebar.select_view(WorkspaceView::Settings);
-                                cx.notify();
+                                this.select_workspace_view(WorkspaceView::Settings, cx);
                             }))
                             .child(render_icon(
                                 Icon::Settings,
@@ -3122,6 +3364,122 @@ impl OrbitShell {
         )
     }
 
+    fn dismiss_overlays(&mut self) {
+        self.dismiss_context_menu();
+        self.tabs.close_picker();
+        self.state.dropdown_open = false;
+        self.style_dropdown_open = false;
+        self.namespaces.close_dropdown();
+    }
+
+    fn open_or_toggle_picker(&mut self, toggle: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let should_open = if toggle { !self.tabs.picker_open } else { true };
+        self.dismiss_overlays();
+        if should_open {
+            self.tabs.open_picker();
+            self.picker_search_focus.focus(window);
+        }
+        cx.notify();
+    }
+
+    fn build_tab_context_menu_callbacks(cx: &Context<Self>) -> TabContextMenuCallbacks {
+        let move_left_e = cx.entity().clone();
+        let move_right_e = cx.entity().clone();
+        let close_e = cx.entity().clone();
+        let close_others_e = cx.entity().clone();
+        let close_right_e = cx.entity().clone();
+        let close_all_e = cx.entity().clone();
+
+        TabContextMenuCallbacks {
+            on_move_left: std::rc::Rc::new(move |v, _w, cx| {
+                move_left_e.update(cx, |s, cx| s.move_tab_left(v, cx));
+            }),
+            on_move_right: std::rc::Rc::new(move |v, _w, cx| {
+                move_right_e.update(cx, |s, cx| s.move_tab_right(v, cx));
+            }),
+            on_close: std::rc::Rc::new(move |v, _w, cx| {
+                close_e.update(cx, |s, cx| s.close_tab(v, cx));
+            }),
+            on_close_others: std::rc::Rc::new(move |v, _w, cx| {
+                close_others_e.update(cx, |s, cx| s.close_other_tabs(v, cx));
+            }),
+            on_close_right: std::rc::Rc::new(move |v, _w, cx| {
+                close_right_e.update(cx, |s, cx| s.close_tabs_to_right(v, cx));
+            }),
+            on_close_all: std::rc::Rc::new(move |_w, cx| {
+                close_all_e.update(cx, |s, cx| s.close_all_tabs(cx));
+            }),
+        }
+    }
+
+    fn render_tab_bar(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let has_active_cluster = self.active_cluster_id().is_some();
+        if !self.tabs.is_bar_visible(has_active_cluster) {
+            return None;
+        }
+        let theme = OrbitTheme::get(cx).clone();
+        let total = self.tabs.open_tabs().len();
+
+        let select_entity = cx.entity().clone();
+        let close_entity = cx.entity().clone();
+        let menu_entity = cx.entity().clone();
+        let drag_start_entity = cx.entity().clone();
+        let drag_move_entity = cx.entity().clone();
+        let drop_entity = cx.entity().clone();
+        let picker_entity = cx.entity().clone();
+
+        let callbacks = TabBarCallbacks {
+            on_select: std::rc::Rc::new(move |view, _window, cx| {
+                select_entity.update(cx, |shell, cx| {
+                    shell.activate_tab(view, cx);
+                });
+            }),
+            on_close: std::rc::Rc::new(move |view, _window, cx| {
+                close_entity.update(cx, |shell, cx| {
+                    shell.close_tab(view, cx);
+                });
+            }),
+            on_context_menu: std::rc::Rc::new(move |view, index, position, _window, cx| {
+                menu_entity.update(cx, |shell, cx| {
+                    shell.dismiss_overlays();
+                    let entries = build_tab_context_menu_entries(
+                        view,
+                        index,
+                        total,
+                        &Self::build_tab_context_menu_callbacks(cx),
+                    );
+                    shell.open_context_menu(position, entries, cx);
+                });
+            }),
+            on_drag_start: std::rc::Rc::new(move |idx, _window, cx| {
+                drag_start_entity.update(cx, |shell, cx| {
+                    shell.tabs.dragging_index = Some(idx);
+                    cx.notify();
+                });
+            }),
+            on_drag_move: std::rc::Rc::new(move |idx, pos, _window, cx| {
+                drag_move_entity.update(cx, |shell, cx| {
+                    if shell.tabs.drop_target != Some((idx, pos)) {
+                        shell.tabs.drop_target = Some((idx, pos));
+                        cx.notify();
+                    }
+                });
+            }),
+            on_drop: std::rc::Rc::new(move |from_idx, hover_idx, pos, _window, cx| {
+                drop_entity.update(cx, |shell, cx| {
+                    shell.reorder_tab_drop(from_idx, hover_idx, pos, cx);
+                });
+            }),
+            on_toggle_picker: std::rc::Rc::new(move |window, cx| {
+                picker_entity.update(cx, |shell, cx| {
+                    shell.open_or_toggle_picker(true, window, cx);
+                });
+            }),
+        };
+
+        Some(render_workspace_tab_bar(&mut self.tabs, &theme, callbacks))
+    }
+
     fn render_workspace(&self, window_width: f32, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
 
@@ -3159,13 +3517,38 @@ impl OrbitShell {
                     cluster_id,
                     display_name,
                     k8s_version,
-                } => self.render_connected_workspace(
-                    cluster_id,
-                    display_name,
-                    k8s_version.as_deref(),
-                    &theme,
-                    cx,
-                ),
+                } => {
+                    if self.tabs.open_tabs().is_empty() {
+                        let open_view_entity = cx.entity().clone();
+                        let on_open_view = std::rc::Rc::new(
+                            move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
+                                open_view_entity.update(cx, |shell, cx| {
+                                    shell.select_workspace_view(view, cx);
+                                });
+                            },
+                        );
+                        let open_picker_entity = cx.entity().clone();
+                        let on_open_picker = move |window: &mut Window, cx: &mut App| {
+                            open_picker_entity.update(cx, |shell, cx| {
+                                shell.open_or_toggle_picker(false, window, cx);
+                            });
+                        };
+                        views::welcome::render_empty_tabs_workspace(
+                            display_name,
+                            &theme,
+                            on_open_view,
+                            on_open_picker,
+                        )
+                    } else {
+                        self.render_connected_workspace(
+                            cluster_id,
+                            display_name,
+                            k8s_version.as_deref(),
+                            &theme,
+                            cx,
+                        )
+                    }
+                }
                 ClusterConnectionState::Unreachable { .. }
                 | ClusterConnectionState::Error { .. } => {
                     if let Some(model) =
@@ -3364,8 +3747,7 @@ impl OrbitShell {
                             .when(is_settings, |el| el.bg(theme.accent.soft))
                             .hover(move |style| style.bg(control_hover))
                             .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.sidebar.select_view(WorkspaceView::Settings);
-                                cx.notify();
+                                this.select_workspace_view(WorkspaceView::Settings, cx);
                             }))
                             .child(render_icon(
                                 Icon::Settings,
@@ -3432,6 +3814,15 @@ impl Render for OrbitShell {
                         return;
                     }
                 }
+                if this.tabs.picker_open
+                    && this.tabs.handle_picker_search_key(
+                        &event.keystroke.key,
+                        event.keystroke.key_char.as_deref(),
+                    )
+                {
+                    cx.notify();
+                    return;
+                }
                 if this.namespaces.dropdown_open
                     && this.namespaces.handle_search_key(
                         &event.keystroke.key,
@@ -3443,6 +3834,30 @@ impl Render for OrbitShell {
                 }
                 if event.keystroke.key.eq_ignore_ascii_case("escape") && this.drawer.is_open {
                     this.dismiss_resource_drawer(cx);
+                    return;
+                }
+                let prev_view = this.sidebar.active_view;
+                let (tab_handled, tab_cmds) = handle_tab_shortcut_with_state(
+                    &this.state,
+                    &mut this.sidebar,
+                    &mut this.namespaces,
+                    &mut this.deployments,
+                    &mut this.nodes,
+                    &mut this.events,
+                    &mut this.tabs,
+                    &event.keystroke.key,
+                    event.keystroke.modifiers.control,
+                    event.keystroke.modifiers.shift,
+                    event.keystroke.modifiers.platform,
+                );
+                if tab_handled {
+                    if this.sidebar.active_view != prev_view {
+                        this.drawer.reset_for_context_change();
+                    }
+                    for cmd in tab_cmds {
+                        this.dispatch_command(cmd);
+                    }
+                    cx.notify();
                     return;
                 }
                 let toggle_pressed = (event.keystroke.modifiers.control
@@ -3485,6 +3900,11 @@ impl Render for OrbitShell {
                         this.drawer.stop_resize();
                         changed = true;
                     }
+                    if this.tabs.dragging_index.is_some() || this.tabs.drop_target.is_some() {
+                        this.tabs.dragging_index = None;
+                        this.tabs.drop_target = None;
+                        changed = true;
+                    }
                     if changed {
                         cx.notify();
                     }
@@ -3514,6 +3934,7 @@ impl Render for OrbitShell {
                             .overflow_hidden()
                             .child(self.render_header(cx))
                             .when_some(self.render_error_banner(cx), |el, banner| el.child(banner))
+                            .when_some(self.render_tab_bar(cx), |el, tab_bar| el.child(tab_bar))
                             .child(self.render_workspace(f32::from(viewport.width), cx)),
                     ),
             )
@@ -3526,6 +3947,27 @@ impl Render for OrbitShell {
             })
             .when_some(self.render_style_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
+            })
+            .when(self.tabs.picker_open, |el| {
+                let select_entity = cx.entity().clone();
+                let close_entity = cx.entity().clone();
+                el.child(render_tab_resource_picker_overlay(
+                    &self.tabs,
+                    &theme,
+                    &self.picker_search_focus,
+                    std::rc::Rc::new(move |view, _window, cx| {
+                        select_entity.update(cx, |shell, cx| {
+                            shell.tabs.close_picker();
+                            shell.select_workspace_view(view, cx);
+                        });
+                    }),
+                    std::rc::Rc::new(move |_window, cx| {
+                        close_entity.update(cx, |shell, cx| {
+                            shell.tabs.close_picker();
+                            cx.notify();
+                        });
+                    }),
+                ))
             })
             .when_some(context_menu_overlay, |el, overlay| el.child(overlay))
     }
@@ -5298,5 +5740,269 @@ mod tests {
         drawer.reset_for_context_change();
         assert!(!drawer.is_open);
         assert!(drawer.yaml_generation > gen_reopen);
+    }
+
+    #[test]
+    fn test_select_workspace_view_opens_and_deduplicates_tabs_and_triggers_load() {
+        let mut state = ClusterSwitcherState::new();
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "c1".to_string(),
+            display_name: "c1".to_string(),
+            k8s_version: None,
+        };
+        state.active_cluster_id = Some("c1".to_string());
+        let mut sidebar = SidebarLayoutState::new();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("c1");
+
+        let cmds1 = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Deployments,
+        );
+        assert!(cmds1.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "c1"
+        )));
+        assert!(cmds1
+            .iter()
+            .any(|c| matches!(c, ClusterBridgeCommand::SaveWorkspaceTabs { .. })));
+
+        let cmds2 = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Nodes,
+        );
+        assert!(cmds2.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadNodes { cluster_id, .. } if cluster_id == "c1"
+        )));
+
+        let _ = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Deployments,
+        );
+
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Overview,
+                WorkspaceView::Deployments,
+                WorkspaceView::Nodes,
+            ]
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
+    }
+
+    #[test]
+    fn test_cluster_connected_restores_per_cluster_tabs_and_loads_active_view() {
+        let mut config = OrbitConfig::default();
+        config.update_workspace_tabs_for_cluster(
+            "c1",
+            vec![
+                WorkspaceView::Overview.id().to_string(),
+                WorkspaceView::Deployments.id().to_string(),
+            ],
+            Some(WorkspaceView::Deployments.id().to_string()),
+        );
+
+        let mut state = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::from_config(&config);
+
+        let cmds_a = apply_cluster_event_with_tabs(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "c1".to_string(),
+                    healthy: true,
+                    error_message: None,
+                    k8s_version: Some("v1.30.0".to_string()),
+                },
+                clusters: Vec::new(),
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("c1".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("c1".to_string()),
+                    server_url: None,
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.30.0".to_string()),
+                },
+            },
+        );
+
+        assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert!(cmds_a.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "c1"
+        )));
+
+        // Switch to cluster c2 (never visited -> defaults to Overview)
+        let _ = apply_cluster_event_with_tabs(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "c2".to_string(),
+                    healthy: true,
+                    error_message: None,
+                    k8s_version: Some("v1.30.0".to_string()),
+                },
+                clusters: Vec::new(),
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("c2".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("c2".to_string()),
+                    server_url: None,
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.30.0".to_string()),
+                },
+            },
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Overview);
+        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Overview]);
+    }
+
+    #[test]
+    fn test_tab_keyboard_shortcuts_cycle_and_close_tabs() {
+        let mut state = ClusterSwitcherState::new();
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "c1".to_string(),
+            display_name: "c1".to_string(),
+            k8s_version: None,
+        };
+        state.active_cluster_id = Some("c1".to_string());
+        let mut sidebar = SidebarLayoutState::new();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("c1");
+        tabs.open_tab(WorkspaceView::Deployments);
+        tabs.open_tab(WorkspaceView::Nodes);
+        tabs.set_active_tab(WorkspaceView::Overview);
+        sidebar.sync_for_view(tabs.active_tab());
+
+        // Ctrl+Tab -> Deployments
+        let (handled, _) = handle_tab_shortcut_with_state(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            "tab",
+            true,
+            false,
+            false,
+        );
+        assert!(handled);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
+
+        // Ctrl+Shift+Tab -> Overview
+        let (handled, _) = handle_tab_shortcut_with_state(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            "tab",
+            true,
+            true,
+            false,
+        );
+        assert!(handled);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Overview));
+
+        // Ctrl+W -> closes Overview, activates Deployments
+        let (handled, _) = handle_tab_shortcut_with_state(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            "w",
+            true,
+            false,
+            false,
+        );
+        assert!(handled);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Deployments, WorkspaceView::Nodes]
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+
+        // Close remaining two tabs
+        for _ in 0..2 {
+            let _ = handle_tab_shortcut_with_state(
+                &state,
+                &mut sidebar,
+                &mut namespaces,
+                &mut deployments,
+                &mut nodes,
+                &mut events,
+                &mut tabs,
+                "w",
+                false,
+                false,
+                true,
+            );
+        }
+        assert!(tabs.open_tabs().is_empty());
+        assert_eq!(tabs.active_tab(), None);
+        assert!(!tabs.is_bar_visible(true));
     }
 }

@@ -3,6 +3,7 @@ pub mod data_table;
 pub mod resource_drawer;
 pub mod resource_kind;
 pub mod status_badge;
+pub mod tab_bar;
 pub mod yaml_viewer;
 
 pub use context_menu::{
@@ -30,6 +31,11 @@ pub use resource_kind::{
 pub use status_badge::{
     SemanticStatus, StatusBadgeStyle, StatusBadgeVariant, classify_status, render_status_badge,
     render_status_badge_from_str, status_badge_style,
+};
+pub use tab_bar::{
+    DraggedWorkspaceTab, TAB_BAR_HEIGHT, TabBarCallbacks, TabContextMenuCallbacks,
+    TabItemPresentation, build_tab_context_menu_entries, render_tab_resource_picker_overlay,
+    render_workspace_tab_bar, tab_icon_color, tab_item_presentation,
 };
 pub use yaml_viewer::{
     YamlLoadStatus, YamlToken, YamlTokenKind, render_yaml_viewer, tokenize_yaml_line,

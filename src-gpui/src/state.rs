@@ -1,5 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
+use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
@@ -8,6 +9,7 @@ use orbit_core::kubernetes::models::{
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
 use crate::components::data_table::DataTableState;
+use crate::navigation::{SidebarCategory, WorkspaceView};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClusterConnectionState {
@@ -53,6 +55,11 @@ pub enum ClusterBridgeCommand {
         name: String,
     },
     SaveNamespaceSelection { cluster_id: String, namespaces: Vec<String> },
+    SaveWorkspaceTabs {
+        cluster_id: String,
+        open_tabs: Vec<String>,
+        active_tab: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -983,6 +990,393 @@ impl ClusterSwitcherState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabDropPosition {
+    Before,
+    After,
+}
+
+pub fn calculate_tab_drop_index(
+    from_index: usize,
+    hover_index: usize,
+    position: TabDropPosition,
+) -> usize {
+    if from_index == hover_index {
+        return from_index;
+    }
+    if from_index < hover_index {
+        match position {
+            TabDropPosition::Before => hover_index.saturating_sub(1),
+            TabDropPosition::After => hover_index,
+        }
+    } else {
+        match position {
+            TabDropPosition::Before => hover_index,
+            TabDropPosition::After => hover_index + 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ClusterTabsState {
+    pub open_tabs: Vec<WorkspaceView>,
+    pub active_tab: Option<WorkspaceView>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkspaceTabsState {
+    by_cluster: HashMap<String, ClusterTabsState>,
+    active_cluster_id: Option<String>,
+    pub scroll_handle: ScrollHandle,
+    pub pending_scroll_to_active: bool,
+    pub picker_open: bool,
+    pub picker_query: String,
+    pub drop_target: Option<(usize, TabDropPosition)>,
+    pub dragging_index: Option<usize>,
+}
+
+impl Default for WorkspaceTabsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WorkspaceTabsState {
+    pub fn new() -> Self {
+        Self {
+            by_cluster: HashMap::new(),
+            active_cluster_id: None,
+            scroll_handle: ScrollHandle::new(),
+            pending_scroll_to_active: false,
+            picker_open: false,
+            picker_query: String::new(),
+            drop_target: None,
+            dragging_index: None,
+        }
+    }
+
+    pub fn from_config(config: &OrbitConfig) -> Self {
+        let mut state = Self::new();
+        for (cluster_id, persisted) in config.workspace_tabs_map() {
+            let mut seen = HashSet::new();
+            let open_tabs: Vec<WorkspaceView> = persisted
+                .open_tabs
+                .iter()
+                .filter_map(|id| WorkspaceView::from_id(id))
+                .filter(|view| seen.insert(*view))
+                .collect();
+
+            let active_tab = if open_tabs.is_empty() {
+                None
+            } else {
+                persisted
+                    .active_tab
+                    .as_deref()
+                    .and_then(WorkspaceView::from_id)
+                    .filter(|view| open_tabs.contains(view))
+                    .or_else(|| open_tabs.first().copied())
+            };
+
+            state.by_cluster.insert(
+                cluster_id,
+                ClusterTabsState {
+                    open_tabs,
+                    active_tab,
+                },
+            );
+        }
+        state
+    }
+
+    pub fn active_cluster_id(&self) -> Option<&str> {
+        self.active_cluster_id.as_deref()
+    }
+
+    pub fn open_tabs(&self) -> &[WorkspaceView] {
+        self.active_cluster_id
+            .as_deref()
+            .and_then(|id| self.by_cluster.get(id))
+            .map(|c| c.open_tabs.as_slice())
+            .unwrap_or(&[])
+    }
+
+    pub fn active_tab(&self) -> Option<WorkspaceView> {
+        self.active_cluster_id
+            .as_deref()
+            .and_then(|id| self.by_cluster.get(id))
+            .and_then(|c| c.active_tab)
+    }
+
+    pub fn is_bar_visible(&self, has_active_cluster: bool) -> bool {
+        has_active_cluster && !self.open_tabs().is_empty()
+    }
+
+    pub fn activate_cluster(&mut self, cluster_id: &str) -> Option<WorkspaceView> {
+        self.active_cluster_id = Some(cluster_id.to_string());
+        self.close_picker();
+        self.drop_target = None;
+        self.dragging_index = None;
+        let entry = self
+            .by_cluster
+            .entry(cluster_id.to_string())
+            .or_insert_with(|| ClusterTabsState {
+                open_tabs: vec![WorkspaceView::Overview],
+                active_tab: Some(WorkspaceView::Overview),
+            });
+        self.pending_scroll_to_active = entry.active_tab.is_some();
+        entry.active_tab
+    }
+
+    pub fn clear_active_cluster(&mut self) {
+        self.active_cluster_id = None;
+        self.close_picker();
+        self.drop_target = None;
+        self.dragging_index = None;
+    }
+
+    fn current_cluster_mut(&mut self) -> Option<&mut ClusterTabsState> {
+        let id = self.active_cluster_id.as_ref()?;
+        Some(self.by_cluster.entry(id.clone()).or_default())
+    }
+
+    pub fn open_tab(&mut self, view: WorkspaceView) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        if !cluster.open_tabs.contains(&view) {
+            cluster.open_tabs.push(view);
+        }
+        cluster.active_tab = Some(view);
+        self.pending_scroll_to_active = true;
+    }
+
+    pub fn set_active_tab(&mut self, view: WorkspaceView) {
+        self.open_tab(view);
+    }
+
+    pub fn activate_next_tab(&mut self) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        if cluster.open_tabs.is_empty() {
+            return;
+        }
+        let next_idx = match cluster
+            .active_tab
+            .and_then(|active| cluster.open_tabs.iter().position(|v| *v == active))
+        {
+            Some(idx) => (idx + 1) % cluster.open_tabs.len(),
+            None => 0,
+        };
+        cluster.active_tab = Some(cluster.open_tabs[next_idx]);
+        self.pending_scroll_to_active = true;
+    }
+
+    pub fn activate_prev_tab(&mut self) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        if cluster.open_tabs.is_empty() {
+            return;
+        }
+        let prev_idx = match cluster
+            .active_tab
+            .and_then(|active| cluster.open_tabs.iter().position(|v| *v == active))
+        {
+            Some(idx) => {
+                if idx == 0 {
+                    cluster.open_tabs.len() - 1
+                } else {
+                    idx - 1
+                }
+            }
+            None => 0,
+        };
+        cluster.active_tab = Some(cluster.open_tabs[prev_idx]);
+        self.pending_scroll_to_active = true;
+    }
+
+    pub fn close_tab(&mut self, view: WorkspaceView) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        let Some(idx) = cluster.open_tabs.iter().position(|v| *v == view) else {
+            return;
+        };
+        cluster.open_tabs.remove(idx);
+        if cluster.active_tab == Some(view) {
+            if cluster.open_tabs.is_empty() {
+                cluster.active_tab = None;
+            } else if idx < cluster.open_tabs.len() {
+                cluster.active_tab = Some(cluster.open_tabs[idx]);
+            } else {
+                cluster.active_tab = Some(cluster.open_tabs[idx - 1]);
+            }
+            self.pending_scroll_to_active = cluster.active_tab.is_some();
+        }
+    }
+
+    pub fn close_active_tab(&mut self) {
+        if let Some(active) = self.active_tab() {
+            self.close_tab(active);
+        }
+    }
+
+    pub fn close_other_tabs(&mut self, view: WorkspaceView) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        if cluster.open_tabs.contains(&view) {
+            cluster.open_tabs = vec![view];
+            cluster.active_tab = Some(view);
+            self.pending_scroll_to_active = true;
+        }
+    }
+
+    pub fn close_tabs_to_right(&mut self, view: WorkspaceView) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        let Some(idx) = cluster.open_tabs.iter().position(|v| *v == view) else {
+            return;
+        };
+        cluster.open_tabs.truncate(idx + 1);
+        if let Some(active) = cluster.active_tab {
+            if !cluster.open_tabs.contains(&active) {
+                cluster.active_tab = Some(view);
+                self.pending_scroll_to_active = true;
+            }
+        }
+    }
+
+    pub fn close_all_tabs(&mut self) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        cluster.open_tabs.clear();
+        cluster.active_tab = None;
+    }
+
+    pub fn reorder_tab(&mut self, from_index: usize, to_index: usize) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        let len = cluster.open_tabs.len();
+        if from_index >= len || to_index >= len || from_index == to_index {
+            return;
+        }
+        let moved = cluster.open_tabs.remove(from_index);
+        cluster.open_tabs.insert(to_index, moved);
+    }
+
+    pub fn move_tab_left(&mut self, view: WorkspaceView) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        if let Some(idx) = cluster.open_tabs.iter().position(|v| *v == view) {
+            if idx > 0 {
+                cluster.open_tabs.swap(idx, idx - 1);
+            }
+        }
+    }
+
+    pub fn move_tab_right(&mut self, view: WorkspaceView) {
+        let Some(cluster) = self.current_cluster_mut() else {
+            return;
+        };
+        if let Some(idx) = cluster.open_tabs.iter().position(|v| *v == view) {
+            if idx + 1 < cluster.open_tabs.len() {
+                cluster.open_tabs.swap(idx, idx + 1);
+            }
+        }
+    }
+
+    pub fn open_picker(&mut self) {
+        self.picker_open = true;
+        self.picker_query.clear();
+    }
+
+    pub fn close_picker(&mut self) {
+        self.picker_open = false;
+        self.picker_query.clear();
+    }
+
+    pub fn toggle_picker(&mut self) {
+        if self.picker_open {
+            self.close_picker();
+        } else {
+            self.open_picker();
+        }
+    }
+
+    pub fn handle_picker_search_key(&mut self, key: &str, key_char: Option<&str>) -> bool {
+        if !self.picker_open {
+            return false;
+        }
+        match key {
+            "escape" => {
+                self.close_picker();
+                true
+            }
+            "backspace" => {
+                self.picker_query.pop();
+                true
+            }
+            _ => {
+                if let Some(ch) = key_char {
+                    if !ch.is_empty() && !ch.chars().all(char::is_control) {
+                        self.picker_query.push_str(ch);
+                        return true;
+                    }
+                }
+                false
+            }
+        }
+    }
+
+    pub fn filtered_picker_views(&self) -> Vec<WorkspaceView> {
+        let query = self.picker_query.trim().to_lowercase();
+        let mut views = Vec::new();
+        for category in SidebarCategory::ALL {
+            if category == SidebarCategory::Clusters {
+                continue;
+            }
+            views.extend_from_slice(category.nav_items());
+        }
+        views.push(WorkspaceView::Settings);
+
+        if query.is_empty() {
+            return views;
+        }
+
+        views
+            .into_iter()
+            .filter(|view| {
+                view.label().to_lowercase().contains(&query)
+                    || view.id().to_lowercase().contains(&query)
+                    || view
+                        .category()
+                        .map(|cat| cat.label().to_lowercase().contains(&query))
+                        .unwrap_or(false)
+            })
+            .collect()
+    }
+
+    pub fn persistence_command(&self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.active_cluster_id.as_ref()?;
+        let cluster = self.by_cluster.get(cluster_id)?;
+        Some(ClusterBridgeCommand::SaveWorkspaceTabs {
+            cluster_id: cluster_id.clone(),
+            open_tabs: cluster
+                .open_tabs
+                .iter()
+                .map(|v| v.id().to_string())
+                .collect(),
+            active_tab: cluster.active_tab.map(|v| v.id().to_string()),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1686,5 +2080,259 @@ mod tests {
         assert_eq!(state.type_filter, EventTypeFilter::All);
         assert!(state.table.selected_row_key.is_none());
         assert!(state.generation > gen_before);
+    }
+
+    #[test]
+    fn test_workspace_tabs_open_deduplicate_activate_and_cycle() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("cluster-a");
+        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Overview]);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Overview));
+
+        tabs.pending_scroll_to_active = false;
+        tabs.open_tab(WorkspaceView::Pods);
+        tabs.open_tab(WorkspaceView::Deployments);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Overview,
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+            ]
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert!(tabs.pending_scroll_to_active);
+
+        // Deduplicate existing view: activates without duplicating
+        tabs.pending_scroll_to_active = false;
+        tabs.open_tab(WorkspaceView::Pods);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Overview,
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+            ]
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Pods));
+        assert!(tabs.pending_scroll_to_active);
+
+        // Cycle next / prev with wrap-around
+        tabs.pending_scroll_to_active = false;
+        tabs.activate_next_tab();
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert!(tabs.pending_scroll_to_active);
+
+        tabs.activate_next_tab();
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Overview));
+
+        tabs.pending_scroll_to_active = false;
+        tabs.activate_prev_tab();
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert!(tabs.pending_scroll_to_active);
+    }
+
+    #[test]
+    fn test_workspace_tabs_close_adjacent_and_empty_fallback() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("cluster-a");
+        tabs.open_tab(WorkspaceView::Pods);
+        tabs.open_tab(WorkspaceView::Deployments);
+        tabs.open_tab(WorkspaceView::Nodes);
+        // [Overview, Pods, Deployments, Nodes], active = Nodes
+
+        // Closing an inactive tab keeps active_tab unchanged
+        tabs.close_tab(WorkspaceView::Overview);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+                WorkspaceView::Nodes,
+            ]
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Nodes));
+
+        // Closing rightmost active tab activates left neighbor
+        tabs.close_active_tab();
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Pods, WorkspaceView::Deployments]
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+
+        // Closing middle active tab activates right neighbor
+        tabs.open_tab(WorkspaceView::Nodes);
+        tabs.set_active_tab(WorkspaceView::Deployments);
+        tabs.close_tab(WorkspaceView::Deployments);
+        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Pods, WorkspaceView::Nodes]);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Nodes));
+
+        // Closing remaining tabs leads to empty state and hides bar
+        assert!(tabs.is_bar_visible(true));
+        tabs.close_active_tab();
+        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Pods]);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Pods));
+        assert!(tabs.is_bar_visible(true));
+
+        tabs.close_active_tab();
+        assert!(tabs.open_tabs().is_empty());
+        assert_eq!(tabs.active_tab(), None);
+        assert!(!tabs.is_bar_visible(true));
+        assert!(!tabs.is_bar_visible(false));
+    }
+
+    #[test]
+    fn test_workspace_tabs_context_actions_and_drag_reorder() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("cluster-a");
+        tabs.open_tab(WorkspaceView::Pods);
+        tabs.open_tab(WorkspaceView::Deployments);
+        tabs.open_tab(WorkspaceView::Nodes);
+        // [Overview, Pods, Deployments, Nodes]
+
+        tabs.move_tab_left(WorkspaceView::Deployments);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Overview,
+                WorkspaceView::Deployments,
+                WorkspaceView::Pods,
+                WorkspaceView::Nodes,
+            ]
+        );
+
+        tabs.move_tab_right(WorkspaceView::Deployments);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Overview,
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+                WorkspaceView::Nodes,
+            ]
+        );
+
+        assert_eq!(calculate_tab_drop_index(0, 2, TabDropPosition::Before), 1);
+        assert_eq!(calculate_tab_drop_index(0, 2, TabDropPosition::After), 2);
+        assert_eq!(calculate_tab_drop_index(3, 1, TabDropPosition::Before), 1);
+        assert_eq!(calculate_tab_drop_index(3, 1, TabDropPosition::After), 2);
+
+        let to_idx = calculate_tab_drop_index(0, 2, TabDropPosition::After);
+        tabs.reorder_tab(0, to_idx);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+                WorkspaceView::Overview,
+                WorkspaceView::Nodes,
+            ]
+        );
+
+        tabs.close_tabs_to_right(WorkspaceView::Deployments);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Pods, WorkspaceView::Deployments]
+        );
+
+        tabs.open_tab(WorkspaceView::Services);
+        tabs.close_other_tabs(WorkspaceView::Deployments);
+        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Deployments]);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+
+        tabs.close_all_tabs();
+        assert!(tabs.open_tabs().is_empty());
+        assert_eq!(tabs.active_tab(), None);
+    }
+
+    #[test]
+    fn test_workspace_tabs_per_cluster_isolation_and_config_hydration() {
+        let mut config = OrbitConfig::default();
+        config.update_workspace_tabs_for_cluster(
+            "cluster-a",
+            vec![
+                WorkspaceView::Pods.id().to_string(),
+                "nonexistent-view".to_string(),
+                WorkspaceView::Deployments.id().to_string(),
+            ],
+            Some(WorkspaceView::Deployments.id().to_string()),
+        );
+        config.update_workspace_tabs_for_cluster("cluster-empty", Vec::new(), None);
+
+        let mut tabs = WorkspaceTabsState::from_config(&config);
+
+        // Cluster A hydrates valid view IDs and ignores unknown IDs
+        assert_eq!(
+            tabs.activate_cluster("cluster-a"),
+            Some(WorkspaceView::Deployments)
+        );
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Pods, WorkspaceView::Deployments]
+        );
+
+        // Explicitly emptied cluster stays empty
+        assert_eq!(tabs.activate_cluster("cluster-empty"), None);
+        assert!(tabs.open_tabs().is_empty());
+
+        // Never-visited cluster initializes with [Overview]
+        assert_eq!(
+            tabs.activate_cluster("cluster-new"),
+            Some(WorkspaceView::Overview)
+        );
+        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Overview]);
+        tabs.open_tab(WorkspaceView::Nodes);
+
+        // Switching back to cluster A preserves its independent list
+        assert_eq!(
+            tabs.activate_cluster("cluster-a"),
+            Some(WorkspaceView::Deployments)
+        );
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Pods, WorkspaceView::Deployments]
+        );
+
+        // Switching to cluster-new preserves its Nodes tab
+        assert_eq!(tabs.activate_cluster("cluster-new"), Some(WorkspaceView::Nodes));
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Overview, WorkspaceView::Nodes]
+        );
+    }
+
+    #[test]
+    fn test_workspace_tabs_picker_search_filtering() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.open_picker();
+        assert!(tabs.picker_open);
+        assert!(!tabs.filtered_picker_views().is_empty());
+
+        tabs.handle_picker_search_key("d", Some("d"));
+        tabs.handle_picker_search_key("e", Some("e"));
+        tabs.handle_picker_search_key("p", Some("p"));
+        tabs.handle_picker_search_key("l", Some("l"));
+        let filtered = tabs.filtered_picker_views();
+        assert!(filtered.contains(&WorkspaceView::Deployments));
+        assert!(!filtered.contains(&WorkspaceView::Pods));
+
+        tabs.handle_picker_search_key("backspace", None);
+        tabs.handle_picker_search_key("backspace", None);
+        tabs.handle_picker_search_key("backspace", None);
+        tabs.handle_picker_search_key("backspace", None);
+        assert_eq!(tabs.picker_query, "");
+
+        // Filter by category label ("network")
+        for ch in ["n", "e", "t", "w", "o", "r", "k"] {
+            tabs.handle_picker_search_key(ch, Some(ch));
+        }
+        let net_filtered = tabs.filtered_picker_views();
+        assert!(net_filtered.contains(&WorkspaceView::Services));
+        assert!(net_filtered.contains(&WorkspaceView::Ingresses));
+
+        tabs.handle_picker_search_key("escape", None);
+        assert!(!tabs.picker_open);
+        assert_eq!(tabs.picker_query, "");
     }
 }
