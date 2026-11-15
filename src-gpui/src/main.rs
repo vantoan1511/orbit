@@ -7,9 +7,10 @@ pub mod theme;
 pub mod views;
 
 use gpui::{
-    AnyElement, App, Application, Bounds, Context, CursorStyle, FocusHandle, FontWeight,
-    KeyDownEvent, MouseButton, MouseMoveEvent, Rgba, SharedString, Window,
-    WindowAppearance, WindowBounds, WindowDecorations, WindowOptions, div, prelude::*, px, size,
+    AnyElement, App, Application, Bounds, ClipboardItem, Context, CursorStyle, FocusHandle,
+    FontWeight, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, Rgba,
+    SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations, WindowOptions, div,
+    prelude::*, px, size,
 };
 use lucide_icons::Icon;
 use orbit_core::config::OrbitConfig;
@@ -17,6 +18,9 @@ use orbit_core::kubernetes::models::ClusterInfo;
 use tokio::sync::mpsc;
 
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
+use crate::components::{
+    ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, render_context_menu_overlay,
+};
 use crate::icons::{render_icon, theme_mode_icon};
 use crate::navigation::{
     ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView,
@@ -338,6 +342,7 @@ pub struct OrbitShell {
     namespace_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
     style_dropdown_open: bool,
+    context_menu: ContextMenuState,
 }
 
 impl OrbitShell {
@@ -404,7 +409,41 @@ impl OrbitShell {
             namespace_search_focus: cx.focus_handle(),
             command_tx,
             style_dropdown_open: false,
+            context_menu: ContextMenuState::new(),
         }
+    }
+
+    fn open_context_menu(
+        &mut self,
+        anchor: Point<Pixels>,
+        entries: Vec<ContextMenuEntry>,
+        cx: &mut Context<Self>,
+    ) {
+        self.state.close_dropdown();
+        self.namespaces.close_dropdown();
+        self.style_dropdown_open = false;
+        self.context_menu.open(anchor, entries);
+        cx.notify();
+    }
+
+    fn dismiss_context_menu(&mut self) {
+        self.context_menu.close();
+    }
+
+    fn filter_by_namespace(&mut self, ns: &str, cx: &mut Context<Self>) {
+        if ns.is_empty() {
+            return;
+        }
+        self.namespaces.select_all_namespaces();
+        if let Some(updated) = self.namespaces.toggle_namespace(ns)
+            && let Some(cluster_id) = self.namespaces.cluster_id.clone()
+        {
+            self.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
+                cluster_id,
+                namespaces: updated,
+            });
+        }
+        cx.notify();
     }
 
     fn dispatch_command(&self, cmd: ClusterBridgeCommand) {
@@ -952,6 +991,7 @@ impl OrbitShell {
                             .hover(move |style| style.bg(control_hover))
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.dismiss_context_menu();
                                 this.style_dropdown_open = false;
                                 this.namespaces.close_dropdown();
                                 this.state.toggle_dropdown();
@@ -999,6 +1039,7 @@ impl OrbitShell {
                                     .hover(move |style| style.bg(control_hover))
                                     .cursor_pointer()
                                     .on_click(cx.listener(|this, _event, window, cx| {
+                                        this.dismiss_context_menu();
                                         this.state.close_dropdown();
                                         this.style_dropdown_open = false;
                                         this.namespaces.toggle_dropdown();
@@ -1113,6 +1154,7 @@ impl OrbitShell {
                             .hover(move |style| style.bg(control_hover))
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.dismiss_context_menu();
                                 this.state.close_dropdown();
                                 this.namespaces.close_dropdown();
                                 this.style_dropdown_open = !this.style_dropdown_open;
@@ -2118,6 +2160,47 @@ impl OrbitShell {
                 });
             };
 
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            ev: &orbit_core::kubernetes::models::EventInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let object_name = ev.object_name.clone();
+                let message = ev.message.clone();
+                let namespace = ev.namespace.clone();
+                let anchor = event.position;
+                let copy_obj = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(object_name.clone()));
+                };
+                let copy_msg = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(message.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let entries = views::events::build_event_context_menu_entries(
+                    ev,
+                    copy_obj,
+                    copy_msg,
+                    filter_ns,
+                    refresh_cb,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.events.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
             let refresh_entity = cx.entity().clone();
             let on_refresh = move |_window: &mut Window, cx: &mut App| {
                 refresh_entity.update(cx, |shell, cx| {
@@ -2131,6 +2214,7 @@ impl OrbitShell {
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_context_menu,
                 on_type_filter,
                 on_refresh,
             );
@@ -2160,6 +2244,42 @@ impl OrbitShell {
                 });
             };
 
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            deployment: &orbit_core::kubernetes::models::DeploymentInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = deployment.name.clone();
+                let namespace = deployment.namespace.clone();
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let entries = views::deployments::build_deployment_context_menu_entries(
+                    deployment,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.deployments.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
             let refresh_entity = cx.entity().clone();
             let on_refresh = move |_window: &mut Window, cx: &mut App| {
                 refresh_entity.update(cx, |shell, cx| {
@@ -2173,6 +2293,7 @@ impl OrbitShell {
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_context_menu,
                 on_refresh,
             );
         }
@@ -2201,6 +2322,42 @@ impl OrbitShell {
                 });
             };
 
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            ns: &orbit_core::kubernetes::models::NamespaceInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = ns.name.clone();
+                let filter_name = ns.name.clone();
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&filter_name, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let entries = views::namespaces::build_namespace_context_menu_entries(
+                    ns,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
             let refresh_entity = cx.entity().clone();
             let on_refresh = move |_window: &mut Window, cx: &mut App| {
                 refresh_entity.update(cx, |shell, cx| {
@@ -2214,6 +2371,7 @@ impl OrbitShell {
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_context_menu,
                 on_refresh,
             );
         }
@@ -2242,6 +2400,31 @@ impl OrbitShell {
                 });
             };
 
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            node: &orbit_core::kubernetes::models::NodeInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = node.name.clone();
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let entries =
+                    views::nodes::build_node_context_menu_entries(node, copy_name, refresh_cb);
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.nodes.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
             let refresh_entity = cx.entity().clone();
             let on_refresh = move |_window: &mut Window, cx: &mut App| {
                 refresh_entity.update(cx, |shell, cx| {
@@ -2254,6 +2437,7 @@ impl OrbitShell {
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_context_menu,
                 on_refresh,
             );
         }
@@ -2588,13 +2772,55 @@ impl OrbitShell {
 }
 
 impl Render for OrbitShell {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = OrbitTheme::get(cx).clone();
+        let viewport = window.viewport_size();
+        let dismiss_entity = cx.entity().clone();
+        let hover_entity = cx.entity().clone();
+        let activate_entity = cx.entity().clone();
+        let context_menu_overlay = render_context_menu_overlay(
+            &self.context_menu,
+            viewport,
+            &theme,
+            move |_window, cx| {
+                dismiss_entity.update(cx, |shell, cx| {
+                    shell.dismiss_context_menu();
+                    cx.notify();
+                });
+            },
+            move |idx, _window, cx| {
+                hover_entity.update(cx, |shell, cx| {
+                    shell.context_menu.set_highlight(idx);
+                    cx.notify();
+                });
+            },
+            move |idx, window, cx| {
+                let callback = activate_entity.update(cx, |shell, cx| {
+                    let cb = shell.context_menu.activate_at(idx);
+                    cx.notify();
+                    cb
+                });
+                if let Some(cb) = callback {
+                    cb(window, cx);
+                }
+            },
+        );
 
         div()
             .id("orbit-shell-root")
             .track_focus(&self.focus_handle)
-            .on_key_down(cx.listener(|this, event: &KeyDownEvent, _window, cx| {
+            .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if this.context_menu.is_open {
+                    let key = event.keystroke.key.to_ascii_lowercase();
+                    let (action, callback) = this.context_menu.handle_key(&key);
+                    if action != ContextMenuKeyAction::Ignored {
+                        if let Some(cb) = callback {
+                            cb(window, cx);
+                        }
+                        cx.notify();
+                        return;
+                    }
+                }
                 if this.namespaces.dropdown_open
                     && this.namespaces.handle_search_key(
                         &event.keystroke.key,
@@ -2665,6 +2891,7 @@ impl Render for OrbitShell {
             .when_some(self.render_style_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
+            .when_some(context_menu_overlay, |el, overlay| el.child(overlay))
     }
 }
 
@@ -4101,5 +4328,219 @@ mod tests {
         assert!(events.cluster_id.is_none());
         assert_eq!(events.status, crate::state::EventsLoadStatus::Idle);
         assert!(events.events.is_empty());
+    }
+
+    #[test]
+    fn test_context_menu_key_handling_and_dropdown_mutual_exclusion() {
+        use crate::components::ContextMenuItem;
+
+        let mut cluster_state = ClusterSwitcherState::new();
+        cluster_state.dropdown_open = true;
+        let mut ns_state = NamespaceFilterState::default();
+        ns_state.dropdown_open = true;
+        let mut style_dropdown_open = true;
+        assert!(style_dropdown_open);
+        let mut context_menu = ContextMenuState::new();
+
+        // Opening context menu closes active header dropdowns
+        cluster_state.close_dropdown();
+        ns_state.close_dropdown();
+        style_dropdown_open = false;
+        context_menu.open(
+            gpui::point(px(20.0), px(30.0)),
+            vec![
+                ContextMenuEntry::Item(ContextMenuItem::new("copy", "Copy").on_select(|_, _| {})),
+                ContextMenuEntry::Separator,
+                ContextMenuEntry::Item(
+                    ContextMenuItem::new("refresh", "Refresh").on_select(|_, _| {}),
+                ),
+            ],
+        );
+
+        assert!(!cluster_state.dropdown_open);
+        assert!(!ns_state.dropdown_open);
+        assert!(!style_dropdown_open);
+        assert!(context_menu.is_open);
+        assert_eq!(context_menu.highlighted_index, Some(0));
+
+        let (action, _) = context_menu.handle_key("arrowdown");
+        assert_eq!(action, ContextMenuKeyAction::Navigated);
+        assert_eq!(context_menu.highlighted_index, Some(2));
+
+        let (action, _) = context_menu.handle_key("arrowup");
+        assert_eq!(action, ContextMenuKeyAction::Navigated);
+        assert_eq!(context_menu.highlighted_index, Some(0));
+
+        let (action, cb) = context_menu.handle_key("enter");
+        assert_eq!(action, ContextMenuKeyAction::Activated);
+        assert!(cb.is_some());
+        assert!(!context_menu.is_open);
+
+        context_menu.open(
+            gpui::point(px(20.0), px(30.0)),
+            vec![ContextMenuEntry::Item(ContextMenuItem::new("copy", "Copy"))],
+        );
+        let (action, cb) = context_menu.handle_key("escape");
+        assert_eq!(action, ContextMenuKeyAction::Closed);
+        assert!(cb.is_none());
+        assert!(!context_menu.is_open);
+    }
+
+    #[test]
+    fn test_resource_row_context_menu_builders_include_actions_separators_and_danger_items() {
+        use orbit_core::kubernetes::models::{
+            DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, Replicas,
+        };
+
+        let deployment = DeploymentInfo {
+            kind: "Deployment".to_string(),
+            name: "api-server".to_string(),
+            namespace: "prod".to_string(),
+            status: "Running".to_string(),
+            conditions: None,
+            replicas: Replicas {
+                current: 2,
+                desired: 2,
+            },
+            available: 2,
+            up_to_date: 2,
+            age: "1d".to_string(),
+            images: Vec::new(),
+            containers: Vec::new(),
+            strategy: None,
+            min_ready_seconds: 0,
+            revision_history: None,
+            labels: Default::default(),
+            annotations: Default::default(),
+            ports: Vec::new(),
+        };
+        let dep_entries = views::deployments::build_deployment_context_menu_entries(
+            &deployment,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        assert!(dep_entries
+            .iter()
+            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(dep_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-name" && !item.disabled
+        )));
+        assert!(dep_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "filter-namespace" && !item.disabled
+        )));
+        assert!(dep_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.danger && item.disabled
+        )));
+
+        let node = NodeInfo {
+            name: "worker-01".to_string(),
+            status: "Ready".to_string(),
+            role: "worker".to_string(),
+            version: "v1.30.0".to_string(),
+            cpu_pct: 20.0,
+            cpu_used: "1".to_string(),
+            cpu_total: "4".to_string(),
+            mem_pct: 30.0,
+            mem_used: "2Gi".to_string(),
+            mem_total: "8Gi".to_string(),
+            pods_count: 5,
+            pods_limit: 110,
+            uptime: "5d".to_string(),
+            created_at: None,
+            labels: Vec::new(),
+            labels_map: Default::default(),
+            annotations: Default::default(),
+            is_cordoned: false,
+            node_info: None,
+            addresses: Vec::new(),
+            conditions: Vec::new(),
+            taints: Vec::new(),
+            capacity: None,
+            allocatable: None,
+            images_count: 0,
+        };
+        let node_entries = views::nodes::build_node_context_menu_entries(&node, |_, _| {}, |_, _| {});
+        assert!(node_entries
+            .iter()
+            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(node_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-name" && !item.disabled
+        )));
+        assert!(node_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.danger && item.disabled
+        )));
+
+        let ns = NamespaceInfo {
+            name: "kube-system".to_string(),
+            status: "Active".to_string(),
+            is_system: true,
+            age: "10d".to_string(),
+            labels: Default::default(),
+            annotations: Default::default(),
+            uid: "uid-kube-system".to_string(),
+            created: String::new(),
+        };
+        let ns_entries = views::namespaces::build_namespace_context_menu_entries(
+            &ns,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        assert!(ns_entries
+            .iter()
+            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(ns_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "filter-namespace" && !item.disabled
+        )));
+        assert!(ns_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.danger && item.disabled
+        )));
+
+        let ev = EventInfo {
+            uid: "ev-1".to_string(),
+            time: "2m".to_string(),
+            r#type: "Normal".to_string(),
+            reason: "ScalingReplicaSet".to_string(),
+            object_name: "api-server-abc".to_string(),
+            object_kind: "Deployment".to_string(),
+            message: "Scaled up replica set".to_string(),
+            namespace: "prod".to_string(),
+            source: "deployment-controller".to_string(),
+            first_seen: String::new(),
+            last_seen: String::new(),
+            count: 1,
+            labels: Default::default(),
+            annotations: Default::default(),
+        };
+        let ev_entries = views::events::build_event_context_menu_entries(
+            &ev,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        assert!(ev_entries
+            .iter()
+            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(ev_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-object" && !item.disabled
+        )));
+        assert!(ev_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-message" && !item.disabled
+        )));
+        assert!(ev_entries.iter().any(|e| matches!(
+            e,
+            ContextMenuEntry::Item(item) if item.danger && item.disabled
+        )));
     }
 }

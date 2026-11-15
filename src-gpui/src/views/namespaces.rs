@@ -2,7 +2,10 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, ClickEvent, FontWeight, Rgba, SharedString, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
+    prelude::*, px,
+};
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::NamespaceInfo;
 
@@ -10,8 +13,8 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{
-    SemanticStatus, StatusBadgeVariant, render_status_badge, render_status_badge_from_str,
-    resource_kind_meta_from_str,
+    ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
+    render_status_badge_from_str, resource_kind_meta_from_str,
 };
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState};
@@ -333,6 +336,49 @@ fn render_summary_cards_row(namespaces: &[NamespaceInfo], theme: &OrbitTheme) ->
         .into_any_element()
 }
 
+pub fn build_namespace_context_menu_entries(
+    _ns: &NamespaceInfo,
+    on_copy_name: impl 'static + Fn(&mut Window, &mut App),
+    on_filter_namespace: impl 'static + Fn(&mut Window, &mut App),
+    on_refresh: impl 'static + Fn(&mut Window, &mut App),
+) -> Vec<ContextMenuEntry> {
+    vec![
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("copy-name", "Copy Name")
+                .icon(Icon::Copy)
+                .on_select(on_copy_name),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("filter-namespace", "Filter by Namespace")
+                .icon(Icon::Filter)
+                .on_select(on_filter_namespace),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("refresh", "Refresh")
+                .icon(Icon::RefreshCw)
+                .on_select(on_refresh),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("view-details", "View Details")
+                .icon(Icon::Info)
+                .disabled(true),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("view-yaml", "View YAML")
+                .icon(Icon::FileCode)
+                .disabled(true),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("delete-namespace", "Delete Namespace")
+                .icon(Icon::Trash2)
+                .danger(true)
+                .disabled(true),
+        ),
+    ]
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn render_namespaces_view(
     state: &NamespaceFilterState,
@@ -340,6 +386,8 @@ pub fn render_namespaces_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_context_menu: impl 'static
+        + Fn(SharedString, &NamespaceInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = namespace_columns();
@@ -468,6 +516,7 @@ pub fn render_namespaces_view(
 
             let key_rows = sorted_rows.clone();
             let cell_rows = sorted_rows.clone();
+            let ctx_rows = sorted_rows.clone();
             let callbacks = DataTableCallbacks::new(
                 move |idx| {
                     key_rows
@@ -483,7 +532,12 @@ pub fn render_namespaces_view(
                 },
             )
             .on_sort(on_sort)
-            .on_row_click(on_row_click);
+            .on_row_click(on_row_click)
+            .on_row_context_menu(move |idx, row_key, event, window, cx| {
+                if let Some(ns) = ctx_rows.get(idx) {
+                    on_row_context_menu(row_key, ns, event, window, cx);
+                }
+            });
 
             render_data_table(
                 "namespaces-table",

@@ -2,7 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, Rgba, SharedString, Window, div, prelude::*, px,
+    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::EventInfo;
@@ -11,7 +12,8 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{
-    StatusBadgeVariant, render_status_badge_from_str, resource_kind_meta_from_str,
+    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
+    resource_kind_meta_from_str,
 };
 use crate::icons::render_icon;
 use crate::state::{EventTypeFilter, EventsLoadStatus, EventsState, NamespaceFilterState};
@@ -405,6 +407,50 @@ fn render_type_filter_pills(
         .into_any_element()
 }
 
+pub fn build_event_context_menu_entries(
+    _event: &EventInfo,
+    on_copy_object: impl 'static + Fn(&mut Window, &mut App),
+    on_copy_message: impl 'static + Fn(&mut Window, &mut App),
+    on_filter_namespace: impl 'static + Fn(&mut Window, &mut App),
+    on_refresh: impl 'static + Fn(&mut Window, &mut App),
+) -> Vec<ContextMenuEntry> {
+    vec![
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("copy-object", "Copy Object")
+                .icon(Icon::Copy)
+                .on_select(on_copy_object),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("copy-message", "Copy Message")
+                .icon(Icon::FileText)
+                .on_select(on_copy_message),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("filter-namespace", "Filter by Namespace")
+                .icon(Icon::Filter)
+                .on_select(on_filter_namespace),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("refresh", "Refresh")
+                .icon(Icon::RefreshCw)
+                .on_select(on_refresh),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("view-details", "View Details")
+                .icon(Icon::Info)
+                .disabled(true),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("delete-event", "Delete Event")
+                .icon(Icon::Trash2)
+                .danger(true)
+                .disabled(true),
+        ),
+    ]
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn render_events_view(
     state: &EventsState,
@@ -412,6 +458,8 @@ pub fn render_events_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_context_menu: impl 'static
+        + Fn(SharedString, &EventInfo, &MouseDownEvent, &mut Window, &mut App),
     on_type_filter: impl 'static + Fn(EventTypeFilter, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
@@ -592,6 +640,7 @@ pub fn render_events_view(
 
             let key_rows = filtered_rows.clone();
             let cell_rows = filtered_rows.clone();
+            let ctx_rows = filtered_rows.clone();
 
             div()
                 .flex_1()
@@ -618,6 +667,13 @@ pub fn render_events_view(
                         },
                         on_sort: Some(Rc::new(on_sort)),
                         on_row_click: Some(Rc::new(on_row_click)),
+                        on_row_context_menu: Some(Rc::new(
+                            move |idx, row_key, event, window, cx| {
+                                if let Some(ev) = ctx_rows.get(idx) {
+                                    on_row_context_menu(row_key, ev, event, window, cx);
+                                }
+                            },
+                        )),
                     },
                 ))
                 .into_any_element()
