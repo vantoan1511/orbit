@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use orbit_core::kubernetes::events::fetch_events;
 use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::nodes::fetch_nodes;
@@ -224,6 +225,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::NodesLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadEvents {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_events(&client, None).await {
+                        Ok(events) => {
+                            let _ = tx.send(ClusterBridgeEvent::EventsLoaded {
+                                cluster_id,
+                                generation,
+                                events,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::EventsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::EventsLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
