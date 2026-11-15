@@ -20,6 +20,7 @@ export const CONFIG_KEYS = {
   NOTIFICATION_PREFERENCES: 'notificationPreferences',
   PROXY_SETTINGS: 'proxySettings',
   SELECTED_NAMESPACES: 'selectedNamespaces',
+  WORKSPACE_TABS: 'workspaceTabs',
   ENABLE_EXPERIENCE_FEATURES: 'enableExperienceFeatures'
 } as const
 
@@ -38,7 +39,8 @@ export const SPECIALIZED_CONFIG_KEYS: readonly string[] = [
   CONFIG_KEYS.CLUSTER_CUSTOMIZATIONS,
   CONFIG_KEYS.NOTIFICATION_PREFERENCES,
   CONFIG_KEYS.PROXY_SETTINGS,
-  CONFIG_KEYS.SELECTED_NAMESPACES
+  CONFIG_KEYS.SELECTED_NAMESPACES,
+  CONFIG_KEYS.WORKSPACE_TABS
 ] as const
 
 export function isGeneralConfigKey(key: string): boolean {

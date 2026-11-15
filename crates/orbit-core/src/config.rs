@@ -258,6 +258,19 @@ impl Configuration {
                 last_updated_at: None,
             },
             Configuration {
+                key: "workspaceTabs".to_string(),
+                name: "Workspace Tabs".to_string(),
+                description: "Per-cluster open workspace tabs and active tab state.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({})),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
                 key: "enableExperienceFeatures".to_string(),
                 name: "Experience Features".to_string(),
                 description: "Enable experimental preview features such as the native GPUI desktop shell.".to_string(),
@@ -275,6 +288,15 @@ impl Configuration {
 }
 
 pub type SelectedNamespacesMap = HashMap<String, Vec<String>>;
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistedClusterTabs {
+    pub open_tabs: Vec<String>,
+    pub active_tab: Option<String>,
+}
+
+pub type WorkspaceTabsMap = HashMap<String, PersistedClusterTabs>;
 
 /// Persistent user configuration storing strictly key-value pairs in `~/.orbit/config.json`.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -622,6 +644,69 @@ impl OrbitConfig {
         namespaces: Vec<String>,
     ) -> Result<(), String> {
         self.update_selected_namespaces_for_cluster(cluster_id, namespaces);
+        self.save()
+    }
+
+    /// Returns the per-cluster workspace tabs map.
+    pub fn workspace_tabs_map(&self) -> WorkspaceTabsMap {
+        self.values
+            .get("workspaceTabs")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default()
+    }
+
+    /// Returns the persisted workspace tabs for a specific cluster ID, if visited.
+    pub fn workspace_tabs_for_cluster(&self, cluster_id: &str) -> Option<PersistedClusterTabs> {
+        self.workspace_tabs_map().get(cluster_id).cloned()
+    }
+
+    /// Updates the persisted workspace tabs for a specific cluster ID in memory.
+    /// Preserves explicit empty `open_tabs` (`active_tab: None`) so a visited cluster
+    /// with all tabs closed does not re-open a default tab on reconnect.
+    pub fn update_workspace_tabs_for_cluster(
+        &mut self,
+        cluster_id: &str,
+        open_tabs: Vec<String>,
+        active_tab: Option<String>,
+    ) {
+        let mut map = self.workspace_tabs_map();
+        let mut seen = std::collections::HashSet::new();
+        let cleaned_tabs: Vec<String> = open_tabs
+            .into_iter()
+            .map(|id| id.trim().to_string())
+            .filter(|id| !id.is_empty() && seen.insert(id.clone()))
+            .collect();
+
+        let resolved_active = if cleaned_tabs.is_empty() {
+            None
+        } else {
+            active_tab
+                .map(|id| id.trim().to_string())
+                .filter(|id| !id.is_empty() && cleaned_tabs.iter().any(|t| t == id))
+                .or_else(|| cleaned_tabs.first().cloned())
+        };
+
+        map.insert(
+            cluster_id.to_string(),
+            PersistedClusterTabs {
+                open_tabs: cleaned_tabs,
+                active_tab: resolved_active,
+            },
+        );
+
+        if let Ok(v) = serde_json::to_value(map) {
+            self.values.insert("workspaceTabs".to_string(), v);
+        }
+    }
+
+    /// Updates and saves the persisted workspace tabs for a specific cluster ID.
+    pub fn set_workspace_tabs_for_cluster(
+        &mut self,
+        cluster_id: &str,
+        open_tabs: Vec<String>,
+        active_tab: Option<String>,
+    ) -> Result<(), String> {
+        self.update_workspace_tabs_for_cluster(cluster_id, open_tabs, active_tab);
         self.save()
     }
 
@@ -1317,6 +1402,57 @@ mod tests {
         assert!(!reloaded_after_clear
             .values
             .contains_key("selectedNamespaces"));
+    }
+
+    #[test]
+    fn test_workspace_tabs_in_system_definitions_and_per_cluster_roundtrip() {
+        let _guard = TestConfigDirGuard::new("workspace_tabs");
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "workspaceTabs")
+            .expect("workspaceTabs must exist");
+        assert!(cfg.enable);
+        assert_eq!(cfg.datatype, "string");
+        assert_eq!(cfg.cardinality, "0..1");
+        assert_eq!(cfg.default_value, Some(serde_json::json!({})));
+
+        let mut config = OrbitConfig::default();
+        config
+            .set_workspace_tabs_for_cluster(
+                "prod-ctx",
+                vec![
+                    "pods".to_string(),
+                    "deployments".to_string(),
+                    "pods".to_string(),
+                    "  ".to_string(),
+                ],
+                Some("missing-tab".to_string()),
+            )
+            .expect("save should succeed");
+
+        let reloaded = OrbitConfig::load();
+        assert_eq!(
+            reloaded.workspace_tabs_for_cluster("prod-ctx"),
+            Some(PersistedClusterTabs {
+                open_tabs: vec!["pods".to_string(), "deployments".to_string()],
+                active_tab: Some("pods".to_string()),
+            })
+        );
+        assert_eq!(reloaded.workspace_tabs_for_cluster("dev-ctx"), None);
+
+        let mut emptied = reloaded;
+        emptied
+            .set_workspace_tabs_for_cluster("prod-ctx", Vec::new(), Some("pods".to_string()))
+            .expect("save empty tabs should succeed");
+        let reloaded_after_empty = OrbitConfig::load();
+        assert_eq!(
+            reloaded_after_empty.workspace_tabs_for_cluster("prod-ctx"),
+            Some(PersistedClusterTabs {
+                open_tabs: Vec::new(),
+                active_tab: None,
+            })
+        );
     }
 }
 
