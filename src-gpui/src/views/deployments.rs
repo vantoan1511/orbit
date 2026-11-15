@@ -268,6 +268,8 @@ pub fn build_deployment_context_menu_entries(
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
     on_filter_namespace: impl 'static + Fn(&mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    on_view_details: impl 'static + Fn(&mut Window, &mut App),
+    on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -292,12 +294,12 @@ pub fn build_deployment_context_menu_entries(
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-details", "View Details")
                 .icon(Icon::Info)
-                .disabled(true),
+                .on_select(on_view_details),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
-                .disabled(true),
+                .on_select(on_view_yaml),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -517,6 +519,250 @@ pub fn render_deployments_view(
             |el| el.when_some(error_banner, |el, banner| el.child(banner)),
         )
         .child(body)
+        .into_any_element()
+}
+
+pub fn filter_events_for_deployment<'a>(
+    events: &'a [orbit_core::kubernetes::models::EventInfo],
+    deployment: &DeploymentInfo,
+) -> Vec<&'a orbit_core::kubernetes::models::EventInfo> {
+    let prefix = format!("{}-", deployment.name);
+    events
+        .iter()
+        .filter(|ev| {
+            ev.namespace == deployment.namespace
+                && ((ev.object_kind == "Deployment" && ev.object_name == deployment.name)
+                    || ((ev.object_kind == "ReplicaSet" || ev.object_kind == "Pod")
+                        && ev.object_name.starts_with(&prefix))
+                    || ev.message.contains(&deployment.name))
+        })
+        .collect()
+}
+
+pub fn render_deployment_drawer_overview(
+    deployment: &DeploymentInfo,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let summary = crate::views::render_drawer_key_values(
+        vec![
+            ("Name", deployment.name.clone(), true),
+            ("Namespace", deployment.namespace.clone(), true),
+            ("Status", deployment.status.clone(), false),
+            (
+                "Ready Replicas",
+                format!("{}/{}", deployment.replicas.current, deployment.replicas.desired),
+                true,
+            ),
+            ("Available", deployment.available.to_string(), true),
+            ("Up-to-date", deployment.up_to_date.to_string(), true),
+            (
+                "Strategy",
+                deployment
+                    .strategy
+                    .clone()
+                    .unwrap_or_else(|| "RollingUpdate".to_string()),
+                false,
+            ),
+            (
+                "Min Ready Seconds",
+                deployment.min_ready_seconds.to_string(),
+                true,
+            ),
+            (
+                "Revision History",
+                deployment
+                    .revision_history
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "-".to_string()),
+                true,
+            ),
+            ("Age", deployment.age.clone(), true),
+        ],
+        theme,
+    );
+
+    let mono = theme.typography.mono_font(FontWeight::NORMAL);
+    let containers_section = {
+        let content = if deployment.containers.is_empty() && deployment.images.is_empty() {
+            apply_text_step(div(), theme.typography.size_xs)
+                .text_color(theme.text.muted)
+                .child("No containers reported.")
+                .into_any_element()
+        } else if !deployment.containers.is_empty() {
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .children(deployment.containers.iter().map(|c| {
+                    div()
+                        .w_full()
+                        .p_2p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.bg_panel)
+                        .border_1()
+                        .border_color(theme.border.default)
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(theme.text.primary)
+                                .child(c.name.clone()),
+                        )
+                        .child(
+                            apply_text_step(div(), theme.typography.size_2xs)
+                                .font(mono.clone())
+                                .text_color(theme.text.secondary)
+                                .child(c.image.clone()),
+                        )
+                }))
+                .into_any_element()
+        } else {
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_1p5()
+                .children(deployment.images.iter().map(|img| {
+                    apply_text_step(div(), theme.typography.size_2xs)
+                        .px_2p5()
+                        .py_1p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.bg_panel)
+                        .font(mono.clone())
+                        .text_color(theme.text.primary)
+                        .child(img.clone())
+                }))
+                .into_any_element()
+        };
+        crate::views::render_drawer_section("CONTAINERS & IMAGES", content, theme)
+    };
+
+    let ports_section = if deployment.ports.is_empty() {
+        None
+    } else {
+        Some(crate::views::render_drawer_section(
+            "EXPOSED PORTS",
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_1p5()
+                .children(deployment.ports.iter().map(|port| {
+                    apply_text_step(div(), theme.typography.size_2xs)
+                        .px_2()
+                        .py_0p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.control_bg)
+                        .border_1()
+                        .border_color(theme.border.default)
+                        .font(mono.clone())
+                        .text_color(theme.text.primary)
+                        .child(port.to_string())
+                }))
+                .into_any_element(),
+            theme,
+        ))
+    };
+
+    let conditions_section = deployment.conditions.as_ref().filter(|c| !c.is_empty()).map(|conds| {
+        crate::views::render_drawer_section(
+            "CONDITIONS",
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .children(conds.iter().map(|cond| {
+                    div()
+                        .w_full()
+                        .p_2p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.bg_panel)
+                        .border_1()
+                        .border_color(theme.border.default)
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .gap_2()
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_xs)
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(theme.text.primary)
+                                        .child(cond.type_.clone()),
+                                )
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_2xs)
+                                        .text_color(theme.text.secondary)
+                                        .child(cond.status.clone()),
+                                ),
+                        )
+                        .when_some(cond.message.as_ref(), |el, msg| {
+                            el.child(
+                                apply_text_step(div(), theme.typography.size_2xs)
+                                    .text_color(theme.text.muted)
+                                    .child(msg.clone()),
+                            )
+                        })
+                }))
+                .into_any_element(),
+            theme,
+        )
+    });
+
+    div()
+        .id("deployment-drawer-overview")
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .p_4()
+        .flex()
+        .flex_col()
+        .gap_5()
+        .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
+        .child(containers_section)
+        .when_some(ports_section, |el, sec| el.child(sec))
+        .when_some(conditions_section, |el, sec| el.child(sec))
+        .child(crate::views::render_drawer_kv_badges(
+            "LABELS",
+            &deployment.labels,
+            "No labels",
+            theme,
+        ))
+        .child(crate::views::render_drawer_kv_badges(
+            "ANNOTATIONS",
+            &deployment.annotations,
+            "No annotations",
+            theme,
+        ))
+        .into_any_element()
+}
+
+pub fn render_deployment_drawer_events(
+    events: &[orbit_core::kubernetes::models::EventInfo],
+    loading: bool,
+    deployment: &DeploymentInfo,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let matched = filter_events_for_deployment(events, deployment);
+    div()
+        .id("deployment-drawer-events")
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .p_4()
+        .child(crate::views::render_drawer_events_list(
+            &matched,
+            loading,
+            "No events found for this deployment.",
+            theme,
+        ))
         .into_any_element()
 }
 
@@ -771,5 +1017,76 @@ mod tests {
             deployments_presentation_mode(&state),
             DeploymentsPresentationMode::ErrorCard
         );
+    }
+
+    #[test]
+    fn test_filter_events_for_deployment_matches_namespace_and_pod_prefix() {
+        let deployment = make_deployment(
+            "api",
+            "default",
+            "Healthy",
+            2,
+            2,
+            2,
+            2,
+            Some("RollingUpdate"),
+            vec!["nginx:1.25"],
+            "1d",
+        );
+        let events = vec![
+            orbit_core::kubernetes::models::EventInfo {
+                uid: "1".to_string(),
+                time: "1m".to_string(),
+                r#type: "Normal".to_string(),
+                reason: "ScalingReplicaSet".to_string(),
+                object_name: "api".to_string(),
+                object_kind: "Deployment".to_string(),
+                message: "Scaled up replica set api-7f9b".to_string(),
+                namespace: "default".to_string(),
+                source: "deployment-controller".to_string(),
+                first_seen: String::new(),
+                last_seen: String::new(),
+                count: 1,
+                labels: Default::default(),
+                annotations: Default::default(),
+            },
+            orbit_core::kubernetes::models::EventInfo {
+                uid: "2".to_string(),
+                time: "1m".to_string(),
+                r#type: "Normal".to_string(),
+                reason: "Started".to_string(),
+                object_name: "api-7f9b-xyz".to_string(),
+                object_kind: "Pod".to_string(),
+                message: "Started container api".to_string(),
+                namespace: "default".to_string(),
+                source: "kubelet".to_string(),
+                first_seen: String::new(),
+                last_seen: String::new(),
+                count: 1,
+                labels: Default::default(),
+                annotations: Default::default(),
+            },
+            orbit_core::kubernetes::models::EventInfo {
+                uid: "3".to_string(),
+                time: "1m".to_string(),
+                r#type: "Normal".to_string(),
+                reason: "Started".to_string(),
+                object_name: "api-7f9b-xyz".to_string(),
+                object_kind: "Pod".to_string(),
+                message: "Wrong namespace".to_string(),
+                namespace: "other".to_string(),
+                source: "kubelet".to_string(),
+                first_seen: String::new(),
+                last_seen: String::new(),
+                count: 1,
+                labels: Default::default(),
+                annotations: Default::default(),
+            },
+        ];
+
+        let filtered = filter_events_for_deployment(&events, &deployment);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].uid, "1");
+        assert_eq!(filtered[1].uid, "2");
     }
 }

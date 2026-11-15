@@ -341,6 +341,8 @@ pub fn build_namespace_context_menu_entries(
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
     on_filter_namespace: impl 'static + Fn(&mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    on_view_details: impl 'static + Fn(&mut Window, &mut App),
+    on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -362,12 +364,12 @@ pub fn build_namespace_context_menu_entries(
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-details", "View Details")
                 .icon(Icon::Info)
-                .disabled(true),
+                .on_select(on_view_details),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
-                .disabled(true),
+                .on_select(on_view_yaml),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -563,6 +565,64 @@ pub fn render_namespaces_view(
             |el| el.when_some(error_banner, |inner, banner| inner.child(banner)),
         )
         .child(body)
+        .into_any_element()
+}
+
+pub fn render_namespace_drawer_overview(ns: &NamespaceInfo, theme: &OrbitTheme) -> AnyElement {
+    let summary = crate::views::render_drawer_key_values(
+        vec![
+            ("Name", ns.name.clone(), true),
+            ("Status", ns.status.clone(), false),
+            (
+                "Type",
+                if ns.is_system { "System" } else { "User" }.to_string(),
+                false,
+            ),
+            (
+                "UID",
+                if ns.uid.is_empty() {
+                    "-".to_string()
+                } else {
+                    ns.uid.clone()
+                },
+                true,
+            ),
+            ("Age", ns.age.clone(), true),
+            (
+                "Created",
+                if ns.created.is_empty() {
+                    "-".to_string()
+                } else {
+                    ns.created.clone()
+                },
+                true,
+            ),
+        ],
+        theme,
+    );
+
+    div()
+        .id("namespace-drawer-overview")
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .p_4()
+        .flex()
+        .flex_col()
+        .gap_5()
+        .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
+        .child(crate::views::render_drawer_kv_badges(
+            "LABELS",
+            &ns.labels,
+            "No labels",
+            theme,
+        ))
+        .child(crate::views::render_drawer_kv_badges(
+            "ANNOTATIONS",
+            &ns.annotations,
+            "No annotations",
+            theme,
+        ))
         .into_any_element()
 }
 

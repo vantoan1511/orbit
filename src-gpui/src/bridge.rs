@@ -268,6 +268,62 @@ pub async fn handle_bridge_command(
                 });
             }
         }
+        ClusterBridgeCommand::LoadResourceYaml {
+            cluster_id,
+            generation,
+            kind,
+            namespace,
+            name,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match orbit_core::kubernetes::raw::fetch_resource_yaml(
+                        &client,
+                        namespace.as_deref(),
+                        &kind,
+                        &name,
+                    )
+                    .await
+                    {
+                        Ok(yaml) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceYamlLoaded {
+                                cluster_id,
+                                generation,
+                                kind,
+                                namespace,
+                                name,
+                                yaml,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceYamlLoadFailed {
+                                cluster_id,
+                                generation,
+                                kind,
+                                namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::ResourceYamlLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    kind,
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
         ClusterBridgeCommand::SaveNamespaceSelection {
             cluster_id,
             namespaces,
@@ -581,6 +637,48 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected NodesLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_resource_yaml_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 4,
+                kind: "Deployment".to_string(),
+                namespace: Some("default".to_string()),
+                name: "web".to_string(),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected ResourceYamlLoadFailed event");
+        match event {
+            ClusterBridgeEvent::ResourceYamlLoadFailed {
+                cluster_id,
+                generation,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 4);
+                assert_eq!(kind, "Deployment");
+                assert_eq!(namespace.as_deref(), Some("default"));
+                assert_eq!(name, "web");
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected ResourceYamlLoadFailed, got {other:?}"),
         }
     }
 }

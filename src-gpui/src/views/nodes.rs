@@ -382,6 +382,8 @@ pub fn build_node_context_menu_entries(
     _node: &NodeInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    on_view_details: impl 'static + Fn(&mut Window, &mut App),
+    on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -398,12 +400,12 @@ pub fn build_node_context_menu_entries(
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-details", "View Details")
                 .icon(Icon::Info)
-                .disabled(true),
+                .on_select(on_view_details),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
-                .disabled(true),
+                .on_select(on_view_yaml),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -598,6 +600,313 @@ pub fn render_nodes_view(
             |el| el.when_some(error_banner, |inner, banner| inner.child(banner)),
         )
         .child(body)
+        .into_any_element()
+}
+
+pub fn filter_events_for_node<'a>(
+    events: &'a [orbit_core::kubernetes::models::EventInfo],
+    node: &NodeInfo,
+) -> Vec<&'a orbit_core::kubernetes::models::EventInfo> {
+    events
+        .iter()
+        .filter(|ev| {
+            (ev.object_kind == "Node" && ev.object_name == node.name)
+                || ev.message.contains(&node.name)
+        })
+        .collect()
+}
+
+fn render_node_resource_bar(
+    label: &'static str,
+    pct: f64,
+    used: &str,
+    total: &str,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let clamped = pct.clamp(0.0, 100.0) as f32;
+    let bar_color = if clamped >= 85.0 {
+        theme.semantic.danger.solid
+    } else if clamped >= 70.0 {
+        theme.semantic.warning.solid
+    } else {
+        theme.accent.accent
+    };
+
+    div()
+        .w_full()
+        .p_2p5()
+        .rounded(theme.style.radius_control)
+        .bg(theme.surface.bg_panel)
+        .border_1()
+        .border_color(theme.border.default)
+        .flex()
+        .flex_col()
+        .gap_1p5()
+        .child(
+            div()
+                .w_full()
+                .flex()
+                .items_center()
+                .justify_between()
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.text.secondary)
+                        .child(label),
+                )
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                        .text_color(theme.text.primary)
+                        .child(format!("{used} / {total} ({pct:.0}%)")),
+                ),
+        )
+        .child(
+            div()
+                .w_full()
+                .h(px(6.0))
+                .rounded_full()
+                .bg(theme.surface.control_bg)
+                .overflow_hidden()
+                .child(
+                    div()
+                        .h_full()
+                        .w(gpui::relative(clamped / 100.0))
+                        .bg(bar_color),
+                ),
+        )
+        .into_any_element()
+}
+
+pub fn render_node_drawer_overview(node: &NodeInfo, theme: &OrbitTheme) -> AnyElement {
+    let pods_pct = if node.pods_limit > 0 {
+        (node.pods_count as f64 / node.pods_limit as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    let utilization = div()
+        .w_full()
+        .flex()
+        .flex_col()
+        .gap_2()
+        .child(render_node_resource_bar(
+            "CPU",
+            node.cpu_pct,
+            &node.cpu_used,
+            &node.cpu_total,
+            theme,
+        ))
+        .child(render_node_resource_bar(
+            "Memory",
+            node.mem_pct,
+            &node.mem_used,
+            &node.mem_total,
+            theme,
+        ))
+        .child(render_node_resource_bar(
+            "Pods",
+            pods_pct,
+            &node.pods_count.to_string(),
+            &node.pods_limit.to_string(),
+            theme,
+        ))
+        .into_any_element();
+
+    let mut summary_rows = vec![
+        ("Name", node.name.clone(), true),
+        ("Status", node.status.clone(), false),
+        ("Role", node.role.clone(), false),
+        ("Kubelet Version", node.version.clone(), true),
+        ("Cordoned", if node.is_cordoned { "Yes" } else { "No" }.to_string(), false),
+        ("Uptime", node.uptime.clone(), true),
+        ("Images Cached", node.images_count.to_string(), true),
+    ];
+    if let Some(created) = node.created_at.as_ref().filter(|s| !s.is_empty()) {
+        summary_rows.push(("Created", created.clone(), true));
+    }
+
+    let system_section = node.node_info.as_ref().map(|sys| {
+        crate::views::render_drawer_section(
+            "SYSTEM INFO",
+            crate::views::render_drawer_key_values(
+                vec![
+                    ("OS Image", sys.os_image.clone(), false),
+                    ("Kernel", sys.kernel_version.clone(), true),
+                    ("Runtime", sys.container_runtime_version.clone(), true),
+                    ("Architecture", sys.architecture.clone(), true),
+                ],
+                theme,
+            ),
+            theme,
+        )
+    });
+
+    let addresses_section = if node.addresses.is_empty() {
+        None
+    } else {
+        Some(crate::views::render_drawer_section(
+            "ADDRESSES",
+            crate::views::render_drawer_key_values(
+                node.addresses
+                    .iter()
+                    .map(|addr| {
+                        let label: &'static str = match addr.type_.as_str() {
+                            "InternalIP" => "InternalIP",
+                            "ExternalIP" => "ExternalIP",
+                            "Hostname" => "Hostname",
+                            _ => "Address",
+                        };
+                        (label, addr.address.clone(), true)
+                    })
+                    .collect(),
+                theme,
+            ),
+            theme,
+        ))
+    };
+
+    let conditions_section = if node.conditions.is_empty() {
+        None
+    } else {
+        Some(crate::views::render_drawer_section(
+            "CONDITIONS",
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .children(node.conditions.iter().map(|cond| {
+                    div()
+                        .w_full()
+                        .p_2p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.bg_panel)
+                        .border_1()
+                        .border_color(theme.border.default)
+                        .flex()
+                        .flex_col()
+                        .gap_1()
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .justify_between()
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_xs)
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(theme.text.primary)
+                                        .child(cond.type_.clone()),
+                                )
+                                .child(
+                                    apply_text_step(div(), theme.typography.size_2xs)
+                                        .text_color(theme.text.secondary)
+                                        .child(cond.status.clone()),
+                                ),
+                        )
+                        .when_some(cond.message.as_ref(), |el, msg| {
+                            el.child(
+                                apply_text_step(div(), theme.typography.size_2xs)
+                                    .text_color(theme.text.muted)
+                                    .child(msg.clone()),
+                            )
+                        })
+                }))
+                .into_any_element(),
+            theme,
+        ))
+    };
+
+    let taints_section = if node.taints.is_empty() {
+        None
+    } else {
+        let mono = theme.typography.mono_font(FontWeight::NORMAL);
+        Some(crate::views::render_drawer_section(
+            "TAINTS",
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_1p5()
+                .children(node.taints.iter().map(|t| {
+                    let val = t.value.as_deref().unwrap_or("");
+                    let label = if val.is_empty() {
+                        format!("{}:{}", t.key, t.effect)
+                    } else {
+                        format!("{}={}:{}", t.key, val, t.effect)
+                    };
+                    apply_text_step(div(), theme.typography.size_2xs)
+                        .px_2()
+                        .py_0p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.control_bg)
+                        .border_1()
+                        .border_color(theme.border.default)
+                        .font(mono.clone())
+                        .text_color(theme.text.primary)
+                        .child(label)
+                }))
+                .into_any_element(),
+            theme,
+        ))
+    };
+
+    div()
+        .id("node-drawer-overview")
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .p_4()
+        .flex()
+        .flex_col()
+        .gap_5()
+        .child(crate::views::render_drawer_section(
+            "RESOURCE UTILIZATION",
+            utilization,
+            theme,
+        ))
+        .child(crate::views::render_drawer_section(
+            "SUMMARY",
+            crate::views::render_drawer_key_values(summary_rows, theme),
+            theme,
+        ))
+        .when_some(addresses_section, |el, sec| el.child(sec))
+        .when_some(system_section, |el, sec| el.child(sec))
+        .when_some(conditions_section, |el, sec| el.child(sec))
+        .when_some(taints_section, |el, sec| el.child(sec))
+        .child(crate::views::render_drawer_kv_badges(
+            "LABELS",
+            &node.labels_map,
+            "No labels",
+            theme,
+        ))
+        .child(crate::views::render_drawer_kv_badges(
+            "ANNOTATIONS",
+            &node.annotations,
+            "No annotations",
+            theme,
+        ))
+        .into_any_element()
+}
+
+pub fn render_node_drawer_events(
+    events: &[orbit_core::kubernetes::models::EventInfo],
+    loading: bool,
+    node: &NodeInfo,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let matched = filter_events_for_node(events, node);
+    div()
+        .id("node-drawer-events")
+        .flex_1()
+        .min_h_0()
+        .overflow_y_scroll()
+        .p_4()
+        .child(crate::views::render_drawer_events_list(
+            &matched,
+            loading,
+            "No events found for this node.",
+            theme,
+        ))
         .into_any_element()
 }
 
@@ -929,5 +1238,80 @@ mod tests {
             "2d",
         ));
         assert_eq!(nodes_presentation_mode(&state), NodesPresentationMode::Table);
+    }
+
+    #[test]
+    fn test_filter_events_for_node_matches_object_name_or_message() {
+        let node = make_node(
+            "node-1",
+            "Ready",
+            "worker",
+            "v1.30.2",
+            false,
+            10.0,
+            "1",
+            "8",
+            20.0,
+            "4",
+            "16",
+            5,
+            110,
+            "2d",
+        );
+        let events = vec![
+            orbit_core::kubernetes::models::EventInfo {
+                uid: "1".to_string(),
+                time: "1m".to_string(),
+                r#type: "Normal".to_string(),
+                reason: "NodeReady".to_string(),
+                object_name: "node-1".to_string(),
+                object_kind: "Node".to_string(),
+                message: "Node node-1 status is now: NodeReady".to_string(),
+                namespace: String::new(),
+                source: "kubelet".to_string(),
+                first_seen: String::new(),
+                last_seen: String::new(),
+                count: 1,
+                labels: Default::default(),
+                annotations: Default::default(),
+            },
+            orbit_core::kubernetes::models::EventInfo {
+                uid: "2".to_string(),
+                time: "1m".to_string(),
+                r#type: "Normal".to_string(),
+                reason: "Scheduled".to_string(),
+                object_name: "web-1".to_string(),
+                object_kind: "Pod".to_string(),
+                message: "Successfully assigned default/web-1 to node-1".to_string(),
+                namespace: "default".to_string(),
+                source: "scheduler".to_string(),
+                first_seen: String::new(),
+                last_seen: String::new(),
+                count: 1,
+                labels: Default::default(),
+                annotations: Default::default(),
+            },
+            orbit_core::kubernetes::models::EventInfo {
+                uid: "3".to_string(),
+                time: "1m".to_string(),
+                r#type: "Normal".to_string(),
+                reason: "Scheduled".to_string(),
+                object_name: "web-2".to_string(),
+                object_kind: "Pod".to_string(),
+                message: "Successfully assigned default/web-2 to node-2".to_string(),
+                namespace: "default".to_string(),
+                source: "scheduler".to_string(),
+                first_seen: String::new(),
+                last_seen: String::new(),
+                count: 1,
+                labels: Default::default(),
+                annotations: Default::default(),
+            },
+        ];
+
+        let filtered = filter_events_for_node(&events, &node);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].uid, "1");
+        assert_eq!(filtered[1].uid, "2");
     }
 }

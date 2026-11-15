@@ -556,9 +556,13 @@ where
 
                         if let Some(click_cb) = on_row_click.clone() {
                             let row_key_for_click = key_shared.clone();
-                            row_el = row_el.on_click(move |event, window, cx| {
-                                click_cb(row_idx, row_key_for_click.clone(), event, window, cx);
-                            });
+                            row_el = row_el
+                                .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                                    cx.stop_propagation();
+                                })
+                                .on_click(move |event, window, cx| {
+                                    click_cb(row_idx, row_key_for_click.clone(), event, window, cx);
+                                });
                         }
 
                         if let Some(ctx_cb) = on_row_context_menu.clone() {
@@ -793,5 +797,18 @@ mod tests {
         )
         .on_row_context_menu(|_, _, _, _, _| {});
         assert!(with_ctx.on_row_context_menu.is_some());
+    }
+
+    #[test]
+    fn test_data_table_row_click_callback_builder_preserves_state_expectations() {
+        let with_both = DataTableCallbacks::new(
+            |idx| format!("row-{idx}"),
+            |_, _, _| div().into_any_element(),
+        )
+        .on_row_click(|_, _, _, _, _| {})
+        .on_row_context_menu(|_, _, _, _, _| {});
+
+        assert!(with_both.on_row_click.is_some());
+        assert!(with_both.on_row_context_menu.is_some());
     }
 }
