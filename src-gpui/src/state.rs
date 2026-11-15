@@ -139,6 +139,10 @@ impl NamespaceFilterState {
         }
     }
 
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == NamespaceLoadStatus::Idle
+    }
+
     pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
         self.generation += 1;
         self.cluster_id = Some(cluster_id.to_string());
@@ -320,6 +324,23 @@ impl NamespaceFilterState {
             return true;
         }
         false
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NamespacesViewState {
+    pub table: DataTableState,
+}
+
+impl NamespacesViewState {
+    pub fn reset_for_cluster(&mut self) {
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.table.selected_row_key = None;
+        self.table.loading = false;
     }
 }
 
@@ -1363,5 +1384,30 @@ mod tests {
         assert!(state.cluster_id.is_none());
         assert_eq!(state.status, NodesLoadStatus::Idle);
         assert!(state.generation > gen_before_disconnect);
+    }
+
+    #[test]
+    fn test_namespaces_view_state_and_filter_needs_load() {
+        let mut filter = NamespaceFilterState::default();
+        assert!(filter.needs_load_for_cluster("ctx-a"));
+
+        filter.begin_load_for_cluster("ctx-a");
+        assert!(!filter.needs_load_for_cluster("ctx-a"));
+        assert!(filter.needs_load_for_cluster("ctx-b"));
+
+        let mut view_state = NamespacesViewState::default();
+        view_state.table.selected_row_key = Some("default".into());
+        view_state.table.loading = true;
+
+        view_state.reset_for_cluster();
+        assert!(view_state.table.selected_row_key.is_none());
+        assert!(!view_state.table.loading);
+
+        view_state.table.selected_row_key = Some("kube-system".into());
+        view_state.table.loading = true;
+
+        view_state.reset_for_disconnected();
+        assert!(view_state.table.selected_row_key.is_none());
+        assert!(!view_state.table.loading);
     }
 }
