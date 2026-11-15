@@ -245,6 +245,19 @@ impl Configuration {
                 last_updated_at: None,
             },
             Configuration {
+                key: "selectedNamespaces".to_string(),
+                name: "Selected Namespaces".to_string(),
+                description: "Per-cluster active namespace filter selections.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({})),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
                 key: "enableExperienceFeatures".to_string(),
                 name: "Experience Features".to_string(),
                 description: "Enable experimental preview features such as the native GPUI desktop shell.".to_string(),
@@ -260,6 +273,8 @@ impl Configuration {
         ]
     }
 }
+
+pub type SelectedNamespacesMap = HashMap<String, Vec<String>>;
 
 /// Persistent user configuration storing strictly key-value pairs in `~/.orbit/config.json`.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -556,6 +571,60 @@ impl OrbitConfig {
         }
     }
 
+    /// Returns the per-cluster selected namespaces map.
+    pub fn selected_namespaces_map(&self) -> SelectedNamespacesMap {
+        self.values
+            .get("selectedNamespaces")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default()
+    }
+
+    /// Returns the persisted namespace selection for a specific cluster ID.
+    /// An empty vector represents "All Namespaces".
+    pub fn selected_namespaces_for_cluster(&self, cluster_id: &str) -> Vec<String> {
+        self.selected_namespaces_map()
+            .get(cluster_id)
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// Updates or clears the persisted namespace selection for a specific cluster ID in memory.
+    pub fn update_selected_namespaces_for_cluster(
+        &mut self,
+        cluster_id: &str,
+        namespaces: Vec<String>,
+    ) {
+        let mut map = self.selected_namespaces_map();
+        let mut seen = std::collections::HashSet::new();
+        let cleaned: Vec<String> = namespaces
+            .into_iter()
+            .map(|ns| ns.trim().to_string())
+            .filter(|ns| !ns.is_empty() && seen.insert(ns.clone()))
+            .collect();
+
+        if cleaned.is_empty() {
+            map.remove(cluster_id);
+        } else {
+            map.insert(cluster_id.to_string(), cleaned);
+        }
+
+        if map.is_empty() {
+            self.values.remove("selectedNamespaces");
+        } else if let Ok(v) = serde_json::to_value(map) {
+            self.values.insert("selectedNamespaces".to_string(), v);
+        }
+    }
+
+    /// Updates and saves the persisted namespace selection for a specific cluster ID.
+    pub fn set_selected_namespaces_for_cluster(
+        &mut self,
+        cluster_id: &str,
+        namespaces: Vec<String>,
+    ) -> Result<(), String> {
+        self.update_selected_namespaces_for_cluster(cluster_id, namespaces);
+        self.save()
+    }
+
     /// Generates the unified `Configuration` model list sent to the frontend.
     pub fn get_configurations(&self) -> Vec<Configuration> {
         let mut defs = Configuration::system_definitions();
@@ -644,14 +713,21 @@ impl OrbitConfig {
 }
 
 #[cfg(any(test, feature = "test-utils"))]
+static TEST_CONFIG_DIR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(any(test, feature = "test-utils"))]
 pub struct TestConfigDirGuard {
     pub temp_dir: PathBuf,
     original_env: Option<std::ffi::OsString>,
+    _lock: std::sync::MutexGuard<'static, ()>,
 }
 
 #[cfg(any(test, feature = "test-utils"))]
 impl TestConfigDirGuard {
     pub fn new(test_name: &str) -> Self {
+        let lock = TEST_CONFIG_DIR_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let temp_dir = std::env::temp_dir().join(format!("orbit_{}_{}", test_name, uuid::Uuid::new_v4()));
         let _ = std::fs::create_dir_all(&temp_dir);
         let original_env = std::env::var_os("ORBIT_CONFIG_DIR");
@@ -661,6 +737,7 @@ impl TestConfigDirGuard {
         Self {
             temp_dir,
             original_env,
+            _lock: lock,
         }
     }
 }
@@ -1192,6 +1269,54 @@ mod tests {
         let updated_proxy = config.proxy_settings();
         assert_eq!(updated_proxy["enabled"], true);
         assert_eq!(updated_proxy["httpProxy"], "http://proxy.corp.internal:8080");
+    }
+
+    #[test]
+    fn test_selected_namespaces_in_system_definitions_and_per_cluster_roundtrip() {
+        let _guard = TestConfigDirGuard::new("selected_namespaces");
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "selectedNamespaces")
+            .expect("selectedNamespaces must exist");
+        assert!(cfg.enable);
+        assert_eq!(cfg.datatype, "string");
+        assert_eq!(cfg.cardinality, "0..1");
+        assert_eq!(cfg.default_value, Some(serde_json::json!({})));
+
+        let mut config = OrbitConfig::default();
+        config
+            .set_selected_namespaces_for_cluster(
+                "prod-ctx",
+                vec![
+                    "payments".to_string(),
+                    "default".to_string(),
+                    "payments".to_string(),
+                    "  ".to_string(),
+                ],
+            )
+            .expect("save should succeed");
+
+        let reloaded = OrbitConfig::load();
+        assert_eq!(
+            reloaded.selected_namespaces_for_cluster("prod-ctx"),
+            vec!["payments".to_string(), "default".to_string()]
+        );
+        assert!(reloaded
+            .selected_namespaces_for_cluster("dev-ctx")
+            .is_empty());
+
+        let mut cleared = reloaded;
+        cleared
+            .set_selected_namespaces_for_cluster("prod-ctx", Vec::new())
+            .expect("clear should succeed");
+        let reloaded_after_clear = OrbitConfig::load();
+        assert!(reloaded_after_clear
+            .selected_namespaces_for_cluster("prod-ctx")
+            .is_empty());
+        assert!(!reloaded_after_clear
+            .values
+            .contains_key("selectedNamespaces"));
     }
 }
 

@@ -68,11 +68,13 @@ pub fn welcome_cluster_prompt_state(cluster_count: usize) -> WelcomeClusterPromp
     }
 }
 
+pub type SelectClusterCallback = Rc<dyn Fn(String, &mut Window, &mut App)>;
+
 pub fn render_welcome_view(
     clusters: &[ClusterInfo],
     kubeconfig_error: Option<&str>,
     theme: &OrbitTheme,
-    on_select_cluster: Rc<dyn Fn(String, &mut Window, &mut App)>,
+    on_select_cluster: SelectClusterCallback,
     on_refresh_contexts: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     div()
@@ -124,7 +126,7 @@ fn render_cluster_section(
     clusters: &[ClusterInfo],
     kubeconfig_error: Option<&str>,
     theme: &OrbitTheme,
-    on_select_cluster: Rc<dyn Fn(String, &mut Window, &mut App)>,
+    on_select_cluster: SelectClusterCallback,
     on_refresh_contexts: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let prompt = welcome_cluster_prompt_state(clusters.len());
@@ -203,7 +205,7 @@ fn render_cluster_section(
 fn render_cluster_list(
     clusters: &[ClusterInfo],
     theme: &OrbitTheme,
-    on_select_cluster: Rc<dyn Fn(String, &mut Window, &mut App)>,
+    on_select_cluster: SelectClusterCallback,
 ) -> AnyElement {
     let hover_bg = theme.surface.bg_hover;
     let mut list = div().flex().flex_col().gap_2();

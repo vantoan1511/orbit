@@ -13,3 +13,4 @@ tracing = "0.1"
 
 [dev-dependencies]
 kube = { version = "0.98.0", default-features = false }
+orbit-core = { path = "../crates/orbit-core", features = ["test-utils"] }

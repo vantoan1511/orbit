@@ -400,7 +400,7 @@ pub struct StorageClassInfo {
     pub age: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct NamespaceInfo {
     pub name: String,
