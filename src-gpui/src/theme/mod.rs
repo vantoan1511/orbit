@@ -96,6 +96,36 @@ impl OrbitTheme {
         )
     }
 
+    pub fn with_accent_color(
+        &self,
+        accent_id: AccentColor,
+        window_appearance: WindowAppearance,
+    ) -> Self {
+        Self::resolve(
+            self.mode,
+            self.style.ui_style,
+            accent_id,
+            self.semantic_pref.clone(),
+            window_appearance,
+        )
+    }
+
+    pub fn with_appearance(
+        &self,
+        mode: ThemeMode,
+        ui_style: UiStyle,
+        accent_id: AccentColor,
+        window_appearance: WindowAppearance,
+    ) -> Self {
+        Self::resolve(
+            mode,
+            ui_style,
+            accent_id,
+            self.semantic_pref.clone(),
+            window_appearance,
+        )
+    }
+
     pub fn with_window_appearance(&self, window_appearance: WindowAppearance) -> Self {
         Self::resolve(
             self.mode,
@@ -187,5 +217,40 @@ mod tests {
             flat_theme.style.window_background,
             WindowBackgroundAppearance::Opaque
         );
+    }
+
+    #[test]
+    fn test_orbit_theme_with_accent_and_reset_appearance() {
+        let custom_pref = SemanticColorsPreference {
+            preset: SemanticPreset::Colorblind,
+            ..Default::default()
+        };
+
+        let base = OrbitTheme::resolve(
+            ThemeMode::Light,
+            UiStyle::Glass,
+            AccentColor::Blue,
+            custom_pref.clone(),
+            WindowAppearance::Dark,
+        );
+
+        let rose = base.with_accent_color(AccentColor::Rose, WindowAppearance::Dark);
+        assert_eq!(rose.mode, ThemeMode::Light);
+        assert_eq!(rose.style.ui_style, UiStyle::Glass);
+        assert_eq!(rose.accent_id, AccentColor::Rose);
+        assert_eq!(rose.semantic_pref, custom_pref);
+        assert_ne!(rose.accent.accent, base.accent.accent);
+
+        let reset = rose.with_appearance(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            WindowAppearance::Dark,
+        );
+        assert_eq!(reset.mode, ThemeMode::Dark);
+        assert!(reset.is_dark);
+        assert_eq!(reset.style.ui_style, UiStyle::Flat);
+        assert_eq!(reset.accent_id, AccentColor::Blue);
+        assert_eq!(reset.semantic_pref, custom_pref);
     }
 }

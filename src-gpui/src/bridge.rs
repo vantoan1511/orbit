@@ -508,6 +508,46 @@ pub async fn handle_bridge_command(
                 );
             }
         }
+        ClusterBridgeCommand::SaveThemeMode { mode } => {
+            let mut guard = manager.write().await;
+            guard.config.update_theme_mode(&mode);
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(error = %message, "Failed to persist theme mode");
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
+        ClusterBridgeCommand::SaveUiStyle { style } => {
+            let mut guard = manager.write().await;
+            guard.config.update_ui_style(&style);
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(error = %message, "Failed to persist UI style");
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
+        ClusterBridgeCommand::SaveAccentColor { accent } => {
+            let mut guard = manager.write().await;
+            guard.config.update_accent_color(&accent);
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(error = %message, "Failed to persist accent color");
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
+        ClusterBridgeCommand::SaveEnableExperienceFeatures { enabled } => {
+            let mut guard = manager.write().await;
+            guard.config.update_enable_experience_features(enabled);
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(error = %message, "Failed to persist experience features toggle");
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
+        ClusterBridgeCommand::ResetAppearanceDefaults => {
+            let mut guard = manager.write().await;
+            guard.config.reset_appearance_preferences();
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(error = %message, "Failed to reset appearance preferences");
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
     }
 }
 
@@ -947,5 +987,66 @@ users:
             }
             other => panic!("Expected ServicesLoadFailed, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_persists_appearance_and_experience_settings() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("bridge_settings_persist");
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveThemeMode {
+                mode: "light".to_string(),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveUiStyle {
+                style: "glass".to_string(),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveAccentColor {
+                accent: "violet".to_string(),
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveEnableExperienceFeatures { enabled: true },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        assert!(event_rx.try_recv().is_err());
+
+        let loaded = OrbitConfig::load();
+        assert_eq!(loaded.theme_mode(), "light");
+        assert_eq!(loaded.ui_style(), "glass");
+        assert_eq!(loaded.accent_color(), "violet");
+        assert!(loaded.enable_experience_features());
+
+        handle_bridge_command(
+            ClusterBridgeCommand::ResetAppearanceDefaults,
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        assert!(event_rx.try_recv().is_err());
+
+        let after_reset = OrbitConfig::load();
+        assert_eq!(after_reset.theme_mode(), "dark");
+        assert_eq!(after_reset.ui_style(), "flat");
+        assert_eq!(after_reset.accent_color(), "blue");
+        assert!(after_reset.enable_experience_features());
     }
 }

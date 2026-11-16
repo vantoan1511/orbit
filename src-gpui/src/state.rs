@@ -65,6 +65,11 @@ pub enum ClusterBridgeCommand {
         open_tabs: Vec<String>,
         active_tab: Option<String>,
     },
+    SaveThemeMode { mode: String },
+    SaveUiStyle { style: String },
+    SaveAccentColor { accent: String },
+    SaveEnableExperienceFeatures { enabled: bool },
+    ResetAppearanceDefaults,
 }
 
 #[derive(Debug, Clone)]
@@ -192,6 +197,9 @@ pub enum ClusterBridgeEvent {
         kind: String,
         namespace: Option<String>,
         name: String,
+        message: String,
+    },
+    SettingsSaveFailed {
         message: String,
     },
 }
@@ -1476,7 +1484,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::EventsLoaded { .. }
             | ClusterBridgeEvent::EventsLoadFailed { .. }
             | ClusterBridgeEvent::ResourceYamlLoaded { .. }
-            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
+            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
+            | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
         }
     }
 

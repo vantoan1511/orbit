@@ -542,6 +542,70 @@ impl OrbitConfig {
             .to_string()
     }
 
+    fn set_validated_string_or_default(
+        &mut self,
+        key: &str,
+        value: &str,
+        valid_values: &[&str],
+        default: &str,
+    ) {
+        let normalized = value.trim().to_ascii_lowercase();
+        let resolved = if valid_values.contains(&normalized.as_str()) {
+            normalized
+        } else {
+            default.to_string()
+        };
+
+        if resolved == default {
+            self.values.remove(key);
+        } else {
+            self.values
+                .insert(key.to_string(), serde_json::Value::String(resolved));
+        }
+    }
+
+    /// Updates `themeMode` ("dark", "light", or "system"), omitting the default "dark".
+    pub fn update_theme_mode(&mut self, mode: &str) {
+        self.set_validated_string_or_default("themeMode", mode, &["dark", "light", "system"], "dark");
+    }
+
+    /// Updates `uiStyle` ("flat", "glass", "aero", "liquidglass", "ios", or "paper"), omitting the default "flat".
+    pub fn update_ui_style(&mut self, style: &str) {
+        self.set_validated_string_or_default(
+            "uiStyle",
+            style,
+            &["flat", "glass", "aero", "liquidglass", "ios", "paper"],
+            "flat",
+        );
+    }
+
+    /// Updates `accentColor` ("blue", "emerald", "violet", "cyan", "amber", "rose", "slate"), omitting the default "blue".
+    pub fn update_accent_color(&mut self, accent: &str) {
+        self.set_validated_string_or_default(
+            "accentColor",
+            accent,
+            &["blue", "emerald", "violet", "cyan", "amber", "rose", "slate"],
+            "blue",
+        );
+    }
+
+    /// Updates `enableExperienceFeatures`, omitting the default `false`.
+    pub fn update_enable_experience_features(&mut self, enabled: bool) {
+        if enabled {
+            self.values
+                .insert("enableExperienceFeatures".to_string(), serde_json::Value::Bool(true));
+        } else {
+            self.values.remove("enableExperienceFeatures");
+        }
+    }
+
+    /// Resets `themeMode`, `uiStyle`, and `accentColor` back to system defaults.
+    pub fn reset_appearance_preferences(&mut self) {
+        self.values.remove("themeMode");
+        self.values.remove("uiStyle");
+        self.values.remove("accentColor");
+    }
+
     /// Returns configured semantic colors. Defaults to default preset.
     pub fn semantic_colors(&self) -> serde_json::Value {
         self.values
@@ -1453,6 +1517,62 @@ mod tests {
                 active_tab: None,
             })
         );
+    }
+
+    #[test]
+    fn test_appearance_and_experience_config_setters_and_persistence() {
+        let _guard = TestConfigDirGuard::new("appearance_and_experience_setters");
+        let mut config = OrbitConfig::default();
+
+        config.update_theme_mode("  LIGHT ");
+        config.update_ui_style("LiquidGlass");
+        config.update_accent_color("EMERALD");
+        config.update_enable_experience_features(true);
+
+        assert_eq!(config.theme_mode(), "light");
+        assert_eq!(config.ui_style(), "liquidglass");
+        assert_eq!(config.accent_color(), "emerald");
+        assert!(config.enable_experience_features());
+
+        config.save().expect("save should succeed");
+        let reloaded = OrbitConfig::load();
+        assert_eq!(reloaded.theme_mode(), "light");
+        assert_eq!(reloaded.ui_style(), "liquidglass");
+        assert_eq!(reloaded.accent_color(), "emerald");
+        assert!(reloaded.enable_experience_features());
+
+        let mut reset = reloaded;
+        reset.update_theme_mode("dark");
+        reset.update_ui_style("flat");
+        reset.update_accent_color("blue");
+        reset.update_enable_experience_features(false);
+
+        assert!(!reset.values.contains_key("themeMode"));
+        assert!(!reset.values.contains_key("uiStyle"));
+        assert!(!reset.values.contains_key("accentColor"));
+        assert!(!reset.values.contains_key("enableExperienceFeatures"));
+
+        // Invalid values fall back to canonical defaults and stay omitted
+        reset.update_theme_mode("unknown-mode");
+        reset.update_ui_style("unknown-style");
+        reset.update_accent_color("unknown-accent");
+        assert_eq!(reset.theme_mode(), "dark");
+        assert_eq!(reset.ui_style(), "flat");
+        assert_eq!(reset.accent_color(), "blue");
+        assert!(!reset.values.contains_key("themeMode"));
+        assert!(!reset.values.contains_key("uiStyle"));
+        assert!(!reset.values.contains_key("accentColor"));
+
+        // reset_appearance_preferences clears all appearance keys while keeping experience flag
+        reset.update_theme_mode("system");
+        reset.update_ui_style("paper");
+        reset.update_accent_color("rose");
+        reset.update_enable_experience_features(true);
+        reset.reset_appearance_preferences();
+        assert!(!reset.values.contains_key("themeMode"));
+        assert!(!reset.values.contains_key("uiStyle"));
+        assert!(!reset.values.contains_key("accentColor"));
+        assert!(reset.enable_experience_features());
     }
 }
 
