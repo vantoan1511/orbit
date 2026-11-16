@@ -43,6 +43,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    Service {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -61,6 +65,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { .. } => "Deployment",
             Self::Pod { .. } => "Pod",
+            Self::Service { .. } => "Service",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -71,6 +76,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { name, .. }
             | Self::Pod { name, .. }
+            | Self::Service { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
@@ -81,6 +87,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { name, .. }
             | Self::Pod { name, .. }
+            | Self::Service { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -91,6 +98,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { namespace, .. }
             | Self::Pod { namespace, .. }
+            | Self::Service { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
             Self::Node { .. } | Self::Namespace { .. } => None,
         }
@@ -698,5 +706,18 @@ mod tests {
         assert_eq!(pod.display_title(), "api-0");
         assert_eq!(pod.namespace(), Some("prod"));
         assert!(pod.supports_live_yaml());
+    }
+
+    #[test]
+    fn test_service_drawer_target_metadata_and_yaml_support() {
+        let svc = ResourceDrawerTarget::Service {
+            name: "api-svc".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(svc.kind(), "Service");
+        assert_eq!(svc.name(), "api-svc");
+        assert_eq!(svc.display_title(), "api-svc");
+        assert_eq!(svc.namespace(), Some("prod"));
+        assert!(svc.supports_live_yaml());
     }
 }

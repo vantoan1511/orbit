@@ -33,7 +33,7 @@ use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, DeploymentsState, EventTypeFilter, EventsLoadStatus, EventsState,
     NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState, PodsState,
-    TabDropPosition, WorkspaceTabsState, calculate_tab_drop_index,
+    ServicesState, TabDropPosition, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -182,6 +182,7 @@ pub fn select_workspace_view_with_state(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     pods: &mut PodsState,
+    services: &mut ServicesState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: WorkspaceView,
@@ -192,6 +193,7 @@ pub fn select_workspace_view_with_state(
         namespaces,
         deployments,
         pods,
+        services,
         nodes,
         events,
         Some(view),
@@ -205,6 +207,7 @@ pub fn select_workspace_view_with_tabs(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     pods: &mut PodsState,
+    services: &mut ServicesState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -218,6 +221,7 @@ pub fn select_workspace_view_with_tabs(
         namespaces,
         deployments,
         pods,
+        services,
         nodes,
         events,
         view,
@@ -230,11 +234,13 @@ pub fn select_workspace_view_with_tabs(
     commands
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_command_for_active_view(
     state: &ClusterSwitcherState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     pods: &mut PodsState,
+    services: &mut ServicesState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: Option<WorkspaceView>,
@@ -251,6 +257,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
         return Some(pods.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::Services && services.needs_load_for_cluster(cluster_id) {
+        return Some(services.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
         return Some(nodes.begin_load_for_cluster(cluster_id));
@@ -270,6 +279,7 @@ pub fn apply_cluster_event_with_tabs(
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
     pods: &mut PodsState,
+    services: &mut ServicesState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -284,6 +294,7 @@ pub fn apply_cluster_event_with_tabs(
         namespaces_view,
         deployments,
         pods,
+        services,
         nodes,
         events,
         event,
@@ -298,6 +309,7 @@ pub fn apply_cluster_event_with_tabs(
                 namespaces,
                 deployments,
                 pods,
+                services,
                 nodes,
                 events,
                 restored,
@@ -319,6 +331,7 @@ pub fn handle_tab_shortcut_with_state(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     pods: &mut PodsState,
+    services: &mut ServicesState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -358,6 +371,7 @@ pub fn handle_tab_shortcut_with_state(
         namespaces,
         deployments,
         pods,
+        services,
         nodes,
         events,
         active,
@@ -380,6 +394,7 @@ pub fn apply_cluster_event_with_workspace(
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
     pods: &mut PodsState,
+    services: &mut ServicesState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     event: ClusterBridgeEvent,
@@ -403,6 +418,11 @@ pub fn apply_cluster_event_with_workspace(
                 } else {
                     pods.reset_for_cluster(id);
                 }
+                if sidebar.active_view == WorkspaceView::Services {
+                    commands.push(services.begin_load_for_cluster(id));
+                } else {
+                    services.reset_for_cluster(id);
+                }
                 if sidebar.active_view == WorkspaceView::Nodes {
                     commands.push(nodes.begin_load_for_cluster(id));
                 } else {
@@ -423,6 +443,7 @@ pub fn apply_cluster_event_with_workspace(
             namespaces_view.reset_for_disconnected();
             deployments.reset_for_disconnected();
             pods.reset_for_disconnected();
+            services.reset_for_disconnected();
             nodes.reset_for_disconnected();
             events.reset_for_disconnected();
         }
@@ -520,6 +541,20 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             events.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::ServicesLoaded {
+            cluster_id,
+            generation,
+            services: loaded_services,
+        } => {
+            services.apply_loaded(&cluster_id, generation, loaded_services);
+        }
+        ClusterBridgeEvent::ServicesLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            services.apply_failed(&cluster_id, generation, message);
+        }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
     }
@@ -582,6 +617,7 @@ pub struct OrbitShell {
     namespaces_view: NamespacesViewState,
     deployments: DeploymentsState,
     pods: PodsState,
+    services: ServicesState,
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
@@ -620,6 +656,7 @@ impl OrbitShell {
                             &mut shell.namespaces_view,
                             &mut shell.deployments,
                             &mut shell.pods,
+                            &mut shell.services,
                             &mut shell.nodes,
                             &mut shell.events,
                             &mut shell.tabs,
@@ -657,6 +694,7 @@ impl OrbitShell {
             namespaces_view: NamespacesViewState::default(),
             deployments: DeploymentsState::default(),
             pods: PodsState::default(),
+            services: ServicesState::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
@@ -719,6 +757,7 @@ impl OrbitShell {
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.pods,
+            &mut self.services,
             &mut self.nodes,
             &mut self.events,
             &mut self.tabs,
@@ -746,6 +785,7 @@ impl OrbitShell {
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.pods,
+            &mut self.services,
             &mut self.nodes,
             &mut self.events,
             active,
@@ -832,6 +872,7 @@ impl OrbitShell {
             target,
             ResourceDrawerTarget::Deployment { .. }
                 | ResourceDrawerTarget::Pod { .. }
+                | ResourceDrawerTarget::Service { .. }
                 | ResourceDrawerTarget::Node { .. }
         ) {
             if let Some(cid) = cluster_id.as_deref() {
@@ -923,6 +964,11 @@ impl OrbitShell {
                 .pods
                 .iter()
                 .any(|p| p.name == *name && p.namespace == *namespace),
+            ResourceDrawerTarget::Service { name, namespace } => self
+                .services
+                .services
+                .iter()
+                .any(|s| s.name == *name && s.namespace == *namespace),
         };
         if !exists {
             self.drawer.close();
@@ -1215,6 +1261,56 @@ impl OrbitShell {
                     body,
                 ))
             }
+            ResourceDrawerTarget::Service { name, namespace } => {
+                let svc = self
+                    .services
+                    .services
+                    .iter()
+                    .find(|s| s.name == *name && s.namespace == *namespace)?;
+                let matched_events =
+                    views::services::filter_events_for_service(&self.events.events, svc);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::services::render_service_drawer_overview(svc, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::services::render_service_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        svc,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(format!("{}/{}", svc.namespace, svc.name), theme, cx)
+                    }
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(svc.name.clone()),
+                    SharedString::from("Service"),
+                    Some(SharedString::from(svc.namespace.clone())),
+                    Some(SharedString::from(svc.age.clone())),
+                    Some(SharedString::from(svc.r#type.clone())),
+                    tabs,
+                    body,
+                ))
+            }
         }
     }
 
@@ -1299,6 +1395,15 @@ impl OrbitShell {
                     .pods
                     .begin_refresh()
                     .unwrap_or_else(|| self.pods.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Services
+                || self.services.cluster_id.is_some()
+            {
+                let cmd = self
+                    .services
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.services.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
@@ -3194,6 +3299,139 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::Services {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.services.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.services.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Service {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            svc: &orbit_core::kubernetes::models::ServiceInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = svc.name.clone();
+                let namespace = svc.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Service {
+                    name: svc.name.clone(),
+                    namespace: svc.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::services::build_service_context_menu_entries(
+                    svc,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.services.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let type_filter_entity = cx.entity().clone();
+            let on_type_filter = move |filter: crate::state::ServiceTypeFilter,
+                                      _window: &mut Window,
+                                      cx: &mut App| {
+                type_filter_entity.update(cx, |shell, cx| {
+                    shell.services.type_filter = filter;
+                    cx.notify();
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    if let ClusterConnectionState::Connected { cluster_id, .. } =
+                        &shell.state.connection_state
+                    {
+                        let cmd = shell
+                            .services
+                            .begin_refresh()
+                            .unwrap_or_else(|| shell.services.begin_load_for_cluster(cluster_id));
+                        shell.dispatch_command(cmd);
+                        cx.notify();
+                    }
+                });
+            };
+
+            return views::services::render_services_view(
+                &self.services,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_type_filter,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Pods {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -3809,6 +4047,7 @@ impl OrbitShell {
             WorkspaceView::Namespaces
                 | WorkspaceView::Deployments
                 | WorkspaceView::Pods
+                | WorkspaceView::Services
                 | WorkspaceView::Nodes
                 | WorkspaceView::Events
         ) && matches!(
@@ -4072,6 +4311,7 @@ impl Render for OrbitShell {
                     &mut this.namespaces,
                     &mut this.deployments,
                     &mut this.pods,
+                    &mut this.services,
                     &mut this.nodes,
                     &mut this.events,
                     &mut this.tabs,
@@ -4479,6 +4719,7 @@ mod tests {
             &mut throwaway_namespaces_view,
             &mut throwaway_deployments,
             &mut throwaway_pods,
+            &mut ServicesState::default(),
             &mut throwaway_nodes,
             &mut EventsState::default(),
             event,
@@ -4598,6 +4839,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -4631,6 +4873,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::OverviewLoaded {
@@ -4650,6 +4893,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NamespacesLoaded {
@@ -4684,6 +4928,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -4795,6 +5040,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut pods,
+                &mut ServicesState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Pods
@@ -4811,6 +5057,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Deployments,
@@ -4835,6 +5082,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -4846,6 +5094,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -4894,6 +5143,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -4914,6 +5164,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -4932,6 +5183,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5004,6 +5256,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -5023,6 +5276,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -5048,6 +5302,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoadFailed {
@@ -5083,6 +5338,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Nodes,
@@ -5104,6 +5360,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -5115,6 +5372,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -5164,6 +5422,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -5184,6 +5443,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -5202,6 +5462,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5279,6 +5540,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -5298,6 +5560,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -5320,6 +5583,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoadFailed {
@@ -5352,6 +5616,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Namespaces,
@@ -5372,6 +5637,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -5383,6 +5649,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -5399,6 +5666,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -5430,6 +5698,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -5462,6 +5731,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5507,6 +5777,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Events,
@@ -5528,6 +5799,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Overview,
@@ -5539,6 +5811,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -5555,6 +5828,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -5587,6 +5861,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -5626,6 +5901,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -5662,6 +5938,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -6046,6 +6323,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6065,6 +6343,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6081,6 +6360,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6130,6 +6410,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6169,6 +6450,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6224,6 +6506,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6243,6 +6526,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6261,6 +6545,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6284,6 +6569,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -6348,6 +6634,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6369,6 +6656,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods_on_connect,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -6419,6 +6707,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoaded {
@@ -6440,6 +6729,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoadFailed {
@@ -6459,6 +6749,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut pods,
+            &mut ServicesState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -6516,6 +6807,308 @@ mod tests {
             ]
         );
         let delete_item = items.iter().find(|i| i.id == "delete-pod").unwrap();
+        assert!(delete_item.disabled);
+        assert!(delete_item.danger);
+    }
+
+    fn make_test_service(name: &str, namespace: &str) -> orbit_core::kubernetes::models::ServiceInfo {
+        orbit_core::kubernetes::models::ServiceInfo {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            r#type: "ClusterIP".to_string(),
+            cluster_ip: "10.96.0.10".to_string(),
+            external_ip: "-".to_string(),
+            ports: "80/TCP".to_string(),
+            endpoints: "2 ready".to_string(),
+            age: "1h".to_string(),
+            session_affinity: "None".to_string(),
+            internal_traffic_policy: None,
+            created: String::new(),
+            uid: format!("uid-{name}"),
+            selector: Default::default(),
+            labels: Default::default(),
+            ports_list: Vec::new(),
+            endpoints_list: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn test_selecting_services_view_triggers_load_services_command() {
+        let mut state = ClusterSwitcherState::new();
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Services,
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Services));
+        assert_eq!(sidebar.active_view, WorkspaceView::Services);
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadServices { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+
+        // Connecting while already on WorkspaceView::Services also dispatches LoadServices.
+        let mut services_on_connect = ServicesState::default();
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services_on_connect,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadServices { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_services_loaded_and_failed_events_update_state() {
+        let mut state = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        services.begin_load_for_cluster("prod-ctx");
+        let gen1 = services.generation;
+
+        // Stale generation should be ignored
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ServicesLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: gen1 + 99,
+                services: vec![make_test_service("stale-svc", "prod")],
+            },
+        );
+        assert!(services.services.is_empty());
+
+        // Matching generation updates state
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ServicesLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: gen1,
+                services: vec![make_test_service("api-svc", "prod")],
+            },
+        );
+        assert_eq!(services.status, crate::state::ServicesLoadStatus::Loaded);
+        assert_eq!(services.services.len(), 1);
+
+        services.begin_refresh();
+        let gen2 = services.generation;
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ServicesLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: gen2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(services.status, crate::state::ServicesLoadStatus::Error);
+        assert_eq!(services.error_message.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn test_apply_cluster_event_resets_services_on_connect_and_disconnect() {
+        let mut state = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        services.begin_load_for_cluster("old-ctx");
+        let gen1 = services.generation;
+        services.apply_loaded("old-ctx", gen1, vec![make_test_service("old-svc", "default")]);
+        assert_eq!(services.services.len(), 1);
+
+        // Connecting to a new cluster while on another view resets services for that cluster
+        sidebar.active_view = WorkspaceView::Overview;
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert_eq!(services.cluster_id.as_deref(), Some("prod-ctx"));
+        assert_eq!(services.status, crate::state::ServicesLoadStatus::Idle);
+        assert!(services.services.is_empty());
+
+        // Disconnecting clears cluster_id and services
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterUnreachable {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: false,
+                    k8s_version: None,
+                    error_message: Some("timeout".to_string()),
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: None,
+                },
+            },
+        );
+        assert!(services.cluster_id.is_none());
+        assert!(services.services.is_empty());
+        assert_eq!(services.status, crate::state::ServicesLoadStatus::Idle);
+    }
+
+    #[test]
+    fn test_service_drawer_and_context_menu_wiring() {
+        let mut drawer = ResourceDrawerState::default();
+        let target = ResourceDrawerTarget::Service {
+            name: "api-svc".to_string(),
+            namespace: "prod".to_string(),
+        };
+        let yaml_cmd = drawer.open_or_switch(Some("prod-ctx"), target.clone(), ResourceDrawerTabId::Yaml);
+        assert!(yaml_cmd.is_some());
+        assert!(drawer.is_open);
+        assert_eq!(drawer.target, Some(target));
+
+        let svc = make_test_service("api-svc", "prod");
+        let entries = views::services::build_service_context_menu_entries(
+            &svc,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let items: Vec<&crate::components::ContextMenuItem> = entries
+            .iter()
+            .filter_map(|e| match e {
+                ContextMenuEntry::Item(item) => Some(item),
+                ContextMenuEntry::Separator => None,
+            })
+            .collect();
+        let delete_item = items.iter().find(|i| i.id == "delete-service").unwrap();
         assert!(delete_item.disabled);
         assert!(delete_item.danger);
     }
