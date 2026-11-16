@@ -47,6 +47,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    ConfigMap {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -66,6 +70,7 @@ impl ResourceDrawerTarget {
             Self::Deployment { .. } => "Deployment",
             Self::Pod { .. } => "Pod",
             Self::Service { .. } => "Service",
+            Self::ConfigMap { .. } => "ConfigMap",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -77,6 +82,7 @@ impl ResourceDrawerTarget {
             Self::Deployment { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
+            | Self::ConfigMap { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
@@ -88,6 +94,7 @@ impl ResourceDrawerTarget {
             Self::Deployment { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
+            | Self::ConfigMap { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -99,6 +106,7 @@ impl ResourceDrawerTarget {
             Self::Deployment { namespace, .. }
             | Self::Pod { namespace, .. }
             | Self::Service { namespace, .. }
+            | Self::ConfigMap { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
             Self::Node { .. } | Self::Namespace { .. } => None,
         }
@@ -719,5 +727,31 @@ mod tests {
         assert_eq!(svc.display_title(), "api-svc");
         assert_eq!(svc.namespace(), Some("prod"));
         assert!(svc.supports_live_yaml());
+    }
+
+    #[test]
+    fn test_resource_drawer_target_configmap_metadata_and_yaml_command() {
+        let target = ResourceDrawerTarget::ConfigMap {
+            name: "app-config".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(target.kind(), "ConfigMap");
+        assert_eq!(target.name(), "app-config");
+        assert_eq!(target.display_title(), "app-config");
+        assert_eq!(target.namespace(), Some("prod"));
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let cmd = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+                kind: "ConfigMap".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "app-config".to_string(),
+            })
+        );
     }
 }
