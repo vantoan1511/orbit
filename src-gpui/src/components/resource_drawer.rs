@@ -39,6 +39,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    Pod {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -56,6 +60,7 @@ impl ResourceDrawerTarget {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Deployment { .. } => "Deployment",
+            Self::Pod { .. } => "Pod",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -64,27 +69,29 @@ impl ResourceDrawerTarget {
 
     pub fn name(&self) -> &str {
         match self {
-            Self::Deployment { name, .. } | Self::Node { name } | Self::Namespace { name } => {
-                name.as_str()
-            }
+            Self::Deployment { name, .. }
+            | Self::Pod { name, .. }
+            | Self::Node { name }
+            | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
         }
     }
 
     pub fn display_title(&self) -> &str {
         match self {
-            Self::Deployment { name, .. } | Self::Node { name } | Self::Namespace { name } => {
-                name.as_str()
-            }
+            Self::Deployment { name, .. }
+            | Self::Pod { name, .. }
+            | Self::Node { name }
+            | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
         }
     }
 
     pub fn namespace(&self) -> Option<&str> {
         match self {
-            Self::Deployment { namespace, .. } | Self::Event { namespace, .. } => {
-                Some(namespace.as_str())
-            }
+            Self::Deployment { namespace, .. }
+            | Self::Pod { namespace, .. }
+            | Self::Event { namespace, .. } => Some(namespace.as_str()),
             Self::Node { .. } | Self::Namespace { .. } => None,
         }
     }
@@ -678,5 +685,18 @@ mod tests {
         let cmd = state.open_or_switch(Some("c1"), event, ResourceDrawerTabId::Yaml);
         assert!(cmd.is_none());
         assert!(state.is_open);
+    }
+
+    #[test]
+    fn test_pod_drawer_target_metadata_and_yaml_support() {
+        let pod = ResourceDrawerTarget::Pod {
+            name: "api-0".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(pod.kind(), "Pod");
+        assert_eq!(pod.name(), "api-0");
+        assert_eq!(pod.display_title(), "api-0");
+        assert_eq!(pod.namespace(), Some("prod"));
+        assert!(pod.supports_live_yaml());
     }
 }

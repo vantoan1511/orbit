@@ -3,6 +3,7 @@ pub mod config;
 pub mod kubernetes {
     pub mod events;
     pub mod manager;
+    pub mod metrics;
     pub mod models;
     pub mod namespaces;
     pub mod nodes;

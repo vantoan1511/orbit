@@ -4,7 +4,7 @@ use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, UserProfileInfo,
+    ClusterInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, PodInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
@@ -45,6 +45,7 @@ pub enum ClusterBridgeCommand {
     LoadOverview { cluster_id: String, generation: u64 },
     LoadNamespaces { cluster_id: String, generation: u64 },
     LoadDeployments { cluster_id: String, generation: u64 },
+    LoadPods { cluster_id: String, generation: u64 },
     LoadNodes { cluster_id: String, generation: u64 },
     LoadEvents { cluster_id: String, generation: u64 },
     LoadResourceYaml {
@@ -109,6 +110,16 @@ pub enum ClusterBridgeEvent {
         deployments: Vec<DeploymentInfo>,
     },
     DeploymentsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    PodsLoaded {
+        cluster_id: String,
+        generation: u64,
+        pods: Vec<PodInfo>,
+    },
+    PodsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -566,6 +577,109 @@ impl DeploymentsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PodsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PodsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: PodsLoadStatus,
+    pub pods: Vec<PodInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl PodsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PodsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.pods.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.pods.is_empty();
+        ClusterBridgeCommand::LoadPods {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = PodsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.pods.is_empty();
+        Some(ClusterBridgeCommand::LoadPods {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PodsLoadStatus::Idle;
+        self.pods.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = PodsLoadStatus::Idle;
+        self.pods.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        pods: Vec<PodInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PodsLoadStatus::Loaded;
+            self.pods = pods;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PodsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == PodsLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -960,6 +1074,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::NamespacesLoadFailed { .. }
             | ClusterBridgeEvent::DeploymentsLoaded { .. }
             | ClusterBridgeEvent::DeploymentsLoadFailed { .. }
+            | ClusterBridgeEvent::PodsLoaded { .. }
+            | ClusterBridgeEvent::PodsLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -1847,6 +1963,103 @@ mod tests {
         state.reset_for_disconnected();
         assert!(state.cluster_id.is_none());
         assert_eq!(state.status, DeploymentsLoadStatus::Idle);
+        assert!(state.generation > gen_before_disconnect);
+    }
+
+    fn sample_pod(name: &str, namespace: &str) -> PodInfo {
+        PodInfo {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            age: "5m".to_string(),
+            cpu: Some("100m".to_string()),
+            memory: Some("128Mi".to_string()),
+            cpu_cores: Some(0.1),
+            memory_bytes: Some(134_217_728.0),
+            cpu_pct: None,
+            memory_pct: None,
+            node: Some("node-1".to_string()),
+            restarts: 0,
+            images: vec!["nginx:latest".to_string()],
+            labels: Default::default(),
+            annotations: Default::default(),
+            ip: Some("10.0.0.2".to_string()),
+            node_ip: Some("192.168.1.2".to_string()),
+            controlled_by: None,
+            qos_class: Some("Burstable".to_string()),
+            containers: vec![],
+        }
+    }
+
+    #[test]
+    fn test_pods_state_lifecycle_and_generation_guard() {
+        let mut state = PodsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd_a = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd_a,
+            ClusterBridgeCommand::LoadPods {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, PodsLoadStatus::Loading);
+        assert!(state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        assert!(!state.apply_loaded("ctx-b", 1, vec![sample_pod("wrong-cluster", "default")]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![sample_pod("wrong-gen", "default")]));
+        assert!(!state.apply_failed("ctx-a", 99, "stale-err".to_string()));
+        assert!(state.pods.is_empty());
+
+        assert!(state.apply_loaded("ctx-a", 1, vec![sample_pod("web-0", "default")]));
+        assert_eq!(state.status, PodsLoadStatus::Loaded);
+        assert!(!state.table.loading);
+        assert_eq!(state.pods.len(), 1);
+        assert_eq!(state.pods[0].name, "web-0");
+
+        state.table.selected_row_key = Some("default/web-0".to_string());
+        let refresh_cmd = state.begin_refresh().expect("refresh command");
+        assert_eq!(
+            refresh_cmd,
+            ClusterBridgeCommand::LoadPods {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            }
+        );
+        assert_eq!(state.status, PodsLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert_eq!(state.pods.len(), 1);
+
+        // Switching cluster clears old pods and enables loading skeleton.
+        let switch_cmd = state.begin_load_for_cluster("ctx-b");
+        assert_eq!(
+            switch_cmd,
+            ClusterBridgeCommand::LoadPods {
+                cluster_id: "ctx-b".to_string(),
+                generation: 3,
+            }
+        );
+        assert!(state.pods.is_empty());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(state.table.loading);
+
+        assert!(state.apply_failed("ctx-b", 3, "timeout".to_string()));
+        assert_eq!(state.status, PodsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+
+        state.reset_for_cluster("ctx-c");
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-c"));
+        assert_eq!(state.status, PodsLoadStatus::Idle);
+        assert!(state.pods.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.needs_load_for_cluster("ctx-c"));
+
+        let gen_before_disconnect = state.generation;
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert_eq!(state.status, PodsLoadStatus::Idle);
         assert!(state.generation > gen_before_disconnect);
     }
 
