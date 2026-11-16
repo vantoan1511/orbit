@@ -4,7 +4,8 @@ use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, PodInfo, UserProfileInfo,
+    ClusterInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, PodInfo, ServiceInfo,
+    UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
@@ -46,6 +47,7 @@ pub enum ClusterBridgeCommand {
     LoadNamespaces { cluster_id: String, generation: u64 },
     LoadDeployments { cluster_id: String, generation: u64 },
     LoadPods { cluster_id: String, generation: u64 },
+    LoadServices { cluster_id: String, generation: u64 },
     LoadNodes { cluster_id: String, generation: u64 },
     LoadEvents { cluster_id: String, generation: u64 },
     LoadResourceYaml {
@@ -120,6 +122,16 @@ pub enum ClusterBridgeEvent {
         pods: Vec<PodInfo>,
     },
     PodsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    ServicesLoaded {
+        cluster_id: String,
+        generation: u64,
+        services: Vec<ServiceInfo>,
+    },
+    ServicesLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -680,6 +692,155 @@ impl PodsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ServicesLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ServiceTypeFilter {
+    #[default]
+    All,
+    ClusterIP,
+    NodePort,
+    LoadBalancer,
+    ExternalName,
+}
+
+impl ServiceTypeFilter {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::All,
+            Self::ClusterIP,
+            Self::NodePort,
+            Self::LoadBalancer,
+            Self::ExternalName,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::All => "All",
+            Self::ClusterIP => "ClusterIP",
+            Self::NodePort => "NodePort",
+            Self::LoadBalancer => "LoadBalancer",
+            Self::ExternalName => "ExternalName",
+        }
+    }
+
+    pub fn matches(&self, service_type: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::ClusterIP => service_type == "ClusterIP",
+            Self::NodePort => service_type == "NodePort",
+            Self::LoadBalancer => service_type == "LoadBalancer",
+            Self::ExternalName => service_type == "ExternalName",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ServicesState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: ServicesLoadStatus,
+    pub services: Vec<ServiceInfo>,
+    pub type_filter: ServiceTypeFilter,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl ServicesState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = ServicesLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.services.clear();
+            self.type_filter = ServiceTypeFilter::All;
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.services.is_empty();
+        ClusterBridgeCommand::LoadServices {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = ServicesLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.services.is_empty();
+        Some(ClusterBridgeCommand::LoadServices {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = ServicesLoadStatus::Idle;
+        self.services.clear();
+        self.type_filter = ServiceTypeFilter::All;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = ServicesLoadStatus::Idle;
+        self.services.clear();
+        self.type_filter = ServiceTypeFilter::All;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        services: Vec<ServiceInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = ServicesLoadStatus::Loaded;
+            self.services = services;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = ServicesLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == ServicesLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -1076,6 +1237,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::DeploymentsLoadFailed { .. }
             | ClusterBridgeEvent::PodsLoaded { .. }
             | ClusterBridgeEvent::PodsLoadFailed { .. }
+            | ClusterBridgeEvent::ServicesLoaded { .. }
+            | ClusterBridgeEvent::ServicesLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -2547,5 +2710,62 @@ mod tests {
         tabs.handle_picker_search_key("escape", None);
         assert!(!tabs.picker_open);
         assert_eq!(tabs.picker_query, "");
+    }
+
+    #[test]
+    fn test_services_state_lifecycle_and_generation_guard() {
+        let mut state = ServicesState::default();
+        assert_eq!(state.status, ServicesLoadStatus::Idle);
+        assert!(state.needs_load_for_cluster("prod-ctx"));
+
+        let cmd = state.begin_load_for_cluster("prod-ctx");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadServices {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, ServicesLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let sample = ServiceInfo {
+            name: "api-svc".to_string(),
+            namespace: "prod".to_string(),
+            r#type: "ClusterIP".to_string(),
+            cluster_ip: "10.96.0.10".to_string(),
+            external_ip: "-".to_string(),
+            ports: "80/TCP".to_string(),
+            endpoints: "2 ready".to_string(),
+            age: "1h".to_string(),
+            session_affinity: "None".to_string(),
+            internal_traffic_policy: None,
+            created: String::new(),
+            uid: "uid-1".to_string(),
+            selector: Default::default(),
+            labels: Default::default(),
+            ports_list: Vec::new(),
+            endpoints_list: Vec::new(),
+            events: Vec::new(),
+        };
+
+        // Stale cluster or generation must be ignored
+        assert!(!state.apply_loaded("other-ctx", 1, vec![sample.clone()]));
+        assert!(!state.apply_loaded("prod-ctx", 99, vec![sample.clone()]));
+        assert!(!state.apply_failed("prod-ctx", 99, "boom".to_string()));
+        assert!(state.services.is_empty());
+
+        // Matching generation updates state
+        assert!(state.apply_loaded("prod-ctx", 1, vec![sample]));
+        assert_eq!(state.status, ServicesLoadStatus::Loaded);
+        assert_eq!(state.services.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("prod-ctx"));
+
+        // Disconnect clears cluster_id and services
+        state.reset_for_disconnected();
+        assert_eq!(state.status, ServicesLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.services.is_empty());
     }
 }

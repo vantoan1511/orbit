@@ -5,6 +5,7 @@ use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
+use orbit_core::kubernetes::services::fetch_services;
 use orbit_core::kubernetes::workloads::{fetch_deployments, fetch_pods};
 use tokio::sync::{RwLock, mpsc};
 
@@ -225,6 +226,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::PodsLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadServices {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_services(&client, None).await {
+                        Ok(services) => {
+                            let _ = tx.send(ClusterBridgeEvent::ServicesLoaded {
+                                cluster_id,
+                                generation,
+                                services,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::ServicesLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::ServicesLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -799,6 +837,39 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected ResourceYamlLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_services_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new().await));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadServices {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 3,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected ServicesLoadFailed event");
+        match event {
+            ClusterBridgeEvent::ServicesLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 3);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected ServicesLoadFailed, got {other:?}"),
         }
     }
 }
