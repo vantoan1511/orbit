@@ -20,11 +20,27 @@ impl ThemeMode {
         }
     }
 
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Light => "light",
+            Self::System => "system",
+        }
+    }
+
     pub fn label(self) -> &'static str {
         match self {
             Self::Dark => "Dark",
             Self::Light => "Light",
             Self::System => "System",
+        }
+    }
+
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::Dark => "High-contrast noir surface for low-glare infrastructure monitoring.",
+            Self::Light => "Crisp daylight palette with neutral stone and slate contrast.",
+            Self::System => "Automatically matches your operating system appearance.",
         }
     }
 
@@ -103,6 +119,24 @@ impl UiStyle {
         }
     }
 
+    pub fn description(self) -> &'static str {
+        match self {
+            Self::Flat => "Clean monochrome Nora surfaces with crisp structural borders.",
+            Self::Glass => "Translucent layered panels with subtle frosted depth.",
+            Self::Aero => "Classic luminous glass sheen with crisp bevel highlights.",
+            Self::LiquidGlass => "Fluid refractive surfaces with soft diffused elevation.",
+            Self::Ios => "Native Cupertino vibrancy with rounded translucent controls.",
+            Self::Paper => "Warm matte editorial surfaces with tactile contrast.",
+        }
+    }
+
+    pub fn badge(self) -> Option<&'static str> {
+        match self {
+            Self::Flat => Some("Standard"),
+            _ => None,
+        }
+    }
+
     pub fn is_translucent(self) -> bool {
         !matches!(self, Self::Flat | Self::Paper)
     }
@@ -141,6 +175,30 @@ impl AccentColor {
             "slate" => Self::Slate,
             "blue" => Self::Blue,
             _ => Self::Blue,
+        }
+    }
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Blue => "blue",
+            Self::Emerald => "emerald",
+            Self::Violet => "violet",
+            Self::Cyan => "cyan",
+            Self::Amber => "amber",
+            Self::Rose => "rose",
+            Self::Slate => "slate",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Blue => "Blue",
+            Self::Emerald => "Emerald",
+            Self::Violet => "Violet",
+            Self::Cyan => "Cyan",
+            Self::Amber => "Amber",
+            Self::Rose => "Rose",
+            Self::Slate => "Slate",
         }
     }
 }
@@ -388,5 +446,27 @@ mod tests {
                 info: "blue".to_string(),
             }
         );
+    }
+
+    #[test]
+    fn test_theme_token_ids_labels_and_descriptions() {
+        for mode in ThemeMode::ALL {
+            assert_eq!(ThemeMode::from_str_lossy(mode.id()), mode);
+            assert!(!mode.label().is_empty());
+            assert!(!mode.description().is_empty());
+        }
+
+        for style in UiStyle::ALL {
+            assert_eq!(UiStyle::from_str_lossy(style.id()), style);
+            assert!(!style.label().is_empty());
+            assert!(!style.description().is_empty());
+        }
+        assert_eq!(UiStyle::Flat.badge(), Some("Standard"));
+        assert_eq!(UiStyle::Glass.badge(), None);
+
+        for accent in AccentColor::ALL {
+            assert_eq!(AccentColor::from_str_lossy(accent.id()), accent);
+            assert!(!accent.label().is_empty());
+        }
     }
 }

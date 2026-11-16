@@ -8,6 +8,7 @@ pub mod overview;
 pub mod pods;
 pub mod secrets;
 pub mod services;
+pub mod settings;
 pub mod welcome;
 
 use std::collections::BTreeMap;

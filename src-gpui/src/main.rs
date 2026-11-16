@@ -25,7 +25,7 @@ use crate::components::{
     render_context_menu_overlay, render_resource_drawer, render_tab_resource_picker_overlay,
     render_workspace_tab_bar, render_yaml_viewer,
 };
-use crate::icons::{render_icon, theme_mode_icon};
+use crate::icons::render_icon;
 use crate::navigation::{
     ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView,
 };
@@ -36,7 +36,7 @@ use crate::state::{
     PodsState, SecretsState, ServicesState, TabDropPosition, WorkspaceTabsState,
     calculate_tab_drop_index,
 };
-use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
+use crate::theme::{AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StatusPresentation {
@@ -625,7 +625,8 @@ pub fn apply_cluster_event_with_workspace(
             secrets.apply_failed(&cluster_id, generation, message);
         }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
-        | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
+        | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
+        | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
     }
     commands
 }
@@ -697,7 +698,9 @@ pub struct OrbitShell {
     namespace_search_focus: FocusHandle,
     picker_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
-    style_dropdown_open: bool,
+    enable_experience_features: bool,
+    resolved_system_is_dark: bool,
+    settings_error: Option<String>,
     context_menu: ContextMenuState,
 }
 
@@ -718,6 +721,9 @@ impl OrbitShell {
             while let Some(event) = event_rx.recv().await {
                 if this
                     .update(cx, |shell, cx| {
+                        if let ClusterBridgeEvent::SettingsSaveFailed { ref message } = event {
+                            shell.settings_error = Some(message.clone());
+                        }
                         apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
                         for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
@@ -748,16 +754,24 @@ impl OrbitShell {
         })
         .detach();
 
+        let appearance_entity = cx.entity().clone();
         window
-            .observe_window_appearance(|window, cx| {
+            .observe_window_appearance(move |window, cx| {
+                let appearance = window.appearance();
+                let is_system_dark = ThemeMode::System.resolve_is_dark(appearance);
+                let _ = appearance_entity.update(cx, |shell, _cx| {
+                    shell.resolved_system_is_dark = is_system_dark;
+                });
                 let current = OrbitTheme::get(cx);
                 if current.mode == ThemeMode::System {
-                    let updated = current.with_window_appearance(window.appearance());
+                    let updated = current.with_window_appearance(appearance);
                     apply_theme(updated, window, cx);
                     window.refresh();
                 }
             })
             .detach();
+
+        let resolved_system_is_dark = ThemeMode::System.resolve_is_dark(window.appearance());
 
         Self {
             state: ClusterSwitcherState::new(),
@@ -778,7 +792,9 @@ impl OrbitShell {
             namespace_search_focus: cx.focus_handle(),
             picker_search_focus: cx.focus_handle(),
             command_tx,
-            style_dropdown_open: false,
+            enable_experience_features: config.enable_experience_features(),
+            resolved_system_is_dark,
+            settings_error: None,
             context_menu: ContextMenuState::new(),
         }
     }
@@ -791,7 +807,6 @@ impl OrbitShell {
     ) {
         self.state.close_dropdown();
         self.namespaces.close_dropdown();
-        self.style_dropdown_open = false;
         self.context_menu.open(anchor, entries);
         cx.notify();
     }
@@ -1677,7 +1692,6 @@ impl OrbitShell {
             self.dispatch_command(cmd);
         }
         self.namespaces.close_dropdown();
-        self.style_dropdown_open = false;
         cx.notify();
     }
 
@@ -1689,18 +1703,58 @@ impl OrbitShell {
         cx.notify();
     }
 
-    fn cycle_theme_mode(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let current = OrbitTheme::get(cx);
-        let next_mode = current.mode.next();
-        let updated = current.with_mode(next_mode, window.appearance());
+    fn select_theme_mode(&mut self, mode: ThemeMode, window: &mut Window, cx: &mut Context<Self>) {
+        let updated = OrbitTheme::get(cx).with_mode(mode, window.appearance());
         apply_theme(updated, window, cx);
+        self.settings_error = None;
+        self.dispatch_command(ClusterBridgeCommand::SaveThemeMode {
+            mode: mode.id().to_string(),
+        });
         cx.notify();
     }
 
     fn select_ui_style(&mut self, style: UiStyle, window: &mut Window, cx: &mut Context<Self>) {
         let updated = OrbitTheme::get(cx).with_ui_style(style, window.appearance());
         apply_theme(updated, window, cx);
-        self.style_dropdown_open = false;
+        self.settings_error = None;
+        self.dispatch_command(ClusterBridgeCommand::SaveUiStyle {
+            style: style.id().to_string(),
+        });
+        cx.notify();
+    }
+
+    fn select_accent_color(
+        &mut self,
+        accent: AccentColor,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let updated = OrbitTheme::get(cx).with_accent_color(accent, window.appearance());
+        apply_theme(updated, window, cx);
+        self.settings_error = None;
+        self.dispatch_command(ClusterBridgeCommand::SaveAccentColor {
+            accent: accent.id().to_string(),
+        });
+        cx.notify();
+    }
+
+    fn toggle_experience_features(&mut self, enabled: bool, cx: &mut Context<Self>) {
+        self.enable_experience_features = enabled;
+        self.settings_error = None;
+        self.dispatch_command(ClusterBridgeCommand::SaveEnableExperienceFeatures { enabled });
+        cx.notify();
+    }
+
+    fn reset_appearance_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let updated = OrbitTheme::get(cx).with_appearance(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            window.appearance(),
+        );
+        apply_theme(updated, window, cx);
+        self.settings_error = None;
+        self.dispatch_command(ClusterBridgeCommand::ResetAppearanceDefaults);
         cx.notify();
     }
 
@@ -1850,26 +1904,6 @@ impl OrbitShell {
                                 } else {
                                     theme.text.secondary
                                 },
-                            )),
-                    )
-                    .child(
-                        div()
-                            .id("activity-theme-btn")
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(40.0))
-                            .h(px(34.0))
-                            .rounded(theme.style.radius_control)
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(hover_bg))
-                            .on_click(cx.listener(|this, _event, window, cx| {
-                                this.cycle_theme_mode(window, cx);
-                            }))
-                            .child(render_icon(
-                                theme_mode_icon(theme.mode),
-                                px(18.0),
-                                theme.text.muted,
                             )),
                     ),
             )
@@ -2108,7 +2142,6 @@ impl OrbitShell {
         let theme = OrbitTheme::get(cx).clone();
         let presentation = format_cluster_status(&self.state, &theme);
         let cluster_chevron = dropdown_chevron_icon(self.state.dropdown_open);
-        let style_chevron = dropdown_chevron_icon(self.style_dropdown_open);
         let control_hover = theme.surface.control_hover;
         let (cat_label, view_label) = self.sidebar.active_view.breadcrumb();
         let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
@@ -2161,7 +2194,6 @@ impl OrbitShell {
                             .cursor_pointer()
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.dismiss_context_menu();
-                                this.style_dropdown_open = false;
                                 this.namespaces.close_dropdown();
                                 this.state.toggle_dropdown();
                                 cx.notify();
@@ -2210,7 +2242,6 @@ impl OrbitShell {
                                     .on_click(cx.listener(|this, _event, window, cx| {
                                         this.dismiss_context_menu();
                                         this.state.close_dropdown();
-                                        this.style_dropdown_open = false;
                                         this.namespaces.toggle_dropdown();
                                         if this.namespaces.dropdown_open {
                                             this.namespace_search_focus.focus(window);
@@ -2282,70 +2313,6 @@ impl OrbitShell {
                     .flex()
                     .items_center()
                     .gap_2()
-                    .child(
-                        theme
-                            .style_control(div().id("theme-mode-toggle-btn"))
-                            .flex()
-                            .items_center()
-                            .gap_1p5()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_sm)
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _event, window, cx| {
-                                this.cycle_theme_mode(window, cx);
-                            }))
-                            .child(render_icon(
-                                theme_mode_icon(theme.mode),
-                                px(13.0),
-                                theme.text.secondary,
-                            ))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.muted)
-                                    .child("Mode:"),
-                            )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.text.primary)
-                                    .child(theme.mode.label()),
-                            ),
-                    )
-                    .child(
-                        theme
-                            .style_control(div().id("ui-style-selector-btn"))
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_sm)
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.dismiss_context_menu();
-                                this.state.close_dropdown();
-                                this.namespaces.close_dropdown();
-                                this.style_dropdown_open = !this.style_dropdown_open;
-                                cx.notify();
-                            }))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.muted)
-                                    .child("Style:"),
-                            )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.text.primary)
-                                    .child(theme.style.ui_style.label()),
-                            )
-                            .child(render_icon(
-                                style_chevron,
-                                px(13.0),
-                                theme.text.secondary,
-                            )),
-                    )
                     .child(
                         theme
                             .style_control(div().id("refresh-clusters-btn"))
@@ -3033,107 +3000,6 @@ impl OrbitShell {
         )
     }
 
-    fn render_style_dropdown_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !self.style_dropdown_open {
-            return None;
-        }
-
-        let theme = OrbitTheme::get(cx).clone();
-        let control_hover = theme.surface.control_hover;
-        let mut list = div().flex().flex_col().gap_1().p_1p5();
-
-        for (idx, style) in UiStyle::ALL.iter().copied().enumerate() {
-            let is_active = theme.style.ui_style == style;
-            let badge = if style.is_translucent() {
-                "Blurred"
-            } else {
-                "Opaque"
-            };
-            list = list.child(
-                div()
-                    .id(("ui-style-option", idx))
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .gap_3()
-                    .px_3()
-                    .py_2()
-                    .rounded(theme.style.radius_control)
-                    .cursor_pointer()
-                    .when(is_active, |el| el.bg(theme.accent.soft))
-                    .hover(move |el| el.bg(control_hover))
-                    .on_click(cx.listener(move |this, _event, window, cx| {
-                        this.select_ui_style(style, window, cx);
-                    }))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_sm)
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(theme.text.primary)
-                            .child(style.label()),
-                    )
-                    .child(if is_active {
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .child(render_icon(Icon::Check, px(12.0), theme.accent.accent))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .text_color(theme.accent.accent)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Active"),
-                            )
-                            .into_any_element()
-                    } else {
-                        apply_text_step(div(), theme.typography.size_2xs)
-                            .text_color(theme.text.muted)
-                            .font_weight(FontWeight::NORMAL)
-                            .child(badge)
-                            .into_any_element()
-                    }),
-            );
-        }
-
-        Some(
-            div()
-                .absolute()
-                .inset_0()
-                .child(
-                    div()
-                        .id("style-dropdown-backdrop")
-                        .absolute()
-                        .inset_0()
-                        .on_click(cx.listener(|this, _event, _window, cx| {
-                            this.style_dropdown_open = false;
-                            cx.notify();
-                        })),
-                )
-                .child(
-                    theme
-                        .style_overlay(div().id("ui-style-dropdown-menu"))
-                        .absolute()
-                        .top(px(Self::HEADER_HEIGHT + 4.0))
-                        .right(px(230.0))
-                        .w(px(240.0))
-                        .on_click(|_event, _window, cx| {
-                            cx.stop_propagation();
-                        })
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .px_3()
-                                .py_2()
-                                .border_b_1()
-                                .border_color(theme.border.default)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.muted)
-                                .child("UI STYLE PREVIEW"),
-                        )
-                        .child(list),
-                )
-                .into_any_element(),
-        )
-    }
-
     fn render_workspace_view_header(&self, theme: &OrbitTheme) -> AnyElement {
         let view = self.sidebar.active_view;
         let (cat_label, _) = view.breadcrumb();
@@ -3191,52 +3057,49 @@ impl OrbitShell {
             .into_any_element()
     }
 
-    fn render_settings_workspace(&self, theme: &OrbitTheme) -> AnyElement {
-        let sidebar_state = if self.sidebar.is_collapsed {
+    fn render_settings_workspace(&self, theme: &OrbitTheme, cx: &mut Context<Self>) -> AnyElement {
+        let sidebar_status = if self.sidebar.is_collapsed {
             "Collapsed".to_string()
         } else {
             format!("Expanded ({:.0}px)", self.sidebar.panel_width)
         };
+        let config_file_path = OrbitConfig::file_path().map(|p| p.display().to_string());
+        let model = views::settings::SettingsViewModel {
+            theme,
+            resolved_system_is_dark: self.resolved_system_is_dark,
+            enable_experience_features: self.enable_experience_features,
+            config_file_path,
+            sidebar_status,
+            save_error: self.settings_error.as_deref(),
+        };
 
-        theme
-            .style_card(div())
-            .flex()
-            .flex_col()
-            .gap_3()
-            .p_6()
-            .w_full()
-            .max_w(px(720.0))
-            .bg(theme.surface.bg_panel)
-            .child(
-                apply_text_step(div(), theme.typography.size_base)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Appearance & Shell Preferences"),
-            )
-            .child(views::render_detail_row(
-                "Theme Mode",
-                theme.mode.label().to_string(),
-                false,
-                theme,
-            ))
-            .child(views::render_detail_row(
-                "UI Style",
-                theme.style.ui_style.label().to_string(),
-                false,
-                theme,
-            ))
-            .child(views::render_detail_row(
-                "Accent Color",
-                format!("{:?}", theme.accent_id),
-                false,
-                theme,
-            ))
-            .child(views::render_detail_row(
-                "Sidebar Layout",
-                sidebar_state,
-                true,
-                theme,
-            ))
-            .into_any_element()
+        let mode_entity = cx.entity().clone();
+        let style_entity = cx.entity().clone();
+        let accent_entity = cx.entity().clone();
+        let exp_entity = cx.entity().clone();
+        let reset_entity = cx.entity().clone();
+
+        let callbacks = views::settings::SettingsCallbacks {
+            on_select_theme_mode: std::rc::Rc::new(move |mode, window, cx| {
+                mode_entity.update(cx, |shell, cx| shell.select_theme_mode(mode, window, cx));
+            }),
+            on_select_ui_style: std::rc::Rc::new(move |style, window, cx| {
+                style_entity.update(cx, |shell, cx| shell.select_ui_style(style, window, cx));
+            }),
+            on_select_accent_color: std::rc::Rc::new(move |accent, window, cx| {
+                accent_entity.update(cx, |shell, cx| {
+                    shell.select_accent_color(accent, window, cx);
+                });
+            }),
+            on_toggle_experience_features: std::rc::Rc::new(move |enabled, _window, cx| {
+                exp_entity.update(cx, |shell, cx| shell.toggle_experience_features(enabled, cx));
+            }),
+            on_reset_appearance: std::rc::Rc::new(move |window, cx| {
+                reset_entity.update(cx, |shell, cx| shell.reset_appearance_defaults(window, cx));
+            }),
+        };
+
+        views::settings::render_settings_view(&model, &callbacks)
     }
 
     fn render_connecting_workspace(
@@ -4324,7 +4187,6 @@ impl OrbitShell {
         self.dismiss_context_menu();
         self.tabs.close_picker();
         self.state.dropdown_open = false;
-        self.style_dropdown_open = false;
         self.namespaces.close_dropdown();
     }
 
@@ -4440,7 +4302,7 @@ impl OrbitShell {
         let theme = OrbitTheme::get(cx).clone();
 
         let body = if self.sidebar.active_view == WorkspaceView::Settings {
-            self.render_settings_workspace(&theme)
+            self.render_settings_workspace(&theme, cx)
         } else {
             match &self.state.connection_state {
                 ClusterConnectionState::Disconnected => {
@@ -4519,7 +4381,6 @@ impl OrbitShell {
                         let switch_entity = cx.entity().clone();
                         let on_switch = move |_window: &mut Window, cx: &mut App| {
                             switch_entity.update(cx, |shell, cx| {
-                                shell.style_dropdown_open = false;
                                 shell.state.dropdown_open = true;
                                 cx.notify();
                             });
@@ -4907,9 +4768,6 @@ impl Render for OrbitShell {
                 el.child(overlay)
             })
             .when_some(self.render_namespace_dropdown_overlay(cx), |el, overlay| {
-                el.child(overlay)
-            })
-            .when_some(self.render_style_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
             .when(self.tabs.picker_open, |el| {
@@ -6541,14 +6399,11 @@ mod tests {
         cluster_state.dropdown_open = true;
         let mut ns_state = NamespaceFilterState::default();
         ns_state.dropdown_open = true;
-        let mut style_dropdown_open = true;
-        assert!(style_dropdown_open);
         let mut context_menu = ContextMenuState::new();
 
         // Opening context menu closes active header dropdowns
         cluster_state.close_dropdown();
         ns_state.close_dropdown();
-        style_dropdown_open = false;
         context_menu.open(
             gpui::point(px(20.0), px(30.0)),
             vec![
@@ -6562,7 +6417,6 @@ mod tests {
 
         assert!(!cluster_state.dropdown_open);
         assert!(!ns_state.dropdown_open);
-        assert!(!style_dropdown_open);
         assert!(context_menu.is_open);
         assert_eq!(context_menu.highlighted_index, Some(0));
 
@@ -8308,5 +8162,25 @@ mod tests {
         let delete_item = items.iter().find(|i| i.id == "delete-secret").unwrap();
         assert!(delete_item.disabled);
         assert!(delete_item.danger);
+    }
+
+    #[test]
+    fn test_settings_persisted_config_restores_theme_and_experience_on_launch() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_settings_relaunch");
+        let mut config = OrbitConfig::default();
+        config.update_theme_mode("system");
+        config.update_ui_style("paper");
+        config.update_accent_color("emerald");
+        config.update_enable_experience_features(true);
+        config.save().expect("save should succeed");
+
+        let reloaded = OrbitConfig::load();
+        let restored = OrbitTheme::from_config(&reloaded, WindowAppearance::Light);
+
+        assert_eq!(restored.mode, ThemeMode::System);
+        assert!(!restored.is_dark);
+        assert_eq!(restored.style.ui_style, UiStyle::Paper);
+        assert_eq!(restored.accent_id, AccentColor::Emerald);
+        assert!(reloaded.enable_experience_features());
     }
 }
