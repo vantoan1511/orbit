@@ -33,7 +33,8 @@ use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, ConfigMapsState, DeploymentsState, EventTypeFilter, EventsLoadStatus,
     EventsState, NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState,
-    PodsState, ServicesState, TabDropPosition, WorkspaceTabsState, calculate_tab_drop_index,
+    PodsState, SecretsState, ServicesState, TabDropPosition, WorkspaceTabsState,
+    calculate_tab_drop_index,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -184,6 +185,7 @@ pub fn select_workspace_view_with_state(
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: WorkspaceView,
@@ -196,6 +198,7 @@ pub fn select_workspace_view_with_state(
         pods,
         services,
         configmaps,
+        secrets,
         nodes,
         events,
         Some(view),
@@ -211,6 +214,7 @@ pub fn select_workspace_view_with_tabs(
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -226,6 +230,7 @@ pub fn select_workspace_view_with_tabs(
         pods,
         services,
         configmaps,
+        secrets,
         nodes,
         events,
         view,
@@ -246,6 +251,7 @@ fn load_command_for_active_view(
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: Option<WorkspaceView>,
@@ -269,6 +275,9 @@ fn load_command_for_active_view(
     if view == WorkspaceView::ConfigMaps && configmaps.needs_load_for_cluster(cluster_id) {
         return Some(configmaps.begin_load_for_cluster(cluster_id));
     }
+    if view == WorkspaceView::Secrets && secrets.needs_load_for_cluster(cluster_id) {
+        return Some(secrets.begin_load_for_cluster(cluster_id));
+    }
     if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
         return Some(nodes.begin_load_for_cluster(cluster_id));
     }
@@ -289,6 +298,7 @@ pub fn apply_cluster_event_with_tabs(
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -305,6 +315,7 @@ pub fn apply_cluster_event_with_tabs(
         pods,
         services,
         configmaps,
+        secrets,
         nodes,
         events,
         event,
@@ -321,6 +332,7 @@ pub fn apply_cluster_event_with_tabs(
                 pods,
                 services,
                 configmaps,
+                secrets,
                 nodes,
                 events,
                 restored,
@@ -344,6 +356,7 @@ pub fn handle_tab_shortcut_with_state(
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -385,6 +398,7 @@ pub fn handle_tab_shortcut_with_state(
         pods,
         services,
         configmaps,
+        secrets,
         nodes,
         events,
         active,
@@ -409,6 +423,7 @@ pub fn apply_cluster_event_with_workspace(
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     event: ClusterBridgeEvent,
@@ -442,6 +457,11 @@ pub fn apply_cluster_event_with_workspace(
                 } else {
                     configmaps.reset_for_cluster(id);
                 }
+                if sidebar.active_view == WorkspaceView::Secrets {
+                    commands.push(secrets.begin_load_for_cluster(id));
+                } else {
+                    secrets.reset_for_cluster(id);
+                }
                 if sidebar.active_view == WorkspaceView::Nodes {
                     commands.push(nodes.begin_load_for_cluster(id));
                 } else {
@@ -464,6 +484,7 @@ pub fn apply_cluster_event_with_workspace(
             pods.reset_for_disconnected();
             services.reset_for_disconnected();
             configmaps.reset_for_disconnected();
+            secrets.reset_for_disconnected();
             nodes.reset_for_disconnected();
             events.reset_for_disconnected();
         }
@@ -589,6 +610,20 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             configmaps.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::SecretsLoaded {
+            cluster_id,
+            generation,
+            secrets: loaded_secrets,
+        } => {
+            secrets.apply_loaded(&cluster_id, generation, loaded_secrets);
+        }
+        ClusterBridgeEvent::SecretsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            secrets.apply_failed(&cluster_id, generation, message);
+        }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
     }
@@ -653,6 +688,7 @@ pub struct OrbitShell {
     pods: PodsState,
     services: ServicesState,
     configmaps: ConfigMapsState,
+    secrets: SecretsState,
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
@@ -693,6 +729,7 @@ impl OrbitShell {
                             &mut shell.pods,
                             &mut shell.services,
                             &mut shell.configmaps,
+                            &mut shell.secrets,
                             &mut shell.nodes,
                             &mut shell.events,
                             &mut shell.tabs,
@@ -732,6 +769,7 @@ impl OrbitShell {
             pods: PodsState::default(),
             services: ServicesState::default(),
             configmaps: ConfigMapsState::default(),
+            secrets: SecretsState::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
@@ -796,6 +834,7 @@ impl OrbitShell {
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
+            &mut self.secrets,
             &mut self.nodes,
             &mut self.events,
             &mut self.tabs,
@@ -825,6 +864,7 @@ impl OrbitShell {
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
+            &mut self.secrets,
             &mut self.nodes,
             &mut self.events,
             active,
@@ -913,6 +953,7 @@ impl OrbitShell {
                 | ResourceDrawerTarget::Pod { .. }
                 | ResourceDrawerTarget::Service { .. }
                 | ResourceDrawerTarget::ConfigMap { .. }
+                | ResourceDrawerTarget::Secret { .. }
                 | ResourceDrawerTarget::Node { .. }
         ) {
             if let Some(cid) = cluster_id.as_deref() {
@@ -1014,6 +1055,11 @@ impl OrbitShell {
                 .configmaps
                 .iter()
                 .any(|c| c.name == *name && c.namespace == *namespace),
+            ResourceDrawerTarget::Secret { name, namespace } => self
+                .secrets
+                .secrets
+                .iter()
+                .any(|s| s.name == *name && s.namespace == *namespace),
         };
         if !exists {
             self.drawer.close();
@@ -1417,6 +1463,82 @@ impl OrbitShell {
                     body,
                 ))
             }
+            ResourceDrawerTarget::Secret { name, namespace } => {
+                let sec = self
+                    .secrets
+                    .secrets
+                    .iter()
+                    .find(|s| s.name == *name && s.namespace == *namespace)?;
+                let matched_events =
+                    views::secrets::filter_events_for_secret(&self.events.events, sec);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Custom(SharedString::from("data")),
+                        label: SharedString::from("Data"),
+                        badge: Some(SharedString::from(sec.keys_count.to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let reveal_entity = cx.entity().clone();
+                let copy_entity = cx.entity().clone();
+                let body = match &self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::secrets::render_secret_drawer_overview(sec, theme)
+                    }
+                    ResourceDrawerTabId::Custom(id) if id.as_ref() == "data" => {
+                        views::secrets::render_secret_drawer_data(
+                            sec,
+                            &self.drawer.revealed_secret_keys,
+                            theme,
+                            move |key, _window, cx| {
+                                reveal_entity.update(cx, |shell, cx| {
+                                    shell.drawer.toggle_secret_key_revealed(&key);
+                                    cx.notify();
+                                });
+                            },
+                            move |value, _window, cx| {
+                                copy_entity.update(cx, |_shell, cx| {
+                                    cx.write_to_clipboard(ClipboardItem::new_string(value));
+                                });
+                            },
+                        )
+                    }
+                    ResourceDrawerTabId::Events => views::secrets::render_secret_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        sec,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(format!("{}/{}", sec.namespace, sec.name), theme, cx)
+                    }
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                let status_label = if sec.immutable { "Immutable" } else { "Mutable" };
+                Some((
+                    SharedString::from(sec.name.clone()),
+                    SharedString::from("Secret"),
+                    Some(SharedString::from(sec.namespace.clone())),
+                    Some(SharedString::from(sec.age.clone())),
+                    Some(SharedString::from(status_label)),
+                    tabs,
+                    body,
+                ))
+            }
         }
     }
 
@@ -1519,6 +1641,15 @@ impl OrbitShell {
                     .configmaps
                     .begin_refresh()
                     .unwrap_or_else(|| self.configmaps.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Secrets
+                || self.secrets.cluster_id.is_some()
+            {
+                let cmd = self
+                    .secrets
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.secrets.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
@@ -3669,6 +3800,128 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::Secrets {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.secrets.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.secrets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Secret {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            sec: &orbit_core::kubernetes::models::SecretInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = sec.name.clone();
+                let namespace = sec.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Secret {
+                    name: sec.name.clone(),
+                    namespace: sec.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::secrets::build_secret_context_menu_entries(
+                    sec,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.secrets.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    if let ClusterConnectionState::Connected { cluster_id, .. } =
+                        &shell.state.connection_state
+                    {
+                        let cmd = shell
+                            .secrets
+                            .begin_refresh()
+                            .unwrap_or_else(|| shell.secrets.begin_load_for_cluster(cluster_id));
+                        shell.dispatch_command(cmd);
+                        cx.notify();
+                    }
+                });
+            };
+
+            return views::secrets::render_secrets_view(
+                &self.secrets,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Pods {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -4286,6 +4539,7 @@ impl OrbitShell {
                 | WorkspaceView::Pods
                 | WorkspaceView::Services
                 | WorkspaceView::ConfigMaps
+                | WorkspaceView::Secrets
                 | WorkspaceView::Nodes
                 | WorkspaceView::Events
         ) && matches!(
@@ -4551,6 +4805,7 @@ impl Render for OrbitShell {
                     &mut this.pods,
                     &mut this.services,
                     &mut this.configmaps,
+                    &mut this.secrets,
                     &mut this.nodes,
                     &mut this.events,
                     &mut this.tabs,
@@ -4960,6 +5215,7 @@ mod tests {
             &mut throwaway_pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut throwaway_nodes,
             &mut EventsState::default(),
             event,
@@ -5081,6 +5337,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -5116,6 +5373,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::OverviewLoaded {
@@ -5137,6 +5395,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NamespacesLoaded {
@@ -5173,6 +5432,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5286,6 +5546,7 @@ mod tests {
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Pods
@@ -5304,6 +5565,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Deployments,
@@ -5330,6 +5592,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -5343,6 +5606,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -5393,6 +5657,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -5415,6 +5680,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -5435,6 +5701,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5509,6 +5776,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -5530,6 +5798,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -5557,6 +5826,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoadFailed {
@@ -5594,6 +5864,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Nodes,
@@ -5617,6 +5888,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -5630,6 +5902,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -5681,6 +5954,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -5703,6 +5977,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -5723,6 +5998,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5802,6 +6078,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -5823,6 +6100,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -5847,6 +6125,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoadFailed {
@@ -5881,6 +6160,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Namespaces,
@@ -5903,6 +6183,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -5916,6 +6197,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -5934,6 +6216,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -5967,6 +6250,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -6001,6 +6285,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -6048,6 +6333,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Events,
@@ -6071,6 +6357,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Overview,
@@ -6084,6 +6371,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -6102,6 +6390,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -6136,6 +6425,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -6177,6 +6467,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -6215,6 +6506,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -6601,6 +6893,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6622,6 +6915,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6640,6 +6934,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6691,6 +6986,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6732,6 +7028,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6789,6 +7086,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6810,6 +7108,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6830,6 +7129,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6855,6 +7155,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -6921,6 +7222,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -6944,6 +7246,7 @@ mod tests {
             &mut pods_on_connect,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -6996,6 +7299,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoaded {
@@ -7019,6 +7323,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoadFailed {
@@ -7040,6 +7345,7 @@ mod tests {
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7151,6 +7457,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -7175,6 +7482,7 @@ mod tests {
             &mut pods,
             &mut services_on_connect,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -7229,6 +7537,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -7250,6 +7559,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -7273,6 +7583,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoadFailed {
@@ -7315,6 +7626,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -7351,6 +7663,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7453,6 +7766,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut configmaps,
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::ConfigMaps,
@@ -7499,6 +7813,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut configmaps,
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -7520,6 +7835,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut configmaps,
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -7545,6 +7861,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut configmaps,
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoadFailed {
@@ -7604,6 +7921,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut configmaps,
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -7623,6 +7941,7 @@ mod tests {
             &mut pods,
             &mut services,
             &mut configmaps,
+            &mut SecretsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7690,6 +8009,303 @@ mod tests {
             })
             .collect();
         let delete_item = items.iter().find(|i| i.id == "delete-configmap").unwrap();
+        assert!(delete_item.disabled);
+        assert!(delete_item.danger);
+    }
+
+    fn make_test_secret(name: &str, namespace: &str) -> orbit_core::kubernetes::models::SecretInfo {
+        let mut data = std::collections::BTreeMap::new();
+        data.insert("password".to_string(), "c2VjcmV0".to_string());
+        orbit_core::kubernetes::models::SecretInfo {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            labels: Default::default(),
+            annotations: 0,
+            created: String::new(),
+            age: "1h".to_string(),
+            resource_version: "1".to_string(),
+            r#type: "Opaque".to_string(),
+            immutable: false,
+            keys_count: 1,
+            size: "14 B".to_string(),
+            mounted_pods: 1,
+            used_by: Vec::new(),
+            data,
+        }
+    }
+
+    #[test]
+    fn test_selecting_secrets_view_triggers_load_secrets_command() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: None,
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            WorkspaceView::Secrets,
+        );
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadSecrets {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Secrets);
+        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Loading);
+    }
+
+    #[test]
+    fn test_secrets_loaded_and_failed_events_update_state() {
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let _ = secrets.begin_load_for_cluster("prod-ctx");
+        let sec = make_test_secret("db-creds", "prod");
+
+        // Stale generation is ignored
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::SecretsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 99,
+                secrets: vec![sec.clone()],
+            },
+        );
+        assert!(secrets.secrets.is_empty());
+
+        // Matching generation updates state
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::SecretsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                secrets: vec![sec],
+            },
+        );
+        assert_eq!(secrets.secrets.len(), 1);
+        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Loaded);
+
+        let _ = secrets.begin_refresh();
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::SecretsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Error);
+        assert_eq!(secrets.error_message.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn test_apply_cluster_event_resets_secrets_on_connect_and_disconnect() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.select_view(WorkspaceView::Secrets);
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let connect_event = ClusterBridgeEvent::ClusterConnected {
+            outcome: ClusterSwitchOutcome {
+                context_name: "prod-ctx".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.1".to_string()),
+                error_message: None,
+            },
+            clusters: vec![],
+            profile: UserProfileInfo {
+                active_context: Some("prod-ctx".to_string()),
+                user_name: None,
+                auth_type: "None".to_string(),
+                cluster_name: Some("prod".to_string()),
+                server_url: Some("https://10.0.0.10:6443".to_string()),
+                kubeconfig_paths: vec![],
+                k8s_version: Some("v1.31.1".to_string()),
+            },
+        };
+
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            connect_event,
+        );
+        assert!(cmds.contains(&ClusterBridgeCommand::LoadSecrets {
+            cluster_id: "prod-ctx".to_string(),
+            generation: 1,
+        }));
+
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterUnreachable {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: false,
+                    k8s_version: None,
+                    error_message: Some("timeout".to_string()),
+                },
+                clusters: vec![],
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: None,
+                    server_url: None,
+                    kubeconfig_paths: vec![],
+                    k8s_version: None,
+                },
+            },
+        );
+        assert_eq!(secrets.status, crate::state::SecretsLoadStatus::Idle);
+        assert!(secrets.cluster_id.is_none());
+        assert!(secrets.secrets.is_empty());
+    }
+
+    #[test]
+    fn test_secret_drawer_target_reveal_toggle_and_context_menu_integration() {
+        let mut drawer = ResourceDrawerState::default();
+        let target = ResourceDrawerTarget::Secret {
+            name: "db-creds".to_string(),
+            namespace: "prod".to_string(),
+        };
+        let yaml_cmd = drawer.open_or_switch(
+            Some("prod-ctx"),
+            target.clone(),
+            ResourceDrawerTabId::Yaml,
+        );
+        assert!(yaml_cmd.is_some());
+        assert!(drawer.is_open);
+        assert_eq!(drawer.target, Some(target));
+
+        let _ = drawer.select_tab(
+            Some("prod-ctx"),
+            ResourceDrawerTabId::Custom(SharedString::from("data")),
+        );
+        assert_eq!(
+            drawer.active_tab,
+            ResourceDrawerTabId::Custom(SharedString::from("data"))
+        );
+
+        assert!(!drawer.is_secret_key_revealed("password"));
+        drawer.toggle_secret_key_revealed("password");
+        assert!(drawer.is_secret_key_revealed("password"));
+        drawer.close();
+        assert!(!drawer.is_secret_key_revealed("password"));
+
+        let sec = make_test_secret("db-creds", "prod");
+        let entries = views::secrets::build_secret_context_menu_entries(
+            &sec,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let items: Vec<&crate::components::ContextMenuItem> = entries
+            .iter()
+            .filter_map(|e| match e {
+                ContextMenuEntry::Item(item) => Some(item),
+                ContextMenuEntry::Separator => None,
+            })
+            .collect();
+        let delete_item = items.iter().find(|i| i.id == "delete-secret").unwrap();
         assert!(delete_item.disabled);
         assert!(delete_item.danger);
     }

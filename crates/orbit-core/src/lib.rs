@@ -10,6 +10,7 @@ pub mod kubernetes {
     pub mod nodes;
     pub mod overview;
     pub mod raw;
+    pub mod secrets;
     pub mod services;
     pub mod workloads;
 }

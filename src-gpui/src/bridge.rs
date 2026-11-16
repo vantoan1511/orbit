@@ -6,6 +6,7 @@ use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
+use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
 use orbit_core::kubernetes::workloads::{fetch_deployments, fetch_pods};
 use tokio::sync::{RwLock, mpsc};
@@ -301,6 +302,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::ConfigMapsLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadSecrets {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_secrets(&client, None).await {
+                        Ok(secrets) => {
+                            let _ = tx.send(ClusterBridgeEvent::SecretsLoaded {
+                                cluster_id,
+                                generation,
+                                secrets,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::SecretsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::SecretsLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
