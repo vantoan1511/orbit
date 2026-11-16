@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use orbit_core::kubernetes::configmaps::fetch_configmaps;
 use orbit_core::kubernetes::events::fetch_events;
 use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
@@ -263,6 +264,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::ServicesLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadConfigMaps {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_configmaps(&client, None).await {
+                        Ok(configmaps) => {
+                            let _ = tx.send(ClusterBridgeEvent::ConfigMapsLoaded {
+                                cluster_id,
+                                generation,
+                                configmaps,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::ConfigMapsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::ConfigMapsLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),

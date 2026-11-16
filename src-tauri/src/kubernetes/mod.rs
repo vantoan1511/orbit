@@ -41,15 +41,7 @@ pub use hpa::{list_hpas, map_hpa, update_hpa_replicas};
 pub(crate) use orbit_core::kubernetes::namespaces::format_age;
 
 /// Formats a byte count into a human-readable size string.
-pub(crate) fn format_size(bytes: usize) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KiB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
-    }
-}
+pub(crate) use orbit_core::kubernetes::configmaps::format_size;
 
 /// Formats a Kubernetes API or client error into a user-friendly message,
 /// extracting clean messages from Api error responses.
