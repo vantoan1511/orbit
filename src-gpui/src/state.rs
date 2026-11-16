@@ -5,7 +5,7 @@ use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, PodInfo,
-    ServiceInfo, UserProfileInfo,
+    SecretInfo, ServiceInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 
@@ -49,6 +49,7 @@ pub enum ClusterBridgeCommand {
     LoadPods { cluster_id: String, generation: u64 },
     LoadServices { cluster_id: String, generation: u64 },
     LoadConfigMaps { cluster_id: String, generation: u64 },
+    LoadSecrets { cluster_id: String, generation: u64 },
     LoadNodes { cluster_id: String, generation: u64 },
     LoadEvents { cluster_id: String, generation: u64 },
     LoadResourceYaml {
@@ -143,6 +144,16 @@ pub enum ClusterBridgeEvent {
         configmaps: Vec<ConfigMapInfo>,
     },
     ConfigMapsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    SecretsLoaded {
+        cluster_id: String,
+        generation: u64,
+        secrets: Vec<SecretInfo>,
+    },
+    SecretsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -955,6 +966,109 @@ impl ConfigMapsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SecretsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct SecretsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: SecretsLoadStatus,
+    pub secrets: Vec<SecretInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl SecretsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = SecretsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.secrets.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.secrets.is_empty();
+        ClusterBridgeCommand::LoadSecrets {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = SecretsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.secrets.is_empty();
+        Some(ClusterBridgeCommand::LoadSecrets {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = SecretsLoadStatus::Idle;
+        self.secrets.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = SecretsLoadStatus::Idle;
+        self.secrets.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        secrets: Vec<SecretInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = SecretsLoadStatus::Loaded;
+            self.secrets = secrets;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = SecretsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == SecretsLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -1355,6 +1469,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::ServicesLoadFailed { .. }
             | ClusterBridgeEvent::ConfigMapsLoaded { .. }
             | ClusterBridgeEvent::ConfigMapsLoadFailed { .. }
+            | ClusterBridgeEvent::SecretsLoaded { .. }
+            | ClusterBridgeEvent::SecretsLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -2936,5 +3052,81 @@ mod tests {
         assert_eq!(state.status, ConfigMapsLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.configmaps.is_empty());
+    }
+
+    #[test]
+    fn test_secrets_state_lifecycle_and_generation_guard() {
+        let mut state = SecretsState::default();
+        assert_eq!(state.status, SecretsLoadStatus::Idle);
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadSecrets {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, SecretsLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let sample = SecretInfo {
+            name: "app-secret".to_string(),
+            namespace: "prod".to_string(),
+            labels: Default::default(),
+            annotations: 0,
+            created: String::new(),
+            age: "2h".to_string(),
+            resource_version: "10".to_string(),
+            r#type: "Opaque".to_string(),
+            immutable: false,
+            keys_count: 1,
+            size: "16 B".to_string(),
+            mounted_pods: 1,
+            used_by: Vec::new(),
+            data: Default::default(),
+        };
+
+        // Stale generation or wrong cluster must be ignored
+        assert!(!state.apply_loaded("ctx-b", 1, vec![sample.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 0, vec![sample.clone()]));
+        assert!(!state.apply_failed("ctx-a", 0, "boom".to_string()));
+        assert!(state.secrets.is_empty());
+
+        // Matching generation updates state
+        assert!(state.apply_loaded("ctx-a", 1, vec![sample]));
+        assert_eq!(state.status, SecretsLoadStatus::Loaded);
+        assert_eq!(state.secrets.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Refresh + failure transitions to Error while retaining cached secrets
+        let refresh_cmd = state.begin_refresh();
+        assert_eq!(
+            refresh_cmd,
+            Some(ClusterBridgeCommand::LoadSecrets {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, SecretsLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert!(state.apply_failed("ctx-a", 2, "forbidden".to_string()));
+        assert_eq!(state.status, SecretsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(state.secrets.len(), 1);
+
+        // Reset for cluster clears secrets and returns to Idle
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, SecretsLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.secrets.is_empty());
+
+        // Disconnect clears cluster_id and secrets
+        state.reset_for_disconnected();
+        assert_eq!(state.status, SecretsLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.secrets.is_empty());
     }
 }

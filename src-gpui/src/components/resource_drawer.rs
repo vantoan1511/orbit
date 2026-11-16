@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use gpui::{
@@ -51,6 +52,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    Secret {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -71,6 +76,7 @@ impl ResourceDrawerTarget {
             Self::Pod { .. } => "Pod",
             Self::Service { .. } => "Service",
             Self::ConfigMap { .. } => "ConfigMap",
+            Self::Secret { .. } => "Secret",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -83,6 +89,7 @@ impl ResourceDrawerTarget {
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
+            | Self::Secret { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
@@ -95,6 +102,7 @@ impl ResourceDrawerTarget {
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
+            | Self::Secret { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -107,6 +115,7 @@ impl ResourceDrawerTarget {
             | Self::Pod { namespace, .. }
             | Self::Service { namespace, .. }
             | Self::ConfigMap { namespace, .. }
+            | Self::Secret { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
             Self::Node { .. } | Self::Namespace { .. } => None,
         }
@@ -130,6 +139,7 @@ pub struct ResourceDrawerState {
     pub yaml_content: Option<String>,
     pub yaml_error: Option<String>,
     pub yaml_copied: bool,
+    pub revealed_secret_keys: BTreeSet<String>,
 }
 
 impl Default for ResourceDrawerState {
@@ -146,6 +156,7 @@ impl Default for ResourceDrawerState {
             yaml_content: None,
             yaml_error: None,
             yaml_copied: false,
+            revealed_secret_keys: BTreeSet::new(),
         }
     }
 }
@@ -172,6 +183,7 @@ impl ResourceDrawerState {
             self.yaml_status = YamlLoadStatus::Idle;
             self.yaml_content = None;
             self.yaml_error = None;
+            self.revealed_secret_keys.clear();
         }
 
         if initial_tab == ResourceDrawerTabId::Yaml {
@@ -295,11 +307,22 @@ impl ResourceDrawerState {
         true
     }
 
+    pub fn is_secret_key_revealed(&self, key: &str) -> bool {
+        self.revealed_secret_keys.contains(key)
+    }
+
+    pub fn toggle_secret_key_revealed(&mut self, key: &str) {
+        if !self.revealed_secret_keys.remove(key) {
+            self.revealed_secret_keys.insert(key.to_string());
+        }
+    }
+
     pub fn close(&mut self) {
         self.is_open = false;
         self.is_resizing = false;
         self.yaml_copied = false;
         self.yaml_generation = self.yaml_generation.saturating_add(1);
+        self.revealed_secret_keys.clear();
     }
 
     pub fn reset_for_context_change(&mut self) {
@@ -312,6 +335,7 @@ impl ResourceDrawerState {
         self.yaml_content = None;
         self.yaml_error = None;
         self.yaml_copied = false;
+        self.revealed_secret_keys.clear();
     }
 
     pub fn start_resize(&mut self) {
@@ -753,5 +777,58 @@ mod tests {
                 name: "app-config".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn test_secret_drawer_target_and_revealed_keys_reset() {
+        let target = ResourceDrawerTarget::Secret {
+            name: "db-creds".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(target.kind(), "Secret");
+        assert_eq!(target.name(), "db-creds");
+        assert_eq!(target.display_title(), "db-creds");
+        assert_eq!(target.namespace(), Some("prod"));
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let _ = state.open_or_switch(
+            Some("ctx-a"),
+            target.clone(),
+            ResourceDrawerTabId::Custom(SharedString::from("data")),
+        );
+        assert!(!state.is_secret_key_revealed("password"));
+
+        state.toggle_secret_key_revealed("password");
+        assert!(state.is_secret_key_revealed("password"));
+
+        // Switching to the same target keeps revealed keys
+        let _ = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Overview);
+        assert!(state.is_secret_key_revealed("password"));
+
+        // Switching to a different target clears revealed keys
+        let other = ResourceDrawerTarget::Secret {
+            name: "api-token".to_string(),
+            namespace: "prod".to_string(),
+        };
+        let _ = state.open_or_switch(
+            Some("ctx-a"),
+            other,
+            ResourceDrawerTabId::Custom(SharedString::from("data")),
+        );
+        assert!(!state.is_secret_key_revealed("password"));
+
+        state.toggle_secret_key_revealed("token");
+        assert!(state.is_secret_key_revealed("token"));
+
+        // Closing clears revealed keys
+        state.close();
+        assert!(!state.is_secret_key_revealed("token"));
+
+        // Context change clears revealed keys
+        state.toggle_secret_key_revealed("token");
+        assert!(state.is_secret_key_revealed("token"));
+        state.reset_for_context_change();
+        assert!(!state.is_secret_key_revealed("token"));
     }
 }

@@ -40,9 +40,6 @@ pub use hpa::{list_hpas, map_hpa, update_hpa_replicas};
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
 pub(crate) use orbit_core::kubernetes::namespaces::format_age;
 
-/// Formats a byte count into a human-readable size string.
-pub(crate) use orbit_core::kubernetes::configmaps::format_size;
-
 /// Formats a Kubernetes API or client error into a user-friendly message,
 /// extracting clean messages from Api error responses.
 pub(crate) fn format_error(e: &kube::Error) -> String {

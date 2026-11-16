@@ -6,6 +6,7 @@ pub mod nodes;
 pub mod offline;
 pub mod overview;
 pub mod pods;
+pub mod secrets;
 pub mod services;
 pub mod welcome;
 
