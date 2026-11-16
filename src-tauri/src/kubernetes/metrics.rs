@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use kube::{
@@ -9,67 +8,10 @@ use kube::{
 use crate::ipc::bridge::{Bridge, WsWriter};
 use crate::ipc::events::OrbitEvent;
 use crate::kubernetes::models::PodMetricItem;
-use crate::kubernetes::nodes::{parse_cpu_quantity, parse_memory_quantity};
+pub use orbit_core::kubernetes::metrics::{
+    format_cpu_cores, format_memory_mib, parse_pod_metric_obj, parse_pod_metrics_map,
+};
 pub use orbit_core::kubernetes::nodes::format_decimal;
-
-pub fn format_memory_mib(mib: f64) -> String {
-    format!("{}Mi", format_decimal(mib, 2))
-}
-
-pub fn format_cpu_cores(cores: f64) -> String {
-    if cores >= 1.0 {
-        format!("{} cores", format_decimal(cores, 2))
-    } else if cores > 0.0 {
-        format!("{}m", format_decimal(cores * 1000.0, 2))
-    } else {
-        "0m".to_string()
-    }
-}
-
-pub fn parse_pod_metric_obj(obj: &DynamicObject) -> Option<PodMetricItem> {
-    let name = obj.metadata.name.clone()?;
-    let namespace = obj.metadata.namespace.clone().unwrap_or_default();
-
-    let containers = obj.data.get("containers")?.as_array()?;
-
-    let mut total_cpu_cores: f64 = 0.0;
-    let mut total_mem_gib: f64 = 0.0;
-
-    for container in containers {
-        if let Some(usage) = container.get("usage") {
-            if let Some(cpu) = usage.get("cpu").and_then(|v| v.as_str()) {
-                total_cpu_cores += parse_cpu_quantity(cpu);
-            }
-            if let Some(mem) = usage.get("memory").and_then(|v| v.as_str()) {
-                total_mem_gib += parse_memory_quantity(mem);
-            }
-        }
-    }
-
-    let cpu_str = format_cpu_cores(total_cpu_cores);
-    let mem_mib = total_mem_gib * 1024.0;
-    let memory_str = format_memory_mib(mem_mib);
-    let memory_bytes = total_mem_gib * 1024.0 * 1024.0 * 1024.0;
-
-    Some(PodMetricItem {
-        name,
-        namespace,
-        cpu: cpu_str,
-        memory: memory_str,
-        cpu_cores: Some(total_cpu_cores),
-        memory_bytes: Some(memory_bytes),
-    })
-}
-
-pub fn parse_pod_metrics_map(items: &[DynamicObject]) -> HashMap<(String, String), PodMetricItem> {
-    let mut map = HashMap::new();
-    for obj in items {
-        if let Some(item) = parse_pod_metric_obj(obj) {
-            map.insert((item.name.clone(), item.namespace.clone()), item);
-        }
-    }
-    map
-}
 
 /// Polls PodMetrics from the Metrics Server every 15 seconds and broadcasts
 /// the aggregated CPU/memory usage per pod via the `podMetricsUpdated` event.

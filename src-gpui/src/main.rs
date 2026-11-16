@@ -32,8 +32,8 @@ use crate::navigation::{
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, DeploymentsState, EventTypeFilter, EventsLoadStatus, EventsState,
-    NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState, TabDropPosition,
-    WorkspaceTabsState, calculate_tab_drop_index,
+    NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState, PodsState,
+    TabDropPosition, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -175,17 +175,27 @@ pub fn namespace_trigger_presentation(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn select_workspace_view_with_state(
     state: &ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    pods: &mut PodsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: WorkspaceView,
 ) -> Option<ClusterBridgeCommand> {
     sidebar.select_view(view);
-    load_command_for_active_view(state, namespaces, deployments, nodes, events, Some(view))
+    load_command_for_active_view(
+        state,
+        namespaces,
+        deployments,
+        pods,
+        nodes,
+        events,
+        Some(view),
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -194,6 +204,7 @@ pub fn select_workspace_view_with_tabs(
     sidebar: &mut SidebarLayoutState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    pods: &mut PodsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -206,6 +217,7 @@ pub fn select_workspace_view_with_tabs(
         sidebar,
         namespaces,
         deployments,
+        pods,
         nodes,
         events,
         view,
@@ -222,6 +234,7 @@ fn load_command_for_active_view(
     state: &ClusterSwitcherState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    pods: &mut PodsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: Option<WorkspaceView>,
@@ -235,6 +248,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::Deployments && deployments.needs_load_for_cluster(cluster_id) {
         return Some(deployments.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
+        return Some(pods.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
         return Some(nodes.begin_load_for_cluster(cluster_id));
@@ -253,6 +269,7 @@ pub fn apply_cluster_event_with_tabs(
     namespaces: &mut NamespaceFilterState,
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
+    pods: &mut PodsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -266,6 +283,7 @@ pub fn apply_cluster_event_with_tabs(
         namespaces,
         namespaces_view,
         deployments,
+        pods,
         nodes,
         events,
         event,
@@ -279,6 +297,7 @@ pub fn apply_cluster_event_with_tabs(
                 state,
                 namespaces,
                 deployments,
+                pods,
                 nodes,
                 events,
                 restored,
@@ -299,6 +318,7 @@ pub fn handle_tab_shortcut_with_state(
     sidebar: &mut SidebarLayoutState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    pods: &mut PodsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -333,9 +353,15 @@ pub fn handle_tab_shortcut_with_state(
     sidebar.sync_for_view(active);
 
     let mut commands = Vec::new();
-    if let Some(cmd) =
-        load_command_for_active_view(state, namespaces, deployments, nodes, events, active)
-    {
+    if let Some(cmd) = load_command_for_active_view(
+        state,
+        namespaces,
+        deployments,
+        pods,
+        nodes,
+        events,
+        active,
+    ) {
         commands.push(cmd);
     }
     if let Some(save_cmd) = tabs.persistence_command() {
@@ -353,6 +379,7 @@ pub fn apply_cluster_event_with_workspace(
     namespaces: &mut NamespaceFilterState,
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
+    pods: &mut PodsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     event: ClusterBridgeEvent,
@@ -370,6 +397,11 @@ pub fn apply_cluster_event_with_workspace(
                     commands.push(deployments.begin_load_for_cluster(id));
                 } else {
                     deployments.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::Pods {
+                    commands.push(pods.begin_load_for_cluster(id));
+                } else {
+                    pods.reset_for_cluster(id);
                 }
                 if sidebar.active_view == WorkspaceView::Nodes {
                     commands.push(nodes.begin_load_for_cluster(id));
@@ -390,6 +422,7 @@ pub fn apply_cluster_event_with_workspace(
             namespaces.reset_for_disconnected();
             namespaces_view.reset_for_disconnected();
             deployments.reset_for_disconnected();
+            pods.reset_for_disconnected();
             nodes.reset_for_disconnected();
             events.reset_for_disconnected();
         }
@@ -441,6 +474,20 @@ pub fn apply_cluster_event_with_workspace(
             message,
         } => {
             deployments.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::PodsLoaded {
+            cluster_id,
+            generation,
+            pods: loaded_pods,
+        } => {
+            pods.apply_loaded(&cluster_id, generation, loaded_pods);
+        }
+        ClusterBridgeEvent::PodsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            pods.apply_failed(&cluster_id, generation, message);
         }
         other @ ClusterBridgeEvent::ContextsLoaded { .. } => {
             state.apply_event(other);
@@ -534,6 +581,7 @@ pub struct OrbitShell {
     namespaces: NamespaceFilterState,
     namespaces_view: NamespacesViewState,
     deployments: DeploymentsState,
+    pods: PodsState,
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
@@ -571,6 +619,7 @@ impl OrbitShell {
                             &mut shell.namespaces,
                             &mut shell.namespaces_view,
                             &mut shell.deployments,
+                            &mut shell.pods,
                             &mut shell.nodes,
                             &mut shell.events,
                             &mut shell.tabs,
@@ -607,6 +656,7 @@ impl OrbitShell {
             namespaces: NamespaceFilterState::from_config(config),
             namespaces_view: NamespacesViewState::default(),
             deployments: DeploymentsState::default(),
+            pods: PodsState::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
@@ -668,6 +718,7 @@ impl OrbitShell {
             &mut self.sidebar,
             &mut self.namespaces,
             &mut self.deployments,
+            &mut self.pods,
             &mut self.nodes,
             &mut self.events,
             &mut self.tabs,
@@ -694,6 +745,7 @@ impl OrbitShell {
             &self.state,
             &mut self.namespaces,
             &mut self.deployments,
+            &mut self.pods,
             &mut self.nodes,
             &mut self.events,
             active,
@@ -778,7 +830,9 @@ impl OrbitShell {
         let cluster_id = self.active_cluster_id().map(str::to_string);
         if matches!(
             target,
-            ResourceDrawerTarget::Deployment { .. } | ResourceDrawerTarget::Node { .. }
+            ResourceDrawerTarget::Deployment { .. }
+                | ResourceDrawerTarget::Pod { .. }
+                | ResourceDrawerTarget::Node { .. }
         ) {
             if let Some(cid) = cluster_id.as_deref() {
                 if self.events.needs_load_for_cluster(cid) {
@@ -864,6 +918,11 @@ impl OrbitShell {
                 reason,
                 namespace,
             } => self.find_event_for_target(uid, reason, namespace).is_some(),
+            ResourceDrawerTarget::Pod { name, namespace } => self
+                .pods
+                .pods
+                .iter()
+                .any(|p| p.name == *name && p.namespace == *namespace),
         };
         if !exists {
             self.drawer.close();
@@ -968,6 +1027,55 @@ impl OrbitShell {
                     Some(SharedString::from(dep.namespace.clone())),
                     Some(SharedString::from(dep.age.clone())),
                     Some(SharedString::from(dep.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::Pod { name, namespace } => {
+                let pod = self
+                    .pods
+                    .pods
+                    .iter()
+                    .find(|p| p.name == *name && p.namespace == *namespace)?;
+                let matched_events = views::pods::filter_events_for_pod(&self.events.events, pod);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::pods::render_pod_drawer_overview(pod, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::pods::render_pod_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        pod,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(format!("{}/{}", pod.namespace, pod.name), theme, cx)
+                    }
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(pod.name.clone()),
+                    SharedString::from("Pod"),
+                    Some(SharedString::from(pod.namespace.clone())),
+                    Some(SharedString::from(pod.age.clone())),
+                    Some(SharedString::from(pod.status.clone())),
                     tabs,
                     body,
                 ))
@@ -1184,6 +1292,13 @@ impl OrbitShell {
                     .deployments
                     .begin_refresh()
                     .unwrap_or_else(|| self.deployments.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Pods || self.pods.cluster_id.is_some() {
+                let cmd = self
+                    .pods
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.pods.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
@@ -3079,6 +3194,119 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::Pods {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.pods.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.pods.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Pod {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            pod: &orbit_core::kubernetes::models::PodInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = pod.name.clone();
+                let namespace = pod.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Pod {
+                    name: pod.name.clone(),
+                    namespace: pod.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::pods::build_pod_context_menu_entries(
+                    pod,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.pods.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::pods::render_pods_view(
+                &self.pods,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Namespaces {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -3580,6 +3808,7 @@ impl OrbitShell {
             self.sidebar.active_view,
             WorkspaceView::Namespaces
                 | WorkspaceView::Deployments
+                | WorkspaceView::Pods
                 | WorkspaceView::Nodes
                 | WorkspaceView::Events
         ) && matches!(
@@ -3842,6 +4071,7 @@ impl Render for OrbitShell {
                     &mut this.sidebar,
                     &mut this.namespaces,
                     &mut this.deployments,
+                    &mut this.pods,
                     &mut this.nodes,
                     &mut this.events,
                     &mut this.tabs,
@@ -4239,6 +4469,7 @@ mod tests {
         let mut throwaway_namespaces = NamespaceFilterState::default();
         let mut throwaway_namespaces_view = NamespacesViewState::default();
         let mut throwaway_deployments = DeploymentsState::default();
+        let mut throwaway_pods = PodsState::default();
         let mut throwaway_nodes = NodesState::default();
         apply_cluster_event_with_workspace(
             &mut switcher,
@@ -4247,6 +4478,7 @@ mod tests {
             &mut throwaway_namespaces,
             &mut throwaway_namespaces_view,
             &mut throwaway_deployments,
+            &mut throwaway_pods,
             &mut throwaway_nodes,
             &mut EventsState::default(),
             event,
@@ -4336,6 +4568,7 @@ mod tests {
         );
         let mut namespaces = NamespaceFilterState::from_config(&config);
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
@@ -4364,6 +4597,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -4396,6 +4630,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::OverviewLoaded {
@@ -4414,6 +4649,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NamespacesLoaded {
@@ -4447,6 +4683,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -4547,21 +4784,24 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         // Navigating to Pods does not trigger Deployments load.
-        assert_eq!(
+        assert!(matches!(
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut pods,
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Pods
             ),
-            None
-        );
+            Some(ClusterBridgeCommand::LoadPods { .. })
+        ));
+        assert_eq!(deployments.status, crate::state::DeploymentsLoadStatus::Idle);
         assert_eq!(sidebar.active_view, WorkspaceView::Pods);
 
         // Navigating to Deployments while connected & Idle triggers LoadDeployments once.
@@ -4570,6 +4810,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Deployments,
@@ -4593,6 +4834,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -4603,6 +4845,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -4621,6 +4864,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         // Connect while on Overview: DeploymentsState resets for cluster without eager load.
@@ -4649,6 +4893,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -4668,6 +4913,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -4685,6 +4931,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -4719,6 +4966,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         deployments.begin_load_for_cluster("prod-ctx");
@@ -4755,6 +5003,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -4773,6 +5022,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -4797,6 +5047,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoadFailed {
@@ -4823,6 +5074,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         let cmd = select_workspace_view_with_state(
@@ -4830,6 +5082,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Nodes,
@@ -4850,6 +5103,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -4860,6 +5114,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -4878,6 +5133,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         let connect_event = ClusterBridgeEvent::ClusterConnected {
@@ -4907,6 +5163,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -4926,6 +5183,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -4943,6 +5201,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -4977,6 +5236,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         nodes.begin_load_for_cluster("prod-ctx");
@@ -5018,6 +5278,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -5036,6 +5297,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -5057,6 +5319,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoadFailed {
@@ -5080,6 +5343,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         let cmd = select_workspace_view_with_state(
@@ -5087,6 +5351,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Namespaces,
@@ -5106,6 +5371,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -5116,6 +5382,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -5131,6 +5398,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -5150,6 +5418,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
         namespaces_view.table.selected_row_key = Some("default".into());
@@ -5160,6 +5429,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -5191,6 +5461,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5226,6 +5497,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
 
@@ -5234,6 +5506,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             WorkspaceView::Events,
@@ -5254,6 +5527,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             WorkspaceView::Overview,
@@ -5264,6 +5538,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -5279,6 +5554,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -5298,6 +5574,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
 
@@ -5309,6 +5586,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -5347,6 +5625,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -5382,6 +5661,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -5754,6 +6034,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
         let mut tabs = WorkspaceTabsState::new();
@@ -5764,6 +6045,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5782,6 +6064,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5797,6 +6080,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5833,6 +6117,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
         let mut tabs = WorkspaceTabsState::from_config(&config);
@@ -5844,6 +6129,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5882,6 +6168,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5920,6 +6207,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
         let mut tabs = WorkspaceTabsState::new();
@@ -5935,6 +6223,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5953,6 +6242,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5970,6 +6260,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut pods,
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -5992,6 +6283,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+            &mut pods,
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -6004,5 +6296,227 @@ mod tests {
         assert!(tabs.open_tabs().is_empty());
         assert_eq!(tabs.active_tab(), None);
         assert!(!tabs.is_bar_visible(true));
+    }
+
+    fn make_test_pod(name: &str, namespace: &str) -> orbit_core::kubernetes::models::PodInfo {
+        orbit_core::kubernetes::models::PodInfo {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            age: "5m".to_string(),
+            cpu: Some("50m".to_string()),
+            memory: Some("64Mi".to_string()),
+            cpu_cores: Some(0.05),
+            memory_bytes: Some(67_108_864.0),
+            cpu_pct: None,
+            memory_pct: None,
+            node: Some("node-1".to_string()),
+            restarts: 0,
+            images: vec!["nginx:latest".to_string()],
+            labels: Default::default(),
+            annotations: Default::default(),
+            ip: Some("10.0.0.5".to_string()),
+            node_ip: Some("192.168.1.5".to_string()),
+            controlled_by: None,
+            qos_class: Some("Burstable".to_string()),
+            containers: vec![],
+        }
+    }
+
+    #[test]
+    fn test_selecting_pods_view_triggers_load_pods_command() {
+        let mut state = ClusterSwitcherState::new();
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: None,
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut pods,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Pods,
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Pods));
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPods { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+
+        // Connecting while already on WorkspaceView::Pods also dispatches LoadPods.
+        let mut pods_on_connect = PodsState::default();
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods_on_connect,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPods { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_pods_loaded_and_failed_events_update_state() {
+        let mut state = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut pods = PodsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        pods.begin_load_for_cluster("prod-ctx");
+        let gen1 = pods.generation;
+
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::PodsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: gen1,
+                pods: vec![make_test_pod("api-0", "prod")],
+            },
+        );
+        assert_eq!(pods.status, crate::state::PodsLoadStatus::Loaded);
+        assert_eq!(pods.pods.len(), 1);
+
+        pods.begin_refresh();
+        let gen2 = pods.generation;
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::PodsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: gen2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(pods.status, crate::state::PodsLoadStatus::Error);
+        assert_eq!(pods.error_message.as_deref(), Some("forbidden"));
+
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut pods,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterUnreachable {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: false,
+                    k8s_version: None,
+                    error_message: Some("timeout".to_string()),
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: None,
+                },
+            },
+        );
+        assert!(pods.cluster_id.is_none());
+        assert!(pods.pods.is_empty());
+        assert_eq!(pods.status, crate::state::PodsLoadStatus::Idle);
+    }
+
+    #[test]
+    fn test_build_pod_context_menu_entries_contains_expected_actions() {
+        let pod = make_test_pod("api-0", "prod");
+        let entries = views::pods::build_pod_context_menu_entries(
+            &pod,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let items: Vec<&crate::components::ContextMenuItem> = entries
+            .iter()
+            .filter_map(|e| match e {
+                ContextMenuEntry::Item(item) => Some(item),
+                ContextMenuEntry::Separator => None,
+            })
+            .collect();
+        let ids: Vec<&str> = items.iter().map(|i| i.id.as_ref()).collect();
+        assert_eq!(
+            ids,
+            vec![
+                "copy-name",
+                "filter-namespace",
+                "refresh",
+                "view-details",
+                "view-yaml",
+                "delete-pod",
+            ]
+        );
+        let delete_item = items.iter().find(|i| i.id == "delete-pod").unwrap();
+        assert!(delete_item.disabled);
+        assert!(delete_item.danger);
     }
 }
