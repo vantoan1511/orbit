@@ -82,7 +82,13 @@ const emit = defineEmits<{
 }>()
 
 useVisibleResourceKind(() => props.resourceKind)
-const { isScrolling, onScroll } = useTableScrollGuard()
+const { onScroll } = useTableScrollGuard()
+const onTableScroll = (event: Event) => {
+  const target = event.target as HTMLElement | null
+  if (target?.classList?.contains('p-datatable-table-container')) {
+    onScroll()
+  }
+}
 const { isHydrated } = useDeferredMount()
 
 const rowsPerPage = ref(
@@ -118,20 +124,26 @@ const resolveRowKey = (row: any): string => {
   return getResourceCompositeKey(row)
 }
 
-const sortedData = computed(() => {
+const sortedResult = computed(() => {
   if (!isHydrated.value) {
-    return []
+    return { rows: [] as any[], order: new Map<string, number>() }
   }
-  const result = sortTableRowsStable(
+  return sortTableRowsStable(
     props.data,
     sortField.value,
     sortOrder.value,
     resolveRowKey,
     previousOrder
   )
-  previousOrder = result.order
-  return result.rows
 })
+
+watch(sortedResult, (res) => {
+  if (res.order.size > 0) {
+    previousOrder = res.order
+  }
+})
+
+const sortedData = computed(() => sortedResult.value.rows)
 
 const paginatedResult = computed(() => {
   return paginateTableRows(sortedData.value, first.value, rowsPerPage.value)
@@ -391,9 +403,9 @@ const isIndeterminate = computed(() => {
 
     <!-- Table Container -->
     <div
+      data-surface="table-container"
       class="border border-(--border) rounded-[var(--ui-radius-card)] overflow-hidden bg-(--bg-card) flex-1 min-h-0 flex flex-col"
-      :data-scrolling="isScrolling ? 'true' : undefined"
-      @scroll.capture.passive="onScroll"
+      @scroll.capture.passive="onTableScroll"
     >
       <!-- Loading Skeleton or Data Table -->
       <slot name="loading" v-if="shouldShowSkeleton(loading, data.length, isHydrated)">
@@ -404,6 +416,8 @@ const isIndeterminate = computed(() => {
         <!-- Data Table -->
         <DataTable
           :value="displayRows"
+          :lazy="true"
+          :totalRecords="sortedData.length"
           v-model:selection="selection"
           :dataKey="dataKey"
           :rowHover="true"

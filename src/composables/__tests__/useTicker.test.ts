@@ -4,6 +4,7 @@ import {
   useTicker,
   resetTickerForTesting,
   getSubscriberCountForTesting,
+  getMinuteSubscriberCountForTesting,
   setTickerPaused,
   isTickerPausedForTesting
 } from '../useTicker.ts'
@@ -132,5 +133,38 @@ test('setTickerPaused suppresses timestamp updates while paused and refreshes on
   assert.ok(currentTimestamp.value > pausedTime, 'timestamp updates immediately upon resume')
 
   unsubscribe()
+  resetTickerForTesting()
+})
+
+test('minute subscription tracks separate ref-count without starting 1s second-level subscriber count', async () => {
+  resetTickerForTesting()
+  const { currentTimestamp, currentMinuteTimestamp, subscribeMinute, unsubscribeMinute } =
+    useTicker()
+
+  assert.equal(getSubscriberCountForTesting(), 0)
+  assert.equal(getMinuteSubscriberCountForTesting(), 0)
+
+  subscribeMinute()
+  assert.equal(getSubscriberCountForTesting(), 0, 'minute subscriber must not increment 1s count')
+  assert.equal(getMinuteSubscriberCountForTesting(), 1)
+
+  const initialSec = currentTimestamp.value
+  const initialMin = currentMinuteTimestamp.value
+  await new Promise((r) => setTimeout(r, 1100))
+  assert.equal(
+    currentTimestamp.value,
+    initialSec,
+    '1s currentTimestamp must not advance when only minute subscribers exist'
+  )
+  assert.equal(
+    currentMinuteTimestamp.value,
+    initialMin,
+    '60s currentMinuteTimestamp must not churn every 1s'
+  )
+
+  unsubscribeMinute()
+  unsubscribeMinute()
+  assert.equal(getMinuteSubscriberCountForTesting(), 0)
+
   resetTickerForTesting()
 })
