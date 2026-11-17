@@ -130,12 +130,107 @@ jobs:
             git tag $tagName
           }
           git push origin $tagName
+      - name: Generate Release Notes
+        id: notes
+        if: steps.meta.outputs.should_release == 'true'
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_VERSION: ${{ env.VERSION }}
+          TARGET_TAG: v${{ env.VERSION }}
+          TARGET_COMMITISH: ${{ github.sha }}
+          GITHUB_REPOSITORY_NAME: ${{ github.repository }}
+        run: |
+          $notesScript = @'
+          import { execFileSync } from 'node:child_process';
+          import fs from 'node:fs';
+          import os from 'node:os';
+          import path from 'node:path';
+          import {
+            resolvePreviousTag,
+            parseGitLogLines,
+            buildFallbackReleaseNotes,
+            selectReleaseNotes
+          } from './scripts/lib/releaseHelpers.mjs';
+
+          const targetVersion = process.env.TARGET_VERSION;
+          const targetTag = process.env.TARGET_TAG;
+          const targetCommitish = process.env.TARGET_COMMITISH;
+          const repository = process.env.GITHUB_REPOSITORY_NAME;
+          const token = process.env.GITHUB_TOKEN;
+
+          const readTags = (args) =>
+            execFileSync('git', args, { encoding: 'utf8' })
+              .split(/\r?\n/)
+              .map((t) => t.trim())
+              .filter(Boolean);
+
+          const mergedTags = readTags(['tag', '--merged', 'HEAD', '--list', 'v*']);
+          const allTags = readTags(['tag', '-l', 'v*']);
+          const previousTag = resolvePreviousTag(targetVersion, mergedTags, allTags);
+
+          let generatedNotes = null;
+          if (token && repository) {
+            try {
+              const payload = {
+                tag_name: targetTag,
+                target_commitish: targetCommitish,
+                ...(previousTag ? { previous_tag_name: previousTag } : {})
+              };
+              const res = await fetch(`https://api.github.com/repos/${repository}/releases/generate-notes`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28',
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+              });
+              if (res.ok) {
+                const data = await res.json();
+                generatedNotes = typeof data.body === 'string' ? data.body : null;
+              } else {
+                console.error(`GitHub generate-notes returned HTTP ${res.status}; using fallback if needed.`);
+              }
+            } catch (err) {
+              console.error(`Failed to query GitHub generate-notes: ${err?.message || err}`);
+            }
+          }
+
+          const rangeSpec = previousTag ? `${previousTag}..HEAD` : 'HEAD';
+          const logOutput = execFileSync(
+            'git',
+            ['log', rangeSpec, '--no-merges', '--format=%H%x09%an%x09%s'],
+            { encoding: 'utf8' }
+          );
+          const commits = parseGitLogLines(logOutput);
+          const fallbackNotes = buildFallbackReleaseNotes({
+            targetTag,
+            previousTag,
+            repository,
+            commits
+          });
+
+          const selected = selectReleaseNotes({ generatedNotes, fallbackNotes });
+          const notesPath = path.join(process.env.RUNNER_TEMP || os.tmpdir(), 'release-notes.md');
+          fs.writeFileSync(notesPath, selected.body, 'utf8');
+          console.error(`Release notes source: ${selected.source} (previousTag=${previousTag ?? 'none'}, commits=${commits.length})`);
+          console.log(notesPath);
+          '@
+          $notesPath = (node --input-type=module -e $notesScript).Trim()
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($notesPath)) {
+            Write-Error "Failed to generate release notes."
+            exit 1
+          }
+          "release_notes_path=$notesPath" >> $env:GITHUB_OUTPUT
       - name: Create Release
         if: steps.meta.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.release_notes_path }}
+          generate_release_notes: false
           prerelease: ${{ steps.meta.outputs.is_prerelease }}
           make_latest: ${{ steps.meta.outputs.make_latest }}
           files: |

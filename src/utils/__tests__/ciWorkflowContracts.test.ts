@@ -37,17 +37,23 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
     assert.match(content, /runs-on:\s*windows-latest/)
   })
 
-  it('ci.yml triggers on pull_request and push for main, release/**, and hotfix/** branches', () => {
+  it('ci.yml triggers pull_request on main, release/**, hotfix/**, and feat/** (with push scoped to main, release/**, hotfix/**)', () => {
     const ciPath = path.resolve('.github/workflows/ci.yml')
     const content = fs.readFileSync(ciPath, 'utf8')
 
     assert.match(
       content,
-      /pull_request:\s*\n\s*branches:\s*\n\s*-\s*main\s*\n\s*-\s*['"]release\/\*\*['"]\s*\n\s*-\s*['"]hotfix\/\*\*['"]/
+      /pull_request:\s*\n\s*branches:\s*\n\s*-\s*main\s*\n\s*-\s*['"]release\/\*\*['"]\s*\n\s*-\s*['"]hotfix\/\*\*['"]\s*\n\s*-\s*['"]feat\/\*\*['"]/
     )
+    const pushSectionMatch = content.match(/push:\s*\n\s*branches:\s*\n(?:\s*-\s*[^\n]+\n)+/)
+    assert.ok(pushSectionMatch, 'ci.yml must define push.branches')
     assert.match(
-      content,
+      pushSectionMatch[0],
       /push:\s*\n\s*branches:\s*\n\s*-\s*main\s*\n\s*-\s*['"]release\/\*\*['"]\s*\n\s*-\s*['"]hotfix\/\*\*['"]/
+    )
+    assert.ok(
+      !pushSectionMatch[0].includes('feat/**'),
+      'ci.yml push.branches must not include feat/**'
     )
     assert.ok(content.includes("github.ref != 'refs/heads/main'"))
     assert.ok(content.includes("!startsWith(github.ref, 'refs/heads/release/')"))
@@ -86,5 +92,16 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
       assert.ok(idx > lastIndex, `ci.yml must execute gate "${gate}" in expected sequence`)
       lastIndex = idx
     }
+  })
+
+  it('GEMINI.md and README.md document feat/** integration branches and releasable main workflow', () => {
+    const geminiContent = fs.readFileSync(path.resolve('GEMINI.md'), 'utf8')
+    const readmeContent = fs.readFileSync(path.resolve('README.md'), 'utf8')
+
+    assert.match(geminiContent, /feat\/<initiative>|feat\/\*\*/)
+    assert.match(geminiContent, /main.*releasable|releasable.*main/i)
+
+    assert.match(readmeContent, /feat\/<initiative>/)
+    assert.match(readmeContent, /main.*releasable|releasable.*main/i)
   })
 })
