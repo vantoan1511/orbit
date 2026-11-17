@@ -32,6 +32,11 @@ Orbit strictly adheres to the **Shift-Left Quality & Architecture Constitution**
   - `/code-review`: Shift-left audit of uncommitted diffs or GitHub PRs.
   - `/commit` & `/pr`: Conventional staging and PR generation.
 
+### Branching Model
+- **`main`**: Continuously releasable production branch; standard single-PR features and fixes target `main`.
+- **`feat/<initiative>` Integration Branches**: Multi-PR initiatives or large migrations target a shared `feat/<initiative>` branch (validated by CI `pull_request` triggers on `feat/**`) with periodic `main` syncs before merging into `main`.
+- **`release/**` & `hotfix/**`**: Release stabilization and patch branches for targeted releases without blocking `main`.
+
 ---
 
 ## 3. Architecture & Boundary Invariants
