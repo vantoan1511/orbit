@@ -1,9 +1,21 @@
 import { readFileSync, writeFileSync } from 'fs'
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
+import {
+  parseSemver,
+  parseReleaseArgs,
+  resolveBaseBranch,
+  buildPrBranchName,
+  buildPrBody
+} from './lib/releaseHelpers.mjs'
 
 function run(command, options = {}) {
   console.log(`> ${command}`)
   return execSync(command, { stdio: 'inherit', ...options })
+}
+
+function runFile(file, args, options = {}) {
+  console.log(`> ${file} ${args.join(' ')}`)
+  return execFileSync(file, args, { stdio: 'inherit', ...options })
 }
 
 function updateFile(filePath, updater) {
@@ -23,65 +35,53 @@ function updateCargoVersion(filePath, newVersion) {
   })
 }
 
-function parseSemver(versionStr) {
-  const match = versionStr.match(/^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/)
-  if (!match) return null
-  return {
-    major: parseInt(match[1], 10),
-    minor: parseInt(match[2], 10),
-    patch: parseInt(match[3], 10),
-    prerelease: match[4] || null
-  }
-}
-
-function buildPrBody(targetVersion, currentVersion) {
-  return `## Summary
-
-Release preparation for Orbit **v${targetVersion}**.
-
-## Changes
-
-- Bumps version from \`${currentVersion}\` to \`${targetVersion}\` in:
-  - \`package.json\`
-  - \`src-tauri/tauri.conf.json\`
-  - \`src-tauri/Cargo.toml\`
-- Synchronizes lockfiles (\`package-lock.json\` and \`Cargo.lock\`).
-- Verified TypeScript checks via \`npm run type-check\`.
-
-## Automated Release Process
-
-Upon merging this PR into \`main\`:
-1. The GitHub Actions \`Release\` workflow will build Windows desktop binaries and installers (\`.exe\` NSIS & \`.msi\`).
-2. Installer elevation level (\`asInvoker\`) will be verified automatically.
-3. Git tag \`v${targetVersion}\` and GitHub Release notes will be published.
-4. Automated WinGet package submission workflow will be dispatched.
-`
-}
-
-function main() {
-  const args = process.argv.slice(2)
-  if (args.includes('--help') || args.includes('-h')) {
-    console.log(`
+function printHelp() {
+  console.log(`
 Usage: node scripts/release.js [version] [options]
 
 Arguments:
-  [version]       Target semver version (e.g. 0.10.0 or v0.10.0). If omitted, bumps current patch.
+  [version]           Target semver version (e.g. 0.18.3 or v0.18.3). If omitted, bumps current patch.
 
 Options:
-  --dry-run       Preview changes and commands without committing, pushing, or creating PR.
-  --no-pr         Skip creating a GitHub Pull Request.
-  -h, --help      Display this help message.
+  --base <branch>     Target base branch for PR creation (default: current checked-out branch).
+  --direct            Commit and push directly on the current release/* or hotfix/* branch (refuses main/master).
+  --tag               Create and push git tag v<version> (requires --direct or --no-pr).
+  --no-pr             Skip creating a GitHub Pull Request.
+  --dry-run           Preview changes and commands without committing, pushing, or creating PR.
+  -h, --help          Display this help message.
 `)
+}
+
+function main() {
+  let cli
+  try {
+    cli = parseReleaseArgs(process.argv.slice(2))
+  } catch (error) {
+    console.error(`Error: ${error.message}`)
+    process.exit(1)
+  }
+
+  if (cli.help) {
+    printHelp()
     process.exit(0)
   }
 
-  const isDryRun = args.includes('--dry-run')
-  const skipPr = args.includes('--no-pr')
-  const versionArg = args.find((arg) => !arg.startsWith('--') && !arg.startsWith('-'))
-  let targetVersion = versionArg
+  const currentBranch = execSync('git branch --show-current', { encoding: 'utf8' }).trim()
+  let baseBranch
+  try {
+    baseBranch = resolveBaseBranch({
+      explicitBase: cli.baseBranch,
+      currentBranch,
+      direct: cli.direct
+    })
+  } catch (error) {
+    console.error(`Error: ${error.message}`)
+    process.exit(1)
+  }
 
   const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
   const currentVersion = packageJson.version
+  let targetVersion = cli.targetVersionArg
 
   if (!targetVersion) {
     const semver = parseSemver(currentVersion)
@@ -97,7 +97,6 @@ Options:
     )
   }
 
-  // Remove leading 'v' if provided
   if (targetVersion.startsWith('v')) {
     targetVersion = targetVersion.slice(1)
   }
@@ -108,14 +107,14 @@ Options:
   }
 
   console.log(
-    `\n=== Preparing Orbit Release v${targetVersion}${isDryRun ? ' (DRY RUN)' : ''} ===\n`
+    `\n=== Preparing Orbit Release v${targetVersion}${cli.dryRun ? ' (DRY RUN)' : ''} ===\n`
   )
 
-  const branchName = `release/v${targetVersion}`
+  const branchName = cli.direct ? baseBranch : buildPrBranchName(targetVersion)
   const commitMsg = `chore: release v${targetVersion}`
-  const prBody = buildPrBody(targetVersion, currentVersion)
+  const prBody = buildPrBody(targetVersion, currentVersion, baseBranch)
+  const tagName = `v${targetVersion}`
 
-  // Ensure git working tree is clean
   const statusOutput = execSync('git status --porcelain', { encoding: 'utf8' }).trim()
   if (statusOutput.length > 0) {
     console.error(
@@ -124,31 +123,36 @@ Options:
     process.exit(1)
   }
 
-  console.log(`1. Checking out branch ${branchName}...`)
-  try {
-    run(`git checkout -b ${branchName}`)
-  } catch {
-    console.log(`Branch ${branchName} might already exist, checking out...`)
-    run(`git checkout ${branchName}`)
+  if (cli.direct) {
+    console.log(`1. Using current branch ${branchName} (--direct mode)...`)
+  } else {
+    console.log(`1. Checking out PR prep branch ${branchName} (base: ${baseBranch})...`)
+    const checkoutArgs =
+      cli.baseBranch && baseBranch !== currentBranch
+        ? ['checkout', '-b', branchName, baseBranch]
+        : ['checkout', '-b', branchName]
+    try {
+      runFile('git', checkoutArgs)
+    } catch {
+      console.log(`Branch ${branchName} might already exist, checking out...`)
+      runFile('git', ['checkout', branchName])
+    }
   }
 
   console.log(`\n2. Updating version numbers to ${targetVersion}...`)
 
-  // 1. package.json
   updateFile('package.json', (content) => {
     const pkg = JSON.parse(content)
     pkg.version = targetVersion
     return JSON.stringify(pkg, null, 2) + '\n'
   })
 
-  // 2. src-tauri/tauri.conf.json
   updateFile('src-tauri/tauri.conf.json', (content) => {
     const config = JSON.parse(content)
     config.version = targetVersion
     return JSON.stringify(config, null, 2) + '\n'
   })
 
-  // 3. src-tauri/Cargo.toml
   updateCargoVersion('src-tauri/Cargo.toml', targetVersion)
 
   console.log('\n3. Updating lock files...')
@@ -158,17 +162,21 @@ Options:
   console.log('\n4. Running typecheck...')
   run('npm run type-check')
 
-  if (isDryRun) {
-    console.log('\n[DRY RUN] Skipping git commit, push, and PR creation.')
-    console.log(`[DRY RUN] Would execute:`)
+  if (cli.dryRun) {
+    console.log('\n[DRY RUN] Skipping git commit, push, tag, and PR creation.')
+    console.log('[DRY RUN] Would execute:')
     console.log(
-      `  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml`
+      '  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml'
     )
     console.log(`  git commit -m "${commitMsg}"`)
     console.log(`  git push origin ${branchName}`)
-    if (!skipPr) {
+    if (cli.tag) {
+      console.log(`  git tag ${tagName}`)
+      console.log(`  git push origin ${tagName}`)
+    }
+    if (!cli.direct && !cli.skipPr) {
       console.log(
-        `  gh pr create --title "${commitMsg}" --base main --head ${branchName} --label chore --body ...`
+        `  gh pr create --title "${commitMsg}" --base ${baseBranch} --head ${branchName} --label chore --body ...`
       )
     }
     console.log(`\nDry run completed for v${targetVersion}!`)
@@ -179,27 +187,57 @@ Options:
   run(
     'git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml'
   )
-  run(`git commit -m "${commitMsg}"`)
+  runFile('git', ['commit', '-m', commitMsg])
 
-  console.log('\n6. Pushing branch to origin...')
-  run(`git push origin ${branchName}`)
+  console.log(`\n6. Pushing branch ${branchName} to origin...`)
+  runFile('git', ['push', 'origin', branchName])
 
-  if (skipPr) {
-    console.log('\nSkipping GitHub Pull Request creation (--no-pr flag set).')
+  if (cli.tag) {
+    console.log(`\n7. Creating and pushing tag ${tagName}...`)
+    runFile('git', ['tag', tagName])
+    runFile('git', ['push', 'origin', tagName])
+  }
+
+  if (cli.direct || cli.skipPr) {
+    if (cli.skipPr) {
+      console.log('\nSkipping GitHub Pull Request creation (--no-pr flag set).')
+    }
     console.log(`\nRelease v${targetVersion} prepared and pushed successfully!`)
     return
   }
 
-  console.log('\n7. Creating GitHub Pull Request...')
+  console.log(`\n7. Creating GitHub Pull Request (base: ${baseBranch})...`)
+  const prArgs = [
+    'pr',
+    'create',
+    '--title',
+    commitMsg,
+    '--base',
+    baseBranch,
+    '--head',
+    branchName,
+    '--label',
+    'chore',
+    '--body',
+    prBody
+  ]
   try {
-    const prCommand = `gh pr create --title "${commitMsg}" --base main --head ${branchName} --label chore --body "${prBody.replace(/"/g, '\\"')}"`
-    run(prCommand)
+    runFile('gh', prArgs)
   } catch {
     console.log('Retrying PR creation with fallback without labels...')
     try {
-      run(
-        `gh pr create --title "${commitMsg}" --base main --head ${branchName} --body "${prBody.replace(/"/g, '\\"')}"`
-      )
+      runFile('gh', [
+        'pr',
+        'create',
+        '--title',
+        commitMsg,
+        '--base',
+        baseBranch,
+        '--head',
+        branchName,
+        '--body',
+        prBody
+      ])
     } catch {
       console.warn(
         '\nWarning: Failed to create PR automatically via gh cli. You can create it manually on GitHub.'

@@ -2,13 +2,27 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      make_latest:
+        description: "Mark GitHub Release as latest ('auto' uses semver comparison)"
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - 'auto'
+          - 'true'
+          - 'false'
   push:
     branches:
       - main
+      - 'release/**'
+      - 'hotfix/**'
+    tags:
+      - 'v*'
 
 jobs:
   release:
-    if: "contains(github.event.head_commit.message, 'chore: release v') || github.event_name == 'workflow_dispatch'"
+    if: "contains(github.event.head_commit.message, 'chore: release v') || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v')"
     runs-on: windows-latest
     permissions:
       contents: write
@@ -21,18 +35,76 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
+      - name: Determine Release Metadata & Eligibility
+        id: meta
+        shell: pwsh
+        env:
+          GIT_REF: ${{ github.ref }}
+          GIT_REF_NAME: ${{ github.ref_name }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          INPUT_MAKE_LATEST: ${{ inputs.make_latest }}
+        run: |
+          $version = node -p "require('./package.json').version"
+          $expectedTag = "v$version"
+          "VERSION=$version" >> $env:GITHUB_ENV
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+          $gitRef = $env:GIT_REF
+          $refName = $env:GIT_REF_NAME
+          $eventName = $env:GITHUB_EVENT_NAME
+
+          if ($gitRef.StartsWith("refs/tags/v")) {
+            if ($refName -ne $expectedTag) {
+              Write-Error "Pushed tag '$refName' does not match package.json version '$expectedTag'."
+              exit 1
+            }
+          } elseif ($eventName -eq "push" -and $gitRef.StartsWith("refs/heads/")) {
+            $remoteTag = git ls-remote --tags origin "refs/tags/$expectedTag"
+            if (-not [string]::IsNullOrWhiteSpace($remoteTag)) {
+              Write-Output "Tag $expectedTag already exists on origin. Skipping duplicate release build for branch push $gitRef."
+              "should_release=false" >> $env:GITHUB_OUTPUT
+              exit 0
+            }
+          }
+
+          $override = if ([string]::IsNullOrWhiteSpace($env:INPUT_MAKE_LATEST)) { "auto" } else { $env:INPUT_MAKE_LATEST.Trim() }
+          $env:ORBIT_TARGET_VERSION = $version
+          $env:ORBIT_MAKE_LATEST_OVERRIDE = $override
+
+          $metaJson = node --input-type=module -e "
+            import { execSync } from 'node:child_process';
+            import { computeMakeLatest } from './scripts/lib/releaseHelpers.mjs';
+            const tags = execSync('git tag -l \"v*\"', { encoding: 'utf8' })
+              .split(/\r?\n/)
+              .map((t) => t.trim())
+              .filter(Boolean);
+            const result = computeMakeLatest(process.env.ORBIT_TARGET_VERSION, tags, process.env.ORBIT_MAKE_LATEST_OVERRIDE);
+            console.log(JSON.stringify(result));
+          "
+          $meta = $metaJson | ConvertFrom-Json
+
+          Write-Output "Release metadata for $expectedTag`: should_release=true, make_latest=$($meta.makeLatest), is_prerelease=$($meta.isPrerelease)"
+          "should_release=true" >> $env:GITHUB_OUTPUT
+          "make_latest=$($meta.makeLatest)" >> $env:GITHUB_OUTPUT
+          "is_prerelease=$($meta.isPrerelease.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+
       - name: Install Rust
+        if: steps.meta.outputs.should_release == 'true'
         uses: dtolnay/rust-toolchain@stable
       - name: Rust Cache
+        if: steps.meta.outputs.should_release == 'true'
         uses: swatinem/rust-cache@v2
         with:
           workspaces: |
             . -> target
       - name: Install Dependencies
+        if: steps.meta.outputs.should_release == 'true'
         run: npm ci
       - name: Build Tauri Desktop Application
+        if: steps.meta.outputs.should_release == 'true'
         run: npm run tauri:build
       - name: Find NSIS Installer
+        if: steps.meta.outputs.should_release == 'true'
         run: |
           $nsis = Get-ChildItem -Path @("target/release/bundle/nsis/*setup.exe", "src-tauri/target/release/bundle/nsis/*setup.exe") -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $nsis) {
@@ -41,22 +113,31 @@ jobs:
           if (-not $nsis) { throw "NSIS installer not found" }
           echo "NSIS_INSTALLER_PATH=$($nsis.FullName)" >> $env:GITHUB_ENV
       - name: Verify Installer Elevation (Legacy Client Backward-Compatibility)
+        if: steps.meta.outputs.should_release == 'true'
         run: node --experimental-strip-types scripts/verify-installer-elevation.ts $env:NSIS_INSTALLER_PATH
-      - name: Get Version
-        id: version
-        run: |
-          $version = node -p "require('./package.json').version"
-          echo "VERSION=$version" >> $env:GITHUB_ENV
       - name: Create and Push Tag
+        if: steps.meta.outputs.should_release == 'true'
+        shell: pwsh
         run: |
-          git tag v${{ env.VERSION }}
-          git push origin v${{ env.VERSION }}
-        continue-on-error: true
+          $tagName = "v${{ env.VERSION }}"
+          $remoteTag = git ls-remote --tags origin "refs/tags/$tagName"
+          if (-not [string]::IsNullOrWhiteSpace($remoteTag)) {
+            Write-Output "Tag $tagName already exists on origin. Skipping tag push."
+            exit 0
+          }
+          git rev-parse -q --verify "refs/tags/$tagName" | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            git tag $tagName
+          }
+          git push origin $tagName
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        if: steps.meta.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ env.VERSION }}
           generate_release_notes: true
+          prerelease: ${{ steps.meta.outputs.is_prerelease }}
+          make_latest: ${{ steps.meta.outputs.make_latest }}
           files: |
             target/release/bundle/nsis/*setup.exe
             target/release/bundle/msi/*.msi
