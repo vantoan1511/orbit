@@ -173,6 +173,12 @@ Contributions, bug reports, and ideas are always welcome.
 4. Push to your branch (`git push origin feat/your-feature`)
 5. Open a Pull Request
 
+### Branching Model
+
+- **Standard PRs**: Target `main`, which is kept continuously releasable.
+- **Multi-PR Initiatives**: Target a shared `feat/<initiative>` integration branch (CI runs automatically on pull requests to `feat/**`), syncing periodically with `main` before merging into `main`.
+- **Hotfix & Release Branches**: Use `hotfix/*` and `release/*` for patch releases and release stabilization.
+
 Check open [issues](https://github.com/vantoan1511/orbit/issues) for planned roadmap items and bug fixes.
 
 ---
