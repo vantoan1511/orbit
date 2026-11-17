@@ -37,6 +37,23 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
     assert.match(content, /runs-on:\s*windows-latest/)
   })
 
+  it('ci.yml triggers on pull_request and push for main, release/**, and hotfix/** branches', () => {
+    const ciPath = path.resolve('.github/workflows/ci.yml')
+    const content = fs.readFileSync(ciPath, 'utf8')
+
+    assert.match(
+      content,
+      /pull_request:\s*\n\s*branches:\s*\n\s*-\s*main\s*\n\s*-\s*['"]release\/\*\*['"]\s*\n\s*-\s*['"]hotfix\/\*\*['"]/
+    )
+    assert.match(
+      content,
+      /push:\s*\n\s*branches:\s*\n\s*-\s*main\s*\n\s*-\s*['"]release\/\*\*['"]\s*\n\s*-\s*['"]hotfix\/\*\*['"]/
+    )
+    assert.ok(content.includes("github.ref != 'refs/heads/main'"))
+    assert.ok(content.includes("!startsWith(github.ref, 'refs/heads/release/')"))
+    assert.ok(content.includes("!startsWith(github.ref, 'refs/heads/hotfix/')"))
+  })
+
   it('ci.yml configures Node 22 with npm cache, stable Rust toolchain, and swatinem/rust-cache@v2', () => {
     const ciPath = path.resolve('.github/workflows/ci.yml')
     assert.ok(fs.existsSync(ciPath), '.github/workflows/ci.yml must exist')

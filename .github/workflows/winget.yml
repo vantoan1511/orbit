@@ -32,21 +32,93 @@ jobs:
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.tag }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG_NAME: ${{ github.event.release.tag_name }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          GITHUB_REPOSITORY_NAME: ${{ github.repository }}
         run: |
-          $Tag = "${{ inputs.tag }}".Trim()
+          function Compare-Semver {
+            param(
+              [string]$Left,
+              [string]$Right
+            )
+            $regex = '^v?(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(?:-(?<pre>[0-9A-Za-z.-]+))?$'
+            $mL = [regex]::Match($Left.Trim(), $regex)
+            $mR = [regex]::Match($Right.Trim(), $regex)
+            if (-not $mL.Success -or -not $mR.Success) {
+              throw "Invalid semver comparison: '$Left' vs '$Right'"
+            }
+            foreach ($field in @('major', 'minor', 'patch')) {
+              $vL = [int]$mL.Groups[$field].Value
+              $vR = [int]$mR.Groups[$field].Value
+              if ($vL -lt $vR) { return -1 }
+              if ($vL -gt $vR) { return 1 }
+            }
+            $preL = $mL.Groups['pre'].Value
+            $preR = $mR.Groups['pre'].Value
+            if ($preL -eq $preR) { return 0 }
+            if ([string]::IsNullOrEmpty($preL)) { return 1 }
+            if ([string]::IsNullOrEmpty($preR)) { return -1 }
 
-          if ([string]::IsNullOrWhiteSpace($Tag) -and "${{ github.event_name }}" -eq "release") {
-            $Tag = "${{ github.event.release.tag_name }}".Trim()
+            $partsL = $preL.Split('.')
+            $partsR = $preR.Split('.')
+            $max = [Math]::Max($partsL.Count, $partsR.Count)
+            for ($i = 0; $i -lt $max; $i++) {
+              if ($i -ge $partsL.Count) { return -1 }
+              if ($i -ge $partsR.Count) { return 1 }
+              $a = $partsL[$i]
+              $b = $partsR[$i]
+              $aNum = $a -match '^\d+$'
+              $bNum = $b -match '^\d+$'
+              if ($aNum -and $bNum) {
+                $nA = [int]$a; $nB = [int]$b
+                if ($nA -lt $nB) { return -1 }
+                if ($nA -gt $nB) { return 1 }
+              } elseif ($aNum) {
+                return -1
+              } elseif ($bNum) {
+                return 1
+              } elseif ($a -ne $b) {
+                if ($a -lt $b) { return -1 } else { return 1 }
+              }
+            }
+            return 0
           }
 
-          if ([string]::IsNullOrWhiteSpace($Tag)) {
-            Write-Output "No explicit tag provided. Fetching latest release from GitHub API..."
-            $headers = @{
-              "Accept" = "application/vnd.github.v3+json"
-              "Authorization" = "Bearer $env:GITHUB_TOKEN"
+          $headers = @{
+            "Accept" = "application/vnd.github.v3+json"
+            "Authorization" = "Bearer $env:GITHUB_TOKEN"
+          }
+
+          $Tag = if ($null -ne $env:INPUT_TAG) { $env:INPUT_TAG.Trim() } else { "" }
+          $ExplicitTagOverride = -not [string]::IsNullOrWhiteSpace($Tag)
+          $EventName = $env:GITHUB_EVENT_NAME
+
+          if (-not $ExplicitTagOverride -and $EventName -eq "release") {
+            $Tag = if ($null -ne $env:RELEASE_TAG_NAME) { $env:RELEASE_TAG_NAME.Trim() } else { "" }
+          } elseif (-not $ExplicitTagOverride -and $EventName -eq "workflow_run") {
+            $HeadSha = if ($null -ne $env:WORKFLOW_RUN_HEAD_SHA) { $env:WORKFLOW_RUN_HEAD_SHA.Trim() } else { "" }
+            if ([string]::IsNullOrWhiteSpace($HeadSha)) {
+              Write-Error "workflow_run.head_sha is missing; cannot resolve exact release tag."
+              exit 1
             }
             try {
-              $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases/latest" -Headers $headers
+              $pkgContent = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY_NAME/contents/package.json?ref=$HeadSha" -Headers $headers
+              $decodedJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String(($pkgContent.content -replace '\s', '')))
+              $pkg = $decodedJson | ConvertFrom-Json
+              if ([string]::IsNullOrWhiteSpace($pkg.version)) {
+                throw "package.json at $HeadSha has no version field."
+              }
+              $Tag = "v$($pkg.version.Trim())"
+            } catch {
+              Write-Error "Failed to resolve package.json version from workflow_run head_sha ($HeadSha): $_"
+              exit 1
+            }
+          } elseif (-not $ExplicitTagOverride) {
+            Write-Output "No explicit tag provided. Fetching latest release from GitHub API..."
+            try {
+              $latestRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY_NAME/releases/latest" -Headers $headers
               $Tag = $latestRelease.tag_name
             } catch {
               Write-Error "Failed to fetch latest release: $_"
@@ -62,7 +134,55 @@ jobs:
           Write-Output "Resolved release tag: $Tag"
           "tag=$Tag" >> $env:GITHUB_OUTPUT
 
+          try {
+            $targetRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY_NAME/releases/tags/$Tag" -Headers $headers
+          } catch {
+            Write-Error "GitHub Release for tag '$Tag' could not be found: $_"
+            exit 1
+          }
+
+          if ($targetRelease.draft) {
+            Write-Output "Release $Tag is still a draft. Skipping WinGet submission."
+            "should_publish=false" >> $env:GITHUB_OUTPUT
+            exit 0
+          }
+
+          if (-not $ExplicitTagOverride) {
+            $isSemverPrerelease = $Tag -match '^v?\d+\.\d+\.\d+-[0-9A-Za-z.-]+$'
+            if ($targetRelease.prerelease -or $isSemverPrerelease) {
+              Write-Output "Release $Tag is a prerelease. Skipping automatic WinGet submission."
+              "should_publish=false" >> $env:GITHUB_OUTPUT
+              exit 0
+            }
+
+            $latestStableTag = $null
+            try {
+              $latestStable = Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GITHUB_REPOSITORY_NAME/releases/latest" -Headers $headers
+              $latestStableTag = $latestStable.tag_name
+            } catch {
+              $statusCode = $_.Exception.Response.StatusCode.value__
+              if ($statusCode -eq 404) {
+                Write-Output "No existing latest stable release found (HTTP 404). Proceeding with $Tag."
+              } else {
+                Write-Error "Failed to query /releases/latest: $_"
+                exit 1
+              }
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($latestStableTag)) {
+              $cmp = Compare-Semver -Left $Tag -Right $latestStableTag
+              if ($cmp -lt 0) {
+                Write-Output "Release $Tag is older than current latest stable release $latestStableTag. Skipping WinGet submission."
+                "should_publish=false" >> $env:GITHUB_OUTPUT
+                exit 0
+              }
+            }
+          }
+
+          "should_publish=true" >> $env:GITHUB_OUTPUT
+
       - name: Validate WINGET_TOKEN Secret
+        if: steps.resolve-tag.outputs.should_publish == 'true'
         shell: pwsh
         env:
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
@@ -82,6 +202,7 @@ jobs:
           Write-Output "WINGET_TOKEN secret is configured."
 
       - name: Sync WinGet Fork from Upstream
+        if: steps.resolve-tag.outputs.should_publish == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.WINGET_TOKEN }}
@@ -95,6 +216,7 @@ jobs:
           Write-Output "Fork successfully synced with upstream."
 
       - name: Submit to WinGet Community Repository
+        if: steps.resolve-tag.outputs.should_publish == 'true'
         uses: vedantmgoyal9/winget-releaser@v2
         with:
           identifier: ${{ env.PACKAGE_IDENTIFIER }}

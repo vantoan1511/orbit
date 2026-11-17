@@ -12,17 +12,18 @@ This workflow guide covers publishing Orbit releases to the Windows Package Mana
 ## 1. Architecture & Automation Flow
 
 ```
-[Developer merges Release PR to main]
+[Developer merges Release PR to main / release/** / hotfix/** or pushes v* tag]
                  │
                  ▼
      [.github/workflows/release.yml]
      - Builds binaries & installers
      - Pushes Git tag (e.g. v1.0.0)
-     - Publishes GitHub Release with Orbit_<version>_x64-setup.exe & .msi
+     - Publishes GitHub Release (semver make_latest & prerelease flags)
                  │
                  ▼ (workflow_run: Release completed)
      [.github/workflows/winget.yml]
-     - Resolves release tag (or uses manual input)
+     - Resolves exact tag from workflow_run head_sha (or manual input)
+     - Skips prereleases or versions older than latest stable release
      - Validates WINGET_TOKEN secret
      - Syncs fork (vantoan1511/winget-pkgs) from upstream (microsoft/winget-pkgs)
      - Submits PR to microsoft/winget-pkgs via winget-releaser / komac
@@ -88,7 +89,8 @@ To submit Orbit for the very first time (version `0.9.0`):
 ## 4. Triggering the Workflow
 
 ### Automatic Trigger
-- When `.github/workflows/release.yml` completes successfully on `main`, `winget.yml` triggers automatically via `workflow_run`.
+- When `.github/workflows/release.yml` completes successfully on `main`, `release/**`, `hotfix/**`, or a `v*` tag, `winget.yml` triggers automatically via `workflow_run` and resolves the exact tag from `workflow_run.head_sha`.
+- Prereleases and hotfix versions strictly older than the current latest stable release are automatically skipped unless manually dispatched with an explicit `tag` input.
 - It can also trigger when a release is manually published via GitHub Releases (`release: published`).
 
 ### Manual Trigger
