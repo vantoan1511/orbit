@@ -1,8 +1,11 @@
 import { ref, type Ref } from 'vue'
 
 let activeSubscribers = 0
+let activeMinuteSubscribers = 0
 let tickerInterval: ReturnType<typeof setInterval> | null = null
+let minuteTickerInterval: ReturnType<typeof setInterval> | null = null
 const currentTimestamp: Ref<number> = ref(Date.now())
+const currentMinuteTimestamp: Ref<number> = ref(Date.now())
 let isVisibilityListenerAttached = false
 let isTickerPaused = false
 
@@ -27,12 +30,35 @@ function stopInterval() {
   }
 }
 
+function startMinuteInterval() {
+  if (minuteTickerInterval || isDocumentHidden() || activeMinuteSubscribers <= 0) return
+  currentMinuteTimestamp.value = Date.now()
+  minuteTickerInterval = setInterval(() => {
+    if (isTickerPaused) return
+    currentMinuteTimestamp.value = Date.now()
+  }, 60_000)
+}
+
+function stopMinuteInterval() {
+  if (minuteTickerInterval) {
+    clearInterval(minuteTickerInterval)
+    minuteTickerInterval = null
+  }
+}
+
 function handleVisibilityChange() {
   if (isDocumentHidden()) {
     stopInterval()
-  } else if (activeSubscribers > 0) {
+    stopMinuteInterval()
+    return
+  }
+  if (activeSubscribers > 0) {
     currentTimestamp.value = Date.now()
     startInterval()
+  }
+  if (activeMinuteSubscribers > 0) {
+    currentMinuteTimestamp.value = Date.now()
+    startMinuteInterval()
   }
 }
 
@@ -60,10 +86,28 @@ export function useTicker() {
     }
   }
 
+  const subscribeMinute = () => {
+    activeMinuteSubscribers++
+    if (activeMinuteSubscribers === 1) {
+      ensureVisibilityListener()
+      startMinuteInterval()
+    }
+  }
+
+  const unsubscribeMinute = () => {
+    activeMinuteSubscribers = Math.max(0, activeMinuteSubscribers - 1)
+    if (activeMinuteSubscribers === 0) {
+      stopMinuteInterval()
+    }
+  }
+
   return {
     currentTimestamp,
+    currentMinuteTimestamp,
     subscribe,
-    unsubscribe
+    unsubscribe,
+    subscribeMinute,
+    unsubscribeMinute
   }
 }
 
@@ -72,24 +116,38 @@ export function useTicker() {
  */
 export function resetTickerForTesting() {
   stopInterval()
+  stopMinuteInterval()
   activeSubscribers = 0
+  activeMinuteSubscribers = 0
   isTickerPaused = false
   if (isVisibilityListenerAttached && typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
   isVisibilityListenerAttached = false
-  currentTimestamp.value = Date.now()
+  const now = Date.now()
+  currentTimestamp.value = now
+  currentMinuteTimestamp.value = now
 }
 
 export function getSubscriberCountForTesting(): number {
   return activeSubscribers
 }
 
+export function getMinuteSubscriberCountForTesting(): number {
+  return activeMinuteSubscribers
+}
+
 export function setTickerPaused(paused: boolean) {
   if (isTickerPaused === paused) return
   isTickerPaused = paused
-  if (!isTickerPaused && activeSubscribers > 0 && !isDocumentHidden()) {
-    currentTimestamp.value = Date.now()
+  if (!isTickerPaused && !isDocumentHidden()) {
+    const now = Date.now()
+    if (activeSubscribers > 0) {
+      currentTimestamp.value = now
+    }
+    if (activeMinuteSubscribers > 0) {
+      currentMinuteTimestamp.value = now
+    }
   }
 }
 

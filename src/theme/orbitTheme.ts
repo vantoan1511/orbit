@@ -319,12 +319,15 @@ function buildDataTableCss(): string {
 .p-datatable-table-container {
   overscroll-behavior: contain;
   will-change: scroll-position;
-  transform: translateZ(0);
+  contain: layout style;
 }
 
 .p-datatable-scrollable-table > .p-datatable-thead {
   z-index: 2;
-  transform: translateZ(0);
+}
+
+.p-datatable-header-cell {
+  transition: none;
 }
 
 .p-datatable-tbody > tr {
@@ -335,10 +338,6 @@ function buildDataTableCss(): string {
 .p-datatable .p-badge {
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-}
-
-[data-scrolling="true"] .p-datatable-tbody {
-  pointer-events: none;
 }
 `
 }
@@ -611,7 +610,7 @@ export const Noir = definePreset(Nora, {
         borderColor: 'var(--border-subtle, var(--border))'
       },
       row: {
-        background: 'var(--ui-card-bg)',
+        background: 'transparent',
         hoverBackground: 'var(--bg-hover)'
       },
       colorScheme: {
@@ -626,7 +625,7 @@ export const Noir = definePreset(Nora, {
             borderColor: 'var(--border)'
           },
           row: {
-            background: 'var(--ui-card-bg)',
+            background: 'transparent',
             hoverBackground: 'var(--bg-hover)'
           },
           bodyCell: {
@@ -644,7 +643,7 @@ export const Noir = definePreset(Nora, {
             borderColor: 'var(--border)'
           },
           row: {
-            background: 'var(--ui-card-bg)',
+            background: 'transparent',
             hoverBackground: 'var(--bg-hover)'
           },
           bodyCell: {

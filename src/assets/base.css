@@ -704,6 +704,14 @@
   backdrop-filter: var(--ui-mask-blur);
 }
 
+/* DataTable container preserves surface tokens while opting out of full-viewport backdrop-filter blur
+   to guarantee 60 FPS scroll & hover across all UI styles. */
+[data-component="resource-data-table"] [data-surface="table-container"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: none;
+}
+
 /* Subtle ambient background glow for translucent styles to make backdrop-blur pop */
 [data-ui-style="glass"] [data-component="app-layout"],
 [data-ui-style="liquidglass"] [data-component="app-layout"],
@@ -712,5 +720,4 @@
   background-image:
     radial-gradient(at 15% 15%, var(--accent-soft) 0px, transparent 40%),
     radial-gradient(at 85% 85%, var(--accent-soft) 0px, transparent 45%);
-  background-attachment: fixed;
 }

@@ -50,13 +50,25 @@ export function sortTableRowsStable<T extends Record<string, unknown>>(
   getKey: (row: T) => string,
   previousOrder?: ReadonlyMap<string, number>
 ): { rows: T[]; order: Map<string, number> } {
+  if (rows.length === 0) {
+    return { rows: [], order: new Map() }
+  }
+
+  const hasSort = Boolean(sortField && sortOrder)
+  if (!hasSort && (!previousOrder || previousOrder.size === 0)) {
+    const order = new Map<string, number>()
+    for (const [i, row] of rows.entries()) {
+      order.set(getKey(row), i)
+    }
+    return { rows: [...rows], order }
+  }
+
   const decorated = rows.map((row, index) => {
     const key = getKey(row)
     const prevIndex = previousOrder?.get(key)
     return { row, key, originalIndex: index, prevIndex }
   })
 
-  const hasSort = Boolean(sortField && sortOrder)
   const orderFactor = sortOrder === -1 ? -1 : 1
 
   decorated.sort((a, b) => {

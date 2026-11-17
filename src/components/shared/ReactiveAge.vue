@@ -1,58 +1,64 @@
 <script setup lang="ts">
 import { useTicker } from '@/composables/useTicker'
+import {
+  formatAgeSeconds,
+  parseAgeToSeconds,
+  resolveAgeTickCadence,
+  type AgeTickCadence
+} from '@/utils/reactiveAge'
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = defineProps<{
   age?: string
 }>()
 
-const { currentTimestamp, subscribe, unsubscribe } = useTicker()
+const {
+  currentTimestamp,
+  currentMinuteTimestamp,
+  subscribe,
+  unsubscribe,
+  subscribeMinute,
+  unsubscribeMinute
+} = useTicker()
 
 let initialAgeSeconds = 0
 let receivedAt = Date.now()
 const lastAgeProp = ref(props.age)
-let isSubscribed = false
+let activeCadence: AgeTickCadence = 'none'
+let isActive = false
+
+function applySubscription(nextCadence: AgeTickCadence) {
+  if (!isActive) return
+  if (activeCadence === nextCadence) return
+
+  if (activeCadence === 'second') {
+    unsubscribe()
+  } else if (activeCadence === 'minute') {
+    unsubscribeMinute()
+  }
+
+  activeCadence = nextCadence
+
+  if (activeCadence === 'second') {
+    subscribe()
+  } else if (activeCadence === 'minute') {
+    subscribeMinute()
+  }
+}
 
 function handleSubscribe() {
-  if (!isSubscribed) {
-    isSubscribed = true
-    subscribe()
-  }
+  isActive = true
+  applySubscription(resolveAgeTickCadence(props.age))
 }
 
 function handleUnsubscribe() {
-  if (isSubscribed) {
-    isSubscribed = false
+  isActive = false
+  if (activeCadence === 'second') {
     unsubscribe()
+  } else if (activeCadence === 'minute') {
+    unsubscribeMinute()
   }
-}
-
-const parseAgeToSeconds = (ageStr?: string): number => {
-  if (!ageStr) return 0
-  const match = ageStr.trim().match(/^(\d+)([smhd])$/)
-  if (!match) return 0
-  const val = parseInt(match[1] || '0', 10)
-  const unit = match[2] || 's'
-  switch (unit) {
-    case 's':
-      return val
-    case 'm':
-      return val * 60
-    case 'h':
-      return val * 3600
-    case 'd':
-      return val * 86400
-    default:
-      return 0
-  }
-}
-
-const formatSeconds = (seconds: number): string => {
-  if (seconds < 0) return '0s'
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
-  return `${Math.floor(seconds / 86400)}d`
+  activeCadence = 'none'
 }
 
 watch(
@@ -69,21 +75,19 @@ watch(
       lastAgeProp.value = newAge
       initialAgeSeconds = 0
     }
+    applySubscription(resolveAgeTickCadence(newAge))
   },
   { immediate: true }
 )
 
 const displayAge = computed(() => {
-  if (
-    !props.age ||
-    props.age === '-' ||
-    props.age === 'Unknown' ||
-    (initialAgeSeconds === 0 && !props.age.endsWith('s'))
-  ) {
+  const cadence = resolveAgeTickCadence(props.age)
+  if (cadence === 'none') {
     return props.age || '-'
   }
-  const elapsed = Math.floor((currentTimestamp.value - receivedAt) / 1000)
-  return formatSeconds(initialAgeSeconds + elapsed)
+  const now = cadence === 'second' ? currentTimestamp.value : currentMinuteTimestamp.value
+  const elapsed = Math.floor((now - receivedAt) / 1000)
+  return formatAgeSeconds(initialAgeSeconds + elapsed)
 })
 
 onMounted(() => {
