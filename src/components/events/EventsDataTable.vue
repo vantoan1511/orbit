@@ -110,7 +110,7 @@ const handleRefresh = async () => {
               data.objectKind
             }}</span>
             <span
-              class="font-mono text-violet-400 hover:text-violet-300 transition-colors truncate max-w-48"
+              class="font-mono text-violet-400 hover:text-violet-300 truncate max-w-48"
               v-tooltip.top="data.objectName"
             >
               {{ data.objectName }}

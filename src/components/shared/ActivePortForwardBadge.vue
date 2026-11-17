@@ -33,7 +33,7 @@ const stopPortForward = async (id: string) => {
   <div v-if="props.portForwards.length > 0" class="inline-flex items-center">
     <div
       v-tooltip.right="'Active Port Forwards (Click to view/stop)'"
-      class="group inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-(--success-soft) text-(--success) hover:opacity-80 cursor-pointer transition-opacity"
+      class="group inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-(--success-soft) text-(--success) hover:opacity-80 cursor-pointer"
       @click.stop="toggle"
     >
       <Cable class="w-3 h-3" />

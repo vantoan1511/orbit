@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import test from 'node:test'
 import { Noir } from '../orbitTheme.ts'
 import { CONTROL_TIERS, OVERLAY_SURFACES, OVERLAY_SURFACE_TOKENS } from '../uiContract.ts'
@@ -115,7 +117,7 @@ test('Noir preset components connect surfaces, radii, borders, glass blur, and s
   assert.equal(datatable.root?.borderColor, 'var(--border)')
   assert.equal(datatable.headerCell?.borderColor, 'var(--border)')
   assert.equal(datatable.bodyCell?.borderColor, 'var(--border-subtle, var(--border))')
-  assert.equal(datatable.row?.background, 'var(--ui-card-bg)')
+  assert.equal(datatable.row?.background, 'transparent')
   assert.equal(datatable.row?.hoverBackground, 'var(--bg-hover)')
 
   const dialog = components.dialog as Record<string, Record<string, string>>
@@ -729,11 +731,18 @@ test('Noir preset components harmonize typography with centralized design tokens
   assert.equal(toast.detail.fontSize, 'var(--ui-font-size-xs)')
 })
 
-test('Noir preset configures DataTable css hook for compositor promotion, tag blur suppression, and scroll pointer guard', () => {
+test('Noir preset configures DataTable row transparency, compositor containment, and tag blur suppression', () => {
   const components = Noir.components as Record<string, unknown>
   const datatable = components.datatable as Record<string, unknown>
   assert.ok(datatable, 'datatable component config must exist')
   assert.equal(typeof datatable.css, 'function', 'datatable must configure a css hook')
+
+  const row = datatable.row as Record<string, string>
+  assert.equal(row.background, 'transparent')
+
+  const colorScheme = datatable.colorScheme as Record<string, { row: Record<string, string> }>
+  assert.equal(colorScheme.light.row.background, 'transparent')
+  assert.equal(colorScheme.dark.row.background, 'transparent')
 
   const stubDt = (p: string) => `var(--p-${p.replace(/\./g, '-')})`
   const cssOutput = (datatable.css as (opt: { dt: (p: string) => string }) => string)({
@@ -752,20 +761,42 @@ test('Noir preset configures DataTable css hook for compositor promotion, tag bl
     cssOutput.includes('will-change: scroll-position'),
     'must configure will-change: scroll-position'
   )
+  assert.ok(
+    cssOutput.includes('contain: layout style'),
+    'must configure contain: layout style on table container'
+  )
+  assert.ok(cssOutput.includes('.p-datatable-header-cell'), 'must target .p-datatable-header-cell')
   assert.ok(cssOutput.includes('.p-datatable-tbody > tr'), 'must target .p-datatable-tbody > tr')
-  assert.ok(cssOutput.includes('transition: none'), 'must disable row transitions')
+  assert.ok(cssOutput.includes('transition: none'), 'must disable row and header transitions')
   assert.ok(cssOutput.includes('.p-datatable .p-tag'), 'must target .p-datatable .p-tag')
   assert.ok(
     cssOutput.includes('backdrop-filter: none'),
     'must disable backdrop-filter on badges/tags inside datatable'
   )
   assert.ok(
-    cssOutput.includes('[data-scrolling="true"] .p-datatable-tbody'),
-    'must target scrolling state'
+    !cssOutput.includes('translateZ(0)'),
+    'must NOT force translateZ(0) competing GPU layers'
   )
   assert.ok(
-    cssOutput.includes('pointer-events: none'),
-    'must disable pointer-events while scrolling'
+    !cssOutput.includes('pointer-events: none'),
+    'must NOT disable pointer-events during scroll'
+  )
+})
+
+test('base.css omits background-attachment: fixed on app-layout and opts resource-data-table container out of backdrop-filter', () => {
+  const baseCss = readFileSync(resolve(process.cwd(), 'src/assets/base.css'), 'utf8')
+  const appLayoutBlock = baseCss.slice(baseCss.indexOf('[data-component="app-layout"]'))
+  assert.ok(
+    !appLayoutBlock.includes('background-attachment: fixed'),
+    'base.css must not use background-attachment: fixed on app-layout'
+  )
+  assert.ok(
+    baseCss.includes('[data-component="resource-data-table"] [data-surface="table-container"]'),
+    'base.css must opt resource-data-table table-container out of backdrop-filter'
+  )
+  assert.ok(
+    baseCss.includes('backdrop-filter: none'),
+    'base.css must set backdrop-filter: none on table-container'
   )
 })
 

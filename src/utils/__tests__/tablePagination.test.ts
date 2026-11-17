@@ -163,3 +163,21 @@ test('sortTableRowsStable: distinct values still sort correctly and does not mut
   // Input array not mutated
   assert.deepEqual(original, copy)
 })
+
+test('sortTableRowsStable: fast-paths empty rows and unsorted rows with no previousOrder', () => {
+  const emptyResult = sortTableRowsStable([], 'name', 1, (r: { name: string }) => r.name)
+  assert.deepEqual(emptyResult.rows, [])
+  assert.equal(emptyResult.order.size, 0)
+
+  const original = [
+    { id: 'z', val: 1 },
+    { id: 'a', val: 2 },
+    { id: 'm', val: 3 }
+  ]
+  const unsortedResult = sortTableRowsStable(original, undefined, undefined, (r) => r.id, new Map())
+  assert.deepEqual(unsortedResult.rows, original)
+  assert.notEqual(unsortedResult.rows, original)
+  assert.equal(unsortedResult.order.get('z'), 0)
+  assert.equal(unsortedResult.order.get('a'), 1)
+  assert.equal(unsortedResult.order.get('m'), 2)
+})

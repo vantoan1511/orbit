@@ -194,13 +194,15 @@ watch(
   { immediate: true }
 )
 
+const selectionKeys = computed(() => selection.value.map((item) => getRowKey(item)))
+
 watch(
-  () => selection.value.map((item) => getRowKey(item)).join(','),
+  () => selectionKeys.value.join(','),
   () => {
     filterStore.setFilter(
       resolvedStoreKey,
       'selectedRowKeys',
-      selection.value.map((item) => getRowKey(item)),
+      selectionKeys.value,
       k8sStore.activeClusterId || undefined
     )
   }
@@ -213,16 +215,10 @@ watch(selectedNamespace, (newNs) => {
 
 const filteredData = computed(() => {
   if (!isHydrated.value) return []
-  return filteredResources.value.filter((item) => {
-    if (
-      props.statuses.length > 0 &&
-      selectedStatus.value !== 'All Statuses' &&
-      item.status !== selectedStatus.value
-    ) {
-      return false
-    }
-    return true
-  })
+  if (props.statuses.length === 0 || selectedStatus.value === 'All Statuses') {
+    return filteredResources.value
+  }
+  return filteredResources.value.filter((item) => item.status === selectedStatus.value)
 })
 
 // Drawer & Selection state
@@ -393,7 +389,7 @@ const getPortForwards = (data: T): ActivePortForward[] => {
       <template #body="{ data }">
         <div class="flex items-center gap-2">
           <slot name="name" :data="data">
-            <span class="font-semibold transition-colors">{{ data.name }}</span>
+            <span class="font-semibold">{{ data.name }}</span>
           </slot>
           <ActivePortForwardBadge
             v-if="portForwardsMap.size > 0 && getPortForwards(data).length > 0"
