@@ -118,7 +118,7 @@ test('ResourceDataTable and GenericResourceTable wire resourceKind to useVisible
   )
 })
 
-test('ResourceDataTable wires useTableScrollGuard, binds data-scrolling and passive capture scroll listener, and omits border-collapse', () => {
+test('ResourceDataTable wires useTableScrollGuard with passive capture listener, omits data-scrolling DOM thrash and border-collapse', () => {
   const filePath = path.resolve('src/components/shared/ResourceDataTable.vue')
   const content = fs.readFileSync(filePath, 'utf-8')
 
@@ -129,13 +129,46 @@ test('ResourceDataTable wires useTableScrollGuard, binds data-scrolling and pass
   )
   assert.match(
     content,
-    /@scroll\.capture\.passive="onScroll"/,
-    'ResourceDataTable must attach passive capture scroll listener'
+    /@scroll\.capture\.passive="onTableScroll"/,
+    'ResourceDataTable must attach passive capture scroll listener via onTableScroll'
   )
-  assert.match(content, /:data-scrolling=/, 'ResourceDataTable must bind data-scrolling attribute')
+  assert.doesNotMatch(
+    content,
+    /:data-scrolling=/,
+    'ResourceDataTable must not thrash data-scrolling DOM attribute'
+  )
   assert.doesNotMatch(
     content,
     /border-collapse/,
     'ResourceDataTable must omit border-collapse from tableClass'
+  )
+})
+
+test('ResourceDataTable binds :lazy="true" on DataTable and preserves previousOrder on empty data; GenericResourceTable fast-paths filteredData', () => {
+  const rdtPath = path.resolve('src/components/shared/ResourceDataTable.vue')
+  const rdtContent = fs.readFileSync(rdtPath, 'utf-8')
+
+  assert.match(
+    rdtContent,
+    /:lazy="true"/,
+    'ResourceDataTable must bind :lazy="true" on DataTable to prevent double-sorting'
+  )
+  assert.match(
+    rdtContent,
+    /:totalRecords="sortedData\.length"/,
+    'ResourceDataTable must bind :totalRecords="sortedData.length" on DataTable'
+  )
+  assert.doesNotMatch(
+    rdtContent,
+    /previousOrder\s*=\s*result\.order\s*\n\s*return result\.rows/,
+    'ResourceDataTable must not mutate previousOrder inside sortedData computed'
+  )
+
+  const grtPath = path.resolve('src/components/shared/GenericResourceTable.vue')
+  const grtContent = fs.readFileSync(grtPath, 'utf-8')
+  assert.match(
+    grtContent,
+    /if\s*\(\s*props\.statuses\.length\s*===\s*0\s*\|\|\s*selectedStatus\.value\s*===\s*['"]All Statuses['"]\s*\)\s*\{\s*return filteredResources\.value\s*\}/,
+    'GenericResourceTable must fast-path filteredData when no status filter is active'
   )
 })

@@ -118,15 +118,13 @@ const fetchDeployments = async () => {
         <template #body="{ data }">
           <div
             aria-label="Click to edit replicas"
-            class="group inline-flex items-center gap-1.5 font-mono text-muted-color px-1.5 py-0.5 rounded-[var(--ui-radius-control)] hover:bg-(--bg-hover) hover:text-primary transition-colors cursor-pointer"
+            class="group inline-flex items-center gap-1.5 font-mono text-muted-color px-1.5 py-0.5 rounded-[var(--ui-radius-control)] hover:bg-(--bg-hover) hover:text-primary cursor-pointer"
             @click.stop="inlineEdit?.openReplicasEdit($event, data)"
           >
             <span class="font-bold">{{ data.replicas.current }}</span>
             <span class="text-muted-color">/</span>
             <span>{{ data.replicas.desired }}</span>
-            <Pencil
-              class="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity text-muted-color"
-            />
+            <Pencil class="w-3 h-3 opacity-0 group-hover:opacity-60 text-muted-color" />
           </div>
         </template>
       </Column>
@@ -190,13 +188,13 @@ const fetchDeployments = async () => {
                 v-for="img in data.imageTags"
                 :key="img.full"
                 severity="secondary"
-                class="group-hover:text-primary font-mono truncate max-w-full transition-colors inline-block"
+                class="group-hover:text-primary font-mono truncate max-w-full inline-block"
                 v-tooltip.top="img.full"
                 :value="img.short"
               />
             </div>
             <Pencil
-              class="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity text-muted-color ml-0.5"
+              class="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-60 text-muted-color ml-0.5"
             />
           </div>
         </template>

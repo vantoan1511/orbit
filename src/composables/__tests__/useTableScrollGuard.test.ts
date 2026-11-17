@@ -6,25 +6,29 @@ import { useTableScrollGuard } from '../useTableScrollGuard.ts'
 function createFakeTimerEnvironment() {
   let currentTime = 0
   let nextTimerId = 1
+  let scheduleCount = 0
+  let cancelCount = 0
   const timers = new Map<number, { dueTime: number; cb: () => void }>()
 
   const scheduleTimeout = (cb: () => void, ms: number) => {
+    scheduleCount++
     const id = nextTimerId++
     timers.set(id, { dueTime: currentTime + ms, cb })
     return id
   }
 
   const cancelTimeout = (id: unknown) => {
+    cancelCount++
     timers.delete(id as number)
   }
 
   const advanceTime = (ms: number) => {
-    currentTime += ms
+    const targetTime = currentTime + ms
     while (true) {
       let earliestId: number | null = null
       let earliestTime = Infinity
       for (const [id, t] of timers.entries()) {
-        if (t.dueTime <= currentTime && t.dueTime < earliestTime) {
+        if (t.dueTime <= targetTime && t.dueTime < earliestTime) {
           earliestTime = t.dueTime
           earliestId = id
         }
@@ -32,15 +36,20 @@ function createFakeTimerEnvironment() {
       if (earliestId === null) break
       const timer = timers.get(earliestId)!
       timers.delete(earliestId)
+      currentTime = timer.dueTime
       timer.cb()
     }
+    currentTime = targetTime
   }
 
   return {
+    currentTime: () => currentTime,
     scheduleTimeout,
     cancelTimeout,
     advanceTime,
-    getPendingCount: () => timers.size
+    getPendingCount: () => timers.size,
+    getScheduleCount: () => scheduleCount,
+    getCancelCount: () => cancelCount
   }
 }
 
@@ -50,6 +59,7 @@ test('transitions isScrolling to true immediately on scroll and resets to false 
 
   const guard = useTableScrollGuard({
     idleMs: 150,
+    now: env.currentTime,
     scheduleTimeout: env.scheduleTimeout,
     cancelTimeout: env.cancelTimeout,
     onScrollChange: (scrolling) => events.push(scrolling)
@@ -84,6 +94,7 @@ test('debounces consecutive scroll events and resets cleanly on scope dispose', 
   scope.run(() => {
     guard = useTableScrollGuard({
       idleMs: 150,
+      now: env.currentTime,
       scheduleTimeout: env.scheduleTimeout,
       cancelTimeout: env.cancelTimeout,
       onScrollChange: (scrolling) => events.push(scrolling)
@@ -112,4 +123,49 @@ test('debounces consecutive scroll events and resets cleanly on scope dispose', 
   assert.equal(guard.isScrolling.value, false, 'must reset to false on scope dispose')
   assert.deepEqual(events, [true, false], 'must emit false when disposed during scroll')
   assert.equal(env.getPendingCount(), 0, 'pending timers must be cancelled on dispose')
+})
+
+test('coalesces rapid scroll events without churning timers on every frame', () => {
+  const env = createFakeTimerEnvironment()
+  const events: boolean[] = []
+
+  const guard = useTableScrollGuard({
+    idleMs: 150,
+    now: env.currentTime,
+    scheduleTimeout: env.scheduleTimeout,
+    cancelTimeout: env.cancelTimeout,
+    onScrollChange: (scrolling) => events.push(scrolling)
+  })
+
+  // Simulate 12 rapid scroll events at 16ms intervals (192ms burst)
+  for (let i = 0; i < 12; i++) {
+    guard.onScroll()
+    if (i < 11) {
+      env.advanceTime(16)
+    }
+  }
+
+  assert.equal(guard.isScrolling.value, true)
+  assert.deepEqual(events, [true])
+  assert.ok(
+    env.getScheduleCount() <= 2,
+    `expected coalesced timer scheduling (<=2), got ${env.getScheduleCount()}`
+  )
+  assert.equal(env.getCancelCount(), 0, 'must not cancel/re-create timer on every scroll event')
+
+  // Remaining idle window after the last scroll event at t=176ms -> ends at t=326ms
+  env.advanceTime(140)
+  assert.equal(
+    guard.isScrolling.value,
+    true,
+    'must stay scrolling until full idleMs after last event'
+  )
+
+  env.advanceTime(10)
+  assert.equal(
+    guard.isScrolling.value,
+    false,
+    'must reset to false once idleMs elapses after last event'
+  )
+  assert.deepEqual(events, [true, false])
 })
