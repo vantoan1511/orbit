@@ -8,7 +8,7 @@ use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
-use orbit_core::kubernetes::workloads::{fetch_deployments, fetch_pods};
+use orbit_core::kubernetes::workloads::{fetch_deployments, fetch_pods, fetch_statefulsets};
 use tokio::sync::{RwLock, mpsc};
 
 use crate::state::{ClusterBridgeCommand, ClusterBridgeEvent};
@@ -191,6 +191,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::DeploymentsLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadStatefulSets {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_statefulsets(&client, None).await {
+                        Ok(statefulsets) => {
+                            let _ = tx.send(ClusterBridgeEvent::StatefulSetsLoaded {
+                                cluster_id,
+                                generation,
+                                statefulsets,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::StatefulSetsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::StatefulSetsLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -845,6 +882,39 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected DeploymentsLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_statefulsets_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadStatefulSets {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 9,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected StatefulSetsLoadFailed event");
+        match event {
+            ClusterBridgeEvent::StatefulSetsLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 9);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected StatefulSetsLoadFailed, got {other:?}"),
         }
     }
 
