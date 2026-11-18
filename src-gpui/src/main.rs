@@ -740,7 +740,7 @@ pub struct OrbitShell {
 }
 
 impl OrbitShell {
-    pub const WINDOW_TITLE: &'static str = "Orbit (GPUI Preview)";
+    pub const WINDOW_TITLE: &'static str = "Orbit";
     pub const DEFAULT_WIDTH: f32 = 1200.0;
     pub const DEFAULT_HEIGHT: f32 = 800.0;
     pub const HEADER_HEIGHT: f32 = 48.0;
@@ -5054,7 +5054,7 @@ mod tests {
 
     #[test]
     fn test_window_options_and_shell_defaults() {
-        assert_eq!(OrbitShell::WINDOW_TITLE, "Orbit (GPUI Preview)");
+        assert_eq!(OrbitShell::WINDOW_TITLE, "Orbit");
         const {
             assert!(OrbitShell::DEFAULT_WIDTH >= 800.0);
             assert!(OrbitShell::DEFAULT_HEIGHT >= 600.0);
@@ -5087,7 +5087,51 @@ mod tests {
             .as_ref()
             .and_then(|t| t.title.as_ref())
             .map(|s| s.as_ref());
-        assert_eq!(title, Some("Orbit (GPUI Preview)"));
+        assert_eq!(title, Some("Orbit"));
+    }
+
+    #[test]
+    fn test_windows_pe_metadata_and_icon_resource_config() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let cargo_toml = std::fs::read_to_string(manifest_dir.join("Cargo.toml"))
+            .expect("src-gpui/Cargo.toml must be readable");
+        assert!(
+            cargo_toml.contains("[[bin]]") && cargo_toml.contains("name = \"orbit\""),
+            "Cargo.toml must declare [[bin]] name = \"orbit\""
+        );
+        assert!(
+            cargo_toml.contains("tauri-winres"),
+            "Cargo.toml must declare tauri-winres build-dependency"
+        );
+
+        let build_rs = std::fs::read_to_string(manifest_dir.join("build.rs"))
+            .expect("src-gpui/build.rs must exist and be readable");
+        assert!(
+            build_rs.contains("../src-tauri/icons/icon.ico")
+                && build_rs.contains("set_icon_with_id(")
+                && build_rs.contains("\"1\""),
+            "build.rs must embed icon.ico with resource ID \"1\""
+        );
+        assert!(
+            build_rs.contains("\"FileDescription\", \"Orbit\""),
+            "build.rs must set FileDescription to Orbit"
+        );
+        assert!(
+            build_rs.contains("\"ProductName\", \"Orbit\""),
+            "build.rs must set ProductName to Orbit"
+        );
+        assert!(
+            build_rs.contains("\"OriginalFilename\", \"orbit.exe\""),
+            "build.rs must set OriginalFilename to orbit.exe"
+        );
+        assert!(
+            build_rs.contains("\"InternalName\", \"Orbit\""),
+            "build.rs must set InternalName to Orbit"
+        );
+        assert!(
+            build_rs.contains("compile_for(&[\"orbit\"])"),
+            "build.rs must call compile_for(&[\"orbit\"])"
+        );
     }
 
     #[test]

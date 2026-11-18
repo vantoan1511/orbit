@@ -15,9 +15,9 @@ static GPUI_RUNNING: AtomicBool = AtomicBool::new(false);
 
 fn gpui_binary_name() -> &'static str {
     if cfg!(windows) {
-        "orbit-gpui.exe"
+        "orbit.exe"
     } else {
-        "orbit-gpui"
+        "orbit"
     }
 }
 
@@ -69,12 +69,12 @@ pub fn launch_gpui_shell(writer: Arc<Mutex<WsWriter>>, token: String) {
     tokio::spawn(async move {
         let Some(binary_path) = find_gpui_binary() else {
             GPUI_RUNNING.store(false, Ordering::SeqCst);
-            tracing::error!("Could not locate orbit-gpui binary");
+            tracing::error!("Could not locate orbit GPUI binary");
             let _ = Bridge::send_event(
                 &writer,
                 &token,
                 &OrbitEvent::ErrorOccurred {
-                    message: "Could not locate orbit-gpui binary. Build it with `cargo build -p orbit-gpui`.".to_string(),
+                    message: "Could not locate orbit GPUI binary. Build it with `cargo build -p orbit-gpui`.".to_string(),
                 },
             )
             .await;
@@ -92,7 +92,7 @@ pub fn launch_gpui_shell(writer: Arc<Mutex<WsWriter>>, token: String) {
                 }
 
                 if let Err(err) = child.wait().await {
-                    tracing::error!(error = %err, "Failed while waiting for orbit-gpui process exit");
+                    tracing::error!(error = %err, "Failed while waiting for orbit GPUI process exit");
                 }
                 GPUI_RUNNING.store(false, Ordering::SeqCst);
 
@@ -109,7 +109,7 @@ pub fn launch_gpui_shell(writer: Arc<Mutex<WsWriter>>, token: String) {
             }
             Err(err) => {
                 GPUI_RUNNING.store(false, Ordering::SeqCst);
-                tracing::error!(error = %err, path = %binary_path.display(), "Failed to spawn orbit-gpui");
+                tracing::error!(error = %err, path = %binary_path.display(), "Failed to spawn orbit GPUI binary");
                 let _ = Bridge::send_event(
                     &writer,
                     &token,
@@ -515,6 +515,10 @@ mod tests {
 
     #[test]
     fn test_gpui_binary_name_and_candidate_paths() {
+        assert_eq!(
+            gpui_binary_name(),
+            if cfg!(windows) { "orbit.exe" } else { "orbit" }
+        );
         let exe_path = PathBuf::from("D:/Projects/orbit/target/debug/orbit-app.exe");
         let candidates = resolve_gpui_binary_candidates(&exe_path);
         assert!(!candidates.is_empty());
