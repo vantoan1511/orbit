@@ -5376,6 +5376,7 @@ dependencies = [
  "lucide-icons",
  "orbit-core",
  "serde_json",
+ "tauri-winres",
  "tokio",
  "tracing",
 ]
