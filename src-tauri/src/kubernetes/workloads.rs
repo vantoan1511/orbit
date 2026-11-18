@@ -8,70 +8,8 @@ use k8s_openapi::api::batch::v1::{CronJob, Job};
 use crate::kubernetes::{models, format_age};
 
 pub use orbit_core::kubernetes::workloads::{
-    list_deployments, list_pods, map_deployment, map_pod,
+    list_deployments, list_pods, list_statefulsets, map_deployment, map_pod, map_statefulset,
 };
-
-pub fn map_statefulset(ss: &StatefulSet) -> models::StatefulSetInfo {
-    let name = ss.metadata.name.clone().unwrap_or_default();
-    let namespace_name = ss.metadata.namespace.clone().unwrap_or_default();
-    let age = format_age(&ss.metadata.creation_timestamp);
-
-    let desired = ss.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
-    let status_replicas = ss.status.as_ref();
-    let current = status_replicas.and_then(|s| s.ready_replicas).unwrap_or(0);
-    let replicas = models::Replicas { current, desired };
-
-    let status = if desired == current {
-        "Running".to_string()
-    } else {
-        "Progressing".to_string()
-    };
-
-    let mut images = Vec::new();
-    let mut containers = Vec::new();
-    if let Some(spec) = ss.spec.as_ref() {
-        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-            if let Some(img) = &c.image {
-                images.push(img.clone());
-            }
-            containers.push(models::ContainerImageInfo {
-                name: c.name.clone(),
-                image: c.image.clone().unwrap_or_default(),
-            });
-        }
-    }
-
-    let labels = ss.metadata.labels.clone().unwrap_or_default();
-    let annotations = ss.metadata.annotations.clone().unwrap_or_default();
-
-    models::StatefulSetInfo {
-        kind: "StatefulSet".to_string(),
-        name,
-        namespace: namespace_name,
-        status,
-        replicas,
-        age,
-        images,
-        containers,
-        labels,
-        annotations,
-    }
-}
-
-pub async fn list_statefulsets(client: &Client, namespace: Option<String>) -> Result<Vec<models::StatefulSetInfo>, kube::Error> {
-    let api: Api<StatefulSet> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let mut list = Vec::new();
-    for ss in api.list(&ListParams::default()).await? {
-        list.push(map_statefulset(&ss));
-    }
-
-    Ok(list)
-}
 
 pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
     let name = ds.metadata.name.clone().unwrap_or_default();
@@ -980,21 +918,6 @@ mod tests {
     }
 
     #[test]
-    fn test_map_statefulset_kind() {
-        let ss = StatefulSet {
-            metadata: ObjectMeta {
-                name: Some("redis".to_string()),
-                namespace: Some("default".to_string()),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let mapped = map_statefulset(&ss);
-        assert_eq!(mapped.name, "redis");
-        assert_eq!(mapped.kind, "StatefulSet");
-    }
-
-    #[test]
     fn test_map_daemonset_kind() {
         let ds = DaemonSet {
             metadata: ObjectMeta {
@@ -1022,58 +945,6 @@ mod tests {
         let mapped = map_replicaset(&rs);
         assert_eq!(mapped.name, "frontend-rs");
         assert_eq!(mapped.kind, "ReplicaSet");
-    }
-
-    #[test]
-    fn test_map_statefulset_containers() {
-        use k8s_openapi::api::apps::v1::StatefulSetSpec;
-        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
-
-        let ss = StatefulSet {
-            metadata: ObjectMeta {
-                name: Some("redis-cluster".to_string()),
-                namespace: Some("default".to_string()),
-                ..Default::default()
-            },
-            spec: Some(StatefulSetSpec {
-                template: PodTemplateSpec {
-                    spec: Some(PodSpec {
-                        containers: vec![
-                            Container {
-                                name: "redis".to_string(),
-                                image: Some("redis:7.2".to_string()),
-                                ..Default::default()
-                            },
-                            Container {
-                                name: "metrics".to_string(),
-                                image: Some("redis-exporter:1.0".to_string()),
-                                ..Default::default()
-                            },
-                        ],
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let mapped = map_statefulset(&ss);
-        assert_eq!(mapped.images, vec!["redis:7.2", "redis-exporter:1.0"]);
-        assert_eq!(
-            mapped.containers,
-            vec![
-                models::ContainerImageInfo {
-                    name: "redis".to_string(),
-                    image: "redis:7.2".to_string(),
-                },
-                models::ContainerImageInfo {
-                    name: "metrics".to_string(),
-                    image: "redis-exporter:1.0".to_string(),
-                },
-            ]
-        );
     }
 
     #[test]

@@ -33,7 +33,7 @@ use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, ConfigMapsState, DeploymentsState, EventTypeFilter, EventsLoadStatus,
     EventsState, NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState,
-    PodsState, SecretsState, ServicesState, TabDropPosition, WorkspaceTabsState,
+    PodsState, SecretsState, ServicesState, StatefulSetsState, TabDropPosition, WorkspaceTabsState,
     calculate_tab_drop_index,
 };
 use crate::theme::{AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
@@ -182,6 +182,7 @@ pub fn select_workspace_view_with_state(
     sidebar: &mut SidebarLayoutState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -195,6 +196,7 @@ pub fn select_workspace_view_with_state(
         state,
         namespaces,
         deployments,
+        statefulsets,
         pods,
         services,
         configmaps,
@@ -211,6 +213,7 @@ pub fn select_workspace_view_with_tabs(
     sidebar: &mut SidebarLayoutState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -227,6 +230,7 @@ pub fn select_workspace_view_with_tabs(
         sidebar,
         namespaces,
         deployments,
+        statefulsets,
         pods,
         services,
         configmaps,
@@ -248,6 +252,7 @@ fn load_command_for_active_view(
     state: &ClusterSwitcherState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -265,6 +270,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::Deployments && deployments.needs_load_for_cluster(cluster_id) {
         return Some(deployments.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::StatefulSets && statefulsets.needs_load_for_cluster(cluster_id) {
+        return Some(statefulsets.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
         return Some(pods.begin_load_for_cluster(cluster_id));
@@ -295,6 +303,7 @@ pub fn apply_cluster_event_with_tabs(
     namespaces: &mut NamespaceFilterState,
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -312,6 +321,7 @@ pub fn apply_cluster_event_with_tabs(
         namespaces,
         namespaces_view,
         deployments,
+        statefulsets,
         pods,
         services,
         configmaps,
@@ -329,6 +339,7 @@ pub fn apply_cluster_event_with_tabs(
                 state,
                 namespaces,
                 deployments,
+                statefulsets,
                 pods,
                 services,
                 configmaps,
@@ -353,6 +364,7 @@ pub fn handle_tab_shortcut_with_state(
     sidebar: &mut SidebarLayoutState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -395,6 +407,7 @@ pub fn handle_tab_shortcut_with_state(
         state,
         namespaces,
         deployments,
+        statefulsets,
         pods,
         services,
         configmaps,
@@ -420,6 +433,7 @@ pub fn apply_cluster_event_with_workspace(
     namespaces: &mut NamespaceFilterState,
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -441,6 +455,11 @@ pub fn apply_cluster_event_with_workspace(
                     commands.push(deployments.begin_load_for_cluster(id));
                 } else {
                     deployments.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::StatefulSets {
+                    commands.push(statefulsets.begin_load_for_cluster(id));
+                } else {
+                    statefulsets.reset_for_cluster(id);
                 }
                 if sidebar.active_view == WorkspaceView::Pods {
                     commands.push(pods.begin_load_for_cluster(id));
@@ -481,6 +500,7 @@ pub fn apply_cluster_event_with_workspace(
             namespaces.reset_for_disconnected();
             namespaces_view.reset_for_disconnected();
             deployments.reset_for_disconnected();
+            statefulsets.reset_for_disconnected();
             pods.reset_for_disconnected();
             services.reset_for_disconnected();
             configmaps.reset_for_disconnected();
@@ -536,6 +556,20 @@ pub fn apply_cluster_event_with_workspace(
             message,
         } => {
             deployments.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::StatefulSetsLoaded {
+            cluster_id,
+            generation,
+            statefulsets: loaded_statefulsets,
+        } => {
+            statefulsets.apply_loaded(&cluster_id, generation, loaded_statefulsets);
+        }
+        ClusterBridgeEvent::StatefulSetsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            statefulsets.apply_failed(&cluster_id, generation, message);
         }
         ClusterBridgeEvent::PodsLoaded {
             cluster_id,
@@ -686,6 +720,7 @@ pub struct OrbitShell {
     namespaces: NamespaceFilterState,
     namespaces_view: NamespacesViewState,
     deployments: DeploymentsState,
+    statefulsets: StatefulSetsState,
     pods: PodsState,
     services: ServicesState,
     configmaps: ConfigMapsState,
@@ -732,6 +767,7 @@ impl OrbitShell {
                             &mut shell.namespaces,
                             &mut shell.namespaces_view,
                             &mut shell.deployments,
+                            &mut shell.statefulsets,
                             &mut shell.pods,
                             &mut shell.services,
                             &mut shell.configmaps,
@@ -780,6 +816,7 @@ impl OrbitShell {
             namespaces: NamespaceFilterState::from_config(config),
             namespaces_view: NamespacesViewState::default(),
             deployments: DeploymentsState::default(),
+            statefulsets: StatefulSetsState::default(),
             pods: PodsState::default(),
             services: ServicesState::default(),
             configmaps: ConfigMapsState::default(),
@@ -846,6 +883,7 @@ impl OrbitShell {
             &mut self.sidebar,
             &mut self.namespaces,
             &mut self.deployments,
+            &mut self.statefulsets,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -876,6 +914,7 @@ impl OrbitShell {
             &self.state,
             &mut self.namespaces,
             &mut self.deployments,
+            &mut self.statefulsets,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -965,6 +1004,7 @@ impl OrbitShell {
         if matches!(
             target,
             ResourceDrawerTarget::Deployment { .. }
+                | ResourceDrawerTarget::StatefulSet { .. }
                 | ResourceDrawerTarget::Pod { .. }
                 | ResourceDrawerTarget::Service { .. }
                 | ResourceDrawerTarget::ConfigMap { .. }
@@ -1044,6 +1084,11 @@ impl OrbitShell {
                 .deployments
                 .iter()
                 .any(|d| d.name == *name && d.namespace == *namespace),
+            ResourceDrawerTarget::StatefulSet { name, namespace } => self
+                .statefulsets
+                .statefulsets
+                .iter()
+                .any(|s| s.name == *name && s.namespace == *namespace),
             ResourceDrawerTarget::Node { name } => {
                 self.nodes.nodes.iter().any(|n| n.name == *name)
             }
@@ -1179,6 +1224,58 @@ impl OrbitShell {
                     Some(SharedString::from(dep.namespace.clone())),
                     Some(SharedString::from(dep.age.clone())),
                     Some(SharedString::from(dep.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::StatefulSet { name, namespace } => {
+                let ss = self
+                    .statefulsets
+                    .statefulsets
+                    .iter()
+                    .find(|s| s.name == *name && s.namespace == *namespace)?;
+                let matched_events =
+                    views::statefulsets::filter_events_for_statefulset(&self.events.events, ss);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::statefulsets::render_statefulset_drawer_overview(ss, theme)
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::statefulsets::render_statefulset_drawer_events(
+                            &self.events.events,
+                            events_loading,
+                            ss,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => {
+                        self.render_live_yaml_tab(format!("{}/{}", ss.namespace, ss.name), theme, cx)
+                    }
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(ss.name.clone()),
+                    SharedString::from("StatefulSet"),
+                    Some(SharedString::from(ss.namespace.clone())),
+                    Some(SharedString::from(ss.age.clone())),
+                    Some(SharedString::from(ss.status.clone())),
                     tabs,
                     body,
                 ))
@@ -1631,6 +1728,15 @@ impl OrbitShell {
                     .deployments
                     .begin_refresh()
                     .unwrap_or_else(|| self.deployments.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::StatefulSets
+                || self.statefulsets.cluster_id.is_some()
+            {
+                let cmd = self
+                    .statefulsets
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.statefulsets.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Pods || self.pods.cluster_id.is_some() {
@@ -3408,6 +3514,119 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::StatefulSets {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.statefulsets.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::StatefulSet {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            statefulset: &orbit_core::kubernetes::models::StatefulSetInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = statefulset.name.clone();
+                let namespace = statefulset.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::StatefulSet {
+                    name: statefulset.name.clone(),
+                    namespace: statefulset.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::statefulsets::build_statefulset_context_menu_entries(
+                    statefulset,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::statefulsets::render_statefulsets_view(
+                &self.statefulsets,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Services {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -4663,6 +4882,7 @@ impl Render for OrbitShell {
                     &mut this.sidebar,
                     &mut this.namespaces,
                     &mut this.deployments,
+                    &mut this.statefulsets,
                     &mut this.pods,
                     &mut this.services,
                     &mut this.configmaps,
@@ -5061,6 +5281,7 @@ mod tests {
         let mut throwaway_namespaces = NamespaceFilterState::default();
         let mut throwaway_namespaces_view = NamespacesViewState::default();
         let mut throwaway_deployments = DeploymentsState::default();
+        let mut throwaway_statefulsets = StatefulSetsState::default();
         let mut throwaway_pods = PodsState::default();
         let mut throwaway_nodes = NodesState::default();
         apply_cluster_event_with_workspace(
@@ -5070,6 +5291,7 @@ mod tests {
             &mut throwaway_namespaces,
             &mut throwaway_namespaces_view,
             &mut throwaway_deployments,
+            &mut throwaway_statefulsets,
             &mut throwaway_pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5163,6 +5385,7 @@ mod tests {
         );
         let mut namespaces = NamespaceFilterState::from_config(&config);
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5192,6 +5415,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5228,6 +5452,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5250,6 +5475,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5287,6 +5513,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5391,6 +5618,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5401,6 +5629,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -5420,6 +5649,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5447,6 +5677,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5461,6 +5692,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5483,6 +5715,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5512,6 +5745,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5535,6 +5769,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5556,6 +5791,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5594,6 +5830,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5631,6 +5868,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5653,6 +5891,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5681,6 +5920,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5711,6 +5951,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5719,6 +5960,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5743,6 +5985,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5757,6 +6000,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5779,6 +6023,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5809,6 +6054,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5832,6 +6078,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5853,6 +6100,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5891,6 +6139,7 @@ mod tests {
         let mut overview = ClusterOverviewState::default();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5933,6 +6182,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5955,6 +6205,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5980,6 +6231,7 @@ mod tests {
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6007,6 +6259,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6015,6 +6268,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6038,6 +6292,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6052,6 +6307,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6071,6 +6327,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6094,6 +6351,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6105,6 +6363,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6140,6 +6399,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6179,6 +6439,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6188,6 +6449,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6212,6 +6474,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6226,6 +6489,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6245,6 +6509,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6268,6 +6533,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6280,6 +6546,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6322,6 +6589,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6361,6 +6629,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6733,6 +7002,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6744,6 +7014,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6766,6 +7037,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6785,6 +7057,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6825,6 +7098,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6837,6 +7111,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6879,6 +7154,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6921,6 +7197,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6937,6 +7214,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6959,6 +7237,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6980,6 +7259,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7006,6 +7286,7 @@ mod tests {
                 &mut sidebar,
                 &mut namespaces,
                 &mut deployments,
+                &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7062,6 +7343,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7073,6 +7355,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7097,6 +7380,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods_on_connect,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7136,6 +7420,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7150,6 +7435,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7174,6 +7460,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7196,6 +7483,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7296,6 +7584,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -7308,6 +7597,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7333,6 +7623,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services_on_connect,
             &mut ConfigMapsState::default(),
@@ -7372,6 +7663,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -7388,6 +7680,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7410,6 +7703,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7434,6 +7728,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7458,6 +7753,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -7477,6 +7773,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7514,6 +7811,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7606,6 +7904,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -7617,6 +7916,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7647,6 +7947,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -7664,6 +7965,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7686,6 +7988,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7712,6 +8015,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7740,6 +8044,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -7772,6 +8077,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7792,6 +8098,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7899,6 +8206,7 @@ mod tests {
         let mut sidebar = SidebarLayoutState::new();
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -7911,6 +8219,7 @@ mod tests {
             &mut sidebar,
             &mut namespaces,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7938,6 +8247,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -7956,6 +8266,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -7978,6 +8289,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8001,6 +8313,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8029,6 +8342,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8062,6 +8376,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8082,6 +8397,7 @@ mod tests {
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
+            &mut statefulsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8182,5 +8498,203 @@ mod tests {
         assert_eq!(restored.style.ui_style, UiStyle::Paper);
         assert_eq!(restored.accent_id, AccentColor::Emerald);
         assert!(reloaded.enable_experience_features());
+    }
+
+    fn make_test_statefulset(name: &str, namespace: &str) -> orbit_core::kubernetes::models::StatefulSetInfo {
+        orbit_core::kubernetes::models::StatefulSetInfo {
+            kind: "StatefulSet".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 3,
+                desired: 3,
+            },
+            age: "1d".to_string(),
+            images: vec!["redis:7.2".to_string()],
+            containers: vec![orbit_core::kubernetes::models::ContainerImageInfo {
+                name: "redis".to_string(),
+                image: "redis:7.2".to_string(),
+            }],
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_selecting_statefulsets_view_triggers_load_when_connected() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: Some("v1.30.0".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            WorkspaceView::StatefulSets,
+        );
+
+        assert_eq!(sidebar.active_view, WorkspaceView::StatefulSets);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadStatefulSets {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn test_statefulsets_loaded_and_failed_events_update_state() {
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let _ = statefulsets.begin_load_for_cluster("prod-ctx");
+        let ss = make_test_statefulset("redis", "cache");
+
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::StatefulSetsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                statefulsets: vec![ss],
+            },
+        );
+        assert_eq!(statefulsets.statefulsets.len(), 1);
+        assert_eq!(
+            statefulsets.status,
+            crate::state::StatefulSetsLoadStatus::Loaded
+        );
+
+        let _ = statefulsets.begin_refresh();
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::StatefulSetsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(
+            statefulsets.status,
+            crate::state::StatefulSetsLoadStatus::Error
+        );
+        assert_eq!(statefulsets.error_message.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn test_connecting_while_on_statefulsets_view_dispatches_load_statefulsets() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.select_view(WorkspaceView::StatefulSets);
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.30.0".to_string()),
+                    error_message: None,
+                },
+                clusters: Vec::new(),
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("prod".to_string()),
+                    server_url: Some("https://10.0.0.10:6443".to_string()),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.30.0".to_string()),
+                },
+            },
+        );
+
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadStatefulSets { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
     }
 }

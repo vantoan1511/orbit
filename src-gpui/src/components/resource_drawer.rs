@@ -40,6 +40,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    StatefulSet {
+        name: String,
+        namespace: String,
+    },
     Pod {
         name: String,
         namespace: String,
@@ -73,6 +77,7 @@ impl ResourceDrawerTarget {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Deployment { .. } => "Deployment",
+            Self::StatefulSet { .. } => "StatefulSet",
             Self::Pod { .. } => "Pod",
             Self::Service { .. } => "Service",
             Self::ConfigMap { .. } => "ConfigMap",
@@ -86,6 +91,7 @@ impl ResourceDrawerTarget {
     pub fn name(&self) -> &str {
         match self {
             Self::Deployment { name, .. }
+            | Self::StatefulSet { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
@@ -99,6 +105,7 @@ impl ResourceDrawerTarget {
     pub fn display_title(&self) -> &str {
         match self {
             Self::Deployment { name, .. }
+            | Self::StatefulSet { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
@@ -112,6 +119,7 @@ impl ResourceDrawerTarget {
     pub fn namespace(&self) -> Option<&str> {
         match self {
             Self::Deployment { namespace, .. }
+            | Self::StatefulSet { namespace, .. }
             | Self::Pod { namespace, .. }
             | Self::Service { namespace, .. }
             | Self::ConfigMap { namespace, .. }
@@ -830,5 +838,18 @@ mod tests {
         assert!(state.is_secret_key_revealed("token"));
         state.reset_for_context_change();
         assert!(!state.is_secret_key_revealed("token"));
+    }
+
+    #[test]
+    fn test_statefulset_drawer_target_metadata_and_yaml_support() {
+        let target = ResourceDrawerTarget::StatefulSet {
+            name: "redis".to_string(),
+            namespace: "cache".to_string(),
+        };
+        assert_eq!(target.kind(), "StatefulSet");
+        assert_eq!(target.name(), "redis");
+        assert_eq!(target.display_title(), "redis");
+        assert_eq!(target.namespace(), Some("cache"));
+        assert!(target.supports_live_yaml());
     }
 }

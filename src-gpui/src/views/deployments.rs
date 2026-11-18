@@ -18,7 +18,9 @@ use crate::components::{
 use crate::icons::render_icon;
 use crate::state::{DeploymentsLoadStatus, DeploymentsState, NamespaceFilterState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button};
+pub use crate::views::{
+    format_images_summary, format_short_image, parse_age_seconds, render_action_button,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeploymentsPresentationMode {
@@ -48,19 +50,6 @@ pub fn deployment_columns() -> Vec<TableColumn> {
             .fixed_width(px(76.0))
             .right_numeric(),
     ]
-}
-
-pub fn format_short_image(image: &str) -> &str {
-    image.rsplit('/').next().unwrap_or(image)
-}
-
-pub fn format_images_summary(images: &[String]) -> (String, usize) {
-    let Some(first) = images.first() else {
-        return ("-".to_string(), 0);
-    };
-    let short = format_short_image(first).to_string();
-    let extra = images.len().saturating_sub(1);
-    (short, extra)
 }
 
 fn compare_deployments_by_col(a: &DeploymentInfo, b: &DeploymentInfo, col_id: &str) -> Ordering {

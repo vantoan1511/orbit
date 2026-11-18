@@ -9,6 +9,7 @@ pub mod pods;
 pub mod secrets;
 pub mod services;
 pub mod settings;
+pub mod statefulsets;
 pub mod welcome;
 
 use std::collections::BTreeMap;
@@ -45,6 +46,19 @@ pub fn parse_age_seconds(age: &str) -> u64 {
         .parse::<u64>()
         .map(|v| v.saturating_mul(multiplier))
         .unwrap_or(u64::MAX)
+}
+
+pub fn format_short_image(image: &str) -> &str {
+    image.rsplit('/').next().unwrap_or(image)
+}
+
+pub fn format_images_summary(images: &[String]) -> (String, usize) {
+    let Some(first) = images.first() else {
+        return ("-".to_string(), 0);
+    };
+    let short = format_short_image(first).to_string();
+    let extra = images.len().saturating_sub(1);
+    (short, extra)
 }
 
 pub fn render_action_button(
