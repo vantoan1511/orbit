@@ -8,6 +8,7 @@ use orbit_core::kubernetes::models::{
     SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
+use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
 
 use crate::components::data_table::DataTableState;
 use crate::navigation::{SidebarCategory, WorkspaceView};
@@ -44,6 +45,7 @@ pub enum ClusterBridgeCommand {
     ReconnectActiveCluster,
     RefreshClusters,
     LoadOverview { cluster_id: String, generation: u64 },
+    LoadWorkloadsOverview { cluster_id: String, generation: u64 },
     LoadNamespaces { cluster_id: String, generation: u64 },
     LoadDeployments { cluster_id: String, generation: u64 },
     LoadStatefulSets { cluster_id: String, generation: u64 },
@@ -100,6 +102,16 @@ pub enum ClusterBridgeEvent {
         summary: ClusterOverviewSummary,
     },
     OverviewLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    WorkloadsOverviewLoaded {
+        cluster_id: String,
+        generation: u64,
+        snapshot: WorkloadsOverviewSnapshot,
+    },
+    WorkloadsOverviewLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -518,6 +530,99 @@ impl ClusterOverviewState {
     pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
         if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
             self.status = OverviewLoadStatus::Error;
+            self.error_message = Some(message);
+            true
+        } else {
+            false
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WorkloadsOverviewLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WorkloadsOverviewState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: WorkloadsOverviewLoadStatus,
+    pub snapshot: Option<WorkloadsOverviewSnapshot>,
+    pub error_message: Option<String>,
+}
+
+impl WorkloadsOverviewState {
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == WorkloadsOverviewLoadStatus::Idle
+    }
+
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = WorkloadsOverviewLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.snapshot = None;
+        }
+        ClusterBridgeCommand::LoadWorkloadsOverview {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = WorkloadsOverviewLoadStatus::Loading;
+        self.error_message = None;
+        Some(ClusterBridgeCommand::LoadWorkloadsOverview {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = WorkloadsOverviewLoadStatus::Idle;
+        self.snapshot = None;
+        self.error_message = None;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = WorkloadsOverviewLoadStatus::Idle;
+        self.snapshot = None;
+        self.error_message = None;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        snapshot: WorkloadsOverviewSnapshot,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = WorkloadsOverviewLoadStatus::Loaded;
+            self.snapshot = Some(snapshot);
+            self.error_message = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = WorkloadsOverviewLoadStatus::Error;
             self.error_message = Some(message);
             true
         } else {
@@ -1583,6 +1688,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::OverviewLoadFailed { .. }
             | ClusterBridgeEvent::NamespacesLoaded { .. }
             | ClusterBridgeEvent::NamespacesLoadFailed { .. }
+            | ClusterBridgeEvent::WorkloadsOverviewLoaded { .. }
+            | ClusterBridgeEvent::WorkloadsOverviewLoadFailed { .. }
             | ClusterBridgeEvent::DeploymentsLoaded { .. }
             | ClusterBridgeEvent::DeploymentsLoadFailed { .. }
             | ClusterBridgeEvent::StatefulSetsLoaded { .. }
@@ -3348,5 +3455,81 @@ mod tests {
         assert_eq!(state.status, SecretsLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.secrets.is_empty());
+    }
+
+    #[test]
+    fn test_workloads_overview_state_lifecycle_and_stale_generation_guard() {
+        use orbit_core::kubernetes::workloads_overview::{
+            WorkloadHealthItem, WorkloadHealthStatus, WorkloadKindSnapshot,
+        };
+
+        let mut state = WorkloadsOverviewState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadWorkloadsOverview {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, WorkloadsOverviewLoadStatus::Loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+        assert!(state.needs_load_for_cluster("ctx-b"));
+
+        let sample = WorkloadsOverviewSnapshot {
+            pods: WorkloadKindSnapshot {
+                items: vec![WorkloadHealthItem {
+                    namespace: "default".to_string(),
+                    status: WorkloadHealthStatus::Healthy,
+                }],
+                error: None,
+            },
+            ..Default::default()
+        };
+
+        // Stale cluster or generation must be ignored
+        assert!(!state.apply_loaded("ctx-b", 1, sample.clone()));
+        assert!(!state.apply_loaded("ctx-a", 0, sample.clone()));
+        assert!(!state.apply_failed("ctx-a", 0, "stale".to_string()));
+        assert!(state.snapshot.is_none());
+
+        // Valid snapshot updates state
+        assert!(state.apply_loaded("ctx-a", 1, sample.clone()));
+        assert_eq!(state.status, WorkloadsOverviewLoadStatus::Loaded);
+        assert_eq!(state.snapshot.as_ref(), Some(&sample));
+        assert!(state.error_message.is_none());
+
+        // Refresh preserves existing snapshot while loading
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadWorkloadsOverview {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, WorkloadsOverviewLoadStatus::Loading);
+        assert_eq!(state.snapshot.as_ref(), Some(&sample));
+
+        // Failure on current generation sets Error and keeps existing snapshot
+        assert!(state.apply_failed("ctx-a", 2, "network error".to_string()));
+        assert_eq!(state.status, WorkloadsOverviewLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("network error"));
+        assert_eq!(state.snapshot.as_ref(), Some(&sample));
+
+        // Reset for cluster clears snapshot and transitions to Idle
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, WorkloadsOverviewLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.snapshot.is_none());
+        assert!(state.needs_load_for_cluster("ctx-b"));
+
+        // Reset for disconnected clears cluster_id and snapshot
+        state.reset_for_disconnected();
+        assert_eq!(state.status, WorkloadsOverviewLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.snapshot.is_none());
     }
 }

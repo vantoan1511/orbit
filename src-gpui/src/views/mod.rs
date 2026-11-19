@@ -11,6 +11,7 @@ pub mod services;
 pub mod settings;
 pub mod statefulsets;
 pub mod welcome;
+pub mod workloads_overview;
 
 use std::collections::BTreeMap;
 use std::rc::Rc;

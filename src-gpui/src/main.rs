@@ -33,8 +33,8 @@ use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, ConfigMapsState, DeploymentsState, EventTypeFilter, EventsLoadStatus,
     EventsState, NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState,
-    PodsState, SecretsState, ServicesState, StatefulSetsState, TabDropPosition, WorkspaceTabsState,
-    calculate_tab_drop_index,
+    PodsState, SecretsState, ServicesState, StatefulSetsState, TabDropPosition,
+    WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -180,6 +180,7 @@ pub fn namespace_trigger_presentation(
 pub fn select_workspace_view_with_state(
     state: &ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
+    workloads_overview: &mut WorkloadsOverviewState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
@@ -194,6 +195,7 @@ pub fn select_workspace_view_with_state(
     sidebar.select_view(view);
     load_command_for_active_view(
         state,
+        workloads_overview,
         namespaces,
         deployments,
         statefulsets,
@@ -211,6 +213,7 @@ pub fn select_workspace_view_with_state(
 pub fn select_workspace_view_with_tabs(
     state: &ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
+    workloads_overview: &mut WorkloadsOverviewState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
@@ -228,6 +231,7 @@ pub fn select_workspace_view_with_tabs(
     if let Some(cmd) = select_workspace_view_with_state(
         state,
         sidebar,
+        workloads_overview,
         namespaces,
         deployments,
         statefulsets,
@@ -250,6 +254,7 @@ pub fn select_workspace_view_with_tabs(
 #[allow(clippy::too_many_arguments)]
 fn load_command_for_active_view(
     state: &ClusterSwitcherState,
+    workloads_overview: &mut WorkloadsOverviewState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
@@ -265,6 +270,11 @@ fn load_command_for_active_view(
     let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state else {
         return None;
     };
+    if view == WorkspaceView::WorkloadsOverview
+        && workloads_overview.needs_load_for_cluster(cluster_id)
+    {
+        return Some(workloads_overview.begin_load_for_cluster(cluster_id));
+    }
     if view == WorkspaceView::Namespaces && namespaces.needs_load_for_cluster(cluster_id) {
         return Some(namespaces.begin_load_for_cluster(cluster_id));
     }
@@ -300,6 +310,7 @@ pub fn apply_cluster_event_with_tabs(
     state: &mut ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
     overview: &mut ClusterOverviewState,
+    workloads_overview: &mut WorkloadsOverviewState,
     namespaces: &mut NamespaceFilterState,
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
@@ -318,6 +329,7 @@ pub fn apply_cluster_event_with_tabs(
         state,
         sidebar,
         overview,
+        workloads_overview,
         namespaces,
         namespaces_view,
         deployments,
@@ -337,6 +349,7 @@ pub fn apply_cluster_event_with_tabs(
             sidebar.sync_for_view(restored);
             if let Some(load_cmd) = load_command_for_active_view(
                 state,
+                workloads_overview,
                 namespaces,
                 deployments,
                 statefulsets,
@@ -362,6 +375,7 @@ pub fn apply_cluster_event_with_tabs(
 pub fn handle_tab_shortcut_with_state(
     state: &ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
+    workloads_overview: &mut WorkloadsOverviewState,
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
@@ -405,6 +419,7 @@ pub fn handle_tab_shortcut_with_state(
     let mut commands = Vec::new();
     if let Some(cmd) = load_command_for_active_view(
         state,
+        workloads_overview,
         namespaces,
         deployments,
         statefulsets,
@@ -430,6 +445,7 @@ pub fn apply_cluster_event_with_workspace(
     state: &mut ClusterSwitcherState,
     sidebar: &mut SidebarLayoutState,
     overview: &mut ClusterOverviewState,
+    workloads_overview: &mut WorkloadsOverviewState,
     namespaces: &mut NamespaceFilterState,
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
@@ -451,6 +467,11 @@ pub fn apply_cluster_event_with_workspace(
             if let Some(id) = state.active_cluster_id.as_deref() {
                 commands.push(overview.begin_load_for_cluster(id));
                 commands.push(namespaces.begin_load_for_cluster(id));
+                if sidebar.active_view == WorkspaceView::WorkloadsOverview {
+                    commands.push(workloads_overview.begin_load_for_cluster(id));
+                } else {
+                    workloads_overview.reset_for_cluster(id);
+                }
                 if sidebar.active_view == WorkspaceView::Deployments {
                     commands.push(deployments.begin_load_for_cluster(id));
                 } else {
@@ -497,6 +518,7 @@ pub fn apply_cluster_event_with_workspace(
         | ClusterBridgeEvent::ConnectionError { .. } => {
             state.apply_event(event);
             overview.reset_for_disconnected();
+            workloads_overview.reset_for_disconnected();
             namespaces.reset_for_disconnected();
             namespaces_view.reset_for_disconnected();
             deployments.reset_for_disconnected();
@@ -658,6 +680,20 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             secrets.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::WorkloadsOverviewLoaded {
+            cluster_id,
+            generation,
+            snapshot,
+        } => {
+            workloads_overview.apply_loaded(&cluster_id, generation, snapshot);
+        }
+        ClusterBridgeEvent::WorkloadsOverviewLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            workloads_overview.apply_failed(&cluster_id, generation, message);
+        }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
@@ -717,6 +753,7 @@ pub struct OrbitShell {
     state: ClusterSwitcherState,
     sidebar: SidebarLayoutState,
     overview: ClusterOverviewState,
+    workloads_overview: WorkloadsOverviewState,
     namespaces: NamespaceFilterState,
     namespaces_view: NamespacesViewState,
     deployments: DeploymentsState,
@@ -764,6 +801,7 @@ impl OrbitShell {
                             &mut shell.state,
                             &mut shell.sidebar,
                             &mut shell.overview,
+                            &mut shell.workloads_overview,
                             &mut shell.namespaces,
                             &mut shell.namespaces_view,
                             &mut shell.deployments,
@@ -813,6 +851,7 @@ impl OrbitShell {
             state: ClusterSwitcherState::new(),
             sidebar: SidebarLayoutState::new(),
             overview: ClusterOverviewState::default(),
+            workloads_overview: WorkloadsOverviewState::default(),
             namespaces: NamespaceFilterState::from_config(config),
             namespaces_view: NamespacesViewState::default(),
             deployments: DeploymentsState::default(),
@@ -881,6 +920,7 @@ impl OrbitShell {
         for cmd in select_workspace_view_with_tabs(
             &self.state,
             &mut self.sidebar,
+            &mut self.workloads_overview,
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.statefulsets,
@@ -912,6 +952,7 @@ impl OrbitShell {
         }
         if let Some(cmd) = load_command_for_active_view(
             &self.state,
+            &mut self.workloads_overview,
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.statefulsets,
@@ -1714,6 +1755,15 @@ impl OrbitShell {
         self.dispatch_command(ClusterBridgeCommand::RefreshClusters);
         if let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state {
             if let Some(cmd) = self.overview.begin_refresh() {
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::WorkloadsOverview
+                || self.workloads_overview.cluster_id.is_some()
+            {
+                let cmd = self
+                    .workloads_overview
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.workloads_overview.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             let ns_cmd = self
@@ -4322,6 +4372,30 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::WorkloadsOverview {
+            let nav_entity = cx.entity().clone();
+            let on_navigate = std::rc::Rc::new(
+                move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
+                    nav_entity.update(cx, |shell, cx| {
+                        shell.select_workspace_view(view, cx);
+                    });
+                },
+            );
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+            return views::workloads_overview::render_workloads_overview_view(
+                &self.workloads_overview,
+                &self.namespaces,
+                theme,
+                on_navigate,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view != WorkspaceView::Overview {
             let view = self.sidebar.active_view;
             return theme
@@ -4880,6 +4954,7 @@ impl Render for OrbitShell {
                 let (tab_handled, tab_cmds) = handle_tab_shortcut_with_state(
                     &this.state,
                     &mut this.sidebar,
+                    &mut this.workloads_overview,
                     &mut this.namespaces,
                     &mut this.deployments,
                     &mut this.statefulsets,
@@ -5332,6 +5407,7 @@ mod tests {
             &mut switcher,
             &mut connect_sidebar,
             &mut throwaway_overview,
+            &mut WorkloadsOverviewState::default(),
             &mut throwaway_namespaces,
             &mut throwaway_namespaces_view,
             &mut throwaway_deployments,
@@ -5456,6 +5532,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5493,6 +5570,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5516,6 +5594,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5554,6 +5633,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5671,6 +5751,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -5691,6 +5772,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -5719,6 +5801,7 @@ mod tests {
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -5734,6 +5817,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -5786,6 +5870,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5810,6 +5895,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5832,6 +5918,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5909,6 +5996,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5932,6 +6020,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -5961,6 +6050,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6002,6 +6092,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -6027,6 +6118,7 @@ mod tests {
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -6042,6 +6134,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -6095,6 +6188,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6119,6 +6213,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6141,6 +6236,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6223,6 +6319,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6246,6 +6343,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6272,6 +6370,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut NamespacesViewState::default(),
             &mut deployments,
@@ -6310,6 +6409,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -6334,6 +6434,7 @@ mod tests {
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -6349,6 +6450,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -6369,6 +6471,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -6404,6 +6507,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -6440,6 +6544,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -6491,6 +6596,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -6516,6 +6622,7 @@ mod tests {
         select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -6531,6 +6638,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -6551,6 +6659,7 @@ mod tests {
             select_workspace_view_with_state(
                 &switcher,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -6587,6 +6696,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -6630,6 +6740,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -6670,6 +6781,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7056,6 +7168,7 @@ mod tests {
         let cmds1 = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7079,6 +7192,7 @@ mod tests {
         let cmds2 = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7099,6 +7213,7 @@ mod tests {
         let _ = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7152,6 +7267,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7195,6 +7311,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7256,6 +7373,7 @@ mod tests {
         let (handled, _) = handle_tab_shortcut_with_state(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7279,6 +7397,7 @@ mod tests {
         let (handled, _) = handle_tab_shortcut_with_state(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7301,6 +7420,7 @@ mod tests {
         let (handled, _) = handle_tab_shortcut_with_state(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7328,6 +7448,7 @@ mod tests {
             let _ = handle_tab_shortcut_with_state(
                 &state,
                 &mut sidebar,
+                &mut WorkloadsOverviewState::default(),
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
@@ -7397,6 +7518,7 @@ mod tests {
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7421,6 +7543,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7476,6 +7599,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7501,6 +7625,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7524,6 +7649,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7639,6 +7765,7 @@ mod tests {
         let cmds = select_workspace_view_with_tabs(
             &state,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -7664,6 +7791,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7721,6 +7849,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7744,6 +7873,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7769,6 +7899,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7814,6 +7945,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7852,6 +7984,7 @@ mod tests {
             &mut state,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -7958,6 +8091,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -8006,6 +8140,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8029,6 +8164,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8056,6 +8192,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8118,6 +8255,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8139,6 +8277,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8261,6 +8400,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -8307,6 +8447,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8330,6 +8471,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8354,6 +8496,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8417,6 +8560,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8438,6 +8582,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8587,6 +8732,7 @@ mod tests {
         let cmd = select_workspace_view_with_state(
             &switcher,
             &mut sidebar,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
@@ -8632,6 +8778,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8659,6 +8806,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8706,6 +8854,7 @@ mod tests {
             &mut switcher,
             &mut sidebar,
             &mut overview,
+            &mut WorkloadsOverviewState::default(),
             &mut namespaces,
             &mut namespaces_view,
             &mut deployments,
@@ -8739,6 +8888,338 @@ mod tests {
         assert!(cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadStatefulSets { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_selecting_workloads_overview_dispatches_load_and_applies_snapshot_lifecycle() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+        use orbit_core::kubernetes::workloads_overview::{
+            WorkloadHealthItem, WorkloadHealthStatus, WorkloadKindSnapshot,
+            WorkloadsOverviewSnapshot,
+        };
+        use crate::state::WorkloadsOverviewLoadStatus;
+
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: Some("v1.31.0".to_string()),
+        };
+        switcher.active_cluster_id = Some("prod-ctx".to_string());
+
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        // Selecting WorkloadsOverview while connected dispatches LoadWorkloadsOverview
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            WorkspaceView::WorkloadsOverview,
+        );
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadWorkloadsOverview {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+        assert_eq!(
+            workloads_overview.status,
+            WorkloadsOverviewLoadStatus::Loading
+        );
+
+        let sample = WorkloadsOverviewSnapshot {
+            pods: WorkloadKindSnapshot {
+                items: vec![WorkloadHealthItem {
+                    namespace: "default".to_string(),
+                    status: WorkloadHealthStatus::Healthy,
+                }],
+                error: None,
+            },
+            ..Default::default()
+        };
+
+        // Stale generation is ignored
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::WorkloadsOverviewLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 99,
+                snapshot: sample.clone(),
+            },
+        );
+        assert!(workloads_overview.snapshot.is_none());
+
+        // Matching generation applies snapshot
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::WorkloadsOverviewLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                snapshot: sample.clone(),
+            },
+        );
+        assert_eq!(
+            workloads_overview.status,
+            WorkloadsOverviewLoadStatus::Loaded
+        );
+        assert_eq!(workloads_overview.snapshot.as_ref(), Some(&sample));
+
+        // Disconnect resets workloads_overview
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ConnectionError {
+                cluster_id: Some("prod-ctx".to_string()),
+                message: "offline".to_string(),
+                clusters: Vec::new(),
+            },
+        );
+        assert_eq!(workloads_overview.status, WorkloadsOverviewLoadStatus::Idle);
+        assert!(workloads_overview.snapshot.is_none());
+
+        // Reconnecting while WorkloadsOverview is active triggers LoadWorkloadsOverview
+        sidebar.active_view = WorkspaceView::WorkloadsOverview;
+        let reconnect_cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.0".to_string()),
+                    error_message: None,
+                },
+                clusters: Vec::new(),
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("prod".to_string()),
+                    server_url: Some("https://10.0.0.10:6443".to_string()),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.0".to_string()),
+                },
+            },
+        );
+        assert!(reconnect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadWorkloadsOverview { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_workloads_overview_card_navigation_opens_target_view_and_loads_implemented_workloads() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: Some("v1.31.0".to_string()),
+        };
+        switcher.active_cluster_id = Some("prod-ctx".to_string());
+
+        let mut sidebar = SidebarLayoutState::new();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        // Start on WorkloadsOverview
+        let _ = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::WorkloadsOverview,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::WorkloadsOverview);
+
+        // Navigate to Pods
+        let pods_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Pods,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Pods);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Pods));
+        assert!(pods_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPods { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+
+        // Navigate to Deployments
+        let dep_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Deployments,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert!(dep_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+
+        // Navigate to StatefulSets
+        let sts_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::StatefulSets,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::StatefulSets);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::StatefulSets));
+        assert!(sts_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadStatefulSets { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+
+        // Navigate to DaemonSets (unimplemented list view — activates tab without panicking)
+        let ds_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::DaemonSets,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::DaemonSets);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::DaemonSets));
+        assert!(!ds_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPods { .. }
+                | ClusterBridgeCommand::LoadDeployments { .. }
+                | ClusterBridgeCommand::LoadStatefulSets { .. }
         )));
     }
 }
