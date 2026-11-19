@@ -4,8 +4,8 @@ use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, ConfigMapInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo, PodInfo,
-    SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
+    ClusterInfo, ConfigMapInfo, DaemonSetInfo, DeploymentInfo, EventInfo, NamespaceInfo, NodeInfo,
+    PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -41,20 +41,59 @@ pub enum ClusterConnectionState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClusterBridgeCommand {
     LoadContexts,
-    SwitchCluster { cluster_id: String },
+    SwitchCluster {
+        cluster_id: String,
+    },
     ReconnectActiveCluster,
     RefreshClusters,
-    LoadOverview { cluster_id: String, generation: u64 },
-    LoadWorkloadsOverview { cluster_id: String, generation: u64 },
-    LoadNamespaces { cluster_id: String, generation: u64 },
-    LoadDeployments { cluster_id: String, generation: u64 },
-    LoadStatefulSets { cluster_id: String, generation: u64 },
-    LoadPods { cluster_id: String, generation: u64 },
-    LoadServices { cluster_id: String, generation: u64 },
-    LoadConfigMaps { cluster_id: String, generation: u64 },
-    LoadSecrets { cluster_id: String, generation: u64 },
-    LoadNodes { cluster_id: String, generation: u64 },
-    LoadEvents { cluster_id: String, generation: u64 },
+    LoadOverview {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadWorkloadsOverview {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadNamespaces {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadDeployments {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadStatefulSets {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadDaemonSets {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadPods {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadServices {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadConfigMaps {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadSecrets {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadNodes {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadEvents {
+        cluster_id: String,
+        generation: u64,
+    },
     LoadResourceYaml {
         cluster_id: String,
         generation: u64,
@@ -62,16 +101,27 @@ pub enum ClusterBridgeCommand {
         namespace: Option<String>,
         name: String,
     },
-    SaveNamespaceSelection { cluster_id: String, namespaces: Vec<String> },
+    SaveNamespaceSelection {
+        cluster_id: String,
+        namespaces: Vec<String>,
+    },
     SaveWorkspaceTabs {
         cluster_id: String,
         open_tabs: Vec<String>,
         active_tab: Option<String>,
     },
-    SaveThemeMode { mode: String },
-    SaveUiStyle { style: String },
-    SaveAccentColor { accent: String },
-    SaveEnableExperienceFeatures { enabled: bool },
+    SaveThemeMode {
+        mode: String,
+    },
+    SaveUiStyle {
+        style: String,
+    },
+    SaveAccentColor {
+        accent: String,
+    },
+    SaveEnableExperienceFeatures {
+        enabled: bool,
+    },
     ResetAppearanceDefaults,
 }
 
@@ -142,6 +192,16 @@ pub enum ClusterBridgeEvent {
         statefulsets: Vec<StatefulSetInfo>,
     },
     StatefulSetsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    DaemonSetsLoaded {
+        cluster_id: String,
+        generation: u64,
+        daemonsets: Vec<DaemonSetInfo>,
+    },
+    DaemonSetsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -367,7 +427,10 @@ impl NamespaceFilterState {
             return None;
         }
 
-        let entry = self.selected_by_cluster.entry(cluster_id.clone()).or_default();
+        let entry = self
+            .selected_by_cluster
+            .entry(cluster_id.clone())
+            .or_default();
         if let Some(pos) = entry.iter().position(|n| n == trimmed) {
             entry.remove(pos);
         } else {
@@ -729,8 +792,7 @@ impl DeploymentsState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == DeploymentsLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == DeploymentsLoadStatus::Idle
     }
 }
 
@@ -838,6 +900,108 @@ impl StatefulSetsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum DaemonSetsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DaemonSetsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: DaemonSetsLoadStatus,
+    pub daemonsets: Vec<DaemonSetInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl DaemonSetsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = DaemonSetsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.daemonsets.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.daemonsets.is_empty();
+        ClusterBridgeCommand::LoadDaemonSets {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = DaemonSetsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.daemonsets.is_empty();
+        Some(ClusterBridgeCommand::LoadDaemonSets {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = DaemonSetsLoadStatus::Idle;
+        self.daemonsets.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = DaemonSetsLoadStatus::Idle;
+        self.daemonsets.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        daemonsets: Vec<DaemonSetInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = DaemonSetsLoadStatus::Loaded;
+            self.daemonsets = daemonsets;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = DaemonSetsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == DaemonSetsLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PodsLoadStatus {
     #[default]
     Idle,
@@ -906,12 +1070,7 @@ impl PodsState {
         self.table.loading = false;
     }
 
-    pub fn apply_loaded(
-        &mut self,
-        cluster_id: &str,
-        generation: u64,
-        pods: Vec<PodInfo>,
-    ) -> bool {
+    pub fn apply_loaded(&mut self, cluster_id: &str, generation: u64, pods: Vec<PodInfo>) -> bool {
         if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
             self.status = PodsLoadStatus::Loaded;
             self.pods = pods;
@@ -935,8 +1094,7 @@ impl PodsState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == PodsLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == PodsLoadStatus::Idle
     }
 }
 
@@ -1084,8 +1242,7 @@ impl ServicesState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == ServicesLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == ServicesLoadStatus::Idle
     }
 }
 
@@ -1187,8 +1344,7 @@ impl ConfigMapsState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == ConfigMapsLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == ConfigMapsLoadStatus::Idle
     }
 }
 
@@ -1290,8 +1446,7 @@ impl SecretsState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == SecretsLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == SecretsLoadStatus::Idle
     }
 }
 
@@ -1585,15 +1740,23 @@ impl ClusterSwitcherState {
     }
 
     pub fn begin_reconnect(&mut self) -> Option<ClusterBridgeCommand> {
-        if matches!(self.connection_state, ClusterConnectionState::Connecting { .. }) {
+        if matches!(
+            self.connection_state,
+            ClusterConnectionState::Connecting { .. }
+        ) {
             return None;
         }
 
-        let target_cluster_id = self.active_cluster_id.clone().or_else(|| match &self.connection_state {
-            ClusterConnectionState::Unreachable { cluster_id, .. } => Some(cluster_id.clone()),
-            ClusterConnectionState::Error { cluster_id, .. } => cluster_id.clone(),
-            _ => None,
-        })?;
+        let target_cluster_id =
+            self.active_cluster_id
+                .clone()
+                .or_else(|| match &self.connection_state {
+                    ClusterConnectionState::Unreachable { cluster_id, .. } => {
+                        Some(cluster_id.clone())
+                    }
+                    ClusterConnectionState::Error { cluster_id, .. } => cluster_id.clone(),
+                    _ => None,
+                })?;
 
         self.dropdown_open = false;
         let display_name = self.cluster_display_name(&target_cluster_id);
@@ -1694,6 +1857,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::DeploymentsLoadFailed { .. }
             | ClusterBridgeEvent::StatefulSetsLoaded { .. }
             | ClusterBridgeEvent::StatefulSetsLoadFailed { .. }
+            | ClusterBridgeEvent::DaemonSetsLoaded { .. }
+            | ClusterBridgeEvent::DaemonSetsLoadFailed { .. }
             | ClusterBridgeEvent::PodsLoaded { .. }
             | ClusterBridgeEvent::PodsLoadFailed { .. }
             | ClusterBridgeEvent::ServicesLoaded { .. }
@@ -2152,7 +2317,11 @@ mod tests {
     #[test]
     fn test_contexts_loaded_keeps_disconnected_state_and_captures_kubeconfig_error() {
         let mut state = ClusterSwitcherState::new();
-        let clusters = vec![sample_cluster("ctx-1", Some("Prod US"), Some("https://10.0.0.1:6443"))];
+        let clusters = vec![sample_cluster(
+            "ctx-1",
+            Some("Prod US"),
+            Some("https://10.0.0.1:6443"),
+        )];
 
         state.apply_event(ClusterBridgeEvent::ContextsLoaded {
             clusters: clusters.clone(),
@@ -2219,7 +2388,10 @@ mod tests {
         assert_eq!(state.active_cluster_id.as_deref(), Some("ctx-1"));
         assert!(!state.error_banner_dismissed);
         assert_eq!(
-            state.active_profile.as_ref().and_then(|p| p.user_name.as_deref()),
+            state
+                .active_profile
+                .as_ref()
+                .and_then(|p| p.user_name.as_deref()),
             Some("admin")
         );
         assert_eq!(
@@ -2230,20 +2402,13 @@ mod tests {
                 k8s_version: Some("v1.31.2".to_string()),
             }
         );
-        assert_eq!(
-            state.active_cluster().map(|c| c.id.as_str()),
-            Some("ctx-1")
-        );
+        assert_eq!(state.active_cluster().map(|c| c.id.as_str()), Some("ctx-1"));
     }
 
     #[test]
     fn test_apply_event_unreachable_and_connection_error_surface_diagnostics() {
         let mut state = ClusterSwitcherState::new();
-        let clusters = vec![sample_cluster(
-            "ctx-down",
-            None,
-            Some("http://127.0.0.1:1"),
-        )];
+        let clusters = vec![sample_cluster("ctx-down", None, Some("http://127.0.0.1:1"))];
         let profile = sample_profile("ctx-down", Some("http://127.0.0.1:1"));
 
         state.apply_event(ClusterBridgeEvent::ClusterUnreachable {
@@ -2541,19 +2706,11 @@ mod tests {
             1,
             vec![sample_deployment("wrong-cluster", "default")],
         ));
-        assert!(!state.apply_loaded(
-            "ctx-a",
-            99,
-            vec![sample_deployment("wrong-gen", "default")],
-        ));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![sample_deployment("wrong-gen", "default")],));
         assert!(state.deployments.is_empty());
 
         // Matching (cluster_id, generation) succeeds.
-        assert!(state.apply_loaded(
-            "ctx-a",
-            1,
-            vec![sample_deployment("api", "default")],
-        ));
+        assert!(state.apply_loaded("ctx-a", 1, vec![sample_deployment("api", "default")],));
         assert_eq!(state.status, DeploymentsLoadStatus::Loaded);
         assert!(!state.table.loading);
         assert_eq!(state.deployments.len(), 1);
@@ -2645,11 +2802,7 @@ mod tests {
         assert!(state.statefulsets.is_empty());
 
         // Matching cluster and generation is accepted.
-        assert!(state.apply_loaded(
-            "ctx-a",
-            1,
-            vec![sample_statefulset("redis", "default")],
-        ));
+        assert!(state.apply_loaded("ctx-a", 1, vec![sample_statefulset("redis", "default")],));
         assert_eq!(state.status, StatefulSetsLoadStatus::Loaded);
         assert!(!state.table.loading);
         assert_eq!(state.statefulsets.len(), 1);
@@ -2685,6 +2838,96 @@ mod tests {
         state.reset_for_disconnected();
         assert!(state.cluster_id.is_none());
         assert_eq!(state.status, StatefulSetsLoadStatus::Idle);
+        assert!(state.generation > gen_before_disconnect);
+    }
+
+    fn sample_daemonset(name: &str, namespace: &str) -> DaemonSetInfo {
+        DaemonSetInfo {
+            kind: "DaemonSet".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::DaemonSetReplicas {
+                desired: 3,
+                current: 3,
+                ready: 3,
+                up_to_date: 3,
+                available: 3,
+            },
+            age: "2d".to_string(),
+            images: vec!["fluent/fluent-bit:3.0".to_string()],
+            containers: vec![orbit_core::kubernetes::models::ContainerImageInfo {
+                name: "fluent-bit".to_string(),
+                image: "fluent/fluent-bit:3.0".to_string(),
+            }],
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_daemonsets_state_lifecycle_and_generation_guard() {
+        let mut state = DaemonSetsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadDaemonSets {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, DaemonSetsLoadStatus::Loading);
+        assert!(state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Stale cluster or generation is rejected.
+        assert!(!state.apply_loaded(
+            "ctx-other",
+            1,
+            vec![sample_daemonset("wrong-cluster", "default")],
+        ));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![sample_daemonset("wrong-gen", "default")],));
+        assert!(state.daemonsets.is_empty());
+
+        // Matching cluster and generation is accepted.
+        assert!(state.apply_loaded("ctx-a", 1, vec![sample_daemonset("fluent-bit", "logging")],));
+        assert_eq!(state.status, DaemonSetsLoadStatus::Loaded);
+        assert!(!state.table.loading);
+        assert_eq!(state.daemonsets.len(), 1);
+        assert_eq!(state.daemonsets[0].name, "fluent-bit");
+
+        // Refresh retains cached rows while loading.
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadDaemonSets {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, DaemonSetsLoadStatus::Loading);
+        assert_eq!(state.daemonsets.len(), 1);
+
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, DaemonSetsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+
+        // Reset for new cluster clears rows, selection, and returns to Idle.
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert_eq!(state.status, DaemonSetsLoadStatus::Idle);
+        assert!(state.daemonsets.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(state.needs_load_for_cluster("ctx-b"));
+
+        // Disconnect clears cluster_id and invalidates in-flight replies.
+        let gen_before_disconnect = state.generation;
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert_eq!(state.status, DaemonSetsLoadStatus::Idle);
         assert!(state.generation > gen_before_disconnect);
     }
 
@@ -2833,7 +3076,11 @@ mod tests {
         assert!(!state.needs_load_for_cluster("ctx-a"));
 
         // Stale cluster or generation is ignored.
-        assert!(!state.apply_loaded("ctx-b", 1, vec![sample_node("wrong-cluster", "Ready", false)]));
+        assert!(!state.apply_loaded(
+            "ctx-b",
+            1,
+            vec![sample_node("wrong-cluster", "Ready", false)]
+        ));
         assert!(!state.apply_loaded("ctx-a", 99, vec![sample_node("wrong-gen", "Ready", false)]));
         assert!(!state.apply_failed("ctx-b", 1, "wrong-cluster".to_string()));
         assert!(!state.apply_failed("ctx-a", 99, "wrong-gen".to_string()));
@@ -2946,12 +3193,22 @@ mod tests {
         assert!(!state.apply_loaded(
             "cluster-b",
             1,
-            vec![sample_event("ev-wrong-cluster", "Normal", "Scheduled", "default")],
+            vec![sample_event(
+                "ev-wrong-cluster",
+                "Normal",
+                "Scheduled",
+                "default"
+            )],
         ));
         assert!(!state.apply_loaded(
             "cluster-a",
             0,
-            vec![sample_event("ev-stale-gen", "Normal", "Scheduled", "default")],
+            vec![sample_event(
+                "ev-stale-gen",
+                "Normal",
+                "Scheduled",
+                "default"
+            )],
         ));
         assert!(!state.apply_failed("cluster-a", 0, "stale error".to_string()));
         assert!(state.events.is_empty());
@@ -3100,7 +3357,10 @@ mod tests {
         tabs.open_tab(WorkspaceView::Nodes);
         tabs.set_active_tab(WorkspaceView::Deployments);
         tabs.close_tab(WorkspaceView::Deployments);
-        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Pods, WorkspaceView::Nodes]);
+        assert_eq!(
+            tabs.open_tabs(),
+            &[WorkspaceView::Pods, WorkspaceView::Nodes]
+        );
         assert_eq!(tabs.active_tab(), Some(WorkspaceView::Nodes));
 
         // Closing remaining tabs leads to empty state and hides bar
@@ -3230,7 +3490,10 @@ mod tests {
         );
 
         // Switching to cluster-new preserves its Nodes tab
-        assert_eq!(tabs.activate_cluster("cluster-new"), Some(WorkspaceView::Nodes));
+        assert_eq!(
+            tabs.activate_cluster("cluster-new"),
+            Some(WorkspaceView::Nodes)
+        );
         assert_eq!(
             tabs.open_tabs(),
             &[WorkspaceView::Overview, WorkspaceView::Nodes]

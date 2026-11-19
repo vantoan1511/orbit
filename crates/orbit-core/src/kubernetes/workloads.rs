@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use k8s_openapi::api::apps::v1::{Deployment, StatefulSet};
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
-    api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams},
     Client,
+    api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams},
 };
 
 use crate::kubernetes::models;
@@ -13,6 +13,7 @@ use crate::kubernetes::namespaces::format_age;
 pub const DEPLOYMENT_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const POD_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const STATEFULSET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+pub const DAEMONSET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub fn map_pod(p: &Pod) -> models::PodInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
@@ -45,7 +46,10 @@ pub fn map_pod(p: &Pod) -> models::PodInfo {
     let mut images = Vec::new();
     let mut total_restarts = 0;
 
-    let container_statuses = p.status.as_ref().and_then(|s| s.container_statuses.as_ref());
+    let container_statuses = p
+        .status
+        .as_ref()
+        .and_then(|s| s.container_statuses.as_ref());
 
     if let Some(spec) = p.spec.as_ref() {
         for c in &spec.containers {
@@ -203,8 +207,12 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
     let desired = d.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
     let status_replicas = d.status.as_ref();
     let current = status_replicas.and_then(|s| s.replicas).unwrap_or(0);
-    let available = status_replicas.and_then(|s| s.available_replicas).unwrap_or(0);
-    let up_to_date = status_replicas.and_then(|s| s.updated_replicas).unwrap_or(0);
+    let available = status_replicas
+        .and_then(|s| s.available_replicas)
+        .unwrap_or(0);
+    let up_to_date = status_replicas
+        .and_then(|s| s.updated_replicas)
+        .unwrap_or(0);
 
     let replicas = models::Replicas { current, desired };
 
@@ -227,7 +235,13 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
     let mut containers = Vec::new();
     let mut ports = Vec::new();
     if let Some(spec) = d.spec.as_ref() {
-        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
+        for c in &spec
+            .template
+            .spec
+            .as_ref()
+            .map(|s| s.containers.clone())
+            .unwrap_or_default()
+        {
             if let Some(img) = &c.image {
                 images.push(img.clone());
             }
@@ -251,7 +265,11 @@ pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
         .and_then(|s| s.strategy.as_ref())
         .and_then(|strt| strt.type_.clone());
 
-    let min_ready_seconds = d.spec.as_ref().and_then(|s| s.min_ready_seconds).unwrap_or(0);
+    let min_ready_seconds = d
+        .spec
+        .as_ref()
+        .and_then(|s| s.min_ready_seconds)
+        .unwrap_or(0);
     let revision_history = d.spec.as_ref().and_then(|s| s.revision_history_limit);
 
     let labels = d.metadata.labels.clone().unwrap_or_default();
@@ -300,7 +318,12 @@ pub async fn fetch_deployments(
     client: &Client,
     namespace: Option<String>,
 ) -> Result<Vec<models::DeploymentInfo>, String> {
-    match tokio::time::timeout(DEPLOYMENT_FETCH_TIMEOUT, list_deployments(client, namespace)).await {
+    match tokio::time::timeout(
+        DEPLOYMENT_FETCH_TIMEOUT,
+        list_deployments(client, namespace),
+    )
+    .await
+    {
         Ok(Ok(list)) => Ok(list),
         Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
         Ok(Err(err)) => Err(err.to_string()),
@@ -396,12 +419,107 @@ pub async fn fetch_statefulsets(
     }
 }
 
+pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
+    let name = ds.metadata.name.clone().unwrap_or_default();
+    let namespace_name = ds.metadata.namespace.clone().unwrap_or_default();
+    let age = format_age(&ds.metadata.creation_timestamp);
+
+    let status_ds = ds.status.as_ref();
+    let desired = status_ds.map(|s| s.desired_number_scheduled).unwrap_or(0);
+    let current = status_ds.map(|s| s.current_number_scheduled).unwrap_or(0);
+    let ready = status_ds.map(|s| s.number_ready).unwrap_or(0);
+    let up_to_date = status_ds
+        .and_then(|s| s.updated_number_scheduled)
+        .unwrap_or(0);
+    let available = status_ds.and_then(|s| s.number_available).unwrap_or(0);
+
+    let replicas = models::DaemonSetReplicas {
+        desired,
+        current,
+        ready,
+        up_to_date,
+        available,
+    };
+
+    let status = if desired == ready {
+        "Running".to_string()
+    } else {
+        "Progressing".to_string()
+    };
+
+    let mut images = Vec::new();
+    let mut containers = Vec::new();
+    if let Some(spec) = ds.spec.as_ref() {
+        for c in &spec
+            .template
+            .spec
+            .as_ref()
+            .map(|s| s.containers.clone())
+            .unwrap_or_default()
+        {
+            if let Some(img) = &c.image {
+                images.push(img.clone());
+            }
+            containers.push(models::ContainerImageInfo {
+                name: c.name.clone(),
+                image: c.image.clone().unwrap_or_default(),
+            });
+        }
+    }
+
+    let labels = ds.metadata.labels.clone().unwrap_or_default();
+    let annotations = ds.metadata.annotations.clone().unwrap_or_default();
+
+    models::DaemonSetInfo {
+        kind: "DaemonSet".to_string(),
+        name,
+        namespace: namespace_name,
+        status,
+        replicas,
+        age,
+        images,
+        containers,
+        labels,
+        annotations,
+    }
+}
+
+pub async fn list_daemonsets(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<models::DaemonSetInfo>, kube::Error> {
+    let api: Api<DaemonSet> = if let Some(ns) = namespace {
+        Api::namespaced(client.clone(), &ns)
+    } else {
+        Api::all(client.clone())
+    };
+
+    let mut list = Vec::new();
+    for ds in api.list(&ListParams::default()).await? {
+        list.push(map_daemonset(&ds));
+    }
+
+    Ok(list)
+}
+
+pub async fn fetch_daemonsets(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<models::DaemonSetInfo>, String> {
+    match tokio::time::timeout(DAEMONSET_FETCH_TIMEOUT, list_daemonsets(client, namespace)).await {
+        Ok(Ok(list)) => Ok(list),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Timed out fetching daemonsets after 10s".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use k8s_openapi::api::apps::v1::{
-        DeploymentCondition, DeploymentSpec, DeploymentStatus, DeploymentStrategy, StatefulSet,
-        StatefulSetSpec, StatefulSetStatus,
+        DaemonSet, DaemonSetSpec, DaemonSetStatus, DeploymentCondition, DeploymentSpec,
+        DeploymentStatus, DeploymentStrategy, StatefulSet, StatefulSetSpec, StatefulSetStatus,
     };
     use k8s_openapi::api::core::v1::{Container, ContainerPort, PodSpec, PodTemplateSpec};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -550,11 +668,17 @@ mod tests {
         let mapped = map_deployment(&dep);
         assert_eq!(mapped.name, "test-deploy");
         assert_eq!(mapped.kind, "Deployment");
-        let conditions = mapped.conditions.as_ref().expect("conditions should be present");
+        let conditions = mapped
+            .conditions
+            .as_ref()
+            .expect("conditions should be present");
         assert_eq!(conditions.len(), 2);
         assert_eq!(conditions[0].type_, "Available");
         assert_eq!(conditions[0].status, "True");
-        assert_eq!(conditions[0].reason.as_deref(), Some("MinimumReplicasAvailable"));
+        assert_eq!(
+            conditions[0].reason.as_deref(),
+            Some("MinimumReplicasAvailable")
+        );
         assert_eq!(conditions[1].type_, "Progressing");
     }
 
@@ -871,5 +995,134 @@ mod tests {
         assert_eq!(mapped.replicas.desired, 0);
         assert!(mapped.images.is_empty());
         assert!(mapped.containers.is_empty());
+    }
+
+    #[test]
+    fn test_map_daemonset_status_replicas_and_containers() {
+        let mut labels = std::collections::BTreeMap::new();
+        labels.insert("app".to_string(), "fluent-bit".to_string());
+        let mut annotations = std::collections::BTreeMap::new();
+        annotations.insert("owner".to_string(), "observability".to_string());
+
+        let running = DaemonSet {
+            metadata: ObjectMeta {
+                name: Some("fluent-bit".to_string()),
+                namespace: Some("logging".to_string()),
+                labels: Some(labels),
+                annotations: Some(annotations),
+                ..Default::default()
+            },
+            spec: Some(DaemonSetSpec {
+                template: PodTemplateSpec {
+                    spec: Some(PodSpec {
+                        containers: vec![
+                            Container {
+                                name: "fluent-bit".to_string(),
+                                image: Some("fluent/fluent-bit:3.0".to_string()),
+                                ..Default::default()
+                            },
+                            Container {
+                                name: "reloader".to_string(),
+                                image: Some("ghcr.io/org/config-reloader:1.2".to_string()),
+                                ..Default::default()
+                            },
+                        ],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }),
+            status: Some(DaemonSetStatus {
+                desired_number_scheduled: 3,
+                current_number_scheduled: 3,
+                number_ready: 3,
+                updated_number_scheduled: Some(3),
+                number_available: Some(3),
+                ..Default::default()
+            }),
+        };
+
+        let mapped_running = map_daemonset(&running);
+        assert_eq!(mapped_running.kind, "DaemonSet");
+        assert_eq!(mapped_running.name, "fluent-bit");
+        assert_eq!(mapped_running.namespace, "logging");
+        assert_eq!(mapped_running.status, "Running");
+        assert_eq!(mapped_running.replicas.desired, 3);
+        assert_eq!(mapped_running.replicas.current, 3);
+        assert_eq!(mapped_running.replicas.ready, 3);
+        assert_eq!(mapped_running.replicas.up_to_date, 3);
+        assert_eq!(mapped_running.replicas.available, 3);
+        assert_eq!(
+            mapped_running.images,
+            vec!["fluent/fluent-bit:3.0", "ghcr.io/org/config-reloader:1.2"]
+        );
+        assert_eq!(
+            mapped_running.containers,
+            vec![
+                models::ContainerImageInfo {
+                    name: "fluent-bit".to_string(),
+                    image: "fluent/fluent-bit:3.0".to_string(),
+                },
+                models::ContainerImageInfo {
+                    name: "reloader".to_string(),
+                    image: "ghcr.io/org/config-reloader:1.2".to_string(),
+                },
+            ]
+        );
+        assert_eq!(
+            mapped_running.labels.get("app").map(String::as_str),
+            Some("fluent-bit")
+        );
+        assert_eq!(
+            mapped_running.annotations.get("owner").map(String::as_str),
+            Some("observability")
+        );
+
+        let progressing = DaemonSet {
+            status: Some(DaemonSetStatus {
+                desired_number_scheduled: 4,
+                current_number_scheduled: 4,
+                number_ready: 2,
+                updated_number_scheduled: Some(3),
+                number_available: Some(2),
+                ..Default::default()
+            }),
+            ..running
+        };
+        let mapped_progressing = map_daemonset(&progressing);
+        assert_eq!(mapped_progressing.status, "Progressing");
+        assert_eq!(mapped_progressing.replicas.desired, 4);
+        assert_eq!(mapped_progressing.replicas.current, 4);
+        assert_eq!(mapped_progressing.replicas.ready, 2);
+        assert_eq!(mapped_progressing.replicas.up_to_date, 3);
+        assert_eq!(mapped_progressing.replicas.available, 2);
+    }
+
+    #[test]
+    fn test_map_daemonset_defaults_missing_fields() {
+        let ds = DaemonSet {
+            metadata: ObjectMeta {
+                name: Some("bare-ds".to_string()),
+                namespace: Some("default".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let mapped = map_daemonset(&ds);
+        assert_eq!(mapped.kind, "DaemonSet");
+        assert_eq!(mapped.name, "bare-ds");
+        assert_eq!(mapped.namespace, "default");
+        assert_eq!(mapped.status, "Running");
+        assert_eq!(mapped.replicas.desired, 0);
+        assert_eq!(mapped.replicas.current, 0);
+        assert_eq!(mapped.replicas.ready, 0);
+        assert_eq!(mapped.replicas.up_to_date, 0);
+        assert_eq!(mapped.replicas.available, 0);
+        assert!(mapped.images.is_empty());
+        assert!(mapped.containers.is_empty());
+        assert!(mapped.labels.is_empty());
+        assert!(mapped.annotations.is_empty());
     }
 }

@@ -44,6 +44,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    DaemonSet {
+        name: String,
+        namespace: String,
+    },
     Pod {
         name: String,
         namespace: String,
@@ -78,6 +82,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { .. } => "Deployment",
             Self::StatefulSet { .. } => "StatefulSet",
+            Self::DaemonSet { .. } => "DaemonSet",
             Self::Pod { .. } => "Pod",
             Self::Service { .. } => "Service",
             Self::ConfigMap { .. } => "ConfigMap",
@@ -92,6 +97,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { name, .. }
             | Self::StatefulSet { name, .. }
+            | Self::DaemonSet { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
@@ -106,6 +112,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { name, .. }
             | Self::StatefulSet { name, .. }
+            | Self::DaemonSet { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
@@ -120,6 +127,7 @@ impl ResourceDrawerTarget {
         match self {
             Self::Deployment { namespace, .. }
             | Self::StatefulSet { namespace, .. }
+            | Self::DaemonSet { namespace, .. }
             | Self::Pod { namespace, .. }
             | Self::Service { namespace, .. }
             | Self::ConfigMap { namespace, .. }
@@ -850,6 +858,19 @@ mod tests {
         assert_eq!(target.name(), "redis");
         assert_eq!(target.display_title(), "redis");
         assert_eq!(target.namespace(), Some("cache"));
+        assert!(target.supports_live_yaml());
+    }
+
+    #[test]
+    fn test_daemonset_drawer_target_metadata_and_yaml_support() {
+        let target = ResourceDrawerTarget::DaemonSet {
+            name: "fluent-bit".to_string(),
+            namespace: "logging".to_string(),
+        };
+        assert_eq!(target.kind(), "DaemonSet");
+        assert_eq!(target.name(), "fluent-bit");
+        assert_eq!(target.display_title(), "fluent-bit");
+        assert_eq!(target.namespace(), Some("logging"));
         assert!(target.supports_live_yaml());
     }
 }

@@ -1,4 +1,5 @@
 pub mod configmaps;
+pub mod daemonsets;
 pub mod deployments;
 pub mod events;
 pub mod namespaces;
@@ -18,7 +19,7 @@ use std::rc::Rc;
 
 use gpui::{AnyElement, App, FontWeight, Window, div, prelude::*, px};
 use lucide_icons::Icon;
-use orbit_core::kubernetes::models::EventInfo;
+use orbit_core::kubernetes::models::{ContainerImageInfo, EventInfo};
 
 use crate::components::status_badge::{StatusBadgeVariant, render_status_badge_from_str};
 use crate::icons::render_icon;
@@ -201,6 +202,70 @@ pub fn render_drawer_kv_badges(
     };
 
     render_drawer_section(title, content, theme)
+}
+
+pub fn render_drawer_containers_section(
+    containers: &[ContainerImageInfo],
+    images: &[String],
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let mono = theme.typography.mono_font(FontWeight::NORMAL);
+    let content = if containers.is_empty() && images.is_empty() {
+        apply_text_step(div(), theme.typography.size_xs)
+            .text_color(theme.text.muted)
+            .child("No containers reported.")
+            .into_any_element()
+    } else if !containers.is_empty() {
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .children(containers.iter().map(|c| {
+                div()
+                    .w_full()
+                    .p_2p5()
+                    .rounded(theme.style.radius_control)
+                    .bg(theme.surface.bg_panel)
+                    .border_1()
+                    .border_color(theme.border.default)
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.text.primary)
+                            .child(c.name.clone()),
+                    )
+                    .child(
+                        apply_text_step(div(), theme.typography.size_2xs)
+                            .font(mono.clone())
+                            .text_color(theme.text.secondary)
+                            .child(c.image.clone()),
+                    )
+            }))
+            .into_any_element()
+    } else {
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_1p5()
+            .children(images.iter().map(|img| {
+                apply_text_step(div(), theme.typography.size_2xs)
+                    .px_2p5()
+                    .py_1p5()
+                    .rounded(theme.style.radius_control)
+                    .bg(theme.surface.bg_panel)
+                    .font(mono.clone())
+                    .text_color(theme.text.primary)
+                    .child(img.clone())
+            }))
+            .into_any_element()
+    };
+
+    render_drawer_section("CONTAINERS & IMAGES", content, theme)
 }
 
 pub fn render_drawer_events_list(

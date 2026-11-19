@@ -8,7 +8,9 @@ use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
-use orbit_core::kubernetes::workloads::{fetch_deployments, fetch_pods, fetch_statefulsets};
+use orbit_core::kubernetes::workloads::{
+    fetch_daemonsets, fetch_deployments, fetch_pods, fetch_statefulsets,
+};
 use orbit_core::kubernetes::workloads_overview::fetch_workloads_overview;
 use tokio::sync::{RwLock, mpsc};
 
@@ -256,6 +258,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::StatefulSetsLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadDaemonSets {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_daemonsets(&client, None).await {
+                        Ok(daemonsets) => {
+                            let _ = tx.send(ClusterBridgeEvent::DaemonSetsLoaded {
+                                cluster_id,
+                                generation,
+                                daemonsets,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::DaemonSetsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::DaemonSetsLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -562,9 +601,10 @@ pub async fn handle_bridge_command(
             active_tab,
         } => {
             let mut guard = manager.write().await;
-            if let Err(err) = guard
-                .config
-                .set_workspace_tabs_for_cluster(&cluster_id, open_tabs, active_tab)
+            if let Err(err) =
+                guard
+                    .config
+                    .set_workspace_tabs_for_cluster(&cluster_id, open_tabs, active_tab)
             {
                 tracing::warn!(
                     cluster_id = %cluster_id,
@@ -947,6 +987,39 @@ users:
     }
 
     #[tokio::test]
+    async fn test_handle_bridge_command_load_daemonsets_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadDaemonSets {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 11,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected DaemonSetsLoadFailed event");
+        match event {
+            ClusterBridgeEvent::DaemonSetsLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 11);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected DaemonSetsLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
     async fn test_handle_bridge_command_load_pods_without_client_emits_failure() {
         let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
@@ -1150,7 +1223,7 @@ users:
 
     #[tokio::test]
     async fn test_handle_bridge_command_load_workloads_overview_without_active_client_emits_failure()
-    {
+     {
         let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
         let (event_tx, mut event_rx) = mpsc::unbounded_channel();
 
