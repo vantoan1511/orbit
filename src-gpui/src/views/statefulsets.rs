@@ -43,11 +43,7 @@ pub fn statefulset_columns() -> Vec<TableColumn> {
     ]
 }
 
-fn compare_statefulsets_by_col(
-    a: &StatefulSetInfo,
-    b: &StatefulSetInfo,
-    col_id: &str,
-) -> Ordering {
+fn compare_statefulsets_by_col(a: &StatefulSetInfo, b: &StatefulSetInfo, col_id: &str) -> Ordering {
     let tie_break = || {
         a.name
             .to_ascii_lowercase()
@@ -272,7 +268,7 @@ pub fn render_statefulsets_view(
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
-        + Fn(SharedString, &StatefulSetInfo, &MouseDownEvent, &mut Window, &mut App),
+    + Fn(SharedString, &StatefulSetInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = statefulset_columns();
@@ -327,7 +323,11 @@ pub fn render_statefulsets_view(
         .child(render_action_button(
             "statefulsets-refresh-btn",
             Icon::RefreshCw,
-            if is_loading { "Refreshing..." } else { "Refresh" },
+            if is_loading {
+                "Refreshing..."
+            } else {
+                "Refresh"
+            },
             is_loading,
             theme,
             on_refresh_rc.clone(),
@@ -514,64 +514,11 @@ pub fn render_statefulset_drawer_overview(
         theme,
     );
 
-    let mono = theme.typography.mono_font(FontWeight::NORMAL);
-    let containers_section = {
-        let content = if statefulset.containers.is_empty() && statefulset.images.is_empty() {
-            apply_text_step(div(), theme.typography.size_xs)
-                .text_color(theme.text.muted)
-                .child("No containers reported.")
-                .into_any_element()
-        } else if !statefulset.containers.is_empty() {
-            div()
-                .w_full()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .children(statefulset.containers.iter().map(|c| {
-                    div()
-                        .w_full()
-                        .p_2p5()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.surface.bg_panel)
-                        .border_1()
-                        .border_color(theme.border.default)
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child(c.name.clone()),
-                        )
-                        .child(
-                            apply_text_step(div(), theme.typography.size_2xs)
-                                .font(mono.clone())
-                                .text_color(theme.text.secondary)
-                                .child(c.image.clone()),
-                        )
-                }))
-                .into_any_element()
-        } else {
-            div()
-                .w_full()
-                .flex()
-                .flex_col()
-                .gap_1p5()
-                .children(statefulset.images.iter().map(|img| {
-                    apply_text_step(div(), theme.typography.size_2xs)
-                        .px_2p5()
-                        .py_1p5()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.surface.bg_panel)
-                        .font(mono.clone())
-                        .text_color(theme.text.primary)
-                        .child(img.clone())
-                }))
-                .into_any_element()
-        };
-        crate::views::render_drawer_section("CONTAINERS & IMAGES", content, theme)
-    };
+    let containers_section = crate::views::render_drawer_containers_section(
+        &statefulset.containers,
+        &statefulset.images,
+        theme,
+    );
 
     div()
         .id("statefulset-drawer-overview")
@@ -582,7 +529,9 @@ pub fn render_statefulset_drawer_overview(
         .flex()
         .flex_col()
         .gap_5()
-        .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
+        .child(crate::views::render_drawer_section(
+            "SUMMARY", summary, theme,
+        ))
         .child(containers_section)
         .child(crate::views::render_drawer_kv_badges(
             "LABELS",
@@ -741,7 +690,10 @@ mod tests {
         };
         let sorted_age = filter_and_sort_statefulsets(&items, &all_ns, Some(&by_age));
         assert_eq!(
-            sorted_age.iter().map(|s| s.name.as_str()).collect::<Vec<_>>(),
+            sorted_age
+                .iter()
+                .map(|s| s.name.as_str())
+                .collect::<Vec<_>>(),
             vec!["pg", "redis", "zk"]
         );
     }
@@ -765,9 +717,15 @@ mod tests {
             StatefulSetsPresentationMode::ErrorCard
         );
 
-        state
-            .statefulsets
-            .push(make_statefulset("redis", "cache", "Running", 3, 3, "redis:7.2", "1d"));
+        state.statefulsets.push(make_statefulset(
+            "redis",
+            "cache",
+            "Running",
+            3,
+            3,
+            "redis:7.2",
+            "1d",
+        ));
         assert_eq!(
             statefulsets_empty_message(&state),
             "No statefulsets found in the selected namespace(s)."

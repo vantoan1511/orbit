@@ -26,14 +26,12 @@ use crate::components::{
     render_workspace_tab_bar, render_yaml_viewer,
 };
 use crate::icons::render_icon;
-use crate::navigation::{
-    ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView,
-};
+use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView};
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
-    ClusterSwitcherState, ConfigMapsState, DeploymentsState, EventTypeFilter, EventsLoadStatus,
-    EventsState, NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState, NodesState,
-    PodsState, SecretsState, ServicesState, StatefulSetsState, TabDropPosition,
+    ClusterSwitcherState, ConfigMapsState, DaemonSetsState, DeploymentsState, EventTypeFilter,
+    EventsLoadStatus, EventsState, NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState,
+    NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState, TabDropPosition,
     WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
@@ -184,6 +182,7 @@ pub fn select_workspace_view_with_state(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -199,6 +198,7 @@ pub fn select_workspace_view_with_state(
         namespaces,
         deployments,
         statefulsets,
+        daemonsets,
         pods,
         services,
         configmaps,
@@ -217,6 +217,7 @@ pub fn select_workspace_view_with_tabs(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -235,6 +236,7 @@ pub fn select_workspace_view_with_tabs(
         namespaces,
         deployments,
         statefulsets,
+        daemonsets,
         pods,
         services,
         configmaps,
@@ -258,6 +260,7 @@ fn load_command_for_active_view(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -283,6 +286,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::StatefulSets && statefulsets.needs_load_for_cluster(cluster_id) {
         return Some(statefulsets.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::DaemonSets && daemonsets.needs_load_for_cluster(cluster_id) {
+        return Some(daemonsets.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
         return Some(pods.begin_load_for_cluster(cluster_id));
@@ -315,6 +321,7 @@ pub fn apply_cluster_event_with_tabs(
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -334,6 +341,7 @@ pub fn apply_cluster_event_with_tabs(
         namespaces_view,
         deployments,
         statefulsets,
+        daemonsets,
         pods,
         services,
         configmaps,
@@ -353,6 +361,7 @@ pub fn apply_cluster_event_with_tabs(
                 namespaces,
                 deployments,
                 statefulsets,
+                daemonsets,
                 pods,
                 services,
                 configmaps,
@@ -379,6 +388,7 @@ pub fn handle_tab_shortcut_with_state(
     namespaces: &mut NamespaceFilterState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -423,6 +433,7 @@ pub fn handle_tab_shortcut_with_state(
         namespaces,
         deployments,
         statefulsets,
+        daemonsets,
         pods,
         services,
         configmaps,
@@ -450,6 +461,7 @@ pub fn apply_cluster_event_with_workspace(
     namespaces_view: &mut NamespacesViewState,
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -481,6 +493,11 @@ pub fn apply_cluster_event_with_workspace(
                     commands.push(statefulsets.begin_load_for_cluster(id));
                 } else {
                     statefulsets.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::DaemonSets {
+                    commands.push(daemonsets.begin_load_for_cluster(id));
+                } else {
+                    daemonsets.reset_for_cluster(id);
                 }
                 if sidebar.active_view == WorkspaceView::Pods {
                     commands.push(pods.begin_load_for_cluster(id));
@@ -523,6 +540,7 @@ pub fn apply_cluster_event_with_workspace(
             namespaces_view.reset_for_disconnected();
             deployments.reset_for_disconnected();
             statefulsets.reset_for_disconnected();
+            daemonsets.reset_for_disconnected();
             pods.reset_for_disconnected();
             services.reset_for_disconnected();
             configmaps.reset_for_disconnected();
@@ -592,6 +610,20 @@ pub fn apply_cluster_event_with_workspace(
             message,
         } => {
             statefulsets.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::DaemonSetsLoaded {
+            cluster_id,
+            generation,
+            daemonsets: loaded_daemonsets,
+        } => {
+            daemonsets.apply_loaded(&cluster_id, generation, loaded_daemonsets);
+        }
+        ClusterBridgeEvent::DaemonSetsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            daemonsets.apply_failed(&cluster_id, generation, message);
         }
         ClusterBridgeEvent::PodsLoaded {
             cluster_id,
@@ -758,6 +790,7 @@ pub struct OrbitShell {
     namespaces_view: NamespacesViewState,
     deployments: DeploymentsState,
     statefulsets: StatefulSetsState,
+    daemonsets: DaemonSetsState,
     pods: PodsState,
     services: ServicesState,
     configmaps: ConfigMapsState,
@@ -806,6 +839,7 @@ impl OrbitShell {
                             &mut shell.namespaces_view,
                             &mut shell.deployments,
                             &mut shell.statefulsets,
+                            &mut shell.daemonsets,
                             &mut shell.pods,
                             &mut shell.services,
                             &mut shell.configmaps,
@@ -856,6 +890,7 @@ impl OrbitShell {
             namespaces_view: NamespacesViewState::default(),
             deployments: DeploymentsState::default(),
             statefulsets: StatefulSetsState::default(),
+            daemonsets: DaemonSetsState::default(),
             pods: PodsState::default(),
             services: ServicesState::default(),
             configmaps: ConfigMapsState::default(),
@@ -924,6 +959,7 @@ impl OrbitShell {
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.statefulsets,
+            &mut self.daemonsets,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -956,6 +992,7 @@ impl OrbitShell {
             &mut self.namespaces,
             &mut self.deployments,
             &mut self.statefulsets,
+            &mut self.daemonsets,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -1046,6 +1083,7 @@ impl OrbitShell {
             target,
             ResourceDrawerTarget::Deployment { .. }
                 | ResourceDrawerTarget::StatefulSet { .. }
+                | ResourceDrawerTarget::DaemonSet { .. }
                 | ResourceDrawerTarget::Pod { .. }
                 | ResourceDrawerTarget::Service { .. }
                 | ResourceDrawerTarget::ConfigMap { .. }
@@ -1059,9 +1097,9 @@ impl OrbitShell {
                 }
             }
         }
-        if let Some(cmd) =
-            self.drawer
-                .open_or_switch(cluster_id.as_deref(), target, initial_tab)
+        if let Some(cmd) = self
+            .drawer
+            .open_or_switch(cluster_id.as_deref(), target, initial_tab)
         {
             self.dispatch_command(cmd);
         }
@@ -1130,9 +1168,12 @@ impl OrbitShell {
                 .statefulsets
                 .iter()
                 .any(|s| s.name == *name && s.namespace == *namespace),
-            ResourceDrawerTarget::Node { name } => {
-                self.nodes.nodes.iter().any(|n| n.name == *name)
-            }
+            ResourceDrawerTarget::DaemonSet { name, namespace } => self
+                .daemonsets
+                .daemonsets
+                .iter()
+                .any(|d| d.name == *name && d.namespace == *namespace),
+            ResourceDrawerTarget::Node { name } => self.nodes.nodes.iter().any(|n| n.name == *name),
             ResourceDrawerTarget::Namespace { name } => {
                 self.namespaces.namespaces.iter().any(|ns| ns.name == *name)
             }
@@ -1254,9 +1295,11 @@ impl OrbitShell {
                             theme,
                         )
                     }
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("{}/{}", dep.namespace, dep.name), theme, cx)
-                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", dep.namespace, dep.name),
+                        theme,
+                        cx,
+                    ),
                     ResourceDrawerTabId::Custom(_) => div().into_any_element(),
                 };
                 Some((
@@ -1306,9 +1349,11 @@ impl OrbitShell {
                             theme,
                         )
                     }
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("{}/{}", ss.namespace, ss.name), theme, cx)
-                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", ss.namespace, ss.name),
+                        theme,
+                        cx,
+                    ),
                     ResourceDrawerTabId::Custom(_) => div().into_any_element(),
                 };
                 Some((
@@ -1317,6 +1362,60 @@ impl OrbitShell {
                     Some(SharedString::from(ss.namespace.clone())),
                     Some(SharedString::from(ss.age.clone())),
                     Some(SharedString::from(ss.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::DaemonSet { name, namespace } => {
+                let ds = self
+                    .daemonsets
+                    .daemonsets
+                    .iter()
+                    .find(|d| d.name == *name && d.namespace == *namespace)?;
+                let matched_events =
+                    views::daemonsets::filter_events_for_daemonset(&self.events.events, ds);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::daemonsets::render_daemonset_drawer_overview(ds, theme)
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::daemonsets::render_daemonset_drawer_events(
+                            &self.events.events,
+                            events_loading,
+                            ds,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", ds.namespace, ds.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(ds.name.clone()),
+                    SharedString::from("DaemonSet"),
+                    Some(SharedString::from(ds.namespace.clone())),
+                    Some(SharedString::from(ds.age.clone())),
+                    Some(SharedString::from(ds.status.clone())),
                     tabs,
                     body,
                 ))
@@ -1355,9 +1454,11 @@ impl OrbitShell {
                         pod,
                         theme,
                     ),
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("{}/{}", pod.namespace, pod.name), theme, cx)
-                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", pod.namespace, pod.name),
+                        theme,
+                        cx,
+                    ),
                     ResourceDrawerTabId::Custom(_) => div().into_any_element(),
                 };
                 Some((
@@ -1540,9 +1641,11 @@ impl OrbitShell {
                         svc,
                         theme,
                     ),
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("{}/{}", svc.namespace, svc.name), theme, cx)
-                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", svc.namespace, svc.name),
+                        theme,
+                        cx,
+                    ),
                     ResourceDrawerTabId::Custom(_) => div().into_any_element(),
                 };
                 Some((
@@ -1600,9 +1703,11 @@ impl OrbitShell {
                             theme,
                         )
                     }
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("{}/{}", cm.namespace, cm.name), theme, cx)
-                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", cm.namespace, cm.name),
+                        theme,
+                        cx,
+                    ),
                     ResourceDrawerTabId::Custom(_) => div().into_any_element(),
                 };
                 let status_label = if cm.immutable { "Immutable" } else { "Mutable" };
@@ -1676,12 +1781,18 @@ impl OrbitShell {
                         sec,
                         theme,
                     ),
-                    ResourceDrawerTabId::Yaml => {
-                        self.render_live_yaml_tab(format!("{}/{}", sec.namespace, sec.name), theme, cx)
-                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", sec.namespace, sec.name),
+                        theme,
+                        cx,
+                    ),
                     ResourceDrawerTabId::Custom(_) => div().into_any_element(),
                 };
-                let status_label = if sec.immutable { "Immutable" } else { "Mutable" };
+                let status_label = if sec.immutable {
+                    "Immutable"
+                } else {
+                    "Mutable"
+                };
                 Some((
                     SharedString::from(sec.name.clone()),
                     SharedString::from("Secret"),
@@ -1789,6 +1900,15 @@ impl OrbitShell {
                     .unwrap_or_else(|| self.statefulsets.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
+            if self.sidebar.active_view == WorkspaceView::DaemonSets
+                || self.daemonsets.cluster_id.is_some()
+            {
+                let cmd = self
+                    .daemonsets
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.daemonsets.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
             if self.sidebar.active_view == WorkspaceView::Pods || self.pods.cluster_id.is_some() {
                 let cmd = self
                     .pods
@@ -1830,8 +1950,7 @@ impl OrbitShell {
                     .unwrap_or_else(|| self.nodes.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
-            if self.sidebar.active_view == WorkspaceView::Events
-                || self.events.cluster_id.is_some()
+            if self.sidebar.active_view == WorkspaceView::Events || self.events.cluster_id.is_some()
             {
                 let cmd = self
                     .events
@@ -1948,8 +2067,9 @@ impl OrbitShell {
 
         let mut categories_col = div().flex().flex_col().items_center().gap_1p5().w_full();
         for (idx, category) in SidebarCategory::ALL.iter().copied().enumerate() {
-            let is_active =
-                !is_settings && self.sidebar.active_category == category && !self.sidebar.is_collapsed;
+            let is_active = !is_settings
+                && self.sidebar.active_category == category
+                && !self.sidebar.is_collapsed;
             let is_selected_category = !is_settings && self.sidebar.active_category == category;
 
             categories_col = categories_col.child(
@@ -2371,11 +2491,7 @@ impl OrbitShell {
                                     .text_color(theme.text.muted)
                                     .child(presentation.status_label),
                             )
-                            .child(render_icon(
-                                cluster_chevron,
-                                px(13.0),
-                                theme.text.secondary,
-                            )),
+                            .child(render_icon(cluster_chevron, px(13.0), theme.text.secondary)),
                     )
                     .when(
                         matches!(
@@ -2433,11 +2549,7 @@ impl OrbitShell {
                                             theme.semantic.danger.solid,
                                         ))
                                     })
-                                    .child(render_icon(
-                                        ns_chevron,
-                                        px(13.0),
-                                        theme.text.secondary,
-                                    )),
+                                    .child(render_icon(ns_chevron, px(13.0), theme.text.secondary)),
                             )
                         },
                     )
@@ -2451,11 +2563,7 @@ impl OrbitShell {
                                     .text_color(theme.text.muted)
                                     .child(cat_label),
                             )
-                            .child(render_icon(
-                                Icon::ChevronRight,
-                                px(12.0),
-                                theme.text.muted,
-                            ))
+                            .child(render_icon(Icon::ChevronRight, px(12.0), theme.text.muted))
                             .child(
                                 apply_text_step(div(), theme.typography.size_xs)
                                     .font_weight(FontWeight::SEMIBOLD)
@@ -2482,11 +2590,7 @@ impl OrbitShell {
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.refresh_workspace(cx);
                             }))
-                            .child(render_icon(
-                                Icon::RefreshCw,
-                                px(13.0),
-                                theme.text.secondary,
-                            ))
+                            .child(render_icon(Icon::RefreshCw, px(13.0), theme.text.secondary))
                             .child(
                                 apply_text_step(div(), theme.typography.size_sm)
                                     .font_weight(FontWeight::MEDIUM)
@@ -2530,11 +2634,7 @@ impl OrbitShell {
                             .on_click(cx.listener(|_this, _event, _window, cx| {
                                 cx.quit();
                             }))
-                            .child(render_icon(
-                                Icon::LogOut,
-                                px(13.0),
-                                theme.text.secondary,
-                            ))
+                            .child(render_icon(Icon::LogOut, px(13.0), theme.text.secondary))
                             .child(
                                 apply_text_step(div(), theme.typography.size_sm)
                                     .font_weight(FontWeight::MEDIUM)
@@ -2610,9 +2710,7 @@ impl OrbitShell {
                             cx.notify();
                         }))
                         .child(render_icon(Icon::X, px(12.0), theme.text.secondary))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs).child("Dismiss"),
-                        ),
+                        .child(apply_text_step(div(), theme.typography.size_xs).child("Dismiss")),
                 )
                 .into_any_element(),
         )
@@ -2666,13 +2764,7 @@ impl OrbitShell {
                                 .flex()
                                 .items_center()
                                 .gap_2p5()
-                                .child(
-                                    div()
-                                        .w(px(8.0))
-                                        .h(px(8.0))
-                                        .rounded_full()
-                                        .bg(dot_color),
-                                )
+                                .child(div().w(px(8.0)).h(px(8.0)).rounded_full().bg(dot_color))
                                 .child(
                                     div()
                                         .flex()
@@ -2684,9 +2776,12 @@ impl OrbitShell {
                                                 .items_center()
                                                 .gap_2()
                                                 .child(
-                                                    apply_text_step(div(), theme.typography.size_sm)
-                                                        .font_weight(FontWeight::MEDIUM)
-                                                        .child(display),
+                                                    apply_text_step(
+                                                        div(),
+                                                        theme.typography.size_sm,
+                                                    )
+                                                    .font_weight(FontWeight::MEDIUM)
+                                                    .child(display),
                                                 )
                                                 .when(show_raw, |el| {
                                                     el.child(
@@ -2716,11 +2811,7 @@ impl OrbitShell {
                                     .flex()
                                     .items_center()
                                     .gap_1()
-                                    .child(render_icon(
-                                        Icon::Check,
-                                        px(12.0),
-                                        theme.accent.accent,
-                                    ))
+                                    .child(render_icon(Icon::Check, px(12.0), theme.accent.accent))
                                     .child(
                                         apply_text_step(div(), theme.typography.size_xs)
                                             .font_weight(FontWeight::SEMIBOLD)
@@ -3008,11 +3099,7 @@ impl OrbitShell {
             .into_any_element()
     }
 
-    fn render_namespace_list_body(
-        &self,
-        theme: &OrbitTheme,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
+    fn render_namespace_list_body(&self, theme: &OrbitTheme, cx: &mut Context<Self>) -> AnyElement {
         let control_hover = theme.surface.control_hover;
         let filtered = self.namespaces.filtered_namespaces();
         let mut list = div()
@@ -3248,7 +3335,9 @@ impl OrbitShell {
                 });
             }),
             on_toggle_experience_features: std::rc::Rc::new(move |enabled, _window, cx| {
-                exp_entity.update(cx, |shell, cx| shell.toggle_experience_features(enabled, cx));
+                exp_entity.update(cx, |shell, cx| {
+                    shell.toggle_experience_features(enabled, cx)
+                });
             }),
             on_reset_appearance: std::rc::Rc::new(move |window, cx| {
                 reset_entity.update(cx, |shell, cx| shell.reset_appearance_defaults(window, cx));
@@ -3356,12 +3445,13 @@ impl OrbitShell {
             };
 
             let filter_entity = cx.entity().clone();
-            let on_type_filter = move |filter: EventTypeFilter, _window: &mut Window, cx: &mut App| {
-                filter_entity.update(cx, |shell, cx| {
-                    shell.events.set_type_filter(filter);
-                    cx.notify();
-                });
-            };
+            let on_type_filter =
+                move |filter: EventTypeFilter, _window: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.events.set_type_filter(filter);
+                        cx.notify();
+                    });
+                };
 
             let ctx_entity = cx.entity().clone();
             let on_row_context_menu = move |row_key: SharedString,
@@ -3484,67 +3574,68 @@ impl OrbitShell {
             };
 
             let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            deployment: &orbit_core::kubernetes::models::DeploymentInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = deployment.name.clone();
-                let namespace = deployment.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::Deployment {
-                    name: deployment.name.clone(),
-                    namespace: deployment.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
+            let on_row_context_menu =
+                move |row_key: SharedString,
+                      deployment: &orbit_core::kubernetes::models::DeploymentInfo,
+                      event: &MouseDownEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    let name = deployment.name.clone();
+                    let namespace = deployment.namespace.clone();
+                    let drawer_target = ResourceDrawerTarget::Deployment {
+                        name: deployment.name.clone(),
+                        namespace: deployment.namespace.clone(),
+                    };
+                    let anchor = event.position;
+                    let copy_name = move |_w: &mut Window, cx: &mut App| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                    };
+                    let filter_entity = ctx_entity.clone();
+                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                        filter_entity.update(cx, |shell, cx| {
+                            shell.filter_by_namespace(&namespace, cx);
+                        });
+                    };
+                    let refresh_ctx_entity = ctx_entity.clone();
+                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                        refresh_ctx_entity.update(cx, |shell, cx| {
+                            shell.refresh_workspace(cx);
+                        });
+                    };
+                    let details_entity = ctx_entity.clone();
+                    let details_target = drawer_target.clone();
+                    let view_details = move |_w: &mut Window, cx: &mut App| {
+                        details_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                details_target.clone(),
+                                ResourceDrawerTabId::Overview,
+                                cx,
+                            );
+                        });
+                    };
+                    let yaml_entity = ctx_entity.clone();
+                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                        yaml_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                drawer_target.clone(),
+                                ResourceDrawerTabId::Yaml,
+                                cx,
+                            );
+                        });
+                    };
+                    let entries = views::deployments::build_deployment_context_menu_entries(
+                        deployment,
+                        copy_name,
+                        filter_ns,
+                        refresh_cb,
+                        view_details,
+                        view_yaml,
+                    );
+                    ctx_entity.update(cx, |shell, cx| {
+                        shell.deployments.table.selected_row_key = Some(row_key.to_string());
+                        shell.open_context_menu(anchor, entries, cx);
                     });
                 };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let entries = views::deployments::build_deployment_context_menu_entries(
-                    deployment,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.deployments.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
 
             let refresh_entity = cx.entity().clone();
             let on_refresh = move |_window: &mut Window, cx: &mut App| {
@@ -3597,67 +3688,68 @@ impl OrbitShell {
             };
 
             let ctx_entity = cx.entity().clone();
-            let on_row_context_menu = move |row_key: SharedString,
-                                            statefulset: &orbit_core::kubernetes::models::StatefulSetInfo,
-                                            event: &MouseDownEvent,
-                                            _window: &mut Window,
-                                            cx: &mut App| {
-                let name = statefulset.name.clone();
-                let namespace = statefulset.namespace.clone();
-                let drawer_target = ResourceDrawerTarget::StatefulSet {
-                    name: statefulset.name.clone(),
-                    namespace: statefulset.namespace.clone(),
-                };
-                let anchor = event.position;
-                let copy_name = move |_w: &mut Window, cx: &mut App| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
-                };
-                let filter_entity = ctx_entity.clone();
-                let filter_ns = move |_w: &mut Window, cx: &mut App| {
-                    filter_entity.update(cx, |shell, cx| {
-                        shell.filter_by_namespace(&namespace, cx);
+            let on_row_context_menu =
+                move |row_key: SharedString,
+                      statefulset: &orbit_core::kubernetes::models::StatefulSetInfo,
+                      event: &MouseDownEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    let name = statefulset.name.clone();
+                    let namespace = statefulset.namespace.clone();
+                    let drawer_target = ResourceDrawerTarget::StatefulSet {
+                        name: statefulset.name.clone(),
+                        namespace: statefulset.namespace.clone(),
+                    };
+                    let anchor = event.position;
+                    let copy_name = move |_w: &mut Window, cx: &mut App| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                    };
+                    let filter_entity = ctx_entity.clone();
+                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                        filter_entity.update(cx, |shell, cx| {
+                            shell.filter_by_namespace(&namespace, cx);
+                        });
+                    };
+                    let refresh_ctx_entity = ctx_entity.clone();
+                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                        refresh_ctx_entity.update(cx, |shell, cx| {
+                            shell.refresh_workspace(cx);
+                        });
+                    };
+                    let details_entity = ctx_entity.clone();
+                    let details_target = drawer_target.clone();
+                    let view_details = move |_w: &mut Window, cx: &mut App| {
+                        details_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                details_target.clone(),
+                                ResourceDrawerTabId::Overview,
+                                cx,
+                            );
+                        });
+                    };
+                    let yaml_entity = ctx_entity.clone();
+                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                        yaml_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                drawer_target.clone(),
+                                ResourceDrawerTabId::Yaml,
+                                cx,
+                            );
+                        });
+                    };
+                    let entries = views::statefulsets::build_statefulset_context_menu_entries(
+                        statefulset,
+                        copy_name,
+                        filter_ns,
+                        refresh_cb,
+                        view_details,
+                        view_yaml,
+                    );
+                    ctx_entity.update(cx, |shell, cx| {
+                        shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
+                        shell.open_context_menu(anchor, entries, cx);
                     });
                 };
-                let refresh_ctx_entity = ctx_entity.clone();
-                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
-                    refresh_ctx_entity.update(cx, |shell, cx| {
-                        shell.refresh_workspace(cx);
-                    });
-                };
-                let details_entity = ctx_entity.clone();
-                let details_target = drawer_target.clone();
-                let view_details = move |_w: &mut Window, cx: &mut App| {
-                    details_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            details_target.clone(),
-                            ResourceDrawerTabId::Overview,
-                            cx,
-                        );
-                    });
-                };
-                let yaml_entity = ctx_entity.clone();
-                let view_yaml = move |_w: &mut Window, cx: &mut App| {
-                    yaml_entity.update(cx, |shell, cx| {
-                        shell.open_resource_drawer(
-                            drawer_target.clone(),
-                            ResourceDrawerTabId::Yaml,
-                            cx,
-                        );
-                    });
-                };
-                let entries = views::statefulsets::build_statefulset_context_menu_entries(
-                    statefulset,
-                    copy_name,
-                    filter_ns,
-                    refresh_cb,
-                    view_details,
-                    view_yaml,
-                );
-                ctx_entity.update(cx, |shell, cx| {
-                    shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
-                    shell.open_context_menu(anchor, entries, cx);
-                });
-            };
 
             let refresh_entity = cx.entity().clone();
             let on_refresh = move |_window: &mut Window, cx: &mut App| {
@@ -3668,6 +3760,120 @@ impl OrbitShell {
 
             return views::statefulsets::render_statefulsets_view(
                 &self.statefulsets,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::DaemonSets {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.daemonsets.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::DaemonSet {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu =
+                move |row_key: SharedString,
+                      daemonset: &orbit_core::kubernetes::models::DaemonSetInfo,
+                      event: &MouseDownEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    let name = daemonset.name.clone();
+                    let namespace = daemonset.namespace.clone();
+                    let drawer_target = ResourceDrawerTarget::DaemonSet {
+                        name: daemonset.name.clone(),
+                        namespace: daemonset.namespace.clone(),
+                    };
+                    let anchor = event.position;
+                    let copy_name = move |_w: &mut Window, cx: &mut App| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                    };
+                    let filter_entity = ctx_entity.clone();
+                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                        filter_entity.update(cx, |shell, cx| {
+                            shell.filter_by_namespace(&namespace, cx);
+                        });
+                    };
+                    let refresh_ctx_entity = ctx_entity.clone();
+                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                        refresh_ctx_entity.update(cx, |shell, cx| {
+                            shell.refresh_workspace(cx);
+                        });
+                    };
+                    let details_entity = ctx_entity.clone();
+                    let details_target = drawer_target.clone();
+                    let view_details = move |_w: &mut Window, cx: &mut App| {
+                        details_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                details_target.clone(),
+                                ResourceDrawerTabId::Overview,
+                                cx,
+                            );
+                        });
+                    };
+                    let yaml_entity = ctx_entity.clone();
+                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                        yaml_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                drawer_target.clone(),
+                                ResourceDrawerTabId::Yaml,
+                                cx,
+                            );
+                        });
+                    };
+                    let entries = views::daemonsets::build_daemonset_context_menu_entries(
+                        daemonset,
+                        copy_name,
+                        filter_ns,
+                        refresh_cb,
+                        view_details,
+                        view_yaml,
+                    );
+                    ctx_entity.update(cx, |shell, cx| {
+                        shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
+                        shell.open_context_menu(anchor, entries, cx);
+                    });
+                };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::daemonsets::render_daemonsets_view(
+                &self.daemonsets,
                 &self.namespaces,
                 theme,
                 on_sort,
@@ -3774,8 +3980,8 @@ impl OrbitShell {
 
             let type_filter_entity = cx.entity().clone();
             let on_type_filter = move |filter: crate::state::ServiceTypeFilter,
-                                      _window: &mut Window,
-                                      cx: &mut App| {
+                                       _window: &mut Window,
+                                       cx: &mut App| {
                 type_filter_entity.update(cx, |shell, cx| {
                     shell.services.type_filter = filter;
                     cx.notify();
@@ -4450,12 +4656,13 @@ impl OrbitShell {
         }
 
         let nav_entity = cx.entity().clone();
-        let on_navigate =
-            std::rc::Rc::new(move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
+        let on_navigate = std::rc::Rc::new(
+            move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
                 nav_entity.update(cx, |shell, cx| {
                     shell.select_workspace_view(view, cx);
                 });
-            });
+            },
+        );
         let refresh_entity = cx.entity().clone();
         let on_refresh = move |_window: &mut Window, cx: &mut App| {
             refresh_entity.update(cx, |shell, cx| {
@@ -4773,11 +4980,7 @@ impl OrbitShell {
                                     .text_color(theme.text.secondary)
                                     .child(cat_label),
                             )
-                            .child(render_icon(
-                                Icon::ChevronRight,
-                                px(11.0),
-                                theme.text.muted,
-                            ))
+                            .child(render_icon(Icon::ChevronRight, px(11.0), theme.text.muted))
                             .child(
                                 apply_text_step(div(), theme.typography.size_2xs)
                                     .font_weight(FontWeight::MEDIUM)
@@ -4842,11 +5045,7 @@ impl OrbitShell {
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.refresh_workspace(cx);
                             }))
-                            .child(render_icon(
-                                Icon::RefreshCw,
-                                px(12.0),
-                                theme.text.secondary,
-                            )),
+                            .child(render_icon(Icon::RefreshCw, px(12.0), theme.text.secondary)),
                     )
                     .child(
                         div()
@@ -4958,6 +5157,7 @@ impl Render for OrbitShell {
                     &mut this.namespaces,
                     &mut this.deployments,
                     &mut this.statefulsets,
+                    &mut this.daemonsets,
                     &mut this.pods,
                     &mut this.services,
                     &mut this.configmaps,
@@ -5144,7 +5344,10 @@ mod tests {
         );
         let bounds = Bounds::new(
             gpui::point(px(0.0), px(0.0)),
-            size(px(OrbitShell::DEFAULT_WIDTH), px(OrbitShell::DEFAULT_HEIGHT)),
+            size(
+                px(OrbitShell::DEFAULT_WIDTH),
+                px(OrbitShell::DEFAULT_HEIGHT),
+            ),
         );
         let opts = OrbitShell::window_options_for_theme(bounds, &theme);
         assert_eq!(opts.window_decorations, Some(WindowDecorations::Server));
@@ -5235,7 +5438,10 @@ mod tests {
 
         let bounds = Bounds::new(
             gpui::point(px(0.0), px(0.0)),
-            size(px(OrbitShell::DEFAULT_WIDTH), px(OrbitShell::DEFAULT_HEIGHT)),
+            size(
+                px(OrbitShell::DEFAULT_WIDTH),
+                px(OrbitShell::DEFAULT_HEIGHT),
+            ),
         );
         assert_eq!(
             OrbitShell::window_options_for_theme(bounds, &theme_flat).window_background,
@@ -5401,6 +5607,7 @@ mod tests {
         let mut throwaway_namespaces_view = NamespacesViewState::default();
         let mut throwaway_deployments = DeploymentsState::default();
         let mut throwaway_statefulsets = StatefulSetsState::default();
+        let mut throwaway_daemonsets = DaemonSetsState::default();
         let mut throwaway_pods = PodsState::default();
         let mut throwaway_nodes = NodesState::default();
         apply_cluster_event_with_workspace(
@@ -5412,6 +5619,7 @@ mod tests {
             &mut throwaway_namespaces_view,
             &mut throwaway_deployments,
             &mut throwaway_statefulsets,
+            &mut throwaway_daemonsets,
             &mut throwaway_pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5490,7 +5698,8 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_cluster_event_dispatches_overview_and_namespaces_on_connect_and_resets_on_unreachable() {
+    fn test_apply_cluster_event_dispatches_overview_and_namespaces_on_connect_and_resets_on_unreachable()
+     {
         use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
         use orbit_core::kubernetes::models::{NamespaceInfo, UserProfileInfo};
         use orbit_core::kubernetes::overview::{ClusterOverallHealth, ClusterOverviewSummary};
@@ -5506,6 +5715,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::from_config(&config);
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5537,6 +5747,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5575,6 +5786,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5599,6 +5811,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5638,6 +5851,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5743,6 +5957,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5755,6 +5970,7 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
+                &mut daemonsets,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -5765,7 +5981,10 @@ mod tests {
             ),
             Some(ClusterBridgeCommand::LoadPods { .. })
         ));
-        assert_eq!(deployments.status, crate::state::DeploymentsLoadStatus::Idle);
+        assert_eq!(
+            deployments.status,
+            crate::state::DeploymentsLoadStatus::Idle
+        );
         assert_eq!(sidebar.active_view, WorkspaceView::Pods);
 
         // Navigating to Deployments while connected & Idle triggers LoadDeployments once.
@@ -5776,6 +5995,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5805,6 +6025,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5821,10 +6042,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -5844,6 +6066,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5875,6 +6098,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5883,11 +6107,16 @@ mod tests {
             &mut EventsState::default(),
             connect_event.clone(),
         );
-        assert!(!cmds
-            .iter()
-            .any(|c| matches!(c, ClusterBridgeCommand::LoadDeployments { .. })));
+        assert!(
+            !cmds
+                .iter()
+                .any(|c| matches!(c, ClusterBridgeCommand::LoadDeployments { .. }))
+        );
         assert_eq!(deployments.cluster_id.as_deref(), Some("prod-ctx"));
-        assert_eq!(deployments.status, crate::state::DeploymentsLoadStatus::Idle);
+        assert_eq!(
+            deployments.status,
+            crate::state::DeploymentsLoadStatus::Idle
+        );
 
         // Connect while already on Deployments: fires LoadDeployments eagerly.
         sidebar.select_view(WorkspaceView::Deployments);
@@ -5900,6 +6129,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5923,6 +6153,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5949,7 +6180,10 @@ mod tests {
             },
         );
         assert!(deployments.cluster_id.is_none());
-        assert_eq!(deployments.status, crate::state::DeploymentsLoadStatus::Idle);
+        assert_eq!(
+            deployments.status,
+            crate::state::DeploymentsLoadStatus::Idle
+        );
     }
 
     #[test]
@@ -5962,6 +6196,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6001,6 +6236,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6025,6 +6261,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6055,6 +6292,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6086,6 +6324,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6096,6 +6335,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6122,6 +6362,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6138,10 +6379,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -6161,6 +6403,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6193,6 +6436,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6201,9 +6445,11 @@ mod tests {
             &mut EventsState::default(),
             connect_event.clone(),
         );
-        assert!(!cmds
-            .iter()
-            .any(|c| matches!(c, ClusterBridgeCommand::LoadNodes { .. })));
+        assert!(
+            !cmds
+                .iter()
+                .any(|c| matches!(c, ClusterBridgeCommand::LoadNodes { .. }))
+        );
         assert_eq!(nodes.cluster_id.as_deref(), Some("prod-ctx"));
         assert_eq!(nodes.status, crate::state::NodesLoadStatus::Idle);
 
@@ -6218,6 +6464,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6241,6 +6488,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6280,6 +6528,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6324,6 +6573,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6348,6 +6598,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6375,6 +6626,7 @@ mod tests {
             &mut NamespacesViewState::default(),
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6403,6 +6655,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6413,6 +6666,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6438,6 +6692,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6454,10 +6709,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -6475,10 +6731,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -6499,6 +6756,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6512,6 +6770,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6549,6 +6808,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6589,6 +6849,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6600,6 +6861,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6626,6 +6888,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6642,10 +6905,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -6663,10 +6927,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -6687,6 +6952,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6701,6 +6967,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6745,6 +7012,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6786,6 +7054,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6904,9 +7173,11 @@ mod tests {
             |_, _| {},
             |_, _| {},
         );
-        assert!(dep_entries
-            .iter()
-            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(
+            dep_entries
+                .iter()
+                .any(|e| matches!(e, ContextMenuEntry::Separator))
+        );
         assert!(dep_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-name" && !item.disabled
@@ -6962,9 +7233,11 @@ mod tests {
             |_, _| {},
             |_, _| {},
         );
-        assert!(node_entries
-            .iter()
-            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(
+            node_entries
+                .iter()
+                .any(|e| matches!(e, ContextMenuEntry::Separator))
+        );
         assert!(node_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-name" && !item.disabled
@@ -7000,9 +7273,11 @@ mod tests {
             |_, _| {},
             |_, _| {},
         );
-        assert!(ns_entries
-            .iter()
-            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(
+            ns_entries
+                .iter()
+                .any(|e| matches!(e, ContextMenuEntry::Separator))
+        );
         assert!(ns_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "filter-namespace" && !item.disabled
@@ -7045,9 +7320,11 @@ mod tests {
             |_, _| {},
             |_, _| {},
         );
-        assert!(ev_entries
-            .iter()
-            .any(|e| matches!(e, ContextMenuEntry::Separator)));
+        assert!(
+            ev_entries
+                .iter()
+                .any(|e| matches!(e, ContextMenuEntry::Separator))
+        );
         assert!(ev_entries.iter().any(|e| matches!(
             e,
             ContextMenuEntry::Item(item) if item.id.as_ref() == "copy-object" && !item.disabled
@@ -7076,10 +7353,9 @@ mod tests {
         deployments.table.selected_row_key = Some("default/api".to_string());
         deployments.table.toggle_sort("name");
         let mut namespaces = NamespaceFilterState::default();
-        namespaces.selected_by_cluster.insert(
-            "c1".to_string(),
-            vec!["default".to_string()],
-        );
+        namespaces
+            .selected_by_cluster
+            .insert("c1".to_string(), vec!["default".to_string()]);
 
         let mut drawer = ResourceDrawerState::default();
         let _ = drawer.open_or_switch(
@@ -7159,6 +7435,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7172,6 +7449,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7185,9 +7463,11 @@ mod tests {
             c,
             ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "c1"
         )));
-        assert!(cmds1
-            .iter()
-            .any(|c| matches!(c, ClusterBridgeCommand::SaveWorkspaceTabs { .. })));
+        assert!(
+            cmds1
+                .iter()
+                .any(|c| matches!(c, ClusterBridgeCommand::SaveWorkspaceTabs { .. }))
+        );
 
         let cmds2 = select_workspace_view_with_tabs(
             &state,
@@ -7196,6 +7476,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7217,6 +7498,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7258,6 +7540,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7272,6 +7555,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7316,6 +7600,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7359,6 +7644,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7377,6 +7663,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7401,6 +7688,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7424,6 +7712,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7452,10 +7741,11 @@ mod tests {
                 &mut namespaces,
                 &mut deployments,
                 &mut statefulsets,
-            &mut pods,
-            &mut ServicesState::default(),
-            &mut ConfigMapsState::default(),
-            &mut SecretsState::default(),
+                &mut daemonsets,
+                &mut pods,
+                &mut ServicesState::default(),
+                &mut ConfigMapsState::default(),
+                &mut SecretsState::default(),
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -7509,6 +7799,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7522,6 +7813,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7548,6 +7840,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods_on_connect,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7588,6 +7881,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7604,6 +7898,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7630,6 +7925,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7654,6 +7950,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7719,7 +8016,10 @@ mod tests {
         assert!(delete_item.danger);
     }
 
-    fn make_test_service(name: &str, namespace: &str) -> orbit_core::kubernetes::models::ServiceInfo {
+    fn make_test_service(
+        name: &str,
+        namespace: &str,
+    ) -> orbit_core::kubernetes::models::ServiceInfo {
         orbit_core::kubernetes::models::ServiceInfo {
             name: name.to_string(),
             namespace: namespace.to_string(),
@@ -7755,6 +8055,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -7769,6 +8070,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7796,6 +8098,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services_on_connect,
             &mut ConfigMapsState::default(),
@@ -7836,6 +8139,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -7854,6 +8158,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7878,6 +8183,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7904,6 +8210,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7929,6 +8236,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -7936,7 +8244,11 @@ mod tests {
 
         services.begin_load_for_cluster("old-ctx");
         let gen1 = services.generation;
-        services.apply_loaded("old-ctx", gen1, vec![make_test_service("old-svc", "default")]);
+        services.apply_loaded(
+            "old-ctx",
+            gen1,
+            vec![make_test_service("old-svc", "default")],
+        );
         assert_eq!(services.services.len(), 1);
 
         // Connecting to a new cluster while on another view resets services for that cluster
@@ -7950,6 +8262,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -7989,6 +8302,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8026,7 +8340,8 @@ mod tests {
             name: "api-svc".to_string(),
             namespace: "prod".to_string(),
         };
-        let yaml_cmd = drawer.open_or_switch(Some("prod-ctx"), target.clone(), ResourceDrawerTabId::Yaml);
+        let yaml_cmd =
+            drawer.open_or_switch(Some("prod-ctx"), target.clone(), ResourceDrawerTabId::Yaml);
         assert!(yaml_cmd.is_some());
         assert!(drawer.is_open);
         assert_eq!(drawer.target, Some(target));
@@ -8052,7 +8367,10 @@ mod tests {
         assert!(delete_item.danger);
     }
 
-    fn make_test_configmap(name: &str, namespace: &str) -> orbit_core::kubernetes::models::ConfigMapInfo {
+    fn make_test_configmap(
+        name: &str,
+        namespace: &str,
+    ) -> orbit_core::kubernetes::models::ConfigMapInfo {
         orbit_core::kubernetes::models::ConfigMapInfo {
             name: name.to_string(),
             namespace: namespace.to_string(),
@@ -8082,6 +8400,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8095,6 +8414,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8126,6 +8446,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8145,6 +8466,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8169,6 +8491,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8197,6 +8520,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8226,6 +8550,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8260,6 +8585,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8282,6 +8608,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8319,11 +8646,8 @@ mod tests {
             name: "app-config".to_string(),
             namespace: "prod".to_string(),
         };
-        let yaml_cmd = drawer.open_or_switch(
-            Some("prod-ctx"),
-            target.clone(),
-            ResourceDrawerTabId::Yaml,
-        );
+        let yaml_cmd =
+            drawer.open_or_switch(Some("prod-ctx"), target.clone(), ResourceDrawerTabId::Yaml);
         assert!(yaml_cmd.is_some());
         assert!(drawer.is_open);
         assert_eq!(drawer.target, Some(target));
@@ -8390,6 +8714,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8404,6 +8729,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8432,6 +8758,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8452,6 +8779,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8476,6 +8804,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8501,6 +8830,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8530,6 +8860,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8565,6 +8896,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8587,6 +8919,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8624,11 +8957,8 @@ mod tests {
             name: "db-creds".to_string(),
             namespace: "prod".to_string(),
         };
-        let yaml_cmd = drawer.open_or_switch(
-            Some("prod-ctx"),
-            target.clone(),
-            ResourceDrawerTabId::Yaml,
-        );
+        let yaml_cmd =
+            drawer.open_or_switch(Some("prod-ctx"), target.clone(), ResourceDrawerTabId::Yaml);
         assert!(yaml_cmd.is_some());
         assert!(drawer.is_open);
         assert_eq!(drawer.target, Some(target));
@@ -8689,7 +9019,10 @@ mod tests {
         assert!(reloaded.enable_experience_features());
     }
 
-    fn make_test_statefulset(name: &str, namespace: &str) -> orbit_core::kubernetes::models::StatefulSetInfo {
+    fn make_test_statefulset(
+        name: &str,
+        namespace: &str,
+    ) -> orbit_core::kubernetes::models::StatefulSetInfo {
         orbit_core::kubernetes::models::StatefulSetInfo {
             kind: "StatefulSet".to_string(),
             name: name.to_string(),
@@ -8722,6 +9055,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8736,6 +9070,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8764,6 +9099,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8783,6 +9119,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8811,6 +9148,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8843,6 +9181,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8859,6 +9198,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8893,13 +9233,13 @@ mod tests {
 
     #[test]
     fn test_selecting_workloads_overview_dispatches_load_and_applies_snapshot_lifecycle() {
+        use crate::state::WorkloadsOverviewLoadStatus;
         use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
         use orbit_core::kubernetes::models::UserProfileInfo;
         use orbit_core::kubernetes::workloads_overview::{
             WorkloadHealthItem, WorkloadHealthStatus, WorkloadKindSnapshot,
             WorkloadsOverviewSnapshot,
         };
-        use crate::state::WorkloadsOverviewLoadStatus;
 
         let mut switcher = ClusterSwitcherState::new();
         switcher.connection_state = ClusterConnectionState::Connected {
@@ -8916,6 +9256,7 @@ mod tests {
         let mut namespaces_view = NamespacesViewState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8931,6 +9272,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8972,6 +9314,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8996,6 +9339,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9024,6 +9368,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9050,6 +9395,7 @@ mod tests {
             &mut namespaces_view,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9096,6 +9442,7 @@ mod tests {
         let mut namespaces = NamespaceFilterState::default();
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9113,6 +9460,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9132,6 +9480,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9156,6 +9505,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9180,6 +9530,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9196,7 +9547,7 @@ mod tests {
             ClusterBridgeCommand::LoadStatefulSets { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
 
-        // Navigate to DaemonSets (unimplemented list view — activates tab without panicking)
+        // Navigate to DaemonSets
         let ds_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
@@ -9204,6 +9555,7 @@ mod tests {
             &mut namespaces,
             &mut deployments,
             &mut statefulsets,
+            &mut daemonsets,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9215,11 +9567,232 @@ mod tests {
         );
         assert_eq!(sidebar.active_view, WorkspaceView::DaemonSets);
         assert_eq!(tabs.active_tab(), Some(WorkspaceView::DaemonSets));
-        assert!(!ds_cmds.iter().any(|c| matches!(
+        assert!(ds_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadDaemonSets { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+
+        // Navigate to ReplicaSets (unimplemented list view — activates tab without panicking)
+        let rs_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::ReplicaSets,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::ReplicaSets);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::ReplicaSets));
+        assert!(!rs_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadPods { .. }
                 | ClusterBridgeCommand::LoadDeployments { .. }
                 | ClusterBridgeCommand::LoadStatefulSets { .. }
+                | ClusterBridgeCommand::LoadDaemonSets { .. }
+        )));
+    }
+
+    fn make_test_daemonset(
+        name: &str,
+        namespace: &str,
+    ) -> orbit_core::kubernetes::models::DaemonSetInfo {
+        orbit_core::kubernetes::models::DaemonSetInfo {
+            kind: "DaemonSet".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::DaemonSetReplicas {
+                desired: 3,
+                current: 3,
+                ready: 3,
+                up_to_date: 3,
+                available: 3,
+            },
+            age: "1d".to_string(),
+            images: vec!["fluent/fluent-bit:3.0".to_string()],
+            containers: vec![orbit_core::kubernetes::models::ContainerImageInfo {
+                name: "fluent-bit".to_string(),
+                image: "fluent/fluent-bit:3.0".to_string(),
+            }],
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_selecting_daemonsets_view_dispatches_load_and_applies_events() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: Some("v1.31.0".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            WorkspaceView::DaemonSets,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::DaemonSets);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadDaemonSets {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+
+        let ds = make_test_daemonset("fluent-bit", "logging");
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::DaemonSetsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                daemonsets: vec![ds],
+            },
+        );
+        assert_eq!(daemonsets.daemonsets.len(), 1);
+        assert_eq!(
+            daemonsets.status,
+            crate::state::DaemonSetsLoadStatus::Loaded
+        );
+
+        let _ = daemonsets.begin_refresh();
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::DaemonSetsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(daemonsets.status, crate::state::DaemonSetsLoadStatus::Error);
+        assert_eq!(daemonsets.error_message.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn test_connecting_while_on_daemonsets_view_dispatches_load_daemonsets() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.select_view(WorkspaceView::DaemonSets);
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.0".to_string()),
+                    error_message: None,
+                },
+                clusters: Vec::new(),
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("prod".to_string()),
+                    server_url: Some("https://10.0.0.10:6443".to_string()),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.0".to_string()),
+                },
+            },
+        );
+
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadDaemonSets { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
     }
 }

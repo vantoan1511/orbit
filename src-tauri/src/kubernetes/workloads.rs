@@ -8,80 +8,9 @@ use k8s_openapi::api::batch::v1::{CronJob, Job};
 use crate::kubernetes::{models, format_age};
 
 pub use orbit_core::kubernetes::workloads::{
-    list_deployments, list_pods, list_statefulsets, map_deployment, map_pod, map_statefulset,
+    list_daemonsets, list_deployments, list_pods, list_statefulsets, map_daemonset, map_deployment,
+    map_pod, map_statefulset,
 };
-
-pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
-    let name = ds.metadata.name.clone().unwrap_or_default();
-    let namespace_name = ds.metadata.namespace.clone().unwrap_or_default();
-    let age = format_age(&ds.metadata.creation_timestamp);
-
-    let status_ds = ds.status.as_ref();
-    let desired = status_ds.map(|s| s.desired_number_scheduled).unwrap_or(0);
-    let current = status_ds.map(|s| s.current_number_scheduled).unwrap_or(0);
-    let ready = status_ds.map(|s| s.number_ready).unwrap_or(0);
-    let up_to_date = status_ds.and_then(|s| s.updated_number_scheduled).unwrap_or(0);
-    let available = status_ds.and_then(|s| s.number_available).unwrap_or(0);
-
-    let replicas = models::DaemonSetReplicas {
-        desired,
-        current,
-        ready,
-        up_to_date,
-        available,
-    };
-
-    let status = if desired == ready {
-        "Running".to_string()
-    } else {
-        "Progressing".to_string()
-    };
-
-    let mut images = Vec::new();
-    let mut containers = Vec::new();
-    if let Some(spec) = ds.spec.as_ref() {
-        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-            if let Some(img) = &c.image {
-                images.push(img.clone());
-            }
-            containers.push(models::ContainerImageInfo {
-                name: c.name.clone(),
-                image: c.image.clone().unwrap_or_default(),
-            });
-        }
-    }
-
-    let labels = ds.metadata.labels.clone().unwrap_or_default();
-    let annotations = ds.metadata.annotations.clone().unwrap_or_default();
-
-    models::DaemonSetInfo {
-        kind: "DaemonSet".to_string(),
-        name,
-        namespace: namespace_name,
-        status,
-        replicas,
-        age,
-        images,
-        containers,
-        labels,
-        annotations,
-    }
-}
-
-pub async fn list_daemonsets(client: &Client, namespace: Option<String>) -> Result<Vec<models::DaemonSetInfo>, kube::Error> {
-    let api: Api<DaemonSet> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let mut list = Vec::new();
-    for ds in api.list(&ListParams::default()).await? {
-        list.push(map_daemonset(&ds));
-    }
-
-    Ok(list)
-}
 
 pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
     let name = rs.metadata.name.clone().unwrap_or_default();
