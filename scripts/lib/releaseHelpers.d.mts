@@ -72,6 +72,7 @@ export function buildPrBody(
   currentVersion: string,
   baseBranch: string
 ): string
+export function updateCargoManifestVersion(content: string, newVersion: string): string
 export function resolvePreviousTag(
   targetVersion: string,
   mergedTags?: string[],

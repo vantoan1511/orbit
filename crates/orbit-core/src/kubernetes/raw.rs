@@ -289,7 +289,7 @@ pub async fn get_resource_raw(
 }
 
 pub fn format_raw_resource_yaml(value: &Value) -> Result<String, String> {
-    serde_yaml::to_string(value).map_err(|e| format!("Failed to format YAML: {e}"))
+    serde_yaml_ng::to_string(value).map_err(|e| format!("Failed to format YAML: {e}"))
 }
 
 pub async fn fetch_resource_yaml(
@@ -401,6 +401,20 @@ mod tests {
         assert!(yaml.contains("kind: Deployment"));
         assert!(yaml.contains("metadata:"));
         assert!(yaml.contains("spec:"));
+    }
+
+    #[test]
+    fn format_raw_resource_yaml_serializes_json_value_to_yaml() {
+        let value = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": { "name": "demo" }
+        });
+
+        let yaml = format_raw_resource_yaml(&value).expect("should serialize Pod JSON to YAML");
+        assert!(yaml.contains("apiVersion: v1"));
+        assert!(yaml.contains("kind: Pod"));
+        assert!(yaml.contains("name: demo"));
     }
 
     #[test]

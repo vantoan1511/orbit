@@ -10,6 +10,7 @@ import {
   resolveBaseBranch,
   buildPrBranchName,
   buildPrBody,
+  updateCargoManifestVersion,
   resolvePreviousTag,
   hasWhatsChangedSection,
   categorizeCommitPrefix,
@@ -148,6 +149,69 @@ describe('Shared Release Helpers & Semver Contracts', () => {
     const body = buildPrBody('0.18.3', '0.18.2', 'hotfix/v0.18.2')
     assert.ok(body.includes('Upon merging this PR into `hotfix/v0.18.2`:'))
     assert.ok(!body.includes('into `main`'))
+  })
+
+  it('updateCargoManifestVersion updates [workspace.package] version in root Cargo.toml and rejects missing version', () => {
+    const rootManifest = [
+      '[workspace]',
+      'members = ["crates/orbit-core", "src-tauri", "src-gpui"]',
+      'resolver = "2"',
+      '',
+      '[workspace.package]',
+      'version = "0.19.1"',
+      'edition = "2024"',
+      '',
+      '[workspace.dependencies]',
+      'serde = "1.0"',
+      ''
+    ].join('\n')
+
+    const updated = updateCargoManifestVersion(rootManifest, '0.19.2')
+    assert.equal(updated, rootManifest.replace('version = "0.19.1"', 'version = "0.19.2"'))
+
+    const inheritedMemberManifest = [
+      '[package]',
+      'name = "orbit-app"',
+      'version.workspace = true',
+      'edition.workspace = true',
+      ''
+    ].join('\n')
+
+    assert.throws(() => updateCargoManifestVersion(inheritedMemberManifest, '0.19.2'), /version/i)
+
+    const prBody = buildPrBody('0.19.2', '0.19.1', 'main')
+    assert.ok(prBody.includes('- `Cargo.toml`'))
+    assert.ok(!prBody.includes('`src-tauri/Cargo.toml`'))
+  })
+
+  it('root Cargo.toml centralizes [workspace.package], [workspace.dependencies], [workspace.lints.clippy] and clippy.toml allows test unwrap/expect', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+    const cargoToml = fs.readFileSync(path.resolve('Cargo.toml'), 'utf8')
+    const clippyTomlPath = path.resolve('clippy.toml')
+
+    assert.ok(
+      cargoToml.includes('[workspace.package]'),
+      'Cargo.toml must define [workspace.package]'
+    )
+    assert.ok(
+      cargoToml.includes(`version = "${pkg.version}"`),
+      `Cargo.toml [workspace.package] version must match package.json (${pkg.version})`
+    )
+    assert.ok(
+      cargoToml.includes('[workspace.dependencies]'),
+      'Cargo.toml must define [workspace.dependencies]'
+    )
+    assert.ok(
+      cargoToml.includes('[workspace.lints.clippy]'),
+      'Cargo.toml must define [workspace.lints.clippy]'
+    )
+    assert.ok(cargoToml.includes('unwrap_used = "deny"'))
+    assert.ok(cargoToml.includes('expect_used = "deny"'))
+
+    assert.ok(fs.existsSync(clippyTomlPath), 'clippy.toml must exist at workspace root')
+    const clippyToml = fs.readFileSync(clippyTomlPath, 'utf8')
+    assert.ok(clippyToml.includes('allow-unwrap-in-tests = true'))
+    assert.ok(clippyToml.includes('allow-expect-in-tests = true'))
   })
 
   it('release.yml supports release/**, hotfix/**, v* tags, existing-tag skip guard, and action-gh-release@v2 make_latest', () => {

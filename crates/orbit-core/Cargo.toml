@@ -1,22 +1,26 @@
 [package]
 name = "orbit-core"
-version = "0.19.1"
+version.workspace = true
 description = "Shared Kubernetes and configuration core for Orbit"
-authors = ["Toan Nguyen"]
-edition = "2024"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 
 [features]
 test-utils = []
 
 [dependencies]
-base64 = "0.22.1"
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-http = "1"
-k8s-openapi = { version = "0.24.0", features = ["latest"] }
-kube = { version = "0.98.0", features = ["runtime", "derive", "client", "ws"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.9.34"
-tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
-tracing = "0.1"
-uuid = { version = "1.0", features = ["v4"] }
+base64.workspace = true
+chrono.workspace = true
+http.workspace = true
+k8s-openapi.workspace = true
+kube = { workspace = true, default-features = true, features = ["runtime", "derive", "client", "ws"] }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+tokio = { workspace = true, features = ["rt"] }
+tracing.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true
