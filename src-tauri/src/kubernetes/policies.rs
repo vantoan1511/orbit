@@ -169,7 +169,7 @@ pub fn format_network_policy(p: &NetworkPolicy) -> PolicyInfo {
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_yaml::to_string(&p.spec).unwrap_or_default();
+    let rules = serde_yaml_ng::to_string(&p.spec).unwrap_or_default();
 
     let mode = match p.spec.as_ref().and_then(|s| s.policy_types.as_ref()) {
         Some(types) if !types.is_empty() => types.join(", "),
@@ -240,7 +240,7 @@ pub fn format_resource_quota(p: &ResourceQuota) -> PolicyInfo {
         "spec": &p.spec,
         "status": &p.status,
     });
-    let rules = serde_yaml::to_string(&quota_payload).unwrap_or_default();
+    let rules = serde_yaml_ng::to_string(&quota_payload).unwrap_or_default();
 
     let mut violations = 0;
     let hard_count = hard.map(|h| h.len()).unwrap_or(0);
@@ -279,7 +279,7 @@ pub fn format_limit_range(p: &LimitRange) -> PolicyInfo {
     let ns = p.metadata.namespace.clone().unwrap_or_else(|| "-".to_string());
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_yaml::to_string(&p.spec).unwrap_or_default();
+    let rules = serde_yaml_ng::to_string(&p.spec).unwrap_or_default();
 
     let limits = p.spec.as_ref().map(|s| s.limits.as_slice()).unwrap_or_default();
     let (status, mode, description) = if limits.is_empty() {
@@ -315,7 +315,7 @@ pub fn format_val_webhook(p: &ValidatingWebhookConfiguration) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_yaml::to_string(&p.webhooks).unwrap_or_default();
+    let rules = serde_yaml_ng::to_string(&p.webhooks).unwrap_or_default();
 
     let webhooks = p.webhooks.as_deref().unwrap_or_default();
     let count = webhooks.len();
@@ -352,7 +352,7 @@ pub fn format_mut_webhook(p: &MutatingWebhookConfiguration) -> PolicyInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
     let uid = p.metadata.uid.clone().unwrap_or_default();
     let age = format_age(&p.metadata.creation_timestamp);
-    let rules = serde_yaml::to_string(&p.webhooks).unwrap_or_default();
+    let rules = serde_yaml_ng::to_string(&p.webhooks).unwrap_or_default();
 
     let webhooks = p.webhooks.as_deref().unwrap_or_default();
     let count = webhooks.len();
@@ -432,7 +432,7 @@ pub fn format_pod_security_namespace(ns: &Namespace) -> Option<PolicyInfo> {
         .filter(|(k, _)| k.starts_with("pod-security.kubernetes.io/"))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect();
-    let rules = serde_yaml::to_string(&psa_labels).unwrap_or_default();
+    let rules = serde_yaml_ng::to_string(&psa_labels).unwrap_or_default();
 
     Some(PolicyInfo {
         uid,
@@ -750,5 +750,76 @@ mod tests {
         assert!(info.rules.contains("used:"), "rules should contain used:");
         assert!(info.rules.contains("4"), "rules should contain 4");
         assert!(info.rules.contains("2Gi"), "rules should contain 2Gi");
+    }
+
+    #[test]
+    fn test_policy_formatters_serialize_rules_to_yaml() {
+        use k8s_openapi::api::admissionregistration::v1::{MutatingWebhook, ValidatingWebhook};
+        use k8s_openapi::api::core::v1::{LimitRangeItem, LimitRangeSpec};
+        use k8s_openapi::api::networking::v1::NetworkPolicySpec;
+        use std::collections::BTreeMap;
+
+        let netpol = NetworkPolicy {
+            metadata: ObjectMeta {
+                name: Some("yaml-netpol".to_string()),
+                ..Default::default()
+            },
+            spec: Some(NetworkPolicySpec {
+                policy_types: Some(vec!["Ingress".to_string()]),
+                ..Default::default()
+            }),
+        };
+        assert!(format_network_policy(&netpol).rules.contains("policyTypes:"));
+
+        let limit_range = LimitRange {
+            metadata: ObjectMeta {
+                name: Some("yaml-limit".to_string()),
+                ..Default::default()
+            },
+            spec: Some(LimitRangeSpec {
+                limits: vec![LimitRangeItem {
+                    type_: "Container".to_string(),
+                    ..Default::default()
+                }],
+            }),
+        };
+        assert!(format_limit_range(&limit_range).rules.contains("Container"));
+
+        let val_wh = ValidatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("yaml-val".to_string()),
+                ..Default::default()
+            },
+            webhooks: Some(vec![ValidatingWebhook {
+                name: "val.example.com".to_string(),
+                ..Default::default()
+            }]),
+        };
+        assert!(format_val_webhook(&val_wh).rules.contains("val.example.com"));
+
+        let mut_wh = MutatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("yaml-mut".to_string()),
+                ..Default::default()
+            },
+            webhooks: Some(vec![MutatingWebhook {
+                name: "mut.example.com".to_string(),
+                ..Default::default()
+            }]),
+        };
+        assert!(format_mut_webhook(&mut_wh).rules.contains("mut.example.com"));
+
+        let mut labels = BTreeMap::new();
+        labels.insert("pod-security.kubernetes.io/enforce".to_string(), "restricted".to_string());
+        let ns = Namespace {
+            metadata: ObjectMeta {
+                name: Some("yaml-psa".to_string()),
+                labels: Some(labels),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let psa = format_pod_security_namespace(&ns).expect("should format PSA policy");
+        assert!(psa.rules.contains("pod-security.kubernetes.io/enforce: restricted"));
     }
 }

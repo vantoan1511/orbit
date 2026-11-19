@@ -223,7 +223,7 @@ Release preparation for Orbit **v${targetVersion}**.
 - Bumps version from \`${currentVersion}\` to \`${targetVersion}\` in:
   - \`package.json\`
   - \`src-tauri/tauri.conf.json\`
-  - \`src-tauri/Cargo.toml\`
+  - \`Cargo.toml\`
 - Synchronizes lockfiles (\`package-lock.json\` and \`Cargo.lock\`).
 - Verified TypeScript checks via \`npm run type-check\`.
 
@@ -235,6 +235,47 @@ Upon merging this PR into \`${baseBranch}\`:
 3. Git tag \`v${targetVersion}\` and GitHub Release notes will be published (with automatic semver \`make_latest\` gating).
 4. Automated WinGet package submission workflow will be dispatched (skipped automatically for prereleases or older hotfix versions).
 `
+}
+
+/**
+ * Update the literal `version = "..."` field inside `[workspace.package]` (or `[package]`) in a Cargo.toml manifest.
+ * @param {string} content
+ * @param {string} newVersion
+ * @returns {string}
+ */
+export function updateCargoManifestVersion(content, newVersion) {
+  if (typeof content !== 'string') {
+    throw new Error('Cargo manifest content must be a string.')
+  }
+
+  const parts = content.split(/(\r?\n)/)
+  let inTargetSection = false
+  let updated = false
+
+  for (let i = 0; i < parts.length; i += 2) {
+    const line = parts[i]
+    const trimmed = line.trim()
+    if (/^\[.+\]$/.test(trimmed)) {
+      inTargetSection = trimmed === '[workspace.package]' || trimmed === '[package]'
+      continue
+    }
+    if (inTargetSection) {
+      const match = line.match(/^(\s*version\s*=\s*")([^"]+)(".*)$/)
+      if (match) {
+        parts[i] = `${match[1]}${newVersion}${match[3]}`
+        updated = true
+        break
+      }
+    }
+  }
+
+  if (!updated) {
+    throw new Error(
+      'Could not find literal `version = "..."` inside [workspace.package] or [package] in Cargo manifest.'
+    )
+  }
+
+  return parts.join('')
 }
 
 export const RELEASE_CATEGORY_ORDER = [

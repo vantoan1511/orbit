@@ -1,7 +1,9 @@
 [package]
 name = "orbit-gpui"
-version = "0.19.1"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+rust-version.workspace = true
 
 [[bin]]
 name = "orbit"
@@ -10,14 +12,17 @@ path = "src/main.rs"
 [dependencies]
 gpui = "0.2.2"
 lucide-icons = "1.72"
-orbit-core = { path = "../crates/orbit-core" }
-serde_json = "1.0"
-tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros"] }
-tracing = "0.1"
+orbit-core.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
-kube = { version = "0.98.0", default-features = false }
-orbit-core = { path = "../crates/orbit-core", features = ["test-utils"] }
+kube.workspace = true
+orbit-core = { workspace = true, features = ["test-utils"] }
 
 [target.'cfg(windows)'.build-dependencies]
 tauri-winres = "0.3.6"
+
+[lints]
+workspace = true

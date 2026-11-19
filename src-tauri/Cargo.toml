@@ -1,9 +1,10 @@
 [package]
 name = "orbit-app"
-version = "0.19.1"
+version.workspace = true
 description = "Orbit - Kubernetes Desktop Application"
-authors = ["Toan Nguyen"]
-edition = "2024"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 
 [lib]
 name = "orbit_app_lib"
@@ -13,31 +14,30 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-orbit-core = { path = "../crates/orbit-core" }
+orbit-core.workspace = true
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-store = "2"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1", features = ["full"] }
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt", "fs", "io-util", "process"] }
 async-trait = "0.1"
-tracing = "0.1"
+tracing.workspace = true
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-log = "0.2"
-uuid = { version = "1.0", features = ["v4"] }
-urlencoding = "2.1"
+uuid.workspace = true
 futures-util = "0.3"
-http = "1"
-kube = { version = "0.98.0", features = ["runtime", "derive", "client", "ws"] }
+http.workspace = true
+kube = { workspace = true, default-features = true, features = ["runtime", "derive", "client", "ws"] }
 portable-pty = "0.8"
-k8s-openapi = { version = "0.24.0", features = ["latest"] }
-chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
-base64 = "0.22.1"
-serde_yaml = "0.9.34"
-reqwest = { version = "0.13.4", default-features = false, features = ["native-tls", "json", "blocking"] }
+k8s-openapi.workspace = true
+chrono.workspace = true
+base64.workspace = true
+serde_yaml_ng.workspace = true
+reqwest = { version = "0.13.4", default-features = false, features = ["native-tls", "json"] }
 semver = "1.0.28"
 
 [target.'cfg(windows)'.dependencies]
@@ -49,5 +49,8 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [dev-dependencies]
-orbit-core = { path = "../crates/orbit-core", features = ["test-utils"] }
+orbit-core = { workspace = true, features = ["test-utils"] }
+
+[lints]
+workspace = true
 
