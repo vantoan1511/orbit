@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use orbit_core::kubernetes::batch::fetch_jobs;
 use orbit_core::kubernetes::configmaps::fetch_configmaps;
 use orbit_core::kubernetes::events::fetch_events;
 use orbit_core::kubernetes::manager::KubeManager;
@@ -295,6 +296,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::DaemonSetsLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadJobs {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_jobs(&client, None).await {
+                        Ok(jobs) => {
+                            let _ = tx.send(ClusterBridgeEvent::JobsLoaded {
+                                cluster_id,
+                                generation,
+                                jobs,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::JobsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::JobsLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -1252,6 +1290,39 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected WorkloadsOverviewLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_jobs_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadJobs {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 13,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected JobsLoadFailed event");
+        match event {
+            ClusterBridgeEvent::JobsLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 13);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected JobsLoadFailed, got {other:?}"),
         }
     }
 }

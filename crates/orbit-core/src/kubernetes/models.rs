@@ -90,7 +90,6 @@ pub struct UserProfileInfo {
     pub k8s_version: Option<String>,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Replicas {
     pub current: i32,
@@ -107,12 +106,24 @@ pub struct DaemonSetReplicas {
     pub available: i32,
 }
 
-fn default_deployment_kind() -> String { "Deployment".to_string() }
-fn default_statefulset_kind() -> String { "StatefulSet".to_string() }
-fn default_daemonset_kind() -> String { "DaemonSet".to_string() }
-fn default_replicaset_kind() -> String { "ReplicaSet".to_string() }
-fn default_job_kind() -> String { "Job".to_string() }
-fn default_cronjob_kind() -> String { "CronJob".to_string() }
+fn default_deployment_kind() -> String {
+    "Deployment".to_string()
+}
+fn default_statefulset_kind() -> String {
+    "StatefulSet".to_string()
+}
+fn default_daemonset_kind() -> String {
+    "DaemonSet".to_string()
+}
+fn default_replicaset_kind() -> String {
+    "ReplicaSet".to_string()
+}
+fn default_job_kind() -> String {
+    "Job".to_string()
+}
+fn default_cronjob_kind() -> String {
+    "CronJob".to_string()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -208,6 +219,8 @@ pub struct JobInfo {
     pub duration: Option<String>,
     pub age: String,
     pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
 }
@@ -529,5 +542,3 @@ pub struct HpaInfo {
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
 }
-
-
