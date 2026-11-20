@@ -4,8 +4,9 @@ use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, JobInfo,
-    NamespaceInfo, NodeInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
+    ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, IngressInfo,
+    JobInfo, NamespaceInfo, NodeInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo,
+    UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -83,6 +84,10 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadServices {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadIngresses {
         cluster_id: String,
         generation: u64,
     },
@@ -250,6 +255,16 @@ pub enum ClusterBridgeEvent {
         services: Vec<ServiceInfo>,
     },
     ServicesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    IngressesLoaded {
+        cluster_id: String,
+        generation: u64,
+        ingresses: Vec<IngressInfo>,
+    },
+    IngressesLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -1474,6 +1489,108 @@ impl ServicesState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum IngressesLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct IngressesState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: IngressesLoadStatus,
+    pub ingresses: Vec<IngressInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl IngressesState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = IngressesLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.ingresses.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.ingresses.is_empty();
+        ClusterBridgeCommand::LoadIngresses {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = IngressesLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.ingresses.is_empty();
+        Some(ClusterBridgeCommand::LoadIngresses {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = IngressesLoadStatus::Idle;
+        self.ingresses.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = IngressesLoadStatus::Idle;
+        self.ingresses.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        ingresses: Vec<IngressInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = IngressesLoadStatus::Loaded;
+            self.ingresses = ingresses;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = IngressesLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == IngressesLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ConfigMapsLoadStatus {
     #[default]
     Idle,
@@ -2094,6 +2211,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::PodsLoadFailed { .. }
             | ClusterBridgeEvent::ServicesLoaded { .. }
             | ClusterBridgeEvent::ServicesLoadFailed { .. }
+            | ClusterBridgeEvent::IngressesLoaded { .. }
+            | ClusterBridgeEvent::IngressesLoadFailed { .. }
             | ClusterBridgeEvent::ConfigMapsLoaded { .. }
             | ClusterBridgeEvent::ConfigMapsLoadFailed { .. }
             | ClusterBridgeEvent::SecretsLoaded { .. }
@@ -4196,6 +4315,93 @@ mod tests {
         assert_eq!(state.status, CronJobsLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.cronjobs.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+    }
+
+    fn sample_ingress(name: &str, namespace: &str) -> IngressInfo {
+        IngressInfo {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            class_name: Some("nginx".to_string()),
+            hosts: "app.example.com".to_string(),
+            address: "34.120.0.1".to_string(),
+            ports: "80, 443".to_string(),
+            age: "2d".to_string(),
+            created: "Nov 18, 2026, 10:00 AM".to_string(),
+            uid: "uid-ing-1".to_string(),
+            labels: Default::default(),
+            annotations: Default::default(),
+            rules_summary: vec!["app.example.com -> / (web-svc:80)".to_string()],
+        }
+    }
+
+    #[test]
+    fn test_ingresses_state_lifecycle_and_generation_guard() {
+        let mut state = IngressesState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadIngresses {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, IngressesLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let ing = sample_ingress("web-ingress", "prod");
+
+        // Stale cluster or generation must be rejected
+        assert!(!state.apply_loaded("ctx-other", 1, vec![ing.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![ing.clone()]));
+        assert!(!state.apply_failed("ctx-other", 1, "boom".to_string()));
+        assert!(!state.apply_failed("ctx-a", 99, "boom".to_string()));
+        assert!(state.ingresses.is_empty());
+
+        // Matching cluster and generation loads rows
+        assert!(state.apply_loaded("ctx-a", 1, vec![ing]));
+        assert_eq!(state.status, IngressesLoadStatus::Loaded);
+        assert_eq!(state.ingresses.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Refresh increments generation while retaining cached rows
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadIngresses {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, IngressesLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert_eq!(state.ingresses.len(), 1);
+
+        // Failure on generation 2 transitions to Error while retaining cached rows
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, IngressesLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+        assert_eq!(state.ingresses.len(), 1);
+
+        // Reset for another cluster clears rows/selection/error and invalidates in-flight replies
+        state.table.selected_row_key = Some("prod/web-ingress".to_string());
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, IngressesLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.ingresses.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(!state.apply_loaded("ctx-a", 2, vec![sample_ingress("stale", "prod")]));
+
+        // Reset for disconnected clears cluster_id and rows
+        state.reset_for_disconnected();
+        assert_eq!(state.status, IngressesLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.ingresses.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
     }
