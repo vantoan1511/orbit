@@ -19,7 +19,7 @@ pub mod workloads_overview;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, FontWeight, Window, div, prelude::*, px};
+use gpui::{AnyElement, App, FontWeight, Rgba, Window, div, prelude::*, px};
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{ContainerImageInfo, EventInfo};
 
@@ -63,6 +63,18 @@ pub fn format_images_summary(images: &[String]) -> (String, usize) {
     let short = format_short_image(first).to_string();
     let extra = images.len().saturating_sub(1);
     (short, extra)
+}
+
+pub fn numeric_metric_text_color(theme: &OrbitTheme) -> Rgba {
+    theme.text.primary
+}
+
+pub fn nonzero_metric_text_color(value: i32, theme: &OrbitTheme) -> Rgba {
+    if value > 0 {
+        theme.text.primary
+    } else {
+        theme.text.muted
+    }
 }
 
 pub fn render_action_button(
@@ -369,4 +381,41 @@ pub fn render_drawer_events_list(
                 )
         }))
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+
+    #[test]
+    fn test_numeric_and_nonzero_metric_text_colors_are_neutral() {
+        for (mode, appearance) in [
+            (ThemeMode::Light, gpui::WindowAppearance::Light),
+            (ThemeMode::Dark, gpui::WindowAppearance::Dark),
+        ] {
+            let theme = OrbitTheme::resolve(
+                mode,
+                UiStyle::Flat,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                appearance,
+            );
+            let primary = numeric_metric_text_color(&theme);
+            assert_eq!(primary, theme.text.primary);
+            assert_ne!(primary, theme.semantic.success.solid);
+            assert_ne!(primary, theme.semantic.warning.solid);
+
+            assert_eq!(nonzero_metric_text_color(0, &theme), theme.text.muted);
+            assert_eq!(nonzero_metric_text_color(3, &theme), theme.text.primary);
+            assert_ne!(
+                nonzero_metric_text_color(3, &theme),
+                theme.semantic.success.solid
+            );
+            assert_ne!(
+                nonzero_metric_text_color(3, &theme),
+                theme.semantic.warning.solid
+            );
+        }
+    }
 }

@@ -6,11 +6,10 @@ use orbit_core::kubernetes::models::{ClusterInfo, UserProfileInfo};
 use orbit_core::kubernetes::overview::{ClusterOverallHealth, ClusterOverviewSummary};
 
 use crate::components::{SemanticStatus, StatusBadgeVariant, render_status_badge};
-use crate::icons::render_icon;
 use crate::navigation::WorkspaceView;
 use crate::state::{ClusterOverviewState, OverviewLoadStatus};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-use crate::views::render_detail_row;
+use crate::views::{render_action_button, render_detail_row};
 
 #[derive(Debug, Clone)]
 pub struct OverviewMetricCard {
@@ -232,19 +231,34 @@ pub fn render_overview_view(
         &server_url,
         overview,
         theme,
-        on_refresh,
     ));
 
     if let Some(ref err) = overview.error_message {
+        let is_loading = overview.status == OverviewLoadStatus::Loading;
         root = root.child(
-            apply_text_step(div(), theme.typography.size_xs)
+            div()
                 .p_3()
                 .rounded(theme.style.radius_control)
                 .bg(theme.semantic.danger.soft)
                 .border_1()
                 .border_color(theme.semantic.danger.solid)
-                .text_color(theme.semantic.danger.solid)
-                .child(err.clone()),
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap_3()
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .text_color(theme.semantic.danger.solid)
+                        .child(err.clone()),
+                )
+                .child(render_action_button(
+                    "overview-error-retry-btn",
+                    Icon::RefreshCw,
+                    "Retry",
+                    is_loading,
+                    theme,
+                    Rc::new(on_refresh),
+                )),
         );
     }
 
@@ -298,37 +312,12 @@ fn render_status_bar(
     server_url: &str,
     overview: &ClusterOverviewState,
     theme: &OrbitTheme,
-    on_refresh: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
-    let control_hover = theme.surface.control_hover;
     let (health_label, health_status, _) = match overview.summary.as_ref() {
         Some(summary) => cluster_health_presentation(summary.overall_health, theme),
         None => ("Loading", SemanticStatus::Info, theme.semantic.info.solid),
     };
-
-    let refresh_btn = theme
-        .style_control(div().id("overview-refresh-btn"))
-        .px_3()
-        .py_1p5()
-        .text_color(theme.text.primary)
-        .font_weight(FontWeight::MEDIUM)
-        .cursor_pointer()
-        .hover(move |s| s.bg(control_hover))
-        .flex()
-        .items_center()
-        .gap_1p5()
-        .child(render_icon(Icon::RefreshCw, px(12.0), theme.text.secondary))
-        .child(apply_text_step(div(), theme.typography.size_xs).child(
-            if overview.status == OverviewLoadStatus::Loading {
-                "Refreshing..."
-            } else {
-                "Refresh"
-            },
-        ))
-        .on_click(move |_, window, cx| {
-            on_refresh(window, cx);
-        });
 
     theme
         .style_card(div())
@@ -383,7 +372,6 @@ fn render_status_bar(
                     theme,
                 )),
         )
-        .child(refresh_btn)
         .into_any_element()
 }
 

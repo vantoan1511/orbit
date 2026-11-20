@@ -1,10 +1,15 @@
 pub mod palettes;
+pub mod titlebar;
 pub mod tokens;
 pub mod typography;
 
 pub use palettes::{
-    AccentTokens, BorderTokens, K8sResourceColors, SemanticShade, SemanticTokens, StyleBundle,
-    StyleTokens, SurfaceTokens, TextTokens,
+    AccentTokens, BorderTokens, K8sResourceColors, NavSelectionTokens, SemanticShade,
+    SemanticTokens, StyleBundle, StyleTokens, SurfaceTokens, TextTokens,
+};
+pub use titlebar::{
+    TitlebarDwmConfig, resolve_titlebar_dwm_config, rgba_to_win32_colorref,
+    sync_native_titlebar_appearance,
 };
 pub use tokens::{
     AccentColor, K8sResourceKind, SemanticColorsPreference, SemanticPreset, SemanticRole,
@@ -140,6 +145,15 @@ impl OrbitTheme {
         self.k8s.get(kind)
     }
 
+    pub fn nav_selection(&self) -> NavSelectionTokens {
+        NavSelectionTokens {
+            active_bg: self.surface.bg_active,
+            active_fg: self.text.primary,
+            inactive_fg: self.text.muted,
+            indicator: self.text.primary,
+        }
+    }
+
     pub fn style_card<E: Styled>(&self, el: E) -> E {
         let mut styled = el
             .bg(self.surface.bg_card)
@@ -252,5 +266,26 @@ mod tests {
         assert_eq!(reset.style.ui_style, UiStyle::Flat);
         assert_eq!(reset.accent_id, AccentColor::Blue);
         assert_eq!(reset.semantic_pref, custom_pref);
+    }
+
+    #[test]
+    fn test_nav_selection_tokens_are_neutral_and_independent_of_accent_color() {
+        for mode in [ThemeMode::Light, ThemeMode::Dark] {
+            for accent in AccentColor::ALL {
+                let theme = OrbitTheme::resolve(
+                    mode,
+                    UiStyle::Flat,
+                    accent,
+                    SemanticColorsPreference::default(),
+                    WindowAppearance::Dark,
+                );
+                let nav = theme.nav_selection();
+                assert_eq!(nav.active_bg, theme.surface.bg_active);
+                assert_eq!(nav.active_fg, theme.text.primary);
+                assert_eq!(nav.inactive_fg, theme.text.muted);
+                assert_eq!(nav.indicator, theme.text.primary);
+                assert_ne!(nav.active_bg, theme.accent.soft);
+            }
+        }
     }
 }

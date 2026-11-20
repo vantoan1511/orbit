@@ -50,6 +50,14 @@ pub struct AccentTokens {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NavSelectionTokens {
+    pub active_bg: Rgba,
+    pub active_fg: Rgba,
+    pub inactive_fg: Rgba,
+    pub indicator: Rgba,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SemanticShade {
     pub solid: Rgba,
     pub soft: Rgba,
@@ -166,14 +174,14 @@ pub fn resolve_noir_tokens(is_dark: bool) -> (SurfaceTokens, BorderTokens, TextT
     } else {
         (
             SurfaceTokens {
-                bg_app: rgb_hex(0xf8fafc),
-                bg_sidebar: rgb_hex(0xffffff),
-                bg_panel: rgb_hex(0xffffff),
+                bg_app: rgb_hex(0xffffff),
+                bg_sidebar: rgb_hex(0xf3f4f6),
+                bg_panel: rgb_hex(0xf8f9fa),
                 bg_card: rgb_hex(0xffffff),
-                bg_hover: rgb_hex(0xe8ebef),
-                bg_active: rgb_hex(0xdce1e8),
+                bg_hover: rgb_hex(0xe9ecef),
+                bg_active: rgb_hex(0xe2e6ec),
                 control_bg: rgb_hex(0xffffff),
-                control_hover: rgb_hex(0xe8ebef),
+                control_hover: rgb_hex(0xe9ecef),
                 overlay_bg: rgb_hex(0xffffff),
                 dialog_bg: rgb_hex(0xffffff),
                 mask_bg: rgba_u8(0, 0, 0, 0.4),
@@ -181,11 +189,11 @@ pub fn resolve_noir_tokens(is_dark: bool) -> (SurfaceTokens, BorderTokens, TextT
                 selection: rgba_u8(79, 140, 255, 0.15),
             },
             BorderTokens {
-                default: rgb_hex(0xd5d9e1),
-                strong: rgb_hex(0xc7cdd7),
-                subtle: rgb_hex(0xe6e9ef),
+                default: rgb_hex(0xe2e5ea),
+                strong: rgb_hex(0xcfd5de),
+                subtle: rgb_hex(0xeceef2),
                 input: rgba_u8(0, 0, 0, 0.0),
-                card: rgb_hex(0xd5d9e1),
+                card: rgb_hex(0xe2e5ea),
             },
             TextTokens {
                 primary: rgb_hex(0x181a1f),
@@ -496,23 +504,23 @@ fn resolve_paper_style(
         text.muted = rgb_hex(0x8a8377);
         text.disabled = rgb_hex(0x635d53);
     } else {
-        surface.bg_app = rgb_hex(0xf6f3ec);
-        surface.bg_sidebar = rgb_hex(0xf0ece1);
-        surface.bg_panel = rgb_hex(0xf9f6f0);
-        surface.bg_card = rgb_hex(0xfcfaf5);
-        surface.bg_hover = rgb_hex(0xe8e2d5);
-        surface.bg_active = rgb_hex(0xded7c8);
-        surface.input_bg = rgb_hex(0xfffdf9);
-        surface.control_bg = rgb_hex(0xfffdf9);
-        surface.control_hover = rgb_hex(0xe8e2d5);
-        surface.overlay_bg = rgb_hex(0xfcfaf5);
-        surface.dialog_bg = rgb_hex(0xfcfaf5);
+        surface.bg_app = rgb_hex(0xfaf9f7);
+        surface.bg_sidebar = rgb_hex(0xf3f2ee);
+        surface.bg_panel = rgb_hex(0xf7f6f2);
+        surface.bg_card = rgb_hex(0xffffff);
+        surface.bg_hover = rgb_hex(0xeae8e3);
+        surface.bg_active = rgb_hex(0xe2dfd9);
+        surface.input_bg = rgb_hex(0xffffff);
+        surface.control_bg = rgb_hex(0xffffff);
+        surface.control_hover = rgb_hex(0xeae8e3);
+        surface.overlay_bg = rgb_hex(0xffffff);
+        surface.dialog_bg = rgb_hex(0xffffff);
         surface.mask_bg = rgba_u8(28, 25, 23, 0.35);
-        border.default = rgb_hex(0xdcd5c7);
-        border.strong = rgb_hex(0xc7beae);
-        border.subtle = rgb_hex(0xe8e2d5);
-        border.input = rgb_hex(0xdcd5c7);
-        border.card = rgb_hex(0xdcd5c7);
+        border.default = rgb_hex(0xe2e0da);
+        border.strong = rgb_hex(0xcfccc4);
+        border.subtle = rgb_hex(0xeeece7);
+        border.input = rgb_hex(0xe2e0da);
+        border.card = rgb_hex(0xe2e0da);
         text.primary = rgb_hex(0x1c1917);
         text.secondary = rgb_hex(0x57534e);
         text.muted = rgb_hex(0x78716c);
@@ -699,15 +707,48 @@ mod tests {
             }
         }
 
-        let (light_noir, _, _) = resolve_noir_tokens(false);
-        assert_eq!(light_noir.bg_app, rgb_hex(0xf8fafc));
+        let (light_noir, light_border, _) = resolve_noir_tokens(false);
+        assert_eq!(light_noir.bg_app, rgb_hex(0xffffff));
+        assert_eq!(light_noir.bg_sidebar, rgb_hex(0xf3f4f6));
+        assert_eq!(light_noir.bg_panel, rgb_hex(0xf8f9fa));
+        assert_eq!(light_noir.bg_card, rgb_hex(0xffffff));
+        assert_eq!(light_noir.bg_hover, rgb_hex(0xe9ecef));
+        assert_eq!(light_noir.bg_active, rgb_hex(0xe2e6ec));
+        assert_eq!(light_noir.control_bg, rgb_hex(0xffffff));
+        assert_eq!(light_noir.control_hover, rgb_hex(0xe9ecef));
+        assert_eq!(light_border.default, rgb_hex(0xe2e5ea));
+        assert_eq!(light_border.strong, rgb_hex(0xcfd5de));
+        assert_eq!(light_border.subtle, rgb_hex(0xeceef2));
+        assert_eq!(light_border.card, rgb_hex(0xe2e5ea));
+        assert_ne!(light_noir.bg_app, light_noir.bg_sidebar);
         let (dark_noir, _, _) = resolve_noir_tokens(true);
         assert_eq!(dark_noir.bg_app, rgb_hex(0x0b0d0f));
 
         let light_accent = resolve_accent_tokens(AccentColor::Blue, false);
         let dark_accent = resolve_accent_tokens(AccentColor::Blue, true);
         let paper_light = resolve_style_bundle(UiStyle::Paper, false, &light_accent);
-        assert_eq!(paper_light.surface.bg_app, rgb_hex(0xf6f3ec));
+        assert_eq!(paper_light.surface.bg_app, rgb_hex(0xfaf9f7));
+        assert_eq!(paper_light.surface.bg_sidebar, rgb_hex(0xf3f2ee));
+        assert_eq!(paper_light.surface.bg_panel, rgb_hex(0xf7f6f2));
+        assert_eq!(paper_light.surface.bg_card, rgb_hex(0xffffff));
+        assert_eq!(paper_light.surface.bg_hover, rgb_hex(0xeae8e3));
+        assert_eq!(paper_light.surface.bg_active, rgb_hex(0xe2dfd9));
+        assert_eq!(paper_light.surface.input_bg, rgb_hex(0xffffff));
+        assert_eq!(paper_light.surface.control_bg, rgb_hex(0xffffff));
+        assert_eq!(paper_light.surface.control_hover, rgb_hex(0xeae8e3));
+        assert_eq!(paper_light.border.default, rgb_hex(0xe2e0da));
+        assert_eq!(paper_light.border.strong, rgb_hex(0xcfccc4));
+        assert_eq!(paper_light.border.subtle, rgb_hex(0xeeece7));
+        assert_eq!(paper_light.border.input, rgb_hex(0xe2e0da));
+        assert_eq!(paper_light.border.card, rgb_hex(0xe2e0da));
+        assert!(
+            (paper_light.surface.bg_app.r - paper_light.surface.bg_app.b) <= 0.04,
+            "paper light bg_app should have low yellow-cast chroma"
+        );
+        assert!(
+            (paper_light.surface.bg_sidebar.r - paper_light.surface.bg_sidebar.b) <= 0.04,
+            "paper light bg_sidebar should have low yellow-cast chroma"
+        );
         let paper_dark = resolve_style_bundle(UiStyle::Paper, true, &dark_accent);
         assert_eq!(paper_dark.surface.bg_app, rgb_hex(0x141311));
 

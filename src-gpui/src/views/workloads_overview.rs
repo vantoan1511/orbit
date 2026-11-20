@@ -165,7 +165,6 @@ pub fn render_workloads_overview_view(
         namespaces,
         is_loading,
         theme,
-        Rc::clone(&refresh_cb),
     ));
 
     if let Some(ref err) = state.error_message
@@ -267,7 +266,6 @@ fn render_summary_toolbar(
     namespaces: &NamespaceFilterState,
     is_loading: bool,
     theme: &OrbitTheme,
-    on_refresh: RefreshCallback,
 ) -> AnyElement {
     let counts = state
         .snapshot
@@ -286,15 +284,6 @@ fn render_summary_toolbar(
     } else {
         aggregate_workload_status(counts, has_errors)
     };
-
-    let refresh_btn = render_action_button(
-        "workloads-overview-refresh-btn",
-        Icon::RefreshCw,
-        if is_loading { "Refreshing..." } else { "Refresh" },
-        is_loading,
-        theme,
-        on_refresh,
-    );
 
     theme
         .style_card(div())
@@ -344,7 +333,6 @@ fn render_summary_toolbar(
                     theme,
                 )),
         )
-        .child(refresh_btn)
         .into_any_element()
 }
 

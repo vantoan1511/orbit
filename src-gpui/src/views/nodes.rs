@@ -14,7 +14,7 @@ use crate::components::data_table::{
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge,
-    render_status_badge_from_str, resource_kind_meta,
+    render_status_badge_from_str,
 };
 use crate::icons::render_icon;
 use crate::state::{NodesLoadStatus, NodesState};
@@ -256,23 +256,12 @@ pub fn nodes_presentation_mode(state: &NodesState) -> NodesPresentationMode {
 
 fn render_node_cell(node: &NodeInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
     match col.id.as_ref() {
-        "name" => {
-            let meta = resource_kind_meta(K8sResourceKind::Node, theme);
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(node.name.clone()),
-                )
-                .into_any_element()
-        }
+        "name" => apply_text_step(div(), theme.typography.size_xs)
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text.primary)
+            .truncate()
+            .child(node.name.clone())
+            .into_any_element(),
         "status" => div()
             .flex()
             .items_center()
@@ -449,15 +438,7 @@ pub fn render_nodes_view(
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.text.secondary)
                 .child(format!("{total_count} nodes")),
-        )
-        .child(render_action_button(
-            "nodes-refresh-btn",
-            Icon::RefreshCw,
-            if is_loading { "Refreshing..." } else { "Refresh" },
-            is_loading,
-            theme,
-            on_refresh_rc.clone(),
-        ));
+        );
 
     let error_banner = state.error_message.as_ref().map(|message| {
         div()

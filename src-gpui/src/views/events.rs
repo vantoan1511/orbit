@@ -261,7 +261,7 @@ fn render_event_cell(ev: &EventInfo, col: &TableColumn, theme: &OrbitTheme) -> A
                 .items_center()
                 .gap_2()
                 .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
+                .child(render_icon(meta.icon, px(14.0), theme.text.muted))
                 .child(
                     apply_text_step(div(), theme.typography.size_xs)
                         .font_weight(FontWeight::MEDIUM)
@@ -540,14 +540,6 @@ pub fn render_events_view(
                     state.type_filter,
                     theme,
                     on_type_filter_rc,
-                ))
-                .child(render_action_button(
-                    "events-refresh-btn",
-                    Icon::RefreshCw,
-                    if is_loading { "Refreshing..." } else { "Refresh" },
-                    is_loading,
-                    theme,
-                    on_refresh_rc.clone(),
                 )),
         );
 

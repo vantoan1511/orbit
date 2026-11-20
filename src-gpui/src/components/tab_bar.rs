@@ -15,13 +15,13 @@ use crate::theme::{OrbitTheme, apply_text_step};
 
 pub const TAB_BAR_HEIGHT: f32 = 32.0;
 
-pub fn tab_icon_color(view: WorkspaceView, is_active: bool, theme: &OrbitTheme) -> Rgba {
-    if !is_active {
-        return theme.text.muted;
+pub fn tab_icon_color(_view: WorkspaceView, is_active: bool, theme: &OrbitTheme) -> Rgba {
+    let nav = theme.nav_selection();
+    if is_active {
+        nav.active_fg
+    } else {
+        nav.inactive_fg
     }
-    view.resource_kind()
-        .map(|kind| theme.k8s_color(kind))
-        .unwrap_or(theme.accent.accent)
 }
 
 #[derive(Debug, Clone)]
@@ -601,6 +601,7 @@ mod tests {
             assert!(!active.has_top_accent_stripe);
             assert!(active.close_always_visible);
             assert_eq!(active.text_color, theme.text.primary);
+            assert_eq!(active.icon_color, theme.text.primary);
 
             let inactive = tab_item_presentation(WorkspaceView::Deployments, false, &theme);
             assert_eq!(inactive.surface, theme.surface.bg_sidebar);
@@ -608,6 +609,16 @@ mod tests {
             assert!(!inactive.has_top_accent_stripe);
             assert!(!inactive.close_always_visible);
             assert_eq!(inactive.icon_color, theme.text.muted);
+
+            for view in [
+                WorkspaceView::Deployments,
+                WorkspaceView::Pods,
+                WorkspaceView::Overview,
+                WorkspaceView::Logs,
+            ] {
+                assert_eq!(tab_icon_color(view, true, &theme), theme.text.primary);
+                assert_eq!(tab_icon_color(view, false, &theme), theme.text.muted);
+            }
         }
     }
 
