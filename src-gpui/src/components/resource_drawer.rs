@@ -52,6 +52,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    CronJob {
+        name: String,
+        namespace: String,
+    },
     Pod {
         name: String,
         namespace: String,
@@ -88,6 +92,7 @@ impl ResourceDrawerTarget {
             Self::StatefulSet { .. } => "StatefulSet",
             Self::DaemonSet { .. } => "DaemonSet",
             Self::Job { .. } => "Job",
+            Self::CronJob { .. } => "CronJob",
             Self::Pod { .. } => "Pod",
             Self::Service { .. } => "Service",
             Self::ConfigMap { .. } => "ConfigMap",
@@ -104,6 +109,7 @@ impl ResourceDrawerTarget {
             | Self::StatefulSet { name, .. }
             | Self::DaemonSet { name, .. }
             | Self::Job { name, .. }
+            | Self::CronJob { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
@@ -120,6 +126,7 @@ impl ResourceDrawerTarget {
             | Self::StatefulSet { name, .. }
             | Self::DaemonSet { name, .. }
             | Self::Job { name, .. }
+            | Self::CronJob { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
             | Self::ConfigMap { name, .. }
@@ -136,6 +143,7 @@ impl ResourceDrawerTarget {
             | Self::StatefulSet { namespace, .. }
             | Self::DaemonSet { namespace, .. }
             | Self::Job { namespace, .. }
+            | Self::CronJob { namespace, .. }
             | Self::Pod { namespace, .. }
             | Self::Service { namespace, .. }
             | Self::ConfigMap { namespace, .. }
@@ -904,6 +912,32 @@ mod tests {
                 kind: "Job".to_string(),
                 namespace: Some("prod".to_string()),
                 name: "db-migrate".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_resource_drawer_target_cronjob_metadata_and_yaml_command() {
+        let target = ResourceDrawerTarget::CronJob {
+            name: "nightly-backup".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(target.kind(), "CronJob");
+        assert_eq!(target.name(), "nightly-backup");
+        assert_eq!(target.display_title(), "nightly-backup");
+        assert_eq!(target.namespace(), Some("prod"));
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let cmd = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+                kind: "CronJob".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "nightly-backup".to_string(),
             })
         );
     }
