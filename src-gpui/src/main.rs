@@ -35,7 +35,10 @@ use crate::state::{
     NamespacesViewState, NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState,
     TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
-use crate::theme::{AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
+use crate::theme::{
+    AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex,
+    sync_native_titlebar_appearance,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StatusPresentation {
@@ -111,18 +114,63 @@ fn cluster_dot_color(cluster: &ClusterInfo, theme: &OrbitTheme) -> Rgba {
 
 fn apply_theme(updated: OrbitTheme, window: &mut Window, cx: &mut App) {
     let bg = updated.style.window_background;
+    sync_native_titlebar_appearance(window, &updated);
     cx.set_global(updated);
     window.set_background_appearance(bg);
 }
 
-pub fn nav_item_icon_color(view: WorkspaceView, is_active: bool, theme: &OrbitTheme) -> Rgba {
-    view.resource_kind()
-        .map(|kind| theme.k8s_color(kind))
-        .unwrap_or(if is_active {
-            theme.accent.accent
-        } else {
-            theme.text.muted
-        })
+pub fn nav_item_icon_color(_view: WorkspaceView, is_active: bool, theme: &OrbitTheme) -> Rgba {
+    let nav = theme.nav_selection();
+    if is_active {
+        nav.active_fg
+    } else {
+        nav.inactive_fg
+    }
+}
+
+pub const fn should_show_header_kind_badge(_view: WorkspaceView) -> bool {
+    false
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WorkspaceLoadingFlags {
+    pub overview: bool,
+    pub workloads_overview: bool,
+    pub namespaces: bool,
+    pub deployments: bool,
+    pub statefulsets: bool,
+    pub daemonsets: bool,
+    pub jobs: bool,
+    pub cronjobs: bool,
+    pub pods: bool,
+    pub services: bool,
+    pub configmaps: bool,
+    pub secrets: bool,
+    pub nodes: bool,
+    pub events: bool,
+}
+
+pub const fn is_workspace_view_loading(
+    active_view: WorkspaceView,
+    loading: WorkspaceLoadingFlags,
+) -> bool {
+    match active_view {
+        WorkspaceView::Overview => loading.overview,
+        WorkspaceView::WorkloadsOverview => loading.workloads_overview,
+        WorkspaceView::Namespaces => loading.namespaces,
+        WorkspaceView::Deployments => loading.deployments,
+        WorkspaceView::StatefulSets => loading.statefulsets,
+        WorkspaceView::DaemonSets => loading.daemonsets,
+        WorkspaceView::Jobs => loading.jobs,
+        WorkspaceView::CronJobs => loading.cronjobs,
+        WorkspaceView::Pods => loading.pods,
+        WorkspaceView::Services => loading.services,
+        WorkspaceView::ConfigMaps => loading.configmaps,
+        WorkspaceView::Secrets => loading.secrets,
+        WorkspaceView::Nodes => loading.nodes,
+        WorkspaceView::Events => loading.events,
+        _ => false,
+    }
 }
 
 pub const fn sidebar_toggle_icon(is_collapsed: bool) -> Icon {
@@ -949,6 +997,10 @@ impl OrbitShell {
                     apply_theme(updated, window, cx);
                     window.refresh();
                 }
+                window.defer(cx, |window, cx| {
+                    let theme = OrbitTheme::get(cx).clone();
+                    sync_native_titlebar_appearance(window, &theme);
+                });
             })
             .detach();
 
@@ -2058,6 +2110,31 @@ impl OrbitShell {
         )
     }
 
+    fn is_active_view_loading(&self) -> bool {
+        is_workspace_view_loading(
+            self.sidebar.active_view,
+            WorkspaceLoadingFlags {
+                overview: self.overview.status == crate::state::OverviewLoadStatus::Loading,
+                workloads_overview: self.workloads_overview.status
+                    == crate::state::WorkloadsOverviewLoadStatus::Loading,
+                namespaces: self.namespaces.status == NamespaceLoadStatus::Loading,
+                deployments: self.deployments.status
+                    == crate::state::DeploymentsLoadStatus::Loading,
+                statefulsets: self.statefulsets.status
+                    == crate::state::StatefulSetsLoadStatus::Loading,
+                daemonsets: self.daemonsets.status == crate::state::DaemonSetsLoadStatus::Loading,
+                jobs: self.jobs.status == crate::state::JobsLoadStatus::Loading,
+                cronjobs: self.cronjobs.status == crate::state::CronJobsLoadStatus::Loading,
+                pods: self.pods.status == crate::state::PodsLoadStatus::Loading,
+                services: self.services.status == crate::state::ServicesLoadStatus::Loading,
+                configmaps: self.configmaps.status == crate::state::ConfigMapsLoadStatus::Loading,
+                secrets: self.secrets.status == crate::state::SecretsLoadStatus::Loading,
+                nodes: self.nodes.status == crate::state::NodesLoadStatus::Loading,
+                events: self.events.status == EventsLoadStatus::Loading,
+            },
+        )
+    }
+
     fn refresh_workspace(&mut self, cx: &mut Context<Self>) {
         self.dispatch_command(ClusterBridgeCommand::RefreshClusters);
         if let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state {
@@ -2274,6 +2351,7 @@ impl OrbitShell {
 
     fn render_activity_bar(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
+        let nav = theme.nav_selection();
         let hover_bg = theme.surface.bg_hover;
         let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
 
@@ -2296,7 +2374,7 @@ impl OrbitShell {
                     .h(px(36.0))
                     .rounded(theme.style.radius_control)
                     .cursor_pointer()
-                    .when(is_active, |el| el.bg(theme.accent.soft))
+                    .when(is_active, |el| el.bg(nav.active_bg))
                     .hover(move |style| style.bg(hover_bg))
                     .on_click(cx.listener(move |this, _event, _window, cx| {
                         let prev_view = this.sidebar.active_view;
@@ -2316,14 +2394,14 @@ impl OrbitShell {
                                 .bottom(px(6.0))
                                 .w(px(2.0))
                                 .rounded_full()
-                                .bg(theme.accent.accent),
+                                .bg(nav.indicator),
                         )
                     })
                     .child(render_icon(
                         category.icon(),
                         px(18.0),
                         if is_selected_category {
-                            theme.accent.accent
+                            nav.active_fg
                         } else {
                             theme.text.secondary
                         },
@@ -2349,14 +2427,16 @@ impl OrbitShell {
                     .w(px(32.0))
                     .h(px(32.0))
                     .rounded(theme.style.radius_control)
-                    .bg(theme.accent.soft)
+                    .bg(theme.surface.bg_active)
+                    .border_1()
+                    .border_color(theme.border.default)
                     .flex()
                     .items_center()
                     .justify_center()
                     .child(
                         apply_text_step(div(), theme.typography.size_sm)
                             .font_weight(FontWeight::BOLD)
-                            .text_color(theme.accent.accent)
+                            .text_color(theme.text.primary)
                             .child("O"),
                     ),
             )
@@ -2379,16 +2459,28 @@ impl OrbitShell {
                             .h(px(34.0))
                             .rounded(theme.style.radius_control)
                             .cursor_pointer()
-                            .when(is_settings, |el| el.bg(theme.accent.soft))
+                            .when(is_settings, |el| el.bg(nav.active_bg))
                             .hover(move |style| style.bg(hover_bg))
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.select_workspace_view(WorkspaceView::Settings, cx);
                             }))
+                            .when(is_settings, |el| {
+                                el.child(
+                                    div()
+                                        .absolute()
+                                        .left(px(-8.0))
+                                        .top(px(6.0))
+                                        .bottom(px(6.0))
+                                        .w(px(2.0))
+                                        .rounded_full()
+                                        .bg(nav.indicator),
+                                )
+                            })
                             .child(render_icon(
                                 Icon::Settings,
                                 px(18.0),
                                 if is_settings {
-                                    theme.accent.accent
+                                    nav.active_fg
                                 } else {
                                     theme.text.secondary
                                 },
@@ -2400,6 +2492,7 @@ impl OrbitShell {
 
     fn render_clusters_sidebar_content(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
+        let nav = theme.nav_selection();
         let hover_bg = theme.surface.bg_hover;
         let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
 
@@ -2429,7 +2522,7 @@ impl OrbitShell {
                     .py_1p5()
                     .rounded(theme.style.radius_control)
                     .cursor_pointer()
-                    .when(is_active, |el| el.bg(theme.accent.soft))
+                    .when(is_active, |el| el.bg(nav.active_bg))
                     .hover(move |style| style.bg(hover_bg))
                     .on_click(cx.listener(move |this, _event, _window, cx| {
                         this.select_cluster(&cluster_id, cx);
@@ -2461,7 +2554,7 @@ impl OrbitShell {
                                                 FontWeight::MEDIUM
                                             })
                                             .text_color(if is_active {
-                                                theme.accent.accent
+                                                nav.active_fg
                                             } else {
                                                 theme.text.primary
                                             })
@@ -2489,6 +2582,7 @@ impl OrbitShell {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
+        let nav = theme.nav_selection();
         let hover_bg = theme.surface.bg_hover;
         let mut list = div().flex().flex_col().gap_1();
 
@@ -2507,7 +2601,7 @@ impl OrbitShell {
                     .py_1p5()
                     .rounded(theme.style.radius_control)
                     .cursor_pointer()
-                    .when(is_active, |el| el.bg(theme.accent.soft))
+                    .when(is_active, |el| el.bg(nav.active_bg))
                     .hover(move |style| style.bg(hover_bg))
                     .on_click(cx.listener(move |this, _event, _window, cx| {
                         this.select_workspace_view(item, cx);
@@ -2526,7 +2620,7 @@ impl OrbitShell {
                                         FontWeight::MEDIUM
                                     })
                                     .text_color(if is_active {
-                                        theme.accent.accent
+                                        nav.active_fg
                                     } else {
                                         theme.text.primary
                                     })
@@ -2633,6 +2727,7 @@ impl OrbitShell {
         let control_hover = theme.surface.control_hover;
         let (cat_label, view_label) = self.sidebar.active_view.breadcrumb();
         let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
+        let is_refreshing = self.is_active_view_loading();
 
         div()
             .id("orbit-header-toolbar")
@@ -2797,16 +2892,38 @@ impl OrbitShell {
                             .gap_1p5()
                             .h(theme.typography.control_height_sm)
                             .px(theme.typography.control_padding_x_md)
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
+                            .when(is_refreshing, |el| el.opacity(0.6))
+                            .when(!is_refreshing, |el| {
+                                el.hover(move |style| style.bg(control_hover))
+                                    .cursor_pointer()
+                            })
                             .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.refresh_workspace(cx);
+                                if !this.is_active_view_loading() {
+                                    this.refresh_workspace(cx);
+                                }
                             }))
-                            .child(render_icon(Icon::RefreshCw, px(13.0), theme.text.secondary))
+                            .child(render_icon(
+                                Icon::RefreshCw,
+                                px(13.0),
+                                if is_refreshing {
+                                    theme.text.muted
+                                } else {
+                                    theme.text.secondary
+                                },
+                            ))
                             .child(
                                 apply_text_step(div(), theme.typography.size_sm)
                                     .font_weight(FontWeight::MEDIUM)
-                                    .child("Refresh"),
+                                    .text_color(if is_refreshing {
+                                        theme.text.muted
+                                    } else {
+                                        theme.text.primary
+                                    })
+                                    .child(if is_refreshing {
+                                        "Refreshing..."
+                                    } else {
+                                        "Refresh"
+                                    }),
                             ),
                     )
                     .child(
@@ -3458,7 +3575,9 @@ impl OrbitShell {
     fn render_workspace_view_header(&self, theme: &OrbitTheme) -> AnyElement {
         let view = self.sidebar.active_view;
         let (cat_label, _) = view.breadcrumb();
-        let resource_kind = view.resource_kind();
+        let resource_kind = should_show_header_kind_badge(view)
+            .then(|| view.resource_kind())
+            .flatten();
 
         div()
             .flex()
@@ -5471,22 +5590,6 @@ impl OrbitShell {
                     })
                     .child(
                         div()
-                            .id("footer-refresh-btn")
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(20.0))
-                            .h(px(18.0))
-                            .rounded(theme.style.radius_control)
-                            .cursor_pointer()
-                            .hover(move |style| style.bg(control_hover))
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.refresh_workspace(cx);
-                            }))
-                            .child(render_icon(Icon::RefreshCw, px(12.0), theme.text.secondary)),
-                    )
-                    .child(
-                        div()
                             .id("footer-settings-btn")
                             .flex()
                             .items_center()
@@ -5764,7 +5867,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::{AccentColor, K8sResourceKind, SemanticColorsPreference};
+    use crate::theme::{AccentColor, SemanticColorsPreference};
     use gpui::WindowBackgroundAppearance;
 
     #[test]
@@ -6087,38 +6190,99 @@ mod tests {
             (ThemeMode::Dark, WindowAppearance::Dark),
             (ThemeMode::Light, WindowAppearance::Light),
         ] {
-            let theme = OrbitTheme::resolve(
-                mode,
-                UiStyle::Flat,
-                AccentColor::Blue,
-                SemanticColorsPreference::default(),
-                appearance,
-            );
-            assert_eq!(
-                nav_item_icon_color(WorkspaceView::Deployments, false, &theme),
-                theme.k8s_color(K8sResourceKind::Deployment)
-            );
-            assert_eq!(
-                nav_item_icon_color(WorkspaceView::Pods, true, &theme),
-                theme.k8s_color(K8sResourceKind::Pod)
-            );
-            assert_eq!(
-                nav_item_icon_color(WorkspaceView::Services, false, &theme),
-                theme.k8s_color(K8sResourceKind::Service)
-            );
-            assert_eq!(
-                nav_item_icon_color(WorkspaceView::Overview, true, &theme),
-                theme.accent.accent
-            );
-            assert_eq!(
-                nav_item_icon_color(WorkspaceView::Overview, false, &theme),
-                theme.text.muted
-            );
-            assert_eq!(
-                nav_item_icon_color(WorkspaceView::Logs, false, &theme),
-                theme.text.muted
+            for accent in [AccentColor::Blue, AccentColor::Amber, AccentColor::Emerald] {
+                let theme = OrbitTheme::resolve(
+                    mode,
+                    UiStyle::Flat,
+                    accent,
+                    SemanticColorsPreference::default(),
+                    appearance,
+                );
+                for view in [
+                    WorkspaceView::Deployments,
+                    WorkspaceView::Pods,
+                    WorkspaceView::Services,
+                    WorkspaceView::Overview,
+                    WorkspaceView::Logs,
+                ] {
+                    assert_eq!(nav_item_icon_color(view, false, &theme), theme.text.muted);
+                    assert_eq!(nav_item_icon_color(view, true, &theme), theme.text.primary);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_header_omits_redundant_kind_badge_for_resource_views() {
+        for view in [
+            WorkspaceView::Deployments,
+            WorkspaceView::Pods,
+            WorkspaceView::StatefulSets,
+            WorkspaceView::DaemonSets,
+            WorkspaceView::Jobs,
+            WorkspaceView::CronJobs,
+            WorkspaceView::Services,
+            WorkspaceView::ConfigMaps,
+            WorkspaceView::Secrets,
+            WorkspaceView::Nodes,
+            WorkspaceView::Namespaces,
+        ] {
+            assert!(
+                !should_show_header_kind_badge(view),
+                "homogeneous resource view {view:?} should not show redundant header kind badge"
             );
         }
+    }
+
+    #[test]
+    fn test_is_workspace_view_loading_tracks_active_view_status() {
+        assert!(!is_workspace_view_loading(
+            WorkspaceView::Deployments,
+            WorkspaceLoadingFlags {
+                overview: true,
+                ..Default::default()
+            },
+        ));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::Deployments,
+            WorkspaceLoadingFlags {
+                deployments: true,
+                ..Default::default()
+            },
+        ));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::Overview,
+            WorkspaceLoadingFlags {
+                overview: true,
+                ..Default::default()
+            },
+        ));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::Events,
+            WorkspaceLoadingFlags {
+                events: true,
+                ..Default::default()
+            },
+        ));
+        assert!(!is_workspace_view_loading(
+            WorkspaceView::Settings,
+            WorkspaceLoadingFlags {
+                overview: true,
+                workloads_overview: true,
+                namespaces: true,
+                deployments: true,
+                statefulsets: true,
+                daemonsets: true,
+                jobs: true,
+                cronjobs: true,
+                pods: true,
+                services: true,
+                configmaps: true,
+                secrets: true,
+                nodes: true,
+                events: true,
+            },
+        ));
     }
 
     #[test]

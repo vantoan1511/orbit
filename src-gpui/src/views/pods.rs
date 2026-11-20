@@ -13,12 +13,13 @@ use crate::components::data_table::{
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
-    resource_kind_meta,
 };
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, PodsLoadStatus, PodsState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button};
+pub use crate::views::{
+    nonzero_metric_text_color, numeric_metric_text_color, parse_age_seconds, render_action_button,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PodsPresentationMode {
@@ -267,23 +268,12 @@ pub fn pods_presentation_mode(state: &PodsState) -> PodsPresentationMode {
 
 fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
     match col.id.as_ref() {
-        "name" => {
-            let meta = resource_kind_meta(K8sResourceKind::Pod, theme);
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(pod.name.clone()),
-                )
-                .into_any_element()
-        }
+        "name" => apply_text_step(div(), theme.typography.size_xs)
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text.primary)
+            .truncate()
+            .child(pod.name.clone())
+            .into_any_element(),
         "namespace" => apply_text_step(div(), theme.typography.size_xs)
             .text_color(theme.text.secondary)
             .truncate()
@@ -299,11 +289,6 @@ fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
                     .child("-")
                     .into_any_element()
             } else {
-                let ready_color = if ready == total {
-                    theme.text.primary
-                } else {
-                    theme.semantic.warning.solid
-                };
                 div()
                     .flex()
                     .items_center()
@@ -311,7 +296,7 @@ fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
                     .child(
                         apply_text_step(div(), theme.typography.size_xs)
                             .font(theme.typography.mono_font(FontWeight::SEMIBOLD))
-                            .text_color(ready_color)
+                            .text_color(numeric_metric_text_color(theme))
                             .child(ready.to_string()),
                     )
                     .child(
@@ -323,18 +308,11 @@ fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
                     .into_any_element()
             }
         }
-        "restarts" => {
-            let color = if pod.restarts > 0 {
-                theme.semantic.warning.solid
-            } else {
-                theme.text.primary
-            };
-            apply_text_step(div(), theme.typography.size_xs)
-                .font(theme.typography.mono_font(FontWeight::MEDIUM))
-                .text_color(color)
-                .child(pod.restarts.to_string())
-                .into_any_element()
-        }
+        "restarts" => apply_text_step(div(), theme.typography.size_xs)
+            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .text_color(nonzero_metric_text_color(pod.restarts, theme))
+            .child(pod.restarts.to_string())
+            .into_any_element(),
         "node" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(if pod.node.is_some() {
@@ -531,15 +509,7 @@ pub fn render_pods_view(
                             .child(format!("Namespace: {}", namespaces.summary_label())),
                     )
                 }),
-        )
-        .child(render_action_button(
-            "pods-refresh-btn",
-            Icon::RefreshCw,
-            if is_loading { "Refreshing..." } else { "Refresh" },
-            is_loading,
-            theme,
-            on_refresh_rc.clone(),
-        ));
+        );
 
     let error_banner = state.error_message.as_ref().map(|message| {
         div()

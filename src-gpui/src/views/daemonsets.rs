@@ -13,12 +13,13 @@ use crate::components::data_table::{
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
-    resource_kind_meta,
 };
 use crate::icons::render_icon;
 use crate::state::{DaemonSetsLoadStatus, DaemonSetsState, NamespaceFilterState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-use crate::views::{format_images_summary, parse_age_seconds, render_action_button};
+use crate::theme::{OrbitTheme, apply_text_step};
+use crate::views::{
+    format_images_summary, numeric_metric_text_color, parse_age_seconds, render_action_button,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DaemonSetsPresentationMode {
@@ -150,23 +151,12 @@ pub fn daemonsets_presentation_mode(state: &DaemonSetsState) -> DaemonSetsPresen
 
 fn render_daemonset_cell(ds: &DaemonSetInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
     match col.id.as_ref() {
-        "name" => {
-            let meta = resource_kind_meta(K8sResourceKind::DaemonSet, theme);
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(ds.name.clone()),
-                )
-                .into_any_element()
-        }
+        "name" => apply_text_step(div(), theme.typography.size_xs)
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text.primary)
+            .truncate()
+            .child(ds.name.clone())
+            .into_any_element(),
         "namespace" => apply_text_step(div(), theme.typography.size_xs)
             .text_color(theme.text.secondary)
             .truncate()
@@ -190,35 +180,21 @@ fn render_daemonset_cell(ds: &DaemonSetInfo, col: &TableColumn, theme: &OrbitThe
                     .child(format!("/{}", ds.replicas.current)),
             )
             .into_any_element(),
-        "ready" => {
-            let color = if ds.replicas.ready == ds.replicas.desired {
-                theme.semantic.success.solid
-            } else {
-                theme.semantic.warning.solid
-            };
-            apply_text_step(div(), theme.typography.size_xs)
-                .font(theme.typography.mono_font(FontWeight::MEDIUM))
-                .text_color(color)
-                .child(ds.replicas.ready.to_string())
-                .into_any_element()
-        }
+        "ready" => apply_text_step(div(), theme.typography.size_xs)
+            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .text_color(numeric_metric_text_color(theme))
+            .child(ds.replicas.ready.to_string())
+            .into_any_element(),
         "up_to_date" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(theme.text.primary)
             .child(ds.replicas.up_to_date.to_string())
             .into_any_element(),
-        "available" => {
-            let color = if ds.replicas.available == ds.replicas.desired {
-                theme.semantic.success.solid
-            } else {
-                theme.semantic.warning.solid
-            };
-            apply_text_step(div(), theme.typography.size_xs)
-                .font(theme.typography.mono_font(FontWeight::MEDIUM))
-                .text_color(color)
-                .child(ds.replicas.available.to_string())
-                .into_any_element()
-        }
+        "available" => apply_text_step(div(), theme.typography.size_xs)
+            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .text_color(numeric_metric_text_color(theme))
+            .child(ds.replicas.available.to_string())
+            .into_any_element(),
         "images" => {
             let (primary, extra) = format_images_summary(&ds.images);
             div()
@@ -364,19 +340,7 @@ pub fn render_daemonsets_view(
                             .child(format!("Namespace: {}", namespaces.summary_label())),
                     )
                 }),
-        )
-        .child(render_action_button(
-            "daemonsets-refresh-btn",
-            Icon::RefreshCw,
-            if is_loading {
-                "Refreshing..."
-            } else {
-                "Refresh"
-            },
-            is_loading,
-            theme,
-            on_refresh_rc.clone(),
-        ));
+        );
 
     let error_banner = state.error_message.as_ref().map(|message| {
         div()

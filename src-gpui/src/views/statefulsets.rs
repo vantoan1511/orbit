@@ -13,11 +13,10 @@ use crate::components::data_table::{
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
-    resource_kind_meta,
 };
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, StatefulSetsLoadStatus, StatefulSetsState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{format_images_summary, parse_age_seconds, render_action_button};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -134,23 +133,12 @@ fn render_statefulset_cell(
     theme: &OrbitTheme,
 ) -> AnyElement {
     match col.id.as_ref() {
-        "name" => {
-            let meta = resource_kind_meta(K8sResourceKind::StatefulSet, theme);
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(ss.name.clone()),
-                )
-                .into_any_element()
-        }
+        "name" => apply_text_step(div(), theme.typography.size_xs)
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text.primary)
+            .truncate()
+            .child(ss.name.clone())
+            .into_any_element(),
         "namespace" => apply_text_step(div(), theme.typography.size_xs)
             .text_color(theme.text.secondary)
             .truncate()
@@ -319,19 +307,7 @@ pub fn render_statefulsets_view(
                             .child(format!("Namespace: {}", namespaces.summary_label())),
                     )
                 }),
-        )
-        .child(render_action_button(
-            "statefulsets-refresh-btn",
-            Icon::RefreshCw,
-            if is_loading {
-                "Refreshing..."
-            } else {
-                "Refresh"
-            },
-            is_loading,
-            theme,
-            on_refresh_rc.clone(),
-        ));
+        );
 
     let error_banner = state.error_message.as_ref().map(|message| {
         div()

@@ -14,7 +14,7 @@ use crate::components::data_table::{
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
-    render_status_badge_from_str, resource_kind_meta_from_str,
+    render_status_badge_from_str,
 };
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState};
@@ -225,23 +225,12 @@ fn render_namespace_cell(
     theme: &OrbitTheme,
 ) -> AnyElement {
     match col.id.as_ref() {
-        "name" => {
-            let meta = resource_kind_meta_from_str("Namespace", theme);
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(ns.name.clone()),
-                )
-                .into_any_element()
-        }
+        "name" => apply_text_step(div(), theme.typography.size_xs)
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text.primary)
+            .truncate()
+            .child(ns.name.clone())
+            .into_any_element(),
         "status" => render_status_badge_from_str(&ns.status, StatusBadgeVariant::Inline, theme),
         "system" => {
             if ns.is_system {
@@ -414,15 +403,7 @@ pub fn render_namespaces_view(
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.text.secondary)
                 .child(format!("{total_count} namespaces")),
-        )
-        .child(render_action_button(
-            "namespaces-refresh-btn",
-            Icon::RefreshCw,
-            if is_loading { "Refreshing..." } else { "Refresh" },
-            is_loading,
-            theme,
-            on_refresh_rc.clone(),
-        ));
+        );
 
     let error_banner = state.error_message.as_ref().map(|message| {
         div()

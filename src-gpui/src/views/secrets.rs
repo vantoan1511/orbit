@@ -16,12 +16,12 @@ use crate::components::data_table::{
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
-    render_status_badge_from_str, resource_kind_meta,
+    render_status_badge_from_str,
 };
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, SecretsLoadStatus, SecretsState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button};
+pub use crate::views::{nonzero_metric_text_color, parse_age_seconds, render_action_button};
 
 pub const MASKED_SECRET_PLACEHOLDER: &str = "••••••••";
 
@@ -219,23 +219,12 @@ pub fn format_secret_entry_display(encoded: &str, revealed: bool) -> (String, bo
 
 fn render_secret_cell(sec: &SecretInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
     match col.id.as_ref() {
-        "name" => {
-            let meta = resource_kind_meta(K8sResourceKind::Secret, theme);
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .min_w(px(0.0))
-                .child(render_icon(meta.icon, px(14.0), meta.color))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(sec.name.clone()),
-                )
-                .into_any_element()
-        }
+        "name" => apply_text_step(div(), theme.typography.size_xs)
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.text.primary)
+            .truncate()
+            .child(sec.name.clone())
+            .into_any_element(),
         "namespace" => apply_text_step(div(), theme.typography.size_xs)
             .text_color(theme.text.secondary)
             .truncate()
@@ -269,11 +258,7 @@ fn render_secret_cell(sec: &SecretInfo, col: &TableColumn, theme: &OrbitTheme) -
             };
             apply_text_step(div(), theme.typography.size_xs)
                 .font(theme.typography.mono_font(FontWeight::NORMAL))
-                .text_color(if sec.mounted_pods > 0 {
-                    theme.semantic.success.solid
-                } else {
-                    theme.text.muted
-                })
+                .text_color(nonzero_metric_text_color(sec.mounted_pods, theme))
                 .child(label)
                 .into_any_element()
         }
@@ -451,15 +436,7 @@ pub fn render_secrets_view(
                             .child(format!("Namespace: {}", namespaces.summary_label())),
                     )
                 }),
-        )
-        .child(render_action_button(
-            "secrets-refresh-btn",
-            Icon::RefreshCw,
-            if is_loading { "Refreshing..." } else { "Refresh" },
-            is_loading,
-            theme,
-            on_refresh_rc.clone(),
-        ));
+        );
 
     let error_banner = state.error_message.as_ref().map(|message| {
         div()
