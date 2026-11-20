@@ -29,7 +29,8 @@ use crate::icons::render_icon;
 use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView};
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
-    ClusterSwitcherState, ConfigMapsState, DaemonSetsState, DeploymentsState, EventTypeFilter,
+    ClusterSwitcherState, ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState,
+    EventTypeFilter,
     EventsLoadStatus, EventsState, JobsState, NamespaceFilterState, NamespaceLoadStatus,
     NamespacesViewState, NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState,
     TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
@@ -184,6 +185,7 @@ pub fn select_workspace_view_with_state(
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
     jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -201,6 +203,7 @@ pub fn select_workspace_view_with_state(
         statefulsets,
         daemonsets,
         jobs,
+        cronjobs,
         pods,
         services,
         configmaps,
@@ -221,6 +224,7 @@ pub fn select_workspace_view_with_tabs(
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
     jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -241,6 +245,7 @@ pub fn select_workspace_view_with_tabs(
         statefulsets,
         daemonsets,
         jobs,
+        cronjobs,
         pods,
         services,
         configmaps,
@@ -266,6 +271,7 @@ fn load_command_for_active_view(
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
     jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -297,6 +303,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::Jobs && jobs.needs_load_for_cluster(cluster_id) {
         return Some(jobs.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::CronJobs && cronjobs.needs_load_for_cluster(cluster_id) {
+        return Some(cronjobs.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
         return Some(pods.begin_load_for_cluster(cluster_id));
@@ -331,6 +340,7 @@ pub fn apply_cluster_event_with_tabs(
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
     jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -352,6 +362,7 @@ pub fn apply_cluster_event_with_tabs(
         statefulsets,
         daemonsets,
         jobs,
+        cronjobs,
         pods,
         services,
         configmaps,
@@ -373,6 +384,7 @@ pub fn apply_cluster_event_with_tabs(
                 statefulsets,
                 daemonsets,
                 jobs,
+                cronjobs,
                 pods,
                 services,
                 configmaps,
@@ -401,6 +413,7 @@ pub fn handle_tab_shortcut_with_state(
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
     jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -447,6 +460,7 @@ pub fn handle_tab_shortcut_with_state(
         statefulsets,
         daemonsets,
         jobs,
+        cronjobs,
         pods,
         services,
         configmaps,
@@ -476,6 +490,7 @@ pub fn apply_cluster_event_with_workspace(
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
     jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -517,6 +532,11 @@ pub fn apply_cluster_event_with_workspace(
                     commands.push(jobs.begin_load_for_cluster(id));
                 } else {
                     jobs.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::CronJobs {
+                    commands.push(cronjobs.begin_load_for_cluster(id));
+                } else {
+                    cronjobs.reset_for_cluster(id);
                 }
                 if sidebar.active_view == WorkspaceView::Pods {
                     commands.push(pods.begin_load_for_cluster(id));
@@ -561,6 +581,7 @@ pub fn apply_cluster_event_with_workspace(
             statefulsets.reset_for_disconnected();
             daemonsets.reset_for_disconnected();
             jobs.reset_for_disconnected();
+            cronjobs.reset_for_disconnected();
             pods.reset_for_disconnected();
             services.reset_for_disconnected();
             configmaps.reset_for_disconnected();
@@ -658,6 +679,20 @@ pub fn apply_cluster_event_with_workspace(
             message,
         } => {
             jobs.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::CronJobsLoaded {
+            cluster_id,
+            generation,
+            cronjobs: loaded_cronjobs,
+        } => {
+            cronjobs.apply_loaded(&cluster_id, generation, loaded_cronjobs);
+        }
+        ClusterBridgeEvent::CronJobsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            cronjobs.apply_failed(&cluster_id, generation, message);
         }
         ClusterBridgeEvent::PodsLoaded {
             cluster_id,
@@ -826,6 +861,7 @@ pub struct OrbitShell {
     statefulsets: StatefulSetsState,
     daemonsets: DaemonSetsState,
     jobs: JobsState,
+    cronjobs: CronJobsState,
     pods: PodsState,
     services: ServicesState,
     configmaps: ConfigMapsState,
@@ -876,6 +912,7 @@ impl OrbitShell {
                             &mut shell.statefulsets,
                             &mut shell.daemonsets,
                             &mut shell.jobs,
+                            &mut shell.cronjobs,
                             &mut shell.pods,
                             &mut shell.services,
                             &mut shell.configmaps,
@@ -928,6 +965,7 @@ impl OrbitShell {
             statefulsets: StatefulSetsState::default(),
             daemonsets: DaemonSetsState::default(),
             jobs: JobsState::default(),
+            cronjobs: CronJobsState::default(),
             pods: PodsState::default(),
             services: ServicesState::default(),
             configmaps: ConfigMapsState::default(),
@@ -998,6 +1036,7 @@ impl OrbitShell {
             &mut self.statefulsets,
             &mut self.daemonsets,
             &mut self.jobs,
+            &mut self.cronjobs,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -1032,6 +1071,7 @@ impl OrbitShell {
             &mut self.statefulsets,
             &mut self.daemonsets,
             &mut self.jobs,
+            &mut self.cronjobs,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -1124,6 +1164,7 @@ impl OrbitShell {
                 | ResourceDrawerTarget::StatefulSet { .. }
                 | ResourceDrawerTarget::DaemonSet { .. }
                 | ResourceDrawerTarget::Job { .. }
+                | ResourceDrawerTarget::CronJob { .. }
                 | ResourceDrawerTarget::Pod { .. }
                 | ResourceDrawerTarget::Service { .. }
                 | ResourceDrawerTarget::ConfigMap { .. }
@@ -1218,6 +1259,11 @@ impl OrbitShell {
                 .jobs
                 .iter()
                 .any(|j| j.name == *name && j.namespace == *namespace),
+            ResourceDrawerTarget::CronJob { name, namespace } => self
+                .cronjobs
+                .cronjobs
+                .iter()
+                .any(|cj| cj.name == *name && cj.namespace == *namespace),
             ResourceDrawerTarget::Node { name } => self.nodes.nodes.iter().any(|n| n.name == *name),
             ResourceDrawerTarget::Namespace { name } => {
                 self.namespaces.namespaces.iter().any(|ns| ns.name == *name)
@@ -1512,6 +1558,60 @@ impl OrbitShell {
                     Some(SharedString::from(job.namespace.clone())),
                     Some(SharedString::from(job.age.clone())),
                     Some(SharedString::from(job.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::CronJob { name, namespace } => {
+                let cj = self
+                    .cronjobs
+                    .cronjobs
+                    .iter()
+                    .find(|c| c.name == *name && c.namespace == *namespace)?;
+                let matched_events =
+                    views::cronjobs::filter_events_for_cronjob(&self.events.events, cj);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::cronjobs::render_cronjob_drawer_overview(cj, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::cronjobs::render_cronjob_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        cj,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", cj.namespace, cj.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(cj.name.clone()),
+                    SharedString::from("CronJob"),
+                    Some(SharedString::from(cj.namespace.clone())),
+                    Some(SharedString::from(cj.age.clone())),
+                    Some(SharedString::from(views::cronjobs::cronjob_suspend_status(
+                        cj.suspend,
+                    ))),
                     tabs,
                     body,
                 ))
@@ -2010,6 +2110,15 @@ impl OrbitShell {
                     .jobs
                     .begin_refresh()
                     .unwrap_or_else(|| self.jobs.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::CronJobs
+                || self.cronjobs.cluster_id.is_some()
+            {
+                let cmd = self
+                    .cronjobs
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.cronjobs.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Pods || self.pods.cluster_id.is_some() {
@@ -4099,6 +4208,119 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::CronJobs {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.cronjobs.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::CronJob {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            cj: &orbit_core::kubernetes::models::CronJobInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = cj.name.clone();
+                let namespace = cj.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::CronJob {
+                    name: cj.name.clone(),
+                    namespace: cj.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::cronjobs::build_cronjob_context_menu_entries(
+                    cj,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::cronjobs::render_cronjobs_view(
+                &self.cronjobs,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Services {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -5375,6 +5597,7 @@ impl Render for OrbitShell {
                     &mut this.statefulsets,
                     &mut this.daemonsets,
                     &mut this.jobs,
+                    &mut this.cronjobs,
                     &mut this.pods,
                     &mut this.services,
                     &mut this.configmaps,
@@ -5826,6 +6049,7 @@ mod tests {
         let mut throwaway_statefulsets = StatefulSetsState::default();
         let mut throwaway_daemonsets = DaemonSetsState::default();
         let mut throwaway_jobs = JobsState::default();
+        let mut throwaway_cronjobs = CronJobsState::default();
         let mut throwaway_pods = PodsState::default();
         let mut throwaway_nodes = NodesState::default();
         apply_cluster_event_with_workspace(
@@ -5839,6 +6063,7 @@ mod tests {
             &mut throwaway_statefulsets,
             &mut throwaway_daemonsets,
             &mut throwaway_jobs,
+            &mut throwaway_cronjobs,
             &mut throwaway_pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5936,6 +6161,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5969,6 +6195,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6009,6 +6236,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6035,6 +6263,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6076,6 +6305,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6183,6 +6413,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6197,6 +6428,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6223,6 +6455,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6254,6 +6487,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6272,6 +6506,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6297,6 +6532,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6330,6 +6566,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6362,6 +6599,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6387,6 +6625,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6431,6 +6670,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6472,6 +6712,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6498,6 +6739,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6530,6 +6772,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6563,6 +6806,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6575,6 +6819,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6603,6 +6848,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6621,6 +6867,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6646,6 +6893,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6680,6 +6928,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6709,6 +6958,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6734,6 +6984,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6775,6 +7026,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6821,6 +7073,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6847,6 +7100,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6876,6 +7130,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6906,6 +7161,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6918,6 +7174,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6945,6 +7202,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6963,6 +7221,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6986,6 +7245,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -7012,6 +7272,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -7027,6 +7288,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7066,6 +7328,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7108,6 +7371,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7121,6 +7385,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7149,6 +7414,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7167,6 +7433,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -7190,6 +7457,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -7216,6 +7484,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7232,6 +7501,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7278,6 +7548,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7321,6 +7592,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7703,6 +7975,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7718,6 +7991,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7746,6 +8020,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7769,6 +8044,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7812,6 +8088,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7828,6 +8105,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7874,6 +8152,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7919,6 +8198,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7939,6 +8219,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7965,6 +8246,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7990,6 +8272,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8020,6 +8303,7 @@ mod tests {
                 &mut statefulsets,
                 &mut daemonsets,
                 &mut jobs,
+            &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -8079,6 +8363,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -8094,6 +8379,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8122,6 +8408,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods_on_connect,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8164,6 +8451,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -8182,6 +8470,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8210,6 +8499,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8236,6 +8526,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8342,6 +8633,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -8358,6 +8650,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8387,6 +8680,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services_on_connect,
             &mut ConfigMapsState::default(),
@@ -8429,6 +8723,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -8449,6 +8744,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8475,6 +8771,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8503,6 +8800,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8530,6 +8828,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -8557,6 +8856,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8598,6 +8898,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8697,6 +8998,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8712,6 +9014,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8745,6 +9048,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8766,6 +9070,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8792,6 +9097,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8822,6 +9128,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8853,6 +9160,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8889,6 +9197,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8913,6 +9222,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9020,6 +9330,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9036,6 +9347,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9066,6 +9378,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9088,6 +9401,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9114,6 +9428,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9141,6 +9456,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9172,6 +9488,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9209,6 +9526,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9233,6 +9551,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9370,6 +9689,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9386,6 +9706,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9416,6 +9737,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9437,6 +9759,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9467,6 +9790,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9501,6 +9825,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9519,6 +9844,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9578,6 +9904,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9595,6 +9922,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9638,6 +9966,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9664,6 +9993,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9694,6 +10024,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9722,6 +10053,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9770,6 +10102,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9789,6 +10122,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9810,6 +10144,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9836,6 +10171,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9862,6 +10198,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9888,6 +10225,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9914,6 +10252,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9940,6 +10279,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10005,6 +10345,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -10021,6 +10362,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10050,6 +10392,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10080,6 +10423,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10112,6 +10456,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -10130,6 +10475,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10198,6 +10544,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -10214,6 +10561,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10243,6 +10591,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10270,6 +10619,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10302,6 +10652,7 @@ mod tests {
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
         let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -10320,6 +10671,7 @@ mod tests {
             &mut statefulsets,
             &mut daemonsets,
             &mut jobs,
+            &mut cronjobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -10349,6 +10701,203 @@ mod tests {
         assert!(cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadJobs { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    fn make_test_cronjob(
+        name: &str,
+        namespace: &str,
+    ) -> orbit_core::kubernetes::models::CronJobInfo {
+        orbit_core::kubernetes::models::CronJobInfo {
+            kind: "CronJob".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            schedule: "0 2 * * *".to_string(),
+            suspend: false,
+            active: 1,
+            last_schedule: Some("5m ago".to_string()),
+            age: "2d".to_string(),
+            images: vec!["busybox:1.36".to_string()],
+            containers: Vec::new(),
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_selecting_cronjobs_view_dispatches_load_and_applies_events() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: Some("v1.31.0".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            WorkspaceView::CronJobs,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::CronJobs);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadCronJobs {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+
+        let cj = make_test_cronjob("nightly-backup", "prod");
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::CronJobsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                cronjobs: vec![cj],
+            },
+        );
+        assert_eq!(cronjobs.cronjobs.len(), 1);
+        assert_eq!(cronjobs.status, crate::state::CronJobsLoadStatus::Loaded);
+
+        let _ = cronjobs.begin_refresh();
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::CronJobsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(cronjobs.status, crate::state::CronJobsLoadStatus::Error);
+        assert_eq!(cronjobs.error_message.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn test_connecting_while_on_cronjobs_view_dispatches_load_cronjobs() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.select_view(WorkspaceView::CronJobs);
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.0".to_string()),
+                    error_message: None,
+                },
+                clusters: Vec::new(),
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("prod".to_string()),
+                    server_url: Some("https://10.0.0.10:6443".to_string()),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.0".to_string()),
+                },
+            },
+        );
+
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadCronJobs { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
     }
 }

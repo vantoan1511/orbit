@@ -4,8 +4,8 @@ use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, ConfigMapInfo, DaemonSetInfo, DeploymentInfo, EventInfo, JobInfo, NamespaceInfo,
-    NodeInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
+    ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, JobInfo,
+    NamespaceInfo, NodeInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -71,6 +71,10 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadJobs {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadCronJobs {
         cluster_id: String,
         generation: u64,
     },
@@ -216,6 +220,16 @@ pub enum ClusterBridgeEvent {
         jobs: Vec<JobInfo>,
     },
     JobsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    CronJobsLoaded {
+        cluster_id: String,
+        generation: u64,
+        cronjobs: Vec<CronJobInfo>,
+    },
+    CronJobsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -1113,6 +1127,108 @@ impl JobsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CronJobsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CronJobsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: CronJobsLoadStatus,
+    pub cronjobs: Vec<CronJobInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl CronJobsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = CronJobsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.cronjobs.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.cronjobs.is_empty();
+        ClusterBridgeCommand::LoadCronJobs {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = CronJobsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.cronjobs.is_empty();
+        Some(ClusterBridgeCommand::LoadCronJobs {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = CronJobsLoadStatus::Idle;
+        self.cronjobs.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = CronJobsLoadStatus::Idle;
+        self.cronjobs.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        cronjobs: Vec<CronJobInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = CronJobsLoadStatus::Loaded;
+            self.cronjobs = cronjobs;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = CronJobsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == CronJobsLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PodsLoadStatus {
     #[default]
     Idle,
@@ -1972,6 +2088,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::DaemonSetsLoadFailed { .. }
             | ClusterBridgeEvent::JobsLoaded { .. }
             | ClusterBridgeEvent::JobsLoadFailed { .. }
+            | ClusterBridgeEvent::CronJobsLoaded { .. }
+            | ClusterBridgeEvent::CronJobsLoadFailed { .. }
             | ClusterBridgeEvent::PodsLoaded { .. }
             | ClusterBridgeEvent::PodsLoadFailed { .. }
             | ClusterBridgeEvent::ServicesLoaded { .. }
@@ -3991,6 +4109,93 @@ mod tests {
         assert_eq!(state.status, JobsLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.jobs.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+    }
+
+    fn sample_cronjob(name: &str, namespace: &str) -> CronJobInfo {
+        CronJobInfo {
+            kind: "CronJob".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            schedule: "0 2 * * *".to_string(),
+            suspend: false,
+            active: 1,
+            last_schedule: Some("5m ago".to_string()),
+            age: "2d".to_string(),
+            images: vec!["busybox:1.36".to_string()],
+            containers: Vec::new(),
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_cronjobs_state_lifecycle_and_generation_guard() {
+        let mut state = CronJobsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadCronJobs {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, CronJobsLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let cj = sample_cronjob("nightly-backup", "prod");
+
+        // Stale cluster or generation must be rejected
+        assert!(!state.apply_loaded("ctx-other", 1, vec![cj.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![cj.clone()]));
+        assert!(!state.apply_failed("ctx-other", 1, "boom".to_string()));
+        assert!(!state.apply_failed("ctx-a", 99, "boom".to_string()));
+        assert!(state.cronjobs.is_empty());
+
+        // Matching cluster and generation loads rows
+        assert!(state.apply_loaded("ctx-a", 1, vec![cj]));
+        assert_eq!(state.status, CronJobsLoadStatus::Loaded);
+        assert_eq!(state.cronjobs.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Refresh increments generation while retaining cached rows
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadCronJobs {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, CronJobsLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert_eq!(state.cronjobs.len(), 1);
+
+        // Failure on generation 2 transitions to Error while retaining cached rows
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, CronJobsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+        assert_eq!(state.cronjobs.len(), 1);
+
+        // Reset for another cluster clears rows/selection/error and invalidates in-flight replies
+        state.table.selected_row_key = Some("prod/nightly-backup".to_string());
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, CronJobsLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.cronjobs.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(!state.apply_loaded("ctx-a", 2, vec![sample_cronjob("stale", "prod")]));
+
+        // Reset for disconnected clears cluster_id and rows
+        state.reset_for_disconnected();
+        assert_eq!(state.status, CronJobsLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.cronjobs.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
     }

@@ -238,6 +238,8 @@ pub struct CronJobInfo {
     pub last_schedule: Option<String>,
     pub age: String,
     pub images: Vec<String>,
+    #[serde(default)]
+    pub containers: Vec<ContainerImageInfo>,
     pub labels: std::collections::BTreeMap<String, String>,
     pub annotations: std::collections::BTreeMap<String, String>,
 }
