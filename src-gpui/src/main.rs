@@ -30,9 +30,9 @@ use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState,
 use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, ConfigMapsState, DaemonSetsState, DeploymentsState, EventTypeFilter,
-    EventsLoadStatus, EventsState, NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState,
-    NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState, TabDropPosition,
-    WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
+    EventsLoadStatus, EventsState, JobsState, NamespaceFilterState, NamespaceLoadStatus,
+    NamespacesViewState, NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState,
+    TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex};
 
@@ -183,6 +183,7 @@ pub fn select_workspace_view_with_state(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    jobs: &mut JobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -199,6 +200,7 @@ pub fn select_workspace_view_with_state(
         deployments,
         statefulsets,
         daemonsets,
+        jobs,
         pods,
         services,
         configmaps,
@@ -218,6 +220,7 @@ pub fn select_workspace_view_with_tabs(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    jobs: &mut JobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -237,6 +240,7 @@ pub fn select_workspace_view_with_tabs(
         deployments,
         statefulsets,
         daemonsets,
+        jobs,
         pods,
         services,
         configmaps,
@@ -261,6 +265,7 @@ fn load_command_for_active_view(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    jobs: &mut JobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -289,6 +294,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::DaemonSets && daemonsets.needs_load_for_cluster(cluster_id) {
         return Some(daemonsets.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::Jobs && jobs.needs_load_for_cluster(cluster_id) {
+        return Some(jobs.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Pods && pods.needs_load_for_cluster(cluster_id) {
         return Some(pods.begin_load_for_cluster(cluster_id));
@@ -322,6 +330,7 @@ pub fn apply_cluster_event_with_tabs(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    jobs: &mut JobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -342,6 +351,7 @@ pub fn apply_cluster_event_with_tabs(
         deployments,
         statefulsets,
         daemonsets,
+        jobs,
         pods,
         services,
         configmaps,
@@ -362,6 +372,7 @@ pub fn apply_cluster_event_with_tabs(
                 deployments,
                 statefulsets,
                 daemonsets,
+                jobs,
                 pods,
                 services,
                 configmaps,
@@ -389,6 +400,7 @@ pub fn handle_tab_shortcut_with_state(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    jobs: &mut JobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -434,6 +446,7 @@ pub fn handle_tab_shortcut_with_state(
         deployments,
         statefulsets,
         daemonsets,
+        jobs,
         pods,
         services,
         configmaps,
@@ -462,6 +475,7 @@ pub fn apply_cluster_event_with_workspace(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    jobs: &mut JobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
     configmaps: &mut ConfigMapsState,
@@ -498,6 +512,11 @@ pub fn apply_cluster_event_with_workspace(
                     commands.push(daemonsets.begin_load_for_cluster(id));
                 } else {
                     daemonsets.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::Jobs {
+                    commands.push(jobs.begin_load_for_cluster(id));
+                } else {
+                    jobs.reset_for_cluster(id);
                 }
                 if sidebar.active_view == WorkspaceView::Pods {
                     commands.push(pods.begin_load_for_cluster(id));
@@ -541,6 +560,7 @@ pub fn apply_cluster_event_with_workspace(
             deployments.reset_for_disconnected();
             statefulsets.reset_for_disconnected();
             daemonsets.reset_for_disconnected();
+            jobs.reset_for_disconnected();
             pods.reset_for_disconnected();
             services.reset_for_disconnected();
             configmaps.reset_for_disconnected();
@@ -624,6 +644,20 @@ pub fn apply_cluster_event_with_workspace(
             message,
         } => {
             daemonsets.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::JobsLoaded {
+            cluster_id,
+            generation,
+            jobs: loaded_jobs,
+        } => {
+            jobs.apply_loaded(&cluster_id, generation, loaded_jobs);
+        }
+        ClusterBridgeEvent::JobsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            jobs.apply_failed(&cluster_id, generation, message);
         }
         ClusterBridgeEvent::PodsLoaded {
             cluster_id,
@@ -791,6 +825,7 @@ pub struct OrbitShell {
     deployments: DeploymentsState,
     statefulsets: StatefulSetsState,
     daemonsets: DaemonSetsState,
+    jobs: JobsState,
     pods: PodsState,
     services: ServicesState,
     configmaps: ConfigMapsState,
@@ -840,6 +875,7 @@ impl OrbitShell {
                             &mut shell.deployments,
                             &mut shell.statefulsets,
                             &mut shell.daemonsets,
+                            &mut shell.jobs,
                             &mut shell.pods,
                             &mut shell.services,
                             &mut shell.configmaps,
@@ -891,6 +927,7 @@ impl OrbitShell {
             deployments: DeploymentsState::default(),
             statefulsets: StatefulSetsState::default(),
             daemonsets: DaemonSetsState::default(),
+            jobs: JobsState::default(),
             pods: PodsState::default(),
             services: ServicesState::default(),
             configmaps: ConfigMapsState::default(),
@@ -960,6 +997,7 @@ impl OrbitShell {
             &mut self.deployments,
             &mut self.statefulsets,
             &mut self.daemonsets,
+            &mut self.jobs,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -993,6 +1031,7 @@ impl OrbitShell {
             &mut self.deployments,
             &mut self.statefulsets,
             &mut self.daemonsets,
+            &mut self.jobs,
             &mut self.pods,
             &mut self.services,
             &mut self.configmaps,
@@ -1084,6 +1123,7 @@ impl OrbitShell {
             ResourceDrawerTarget::Deployment { .. }
                 | ResourceDrawerTarget::StatefulSet { .. }
                 | ResourceDrawerTarget::DaemonSet { .. }
+                | ResourceDrawerTarget::Job { .. }
                 | ResourceDrawerTarget::Pod { .. }
                 | ResourceDrawerTarget::Service { .. }
                 | ResourceDrawerTarget::ConfigMap { .. }
@@ -1173,6 +1213,11 @@ impl OrbitShell {
                 .daemonsets
                 .iter()
                 .any(|d| d.name == *name && d.namespace == *namespace),
+            ResourceDrawerTarget::Job { name, namespace } => self
+                .jobs
+                .jobs
+                .iter()
+                .any(|j| j.name == *name && j.namespace == *namespace),
             ResourceDrawerTarget::Node { name } => self.nodes.nodes.iter().any(|n| n.name == *name),
             ResourceDrawerTarget::Namespace { name } => {
                 self.namespaces.namespaces.iter().any(|ns| ns.name == *name)
@@ -1416,6 +1461,57 @@ impl OrbitShell {
                     Some(SharedString::from(ds.namespace.clone())),
                     Some(SharedString::from(ds.age.clone())),
                     Some(SharedString::from(ds.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::Job { name, namespace } => {
+                let job = self
+                    .jobs
+                    .jobs
+                    .iter()
+                    .find(|j| j.name == *name && j.namespace == *namespace)?;
+                let matched_events = views::jobs::filter_events_for_job(&self.events.events, job);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::jobs::render_job_drawer_overview(job, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::jobs::render_job_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        job,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", job.namespace, job.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(job.name.clone()),
+                    SharedString::from("Job"),
+                    Some(SharedString::from(job.namespace.clone())),
+                    Some(SharedString::from(job.age.clone())),
+                    Some(SharedString::from(job.status.clone())),
                     tabs,
                     body,
                 ))
@@ -1907,6 +2003,13 @@ impl OrbitShell {
                     .daemonsets
                     .begin_refresh()
                     .unwrap_or_else(|| self.daemonsets.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Jobs || self.jobs.cluster_id.is_some() {
+                let cmd = self
+                    .jobs
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.jobs.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Pods || self.pods.cluster_id.is_some() {
@@ -3883,6 +3986,119 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::Jobs {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.jobs.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.jobs.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Job {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            job: &orbit_core::kubernetes::models::JobInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = job.name.clone();
+                let namespace = job.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Job {
+                    name: job.name.clone(),
+                    namespace: job.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::jobs::build_job_context_menu_entries(
+                    job,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.jobs.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::jobs::render_jobs_view(
+                &self.jobs,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Services {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -5158,6 +5374,7 @@ impl Render for OrbitShell {
                     &mut this.deployments,
                     &mut this.statefulsets,
                     &mut this.daemonsets,
+                    &mut this.jobs,
                     &mut this.pods,
                     &mut this.services,
                     &mut this.configmaps,
@@ -5608,6 +5825,7 @@ mod tests {
         let mut throwaway_deployments = DeploymentsState::default();
         let mut throwaway_statefulsets = StatefulSetsState::default();
         let mut throwaway_daemonsets = DaemonSetsState::default();
+        let mut throwaway_jobs = JobsState::default();
         let mut throwaway_pods = PodsState::default();
         let mut throwaway_nodes = NodesState::default();
         apply_cluster_event_with_workspace(
@@ -5620,6 +5838,7 @@ mod tests {
             &mut throwaway_deployments,
             &mut throwaway_statefulsets,
             &mut throwaway_daemonsets,
+            &mut throwaway_jobs,
             &mut throwaway_pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5716,6 +5935,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5748,6 +5968,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5787,6 +6008,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5812,6 +6034,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5852,6 +6075,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -5958,6 +6182,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -5971,6 +6196,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -5996,6 +6222,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6026,6 +6253,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6043,6 +6271,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6067,6 +6296,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6099,6 +6329,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6130,6 +6361,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6154,6 +6386,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6197,6 +6430,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6237,6 +6471,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6262,6 +6497,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6293,6 +6529,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6325,6 +6562,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6336,6 +6574,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6363,6 +6602,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6380,6 +6620,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6404,6 +6645,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6437,6 +6679,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6465,6 +6708,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6489,6 +6733,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6529,6 +6774,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6574,6 +6820,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6599,6 +6846,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6627,6 +6875,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6656,6 +6905,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6667,6 +6917,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6693,6 +6944,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6710,6 +6962,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6732,6 +6985,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6757,6 +7011,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
 
@@ -6771,6 +7026,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6809,6 +7065,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6850,6 +7107,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6862,6 +7120,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6889,6 +7148,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -6906,6 +7166,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6928,6 +7189,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -6953,6 +7215,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -6968,6 +7231,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7013,6 +7277,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7055,6 +7320,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7436,6 +7702,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7450,6 +7717,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7477,6 +7745,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7499,6 +7768,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7541,6 +7811,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7556,6 +7827,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7601,6 +7873,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7645,6 +7918,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7664,6 +7938,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7689,6 +7964,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7713,6 +7989,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7742,6 +8019,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut jobs,
                 &mut pods,
                 &mut ServicesState::default(),
                 &mut ConfigMapsState::default(),
@@ -7800,6 +8078,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7814,6 +8093,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7841,6 +8121,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods_on_connect,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7882,6 +8163,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut nodes = NodesState::default();
         let mut events = EventsState::default();
@@ -7899,6 +8181,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7926,6 +8209,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -7951,6 +8235,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut ServicesState::default(),
             &mut ConfigMapsState::default(),
@@ -8056,6 +8341,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -8071,6 +8357,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8099,6 +8386,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services_on_connect,
             &mut ConfigMapsState::default(),
@@ -8140,6 +8428,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -8159,6 +8448,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8184,6 +8474,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8211,6 +8502,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8237,6 +8529,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut nodes = NodesState::default();
@@ -8263,6 +8556,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8303,6 +8597,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut ConfigMapsState::default(),
@@ -8401,6 +8696,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8415,6 +8711,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8447,6 +8744,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8467,6 +8765,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8492,6 +8791,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8521,6 +8821,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8551,6 +8852,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8586,6 +8888,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8609,6 +8912,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8715,6 +9019,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8730,6 +9035,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8759,6 +9065,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8780,6 +9087,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8805,6 +9113,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8831,6 +9140,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8861,6 +9171,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -8897,6 +9208,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -8920,6 +9232,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9056,6 +9369,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9071,6 +9385,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9100,6 +9415,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9120,6 +9436,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9149,6 +9466,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9182,6 +9500,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9199,6 +9518,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9257,6 +9577,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9273,6 +9594,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9315,6 +9637,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9340,6 +9663,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9369,6 +9693,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9396,6 +9721,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9443,6 +9769,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9461,6 +9788,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9481,6 +9809,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9506,6 +9835,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9531,6 +9861,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9556,6 +9887,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9572,6 +9904,32 @@ mod tests {
             ClusterBridgeCommand::LoadDaemonSets { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
 
+        // Navigate to Jobs
+        let jobs_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Jobs,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Jobs);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Jobs));
+        assert!(jobs_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadJobs { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+
         // Navigate to ReplicaSets (unimplemented list view — activates tab without panicking)
         let rs_cmds = select_workspace_view_with_tabs(
             &switcher,
@@ -9581,6 +9939,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9598,6 +9957,7 @@ mod tests {
                 | ClusterBridgeCommand::LoadDeployments { .. }
                 | ClusterBridgeCommand::LoadStatefulSets { .. }
                 | ClusterBridgeCommand::LoadDaemonSets { .. }
+                | ClusterBridgeCommand::LoadJobs { .. }
         )));
     }
 
@@ -9644,6 +10004,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9659,6 +10020,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9687,6 +10049,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9716,6 +10079,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9747,6 +10111,7 @@ mod tests {
         let mut deployments = DeploymentsState::default();
         let mut statefulsets = StatefulSetsState::default();
         let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
         let mut pods = PodsState::default();
         let mut services = ServicesState::default();
         let mut configmaps = ConfigMapsState::default();
@@ -9764,6 +10129,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut jobs,
             &mut pods,
             &mut services,
             &mut configmaps,
@@ -9793,6 +10159,196 @@ mod tests {
         assert!(cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadDaemonSets { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    fn make_test_job(name: &str, namespace: &str) -> orbit_core::kubernetes::models::JobInfo {
+        orbit_core::kubernetes::models::JobInfo {
+            kind: "Job".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Succeeded".to_string(),
+            completions: "1/1".to_string(),
+            duration: Some("30s".to_string()),
+            age: "5m".to_string(),
+            images: vec!["ghcr.io/orbit/migrate:v1".to_string()],
+            containers: vec![orbit_core::kubernetes::models::ContainerImageInfo {
+                name: "migrate".to_string(),
+                image: "ghcr.io/orbit/migrate:v1".to_string(),
+            }],
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_selecting_jobs_view_dispatches_load_and_applies_events() {
+        let mut switcher = ClusterSwitcherState::new();
+        switcher.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "prod".to_string(),
+            k8s_version: Some("v1.31.0".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmd = select_workspace_view_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            WorkspaceView::Jobs,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::Jobs);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadJobs {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+            })
+        );
+
+        let job = make_test_job("db-migrate", "prod");
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::JobsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                jobs: vec![job],
+            },
+        );
+        assert_eq!(jobs.jobs.len(), 1);
+        assert_eq!(jobs.status, crate::state::JobsLoadStatus::Loaded);
+
+        let _ = jobs.begin_refresh();
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::JobsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(jobs.status, crate::state::JobsLoadStatus::Error);
+        assert_eq!(jobs.error_message.as_deref(), Some("forbidden"));
+    }
+
+    #[test]
+    fn test_connecting_while_on_jobs_view_dispatches_load_jobs() {
+        use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
+        use orbit_core::kubernetes::models::UserProfileInfo;
+
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.select_view(WorkspaceView::Jobs);
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cmds = apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut pods,
+            &mut services,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.0".to_string()),
+                    error_message: None,
+                },
+                clusters: Vec::new(),
+                profile: UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    user_name: None,
+                    auth_type: "None".to_string(),
+                    cluster_name: Some("prod".to_string()),
+                    server_url: Some("https://10.0.0.10:6443".to_string()),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.0".to_string()),
+                },
+            },
+        );
+
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadJobs { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
     }
 }

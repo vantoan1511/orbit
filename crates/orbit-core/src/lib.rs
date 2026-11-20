@@ -1,6 +1,7 @@
 pub mod config;
 
 pub mod kubernetes {
+    pub mod batch;
     pub mod configmaps;
     pub mod events;
     pub mod manager;

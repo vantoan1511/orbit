@@ -2,6 +2,7 @@ pub mod configmaps;
 pub mod daemonsets;
 pub mod deployments;
 pub mod events;
+pub mod jobs;
 pub mod namespaces;
 pub mod nodes;
 pub mod offline;
