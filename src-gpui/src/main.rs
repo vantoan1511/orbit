@@ -31,8 +31,8 @@ use crate::state::{
     ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState,
     EventTypeFilter,
-    EventsLoadStatus, EventsState, JobsState, NamespaceFilterState, NamespaceLoadStatus,
-    NamespacesViewState, NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState,
+    EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
+    NamespaceLoadStatus, NamespacesViewState, NodesState, PodsState, SecretsState, ServicesState, StatefulSetsState,
     TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{
@@ -144,6 +144,7 @@ pub struct WorkspaceLoadingFlags {
     pub cronjobs: bool,
     pub pods: bool,
     pub services: bool,
+    pub ingresses: bool,
     pub configmaps: bool,
     pub secrets: bool,
     pub nodes: bool,
@@ -165,6 +166,7 @@ pub const fn is_workspace_view_loading(
         WorkspaceView::CronJobs => loading.cronjobs,
         WorkspaceView::Pods => loading.pods,
         WorkspaceView::Services => loading.services,
+        WorkspaceView::Ingresses => loading.ingresses,
         WorkspaceView::ConfigMaps => loading.configmaps,
         WorkspaceView::Secrets => loading.secrets,
         WorkspaceView::Nodes => loading.nodes,
@@ -236,6 +238,7 @@ pub fn select_workspace_view_with_state(
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
+    ingresses: &mut IngressesState,
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     nodes: &mut NodesState,
@@ -254,6 +257,7 @@ pub fn select_workspace_view_with_state(
         cronjobs,
         pods,
         services,
+        ingresses,
         configmaps,
         secrets,
         nodes,
@@ -275,6 +279,7 @@ pub fn select_workspace_view_with_tabs(
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
+    ingresses: &mut IngressesState,
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     nodes: &mut NodesState,
@@ -296,6 +301,7 @@ pub fn select_workspace_view_with_tabs(
         cronjobs,
         pods,
         services,
+        ingresses,
         configmaps,
         secrets,
         nodes,
@@ -322,6 +328,7 @@ fn load_command_for_active_view(
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
+    ingresses: &mut IngressesState,
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     nodes: &mut NodesState,
@@ -361,6 +368,9 @@ fn load_command_for_active_view(
     if view == WorkspaceView::Services && services.needs_load_for_cluster(cluster_id) {
         return Some(services.begin_load_for_cluster(cluster_id));
     }
+    if view == WorkspaceView::Ingresses && ingresses.needs_load_for_cluster(cluster_id) {
+        return Some(ingresses.begin_load_for_cluster(cluster_id));
+    }
     if view == WorkspaceView::ConfigMaps && configmaps.needs_load_for_cluster(cluster_id) {
         return Some(configmaps.begin_load_for_cluster(cluster_id));
     }
@@ -391,6 +401,7 @@ pub fn apply_cluster_event_with_tabs(
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
+    ingresses: &mut IngressesState,
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     nodes: &mut NodesState,
@@ -413,6 +424,7 @@ pub fn apply_cluster_event_with_tabs(
         cronjobs,
         pods,
         services,
+        ingresses,
         configmaps,
         secrets,
         nodes,
@@ -435,6 +447,7 @@ pub fn apply_cluster_event_with_tabs(
                 cronjobs,
                 pods,
                 services,
+                ingresses,
                 configmaps,
                 secrets,
                 nodes,
@@ -464,6 +477,7 @@ pub fn handle_tab_shortcut_with_state(
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
+    ingresses: &mut IngressesState,
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     nodes: &mut NodesState,
@@ -511,6 +525,7 @@ pub fn handle_tab_shortcut_with_state(
         cronjobs,
         pods,
         services,
+        ingresses,
         configmaps,
         secrets,
         nodes,
@@ -541,6 +556,7 @@ pub fn apply_cluster_event_with_workspace(
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
     services: &mut ServicesState,
+    ingresses: &mut IngressesState,
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     nodes: &mut NodesState,
@@ -596,6 +612,11 @@ pub fn apply_cluster_event_with_workspace(
                 } else {
                     services.reset_for_cluster(id);
                 }
+                if sidebar.active_view == WorkspaceView::Ingresses {
+                    commands.push(ingresses.begin_load_for_cluster(id));
+                } else {
+                    ingresses.reset_for_cluster(id);
+                }
                 if sidebar.active_view == WorkspaceView::ConfigMaps {
                     commands.push(configmaps.begin_load_for_cluster(id));
                 } else {
@@ -632,6 +653,7 @@ pub fn apply_cluster_event_with_workspace(
             cronjobs.reset_for_disconnected();
             pods.reset_for_disconnected();
             services.reset_for_disconnected();
+            ingresses.reset_for_disconnected();
             configmaps.reset_for_disconnected();
             secrets.reset_for_disconnected();
             nodes.reset_for_disconnected();
@@ -801,6 +823,20 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             services.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::IngressesLoaded {
+            cluster_id,
+            generation,
+            ingresses: loaded_ingresses,
+        } => {
+            ingresses.apply_loaded(&cluster_id, generation, loaded_ingresses);
+        }
+        ClusterBridgeEvent::IngressesLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            ingresses.apply_failed(&cluster_id, generation, message);
+        }
         ClusterBridgeEvent::ConfigMapsLoaded {
             cluster_id,
             generation,
@@ -912,6 +948,7 @@ pub struct OrbitShell {
     cronjobs: CronJobsState,
     pods: PodsState,
     services: ServicesState,
+    ingresses: IngressesState,
     configmaps: ConfigMapsState,
     secrets: SecretsState,
     nodes: NodesState,
@@ -963,6 +1000,7 @@ impl OrbitShell {
                             &mut shell.cronjobs,
                             &mut shell.pods,
                             &mut shell.services,
+                            &mut shell.ingresses,
                             &mut shell.configmaps,
                             &mut shell.secrets,
                             &mut shell.nodes,
@@ -1020,6 +1058,7 @@ impl OrbitShell {
             cronjobs: CronJobsState::default(),
             pods: PodsState::default(),
             services: ServicesState::default(),
+            ingresses: IngressesState::default(),
             configmaps: ConfigMapsState::default(),
             secrets: SecretsState::default(),
             nodes: NodesState::default(),
@@ -1091,6 +1130,7 @@ impl OrbitShell {
             &mut self.cronjobs,
             &mut self.pods,
             &mut self.services,
+            &mut self.ingresses,
             &mut self.configmaps,
             &mut self.secrets,
             &mut self.nodes,
@@ -1126,6 +1166,7 @@ impl OrbitShell {
             &mut self.cronjobs,
             &mut self.pods,
             &mut self.services,
+            &mut self.ingresses,
             &mut self.configmaps,
             &mut self.secrets,
             &mut self.nodes,
@@ -1219,6 +1260,7 @@ impl OrbitShell {
                 | ResourceDrawerTarget::CronJob { .. }
                 | ResourceDrawerTarget::Pod { .. }
                 | ResourceDrawerTarget::Service { .. }
+                | ResourceDrawerTarget::Ingress { .. }
                 | ResourceDrawerTarget::ConfigMap { .. }
                 | ResourceDrawerTarget::Secret { .. }
                 | ResourceDrawerTarget::Node { .. }
@@ -1335,6 +1377,11 @@ impl OrbitShell {
                 .services
                 .iter()
                 .any(|s| s.name == *name && s.namespace == *namespace),
+            ResourceDrawerTarget::Ingress { name, namespace } => self
+                .ingresses
+                .ingresses
+                .iter()
+                .any(|ing| ing.name == *name && ing.namespace == *namespace),
             ResourceDrawerTarget::ConfigMap { name, namespace } => self
                 .configmaps
                 .configmaps
@@ -1854,6 +1901,70 @@ impl OrbitShell {
                     body,
                 ))
             }
+            ResourceDrawerTarget::Ingress { name, namespace } => {
+                let ing = self
+                    .ingresses
+                    .ingresses
+                    .iter()
+                    .find(|i| i.name == *name && i.namespace == *namespace)?;
+                let matched_events =
+                    views::ingresses::filter_events_for_ingress(&self.events.events, ing);
+                let rules_tab_id = ResourceDrawerTabId::Custom(SharedString::from("rules"));
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: rules_tab_id.clone(),
+                        label: SharedString::from("Rules"),
+                        badge: Some(SharedString::from(ing.rules_summary.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match &self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::ingresses::render_ingress_drawer_overview(ing, theme)
+                    }
+                    ResourceDrawerTabId::Custom(id) if id.as_ref() == "rules" => {
+                        views::ingresses::render_ingress_drawer_rules(ing, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::ingresses::render_ingress_drawer_events(
+                        &self.events.events,
+                        events_loading,
+                        ing,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", ing.namespace, ing.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(ing.name.clone()),
+                    SharedString::from("Ingress"),
+                    Some(SharedString::from(ing.namespace.clone())),
+                    Some(SharedString::from(ing.age.clone())),
+                    ing.class_name
+                        .as_deref()
+                        .filter(|c| !c.trim().is_empty())
+                        .map(|c| SharedString::from(c.to_string())),
+                    tabs,
+                    body,
+                ))
+            }
             ResourceDrawerTarget::Service { name, namespace } => {
                 let svc = self
                     .services
@@ -2127,6 +2238,7 @@ impl OrbitShell {
                 cronjobs: self.cronjobs.status == crate::state::CronJobsLoadStatus::Loading,
                 pods: self.pods.status == crate::state::PodsLoadStatus::Loading,
                 services: self.services.status == crate::state::ServicesLoadStatus::Loading,
+                ingresses: self.ingresses.status == crate::state::IngressesLoadStatus::Loading,
                 configmaps: self.configmaps.status == crate::state::ConfigMapsLoadStatus::Loading,
                 secrets: self.secrets.status == crate::state::SecretsLoadStatus::Loading,
                 nodes: self.nodes.status == crate::state::NodesLoadStatus::Loading,
@@ -2212,6 +2324,15 @@ impl OrbitShell {
                     .services
                     .begin_refresh()
                     .unwrap_or_else(|| self.services.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::Ingresses
+                || self.ingresses.cluster_id.is_some()
+            {
+                let cmd = self
+                    .ingresses
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.ingresses.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::ConfigMaps
@@ -4573,6 +4694,128 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::Ingresses {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.ingresses.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.ingresses.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Ingress {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            ing: &orbit_core::kubernetes::models::IngressInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = ing.name.clone();
+                let namespace = ing.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Ingress {
+                    name: ing.name.clone(),
+                    namespace: ing.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::ingresses::build_ingress_context_menu_entries(
+                    ing,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.ingresses.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    if let ClusterConnectionState::Connected { cluster_id, .. } =
+                        &shell.state.connection_state
+                    {
+                        let cmd = shell
+                            .ingresses
+                            .begin_refresh()
+                            .unwrap_or_else(|| shell.ingresses.begin_load_for_cluster(cluster_id));
+                        shell.dispatch_command(cmd);
+                        cx.notify();
+                    }
+                });
+            };
+
+            return views::ingresses::render_ingresses_view(
+                &self.ingresses,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::ConfigMaps {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -5456,6 +5699,7 @@ impl OrbitShell {
                 | WorkspaceView::Deployments
                 | WorkspaceView::Pods
                 | WorkspaceView::Services
+                | WorkspaceView::Ingresses
                 | WorkspaceView::ConfigMaps
                 | WorkspaceView::Secrets
                 | WorkspaceView::Nodes
@@ -5703,6 +5947,7 @@ impl Render for OrbitShell {
                     &mut this.cronjobs,
                     &mut this.pods,
                     &mut this.services,
+                    &mut this.ingresses,
                     &mut this.configmaps,
                     &mut this.secrets,
                     &mut this.nodes,
@@ -6169,6 +6414,7 @@ mod tests {
             &mut throwaway_cronjobs,
             &mut throwaway_pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut throwaway_nodes,
@@ -6222,6 +6468,7 @@ mod tests {
             WorkspaceView::Jobs,
             WorkspaceView::CronJobs,
             WorkspaceView::Services,
+            WorkspaceView::Ingresses,
             WorkspaceView::ConfigMaps,
             WorkspaceView::Secrets,
             WorkspaceView::Nodes,
@@ -6277,6 +6524,7 @@ mod tests {
                 cronjobs: true,
                 pods: true,
                 services: true,
+                ingresses: true,
                 configmaps: true,
                 secrets: true,
                 nodes: true,
@@ -6362,6 +6610,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6403,6 +6652,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6430,6 +6680,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6472,6 +6723,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6595,6 +6847,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -6622,6 +6875,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6654,6 +6908,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6673,6 +6928,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -6733,6 +6989,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6766,6 +7023,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6792,6 +7050,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6879,6 +7138,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6906,6 +7166,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6939,6 +7200,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -6986,6 +7248,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7015,6 +7278,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7034,6 +7298,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -7095,6 +7360,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7125,6 +7391,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7151,6 +7418,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7240,6 +7508,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7267,6 +7536,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7297,6 +7567,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7341,6 +7612,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7369,6 +7641,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7388,6 +7661,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -7412,6 +7686,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -7455,6 +7730,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7495,6 +7771,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7552,6 +7829,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7581,6 +7859,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7600,6 +7879,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -7624,6 +7904,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -7668,6 +7949,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7715,6 +7997,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -7759,6 +8042,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8158,6 +8442,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8187,6 +8472,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8211,6 +8497,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8272,6 +8559,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8319,6 +8607,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8386,6 +8675,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8413,6 +8703,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8439,6 +8730,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8470,6 +8762,7 @@ mod tests {
             &mut cronjobs,
                 &mut pods,
                 &mut ServicesState::default(),
+                &mut IngressesState::default(),
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut nodes,
@@ -8546,6 +8839,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8575,6 +8869,7 @@ mod tests {
             &mut cronjobs,
             &mut pods_on_connect,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8637,6 +8932,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8666,6 +8962,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8693,6 +8990,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut ServicesState::default(),
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8817,6 +9115,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8847,6 +9146,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services_on_connect,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8911,6 +9211,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8938,6 +9239,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -8967,6 +9269,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -9023,6 +9326,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -9065,6 +9369,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut nodes,
@@ -9181,6 +9486,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut SecretsState::default(),
             &mut nodes,
@@ -9237,6 +9543,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut SecretsState::default(),
             &mut nodes,
@@ -9264,6 +9571,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut SecretsState::default(),
             &mut nodes,
@@ -9295,6 +9603,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut SecretsState::default(),
             &mut nodes,
@@ -9364,6 +9673,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut SecretsState::default(),
             &mut nodes,
@@ -9389,6 +9699,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut SecretsState::default(),
             &mut nodes,
@@ -9514,6 +9825,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9568,6 +9880,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9595,6 +9908,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9623,6 +9937,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9693,6 +10008,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9718,6 +10034,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9873,6 +10190,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9926,6 +10244,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -9957,6 +10276,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10011,6 +10331,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10089,6 +10410,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10133,6 +10455,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10160,6 +10483,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10191,6 +10515,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10220,6 +10545,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10289,6 +10615,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10311,6 +10638,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10338,6 +10666,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10365,6 +10694,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10392,6 +10722,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10419,6 +10750,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10446,6 +10778,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10529,6 +10862,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10559,6 +10893,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10590,6 +10925,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10642,6 +10978,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10728,6 +11065,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10758,6 +11096,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10786,6 +11125,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10838,6 +11178,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10925,6 +11266,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10955,6 +11297,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -10983,6 +11326,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -11035,6 +11379,7 @@ mod tests {
             &mut cronjobs,
             &mut pods,
             &mut services,
+            &mut IngressesState::default(),
             &mut configmaps,
             &mut secrets,
             &mut nodes,
@@ -11062,6 +11407,197 @@ mod tests {
         assert!(cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadCronJobs { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_is_workspace_view_loading_tracks_ingresses_status() {
+        assert!(!is_workspace_view_loading(
+            WorkspaceView::Ingresses,
+            WorkspaceLoadingFlags {
+                services: true,
+                ..Default::default()
+            },
+        ));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::Ingresses,
+            WorkspaceLoadingFlags {
+                ingresses: true,
+                ..Default::default()
+            },
+        ));
+    }
+
+    #[test]
+    fn test_selecting_ingresses_view_dispatches_load_and_handles_events() {
+        let mut state = ClusterSwitcherState::new();
+        state.active_cluster_id = Some("prod-ctx".to_string());
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut ingresses = IngressesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::Ingresses,
+        );
+        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Ingresses));
+        assert_eq!(sidebar.active_view, WorkspaceView::Ingresses);
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadIngresses { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+
+        // Receiving IngressesLoaded populates state
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::IngressesLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                ingresses: vec![orbit_core::kubernetes::models::IngressInfo {
+                    name: "web-ingress".to_string(),
+                    namespace: "prod".to_string(),
+                    class_name: Some("nginx".to_string()),
+                    hosts: "app.example.com".to_string(),
+                    address: "34.120.0.1".to_string(),
+                    ports: "80, 443".to_string(),
+                    age: "2d".to_string(),
+                    created: "Nov 18, 2026, 10:00 AM".to_string(),
+                    uid: "uid-ing-1".to_string(),
+                    labels: Default::default(),
+                    annotations: Default::default(),
+                    rules_summary: vec!["app.example.com -> / (web-svc:80)".to_string()],
+                }],
+            },
+        );
+        assert_eq!(ingresses.status, crate::state::IngressesLoadStatus::Loaded);
+        assert_eq!(ingresses.ingresses.len(), 1);
+        assert_eq!(ingresses.ingresses[0].name, "web-ingress");
+
+        // Disconnecting clears ingresses state
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ConnectionError {
+                cluster_id: Some("prod-ctx".to_string()),
+                message: "lost connection".to_string(),
+                clusters: vec![],
+            },
+        );
+        assert_eq!(ingresses.status, crate::state::IngressesLoadStatus::Idle);
+        assert!(ingresses.ingresses.is_empty());
+
+        // Connecting while already on WorkspaceView::Ingresses dispatches LoadIngresses
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadIngresses { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
     }
 }

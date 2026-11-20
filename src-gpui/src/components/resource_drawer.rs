@@ -64,6 +64,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    Ingress {
+        name: String,
+        namespace: String,
+    },
     ConfigMap {
         name: String,
         namespace: String,
@@ -95,6 +99,7 @@ impl ResourceDrawerTarget {
             Self::CronJob { .. } => "CronJob",
             Self::Pod { .. } => "Pod",
             Self::Service { .. } => "Service",
+            Self::Ingress { .. } => "Ingress",
             Self::ConfigMap { .. } => "ConfigMap",
             Self::Secret { .. } => "Secret",
             Self::Node { .. } => "Node",
@@ -112,6 +117,7 @@ impl ResourceDrawerTarget {
             | Self::CronJob { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
+            | Self::Ingress { name, .. }
             | Self::ConfigMap { name, .. }
             | Self::Secret { name, .. }
             | Self::Node { name }
@@ -129,6 +135,7 @@ impl ResourceDrawerTarget {
             | Self::CronJob { name, .. }
             | Self::Pod { name, .. }
             | Self::Service { name, .. }
+            | Self::Ingress { name, .. }
             | Self::ConfigMap { name, .. }
             | Self::Secret { name, .. }
             | Self::Node { name }
@@ -146,6 +153,7 @@ impl ResourceDrawerTarget {
             | Self::CronJob { namespace, .. }
             | Self::Pod { namespace, .. }
             | Self::Service { namespace, .. }
+            | Self::Ingress { namespace, .. }
             | Self::ConfigMap { namespace, .. }
             | Self::Secret { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
@@ -938,6 +946,32 @@ mod tests {
                 kind: "CronJob".to_string(),
                 namespace: Some("prod".to_string()),
                 name: "nightly-backup".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_ingress_drawer_target_metadata_and_yaml_support() {
+        let target = ResourceDrawerTarget::Ingress {
+            name: "web-ingress".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(target.kind(), "Ingress");
+        assert_eq!(target.name(), "web-ingress");
+        assert_eq!(target.display_title(), "web-ingress");
+        assert_eq!(target.namespace(), Some("prod"));
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let cmd = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+                kind: "Ingress".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "web-ingress".to_string(),
             })
         );
     }

@@ -3,6 +3,7 @@ pub mod cronjobs;
 pub mod daemonsets;
 pub mod deployments;
 pub mod events;
+pub mod ingresses;
 pub mod jobs;
 pub mod namespaces;
 pub mod nodes;
