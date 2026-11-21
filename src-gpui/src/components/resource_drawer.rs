@@ -76,6 +76,9 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    PersistentVolume {
+        name: String,
+    },
     Node {
         name: String,
     },
@@ -102,6 +105,7 @@ impl ResourceDrawerTarget {
             Self::Ingress { .. } => "Ingress",
             Self::ConfigMap { .. } => "ConfigMap",
             Self::Secret { .. } => "Secret",
+            Self::PersistentVolume { .. } => "PersistentVolume",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -120,6 +124,7 @@ impl ResourceDrawerTarget {
             | Self::Ingress { name, .. }
             | Self::ConfigMap { name, .. }
             | Self::Secret { name, .. }
+            | Self::PersistentVolume { name }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
@@ -138,6 +143,7 @@ impl ResourceDrawerTarget {
             | Self::Ingress { name, .. }
             | Self::ConfigMap { name, .. }
             | Self::Secret { name, .. }
+            | Self::PersistentVolume { name }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -157,7 +163,7 @@ impl ResourceDrawerTarget {
             | Self::ConfigMap { namespace, .. }
             | Self::Secret { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
-            Self::Node { .. } | Self::Namespace { .. } => None,
+            Self::PersistentVolume { .. } | Self::Node { .. } | Self::Namespace { .. } => None,
         }
     }
 
@@ -972,6 +978,31 @@ mod tests {
                 kind: "Ingress".to_string(),
                 namespace: Some("prod".to_string()),
                 name: "web-ingress".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_persistent_volume_drawer_target_metadata_and_yaml_support() {
+        let target = ResourceDrawerTarget::PersistentVolume {
+            name: "pv-data-01".to_string(),
+        };
+        assert_eq!(target.kind(), "PersistentVolume");
+        assert_eq!(target.name(), "pv-data-01");
+        assert_eq!(target.display_title(), "pv-data-01");
+        assert_eq!(target.namespace(), None);
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let cmd = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+                kind: "PersistentVolume".to_string(),
+                namespace: None,
+                name: "pv-data-01".to_string(),
             })
         );
     }
