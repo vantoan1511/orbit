@@ -6,7 +6,7 @@ use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, IngressInfo,
     JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeClaimInfo, PersistentVolumeInfo, PodInfo,
-    SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
+    PolicyInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -104,6 +104,10 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadPersistentVolumeClaims {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadNetworkPolicies {
         cluster_id: String,
         generation: u64,
     },
@@ -313,6 +317,16 @@ pub enum ClusterBridgeEvent {
         persistent_volume_claims: Vec<PersistentVolumeClaimInfo>,
     },
     PersistentVolumeClaimsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    NetworkPoliciesLoaded {
+        cluster_id: String,
+        generation: u64,
+        network_policies: Vec<PolicyInfo>,
+    },
+    NetworkPoliciesLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -2029,6 +2043,109 @@ impl PersistentVolumeClaimsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum NetworkPoliciesLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NetworkPoliciesState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: NetworkPoliciesLoadStatus,
+    pub network_policies: Vec<PolicyInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl NetworkPoliciesState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = NetworkPoliciesLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.network_policies.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.network_policies.is_empty();
+        ClusterBridgeCommand::LoadNetworkPolicies {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = NetworkPoliciesLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.network_policies.is_empty();
+        Some(ClusterBridgeCommand::LoadNetworkPolicies {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = NetworkPoliciesLoadStatus::Idle;
+        self.network_policies.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = NetworkPoliciesLoadStatus::Idle;
+        self.network_policies.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        network_policies: Vec<PolicyInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = NetworkPoliciesLoadStatus::Loaded;
+            self.network_policies = network_policies;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = NetworkPoliciesLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == NetworkPoliciesLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -2455,6 +2572,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::PersistentVolumesLoadFailed { .. }
             | ClusterBridgeEvent::PersistentVolumeClaimsLoaded { .. }
             | ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed { .. }
+            | ClusterBridgeEvent::NetworkPoliciesLoaded { .. }
+            | ClusterBridgeEvent::NetworkPoliciesLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -4811,6 +4930,97 @@ mod tests {
         assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.persistent_volume_claims.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+    }
+
+    fn sample_network_policy(name: &str, namespace: &str) -> PolicyInfo {
+        PolicyInfo {
+            uid: format!("uid-{name}"),
+            name: name.to_string(),
+            r#type: "Network Policy".to_string(),
+            scope: "Namespaced".to_string(),
+            namespace: namespace.to_string(),
+            status: "Enforced".to_string(),
+            mode: "Ingress, Egress".to_string(),
+            violations: 0,
+            last_updated: "2d".to_string(),
+            description: "Pods matching: app=api".to_string(),
+            rules: "policyTypes:\n- Ingress\n".to_string(),
+            kind: "NetworkPolicy".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_network_policies_state_lifecycle_and_generation_guard() {
+        let mut state = NetworkPoliciesState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadNetworkPolicies {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, NetworkPoliciesLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let policy = sample_network_policy("allow-api", "prod");
+
+        // Stale cluster or generation must be rejected
+        assert!(!state.apply_loaded("ctx-other", 1, vec![policy.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![policy.clone()]));
+        assert!(!state.apply_failed("ctx-other", 1, "boom".to_string()));
+        assert!(!state.apply_failed("ctx-a", 99, "boom".to_string()));
+        assert!(state.network_policies.is_empty());
+
+        // Matching cluster and generation loads rows
+        assert!(state.apply_loaded("ctx-a", 1, vec![policy]));
+        assert_eq!(state.status, NetworkPoliciesLoadStatus::Loaded);
+        assert_eq!(state.network_policies.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Refresh increments generation while retaining cached rows
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadNetworkPolicies {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, NetworkPoliciesLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert_eq!(state.network_policies.len(), 1);
+
+        // Failure on generation 2 transitions to Error while retaining cached rows
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, NetworkPoliciesLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+        assert_eq!(state.network_policies.len(), 1);
+
+        // Reset for another cluster clears rows/selection/error and invalidates in-flight replies
+        state.table.selected_row_key = Some("prod/allow-api".to_string());
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, NetworkPoliciesLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.network_policies.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(!state.apply_loaded(
+            "ctx-a",
+            2,
+            vec![sample_network_policy("stale", "prod")]
+        ));
+
+        // Reset for disconnected clears cluster_id and rows
+        state.reset_for_disconnected();
+        assert_eq!(state.status, NetworkPoliciesLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.network_policies.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
     }
