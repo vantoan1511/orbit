@@ -10,7 +10,7 @@ use orbit_core::kubernetes::configmaps::{format_size, parse_size_bytes};
 use orbit_core::kubernetes::models::{ConfigMapInfo, EventInfo};
 
 use crate::components::data_table::{
-    ColumnAlign, DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
+    DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
@@ -784,7 +784,7 @@ pub fn render_configmap_drawer_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::data_table::SortDirection;
+    use crate::components::data_table::{ColumnAlign, SortDirection};
     use std::collections::BTreeMap;
 
     fn make_configmap(
