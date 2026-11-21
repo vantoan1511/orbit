@@ -183,13 +183,27 @@ pub const fn is_workspace_view_loading(
     }
 }
 
-pub const fn sidebar_toggle_icon(is_collapsed: bool) -> Icon {
-    if is_collapsed {
-        Icon::PanelLeftOpen
-    } else {
-        Icon::PanelLeftClose
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub struct ShellChromeLayout {
+    pub show_activity_settings_btn: bool,
+    pub show_header_settings_btn: bool,
+    pub show_footer_settings_btn: bool,
+    pub show_header_breadcrumb: bool,
+    pub show_footer_breadcrumb: bool,
+    pub show_sidebar_panel_collapse_btn: bool,
+    pub show_header_sidebar_toggle_btn: bool,
 }
+
+pub const ORBIT_SHELL_CHROME: ShellChromeLayout = ShellChromeLayout {
+    show_activity_settings_btn: true,
+    show_header_settings_btn: false,
+    show_footer_settings_btn: false,
+    show_header_breadcrumb: false,
+    show_footer_breadcrumb: false,
+    show_sidebar_panel_collapse_btn: false,
+    show_header_sidebar_toggle_btn: false,
+};
 
 pub const fn dropdown_chevron_icon(is_open: bool) -> Icon {
     if is_open {
@@ -2925,44 +2939,46 @@ impl OrbitShell {
                     .flex_col()
                     .items_center()
                     .gap_1p5()
-                    .child(
-                        div()
-                            .id("activity-settings-btn")
-                            .relative()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(40.0))
-                            .h(px(34.0))
-                            .rounded(theme.style.radius_control)
-                            .cursor_pointer()
-                            .when(is_settings, |el| el.bg(nav.active_bg))
-                            .hover(move |style| style.bg(hover_bg))
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.select_workspace_view(WorkspaceView::Settings, cx);
-                            }))
-                            .when(is_settings, |el| {
-                                el.child(
-                                    div()
-                                        .absolute()
-                                        .left(px(-8.0))
-                                        .top(px(6.0))
-                                        .bottom(px(6.0))
-                                        .w(px(2.0))
-                                        .rounded_full()
-                                        .bg(nav.indicator),
-                                )
-                            })
-                            .child(render_icon(
-                                Icon::Settings,
-                                px(18.0),
-                                if is_settings {
-                                    nav.active_fg
-                                } else {
-                                    theme.text.secondary
-                                },
-                            )),
-                    ),
+                    .when(ORBIT_SHELL_CHROME.show_activity_settings_btn, |el| {
+                        el.child(
+                            div()
+                                .id("activity-settings-btn")
+                                .relative()
+                                .flex()
+                                .items_center()
+                                .justify_center()
+                                .w(px(40.0))
+                                .h(px(34.0))
+                                .rounded(theme.style.radius_control)
+                                .cursor_pointer()
+                                .when(is_settings, |el| el.bg(nav.active_bg))
+                                .hover(move |style| style.bg(hover_bg))
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.select_workspace_view(WorkspaceView::Settings, cx);
+                                }))
+                                .when(is_settings, |el| {
+                                    el.child(
+                                        div()
+                                            .absolute()
+                                            .left(px(-8.0))
+                                            .top(px(6.0))
+                                            .bottom(px(6.0))
+                                            .w(px(2.0))
+                                            .rounded_full()
+                                            .bg(nav.indicator),
+                                    )
+                                })
+                                .child(render_icon(
+                                    Icon::Settings,
+                                    px(18.0),
+                                    if is_settings {
+                                        nav.active_fg
+                                    } else {
+                                        theme.text.secondary
+                                    },
+                                )),
+                        )
+                    }),
             )
             .into_any_element()
     }
@@ -3113,7 +3129,6 @@ impl OrbitShell {
     fn render_sidebar_panel(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let category = self.sidebar.visible_panel_category()?;
         let theme = OrbitTheme::get(cx).clone();
-        let hover_bg = theme.surface.bg_hover;
 
         let body = if category == SidebarCategory::Clusters {
             self.render_clusters_sidebar_content(cx)
@@ -3142,30 +3157,11 @@ impl OrbitShell {
                         .border_color(theme.border.default)
                         .flex()
                         .items_center()
-                        .justify_between()
                         .child(
                             apply_text_step(div(), theme.typography.size_xs)
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .text_color(theme.text.muted)
                                 .child(category.label().to_ascii_uppercase()),
-                        )
-                        .child(
-                            div()
-                                .id("sidebar-collapse-btn")
-                                .px_1p5()
-                                .py_0p5()
-                                .rounded(theme.style.radius_control)
-                                .cursor_pointer()
-                                .hover(move |style| style.bg(hover_bg))
-                                .on_click(cx.listener(|this, _event, _window, cx| {
-                                    this.sidebar.toggle_collapse();
-                                    cx.notify();
-                                }))
-                                .child(render_icon(
-                                    Icon::PanelLeftClose,
-                                    px(14.0),
-                                    theme.text.secondary,
-                                )),
                         ),
                 )
                 .child(
@@ -3202,8 +3198,6 @@ impl OrbitShell {
         let presentation = format_cluster_status(&self.state, &theme);
         let cluster_chevron = dropdown_chevron_icon(self.state.dropdown_open);
         let control_hover = theme.surface.control_hover;
-        let (cat_label, view_label) = self.sidebar.active_view.breadcrumb();
-        let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
         let is_refreshing = self.is_active_view_loading();
 
         div()
@@ -3223,25 +3217,6 @@ impl OrbitShell {
                     .flex()
                     .items_center()
                     .gap_3()
-                    .child(
-                        theme
-                            .style_control(div().id("sidebar-toggle-btn"))
-                            .flex()
-                            .items_center()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_sm)
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.sidebar.toggle_collapse();
-                                cx.notify();
-                            }))
-                            .child(render_icon(
-                                sidebar_toggle_icon(self.sidebar.is_collapsed),
-                                px(14.0),
-                                theme.text.secondary,
-                            )),
-                    )
                     .child(
                         theme
                             .style_control(div().id("cluster-switcher-btn"))
@@ -3336,24 +3311,6 @@ impl OrbitShell {
                                     .child(render_icon(ns_chevron, px(13.0), theme.text.secondary)),
                             )
                         },
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_1p5()
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.muted)
-                                    .child(cat_label),
-                            )
-                            .child(render_icon(Icon::ChevronRight, px(12.0), theme.text.muted))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .text_color(theme.text.primary)
-                                    .child(view_label),
-                            ),
                     ),
             )
             .child(
@@ -3402,30 +3359,6 @@ impl OrbitShell {
                                         "Refresh"
                                     }),
                             ),
-                    )
-                    .child(
-                        theme
-                            .style_control(div().id("header-settings-btn"))
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(theme.typography.control_height_sm)
-                            .h(theme.typography.control_height_sm)
-                            .when(is_settings, |el| el.bg(theme.accent.soft))
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.select_workspace_view(WorkspaceView::Settings, cx);
-                            }))
-                            .child(render_icon(
-                                Icon::Settings,
-                                px(14.0),
-                                if is_settings {
-                                    theme.accent.accent
-                                } else {
-                                    theme.text.secondary
-                                },
-                            )),
                     )
                     .child(
                         theme
@@ -6434,7 +6367,6 @@ impl OrbitShell {
     fn render_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
         let presentation = format_cluster_status(&self.state, &theme);
-        let (cat_label, view_label) = self.sidebar.active_view.breadcrumb();
         let sidebar_status = if self.sidebar.is_collapsed {
             "Sidebar: Collapsed".to_string()
         } else {
@@ -6444,8 +6376,6 @@ impl OrbitShell {
             ClusterConnectionState::Connected { k8s_version, .. } => k8s_version.clone(),
             _ => None,
         };
-        let control_hover = theme.surface.control_hover;
-        let is_settings = self.sidebar.active_view == WorkspaceView::Settings;
 
         div()
             .id("orbit-footer-status-bar")
@@ -6463,25 +6393,6 @@ impl OrbitShell {
                     .flex()
                     .items_center()
                     .gap_3()
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.text.secondary)
-                                    .child(cat_label),
-                            )
-                            .child(render_icon(Icon::ChevronRight, px(11.0), theme.text.muted))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(theme.text.secondary)
-                                    .child(view_label),
-                            ),
-                    )
                     .child(
                         div()
                             .flex()
@@ -6524,32 +6435,7 @@ impl OrbitShell {
                                 .text_color(theme.text.muted)
                                 .child(format!("• {ver}")),
                         )
-                    })
-                    .child(
-                        div()
-                            .id("footer-settings-btn")
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .w(px(20.0))
-                            .h(px(18.0))
-                            .rounded(theme.style.radius_control)
-                            .cursor_pointer()
-                            .when(is_settings, |el| el.bg(theme.accent.soft))
-                            .hover(move |style| style.bg(control_hover))
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.select_workspace_view(WorkspaceView::Settings, cx);
-                            }))
-                            .child(render_icon(
-                                Icon::Settings,
-                                px(12.0),
-                                if is_settings {
-                                    theme.accent.accent
-                                } else {
-                                    theme.text.secondary
-                                },
-                            )),
-                    ),
+                    }),
             )
             .into_any_element()
     }
@@ -7255,14 +7141,6 @@ mod tests {
     #[test]
     fn test_header_and_status_icon_mapping() {
         assert_eq!(
-            char::from(sidebar_toggle_icon(true)),
-            char::from(Icon::PanelLeftOpen)
-        );
-        assert_eq!(
-            char::from(sidebar_toggle_icon(false)),
-            char::from(Icon::PanelLeftClose)
-        );
-        assert_eq!(
             char::from(dropdown_chevron_icon(true)),
             char::from(Icon::ChevronUp)
         );
@@ -7270,6 +7148,35 @@ mod tests {
             char::from(dropdown_chevron_icon(false)),
             char::from(Icon::ChevronDown)
         );
+    }
+
+    #[test]
+    fn test_shell_chrome_removes_redundant_controls() {
+        const {
+            assert!(ORBIT_SHELL_CHROME.show_activity_settings_btn);
+            assert!(!ORBIT_SHELL_CHROME.show_header_settings_btn);
+            assert!(!ORBIT_SHELL_CHROME.show_footer_settings_btn);
+            assert!(!ORBIT_SHELL_CHROME.show_header_breadcrumb);
+            assert!(!ORBIT_SHELL_CHROME.show_footer_breadcrumb);
+            assert!(!ORBIT_SHELL_CHROME.show_sidebar_panel_collapse_btn);
+            assert!(!ORBIT_SHELL_CHROME.show_header_sidebar_toggle_btn);
+        }
+
+        let mut sidebar = SidebarLayoutState::new();
+        assert!(!sidebar.is_collapsed);
+
+        // Ctrl+B / Cmd+B path
+        sidebar.toggle_collapse();
+        assert!(sidebar.is_collapsed);
+        sidebar.toggle_collapse();
+        assert!(!sidebar.is_collapsed);
+
+        // Activity Bar active category click path
+        let active_category = sidebar.active_category;
+        sidebar.toggle_category(active_category);
+        assert!(sidebar.is_collapsed);
+        sidebar.toggle_category(active_category);
+        assert!(!sidebar.is_collapsed);
     }
 
     #[test]
