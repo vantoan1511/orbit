@@ -112,9 +112,21 @@ jobs:
           }
           if (-not $nsis) { throw "NSIS installer not found" }
           echo "NSIS_INSTALLER_PATH=$($nsis.FullName)" >> $env:GITHUB_ENV
+      - name: Find MSI Installer
+        if: steps.meta.outputs.should_release == 'true'
+        run: |
+          $msi = Get-ChildItem -Path @("target/release/bundle/msi/*.msi", "src-tauri/target/release/bundle/msi/*.msi") -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $msi) {
+            $msi = Get-ChildItem target/release/bundle/msi/*.msi -ErrorAction SilentlyContinue | Select-Object -First 1
+          }
+          if (-not $msi) { throw "MSI installer not found" }
+          echo "MSI_INSTALLER_PATH=$($msi.FullName)" >> $env:GITHUB_ENV
       - name: Verify Installer Elevation (Legacy Client Backward-Compatibility)
         if: steps.meta.outputs.should_release == 'true'
         run: node --experimental-strip-types scripts/verify-installer-elevation.ts $env:NSIS_INSTALLER_PATH
+      - name: Verify GPUI Binary Bundled in Installers
+        if: steps.meta.outputs.should_release == 'true'
+        run: node --experimental-strip-types scripts/verify-gpui-bundle.ts --profile release --nsis "$env:NSIS_INSTALLER_PATH" --msi "$env:MSI_INSTALLER_PATH"
       - name: Create and Push Tag
         if: steps.meta.outputs.should_release == 'true'
         shell: pwsh
