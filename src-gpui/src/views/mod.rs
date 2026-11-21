@@ -9,6 +9,7 @@ pub mod namespaces;
 pub mod nodes;
 pub mod offline;
 pub mod overview;
+pub mod persistent_volume_claims;
 pub mod persistent_volumes;
 pub mod pods;
 pub mod secrets;

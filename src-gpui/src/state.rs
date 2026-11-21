@@ -5,8 +5,8 @@ use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, IngressInfo,
-    JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeInfo, PodInfo, SecretInfo, ServiceInfo,
-    StatefulSetInfo, UserProfileInfo,
+    JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeClaimInfo, PersistentVolumeInfo, PodInfo,
+    SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -100,6 +100,10 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadPersistentVolumes {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadPersistentVolumeClaims {
         cluster_id: String,
         generation: u64,
     },
@@ -299,6 +303,16 @@ pub enum ClusterBridgeEvent {
         persistent_volumes: Vec<PersistentVolumeInfo>,
     },
     PersistentVolumesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    PersistentVolumeClaimsLoaded {
+        cluster_id: String,
+        generation: u64,
+        persistent_volume_claims: Vec<PersistentVolumeClaimInfo>,
+    },
+    PersistentVolumeClaimsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -1912,6 +1926,109 @@ impl PersistentVolumesState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PersistentVolumeClaimsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PersistentVolumeClaimsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: PersistentVolumeClaimsLoadStatus,
+    pub persistent_volume_claims: Vec<PersistentVolumeClaimInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl PersistentVolumeClaimsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PersistentVolumeClaimsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.persistent_volume_claims.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.persistent_volume_claims.is_empty();
+        ClusterBridgeCommand::LoadPersistentVolumeClaims {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = PersistentVolumeClaimsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.persistent_volume_claims.is_empty();
+        Some(ClusterBridgeCommand::LoadPersistentVolumeClaims {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PersistentVolumeClaimsLoadStatus::Idle;
+        self.persistent_volume_claims.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = PersistentVolumeClaimsLoadStatus::Idle;
+        self.persistent_volume_claims.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        persistent_volume_claims: Vec<PersistentVolumeClaimInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PersistentVolumeClaimsLoadStatus::Loaded;
+            self.persistent_volume_claims = persistent_volume_claims;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PersistentVolumeClaimsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == PersistentVolumeClaimsLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -2336,6 +2453,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::SecretsLoadFailed { .. }
             | ClusterBridgeEvent::PersistentVolumesLoaded { .. }
             | ClusterBridgeEvent::PersistentVolumesLoadFailed { .. }
+            | ClusterBridgeEvent::PersistentVolumeClaimsLoaded { .. }
+            | ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -4605,6 +4724,93 @@ mod tests {
         assert_eq!(state.status, PersistentVolumesLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.persistent_volumes.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+    }
+
+    fn sample_persistent_volume_claim(name: &str, namespace: &str) -> PersistentVolumeClaimInfo {
+        PersistentVolumeClaimInfo {
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Bound".to_string(),
+            volume: "pv-data-01".to_string(),
+            capacity: "20Gi".to_string(),
+            access_mode: "ReadWriteOnce".to_string(),
+            storage_class: "gp3".to_string(),
+            age: "4d".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_persistent_volume_claims_state_lifecycle_and_generation_guard() {
+        let mut state = PersistentVolumeClaimsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadPersistentVolumeClaims {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let pvc = sample_persistent_volume_claim("data-pg-0", "prod");
+
+        // Stale cluster or generation must be rejected
+        assert!(!state.apply_loaded("ctx-other", 1, vec![pvc.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![pvc.clone()]));
+        assert!(!state.apply_failed("ctx-other", 1, "boom".to_string()));
+        assert!(!state.apply_failed("ctx-a", 99, "boom".to_string()));
+        assert!(state.persistent_volume_claims.is_empty());
+
+        // Matching cluster and generation loads rows
+        assert!(state.apply_loaded("ctx-a", 1, vec![pvc]));
+        assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Loaded);
+        assert_eq!(state.persistent_volume_claims.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Refresh increments generation while retaining cached rows
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadPersistentVolumeClaims {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert_eq!(state.persistent_volume_claims.len(), 1);
+
+        // Failure on generation 2 transitions to Error while retaining cached rows
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+        assert_eq!(state.persistent_volume_claims.len(), 1);
+
+        // Reset for another cluster clears rows/selection/error and invalidates in-flight replies
+        state.table.selected_row_key = Some("prod/data-pg-0".to_string());
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.persistent_volume_claims.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(!state.apply_loaded(
+            "ctx-a",
+            2,
+            vec![sample_persistent_volume_claim("stale", "prod")]
+        ));
+
+        // Reset for disconnected clears cluster_id and rows
+        state.reset_for_disconnected();
+        assert_eq!(state.status, PersistentVolumeClaimsLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.persistent_volume_claims.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
     }

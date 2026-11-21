@@ -79,6 +79,10 @@ pub enum ResourceDrawerTarget {
     PersistentVolume {
         name: String,
     },
+    PersistentVolumeClaim {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -106,6 +110,7 @@ impl ResourceDrawerTarget {
             Self::ConfigMap { .. } => "ConfigMap",
             Self::Secret { .. } => "Secret",
             Self::PersistentVolume { .. } => "PersistentVolume",
+            Self::PersistentVolumeClaim { .. } => "PersistentVolumeClaim",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -125,6 +130,7 @@ impl ResourceDrawerTarget {
             | Self::ConfigMap { name, .. }
             | Self::Secret { name, .. }
             | Self::PersistentVolume { name }
+            | Self::PersistentVolumeClaim { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
@@ -144,6 +150,7 @@ impl ResourceDrawerTarget {
             | Self::ConfigMap { name, .. }
             | Self::Secret { name, .. }
             | Self::PersistentVolume { name }
+            | Self::PersistentVolumeClaim { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -162,6 +169,7 @@ impl ResourceDrawerTarget {
             | Self::Ingress { namespace, .. }
             | Self::ConfigMap { namespace, .. }
             | Self::Secret { namespace, .. }
+            | Self::PersistentVolumeClaim { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
             Self::PersistentVolume { .. } | Self::Node { .. } | Self::Namespace { .. } => None,
         }
@@ -1003,6 +1011,32 @@ mod tests {
                 kind: "PersistentVolume".to_string(),
                 namespace: None,
                 name: "pv-data-01".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_resource_drawer_target_persistent_volume_claim_metadata_and_yaml_support() {
+        let target = ResourceDrawerTarget::PersistentVolumeClaim {
+            name: "data-pg-0".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(target.kind(), "PersistentVolumeClaim");
+        assert_eq!(target.name(), "data-pg-0");
+        assert_eq!(target.display_title(), "data-pg-0");
+        assert_eq!(target.namespace(), Some("prod"));
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let cmd = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+                kind: "PersistentVolumeClaim".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "data-pg-0".to_string(),
             })
         );
     }

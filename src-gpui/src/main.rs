@@ -32,7 +32,8 @@ use crate::state::{
     ClusterSwitcherState, ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState,
     EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
-    NamespaceLoadStatus, NamespacesViewState, NodesState, PersistentVolumesState, PodsState,
+    NamespaceLoadStatus, NamespacesViewState, NodesState, PersistentVolumeClaimsState,
+    PersistentVolumesState, PodsState,
     SecretsState, ServicesState, StatefulSetsState,
     TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
@@ -149,6 +150,7 @@ pub struct WorkspaceLoadingFlags {
     pub configmaps: bool,
     pub secrets: bool,
     pub persistent_volumes: bool,
+    pub persistent_volume_claims: bool,
     pub nodes: bool,
     pub events: bool,
 }
@@ -172,6 +174,7 @@ pub const fn is_workspace_view_loading(
         WorkspaceView::ConfigMaps => loading.configmaps,
         WorkspaceView::Secrets => loading.secrets,
         WorkspaceView::PersistentVolumes => loading.persistent_volumes,
+        WorkspaceView::PersistentVolumeClaims => loading.persistent_volume_claims,
         WorkspaceView::Nodes => loading.nodes,
         WorkspaceView::Events => loading.events,
         _ => false,
@@ -245,6 +248,7 @@ pub fn select_workspace_view_with_state(
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: WorkspaceView,
@@ -265,6 +269,7 @@ pub fn select_workspace_view_with_state(
         configmaps,
         secrets,
         persistent_volumes,
+        persistent_volume_claims,
         nodes,
         events,
         Some(view),
@@ -288,6 +293,7 @@ pub fn select_workspace_view_with_tabs(
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -311,6 +317,7 @@ pub fn select_workspace_view_with_tabs(
         configmaps,
         secrets,
         persistent_volumes,
+        persistent_volume_claims,
         nodes,
         events,
         view,
@@ -339,6 +346,7 @@ fn load_command_for_active_view(
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: Option<WorkspaceView>,
@@ -390,6 +398,11 @@ fn load_command_for_active_view(
     {
         return Some(persistent_volumes.begin_load_for_cluster(cluster_id));
     }
+    if view == WorkspaceView::PersistentVolumeClaims
+        && persistent_volume_claims.needs_load_for_cluster(cluster_id)
+    {
+        return Some(persistent_volume_claims.begin_load_for_cluster(cluster_id));
+    }
     if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
         return Some(nodes.begin_load_for_cluster(cluster_id));
     }
@@ -418,6 +431,7 @@ pub fn apply_cluster_event_with_tabs(
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -442,6 +456,7 @@ pub fn apply_cluster_event_with_tabs(
         configmaps,
         secrets,
         persistent_volumes,
+        persistent_volume_claims,
         nodes,
         events,
         event,
@@ -466,6 +481,7 @@ pub fn apply_cluster_event_with_tabs(
                 configmaps,
                 secrets,
                 persistent_volumes,
+                persistent_volume_claims,
                 nodes,
                 events,
                 restored,
@@ -497,6 +513,7 @@ pub fn handle_tab_shortcut_with_state(
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -546,6 +563,7 @@ pub fn handle_tab_shortcut_with_state(
         configmaps,
         secrets,
         persistent_volumes,
+        persistent_volume_claims,
         nodes,
         events,
         active,
@@ -578,6 +596,7 @@ pub fn apply_cluster_event_with_workspace(
     configmaps: &mut ConfigMapsState,
     secrets: &mut SecretsState,
     persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     event: ClusterBridgeEvent,
@@ -651,6 +670,11 @@ pub fn apply_cluster_event_with_workspace(
                 } else {
                     persistent_volumes.reset_for_cluster(id);
                 }
+                if sidebar.active_view == WorkspaceView::PersistentVolumeClaims {
+                    commands.push(persistent_volume_claims.begin_load_for_cluster(id));
+                } else {
+                    persistent_volume_claims.reset_for_cluster(id);
+                }
                 if sidebar.active_view == WorkspaceView::Nodes {
                     commands.push(nodes.begin_load_for_cluster(id));
                 } else {
@@ -681,6 +705,7 @@ pub fn apply_cluster_event_with_workspace(
             configmaps.reset_for_disconnected();
             secrets.reset_for_disconnected();
             persistent_volumes.reset_for_disconnected();
+            persistent_volume_claims.reset_for_disconnected();
             nodes.reset_for_disconnected();
             events.reset_for_disconnected();
         }
@@ -918,6 +943,20 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             persistent_volumes.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
+            cluster_id,
+            generation,
+            persistent_volume_claims: loaded_pvcs,
+        } => {
+            persistent_volume_claims.apply_loaded(&cluster_id, generation, loaded_pvcs);
+        }
+        ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            persistent_volume_claims.apply_failed(&cluster_id, generation, message);
+        }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
@@ -991,6 +1030,7 @@ pub struct OrbitShell {
     configmaps: ConfigMapsState,
     secrets: SecretsState,
     persistent_volumes: PersistentVolumesState,
+    persistent_volume_claims: PersistentVolumeClaimsState,
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
@@ -1044,6 +1084,7 @@ impl OrbitShell {
                             &mut shell.configmaps,
                             &mut shell.secrets,
                             &mut shell.persistent_volumes,
+                            &mut shell.persistent_volume_claims,
                             &mut shell.nodes,
                             &mut shell.events,
                             &mut shell.tabs,
@@ -1103,6 +1144,7 @@ impl OrbitShell {
             configmaps: ConfigMapsState::default(),
             secrets: SecretsState::default(),
             persistent_volumes: PersistentVolumesState::default(),
+            persistent_volume_claims: PersistentVolumeClaimsState::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
@@ -1176,6 +1218,7 @@ impl OrbitShell {
             &mut self.configmaps,
             &mut self.secrets,
             &mut self.persistent_volumes,
+            &mut self.persistent_volume_claims,
             &mut self.nodes,
             &mut self.events,
             &mut self.tabs,
@@ -1213,6 +1256,7 @@ impl OrbitShell {
             &mut self.configmaps,
             &mut self.secrets,
             &mut self.persistent_volumes,
+            &mut self.persistent_volume_claims,
             &mut self.nodes,
             &mut self.events,
             active,
@@ -1308,6 +1352,7 @@ impl OrbitShell {
                 | ResourceDrawerTarget::ConfigMap { .. }
                 | ResourceDrawerTarget::Secret { .. }
                 | ResourceDrawerTarget::PersistentVolume { .. }
+                | ResourceDrawerTarget::PersistentVolumeClaim { .. }
                 | ResourceDrawerTarget::Node { .. }
         ) {
             if let Some(cid) = cluster_id.as_deref() {
@@ -1442,6 +1487,11 @@ impl OrbitShell {
                 .secrets
                 .iter()
                 .any(|s| s.name == *name && s.namespace == *namespace),
+            ResourceDrawerTarget::PersistentVolumeClaim { name, namespace } => self
+                .persistent_volume_claims
+                .persistent_volume_claims
+                .iter()
+                .any(|p| p.name == *name && p.namespace == *namespace),
         };
         if !exists {
             self.drawer.close();
@@ -2268,6 +2318,64 @@ impl OrbitShell {
                     body,
                 ))
             }
+            ResourceDrawerTarget::PersistentVolumeClaim { name, namespace } => {
+                let pvc = self
+                    .persistent_volume_claims
+                    .persistent_volume_claims
+                    .iter()
+                    .find(|p| p.name == *name && p.namespace == *namespace)?;
+                let matched_events =
+                    views::persistent_volume_claims::filter_events_for_persistent_volume_claim(
+                        &self.events.events,
+                        pvc,
+                    );
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::persistent_volume_claims::render_persistent_volume_claim_drawer_overview(
+                            pvc, theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::persistent_volume_claims::render_persistent_volume_claim_drawer_events(
+                            &matched_events,
+                            events_loading,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", pvc.namespace, pvc.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(pvc.name.clone()),
+                    SharedString::from("PersistentVolumeClaim"),
+                    Some(SharedString::from(pvc.namespace.clone())),
+                    Some(SharedString::from(pvc.age.clone())),
+                    Some(SharedString::from(pvc.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
         }
     }
 
@@ -2349,6 +2457,8 @@ impl OrbitShell {
                 secrets: self.secrets.status == crate::state::SecretsLoadStatus::Loading,
                 persistent_volumes: self.persistent_volumes.status
                     == crate::state::PersistentVolumesLoadStatus::Loading,
+                persistent_volume_claims: self.persistent_volume_claims.status
+                    == crate::state::PersistentVolumeClaimsLoadStatus::Loading,
                 nodes: self.nodes.status == crate::state::NodesLoadStatus::Loading,
                 events: self.events.status == EventsLoadStatus::Loading,
             },
@@ -2468,6 +2578,18 @@ impl OrbitShell {
                     .persistent_volumes
                     .begin_refresh()
                     .unwrap_or_else(|| self.persistent_volumes.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::PersistentVolumeClaims
+                || self.persistent_volume_claims.cluster_id.is_some()
+            {
+                let cmd = self
+                    .persistent_volume_claims
+                    .begin_refresh()
+                    .unwrap_or_else(|| {
+                        self.persistent_volume_claims
+                            .begin_load_for_cluster(cluster_id)
+                    });
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
@@ -5499,6 +5621,125 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::PersistentVolumeClaims {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell
+                        .persistent_volume_claims
+                        .table
+                        .toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.persistent_volume_claims.table.selected_row_key =
+                        Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::PersistentVolumeClaim {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            pvc: &orbit_core::kubernetes::models::PersistentVolumeClaimInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = pvc.name.clone();
+                let namespace = pvc.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::PersistentVolumeClaim {
+                    name: pvc.name.clone(),
+                    namespace: pvc.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries =
+                    views::persistent_volume_claims::build_persistent_volume_claim_context_menu_entries(
+                        pvc,
+                        copy_name,
+                        filter_ns,
+                        refresh_cb,
+                        view_details,
+                        view_yaml,
+                    );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.persistent_volume_claims.table.selected_row_key =
+                        Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::persistent_volume_claims::render_persistent_volume_claims_view(
+                &self.persistent_volume_claims,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view == WorkspaceView::Nodes {
             let sort_entity = cx.entity().clone();
             let on_sort = move |col_id: SharedString,
@@ -5922,6 +6163,7 @@ impl OrbitShell {
                 | WorkspaceView::ConfigMaps
                 | WorkspaceView::Secrets
                 | WorkspaceView::PersistentVolumes
+                | WorkspaceView::PersistentVolumeClaims
                 | WorkspaceView::Nodes
                 | WorkspaceView::Events
         ) && matches!(
@@ -6171,6 +6413,7 @@ impl Render for OrbitShell {
                     &mut this.configmaps,
                     &mut this.secrets,
                     &mut this.persistent_volumes,
+                    &mut this.persistent_volume_claims,
                     &mut this.nodes,
                     &mut this.events,
                     &mut this.tabs,
@@ -6639,6 +6882,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut throwaway_nodes,
             &mut EventsState::default(),
             event,
@@ -6694,6 +6938,7 @@ mod tests {
             WorkspaceView::ConfigMaps,
             WorkspaceView::Secrets,
             WorkspaceView::PersistentVolumes,
+            WorkspaceView::PersistentVolumeClaims,
             WorkspaceView::Nodes,
             WorkspaceView::Namespaces,
         ] {
@@ -6734,6 +6979,13 @@ mod tests {
                 ..Default::default()
             },
         ));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::PersistentVolumeClaims,
+            WorkspaceLoadingFlags {
+                persistent_volume_claims: true,
+                ..Default::default()
+            },
+        ));
         assert!(!is_workspace_view_loading(
             WorkspaceView::Settings,
             WorkspaceLoadingFlags {
@@ -6751,6 +7003,7 @@ mod tests {
                 configmaps: true,
                 secrets: true,
                 persistent_volumes: true,
+                persistent_volume_claims: true,
                 nodes: true,
                 events: true,
             },
@@ -6838,6 +7091,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -6881,6 +7135,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::OverviewLoaded {
@@ -6910,6 +7165,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NamespacesLoaded {
@@ -6954,6 +7210,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7079,6 +7336,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Pods
@@ -7108,6 +7366,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Deployments,
@@ -7142,6 +7401,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -7163,6 +7423,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -7225,6 +7486,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -7260,6 +7522,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -7288,6 +7551,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7377,6 +7641,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -7406,6 +7671,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -7441,6 +7707,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoadFailed {
@@ -7490,6 +7757,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Nodes,
@@ -7521,6 +7789,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -7542,6 +7811,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -7605,6 +7875,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -7637,6 +7908,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -7665,6 +7937,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7756,6 +8029,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -7785,6 +8059,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -7817,6 +8092,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoadFailed {
@@ -7863,6 +8139,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Namespaces,
@@ -7893,6 +8170,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -7914,6 +8192,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -7940,6 +8219,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -7985,6 +8265,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -8027,6 +8308,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -8086,6 +8368,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Events,
@@ -8117,6 +8400,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Overview,
@@ -8138,6 +8422,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -8164,6 +8449,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -8210,6 +8496,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -8259,6 +8546,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -8305,6 +8593,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -8706,6 +8995,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -8737,6 +9027,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -8763,6 +9054,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -8826,6 +9118,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -8875,6 +9168,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -8944,6 +9238,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -8973,6 +9268,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9001,6 +9297,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9034,6 +9331,7 @@ mod tests {
                 &mut ConfigMapsState::default(),
                 &mut SecretsState::default(),
                 &mut PersistentVolumesState::default(),
+                &mut PersistentVolumeClaimsState::default(),
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -9112,6 +9410,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9143,6 +9442,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -9207,6 +9507,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoaded {
@@ -9238,6 +9539,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoadFailed {
@@ -9267,6 +9569,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -9393,6 +9696,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9425,6 +9729,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -9491,6 +9796,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -9520,6 +9826,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -9551,6 +9858,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoadFailed {
@@ -9609,6 +9917,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -9653,6 +9962,7 @@ mod tests {
             &mut ConfigMapsState::default(),
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -9771,6 +10081,7 @@ mod tests {
             &mut configmaps,
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::ConfigMaps,
@@ -9829,6 +10140,7 @@ mod tests {
             &mut configmaps,
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -9858,6 +10170,7 @@ mod tests {
             &mut configmaps,
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -9891,6 +10204,7 @@ mod tests {
             &mut configmaps,
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoadFailed {
@@ -9962,6 +10276,7 @@ mod tests {
             &mut configmaps,
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -9989,6 +10304,7 @@ mod tests {
             &mut configmaps,
             &mut SecretsState::default(),
             &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -10117,6 +10433,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Secrets,
@@ -10174,6 +10491,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoaded {
@@ -10203,6 +10521,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoaded {
@@ -10233,6 +10552,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoadFailed {
@@ -10306,6 +10626,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -10333,6 +10654,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -10491,6 +10813,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::StatefulSets,
@@ -10547,6 +10870,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::StatefulSetsLoaded {
@@ -10580,6 +10904,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::StatefulSetsLoadFailed {
@@ -10637,6 +10962,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10718,6 +11044,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::WorkloadsOverview,
@@ -10764,6 +11091,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
@@ -10793,6 +11121,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
@@ -10826,6 +11155,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -10857,6 +11187,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10929,6 +11260,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10953,6 +11285,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10982,6 +11315,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11011,6 +11345,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11040,6 +11375,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11069,6 +11405,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11098,6 +11435,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11184,6 +11522,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::DaemonSets,
@@ -11216,6 +11555,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::DaemonSetsLoaded {
@@ -11249,6 +11589,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::DaemonSetsLoadFailed {
@@ -11304,6 +11645,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11393,6 +11735,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Jobs,
@@ -11425,6 +11768,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::JobsLoaded {
@@ -11455,6 +11799,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::JobsLoadFailed {
@@ -11510,6 +11855,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11600,6 +11946,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::CronJobs,
@@ -11632,6 +11979,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::CronJobsLoaded {
@@ -11662,6 +12010,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::CronJobsLoadFailed {
@@ -11717,6 +12066,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11809,6 +12159,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11840,6 +12191,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::IngressesLoaded {
@@ -11884,6 +12236,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -11914,6 +12267,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -12005,6 +12359,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -12036,6 +12391,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PersistentVolumesLoaded {
@@ -12080,6 +12436,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -12113,6 +12470,7 @@ mod tests {
             &mut configmaps,
             &mut secrets,
             &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -12137,6 +12495,199 @@ mod tests {
         assert!(connect_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadPersistentVolumes { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_selecting_persistent_volume_claims_view_triggers_load_and_handles_events() {
+        let mut state = ClusterSwitcherState::new();
+        state.active_cluster_id = Some("prod-ctx".to_string());
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut ingresses = IngressesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut persistent_volumes = PersistentVolumesState::default();
+        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            WorkspaceView::PersistentVolumeClaims,
+        );
+        assert_eq!(
+            tabs.active_tab(),
+            Some(WorkspaceView::PersistentVolumeClaims)
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::PersistentVolumeClaims);
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPersistentVolumeClaims { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+
+        // Receiving PersistentVolumeClaimsLoaded populates state
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                persistent_volume_claims: vec![
+                    orbit_core::kubernetes::models::PersistentVolumeClaimInfo {
+                        name: "data-pg-0".to_string(),
+                        namespace: "prod".to_string(),
+                        status: "Bound".to_string(),
+                        volume: "pv-data-01".to_string(),
+                        capacity: "20Gi".to_string(),
+                        access_mode: "ReadWriteOnce".to_string(),
+                        storage_class: "gp3".to_string(),
+                        age: "4d".to_string(),
+                    },
+                ],
+            },
+        );
+        assert_eq!(
+            persistent_volume_claims.status,
+            crate::state::PersistentVolumeClaimsLoadStatus::Loaded
+        );
+        assert_eq!(persistent_volume_claims.persistent_volume_claims.len(), 1);
+        assert_eq!(
+            persistent_volume_claims.persistent_volume_claims[0].name,
+            "data-pg-0"
+        );
+
+        // Disconnecting clears persistent_volume_claims state
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ConnectionError {
+                cluster_id: Some("prod-ctx".to_string()),
+                message: "lost connection".to_string(),
+                clusters: vec![],
+            },
+        );
+        assert_eq!(
+            persistent_volume_claims.status,
+            crate::state::PersistentVolumeClaimsLoadStatus::Idle
+        );
+        assert!(persistent_volume_claims.persistent_volume_claims.is_empty());
+
+        // Connecting while already on WorkspaceView::PersistentVolumeClaims dispatches LoadPersistentVolumeClaims
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPersistentVolumeClaims { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
     }
 }
