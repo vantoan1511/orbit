@@ -17,7 +17,7 @@ use crate::components::{
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, ServiceTypeFilter, ServicesLoadStatus, ServicesState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button};
+pub use crate::views::{parse_age_seconds, render_action_button, table_numeric_font};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServicesPresentationMode {
@@ -313,7 +313,7 @@ fn render_service_cell(svc: &ServiceInfo, col: &TableColumn, theme: &OrbitTheme)
                             .bg(theme.surface.control_bg)
                             .border_1()
                             .border_color(theme.border.default)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .font(table_numeric_font(theme))
                             .text_color(theme.text.muted)
                             .flex_shrink_0()
                             .child(format!("+{extra}")),
@@ -373,7 +373,7 @@ fn render_summary_cards_row(
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_lg)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(card.primary_value),
                 )

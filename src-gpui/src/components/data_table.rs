@@ -3,8 +3,8 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, Div, ElementId, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, MouseDownEvent, Pixels, SharedString, StatefulInteractiveElement, Styled,
+    AnyElement, App, ClickEvent, Div, ElementId, Font, FontWeight, InteractiveElement, IntoElement,
+    MouseButton, MouseDownEvent, Pixels, Rgba, SharedString, StatefulInteractiveElement, Styled,
     UniformListScrollHandle, Window, div, prelude::*, px, uniform_list,
 };
 use lucide_icons::Icon;
@@ -237,6 +237,49 @@ pub fn apply_column_alignment<E: Styled>(el: E, align: ColumnAlign) -> E {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TableHeaderStyle {
+    pub text_color: Rgba,
+    pub font_weight: FontWeight,
+    pub icon_color: Rgba,
+}
+
+/// 3-tier ink contract for table headers:
+/// - Inactive header: `theme.text.muted`, `FontWeight::MEDIUM`, muted sort indicator.
+/// - Active sort header: `theme.text.primary`, `FontWeight::MEDIUM`, accent sort indicator.
+pub fn resolve_table_header_style(is_active_sort: bool, theme: &OrbitTheme) -> TableHeaderStyle {
+    if is_active_sort {
+        TableHeaderStyle {
+            text_color: theme.text.primary,
+            font_weight: FontWeight::MEDIUM,
+            icon_color: theme.accent.accent,
+        }
+    } else {
+        TableHeaderStyle {
+            text_color: theme.text.muted,
+            font_weight: FontWeight::MEDIUM,
+            icon_color: theme.text.muted,
+        }
+    }
+}
+
+/// Right-aligned columns place the sort icon BEFORE the header label so the label's
+/// right edge aligns pixel-flush with right-aligned numeric cell digits below.
+/// Left and Center columns place the sort icon AFTER the header label.
+pub fn table_header_icon_before_label(align: ColumnAlign) -> bool {
+    align == ColumnAlign::Right
+}
+
+/// Returns tabular monospace font (`FontWeight::NORMAL`, `tnum = 1`) for monospace/numeric
+/// columns (`col.monospace == true`), or `None` to inherit standard UI typography.
+pub fn resolve_table_cell_font(col: &TableColumn, theme: &OrbitTheme) -> Option<Font> {
+    if col.monospace {
+        Some(theme.typography.mono_font(FontWeight::NORMAL))
+    } else {
+        None
+    }
+}
+
 pub type SortCallback = Rc<dyn Fn(SharedString, &ClickEvent, &mut Window, &mut App)>;
 pub type RowClickCallback = Rc<dyn Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App)>;
 pub type RowContextMenuCallback =
@@ -349,24 +392,24 @@ pub fn render_table_header(
             });
         }
 
+        let header_style = resolve_table_header_style(is_active_sort, theme);
         let label = apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::SEMIBOLD)
-            .text_color(if is_active_sort {
-                theme.text.primary
-            } else {
-                theme.text.secondary
-            })
+            .font_weight(header_style.font_weight)
+            .text_color(header_style.text_color)
             .child(col.header.clone());
 
-        cell = cell.child(label);
+        let icon_el = sort_icon.map(|icon| render_icon(icon, px(12.0), header_style.icon_color));
 
-        if let Some(icon) = sort_icon {
-            let icon_color = if is_active_sort {
-                theme.accent.accent
-            } else {
-                theme.text.muted
-            };
-            cell = cell.child(render_icon(icon, px(12.0), icon_color));
+        if table_header_icon_before_label(col.align) {
+            if let Some(icon_el) = icon_el {
+                cell = cell.child(icon_el);
+            }
+            cell = cell.child(label);
+        } else {
+            cell = cell.child(label);
+            if let Some(icon_el) = icon_el {
+                cell = cell.child(icon_el);
+            }
         }
 
         header_row = header_row.child(cell);
@@ -380,7 +423,7 @@ pub fn render_table_cell(
     theme: &OrbitTheme,
     content: impl IntoElement,
 ) -> Div {
-    let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
+    let cell_font = resolve_table_cell_font(col, theme);
     apply_column_alignment(apply_column_width(div(), col.width), col.align)
         .h_full()
         .px_3()
@@ -390,7 +433,7 @@ pub fn render_table_cell(
         .text_size(theme.typography.size_xs.font_size)
         .line_height(theme.typography.size_xs.line_height)
         .text_color(theme.text.primary)
-        .when(col.monospace, |el| el.font(mono_font))
+        .when_some(cell_font, |el, font| el.font(font))
         .child(content)
 }
 
@@ -810,5 +853,70 @@ mod tests {
 
         assert!(with_both.on_row_click.is_some());
         assert!(with_both.on_row_context_menu.is_some());
+    }
+
+    #[test]
+    fn test_table_header_style_uses_muted_inactive_and_primary_active_without_bolding() {
+        use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+
+        for (mode, appearance) in [
+            (ThemeMode::Light, gpui::WindowAppearance::Light),
+            (ThemeMode::Dark, gpui::WindowAppearance::Dark),
+        ] {
+            let theme = OrbitTheme::resolve(
+                mode,
+                UiStyle::Flat,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                appearance,
+            );
+
+            let inactive = resolve_table_header_style(false, &theme);
+            assert_eq!(inactive.text_color, theme.text.muted);
+            assert_eq!(inactive.font_weight, FontWeight::MEDIUM);
+            assert_eq!(inactive.icon_color, theme.text.muted);
+
+            let active = resolve_table_header_style(true, &theme);
+            assert_eq!(active.text_color, theme.text.primary);
+            assert_eq!(active.font_weight, FontWeight::MEDIUM);
+            assert_eq!(active.icon_color, theme.accent.accent);
+        }
+    }
+
+    #[test]
+    fn test_table_header_icon_order_aligns_edges_for_left_center_and_right_columns() {
+        assert!(table_header_icon_before_label(ColumnAlign::Right));
+        assert!(!table_header_icon_before_label(ColumnAlign::Left));
+        assert!(!table_header_icon_before_label(ColumnAlign::Center));
+    }
+
+    #[test]
+    fn test_table_cell_font_enables_tabular_numerals_for_right_numeric_and_monospace_columns() {
+        use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            gpui::WindowAppearance::Dark,
+        );
+
+        let col_name = TableColumn::new("name", "Name");
+        let col_replicas = TableColumn::new("replicas", "Replicas").right_numeric();
+        let col_actions = TableColumn::new("actions", "Actions").align(ColumnAlign::Center);
+
+        assert!(resolve_table_cell_font(&col_name, &theme).is_none());
+        assert!(resolve_table_cell_font(&col_actions, &theme).is_none());
+
+        let font = resolve_table_cell_font(&col_replicas, &theme)
+            .expect("right_numeric column should resolve tabular monospace font");
+        assert_eq!(font.weight, FontWeight::NORMAL);
+        assert!(
+            font.features
+                .tag_value_list()
+                .iter()
+                .any(|(tag, val)| tag == "tnum" && *val == 1)
+        );
     }
 }

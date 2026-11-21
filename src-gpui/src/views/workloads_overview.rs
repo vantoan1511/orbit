@@ -228,6 +228,7 @@ fn render_semantic_counter(
         .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(dot_color))
         .child(
             apply_text_step(div(), theme.typography.size_xs)
+                .font(theme.typography.tabular_ui_font(FontWeight::NORMAL))
                 .text_color(theme.text.secondary)
                 .child(format!("{label}: {count}")),
         )
@@ -312,7 +313,7 @@ fn render_summary_toolbar(
                 .child(render_summary_metric(
                     "Total Workloads",
                     apply_text_step(div(), theme.typography.size_sm)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(counts.total.to_string())
                         .into_any_element(),
@@ -512,7 +513,7 @@ fn render_workload_card(
                 .gap_2()
                 .child(
                     apply_text_step(div(), theme.typography.size_xl)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(card.counts.total.to_string()),
                 )

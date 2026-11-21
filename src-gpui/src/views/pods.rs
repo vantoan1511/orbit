@@ -19,6 +19,7 @@ use crate::state::{NamespaceFilterState, PodsLoadStatus, PodsState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
 pub use crate::views::{
     nonzero_metric_text_color, numeric_metric_text_color, parse_age_seconds, render_action_button,
+    render_ratio_metric_cell, table_numeric_font,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -284,32 +285,16 @@ fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
             let (ready, total) = pod_ready_counts(pod);
             if total == 0 {
                 apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::NORMAL))
+                    .font(table_numeric_font(theme))
                     .text_color(theme.text.muted)
                     .child("-")
                     .into_any_element()
             } else {
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_end()
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .font(theme.typography.mono_font(FontWeight::SEMIBOLD))
-                            .text_color(numeric_metric_text_color(theme))
-                            .child(ready.to_string()),
-                    )
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .font(theme.typography.mono_font(FontWeight::NORMAL))
-                            .text_color(theme.text.muted)
-                            .child(format!("/{total}")),
-                    )
-                    .into_any_element()
+                render_ratio_metric_cell(ready.to_string(), total.to_string(), theme)
             }
         }
         "restarts" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .font(table_numeric_font(theme))
             .text_color(nonzero_metric_text_color(pod.restarts, theme))
             .child(pod.restarts.to_string())
             .into_any_element(),
@@ -393,7 +378,7 @@ fn render_summary_cards_row(
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_lg)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(card.primary_value),
                 )
@@ -921,6 +906,11 @@ mod tests {
         for id in ["ready", "restarts", "cpu", "memory", "age"] {
             let col = cols.iter().find(|c| c.id == id).unwrap();
             assert_eq!(col.align, ColumnAlign::Right, "column {id} should be right-aligned");
+            assert!(col.monospace, "column {id} should be monospace");
+        }
+        for id in ["name", "namespace", "status", "node", "ip"] {
+            let col = cols.iter().find(|c| c.id == id).unwrap();
+            assert_eq!(col.align, ColumnAlign::Left, "column {id} should be left-aligned");
         }
         for id in ["node", "ip"] {
             let col = cols.iter().find(|c| c.id == id).unwrap();

@@ -19,7 +19,7 @@ use crate::state::{DeploymentsLoadStatus, DeploymentsState, NamespaceFilterState
 use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
     format_images_summary, format_short_image, numeric_metric_text_color, parse_age_seconds,
-    render_action_button,
+    render_action_button, render_ratio_metric_cell, table_numeric_font,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -164,30 +164,18 @@ fn render_deployment_cell(
             .child(dep.namespace.clone())
             .into_any_element(),
         "status" => render_status_badge_from_str(&dep.status, StatusBadgeVariant::Inline, theme),
-        "replicas" => div()
-            .flex()
-            .items_center()
-            .justify_end()
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::SEMIBOLD))
-                    .text_color(theme.text.primary)
-                    .child(dep.replicas.current.to_string()),
-            )
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::NORMAL))
-                    .text_color(theme.text.muted)
-                    .child(format!("/{}", dep.replicas.desired)),
-            )
-            .into_any_element(),
+        "replicas" => render_ratio_metric_cell(
+            dep.replicas.current.to_string(),
+            dep.replicas.desired.to_string(),
+            theme,
+        ),
         "up_to_date" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(theme.text.primary)
+            .font(table_numeric_font(theme))
+            .text_color(numeric_metric_text_color(theme))
             .child(dep.up_to_date.to_string())
             .into_any_element(),
         "available" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .font(table_numeric_font(theme))
             .text_color(numeric_metric_text_color(theme))
             .child(dep.available.to_string())
             .into_any_element(),
@@ -218,7 +206,7 @@ fn render_deployment_cell(
                             .flex_shrink_0()
                             .rounded(theme.style.radius_control)
                             .bg(theme.surface.bg_hover)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .font(table_numeric_font(theme))
                             .text_color(theme.text.muted)
                             .child(format!("+{extra}")),
                     )
@@ -807,6 +795,13 @@ mod tests {
                 .expect("numeric column present");
             assert_eq!(col.align, ColumnAlign::Right, "{numeric_id} right-aligned");
             assert!(col.monospace, "{numeric_id} monospace");
+        }
+        for text_id in ["name", "namespace", "status", "strategy", "images"] {
+            let col = cols
+                .iter()
+                .find(|c| c.id.as_ref() == text_id)
+                .expect("text column present");
+            assert_eq!(col.align, ColumnAlign::Left, "{text_id} left-aligned");
         }
     }
 

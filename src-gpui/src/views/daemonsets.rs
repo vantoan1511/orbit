@@ -19,6 +19,7 @@ use crate::state::{DaemonSetsLoadStatus, DaemonSetsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
     format_images_summary, numeric_metric_text_color, parse_age_seconds, render_action_button,
+    render_ratio_metric_cell, table_numeric_font,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,35 +164,23 @@ fn render_daemonset_cell(ds: &DaemonSetInfo, col: &TableColumn, theme: &OrbitThe
             .child(ds.namespace.clone())
             .into_any_element(),
         "status" => render_status_badge_from_str(&ds.status, StatusBadgeVariant::Inline, theme),
-        "desired_current" => div()
-            .flex()
-            .items_center()
-            .justify_end()
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::SEMIBOLD))
-                    .text_color(theme.text.primary)
-                    .child(ds.replicas.desired.to_string()),
-            )
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::NORMAL))
-                    .text_color(theme.text.muted)
-                    .child(format!("/{}", ds.replicas.current)),
-            )
-            .into_any_element(),
+        "desired_current" => render_ratio_metric_cell(
+            ds.replicas.desired.to_string(),
+            ds.replicas.current.to_string(),
+            theme,
+        ),
         "ready" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .font(table_numeric_font(theme))
             .text_color(numeric_metric_text_color(theme))
             .child(ds.replicas.ready.to_string())
             .into_any_element(),
         "up_to_date" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(theme.text.primary)
+            .font(table_numeric_font(theme))
+            .text_color(numeric_metric_text_color(theme))
             .child(ds.replicas.up_to_date.to_string())
             .into_any_element(),
         "available" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .font(table_numeric_font(theme))
             .text_color(numeric_metric_text_color(theme))
             .child(ds.replicas.available.to_string())
             .into_any_element(),
@@ -217,7 +206,7 @@ fn render_daemonset_cell(ds: &DaemonSetInfo, col: &TableColumn, theme: &OrbitThe
                             .flex_shrink_0()
                             .rounded(theme.style.radius_control)
                             .bg(theme.surface.bg_hover)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .font(table_numeric_font(theme))
                             .text_color(theme.text.muted)
                             .child(format!("+{extra}")),
                     )
@@ -655,11 +644,13 @@ mod tests {
                 "Age",
             ]
         );
-        assert_eq!(cols[3].align, ColumnAlign::Right);
-        assert_eq!(cols[4].align, ColumnAlign::Right);
-        assert_eq!(cols[5].align, ColumnAlign::Right);
-        assert_eq!(cols[6].align, ColumnAlign::Right);
-        assert_eq!(cols[8].align, ColumnAlign::Right);
+        for idx in [3, 4, 5, 6, 8] {
+            assert_eq!(cols[idx].align, ColumnAlign::Right);
+            assert!(cols[idx].monospace);
+        }
+        for idx in [0, 1, 2, 7] {
+            assert_eq!(cols[idx].align, ColumnAlign::Left);
+        }
     }
 
     #[test]

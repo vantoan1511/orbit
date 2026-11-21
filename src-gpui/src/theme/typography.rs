@@ -1,4 +1,11 @@
+use std::sync::Arc;
+
 use gpui::{Font, FontFallbacks, FontFeatures, FontStyle, FontWeight, Pixels, SharedString, Styled, px};
+
+/// Returns OpenType font features enabling tabular numerals (`tnum = 1`).
+pub fn tabular_features() -> FontFeatures {
+    FontFeatures(Arc::new(vec![("tnum".to_string(), 1)]))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TypographyScaleStep {
@@ -77,6 +84,7 @@ impl Default for TypographyTokens {
 }
 
 impl TypographyTokens {
+    /// Standard UI font for prose, labels, and names (proportional numerals).
     pub fn ui_font(&self, weight: FontWeight) -> Font {
         Font {
             family: self.ui_family.clone(),
@@ -87,10 +95,22 @@ impl TypographyTokens {
         }
     }
 
+    /// UI font with OpenType `tnum` enabled for KPI counters and numeric UI summaries.
+    pub fn tabular_ui_font(&self, weight: FontWeight) -> Font {
+        Font {
+            family: self.ui_family.clone(),
+            features: tabular_features(),
+            fallbacks: Some(self.ui_fallbacks.clone()),
+            weight,
+            style: FontStyle::Normal,
+        }
+    }
+
+    /// Monospace font with OpenType `tnum` always enabled for numeric/technical columns and code.
     pub fn mono_font(&self, weight: FontWeight) -> Font {
         Font {
             family: self.mono_family.clone(),
-            features: FontFeatures::default(),
+            features: tabular_features(),
             fallbacks: Some(self.mono_fallbacks.clone()),
             weight,
             style: FontStyle::Normal,
@@ -137,5 +157,45 @@ mod tests {
         let mono_fallbacks = mono.fallbacks.as_ref().map(|f| f.fallback_list()).unwrap_or_default();
         assert!(mono_fallbacks.iter().any(|f| f == "JetBrains Mono"));
         assert!(mono_fallbacks.iter().any(|f| f == "Consolas"));
+    }
+
+    #[test]
+    fn test_tabular_features_enabled_on_mono_and_tabular_ui_fonts() {
+        let t = TypographyTokens::default();
+
+        let features = tabular_features();
+        assert!(
+            features
+                .tag_value_list()
+                .iter()
+                .any(|(tag, val)| tag == "tnum" && *val == 1)
+        );
+
+        let mono = t.mono_font(FontWeight::NORMAL);
+        assert_eq!(mono.family.as_ref(), "Geist Mono");
+        let mono_fallbacks = mono.fallbacks.as_ref().map(|f| f.fallback_list()).unwrap_or_default();
+        assert!(mono_fallbacks.iter().any(|f| f == "JetBrains Mono"));
+        assert!(
+            mono.features
+                .tag_value_list()
+                .iter()
+                .any(|(tag, val)| tag == "tnum" && *val == 1)
+        );
+
+        let tab_ui = t.tabular_ui_font(FontWeight::SEMIBOLD);
+        assert_eq!(tab_ui.family.as_ref(), "Inter");
+        assert_eq!(tab_ui.weight, FontWeight::SEMIBOLD);
+        let tab_ui_fallbacks = tab_ui.fallbacks.as_ref().map(|f| f.fallback_list()).unwrap_or_default();
+        assert!(tab_ui_fallbacks.iter().any(|f| f == "Manrope"));
+        assert!(
+            tab_ui
+                .features
+                .tag_value_list()
+                .iter()
+                .any(|(tag, val)| tag == "tnum" && *val == 1)
+        );
+
+        let ui = t.ui_font(FontWeight::MEDIUM);
+        assert!(ui.features.tag_value_list().is_empty());
     }
 }

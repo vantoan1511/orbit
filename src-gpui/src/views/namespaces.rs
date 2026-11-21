@@ -70,8 +70,7 @@ pub fn namespace_columns() -> Vec<TableColumn> {
         TableColumn::new("labels", "Labels").flex_width(2.0, px(200.0)),
         TableColumn::new("age", "Age")
             .fixed_width(px(80.0))
-            .right_numeric()
-            .monospace(true),
+            .right_numeric(),
     ]
 }
 
@@ -311,7 +310,7 @@ fn render_summary_cards_row(namespaces: &[NamespaceInfo], theme: &OrbitTheme) ->
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_lg)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(card.primary_value),
                 )

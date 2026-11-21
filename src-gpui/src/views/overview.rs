@@ -346,7 +346,6 @@ fn render_status_bar(
                     "Kubernetes Version",
                     apply_text_step(div(), theme.typography.size_sm)
                         .font(mono_font.clone())
-                        .font_weight(FontWeight::SEMIBOLD)
                         .text_color(theme.text.primary)
                         .child(version_label.to_string())
                         .into_any_element(),
@@ -356,7 +355,6 @@ fn render_status_bar(
                     "Active Context",
                     apply_text_step(div(), theme.typography.size_sm)
                         .font(mono_font.clone())
-                        .font_weight(FontWeight::MEDIUM)
                         .text_color(theme.text.primary)
                         .child(cluster_id.to_string())
                         .into_any_element(),
@@ -409,21 +407,21 @@ fn render_metric_cards(
                     .justify_between()
                     .child(
                         apply_text_step(div(), theme.typography.size_xs)
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(theme.text.secondary)
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(theme.text.muted)
                             .child(card.title),
                     )
                     .child(div().w(px(8.0)).h(px(8.0)).rounded_full().bg(card.color)),
             )
             .child(
                 apply_text_step(div(), theme.typography.size_xl)
-                    .font_weight(FontWeight::BOLD)
+                    .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                     .text_color(theme.text.primary)
                     .child(card.primary_value),
             )
             .child(
                 apply_text_step(div(), theme.typography.size_xs)
-                    .text_color(theme.text.muted)
+                    .text_color(theme.text.secondary)
                     .child(card.subtitle),
             );
 

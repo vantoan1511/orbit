@@ -17,7 +17,9 @@ use crate::components::{
 use crate::icons::render_icon;
 use crate::state::{CronJobsLoadStatus, CronJobsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
-use crate::views::{parse_age_seconds, render_action_button};
+use crate::views::{
+    nonzero_metric_text_color, parse_age_seconds, render_action_button, table_numeric_font,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CronJobsPresentationMode {
@@ -38,8 +40,7 @@ pub fn cronjob_columns() -> Vec<TableColumn> {
             .right_numeric(),
         TableColumn::new("last_schedule", "Last Schedule")
             .fixed_width(px(120.0))
-            .right_numeric()
-            .monospace(true),
+            .right_numeric(),
         TableColumn::new("age", "Age")
             .fixed_width(px(76.0))
             .right_numeric(),
@@ -176,12 +177,8 @@ fn render_cronjob_cell(cj: &CronJobInfo, col: &TableColumn, theme: &OrbitTheme) 
             theme,
         ),
         "active" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
-            .text_color(if cj.active > 0 {
-                theme.text.primary
-            } else {
-                theme.text.muted
-            })
+            .font(table_numeric_font(theme))
+            .text_color(nonzero_metric_text_color(cj.active, theme))
             .child(cj.active.to_string())
             .into_any_element(),
         "last_schedule" => {
@@ -621,10 +618,13 @@ mod tests {
             ]
         );
         assert!(cols[2].monospace);
-        assert_eq!(cols[4].align, ColumnAlign::Right);
-        assert_eq!(cols[5].align, ColumnAlign::Right);
-        assert!(cols[5].monospace);
-        assert_eq!(cols[6].align, ColumnAlign::Right);
+        for idx in [4, 5, 6] {
+            assert_eq!(cols[idx].align, ColumnAlign::Right);
+            assert!(cols[idx].monospace);
+        }
+        for idx in [0, 1, 2, 3] {
+            assert_eq!(cols[idx].align, ColumnAlign::Left);
+        }
     }
 
     #[test]

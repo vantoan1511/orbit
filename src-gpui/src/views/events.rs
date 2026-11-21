@@ -18,7 +18,7 @@ use crate::components::{
 use crate::icons::render_icon;
 use crate::state::{EventTypeFilter, EventsLoadStatus, EventsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
-use crate::views::{parse_age_seconds, render_action_button};
+use crate::views::{parse_age_seconds, render_action_button, table_numeric_font};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventsPresentationMode {
@@ -264,7 +264,7 @@ fn render_event_cell(ev: &EventInfo, col: &TableColumn, theme: &OrbitTheme) -> A
                 .child(render_icon(meta.icon, px(14.0), theme.text.muted))
                 .child(
                     apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
+                        .font_weight(FontWeight::NORMAL)
                         .text_color(theme.text.primary)
                         .truncate()
                         .child(label),
@@ -294,7 +294,7 @@ fn render_event_cell(ev: &EventInfo, col: &TableColumn, theme: &OrbitTheme) -> A
             })
             .into_any_element(),
         "count" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .font(table_numeric_font(theme))
             .text_color(theme.text.primary)
             .child(ev.count.to_string())
             .into_any_element(),
@@ -340,7 +340,7 @@ fn render_summary_cards_row(
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_lg)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(card.primary_value),
                 )
