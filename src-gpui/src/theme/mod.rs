@@ -15,7 +15,7 @@ pub use tokens::{
     AccentColor, K8sResourceKind, SemanticColorsPreference, SemanticPreset, SemanticRole,
     ThemeMode, UiStyle, rgb_hex, rgba_hex, rgba_u8,
 };
-pub use typography::{TypographyScaleStep, TypographyTokens, apply_text_step};
+pub use typography::{TypographyScaleStep, TypographyTokens, apply_text_step, tabular_features};
 
 use gpui::{App, Global, Rgba, Styled, WindowAppearance};
 use orbit_core::config::OrbitConfig;

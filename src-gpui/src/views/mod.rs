@@ -81,6 +81,42 @@ pub fn nonzero_metric_text_color(value: i32, theme: &OrbitTheme) -> Rgba {
     }
 }
 
+/// Canonical tabular monospace font for numeric/metric table cells (`FontWeight::NORMAL`, `tnum = 1`).
+pub fn table_numeric_font(theme: &OrbitTheme) -> gpui::Font {
+    theme.typography.mono_font(FontWeight::NORMAL)
+}
+
+/// Renders a right-aligned tabular numeric ratio cell (`current/total`) with primary numerator
+/// ink and muted denominator ink.
+pub fn render_ratio_metric_cell(
+    current: impl Into<gpui::SharedString>,
+    total: impl Into<gpui::SharedString>,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let numeric_font = table_numeric_font(theme);
+    let current = current.into();
+    let total = total.into();
+
+    apply_text_step(div(), theme.typography.size_xs)
+        .w_full()
+        .flex()
+        .items_center()
+        .justify_end()
+        .child(
+            div()
+                .font(numeric_font.clone())
+                .text_color(theme.text.primary)
+                .child(current),
+        )
+        .child(
+            div()
+                .font(numeric_font)
+                .text_color(theme.text.muted)
+                .child(format!("/{total}")),
+        )
+        .into_any_element()
+}
+
 pub fn render_action_button(
     id: &'static str,
     icon: Icon,
@@ -123,12 +159,12 @@ pub fn render_detail_row(
     mono: bool,
     theme: &OrbitTheme,
 ) -> AnyElement {
-    let mut value_el = apply_text_step(div(), theme.typography.size_xs)
-        .font_weight(FontWeight::MEDIUM)
-        .text_color(theme.text.primary);
-    if mono {
-        value_el = value_el.font(theme.typography.mono_font(FontWeight::MEDIUM));
-    }
+    let value_el = apply_text_step(div(), theme.typography.size_xs)
+        .text_color(theme.text.primary)
+        .when(mono, |el| {
+            el.font(theme.typography.mono_font(FontWeight::NORMAL))
+        })
+        .when(!mono, |el| el.font_weight(FontWeight::MEDIUM));
 
     div()
         .flex()
@@ -420,6 +456,124 @@ mod tests {
                 nonzero_metric_text_color(3, &theme),
                 theme.semantic.warning.solid
             );
+        }
+    }
+
+    #[test]
+    fn test_table_numeric_font_uses_normal_weight_and_tabular_numerals() {
+        for (mode, appearance) in [
+            (ThemeMode::Light, gpui::WindowAppearance::Light),
+            (ThemeMode::Dark, gpui::WindowAppearance::Dark),
+        ] {
+            let theme = OrbitTheme::resolve(
+                mode,
+                UiStyle::Flat,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                appearance,
+            );
+            let font = table_numeric_font(&theme);
+            assert_eq!(font.weight, FontWeight::NORMAL);
+            assert!(
+                font.features
+                    .tag_value_list()
+                    .iter()
+                    .any(|(tag, val)| tag == "tnum" && *val == 1)
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_resource_table_views_enforce_column_alignment_and_tabular_monospace_contract() {
+        use crate::components::data_table::{ColumnAlign, resolve_table_cell_font};
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            gpui::WindowAppearance::Dark,
+        );
+
+        let numeric_or_temporal_ids = [
+            "replicas",
+            "desired_current",
+            "ready",
+            "up_to_date",
+            "available",
+            "restarts",
+            "cpu",
+            "memory",
+            "pods",
+            "keys_count",
+            "size",
+            "mounted_pods",
+            "capacity",
+            "completions",
+            "duration",
+            "active",
+            "last_schedule",
+            "count",
+            "last_seen",
+            "age",
+        ];
+
+        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 16] = [
+            ("configmaps", configmaps::configmap_columns()),
+            ("cronjobs", cronjobs::cronjob_columns()),
+            ("daemonsets", daemonsets::daemonset_columns()),
+            ("deployments", deployments::deployment_columns()),
+            ("events", events::event_columns()),
+            ("ingresses", ingresses::ingress_columns()),
+            ("jobs", jobs::job_columns()),
+            ("namespaces", namespaces::namespace_columns()),
+            ("network_policies", network_policies::network_policy_columns()),
+            ("nodes", nodes::node_columns()),
+            (
+                "persistent_volume_claims",
+                persistent_volume_claims::persistent_volume_claim_columns(),
+            ),
+            (
+                "persistent_volumes",
+                persistent_volumes::persistent_volume_columns(),
+            ),
+            ("pods", pods::pod_columns()),
+            ("secrets", secrets::secret_columns()),
+            ("services", services::service_columns()),
+            ("statefulsets", statefulsets::statefulset_columns()),
+        ];
+
+        for (view_name, cols) in all_views {
+            for col in &cols {
+                let col_id = col.id.as_ref();
+                if numeric_or_temporal_ids.contains(&col_id) {
+                    assert_eq!(
+                        col.align,
+                        ColumnAlign::Right,
+                        "{view_name}.{col_id} must be right-aligned"
+                    );
+                    assert!(
+                        col.monospace,
+                        "{view_name}.{col_id} must enable monospace tabular formatting"
+                    );
+                    let font = resolve_table_cell_font(col, &theme)
+                        .expect("numeric/temporal column must resolve a cell font");
+                    assert_eq!(font.weight, FontWeight::NORMAL);
+                    assert!(
+                        font.features
+                            .tag_value_list()
+                            .iter()
+                            .any(|(tag, val)| tag == "tnum" && *val == 1),
+                        "{view_name}.{col_id} must enable OpenType tnum=1"
+                    );
+                } else {
+                    assert_eq!(
+                        col.align,
+                        ColumnAlign::Left,
+                        "{view_name}.{col_id} must be left-aligned"
+                    );
+                }
+            }
         }
     }
 }

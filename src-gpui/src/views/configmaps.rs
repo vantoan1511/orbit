@@ -292,7 +292,7 @@ fn render_summary_cards_row(
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_lg)
-                        .font_weight(FontWeight::BOLD)
+                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
                         .text_color(theme.text.primary)
                         .child(card.primary_value),
                 )

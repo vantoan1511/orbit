@@ -16,7 +16,7 @@ use crate::components::{ContextMenuEntry, ContextMenuItem};
 use crate::icons::render_icon;
 use crate::state::{IngressesLoadStatus, IngressesState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button};
+pub use crate::views::{parse_age_seconds, render_action_button, table_numeric_font};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IngressesPresentationMode {
@@ -205,7 +205,7 @@ fn render_ingress_cell(ing: &IngressInfo, col: &TableColumn, theme: &OrbitTheme)
                             .bg(theme.surface.control_bg)
                             .border_1()
                             .border_color(theme.border.default)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .font(table_numeric_font(theme))
                             .text_color(theme.text.muted)
                             .flex_shrink_0()
                             .child(format!("+{extra}")),

@@ -17,7 +17,10 @@ use crate::components::{
 use crate::icons::render_icon;
 use crate::state::{NamespaceFilterState, StatefulSetsLoadStatus, StatefulSetsState};
 use crate::theme::{OrbitTheme, apply_text_step};
-use crate::views::{format_images_summary, parse_age_seconds, render_action_button};
+use crate::views::{
+    format_images_summary, parse_age_seconds, render_action_button, render_ratio_metric_cell,
+    table_numeric_font,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatefulSetsPresentationMode {
@@ -145,23 +148,11 @@ fn render_statefulset_cell(
             .child(ss.namespace.clone())
             .into_any_element(),
         "status" => render_status_badge_from_str(&ss.status, StatusBadgeVariant::Inline, theme),
-        "replicas" => div()
-            .flex()
-            .items_center()
-            .justify_end()
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::SEMIBOLD))
-                    .text_color(theme.text.primary)
-                    .child(ss.replicas.current.to_string()),
-            )
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::NORMAL))
-                    .text_color(theme.text.muted)
-                    .child(format!("/{}", ss.replicas.desired)),
-            )
-            .into_any_element(),
+        "replicas" => render_ratio_metric_cell(
+            ss.replicas.current.to_string(),
+            ss.replicas.desired.to_string(),
+            theme,
+        ),
         "images" => {
             let (primary, extra) = format_images_summary(&ss.images);
             div()
@@ -184,7 +175,7 @@ fn render_statefulset_cell(
                             .flex_shrink_0()
                             .rounded(theme.style.radius_control)
                             .bg(theme.surface.bg_hover)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .font(table_numeric_font(theme))
                             .text_color(theme.text.muted)
                             .child(format!("+{extra}")),
                     )
@@ -586,8 +577,13 @@ mod tests {
             ids,
             vec!["name", "namespace", "status", "replicas", "images", "age"]
         );
-        assert_eq!(cols[3].align, ColumnAlign::Right);
-        assert_eq!(cols[5].align, ColumnAlign::Right);
+        for idx in [3, 5] {
+            assert_eq!(cols[idx].align, ColumnAlign::Right);
+            assert!(cols[idx].monospace);
+        }
+        for idx in [0, 1, 2, 4] {
+            assert_eq!(cols[idx].align, ColumnAlign::Left);
+        }
     }
 
     #[test]

@@ -17,7 +17,9 @@ use crate::components::{
 use crate::icons::render_icon;
 use crate::state::{JobsLoadStatus, JobsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
-use crate::views::{format_images_summary, parse_age_seconds, render_action_button};
+use crate::views::{
+    format_images_summary, parse_age_seconds, render_action_button, table_numeric_font,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JobsPresentationMode {
@@ -35,8 +37,7 @@ pub fn job_columns() -> Vec<TableColumn> {
             .right_numeric(),
         TableColumn::new("duration", "Duration")
             .fixed_width(px(115.0))
-            .right_numeric()
-            .monospace(true),
+            .right_numeric(),
         TableColumn::new("images", "Images")
             .flex_width(1.8, px(160.0))
             .monospace(true),
@@ -208,7 +209,7 @@ fn render_job_cell(job: &JobInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
             .into_any_element(),
         "status" => render_status_badge_from_str(&job.status, StatusBadgeVariant::Inline, theme),
         "completions" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+            .font(table_numeric_font(theme))
             .text_color(theme.text.primary)
             .child(job.completions.clone())
             .into_any_element(),
@@ -245,7 +246,7 @@ fn render_job_cell(job: &JobInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
                             .flex_shrink_0()
                             .rounded(theme.style.radius_control)
                             .bg(theme.surface.bg_hover)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .font(table_numeric_font(theme))
                             .text_color(theme.text.muted)
                             .child(format!("+{extra}")),
                     )
@@ -662,11 +663,14 @@ mod tests {
                 "Age",
             ]
         );
-        assert_eq!(cols[3].align, ColumnAlign::Right);
-        assert_eq!(cols[4].align, ColumnAlign::Right);
-        assert!(cols[4].monospace);
+        for idx in [3, 4, 6] {
+            assert_eq!(cols[idx].align, ColumnAlign::Right);
+            assert!(cols[idx].monospace);
+        }
+        for idx in [0, 1, 2, 5] {
+            assert_eq!(cols[idx].align, ColumnAlign::Left);
+        }
         assert!(cols[5].monospace);
-        assert_eq!(cols[6].align, ColumnAlign::Right);
     }
 
     #[test]
