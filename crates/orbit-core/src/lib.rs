@@ -11,6 +11,7 @@ pub mod kubernetes {
     pub mod namespaces;
     pub mod nodes;
     pub mod overview;
+    pub mod policies;
     pub mod raw;
     pub mod secrets;
     pub mod services;

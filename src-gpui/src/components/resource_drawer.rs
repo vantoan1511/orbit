@@ -83,6 +83,10 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    NetworkPolicy {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -111,6 +115,7 @@ impl ResourceDrawerTarget {
             Self::Secret { .. } => "Secret",
             Self::PersistentVolume { .. } => "PersistentVolume",
             Self::PersistentVolumeClaim { .. } => "PersistentVolumeClaim",
+            Self::NetworkPolicy { .. } => "NetworkPolicy",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -131,6 +136,7 @@ impl ResourceDrawerTarget {
             | Self::Secret { name, .. }
             | Self::PersistentVolume { name }
             | Self::PersistentVolumeClaim { name, .. }
+            | Self::NetworkPolicy { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
@@ -151,6 +157,7 @@ impl ResourceDrawerTarget {
             | Self::Secret { name, .. }
             | Self::PersistentVolume { name }
             | Self::PersistentVolumeClaim { name, .. }
+            | Self::NetworkPolicy { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -170,6 +177,7 @@ impl ResourceDrawerTarget {
             | Self::ConfigMap { namespace, .. }
             | Self::Secret { namespace, .. }
             | Self::PersistentVolumeClaim { namespace, .. }
+            | Self::NetworkPolicy { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
             Self::PersistentVolume { .. } | Self::Node { .. } | Self::Namespace { .. } => None,
         }
@@ -1037,6 +1045,32 @@ mod tests {
                 kind: "PersistentVolumeClaim".to_string(),
                 namespace: Some("prod".to_string()),
                 name: "data-pg-0".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn test_resource_drawer_target_network_policy_supports_live_yaml_and_dispatches_load_command() {
+        let target = ResourceDrawerTarget::NetworkPolicy {
+            name: "allow-api".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(target.kind(), "NetworkPolicy");
+        assert_eq!(target.name(), "allow-api");
+        assert_eq!(target.display_title(), "allow-api");
+        assert_eq!(target.namespace(), Some("prod"));
+        assert!(target.supports_live_yaml());
+
+        let mut state = ResourceDrawerState::default();
+        let cmd = state.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+                kind: "NetworkPolicy".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "allow-api".to_string(),
             })
         );
     }

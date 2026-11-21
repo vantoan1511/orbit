@@ -6,6 +6,7 @@ pub mod events;
 pub mod ingresses;
 pub mod jobs;
 pub mod namespaces;
+pub mod network_policies;
 pub mod nodes;
 pub mod offline;
 pub mod overview;
