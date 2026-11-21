@@ -14,6 +14,7 @@ pub mod kubernetes {
     pub mod raw;
     pub mod secrets;
     pub mod services;
+    pub mod storage;
     pub mod workloads;
     pub mod workloads_overview;
 }

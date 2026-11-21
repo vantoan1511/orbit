@@ -5,8 +5,8 @@ use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, IngressInfo,
-    JobInfo, NamespaceInfo, NodeInfo, PodInfo, SecretInfo, ServiceInfo, StatefulSetInfo,
-    UserProfileInfo,
+    JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeInfo, PodInfo, SecretInfo, ServiceInfo,
+    StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -96,6 +96,10 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadSecrets {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadPersistentVolumes {
         cluster_id: String,
         generation: u64,
     },
@@ -285,6 +289,16 @@ pub enum ClusterBridgeEvent {
         secrets: Vec<SecretInfo>,
     },
     SecretsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    PersistentVolumesLoaded {
+        cluster_id: String,
+        generation: u64,
+        persistent_volumes: Vec<PersistentVolumeInfo>,
+    },
+    PersistentVolumesLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -1795,6 +1809,109 @@ impl SecretsState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PersistentVolumesLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PersistentVolumesState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: PersistentVolumesLoadStatus,
+    pub persistent_volumes: Vec<PersistentVolumeInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl PersistentVolumesState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PersistentVolumesLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.persistent_volumes.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.persistent_volumes.is_empty();
+        ClusterBridgeCommand::LoadPersistentVolumes {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = PersistentVolumesLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.persistent_volumes.is_empty();
+        Some(ClusterBridgeCommand::LoadPersistentVolumes {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PersistentVolumesLoadStatus::Idle;
+        self.persistent_volumes.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = PersistentVolumesLoadStatus::Idle;
+        self.persistent_volumes.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        persistent_volumes: Vec<PersistentVolumeInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PersistentVolumesLoadStatus::Loaded;
+            self.persistent_volumes = persistent_volumes;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PersistentVolumesLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == PersistentVolumesLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -2217,6 +2334,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::ConfigMapsLoadFailed { .. }
             | ClusterBridgeEvent::SecretsLoaded { .. }
             | ClusterBridgeEvent::SecretsLoadFailed { .. }
+            | ClusterBridgeEvent::PersistentVolumesLoaded { .. }
+            | ClusterBridgeEvent::PersistentVolumesLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -4402,6 +4521,90 @@ mod tests {
         assert_eq!(state.status, IngressesLoadStatus::Idle);
         assert!(state.cluster_id.is_none());
         assert!(state.ingresses.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+    }
+
+    fn sample_persistent_volume(name: &str) -> PersistentVolumeInfo {
+        PersistentVolumeInfo {
+            name: name.to_string(),
+            capacity: "20Gi".to_string(),
+            access_mode: "ReadWriteOnce".to_string(),
+            reclaim_policy: "Retain".to_string(),
+            status: "Bound".to_string(),
+            storage_class: "gp3".to_string(),
+            age: "4d".to_string(),
+            volume_mode: "Filesystem".to_string(),
+            reason: None,
+        }
+    }
+
+    #[test]
+    fn test_persistent_volumes_state_lifecycle_and_generation_guard() {
+        let mut state = PersistentVolumesState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadPersistentVolumes {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, PersistentVolumesLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let pv = sample_persistent_volume("pv-data-01");
+
+        // Stale cluster or generation must be rejected
+        assert!(!state.apply_loaded("ctx-other", 1, vec![pv.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![pv.clone()]));
+        assert!(!state.apply_failed("ctx-other", 1, "boom".to_string()));
+        assert!(!state.apply_failed("ctx-a", 99, "boom".to_string()));
+        assert!(state.persistent_volumes.is_empty());
+
+        // Matching cluster and generation loads rows
+        assert!(state.apply_loaded("ctx-a", 1, vec![pv]));
+        assert_eq!(state.status, PersistentVolumesLoadStatus::Loaded);
+        assert_eq!(state.persistent_volumes.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Refresh increments generation while retaining cached rows
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadPersistentVolumes {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, PersistentVolumesLoadStatus::Loading);
+        assert!(!state.table.loading);
+        assert_eq!(state.persistent_volumes.len(), 1);
+
+        // Failure on generation 2 transitions to Error while retaining cached rows
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, PersistentVolumesLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+        assert_eq!(state.persistent_volumes.len(), 1);
+
+        // Reset for another cluster clears rows/selection/error and invalidates in-flight replies
+        state.table.selected_row_key = Some("pv-data-01".to_string());
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, PersistentVolumesLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.persistent_volumes.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(!state.apply_loaded("ctx-a", 2, vec![sample_persistent_volume("stale")]));
+
+        // Reset for disconnected clears cluster_id and rows
+        state.reset_for_disconnected();
+        assert_eq!(state.status, PersistentVolumesLoadStatus::Idle);
+        assert!(state.cluster_id.is_none());
+        assert!(state.persistent_volumes.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
     }

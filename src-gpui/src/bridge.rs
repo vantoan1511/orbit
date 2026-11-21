@@ -10,6 +10,7 @@ use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
+use orbit_core::kubernetes::storage::fetch_pvs;
 use orbit_core::kubernetes::workloads::{
     fetch_daemonsets, fetch_deployments, fetch_pods, fetch_statefulsets,
 };
@@ -556,6 +557,43 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::SecretsLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadPersistentVolumes {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_pvs(&client).await {
+                        Ok(persistent_volumes) => {
+                            let _ = tx.send(ClusterBridgeEvent::PersistentVolumesLoaded {
+                                cluster_id,
+                                generation,
+                                persistent_volumes,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::PersistentVolumesLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::PersistentVolumesLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -1464,6 +1502,39 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected IngressesLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_load_persistent_volumes_without_client_emits_failure() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadPersistentVolumes {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 16,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let event = event_rx
+            .recv()
+            .await
+            .expect("Expected PersistentVolumesLoadFailed event");
+        match event {
+            ClusterBridgeEvent::PersistentVolumesLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 16);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected PersistentVolumesLoadFailed, got {other:?}"),
         }
     }
 }
