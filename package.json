@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "gpui:build:dev": "node --experimental-strip-types scripts/build-gpui-sidecar.ts --profile debug",
+    "gpui:build:release": "node --experimental-strip-types scripts/build-gpui-sidecar.ts --profile release",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:dev": "npm run gpui:build:dev && tauri dev --config src-tauri/tauri.dev.conf.json",
     "tauri:build": "tauri build",
     "release": "node scripts/release.js",
     "build": "run-p type-check \"build-only {@}\" --",

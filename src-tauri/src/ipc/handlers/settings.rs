@@ -13,7 +13,17 @@ use crate::kubernetes::manager::KubeManager;
 
 static GPUI_RUNNING: AtomicBool = AtomicBool::new(false);
 
-fn gpui_binary_name() -> &'static str {
+/// Returns the bundled Tauri externalBin sidecar filename (`orbit-gpui.exe` on Windows, `orbit-gpui` on Unix).
+pub fn gpui_sidecar_binary_name() -> &'static str {
+    if cfg!(windows) {
+        "orbit-gpui.exe"
+    } else {
+        "orbit-gpui"
+    }
+}
+
+/// Returns the direct `cargo build -p orbit-gpui` output filename (`orbit.exe` on Windows, `orbit` on Unix).
+pub fn gpui_dev_binary_name() -> &'static str {
     if cfg!(windows) {
         "orbit.exe"
     } else {
@@ -21,25 +31,71 @@ fn gpui_binary_name() -> &'static str {
     }
 }
 
-pub fn resolve_gpui_binary_candidates(current_exe: &Path) -> Vec<PathBuf> {
-    let bin = gpui_binary_name();
-    let mut candidates = Vec::new();
-    if let Some(dir) = current_exe.parent() {
-        candidates.push(dir.join(bin));
+fn paths_match_executable(a: &Path, b: &Path) -> bool {
+    if cfg!(windows) {
+        let norm_a = a.to_string_lossy().replace('/', "\\").to_lowercase();
+        let norm_b = b.to_string_lossy().replace('/', "\\").to_lowercase();
+        norm_a == norm_b
+    } else {
+        a == b
     }
+}
+
+fn push_candidate_if_distinct(candidates: &mut Vec<PathBuf>, candidate: PathBuf, current_exe: &Path) {
+    if paths_match_executable(&candidate, current_exe) {
+        return;
+    }
+    if candidates.iter().any(|existing| paths_match_executable(existing, &candidate)) {
+        return;
+    }
+    candidates.push(candidate);
+}
+
+/// Returns ordered candidate paths for locating the GPUI binary:
+/// 1. `<current_exe_dir>/orbit-gpui[.exe]` (installed NSIS/MSI sidecar & `tauri-build` target copy)
+/// 2. `<current_exe_dir>/orbit[.exe]` (direct dev build fallback next to `orbit-app[.exe]`)
+/// 3. `<workspace_root>/target/{debug,release}/orbit-gpui[.exe]` and `orbit[.exe]` (dev workspace fallback)
+///
+/// Never returns a candidate whose path matches `current_exe` (case-insensitive on Windows) to prevent self-spawn loops.
+pub fn resolve_gpui_binary_candidates(current_exe: &Path) -> Vec<PathBuf> {
+    let sidecar_bin = gpui_sidecar_binary_name();
+    let dev_bin = gpui_dev_binary_name();
+    let mut candidates = Vec::new();
+
+    if let Some(dir) = current_exe.parent() {
+        push_candidate_if_distinct(&mut candidates, dir.join(sidecar_bin), current_exe);
+        push_candidate_if_distinct(&mut candidates, dir.join(dev_bin), current_exe);
+    }
+
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     if let Some(workspace_root) = manifest_dir.parent() {
-        candidates.push(workspace_root.join("target").join("debug").join(bin));
-        candidates.push(workspace_root.join("target").join("release").join(bin));
+        let target_dir = workspace_root.join("target");
+        for profile in ["debug", "release"] {
+            let profile_dir = target_dir.join(profile);
+            push_candidate_if_distinct(&mut candidates, profile_dir.join(sidecar_bin), current_exe);
+            push_candidate_if_distinct(&mut candidates, profile_dir.join(dev_bin), current_exe);
+        }
     }
+
     candidates
+}
+
+/// Selects the first existing, non-empty file from candidate paths.
+pub fn find_gpui_binary_from_candidates(candidates: &[PathBuf]) -> Option<PathBuf> {
+    candidates
+        .iter()
+        .find(|path| {
+            std::fs::metadata(path)
+                .map(|meta| meta.is_file() && meta.len() > 0)
+                .unwrap_or(false)
+        })
+        .cloned()
 }
 
 fn find_gpui_binary() -> Option<PathBuf> {
     let current_exe = std::env::current_exe().ok()?;
-    resolve_gpui_binary_candidates(&current_exe)
-        .into_iter()
-        .find(|p| p.is_file())
+    let candidates = resolve_gpui_binary_candidates(&current_exe);
+    find_gpui_binary_from_candidates(&candidates)
 }
 
 pub fn launch_gpui_shell(writer: Arc<Mutex<WsWriter>>, token: String) {
@@ -516,15 +572,85 @@ mod tests {
     #[test]
     fn test_gpui_binary_name_and_candidate_paths() {
         assert_eq!(
-            gpui_binary_name(),
+            gpui_sidecar_binary_name(),
+            if cfg!(windows) { "orbit-gpui.exe" } else { "orbit-gpui" }
+        );
+        assert_eq!(
+            gpui_dev_binary_name(),
             if cfg!(windows) { "orbit.exe" } else { "orbit" }
         );
         let exe_path = PathBuf::from("D:/Projects/orbit/target/debug/orbit-app.exe");
         let candidates = resolve_gpui_binary_candidates(&exe_path);
-        assert!(!candidates.is_empty());
-        assert_eq!(candidates[0], PathBuf::from("D:/Projects/orbit/target/debug").join(gpui_binary_name()));
-        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("debug").join(gpui_binary_name()))));
-        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("release").join(gpui_binary_name()))));
+        assert!(candidates.len() >= 2);
+        assert_eq!(
+            candidates[0],
+            PathBuf::from("D:/Projects/orbit/target/debug").join(gpui_sidecar_binary_name())
+        );
+        assert_eq!(
+            candidates[1],
+            PathBuf::from("D:/Projects/orbit/target/debug").join(gpui_dev_binary_name())
+        );
+        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("debug").join(gpui_sidecar_binary_name()))));
+        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("debug").join(gpui_dev_binary_name()))));
+        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("release").join(gpui_sidecar_binary_name()))));
+        assert!(candidates.iter().any(|p| p.ends_with(Path::new("target").join("release").join(gpui_dev_binary_name()))));
+    }
+
+    #[test]
+    fn test_resolve_gpui_binary_candidates_never_returns_current_exe() {
+        let exe_path = if cfg!(windows) {
+            PathBuf::from("C:/Users/dev/AppData/Local/Orbit/Orbit.exe")
+        } else {
+            PathBuf::from("/opt/orbit/orbit")
+        };
+        let exe_dir = exe_path.parent().unwrap();
+        let candidates = resolve_gpui_binary_candidates(&exe_path);
+
+        assert_eq!(
+            candidates[0],
+            exe_dir.join(gpui_sidecar_binary_name()),
+            "Bundled sidecar must be candidate 0"
+        );
+        assert!(
+            !candidates.iter().any(|p| p == &exe_dir.join(gpui_dev_binary_name())),
+            "Candidate matching current_exe must be excluded to prevent self-spawn loops"
+        );
+    }
+
+    #[test]
+    fn test_find_gpui_binary_from_candidates_prefers_bundled_sidecar_and_skips_empty_files() {
+        let unique = format!(
+            "orbit_gpui_candidates_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        );
+        let temp_dir = std::env::temp_dir().join(unique);
+        std::fs::create_dir_all(&temp_dir).unwrap();
+
+        let sidecar = temp_dir.join(gpui_sidecar_binary_name());
+        let dev_bin = temp_dir.join(gpui_dev_binary_name());
+
+        // Case 1: empty 0-byte sidecar is skipped in favor of non-empty dev binary
+        std::fs::write(&sidecar, b"").unwrap();
+        std::fs::write(&dev_bin, b"dev-binary-bytes").unwrap();
+        let selected = find_gpui_binary_from_candidates(&[sidecar.clone(), dev_bin.clone()]);
+        assert_eq!(selected, Some(dev_bin.clone()));
+
+        // Case 2: non-empty bundled sidecar wins over dev binary
+        std::fs::write(&sidecar, b"sidecar-binary-bytes").unwrap();
+        let selected = find_gpui_binary_from_candidates(&[sidecar.clone(), dev_bin.clone()]);
+        assert_eq!(selected, Some(sidecar.clone()));
+
+        // Case 3: all candidates empty -> None
+        std::fs::write(&sidecar, b"").unwrap();
+        std::fs::write(&dev_bin, b"").unwrap();
+        let selected = find_gpui_binary_from_candidates(&[sidecar, dev_bin]);
+        assert_eq!(selected, None);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
     }
 }
 

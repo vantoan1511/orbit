@@ -49,5 +49,9 @@ jobs:
         run: npm run lint
       - name: Frontend Unit Tests
         run: npm test
+      - name: Build GPUI Sidecar (Debug)
+        run: npm run gpui:build:dev
       - name: Backend Unit Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: GPUI Unit Tests
+        run: cargo test -p orbit-gpui
