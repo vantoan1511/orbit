@@ -12,7 +12,7 @@ use windows_sys::Win32::System::Registry::{
     RegOpenKeyExW, RegQueryValueExW, RegSetValueExW,
 };
 #[cfg(test)]
-use windows_sys::Win32::System::Registry::{RegDeleteKeyW, RegDeleteTreeW};
+use windows_sys::Win32::System::Registry::RegDeleteTreeW;
 
 use crate::autostart::backend::{
     AutostartBackend, AutostartEntry, AutostartError, RegisteredEntry,
@@ -307,8 +307,10 @@ impl Default for SandboxRunKey {
 impl SandboxRunKey {
     pub fn new() -> Self {
         let id = uuid::Uuid::new_v4();
-        let root_subkey = format!("Software\\OrbitTest\\{}", id);
-        let run_subkey = format!("{}\\Run", root_subkey);
+        // Give each sandbox its own top-level subkey under HKCU\Software so parallel tests
+        // never race deleting a shared parent key during Drop.
+        let root_subkey = format!("Software\\OrbitTest-{id}");
+        let run_subkey = format!("{root_subkey}\\Run");
         let backend = Arc::new(WindowsRunKeyBackend::sandbox(run_subkey.clone()));
         Self {
             root_subkey,
@@ -330,11 +332,9 @@ impl SandboxRunKey {
 impl Drop for SandboxRunKey {
     fn drop(&mut self) {
         let wide_root = to_wide(&self.root_subkey);
-        // SAFETY: RegDeleteTreeW recursively removes the test-specific subkey under HKCU.
+        // SAFETY: RegDeleteTreeW recursively removes only this test's unique subkey under HKCU\Software.
         unsafe {
             RegDeleteTreeW(HKEY_CURRENT_USER, wide_root.as_ptr());
-            let wide_parent = to_wide("Software\\OrbitTest");
-            RegDeleteKeyW(HKEY_CURRENT_USER, wide_parent.as_ptr());
         }
     }
 }
@@ -447,5 +447,31 @@ mod tests {
 
         let prod_after = prod.list().unwrap();
         assert_eq!(prod_before, prod_after, "Production Run key was modified by sandbox!");
+    }
+
+    #[test]
+    fn sandbox_parallel_create_and_drop_has_no_parent_key_race() {
+        let barrier = Arc::new(std::sync::Barrier::new(8));
+        let mut handles = Vec::new();
+
+        for thread_idx in 0..8 {
+            let b = barrier.clone();
+            handles.push(std::thread::spawn(move || {
+                b.wait();
+                for iter in 0..25 {
+                    let sandbox = SandboxRunKey::new();
+                    let entry = AutostartEntry {
+                        name: format!("ParallelTest-{thread_idx}-{iter}"),
+                        exe_path: PathBuf::from("C:\\fake\\orbit.exe"),
+                    };
+                    sandbox.backend().register(&entry).unwrap();
+                    assert!(sandbox.backend().is_registered(&entry.name).unwrap());
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().expect("parallel sandbox thread panicked");
+        }
     }
 }
