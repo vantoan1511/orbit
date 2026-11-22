@@ -35,7 +35,7 @@ pub trait EventEmitter: Send + Sync + 'static {
 use tokio::sync::Mutex;
 
 #[cfg(test)]
-pub static TEST_EMITTER_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+pub static TEST_EMITTER_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 #[cfg(test)]
 #[derive(Clone, Default)]

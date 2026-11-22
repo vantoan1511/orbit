@@ -472,7 +472,7 @@ mod tests {
 
     #[tokio::test]
     async fn connection_reporter_emits_event() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
@@ -496,7 +496,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_unreachable_api_server_does_not_hot_loop() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mut config = kube::Config::new("http://127.0.0.1:1".parse().unwrap());
         config.connect_timeout = Some(Duration::from_millis(200));
         let client = kube::Client::try_from(config).unwrap();

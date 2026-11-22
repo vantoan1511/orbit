@@ -60,19 +60,23 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
     assert.ok(content.includes("!startsWith(github.ref, 'refs/heads/hotfix/')"))
   })
 
-  it('ci.yml configures Node 22 with npm cache, stable Rust toolchain, and swatinem/rust-cache@v2', () => {
+  it('ci.yml configures Node 22 with npm cache, stable Rust toolchain with clippy, and root workspace rust-cache@v2', () => {
     const ciPath = path.resolve('.github/workflows/ci.yml')
     assert.ok(fs.existsSync(ciPath), '.github/workflows/ci.yml must exist')
 
     const content = fs.readFileSync(ciPath, 'utf8')
     assert.match(content, /actions\/setup-node@v4[\s\S]*?node-version:\s*['"]22['"]/)
     assert.match(content, /actions\/setup-node@v4[\s\S]*?cache:\s*['"]npm['"]/)
-    assert.match(content, /dtolnay\/rust-toolchain@stable/)
-    assert.match(content, /swatinem\/rust-cache@v2/)
+    assert.match(content, /dtolnay\/rust-toolchain@stable[\s\S]*?components:\s*clippy/)
+    assert.match(content, /swatinem\/rust-cache@v2[\s\S]*?workspaces:\s*\|\s*\n\s*\.\s*->\s*target/)
+    assert.ok(
+      !content.includes('src-tauri -> target'),
+      'ci.yml rust-cache must not include legacy duplicate src-tauri -> target workspace'
+    )
     assert.match(content, /run:\s*npm\s+ci\b/)
   })
 
-  it('ci.yml executes all five required Shift-Left verification gates in order', () => {
+  it('ci.yml executes all seven required Shift-Left verification gates in order', () => {
     const ciPath = path.resolve('.github/workflows/ci.yml')
     assert.ok(fs.existsSync(ciPath), '.github/workflows/ci.yml must exist')
 
@@ -82,7 +86,9 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
       'npm run type-check',
       'npm run lint',
       'npm test',
-      'cargo test --manifest-path src-tauri/Cargo.toml'
+      'npm run gpui:build:dev',
+      'cargo clippy --workspace --all-targets -- -D warnings',
+      'cargo test --workspace'
     ]
 
     let lastIndex = -1
@@ -92,6 +98,18 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
       assert.ok(idx > lastIndex, `ci.yml must execute gate "${gate}" in expected sequence`)
       lastIndex = idx
     }
+  })
+
+  it('root Cargo.toml defines all three workspace crates and workspace clippy lints enforced by --workspace', () => {
+    const cargoPath = path.resolve('Cargo.toml')
+    assert.ok(fs.existsSync(cargoPath), 'root Cargo.toml must exist')
+
+    const content = fs.readFileSync(cargoPath, 'utf8')
+    assert.match(content, /"crates\/orbit-core"/)
+    assert.match(content, /"src-tauri"/)
+    assert.match(content, /"src-gpui"/)
+    assert.match(content, /\[workspace\.lints\.clippy\][\s\S]*?unwrap_used\s*=\s*"deny"/)
+    assert.match(content, /\[workspace\.lints\.clippy\][\s\S]*?expect_used\s*=\s*"deny"/)
   })
 
   it('GEMINI.md and README.md document feat/** integration branches and releasable main workflow', () => {

@@ -430,6 +430,9 @@ pub fn effective_drawer_width(requested_width: f32, window_width: f32) -> f32 {
     clamped.min(max_for_viewport)
 }
 
+pub type DrawerActionCallback = Rc<dyn Fn(&mut Window, &mut App)>;
+pub type DrawerTabSelectCallback = Rc<dyn Fn(ResourceDrawerTabId, &mut Window, &mut App)>;
+
 pub struct ResourceDrawerProps {
     pub title: SharedString,
     pub kind: SharedString,
@@ -440,9 +443,9 @@ pub struct ResourceDrawerProps {
     pub active_tab: ResourceDrawerTabId,
     pub width: f32,
     pub window_width: f32,
-    pub on_select_tab: Rc<dyn Fn(ResourceDrawerTabId, &mut Window, &mut App)>,
-    pub on_close: Rc<dyn Fn(&mut Window, &mut App)>,
-    pub on_start_resize: Rc<dyn Fn(&mut Window, &mut App)>,
+    pub on_select_tab: DrawerTabSelectCallback,
+    pub on_close: DrawerActionCallback,
+    pub on_start_resize: DrawerActionCallback,
     pub body: AnyElement,
 }
 

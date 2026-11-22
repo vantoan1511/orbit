@@ -122,7 +122,7 @@ pub fn sort_nodes<'a>(nodes: &'a [NodeInfo], sort: Option<&SortState>) -> Vec<&'
             compare_nodes_by_col(a, b, col_id)
         });
     } else {
-        rows.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase()));
+        rows.sort_by_key(|a| a.name.to_ascii_lowercase());
     }
     rows
 }
@@ -425,7 +425,7 @@ pub fn render_nodes_view(
     );
     let total_count = sorted_rows.len();
     let is_loading = state.status == NodesLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let toolbar = div()
         .flex()
@@ -899,6 +899,7 @@ mod tests {
     use crate::components::data_table::{ColumnAlign, SortDirection};
     use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
 
+    #[allow(clippy::too_many_arguments)]
     fn make_node(
         name: &str,
         status: &str,

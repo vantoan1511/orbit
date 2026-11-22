@@ -389,7 +389,7 @@ pub fn render_namespaces_view(
     );
     let total_count = sorted_rows.len();
     let is_loading = state.status == NamespaceLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let toolbar = div()
         .flex()

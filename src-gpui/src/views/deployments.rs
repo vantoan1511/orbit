@@ -291,7 +291,7 @@ pub fn render_deployments_view(
     let total_count = state.deployments.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == DeploymentsLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = if namespaces.is_all_namespaces() {
         format!("{total_count} deployments")
@@ -723,6 +723,7 @@ mod tests {
     use crate::components::data_table::{ColumnAlign, SortDirection};
     use orbit_core::kubernetes::models::{NamespaceInfo, Replicas};
 
+    #[allow(clippy::too_many_arguments)]
     fn make_deployment(
         name: &str,
         namespace: &str,
