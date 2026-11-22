@@ -399,7 +399,7 @@ pub fn render_secrets_view(
     let total_count = state.secrets.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == SecretsLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = if namespaces.is_all_namespaces() {
         format!("{total_count} secrets")
@@ -751,8 +751,8 @@ pub fn render_secret_drawer_data(
     on_copy_value: impl 'static + Fn(String, &mut Window, &mut App),
 ) -> AnyElement {
     let mono = theme.typography.mono_font(FontWeight::NORMAL);
-    let on_toggle_rc: Rc<dyn Fn(String, &mut Window, &mut App)> = Rc::new(on_toggle_reveal);
-    let on_copy_rc: Rc<dyn Fn(String, &mut Window, &mut App)> = Rc::new(on_copy_value);
+    let on_toggle_rc: super::ValueCallback<String> = Rc::new(on_toggle_reveal);
+    let on_copy_rc: super::ValueCallback<String> = Rc::new(on_copy_value);
 
     let content = if secret.data.is_empty() {
         apply_text_step(div(), theme.typography.size_xs)
@@ -934,6 +934,7 @@ mod tests {
         ns
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn sample_secret(
         name: &str,
         namespace: &str,

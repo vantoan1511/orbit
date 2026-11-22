@@ -132,7 +132,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_dispatch_ping_responds_with_pong() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 

@@ -96,14 +96,22 @@ impl Render for DraggedWorkspaceTab {
     }
 }
 
+pub type TabActionCallback = Rc<dyn Fn(&mut Window, &mut App)>;
+pub type TabViewCallback = Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>;
+pub type TabContextMenuCallback =
+    Rc<dyn Fn(WorkspaceView, usize, Point<Pixels>, &mut Window, &mut App)>;
+pub type TabDragStartCallback = Rc<dyn Fn(usize, &mut Window, &mut App)>;
+pub type TabDragMoveCallback = Rc<dyn Fn(usize, TabDropPosition, &mut Window, &mut App)>;
+pub type TabDropCallback = Rc<dyn Fn(usize, usize, TabDropPosition, &mut Window, &mut App)>;
+
 #[derive(Clone)]
 pub struct TabContextMenuCallbacks {
-    pub on_move_left: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_move_right: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_close: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_close_others: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_close_right: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_close_all: Rc<dyn Fn(&mut Window, &mut App)>,
+    pub on_move_left: TabViewCallback,
+    pub on_move_right: TabViewCallback,
+    pub on_close: TabViewCallback,
+    pub on_close_others: TabViewCallback,
+    pub on_close_right: TabViewCallback,
+    pub on_close_all: TabActionCallback,
 }
 
 impl TabContextMenuCallbacks {
@@ -182,13 +190,13 @@ pub fn build_tab_context_menu_entries(
 
 #[derive(Clone)]
 pub struct TabBarCallbacks {
-    pub on_select: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_close: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    pub on_context_menu: Rc<dyn Fn(WorkspaceView, usize, Point<Pixels>, &mut Window, &mut App)>,
-    pub on_drag_start: Rc<dyn Fn(usize, &mut Window, &mut App)>,
-    pub on_drag_move: Rc<dyn Fn(usize, TabDropPosition, &mut Window, &mut App)>,
-    pub on_drop: Rc<dyn Fn(usize, usize, TabDropPosition, &mut Window, &mut App)>,
-    pub on_toggle_picker: Rc<dyn Fn(&mut Window, &mut App)>,
+    pub on_select: TabViewCallback,
+    pub on_close: TabViewCallback,
+    pub on_context_menu: TabContextMenuCallback,
+    pub on_drag_start: TabDragStartCallback,
+    pub on_drag_move: TabDragMoveCallback,
+    pub on_drop: TabDropCallback,
+    pub on_toggle_picker: TabActionCallback,
 }
 
 pub fn render_workspace_tab_bar(
@@ -431,8 +439,8 @@ pub fn render_tab_resource_picker_overlay(
     tabs: &WorkspaceTabsState,
     theme: &OrbitTheme,
     search_focus: &FocusHandle,
-    on_select_view: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
-    on_close: Rc<dyn Fn(&mut Window, &mut App)>,
+    on_select_view: TabViewCallback,
+    on_close: TabActionCallback,
 ) -> AnyElement {
     let views = tabs.filtered_picker_views();
     let search_text = if tabs.picker_query.is_empty() {
@@ -493,7 +501,7 @@ pub fn render_tab_resource_picker_overlay(
 fn render_picker_list(
     views: &[WorkspaceView],
     theme: &OrbitTheme,
-    on_select_view: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
+    on_select_view: TabViewCallback,
 ) -> AnyElement {
     let mut list = div()
         .id("tab-picker-list")

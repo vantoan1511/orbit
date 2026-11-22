@@ -376,7 +376,7 @@ pub fn render_configmaps_view(
     let total_count = state.configmaps.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == ConfigMapsLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = if namespaces.is_all_namespaces() {
         format!("{total_count} configmaps")

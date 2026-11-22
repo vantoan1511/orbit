@@ -21,9 +21,9 @@ use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, ResourceDrawerProps,
     ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
-    TabBarCallbacks, TabContextMenuCallbacks, YamlLoadStatus, build_tab_context_menu_entries,
-    render_context_menu_overlay, render_resource_drawer, render_tab_resource_picker_overlay,
-    render_workspace_tab_bar, render_yaml_viewer,
+    TabBarCallbacks, TabContextMenuCallbacks, YamlLoadStatus, YamlViewerProps,
+    build_tab_context_menu_entries, render_context_menu_overlay, render_resource_drawer,
+    render_tab_resource_picker_overlay, render_workspace_tab_bar, render_yaml_viewer,
 };
 use crate::icons::render_icon;
 use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView};
@@ -48,6 +48,16 @@ pub struct StatusPresentation {
     pub color: Rgba,
     pub pill_label: String,
 }
+
+type DrawerTargetContent = (
+    SharedString,
+    SharedString,
+    Option<SharedString>,
+    Option<SharedString>,
+    Option<SharedString>,
+    Vec<ResourceDrawerTabDef>,
+    AnyElement,
+);
 
 pub fn format_cluster_status(
     state: &ClusterSwitcherState,
@@ -1162,7 +1172,7 @@ impl OrbitShell {
             .observe_window_appearance(move |window, cx| {
                 let appearance = window.appearance();
                 let is_system_dark = ThemeMode::System.resolve_is_dark(appearance);
-                let _ = appearance_entity.update(cx, |shell, _cx| {
+                appearance_entity.update(cx, |shell, _cx| {
                     shell.resolved_system_is_dark = is_system_dark;
                 });
                 let current = OrbitTheme::get(cx);
@@ -1583,14 +1593,16 @@ impl OrbitShell {
             });
         });
         render_yaml_viewer(
-            self.drawer.yaml_status,
-            self.drawer.yaml_content.as_deref(),
-            self.drawer.yaml_error.as_deref(),
-            self.drawer.yaml_copied,
-            subtitle,
+            YamlViewerProps {
+                status: self.drawer.yaml_status,
+                yaml_content: self.drawer.yaml_content.as_deref(),
+                error_message: self.drawer.yaml_error.as_deref(),
+                copied: self.drawer.yaml_copied,
+                subtitle: subtitle.into(),
+                on_copy,
+                on_retry: Some(on_retry),
+            },
             theme,
-            on_copy,
-            Some(on_retry),
         )
     }
 
@@ -1599,15 +1611,7 @@ impl OrbitShell {
         target: &ResourceDrawerTarget,
         theme: &OrbitTheme,
         cx: &mut Context<Self>,
-    ) -> Option<(
-        SharedString,
-        SharedString,
-        Option<SharedString>,
-        Option<SharedString>,
-        Option<SharedString>,
-        Vec<ResourceDrawerTabDef>,
-        AnyElement,
-    )> {
+    ) -> Option<DrawerTargetContent> {
         let events_loading = self.events.status == EventsLoadStatus::Loading;
 
         match target {
@@ -2094,14 +2098,19 @@ impl OrbitShell {
                             });
                         });
                         render_yaml_viewer(
-                            YamlLoadStatus::Loaded,
-                            Some(&formatted),
-                            None,
-                            self.drawer.yaml_copied,
-                            format!("{}/{}", ev.object_kind, ev.object_name),
+                            YamlViewerProps {
+                                status: YamlLoadStatus::Loaded,
+                                yaml_content: Some(&formatted),
+                                error_message: None,
+                                copied: self.drawer.yaml_copied,
+                                subtitle: SharedString::from(format!(
+                                    "{}/{}",
+                                    ev.object_kind, ev.object_name
+                                )),
+                                on_copy: Some(on_copy),
+                                on_retry: None,
+                            },
                             theme,
-                            Some(on_copy),
-                            None,
                         )
                     }
                     _ => views::events::render_event_drawer_overview(ev, theme),
@@ -8811,8 +8820,10 @@ mod tests {
 
         let mut cluster_state = ClusterSwitcherState::new();
         cluster_state.dropdown_open = true;
-        let mut ns_state = NamespaceFilterState::default();
-        ns_state.dropdown_open = true;
+        let mut ns_state = NamespaceFilterState {
+            dropdown_open: true,
+            ..Default::default()
+        };
         let mut context_menu = ContextMenuState::new();
 
         // Opening context menu closes active header dropdowns

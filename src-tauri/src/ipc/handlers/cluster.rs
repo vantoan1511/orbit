@@ -462,7 +462,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_broadcast_engine_ready_emits_expected_events() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
@@ -481,7 +481,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_cluster_metadata_updates_config_and_emits_event() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("cluster_metadata");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
@@ -513,7 +513,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_cluster_metadata_preserves_existing_settings() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap();
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("preserve_settings");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());

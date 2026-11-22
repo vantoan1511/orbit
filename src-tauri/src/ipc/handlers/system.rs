@@ -303,7 +303,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cordon_node_empty_name_emits_error() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
@@ -320,7 +320,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_uncordon_node_empty_name_emits_error() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 
@@ -337,7 +337,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_drain_node_empty_name_emits_error() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
 

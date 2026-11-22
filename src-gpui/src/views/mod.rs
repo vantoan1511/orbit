@@ -117,13 +117,16 @@ pub fn render_ratio_metric_cell(
         .into_any_element()
 }
 
+pub type ActionCallback = Rc<dyn Fn(&mut Window, &mut App)>;
+pub type ValueCallback<T> = Rc<dyn Fn(T, &mut Window, &mut App)>;
+
 pub fn render_action_button(
     id: &'static str,
     icon: Icon,
     label: &'static str,
     disabled: bool,
     theme: &OrbitTheme,
-    on_click: Rc<dyn Fn(&mut Window, &mut App)>,
+    on_click: ActionCallback,
 ) -> AnyElement {
     let hover_bg = theme.surface.control_hover;
     div()

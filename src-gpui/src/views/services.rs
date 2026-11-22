@@ -459,9 +459,8 @@ pub fn render_services_view(
     let total_count = state.services.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == ServicesLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
-    let on_type_filter_rc: Rc<dyn Fn(ServiceTypeFilter, &mut Window, &mut App)> =
-        Rc::new(on_type_filter);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
+    let on_type_filter_rc: super::ValueCallback<ServiceTypeFilter> = Rc::new(on_type_filter);
 
     let count_label = if namespaces.is_all_namespaces() && state.type_filter == ServiceTypeFilter::All
     {

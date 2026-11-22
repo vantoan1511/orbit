@@ -297,6 +297,13 @@ pub struct SandboxRunKey {
 }
 
 #[cfg(test)]
+impl Default for SandboxRunKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
 impl SandboxRunKey {
     pub fn new() -> Self {
         let id = uuid::Uuid::new_v4();

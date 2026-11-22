@@ -359,7 +359,7 @@ pub fn empty_tabs_quick_start_items() -> [QuickStartTabItem; 6] {
 pub fn render_empty_tabs_workspace(
     cluster_name: &str,
     theme: &OrbitTheme,
-    on_open_view: Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>,
+    on_open_view: super::ValueCallback<WorkspaceView>,
     on_open_picker: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let mut grid = div().flex().flex_wrap().gap_3();

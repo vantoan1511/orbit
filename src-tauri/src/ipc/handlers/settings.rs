@@ -358,7 +358,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_launch_on_startup_emits_app_settings_updated() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_on_startup");
         let in_memory_backend = Arc::new(crate::autostart::InMemoryBackend::new());
         let test_service = Arc::new(crate::autostart::AutostartService::new(
@@ -396,7 +396,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_launch_on_startup_failure_emits_error_occurred() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_failure");
         let failing_service = Arc::new(crate::autostart::AutostartService::new(
             Arc::new(crate::autostart::memory::InMemoryBackend::new()),
@@ -429,7 +429,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_launch_on_startup_in_dev_mode_does_not_register() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("set_launch_dev_mode");
         let in_memory_backend = Arc::new(crate::autostart::InMemoryBackend::new());
         let test_service = Arc::new(crate::autostart::AutostartService::new(
@@ -461,7 +461,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_app_settings_toggling_launch_on_startup_calls_backend() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("toggle_launch_on_startup");
         let in_memory_backend = Arc::new(crate::autostart::InMemoryBackend::new());
         let test_service = Arc::new(crate::autostart::AutostartService::new(
@@ -494,9 +494,12 @@ mod tests {
 
     #[tokio::test]
     #[cfg(target_os = "windows")]
+    // AUTOSTART_TEST_LOCK is shared with synchronous unit tests and AutostartTestGuard,
+    // so it must remain a std::sync::Mutex held for the duration of this serialized test.
+    #[allow(clippy::await_holding_lock)]
     async fn test_handlers_do_not_touch_production_run_key() {
         use crate::autostart::AutostartBackend;
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("prod_run_key_untouched");
         let _autostart_lock = crate::autostart::AUTOSTART_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -522,7 +525,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_app_settings_emits_app_settings_updated() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("update_app_settings");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());
@@ -547,7 +550,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_update_app_settings_syncs_manager_config() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let _config_guard = crate::config::TestConfigDirGuard::new("sync_manager_config");
         let mock_emitter = Arc::new(MockEventEmitter::new());
         set_global_emitter(mock_emitter.clone());

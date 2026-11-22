@@ -244,17 +244,26 @@ pub fn yaml_token_color(kind: YamlTokenKind, theme: &OrbitTheme) -> Rgba {
     }
 }
 
-pub fn render_yaml_viewer(
-    status: YamlLoadStatus,
-    yaml_content: Option<&str>,
-    error_message: Option<&str>,
-    copied: bool,
-    subtitle: impl Into<SharedString>,
-    theme: &OrbitTheme,
-    on_copy: Option<YamlActionCallback>,
-    on_retry: Option<YamlActionCallback>,
-) -> AnyElement {
-    let subtitle = subtitle.into();
+pub struct YamlViewerProps<'a> {
+    pub status: YamlLoadStatus,
+    pub yaml_content: Option<&'a str>,
+    pub error_message: Option<&'a str>,
+    pub copied: bool,
+    pub subtitle: SharedString,
+    pub on_copy: Option<YamlActionCallback>,
+    pub on_retry: Option<YamlActionCallback>,
+}
+
+pub fn render_yaml_viewer(props: YamlViewerProps<'_>, theme: &OrbitTheme) -> AnyElement {
+    let YamlViewerProps {
+        status,
+        yaml_content,
+        error_message,
+        copied,
+        subtitle,
+        on_copy,
+        on_retry,
+    } = props;
     let can_copy = status == YamlLoadStatus::Loaded
         && yaml_content.is_some_and(|content| !content.is_empty())
         && on_copy.is_some();

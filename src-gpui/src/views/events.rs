@@ -357,7 +357,7 @@ fn render_summary_cards_row(
 fn render_type_filter_pills(
     active: EventTypeFilter,
     theme: &OrbitTheme,
-    on_type_filter: Rc<dyn Fn(EventTypeFilter, &mut Window, &mut App)>,
+    on_type_filter: super::ValueCallback<EventTypeFilter>,
 ) -> AnyElement {
     let options = [
         ("events-filter-all", "All", EventTypeFilter::All),
@@ -491,9 +491,8 @@ pub fn render_events_view(
     );
     let visible_count = filtered_rows.len();
     let is_loading = state.status == EventsLoadStatus::Loading;
-    let on_refresh_rc: Rc<dyn Fn(&mut Window, &mut App)> = Rc::new(on_refresh);
-    let on_type_filter_rc: Rc<dyn Fn(EventTypeFilter, &mut Window, &mut App)> =
-        Rc::new(on_type_filter);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
+    let on_type_filter_rc: super::ValueCallback<EventTypeFilter> = Rc::new(on_type_filter);
 
     let count_label = if state.type_filter == EventTypeFilter::All {
         format!("{total_ns_count} events")
@@ -771,6 +770,7 @@ mod tests {
     use gpui::WindowAppearance;
     use orbit_core::config::OrbitConfig;
 
+    #[allow(clippy::too_many_arguments)]
     fn sample_event(
         uid: &str,
         event_type: &str,
@@ -901,7 +901,7 @@ mod tests {
 
     #[test]
     fn test_compute_event_summary_counts_normal_warning_and_other() {
-        let events = vec![
+        let events = [
             sample_event("1", "Normal", "Scheduled", "Pod", "web-1", "default", 1, "1m"),
             sample_event("2", "Normal", "Pulled", "Pod", "web-2", "default", 1, "2m"),
             sample_event("3", "Warning", "BackOff", "Pod", "api-1", "default", 4, "3m"),

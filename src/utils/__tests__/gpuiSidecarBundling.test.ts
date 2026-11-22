@@ -376,25 +376,31 @@ describe('Tauri & Package Configuration Contracts for GPUI Sidecar', () => {
 })
 
 describe('CI & Release Workflow Contracts for GPUI Sidecar', () => {
-  it('.github/workflows/ci.yml builds GPUI sidecar before backend tests and runs GPUI unit tests', () => {
+  it('.github/workflows/ci.yml builds GPUI sidecar before workspace clippy and workspace unit tests', () => {
     const ciContent = fs.readFileSync(path.resolve('.github/workflows/ci.yml'), 'utf8')
     const buildGpuiIdx = ciContent.indexOf('npm run gpui:build:dev')
-    const backendTestIdx = ciContent.indexOf('cargo test --manifest-path src-tauri/Cargo.toml')
-    const gpuiTestIdx = ciContent.indexOf('cargo test -p orbit-gpui')
+    const workspaceClippyIdx = ciContent.indexOf(
+      'cargo clippy --workspace --all-targets -- -D warnings'
+    )
+    const workspaceTestIdx = ciContent.indexOf('cargo test --workspace')
 
     assert.ok(buildGpuiIdx !== -1, 'ci.yml must run npm run gpui:build:dev')
     assert.ok(
-      backendTestIdx !== -1,
-      'ci.yml must run cargo test --manifest-path src-tauri/Cargo.toml'
+      workspaceClippyIdx !== -1,
+      'ci.yml must run cargo clippy --workspace --all-targets -- -D warnings'
     )
-    assert.ok(gpuiTestIdx !== -1, 'ci.yml must run cargo test -p orbit-gpui')
+    assert.ok(workspaceTestIdx !== -1, 'ci.yml must run cargo test --workspace')
     assert.ok(
-      buildGpuiIdx < backendTestIdx,
-      'ci.yml must run npm run gpui:build:dev before Backend Unit Tests'
+      buildGpuiIdx < workspaceClippyIdx,
+      'ci.yml must run npm run gpui:build:dev before Rust Workspace Clippy'
     )
     assert.ok(
-      backendTestIdx < gpuiTestIdx,
-      'ci.yml must run cargo test -p orbit-gpui after Backend Unit Tests'
+      buildGpuiIdx < workspaceTestIdx,
+      'ci.yml must run npm run gpui:build:dev before Rust Workspace Tests'
+    )
+    assert.ok(
+      workspaceClippyIdx < workspaceTestIdx,
+      'ci.yml must run Rust Workspace Clippy before Rust Workspace Tests'
     )
   })
 

@@ -162,7 +162,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_spawn_watchers_emits_initial_connected() {
-        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
         let mock_emitter = Arc::new(crate::ipc::emitter::MockEventEmitter::new());
         crate::ipc::emitter::set_global_emitter(mock_emitter.clone());
 
