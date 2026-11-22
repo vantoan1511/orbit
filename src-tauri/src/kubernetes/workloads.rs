@@ -255,7 +255,7 @@ pub async fn clone_deployment(
 
     // Update metadata labels if any match source_name
     if let Some(labels) = cloned.metadata.labels.as_mut() {
-        for (_, val) in labels.iter_mut() {
+        for val in labels.values_mut() {
             if val == source_name {
                 *val = new_name.to_string();
             }
@@ -265,7 +265,7 @@ pub async fn clone_deployment(
     // Update spec.selector.match_labels and spec.template.metadata.labels
     if let Some(spec) = cloned.spec.as_mut() {
         if let Some(match_labels) = spec.selector.match_labels.as_mut() {
-            for (_, val) in match_labels.iter_mut() {
+            for val in match_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
                 }
@@ -273,7 +273,7 @@ pub async fn clone_deployment(
         }
 
         if let Some(template_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
-            for (_, val) in template_labels.iter_mut() {
+            for val in template_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
                 }
@@ -585,7 +585,7 @@ mod tests {
         // Apply metadata updates as in clone_deployment
         dep.metadata.name = Some(new_name.to_string());
         if let Some(meta_labels) = dep.metadata.labels.as_mut() {
-            for (_, val) in meta_labels.iter_mut() {
+            for val in meta_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
                 }
@@ -594,7 +594,7 @@ mod tests {
 
         if let Some(spec) = dep.spec.as_mut() {
             if let Some(match_labels) = spec.selector.match_labels.as_mut() {
-                for (_, val) in match_labels.iter_mut() {
+                for val in match_labels.values_mut() {
                     if val == source_name {
                         *val = new_name.to_string();
                     }
@@ -602,7 +602,7 @@ mod tests {
             }
 
             if let Some(t_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
-                for (_, val) in t_labels.iter_mut() {
+                for val in t_labels.values_mut() {
                     if val == source_name {
                         *val = new_name.to_string();
                     }
