@@ -6,5 +6,119 @@
     "lint": "npm run lint",
     "test": "npm test",
     "build": "npm run build"
+  },
+  "github_project": {
+    "project_id": "PVT_kwHOBz_QRM4Brit7",
+    "project_number": 5,
+    "title": "Orbit",
+    "fields": {
+      "Title": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_Rs",
+        "dataType": "TITLE"
+      },
+      "Assignees": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_Rw",
+        "dataType": "ASSIGNEES"
+      },
+      "Status": {
+        "id": "PVTSSF_lAHOBz_QRM4Brit7zhp0_R0",
+        "dataType": "SINGLE_SELECT",
+        "options": {
+          "Todo": "f75ad846",
+          "In Progress": "47fc9ee4",
+          "Done": "98236657"
+        }
+      },
+      "Labels": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_R4",
+        "dataType": "LABELS"
+      },
+      "Linked pull requests": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_R8",
+        "dataType": "LINKED_PULL_REQUESTS"
+      },
+      "Milestone": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_SA",
+        "dataType": "MILESTONE"
+      },
+      "Repository": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_SE",
+        "dataType": "REPOSITORY"
+      },
+      "Reviewers": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_SM",
+        "dataType": "REVIEWERS"
+      },
+      "Parent issue": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_SQ",
+        "dataType": "PARENT_ISSUE"
+      },
+      "Sub-issues progress": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_SU",
+        "dataType": "SUB_ISSUES_PROGRESS"
+      },
+      "Created": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_SY",
+        "dataType": "CREATED"
+      },
+      "Updated": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_Sc",
+        "dataType": "UPDATED"
+      },
+      "Closed": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_Sg",
+        "dataType": "CLOSED"
+      },
+      "Start date": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_34",
+        "dataType": "DATE"
+      },
+      "Target date": {
+        "id": "PVTF_lAHOBz_QRM4Brit7zhp0_4A",
+        "dataType": "DATE"
+      },
+      "Priority": {
+        "id": "PVTSSF_lAHOBz_QRM4Brit7zhp0_5I",
+        "dataType": "SINGLE_SELECT",
+        "options": {
+          "P0 - Critical": "69caa543",
+          "P1 - High": "040ffdbf",
+          "P2 - Medium": "6fa29b84",
+          "P3 - Low": "833d88f8"
+        }
+      },
+      "Sprint": {
+        "id": "PVTIF_lAHOBz_QRM4Brit7zhp0_9k",
+        "dataType": "ITERATION",
+        "iterations": {
+          "2026.11.A": {
+            "id": "412acacc",
+            "startDate": "2026-11-14",
+            "duration": 14,
+            "endDate": "2026-11-27"
+          },
+          "2026.11.B": {
+            "id": "c65b4290",
+            "startDate": "2026-11-28",
+            "duration": 14,
+            "endDate": "2026-12-11"
+          },
+          "2026.12.A": {
+            "id": "f7ec235a",
+            "startDate": "2026-12-12",
+            "duration": 14,
+            "endDate": "2026-12-25"
+          },
+          "2026.12.B": {
+            "id": "0940d970",
+            "startDate": "2026-12-26",
+            "duration": 14,
+            "endDate": "2027-01-08"
+          }
+        }
+      }
+    },
+    "owner": "vantoan1511",
+    "repo": "vantoan1511/orbit"
   }
 }

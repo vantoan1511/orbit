@@ -48,3 +48,12 @@ test('GeneralSettingsForm saves silently without Settings Saved toast but retain
     'GeneralSettingsForm should show "Settings Reset" toast when a setting is reset'
   )
 })
+
+test('ENABLE_EXPERIENCE_FEATURES is registered in CONFIG_KEYS and treated as a general config key', async () => {
+  const { CONFIG_KEYS, isGeneralConfigKey } = await import('../../../types/settings.ts')
+  assert.equal(
+    (CONFIG_KEYS as Record<string, string>).ENABLE_EXPERIENCE_FEATURES,
+    'enableExperienceFeatures'
+  )
+  assert.equal(isGeneralConfigKey('enableExperienceFeatures'), true)
+})

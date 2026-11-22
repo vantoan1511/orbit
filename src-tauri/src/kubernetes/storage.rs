@@ -2,106 +2,11 @@ use kube::{
     api::{Api, ListParams},
     Client,
 };
-use k8s_openapi::api::core::v1::{PersistentVolume, PersistentVolumeClaim};
 use k8s_openapi::api::storage::v1::StorageClass;
-use crate::kubernetes::models::{PersistentVolumeInfo, PersistentVolumeClaimInfo, StorageClassInfo};
+use crate::kubernetes::models::StorageClassInfo;
 use crate::kubernetes::format_age;
 
-/// Formats a Kubernetes `PersistentVolume` into `PersistentVolumeInfo`.
-pub fn format_pv(pv: &PersistentVolume) -> PersistentVolumeInfo {
-    let name = pv.metadata.name.clone().unwrap_or_default();
-    let age = format_age(&pv.metadata.creation_timestamp);
-
-    let capacity = pv.spec.as_ref()
-        .and_then(|s| s.capacity.as_ref())
-        .and_then(|cap| cap.get("storage"))
-        .map(|q| q.0.clone())
-        .unwrap_or_else(|| "-".to_string());
-
-    let access_mode = pv.spec.as_ref()
-        .and_then(|s| s.access_modes.as_ref())
-        .map(|modes| modes.join(", "))
-        .unwrap_or_else(|| "-".to_string());
-
-    let reclaim_policy = pv.spec.as_ref()
-        .and_then(|s| s.persistent_volume_reclaim_policy.clone())
-        .unwrap_or_else(|| "-".to_string());
-
-    let status = pv.status.as_ref()
-        .and_then(|s| s.phase.clone())
-        .unwrap_or_else(|| "Unknown".to_string());
-
-    let storage_class = pv.spec.as_ref()
-        .and_then(|s| s.storage_class_name.clone())
-        .unwrap_or_else(|| "-".to_string());
-
-    let volume_mode = pv.spec.as_ref()
-        .and_then(|s| s.volume_mode.clone())
-        .unwrap_or_else(|| "Filesystem".to_string());
-
-    let reason = pv.status.as_ref()
-        .and_then(|s| s.reason.clone());
-
-    PersistentVolumeInfo {
-        name,
-        capacity,
-        access_mode,
-        reclaim_policy,
-        status,
-        storage_class,
-        age,
-        volume_mode,
-        reason,
-    }
-}
-
-/// Formats a Kubernetes `PersistentVolumeClaim` into `PersistentVolumeClaimInfo`.
-pub fn format_pvc(pvc: &PersistentVolumeClaim) -> PersistentVolumeClaimInfo {
-    let name = pvc.metadata.name.clone().unwrap_or_default();
-    let namespace = pvc.metadata.namespace.clone().unwrap_or_default();
-    let age = format_age(&pvc.metadata.creation_timestamp);
-
-    let status = pvc.status.as_ref()
-        .and_then(|s| s.phase.clone())
-        .unwrap_or_else(|| "Unknown".to_string());
-
-    let volume = pvc.spec.as_ref()
-        .and_then(|s| s.volume_name.clone())
-        .unwrap_or_else(|| "-".to_string());
-
-    let capacity = pvc.status.as_ref()
-        .and_then(|s| s.capacity.as_ref())
-        .and_then(|cap| cap.get("storage"))
-        .map(|q| q.0.clone())
-        .or_else(|| {
-            pvc.spec.as_ref()
-                .and_then(|s| s.resources.as_ref())
-                .and_then(|r| r.requests.as_ref())
-                .and_then(|req| req.get("storage"))
-                .map(|q| q.0.clone())
-        })
-        .unwrap_or_else(|| "-".to_string());
-
-    let access_mode = pvc.spec.as_ref()
-        .and_then(|s| s.access_modes.as_ref())
-        .map(|modes| modes.join(", "))
-        .unwrap_or_else(|| "-".to_string());
-
-    let storage_class = pvc.spec.as_ref()
-        .and_then(|s| s.storage_class_name.clone())
-        .unwrap_or_else(|| "-".to_string());
-
-    PersistentVolumeClaimInfo {
-        name,
-        namespace,
-        status,
-        volume,
-        capacity,
-        access_mode,
-        storage_class,
-        age,
-    }
-}
+pub use orbit_core::kubernetes::storage::{format_pv, format_pvc, list_pvcs, list_pvs};
 
 /// Formats a Kubernetes `StorageClass` into `StorageClassInfo`.
 pub fn format_storage_class(sc: &StorageClass) -> StorageClassInfo {
@@ -127,30 +32,6 @@ pub fn format_storage_class(sc: &StorageClass) -> StorageClassInfo {
     }
 }
 
-/// Lists all PersistentVolumes in the cluster.
-pub async fn list_pvs(client: &Client) -> Result<Vec<PersistentVolumeInfo>, kube::Error> {
-    let api: Api<PersistentVolume> = Api::all(client.clone());
-    let mut list = Vec::new();
-    for pv in api.list(&ListParams::default()).await? {
-        list.push(format_pv(&pv));
-    }
-    Ok(list)
-}
-
-/// Lists all PersistentVolumeClaims in the specified namespace or all namespaces.
-pub async fn list_pvcs(client: &Client, namespace: Option<String>) -> Result<Vec<PersistentVolumeClaimInfo>, kube::Error> {
-    let api: Api<PersistentVolumeClaim> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-    let mut list = Vec::new();
-    for pvc in api.list(&ListParams::default()).await? {
-        list.push(format_pvc(&pvc));
-    }
-    Ok(list)
-}
-
 /// Lists all StorageClasses in the cluster.
 pub async fn list_storage_classes(client: &Client) -> Result<Vec<StorageClassInfo>, kube::Error> {
     let api: Api<StorageClass> = Api::all(client.clone());
@@ -166,7 +47,7 @@ mod tests {
     use super::*;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, Time};
     use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
-    use k8s_openapi::api::core::v1::{PersistentVolumeSpec, PersistentVolumeStatus, PersistentVolumeClaimSpec, PersistentVolumeClaimStatus, VolumeResourceRequirements};
+    use k8s_openapi::api::core::v1::{PersistentVolume, PersistentVolumeClaim, PersistentVolumeSpec, PersistentVolumeStatus, PersistentVolumeClaimSpec, PersistentVolumeClaimStatus, VolumeResourceRequirements};
     use std::collections::BTreeMap;
     use chrono::{TimeZone, Utc};
 

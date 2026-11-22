@@ -84,6 +84,16 @@ pub fn should_register_single_instance() -> bool {
     !crate::config::OrbitConfig::is_dev_mode()
 }
 
+/// Handles second-instance reactivation by logging GPUI shell status and revealing the main window.
+pub fn handle_single_instance_reactivation(app: &AppHandle) {
+    if crate::ipc::handlers::settings::is_gpui_shell_running() {
+        tracing::info!(
+            "Second Orbit instance activated while GPUI shell is running; restoring main window"
+        );
+    }
+    crate::tray::show_main_window(app);
+}
+
 pub fn run() {
     // Initialize file logger
     if let Err(e) = crate::logger::init() {
@@ -101,7 +111,7 @@ pub fn run() {
 
     if should_register_single_instance() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            crate::tray::show_main_window(app);
+            handle_single_instance_reactivation(app);
         }));
     }
 
@@ -220,16 +230,9 @@ mod tests {
 
     #[test]
     fn test_app_state_creation() {
-        let km = Arc::new(RwLock::new(KubeManager {
-            kubeconfig: None,
-            active_context: None,
-            active_client: None,
-            watch_cancel: None,
-            active_context_healthy: false,
-            log_cancel: Vec::new(),
-            port_forward_cancel: std::collections::HashMap::new(),
-            config: crate::config::OrbitConfig::load(),
-        }));
+        let km = Arc::new(RwLock::new(KubeManager::new_empty(
+            crate::config::OrbitConfig::load(),
+        )));
         let state = AppState { kube_manager: km };
         assert!(state.kube_manager.blocking_read().active_context.is_none());
     }

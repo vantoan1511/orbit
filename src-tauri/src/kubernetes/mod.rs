@@ -38,37 +38,7 @@ pub use edit::{get_resource_raw, apply_resource, create_resource};
 pub use hpa::{list_hpas, map_hpa, update_hpa_replicas};
 
 /// Formats a Kubernetes creation timestamp into a human-readable age string.
-pub(crate) fn format_age(creation_timestamp: &Option<k8s_openapi::apimachinery::pkg::apis::meta::v1::Time>) -> String {
-    if let Some(creation) = creation_timestamp {
-        let now = chrono::Utc::now();
-        let duration = now.signed_duration_since(creation.0);
-        let seconds = duration.num_seconds();
-        if seconds < 0 {
-            "0s".to_string()
-        } else if seconds < 60 {
-            format!("{}s", seconds)
-        } else if seconds < 3600 {
-            format!("{}m", duration.num_minutes())
-        } else if seconds < 86400 {
-            format!("{}h", duration.num_hours())
-        } else {
-            format!("{}d", duration.num_days())
-        }
-    } else {
-        "Unknown".to_string()
-    }
-}
-
-/// Formats a byte count into a human-readable size string.
-pub(crate) fn format_size(bytes: usize) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KiB", bytes as f64 / 1024.0)
-    } else {
-        format!("{:.1} MiB", bytes as f64 / (1024.0 * 1024.0))
-    }
-}
+pub(crate) use orbit_core::kubernetes::namespaces::format_age;
 
 /// Formats a Kubernetes API or client error into a user-friendly message,
 /// extracting clean messages from Api error responses.

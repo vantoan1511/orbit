@@ -10,6 +10,7 @@ import {
   resolveBaseBranch,
   buildPrBranchName,
   buildPrBody,
+  updateCargoManifestVersion,
   resolvePreviousTag,
   hasWhatsChangedSection,
   categorizeCommitPrefix,
@@ -148,6 +149,69 @@ describe('Shared Release Helpers & Semver Contracts', () => {
     const body = buildPrBody('0.18.3', '0.18.2', 'hotfix/v0.18.2')
     assert.ok(body.includes('Upon merging this PR into `hotfix/v0.18.2`:'))
     assert.ok(!body.includes('into `main`'))
+  })
+
+  it('updateCargoManifestVersion updates [workspace.package] version in root Cargo.toml and rejects missing version', () => {
+    const rootManifest = [
+      '[workspace]',
+      'members = ["crates/orbit-core", "src-tauri", "src-gpui"]',
+      'resolver = "2"',
+      '',
+      '[workspace.package]',
+      'version = "0.19.1"',
+      'edition = "2024"',
+      '',
+      '[workspace.dependencies]',
+      'serde = "1.0"',
+      ''
+    ].join('\n')
+
+    const updated = updateCargoManifestVersion(rootManifest, '0.19.2')
+    assert.equal(updated, rootManifest.replace('version = "0.19.1"', 'version = "0.19.2"'))
+
+    const inheritedMemberManifest = [
+      '[package]',
+      'name = "orbit-app"',
+      'version.workspace = true',
+      'edition.workspace = true',
+      ''
+    ].join('\n')
+
+    assert.throws(() => updateCargoManifestVersion(inheritedMemberManifest, '0.19.2'), /version/i)
+
+    const prBody = buildPrBody('0.19.2', '0.19.1', 'main')
+    assert.ok(prBody.includes('- `Cargo.toml`'))
+    assert.ok(!prBody.includes('`src-tauri/Cargo.toml`'))
+  })
+
+  it('root Cargo.toml centralizes [workspace.package], [workspace.dependencies], [workspace.lints.clippy] and clippy.toml allows test unwrap/expect', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+    const cargoToml = fs.readFileSync(path.resolve('Cargo.toml'), 'utf8')
+    const clippyTomlPath = path.resolve('clippy.toml')
+
+    assert.ok(
+      cargoToml.includes('[workspace.package]'),
+      'Cargo.toml must define [workspace.package]'
+    )
+    assert.ok(
+      cargoToml.includes(`version = "${pkg.version}"`),
+      `Cargo.toml [workspace.package] version must match package.json (${pkg.version})`
+    )
+    assert.ok(
+      cargoToml.includes('[workspace.dependencies]'),
+      'Cargo.toml must define [workspace.dependencies]'
+    )
+    assert.ok(
+      cargoToml.includes('[workspace.lints.clippy]'),
+      'Cargo.toml must define [workspace.lints.clippy]'
+    )
+    assert.ok(cargoToml.includes('unwrap_used = "deny"'))
+    assert.ok(cargoToml.includes('expect_used = "deny"'))
+
+    assert.ok(fs.existsSync(clippyTomlPath), 'clippy.toml must exist at workspace root')
+    const clippyToml = fs.readFileSync(clippyTomlPath, 'utf8')
+    assert.ok(clippyToml.includes('allow-unwrap-in-tests = true'))
+    assert.ok(clippyToml.includes('allow-expect-in-tests = true'))
   })
 
   it('release.yml supports release/**, hotfix/**, v* tags, existing-tag skip guard, and action-gh-release@v2 make_latest', () => {
@@ -300,5 +364,78 @@ describe('Shared Release Helpers & Semver Contracts', () => {
       !content.includes('generate_release_notes: true'),
       'release.yml must not leave generate_release_notes: true enabled when using body_path'
     )
+  })
+
+  it('scripts/release.js synchronizes Cargo.lock via cargo update --workspace instead of cargo check and never references src-tauri/Cargo.toml', () => {
+    const releasePath = path.resolve('scripts/release.js')
+    const content = fs.readFileSync(releasePath, 'utf8')
+
+    assert.ok(
+      content.includes("run('cargo update --workspace')"),
+      'scripts/release.js must synchronize Cargo.lock with cargo update --workspace'
+    )
+    assert.ok(
+      !content.includes("run('cargo check')"),
+      'scripts/release.js must not run cargo check (fails on clean checkouts without staged GPUI sidecar)'
+    )
+    assert.ok(
+      content.includes(
+        'git add package.json package-lock.json src-tauri/tauri.conf.json Cargo.toml Cargo.lock'
+      ),
+      'scripts/release.js must stage package.json, package-lock.json, src-tauri/tauri.conf.json, Cargo.toml, and Cargo.lock'
+    )
+    assert.ok(
+      !content.includes('src-tauri/Cargo.toml'),
+      'scripts/release.js must never reference src-tauri/Cargo.toml'
+    )
+  })
+
+  it('workspace member manifests inherit version.workspace = true and Cargo.lock matches package.json and tauri.conf.json across all three crates', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+    const tauriConf = JSON.parse(fs.readFileSync(path.resolve('src-tauri/tauri.conf.json'), 'utf8'))
+    const rootCargoToml = fs.readFileSync(path.resolve('Cargo.toml'), 'utf8')
+    const cargoLock = fs.readFileSync(path.resolve('Cargo.lock'), 'utf8')
+
+    assert.equal(
+      tauriConf.version,
+      pkg.version,
+      'src-tauri/tauri.conf.json version must match package.json'
+    )
+    assert.ok(
+      rootCargoToml.includes(`version = "${pkg.version}"`),
+      `Cargo.toml [workspace.package] version must match package.json (${pkg.version})`
+    )
+
+    const memberManifests = [
+      'crates/orbit-core/Cargo.toml',
+      'src-tauri/Cargo.toml',
+      'src-gpui/Cargo.toml'
+    ]
+    for (const manifestPath of memberManifests) {
+      const manifest = fs.readFileSync(path.resolve(manifestPath), 'utf8')
+      assert.match(
+        manifest,
+        /^version\.workspace\s*=\s*true$/m,
+        `${manifestPath} must inherit version.workspace = true`
+      )
+      assert.doesNotMatch(
+        manifest,
+        /^version\s*=\s*"/m,
+        `${manifestPath} must not hardcode a crate-local version`
+      )
+    }
+
+    const workspaceCrates = ['orbit-core', 'orbit-app', 'orbit-gpui']
+    for (const crateName of workspaceCrates) {
+      const pattern = new RegExp(
+        `\\[\\[package\\]\\]\\r?\\nname = "${crateName}"\\r?\\nversion = "${pkg.version.replaceAll('.', '\\.')}"`,
+        'm'
+      )
+      assert.match(
+        cargoLock,
+        pattern,
+        `Cargo.lock entry for ${crateName} must match package.json version (${pkg.version})`
+      )
+    }
   })
 })

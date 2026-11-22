@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { getThemeModeTooltip, useAppearance } from '@/composables/useAppearance'
-import { os } from '@/services/nativeService'
+import { appSettingsService } from '@/services/appSettingsService'
+import { events, os } from '@/services/nativeService'
 import { useNotificationStore } from '@/stores/notificationStore'
 import { useProfileStore } from '@/stores/profileStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useTabsStore } from '@/stores/tabsStore'
-import { Bell, Laptop, Moon, Settings, Sun, User } from '@lucide/vue'
+import { OrbitEvents } from '@/types/events'
+import { CONFIG_KEYS } from '@/types/settings'
+import { Bell, Laptop, Moon, Settings, Sparkles, Sun, User } from '@lucide/vue'
 import { Button } from 'primevue'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { GitHubIcon } from 'vue3-simple-icons'
 import { categories, type CategoryId, type SidebarCategory } from './navigation'
@@ -33,10 +37,60 @@ const isCategoryDisabled = (cat: SidebarCategory): boolean => {
 
 const notificationStore = useNotificationStore()
 const profileStore = useProfileStore()
+const settingsStore = useSettingsStore()
 const tabsStore = useTabsStore()
 const route = useRoute()
 const router = useRouter()
 const { themeMode, resolvedTheme, cycleThemeMode } = useAppearance()
+
+const isExperienceFeaturesEnabled = computed(() =>
+  Boolean(settingsStore.getConfigValue(CONFIG_KEYS.ENABLE_EXPERIENCE_FEATURES, false))
+)
+
+const GPUI_LAUNCH_COOLDOWN_MS = 1200
+const isLaunchingGpui = ref(false)
+let gpuiLaunchCooldownTimer: ReturnType<typeof setTimeout> | null = null
+
+const resetGpuiLaunchingState = () => {
+  if (gpuiLaunchCooldownTimer !== null) {
+    clearTimeout(gpuiLaunchCooldownTimer)
+    gpuiLaunchCooldownTimer = null
+  }
+  isLaunchingGpui.value = false
+}
+
+const handleLaunchGpuiShell = async () => {
+  if (isLaunchingGpui.value) return
+  isLaunchingGpui.value = true
+  gpuiLaunchCooldownTimer = setTimeout(resetGpuiLaunchingState, GPUI_LAUNCH_COOLDOWN_MS)
+
+  try {
+    await appSettingsService.launchGpuiShell()
+  } catch {
+    resetGpuiLaunchingState()
+    notificationStore.addNotification({
+      title: 'Error',
+      message: 'Unable to start the Native UI (GPUI) shell.',
+      severity: 'error',
+      category: 'system'
+    })
+  }
+}
+
+onMounted(() => {
+  void events.on(OrbitEvents.ErrorOccurred, resetGpuiLaunchingState)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', resetGpuiLaunchingState)
+  }
+})
+
+onUnmounted(() => {
+  resetGpuiLaunchingState()
+  void events.off(OrbitEvents.ErrorOccurred, resetGpuiLaunchingState)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('focus', resetGpuiLaunchingState)
+  }
+})
 
 const isSettingsActive = computed(() => {
   if (route.path !== '/settings') return false
@@ -88,6 +142,22 @@ const isSettingsActive = computed(() => {
 
     <!-- Bottom Activity Actions -->
     <div class="flex flex-col gap-2 items-center w-full px-1">
+      <!-- New UI (GPUI Preview) -->
+      <Button
+        v-if="isExperienceFeaturesEnabled"
+        v-tooltip.right="isLaunchingGpui ? 'Launching New UI (GPUI)...' : 'New UI (GPUI)'"
+        variant="text"
+        severity="secondary"
+        :loading="isLaunchingGpui"
+        :disabled="isLaunchingGpui"
+        :class="getActivityBarItemClass(false, isLaunchingGpui)"
+        @click="handleLaunchGpuiShell"
+      >
+        <template #icon>
+          <Sparkles class="w-5 h-5" />
+        </template>
+      </Button>
+
       <!-- Settings Link -->
       <Button
         v-tooltip.right="'Settings'"

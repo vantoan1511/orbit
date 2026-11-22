@@ -21,5 +21,12 @@ export const appSettingsService = {
    */
   async setLaunchOnStartup(enabled: boolean): Promise<void> {
     await coreEngine.dispatch('setLaunchOnStartup', { enabled })
+  },
+
+  /**
+   * Launch the native GPUI preview shell window via backend IPC.
+   */
+  async launchGpuiShell(): Promise<void> {
+    await coreEngine.dispatch('launchGpuiShell')
   }
 }

@@ -1,0 +1,26 @@
+[package]
+name = "orbit-core"
+version.workspace = true
+description = "Shared Kubernetes and configuration core for Orbit"
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[features]
+test-utils = []
+
+[dependencies]
+base64.workspace = true
+chrono.workspace = true
+http.workspace = true
+k8s-openapi.workspace = true
+kube = { workspace = true, default-features = true, features = ["runtime", "derive", "client", "ws"] }
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml_ng.workspace = true
+tokio = { workspace = true, features = ["rt"] }
+tracing.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

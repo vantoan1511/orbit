@@ -18,7 +18,10 @@ export const CONFIG_KEYS = {
   SEMANTIC_COLORS: 'semanticColors',
   CLUSTER_CUSTOMIZATIONS: 'clusterCustomizations',
   NOTIFICATION_PREFERENCES: 'notificationPreferences',
-  PROXY_SETTINGS: 'proxySettings'
+  PROXY_SETTINGS: 'proxySettings',
+  SELECTED_NAMESPACES: 'selectedNamespaces',
+  WORKSPACE_TABS: 'workspaceTabs',
+  ENABLE_EXPERIENCE_FEATURES: 'enableExperienceFeatures'
 } as const
 
 export type ConfigKey = (typeof CONFIG_KEYS)[keyof typeof CONFIG_KEYS]
@@ -35,7 +38,9 @@ export const SPECIALIZED_CONFIG_KEYS: readonly string[] = [
   CONFIG_KEYS.SEMANTIC_COLORS,
   CONFIG_KEYS.CLUSTER_CUSTOMIZATIONS,
   CONFIG_KEYS.NOTIFICATION_PREFERENCES,
-  CONFIG_KEYS.PROXY_SETTINGS
+  CONFIG_KEYS.PROXY_SETTINGS,
+  CONFIG_KEYS.SELECTED_NAMESPACES,
+  CONFIG_KEYS.WORKSPACE_TABS
 ] as const
 
 export function isGeneralConfigKey(key: string): boolean {

@@ -1,5 +1,5 @@
 use kube::{
-    api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams, Patch, PatchParams, DeleteParams, PostParams},
+    api::{Api, ListParams, Patch, PatchParams, DeleteParams, PostParams},
     Client,
 };
 use k8s_openapi::api::core::v1::Pod;
@@ -7,386 +7,10 @@ use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet}
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use crate::kubernetes::{models, format_age};
 
-pub fn map_pod(p: &Pod) -> models::PodInfo {
-    let name = p.metadata.name.clone().unwrap_or_default();
-    let namespace_name = p.metadata.namespace.clone().unwrap_or_default();
-
-    let status = p.status.as_ref()
-        .and_then(|s| s.phase.clone())
-        .unwrap_or_else(|| "Unknown".to_string());
-
-    let age = format_age(&p.metadata.creation_timestamp);
-
-    let node = p.spec.as_ref().and_then(|s| s.node_name.clone());
-    let ip = p.status.as_ref().and_then(|s| s.pod_ip.clone());
-    let node_ip = p.status.as_ref().and_then(|s| s.host_ip.clone());
-    let qos_class = p.status.as_ref().and_then(|s| s.qos_class.clone());
-
-    let controlled_by = p.metadata.owner_references.as_ref()
-        .and_then(|owners| owners.first())
-        .map(|o| format!("{}/{}", o.kind, o.name));
-
-    let labels = p.metadata.labels.clone().unwrap_or_default();
-    let annotations = p.metadata.annotations.clone().unwrap_or_default();
-
-    let mut containers = Vec::new();
-    let mut images = Vec::new();
-    let mut total_restarts = 0;
-
-    let container_statuses = p.status.as_ref().and_then(|s| s.container_statuses.as_ref());
-
-    if let Some(spec) = p.spec.as_ref() {
-        for c in &spec.containers {
-            let c_name = c.name.clone();
-            let c_image = c.image.clone().unwrap_or_default();
-            if !c_image.is_empty() && !images.contains(&c_image) {
-                images.push(c_image.clone());
-            }
-
-            let mut status_str = "Waiting".to_string();
-            let mut ready_str = "false".to_string();
-            let mut restarts = 0;
-
-            if let Some(statuses) = container_statuses
-                && let Some(cs) = statuses.iter().find(|s| s.name == c_name)
-            {
-                ready_str = cs.ready.to_string();
-                restarts = cs.restart_count;
-                total_restarts += restarts;
-
-                if let Some(state) = &cs.state {
-                    if state.running.is_some() {
-                        status_str = "Running".to_string();
-                    } else if let Some(term) = &state.terminated {
-                        let reason = term.reason.as_deref().unwrap_or("Terminated");
-                        status_str = format!("Terminated ({})", reason);
-                    } else if let Some(waiting) = &state.waiting {
-                        status_str = waiting.reason.clone().unwrap_or_else(|| "Waiting".to_string());
-                    }
-                }
-            }
-
-            let mut ports_str = None;
-            if let Some(ports) = &c.ports {
-                let port_list: Vec<String> = ports.iter()
-                    .map(|port| format!("{}/{}", port.container_port, port.protocol.as_deref().unwrap_or("TCP")))
-                    .collect();
-                if !port_list.is_empty() {
-                    ports_str = Some(port_list.join(", "));
-                }
-            }
-
-            containers.push(models::PodContainer {
-                name: c_name,
-                image: c_image,
-                status: status_str,
-                ready: ready_str,
-                restarts,
-                ports: ports_str,
-            });
-        }
-    }
-
-    models::PodInfo {
-        name,
-        namespace: namespace_name,
-        status,
-        age,
-        cpu: None,
-        memory: None,
-        cpu_cores: None,
-        memory_bytes: None,
-        cpu_pct: None,
-        memory_pct: None,
-        node,
-        restarts: total_restarts,
-        images,
-        labels,
-        annotations,
-        ip,
-        node_ip,
-        controlled_by,
-        qos_class,
-        containers,
-    }
-}
-
-pub async fn list_pods(client: &Client, namespace: Option<String>) -> Result<Vec<models::PodInfo>, kube::Error> {
-    let pods: Api<Pod> = if let Some(ref ns) = namespace {
-        Api::namespaced(client.clone(), ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "PodMetrics");
-    let ar = ApiResource::from_gvk(&gvk);
-    let metrics_api: Api<DynamicObject> = if let Some(ref ns) = namespace {
-        Api::namespaced_with(client.clone(), ns, &ar)
-    } else {
-        Api::all_with(client.clone(), &ar)
-    };
-
-    let lp = ListParams::default();
-    let (pods_res, metrics_res) = tokio::join!(
-        pods.list(&lp),
-        metrics_api.list(&lp)
-    );
-
-    let pod_items = pods_res?;
-
-    let metrics_map = match metrics_res {
-        Ok(metric_list) => crate::kubernetes::metrics::parse_pod_metrics_map(&metric_list.items),
-        Err(e) => {
-            tracing::debug!(error = ?e, "Could not fetch pod metrics on list (Metrics Server not installed?)");
-            std::collections::HashMap::new()
-        }
-    };
-
-    let mut pod_list = Vec::new();
-    for p in pod_items {
-        let mut info = map_pod(&p);
-        if let Some(metric) = metrics_map.get(&(info.name.clone(), info.namespace.clone())) {
-            info.cpu = Some(metric.cpu.clone());
-            info.memory = Some(metric.memory.clone());
-            info.cpu_cores = metric.cpu_cores;
-            info.memory_bytes = metric.memory_bytes;
-        }
-        pod_list.push(info);
-    }
-
-    Ok(pod_list)
-}
-
-pub fn map_deployment(d: &Deployment) -> models::DeploymentInfo {
-    let name = d.metadata.name.clone().unwrap_or_default();
-    let namespace_name = d.metadata.namespace.clone().unwrap_or_default();
-
-    let age = format_age(&d.metadata.creation_timestamp);
-
-    let desired = d.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
-    let status_replicas = d.status.as_ref();
-    let current = status_replicas.and_then(|s| s.replicas).unwrap_or(0);
-    let available = status_replicas.and_then(|s| s.available_replicas).unwrap_or(0);
-    let up_to_date = status_replicas.and_then(|s| s.updated_replicas).unwrap_or(0);
-
-    let replicas = models::Replicas { current, desired };
-
-    let mut status = "Progressing".to_string();
-    if (desired == 0 && current == 0) || available == desired {
-        status = "Running".to_string();
-    } else if let Some(conds) = status_replicas.and_then(|st| st.conditions.as_ref()) {
-        for c in conds {
-            if c.type_ == "ReplicaFailure" && c.status == "True" {
-                status = "Failed".to_string();
-            }
-        }
-    }
-
-    let conditions = status_replicas
-        .and_then(|st| st.conditions.as_ref())
-        .cloned();
-
-    let mut images = Vec::new();
-    let mut containers = Vec::new();
-    let mut ports = Vec::new();
-    if let Some(spec) = d.spec.as_ref() {
-        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-            if let Some(img) = &c.image {
-                images.push(img.clone());
-            }
-            containers.push(models::ContainerImageInfo {
-                name: c.name.clone(),
-                image: c.image.clone().unwrap_or_default(),
-            });
-            if let Some(c_ports) = &c.ports {
-                for cp in c_ports {
-                    if cp.container_port > 0 && !ports.contains(&cp.container_port) {
-                        ports.push(cp.container_port);
-                    }
-                }
-            }
-        }
-    }
-
-    let strategy = d.spec.as_ref()
-        .and_then(|s| s.strategy.as_ref())
-        .and_then(|strt| strt.type_.clone());
-
-    let min_ready_seconds = d.spec.as_ref().and_then(|s| s.min_ready_seconds).unwrap_or(0);
-    let revision_history = d.spec.as_ref().and_then(|s| s.revision_history_limit);
-
-    let labels = d.metadata.labels.clone().unwrap_or_default();
-    let annotations = d.metadata.annotations.clone().unwrap_or_default();
-
-    models::DeploymentInfo {
-        kind: "Deployment".to_string(),
-        name,
-        namespace: namespace_name,
-        status,
-        conditions,
-        replicas,
-        available,
-        up_to_date,
-        age,
-        images,
-        containers,
-        strategy,
-        min_ready_seconds,
-        revision_history,
-        labels,
-        annotations,
-        ports,
-    }
-}
-
-pub async fn list_deployments(client: &Client, namespace: Option<String>) -> Result<Vec<models::DeploymentInfo>, kube::Error> {
-    let api: Api<Deployment> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let mut list = Vec::new();
-    for d in api.list(&ListParams::default()).await? {
-        list.push(map_deployment(&d));
-    }
-
-    Ok(list)
-}
-
-pub fn map_statefulset(ss: &StatefulSet) -> models::StatefulSetInfo {
-    let name = ss.metadata.name.clone().unwrap_or_default();
-    let namespace_name = ss.metadata.namespace.clone().unwrap_or_default();
-    let age = format_age(&ss.metadata.creation_timestamp);
-
-    let desired = ss.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
-    let status_replicas = ss.status.as_ref();
-    let current = status_replicas.and_then(|s| s.ready_replicas).unwrap_or(0);
-    let replicas = models::Replicas { current, desired };
-
-    let status = if desired == current {
-        "Running".to_string()
-    } else {
-        "Progressing".to_string()
-    };
-
-    let mut images = Vec::new();
-    let mut containers = Vec::new();
-    if let Some(spec) = ss.spec.as_ref() {
-        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-            if let Some(img) = &c.image {
-                images.push(img.clone());
-            }
-            containers.push(models::ContainerImageInfo {
-                name: c.name.clone(),
-                image: c.image.clone().unwrap_or_default(),
-            });
-        }
-    }
-
-    let labels = ss.metadata.labels.clone().unwrap_or_default();
-    let annotations = ss.metadata.annotations.clone().unwrap_or_default();
-
-    models::StatefulSetInfo {
-        kind: "StatefulSet".to_string(),
-        name,
-        namespace: namespace_name,
-        status,
-        replicas,
-        age,
-        images,
-        containers,
-        labels,
-        annotations,
-    }
-}
-
-pub async fn list_statefulsets(client: &Client, namespace: Option<String>) -> Result<Vec<models::StatefulSetInfo>, kube::Error> {
-    let api: Api<StatefulSet> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let mut list = Vec::new();
-    for ss in api.list(&ListParams::default()).await? {
-        list.push(map_statefulset(&ss));
-    }
-
-    Ok(list)
-}
-
-pub fn map_daemonset(ds: &DaemonSet) -> models::DaemonSetInfo {
-    let name = ds.metadata.name.clone().unwrap_or_default();
-    let namespace_name = ds.metadata.namespace.clone().unwrap_or_default();
-    let age = format_age(&ds.metadata.creation_timestamp);
-
-    let status_ds = ds.status.as_ref();
-    let desired = status_ds.map(|s| s.desired_number_scheduled).unwrap_or(0);
-    let current = status_ds.map(|s| s.current_number_scheduled).unwrap_or(0);
-    let ready = status_ds.map(|s| s.number_ready).unwrap_or(0);
-    let up_to_date = status_ds.and_then(|s| s.updated_number_scheduled).unwrap_or(0);
-    let available = status_ds.and_then(|s| s.number_available).unwrap_or(0);
-
-    let replicas = models::DaemonSetReplicas {
-        desired,
-        current,
-        ready,
-        up_to_date,
-        available,
-    };
-
-    let status = if desired == ready {
-        "Running".to_string()
-    } else {
-        "Progressing".to_string()
-    };
-
-    let mut images = Vec::new();
-    let mut containers = Vec::new();
-    if let Some(spec) = ds.spec.as_ref() {
-        for c in &spec.template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-            if let Some(img) = &c.image {
-                images.push(img.clone());
-            }
-            containers.push(models::ContainerImageInfo {
-                name: c.name.clone(),
-                image: c.image.clone().unwrap_or_default(),
-            });
-        }
-    }
-
-    let labels = ds.metadata.labels.clone().unwrap_or_default();
-    let annotations = ds.metadata.annotations.clone().unwrap_or_default();
-
-    models::DaemonSetInfo {
-        kind: "DaemonSet".to_string(),
-        name,
-        namespace: namespace_name,
-        status,
-        replicas,
-        age,
-        images,
-        containers,
-        labels,
-        annotations,
-    }
-}
-
-pub async fn list_daemonsets(client: &Client, namespace: Option<String>) -> Result<Vec<models::DaemonSetInfo>, kube::Error> {
-    let api: Api<DaemonSet> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let mut list = Vec::new();
-    for ds in api.list(&ListParams::default()).await? {
-        list.push(map_daemonset(&ds));
-    }
-
-    Ok(list)
-}
+pub use orbit_core::kubernetes::workloads::{
+    list_daemonsets, list_deployments, list_pods, list_statefulsets, map_daemonset, map_deployment,
+    map_pod, map_statefulset,
+};
 
 pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
     let name = rs.metadata.name.clone().unwrap_or_default();
@@ -631,7 +255,7 @@ pub async fn clone_deployment(
 
     // Update metadata labels if any match source_name
     if let Some(labels) = cloned.metadata.labels.as_mut() {
-        for (_, val) in labels.iter_mut() {
+        for val in labels.values_mut() {
             if val == source_name {
                 *val = new_name.to_string();
             }
@@ -641,7 +265,7 @@ pub async fn clone_deployment(
     // Update spec.selector.match_labels and spec.template.metadata.labels
     if let Some(spec) = cloned.spec.as_mut() {
         if let Some(match_labels) = spec.selector.match_labels.as_mut() {
-            for (_, val) in match_labels.iter_mut() {
+            for val in match_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
                 }
@@ -649,7 +273,7 @@ pub async fn clone_deployment(
         }
 
         if let Some(template_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
-            for (_, val) in template_labels.iter_mut() {
+            for val in template_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
                 }
@@ -961,7 +585,7 @@ mod tests {
         // Apply metadata updates as in clone_deployment
         dep.metadata.name = Some(new_name.to_string());
         if let Some(meta_labels) = dep.metadata.labels.as_mut() {
-            for (_, val) in meta_labels.iter_mut() {
+            for val in meta_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
                 }
@@ -970,7 +594,7 @@ mod tests {
 
         if let Some(spec) = dep.spec.as_mut() {
             if let Some(match_labels) = spec.selector.match_labels.as_mut() {
-                for (_, val) in match_labels.iter_mut() {
+                for val in match_labels.values_mut() {
                     if val == source_name {
                         *val = new_name.to_string();
                     }
@@ -978,7 +602,7 @@ mod tests {
             }
 
             if let Some(t_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
-                for (_, val) in t_labels.iter_mut() {
+                for val in t_labels.values_mut() {
                     if val == source_name {
                         *val = new_name.to_string();
                     }
@@ -1223,21 +847,6 @@ mod tests {
     }
 
     #[test]
-    fn test_map_statefulset_kind() {
-        let ss = StatefulSet {
-            metadata: ObjectMeta {
-                name: Some("redis".to_string()),
-                namespace: Some("default".to_string()),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        let mapped = map_statefulset(&ss);
-        assert_eq!(mapped.name, "redis");
-        assert_eq!(mapped.kind, "StatefulSet");
-    }
-
-    #[test]
     fn test_map_daemonset_kind() {
         let ds = DaemonSet {
             metadata: ObjectMeta {
@@ -1265,58 +874,6 @@ mod tests {
         let mapped = map_replicaset(&rs);
         assert_eq!(mapped.name, "frontend-rs");
         assert_eq!(mapped.kind, "ReplicaSet");
-    }
-
-    #[test]
-    fn test_map_statefulset_containers() {
-        use k8s_openapi::api::apps::v1::StatefulSetSpec;
-        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
-
-        let ss = StatefulSet {
-            metadata: ObjectMeta {
-                name: Some("redis-cluster".to_string()),
-                namespace: Some("default".to_string()),
-                ..Default::default()
-            },
-            spec: Some(StatefulSetSpec {
-                template: PodTemplateSpec {
-                    spec: Some(PodSpec {
-                        containers: vec![
-                            Container {
-                                name: "redis".to_string(),
-                                image: Some("redis:7.2".to_string()),
-                                ..Default::default()
-                            },
-                            Container {
-                                name: "metrics".to_string(),
-                                image: Some("redis-exporter:1.0".to_string()),
-                                ..Default::default()
-                            },
-                        ],
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                ..Default::default()
-            }),
-            ..Default::default()
-        };
-
-        let mapped = map_statefulset(&ss);
-        assert_eq!(mapped.images, vec!["redis:7.2", "redis-exporter:1.0"]);
-        assert_eq!(
-            mapped.containers,
-            vec![
-                models::ContainerImageInfo {
-                    name: "redis".to_string(),
-                    image: "redis:7.2".to_string(),
-                },
-                models::ContainerImageInfo {
-                    name: "metrics".to_string(),
-                    image: "redis-exporter:1.0".to_string(),
-                },
-            ]
-        );
     }
 
     #[test]

@@ -5,7 +5,8 @@ import {
   parseReleaseArgs,
   resolveBaseBranch,
   buildPrBranchName,
-  buildPrBody
+  buildPrBody,
+  updateCargoManifestVersion
 } from './lib/releaseHelpers.mjs'
 
 function run(command, options = {}) {
@@ -30,9 +31,7 @@ function updateFile(filePath, updater) {
 }
 
 function updateCargoVersion(filePath, newVersion) {
-  updateFile(filePath, (content) => {
-    return content.replace(/(\[package\][\s\S]*?\bversion\s*=\s*")([^"]+)(")/, `$1${newVersion}$3`)
-  })
+  updateFile(filePath, (content) => updateCargoManifestVersion(content, newVersion))
 }
 
 function printHelp() {
@@ -153,11 +152,11 @@ function main() {
     return JSON.stringify(config, null, 2) + '\n'
   })
 
-  updateCargoVersion('src-tauri/Cargo.toml', targetVersion)
+  updateCargoVersion('Cargo.toml', targetVersion)
 
   console.log('\n3. Updating lock files...')
   run('npm install')
-  run('cargo check')
+  run('cargo update --workspace')
 
   console.log('\n4. Running typecheck...')
   run('npm run type-check')
@@ -166,7 +165,7 @@ function main() {
     console.log('\n[DRY RUN] Skipping git commit, push, tag, and PR creation.')
     console.log('[DRY RUN] Would execute:')
     console.log(
-      '  git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml'
+      '  git add package.json package-lock.json src-tauri/tauri.conf.json Cargo.toml Cargo.lock'
     )
     console.log(`  git commit -m "${commitMsg}"`)
     console.log(`  git push origin ${branchName}`)
@@ -184,9 +183,7 @@ function main() {
   }
 
   console.log('\n5. Staging modified release files and committing...')
-  run(
-    'git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock Cargo.toml'
-  )
+  run('git add package.json package-lock.json src-tauri/tauri.conf.json Cargo.toml Cargo.lock')
   runFile('git', ['commit', '-m', commitMsg])
 
   console.log(`\n6. Pushing branch ${branchName} to origin...`)
