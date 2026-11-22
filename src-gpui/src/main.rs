@@ -6669,8 +6669,18 @@ impl Render for OrbitShell {
     }
 }
 
-fn main() {
+pub fn gpui_exit_code_for_window_open(open_failed: bool) -> std::process::ExitCode {
+    if open_failed {
+        std::process::ExitCode::FAILURE
+    } else {
+        std::process::ExitCode::SUCCESS
+    }
+}
+
+fn main() -> std::process::ExitCode {
     let config = OrbitConfig::load();
+    let open_failed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let open_failed_for_run = std::sync::Arc::clone(&open_failed);
 
     Application::new().run(move |cx: &mut App| {
         if let Err(err) = crate::icons::register_lucide_font(cx) {
@@ -6695,9 +6705,12 @@ fn main() {
             cx.new(|cx| OrbitShell::new(&config_for_window, window, cx))
         }) {
             eprintln!("Failed to open Orbit GPUI window: {err}");
+            open_failed_for_run.store(true, std::sync::atomic::Ordering::SeqCst);
             cx.quit();
         }
     });
+
+    gpui_exit_code_for_window_open(open_failed.load(std::sync::atomic::Ordering::SeqCst))
 }
 
 #[cfg(test)]
@@ -6705,6 +6718,25 @@ mod tests {
     use super::*;
     use crate::theme::{AccentColor, SemanticColorsPreference};
     use gpui::WindowBackgroundAppearance;
+
+    #[test]
+    fn test_gpui_exit_code_for_window_open_returns_failure_on_error() {
+        assert_eq!(
+            format!("{:?}", gpui_exit_code_for_window_open(false)),
+            format!("{:?}", std::process::ExitCode::SUCCESS),
+            "Normal window open must yield ExitCode::SUCCESS"
+        );
+        assert_eq!(
+            format!("{:?}", gpui_exit_code_for_window_open(true)),
+            format!("{:?}", std::process::ExitCode::FAILURE),
+            "Window open failure must yield ExitCode::FAILURE"
+        );
+        assert_ne!(
+            format!("{:?}", gpui_exit_code_for_window_open(false)),
+            format!("{:?}", gpui_exit_code_for_window_open(true)),
+            "Success and failure exit codes must differ"
+        );
+    }
 
     #[test]
     fn test_window_options_and_shell_defaults() {
