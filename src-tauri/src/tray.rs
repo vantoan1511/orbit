@@ -57,6 +57,7 @@ where
 
 /// Reveals and focuses the primary Orbit application window.
 pub fn show_main_window(app: &AppHandle) {
+    crate::ipc::handlers::settings::notify_main_window_shown();
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_decorations(false);
         let _ = window.show();
