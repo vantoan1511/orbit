@@ -365,4 +365,77 @@ describe('Shared Release Helpers & Semver Contracts', () => {
       'release.yml must not leave generate_release_notes: true enabled when using body_path'
     )
   })
+
+  it('scripts/release.js synchronizes Cargo.lock via cargo update --workspace instead of cargo check and never references src-tauri/Cargo.toml', () => {
+    const releasePath = path.resolve('scripts/release.js')
+    const content = fs.readFileSync(releasePath, 'utf8')
+
+    assert.ok(
+      content.includes("run('cargo update --workspace')"),
+      'scripts/release.js must synchronize Cargo.lock with cargo update --workspace'
+    )
+    assert.ok(
+      !content.includes("run('cargo check')"),
+      'scripts/release.js must not run cargo check (fails on clean checkouts without staged GPUI sidecar)'
+    )
+    assert.ok(
+      content.includes(
+        'git add package.json package-lock.json src-tauri/tauri.conf.json Cargo.toml Cargo.lock'
+      ),
+      'scripts/release.js must stage package.json, package-lock.json, src-tauri/tauri.conf.json, Cargo.toml, and Cargo.lock'
+    )
+    assert.ok(
+      !content.includes('src-tauri/Cargo.toml'),
+      'scripts/release.js must never reference src-tauri/Cargo.toml'
+    )
+  })
+
+  it('workspace member manifests inherit version.workspace = true and Cargo.lock matches package.json and tauri.conf.json across all three crates', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'))
+    const tauriConf = JSON.parse(fs.readFileSync(path.resolve('src-tauri/tauri.conf.json'), 'utf8'))
+    const rootCargoToml = fs.readFileSync(path.resolve('Cargo.toml'), 'utf8')
+    const cargoLock = fs.readFileSync(path.resolve('Cargo.lock'), 'utf8')
+
+    assert.equal(
+      tauriConf.version,
+      pkg.version,
+      'src-tauri/tauri.conf.json version must match package.json'
+    )
+    assert.ok(
+      rootCargoToml.includes(`version = "${pkg.version}"`),
+      `Cargo.toml [workspace.package] version must match package.json (${pkg.version})`
+    )
+
+    const memberManifests = [
+      'crates/orbit-core/Cargo.toml',
+      'src-tauri/Cargo.toml',
+      'src-gpui/Cargo.toml'
+    ]
+    for (const manifestPath of memberManifests) {
+      const manifest = fs.readFileSync(path.resolve(manifestPath), 'utf8')
+      assert.match(
+        manifest,
+        /^version\.workspace\s*=\s*true$/m,
+        `${manifestPath} must inherit version.workspace = true`
+      )
+      assert.doesNotMatch(
+        manifest,
+        /^version\s*=\s*"/m,
+        `${manifestPath} must not hardcode a crate-local version`
+      )
+    }
+
+    const workspaceCrates = ['orbit-core', 'orbit-app', 'orbit-gpui']
+    for (const crateName of workspaceCrates) {
+      const pattern = new RegExp(
+        `\\[\\[package\\]\\]\\r?\\nname = "${crateName}"\\r?\\nversion = "${pkg.version.replaceAll('.', '\\.')}"`,
+        'm'
+      )
+      assert.match(
+        cargoLock,
+        pattern,
+        `Cargo.lock entry for ${crateName} must match package.json version (${pkg.version})`
+      )
+    }
+  })
 })

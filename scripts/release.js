@@ -156,7 +156,7 @@ function main() {
 
   console.log('\n3. Updating lock files...')
   run('npm install')
-  run('cargo check')
+  run('cargo update --workspace')
 
   console.log('\n4. Running typecheck...')
   run('npm run type-check')
