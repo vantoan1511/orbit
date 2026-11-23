@@ -274,6 +274,7 @@ pub fn render_workspace_tab_bar(
         .border_color(theme.border.default)
         .hover(|s| s.bg(theme.surface.bg_hover))
         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+            window.prevent_default();
             cx.stop_propagation();
             on_toggle_picker(window, cx);
         })
@@ -435,22 +436,86 @@ fn render_tab_item(
     tab_el.into_any_element()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickerInputPresentation {
+    pub show_placeholder: bool,
+    pub show_caret: bool,
+    pub show_clear_button: bool,
+    pub display_text: String,
+}
+
+pub fn picker_input_presentation(query: &str, is_focused: bool) -> PickerInputPresentation {
+    const PLACEHOLDER: &str = "Search views (e.g. Pods, Deployments, Nodes)...";
+    let is_empty = query.is_empty();
+    PickerInputPresentation {
+        show_placeholder: is_empty,
+        show_caret: is_focused,
+        show_clear_button: !is_empty,
+        display_text: if is_empty {
+            PLACEHOLDER.to_string()
+        } else {
+            query.to_string()
+        },
+    }
+}
+
 pub fn render_tab_resource_picker_overlay(
     tabs: &WorkspaceTabsState,
     theme: &OrbitTheme,
     search_focus: &FocusHandle,
+    is_search_focused: bool,
     on_select_view: TabViewCallback,
+    on_clear_query: TabActionCallback,
     on_close: TabActionCallback,
 ) -> AnyElement {
     let views = tabs.filtered_picker_views();
-    let search_text = if tabs.picker_query.is_empty() {
-        apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.muted)
-            .child("Search views (e.g. Pods, Deployments, Nodes)...")
+    let input_pres = picker_input_presentation(&tabs.picker_query, is_search_focused);
+    let caret = || {
+        div()
+            .w(px(1.5))
+            .h(px(14.0))
+            .flex_shrink_0()
+            .bg(theme.accent.accent)
+    };
+
+    let search_text = if input_pres.show_placeholder {
+        div()
+            .flex()
+            .items_center()
+            .gap_0p5()
+            .min_w_0()
+            .when(input_pres.show_caret, |el| el.child(caret()))
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .text_color(theme.text.muted)
+                    .truncate()
+                    .child(input_pres.display_text),
+            )
     } else {
-        apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.primary)
-            .child(tabs.picker_query.clone())
+        div()
+            .flex()
+            .items_center()
+            .min_w_0()
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .text_color(theme.text.primary)
+                    .truncate()
+                    .child(input_pres.display_text),
+            )
+            .when(input_pres.show_caret, |el| el.child(caret()))
+    };
+
+    let popover_focus = search_focus.clone();
+    let input_focus = search_focus.clone();
+    let input_border_color = if is_search_focused {
+        theme.accent.accent
+    } else {
+        theme.border.default
+    };
+    let search_icon_color = if is_search_focused {
+        theme.accent.accent
+    } else {
+        theme.text.muted
     };
 
     let popover = theme
@@ -463,29 +528,66 @@ pub fn render_tab_resource_picker_overlay(
         .shadow_lg()
         .flex()
         .flex_col()
-        .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+        .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+            window.prevent_default();
             cx.stop_propagation();
+            popover_focus.focus(window);
         })
         .child(
             div()
+                .id("tab-resource-picker-search-input")
                 .track_focus(search_focus)
                 .px_3()
                 .py_2()
                 .border_b_1()
-                .border_color(theme.border.default)
+                .border_color(input_border_color)
                 .flex()
                 .items_center()
                 .gap_2()
-                .child(render_icon(Icon::Search, px(14.0), theme.text.muted))
-                .child(div().flex_1().min_w_0().child(search_text)),
+                .cursor_text()
+                .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    window.prevent_default();
+                    cx.stop_propagation();
+                    input_focus.focus(window);
+                })
+                .child(render_icon(Icon::Search, px(14.0), search_icon_color))
+                .child(div().flex_1().min_w_0().child(search_text))
+                .when(input_pres.show_clear_button, |el| {
+                    let on_clear = on_clear_query.clone();
+                    el.child(
+                        div()
+                            .id("tab-resource-picker-clear-btn")
+                            .w(px(18.0))
+                            .h(px(18.0))
+                            .rounded(theme.style.radius_control)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(theme.surface.bg_hover))
+                            .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                                window.prevent_default();
+                                cx.stop_propagation();
+                                on_clear(window, cx);
+                            })
+                            .child(render_icon(Icon::X, px(12.0), theme.text.muted)),
+                    )
+                }),
         )
-        .child(render_picker_list(&views, theme, on_select_view));
+        .child(render_picker_list(
+            &views,
+            tabs.picker_selected_index,
+            theme,
+            on_select_view,
+        ));
 
     div()
         .id("tab-resource-picker-backdrop")
         .absolute()
         .inset_0()
         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+            window.prevent_default();
+            cx.stop_propagation();
             on_close(window, cx);
         })
         .child(
@@ -500,6 +602,7 @@ pub fn render_tab_resource_picker_overlay(
 
 fn render_picker_list(
     views: &[WorkspaceView],
+    selected_index: usize,
     theme: &OrbitTheme,
     on_select_view: TabViewCallback,
 ) -> AnyElement {
@@ -530,10 +633,13 @@ fn render_picker_list(
             .into_any_element();
     }
 
-    for &view in views {
+    let clamped_selected = selected_index.min(views.len().saturating_sub(1));
+
+    for (idx, &view) in views.iter().enumerate() {
         let on_pick = on_select_view.clone();
         let icon_color = tab_icon_color(view, true, theme);
         let category_label = view.category().map(|c| c.label()).unwrap_or("Application");
+        let is_selected = idx == clamped_selected;
 
         list = list.child(
             div()
@@ -546,8 +652,10 @@ fn render_picker_list(
                 .justify_between()
                 .gap_2()
                 .cursor_pointer()
+                .when(is_selected, |el| el.bg(theme.surface.bg_hover))
                 .hover(|s| s.bg(theme.surface.bg_hover))
                 .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    window.prevent_default();
                     cx.stop_propagation();
                     on_pick(view, window, cx);
                 })
@@ -654,5 +762,32 @@ mod tests {
         assert!(find_item(&single, "move-right").disabled);
         assert!(find_item(&single, "close-others").disabled);
         assert!(find_item(&single, "close-right").disabled);
+    }
+
+    #[test]
+    fn test_picker_input_presentation_tracks_placeholder_caret_and_clear_button() {
+        let empty_unfocused = picker_input_presentation("", false);
+        assert!(empty_unfocused.show_placeholder);
+        assert!(!empty_unfocused.show_caret);
+        assert!(!empty_unfocused.show_clear_button);
+        assert_eq!(
+            empty_unfocused.display_text,
+            "Search views (e.g. Pods, Deployments, Nodes)..."
+        );
+
+        let empty_focused = picker_input_presentation("", true);
+        assert!(empty_focused.show_placeholder);
+        assert!(empty_focused.show_caret);
+        assert!(!empty_focused.show_clear_button);
+        assert_eq!(
+            empty_focused.display_text,
+            "Search views (e.g. Pods, Deployments, Nodes)..."
+        );
+
+        let populated_focused = picker_input_presentation("pod ", true);
+        assert!(!populated_focused.show_placeholder);
+        assert!(populated_focused.show_caret);
+        assert!(populated_focused.show_clear_button);
+        assert_eq!(populated_focused.display_text, "pod ");
     }
 }
