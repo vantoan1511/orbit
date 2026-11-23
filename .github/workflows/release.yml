@@ -71,16 +71,21 @@ jobs:
           $env:ORBIT_TARGET_VERSION = $version
           $env:ORBIT_MAKE_LATEST_OVERRIDE = $override
 
-          $metaJson = node --input-type=module -e "
-            import { execSync } from 'node:child_process';
-            import { computeMakeLatest } from './scripts/lib/releaseHelpers.mjs';
-            const tags = execSync('git tag -l \"v*\"', { encoding: 'utf8' })
-              .split(/\r?\n/)
-              .map((t) => t.trim())
-              .filter(Boolean);
-            const result = computeMakeLatest(process.env.ORBIT_TARGET_VERSION, tags, process.env.ORBIT_MAKE_LATEST_OVERRIDE);
-            console.log(JSON.stringify(result));
-          "
+          $metaScript = @'
+          import { execFileSync } from 'node:child_process';
+          import { computeMakeLatest } from './scripts/lib/releaseHelpers.mjs';
+          const tags = execFileSync('git', ['tag', '-l', 'v*'], { encoding: 'utf8' })
+            .split(/\r?\n/)
+            .map((t) => t.trim())
+            .filter(Boolean);
+          const result = computeMakeLatest(process.env.ORBIT_TARGET_VERSION, tags, process.env.ORBIT_MAKE_LATEST_OVERRIDE);
+          console.log(JSON.stringify(result));
+          '@
+          $metaJson = node --input-type=module -e $metaScript
+          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($metaJson)) {
+            Write-Error "Failed to compute release metadata."
+            exit 1
+          }
           $meta = $metaJson | ConvertFrom-Json
 
           Write-Output "Release metadata for $expectedTag`: should_release=true, make_latest=$($meta.makeLatest), is_prerelease=$($meta.isPrerelease)"
