@@ -1,4 +1,4 @@
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +20,11 @@ export interface StageSidecarResult {
   destPath: string
   bytes: number
   sha256: string
+  skippedCopy: boolean
+}
+
+export function shouldBuildFrontendInParallel(args: readonly string[]): boolean {
+  return args.includes('--with-frontend')
 }
 
 export function buildCargoArgs(
@@ -50,6 +55,25 @@ export function stageGpuiSidecarFile(sourcePath: string, destPath: string): Stag
     throw new Error(`Compiled GPUI binary is empty (0 bytes): ${sourcePath}`)
   }
 
+  const sourceHash = computeFileSha256(sourcePath)
+
+  if (fs.existsSync(destPath)) {
+    const existingStat = fs.statSync(destPath)
+    if (
+      existingStat.isFile() &&
+      existingStat.size === sourceStat.size &&
+      computeFileSha256(destPath) === sourceHash
+    ) {
+      return {
+        sourcePath,
+        destPath,
+        bytes: existingStat.size,
+        sha256: sourceHash,
+        skippedCopy: true
+      }
+    }
+  }
+
   fs.mkdirSync(path.dirname(destPath), { recursive: true })
   fs.copyFileSync(sourcePath, destPath)
 
@@ -58,7 +82,6 @@ export function stageGpuiSidecarFile(sourcePath: string, destPath: string): Stag
   }
 
   const destStat = fs.statSync(destPath)
-  const sourceHash = computeFileSha256(sourcePath)
   const destHash = computeFileSha256(destPath)
 
   if (destStat.size !== sourceStat.size || destHash !== sourceHash) {
@@ -71,7 +94,8 @@ export function stageGpuiSidecarFile(sourcePath: string, destPath: string): Stag
     sourcePath,
     destPath,
     bytes: destStat.size,
-    sha256: destHash
+    sha256: destHash,
+    skippedCopy: false
   }
 }
 
@@ -87,7 +111,48 @@ export function shouldUseExplicitCargoTarget(
   return explicitFromEnv !== null && explicitFromEnv !== hostTriple
 }
 
-function runCli(): void {
+interface CommandExecutionResult {
+  label: string
+  exitCode: number
+  error?: Error
+}
+
+function runCommandAsync(
+  command: string,
+  args: string[],
+  cwd: string,
+  label: string,
+  shell = false
+): Promise<CommandExecutionResult> {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd,
+      stdio: 'inherit',
+      shell
+    })
+
+    child.once('error', (error) => {
+      resolve({ label, exitCode: 1, error })
+    })
+
+    child.once('close', (code) => {
+      resolve({ label, exitCode: code ?? 1 })
+    })
+  })
+}
+
+function assertCommandSucceeded(result: CommandExecutionResult): void {
+  if (result.error) {
+    console.error(`[ERROR] Failed to execute ${result.label}: ${result.error.message}`)
+    process.exit(1)
+  }
+  if (result.exitCode !== 0) {
+    console.error(`[ERROR] ${result.label} failed with exit code ${result.exitCode}`)
+    process.exit(result.exitCode)
+  }
+}
+
+async function runCli(): Promise<void> {
   const args = process.argv.slice(2)
   const workspaceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   const profile = resolveBuildProfile(args, process.env)
@@ -106,26 +171,42 @@ function runCli(): void {
     ? ` (target: ${targetTriple})`
     : ` (host: ${targetTriple})`
 
-  console.log(`[gpui-sidecar] Compiling ${GPUI_PACKAGE_NAME} [${profile}]${explicitTargetNote}...`)
-  console.log(`[gpui-sidecar] Running: cargo ${cargoArgs.join(' ')}`)
+  if (shouldBuildFrontendInParallel(args)) {
+    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+    console.log(
+      `[gpui-sidecar] Running frontend build (npm run build) and ${GPUI_PACKAGE_NAME} [${profile}]${explicitTargetNote} in parallel...`
+    )
+    console.log(`[gpui-sidecar] Running: cargo ${cargoArgs.join(' ')}`)
 
-  const result = spawnSync('cargo', cargoArgs, {
-    cwd: workspaceRoot,
-    stdio: 'inherit'
-  })
+    const results = await Promise.all([
+      runCommandAsync(
+        npmCmd,
+        ['run', 'build'],
+        workspaceRoot,
+        'npm run build',
+        process.platform === 'win32'
+      ),
+      runCommandAsync('cargo', cargoArgs, workspaceRoot, 'cargo build')
+    ])
 
-  if (result.error) {
-    console.error(`[ERROR] Failed to execute cargo: ${result.error.message}`)
-    process.exit(1)
-  }
-  if (result.status !== 0) {
-    console.error(`[ERROR] cargo build failed with exit code ${result.status ?? 1}`)
-    process.exit(result.status ?? 1)
+    for (const result of results) {
+      assertCommandSucceeded(result)
+    }
+  } else {
+    console.log(
+      `[gpui-sidecar] Compiling ${GPUI_PACKAGE_NAME} [${profile}]${explicitTargetNote}...`
+    )
+    console.log(`[gpui-sidecar] Running: cargo ${cargoArgs.join(' ')}`)
+
+    const cargoResult = await runCommandAsync('cargo', cargoArgs, workspaceRoot, 'cargo build')
+    assertCommandSucceeded(cargoResult)
   }
 
   const staged = stageGpuiSidecarFile(cargoOutputPath, paths.stagedSidecarPath)
+  const statusTag = staged.skippedCopy ? 'UNCHANGED' : 'PASS'
+  const actionVerb = staged.skippedCopy ? 'Unchanged GPUI sidecar' : 'Staged GPUI sidecar'
   console.log(
-    `[PASS] Staged GPUI sidecar -> ${path.relative(workspaceRoot, staged.destPath)} (${staged.bytes} bytes, sha256=${staged.sha256.slice(0, 12)}...)`
+    `[${statusTag}] ${actionVerb} -> ${path.relative(workspaceRoot, staged.destPath)} (${staged.bytes} bytes, sha256=${staged.sha256.slice(0, 12)}...)`
   )
 }
 
@@ -133,5 +214,8 @@ const isMain =
   process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
 
 if (isMain) {
-  runCli()
+  void runCli().catch((err: unknown) => {
+    console.error(`[ERROR] ${err instanceof Error ? err.message : String(err)}`)
+    process.exit(1)
+  })
 }

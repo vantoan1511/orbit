@@ -24,6 +24,7 @@ import {
 } from '../../../scripts/lib/gpuiSidecar.ts'
 import {
   buildCargoArgs,
+  shouldBuildFrontendInParallel,
   shouldUseExplicitCargoTarget,
   stageGpuiSidecarFile
 } from '../../../scripts/build-gpui-sidecar.ts'
@@ -343,6 +344,51 @@ describe('GPUI Sidecar Build & Staging Script (scripts/build-gpui-sidecar.ts)', 
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
+  })
+
+  it('stageGpuiSidecarFile skips overwriting destination and preserves mtime when size and SHA-256 already match', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-gpui-stage-idempotent-'))
+    try {
+      const sourcePath = path.join(tmpDir, 'target', 'debug', 'orbit.exe')
+      const destPath = path.join(
+        tmpDir,
+        'src-tauri',
+        'binaries',
+        'orbit-gpui-x86_64-pc-windows-msvc.exe'
+      )
+      fs.mkdirSync(path.dirname(sourcePath), { recursive: true })
+      fs.writeFileSync(sourcePath, 'MZ-initial-gpui-binary')
+
+      const first = stageGpuiSidecarFile(sourcePath, destPath)
+      assert.equal(first.skippedCopy, false)
+
+      // Set an older deterministic mtime on destPath to verify copy is skipped
+      const pastDate = new Date('2025-01-01T00:00:00.000Z')
+      fs.utimesSync(destPath, pastDate, pastDate)
+      const beforeMtimeMs = fs.statSync(destPath).mtimeMs
+
+      const second = stageGpuiSidecarFile(sourcePath, destPath)
+      assert.equal(second.skippedCopy, true)
+      assert.equal(second.sha256, first.sha256)
+      assert.equal(second.bytes, first.bytes)
+      assert.equal(fs.statSync(destPath).mtimeMs, beforeMtimeMs)
+
+      // Modify source content -> must overwrite and report skippedCopy === false
+      fs.writeFileSync(sourcePath, 'MZ-updated-gpui-binary-payload')
+      const third = stageGpuiSidecarFile(sourcePath, destPath)
+      assert.equal(third.skippedCopy, false)
+      assert.notEqual(third.sha256, first.sha256)
+      assert.equal(third.sha256, computeFileSha256(destPath))
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it('shouldBuildFrontendInParallel returns true only when --with-frontend is provided', () => {
+    assert.equal(shouldBuildFrontendInParallel([]), false)
+    assert.equal(shouldBuildFrontendInParallel(['--profile', 'release']), false)
+    assert.equal(shouldBuildFrontendInParallel(['--with-frontend']), true)
+    assert.equal(shouldBuildFrontendInParallel(['--profile', 'release', '--with-frontend']), true)
   })
 })
 

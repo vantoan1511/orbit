@@ -30,6 +30,12 @@ uuid = { version = "1.0", features = ["v4"] }
 unwrap_used = "deny"
 expect_used = "deny"
 
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = 0
+
 [profile.release]
 opt-level = 3          # speed up compilation (3 is faster than 'z')
 lto = "thin"           # faster than full LTO, still good optimization

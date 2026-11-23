@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process'
 
 describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
   it('verify_shift_left.py auto-detects GITHUB_ACTIONS=true to bypass branch safety and scan all repo files', () => {
-    const res = spawnSync('python', ['.agents/scripts/verify_shift_left.py'], {
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3'
+    const res = spawnSync(pythonCmd, ['.agents/scripts/verify_shift_left.py'], {
       encoding: 'utf8',
       env: {
         ...process.env,
@@ -82,9 +83,9 @@ describe('Shift-Left PR CI Workflow & verify_shift_left Contracts', () => {
 
     const content = fs.readFileSync(ciPath, 'utf8')
     const gates = [
-      'python .agents/scripts/verify_shift_left.py',
+      'python3 .agents/scripts/verify_shift_left.py',
       'npm run type-check',
-      'npm run lint',
+      'npm run lint:check',
       'npm test',
       'npm run gpui:build:dev',
       'cargo clippy --workspace --all-targets -- -D warnings',
