@@ -9,11 +9,11 @@ import tailwindcss from '@tailwindcss/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
     tailwindcss(),
-    vueDevTools(),
+    ...(command === 'serve' ? [vueDevTools()] : []),
     Components({
       resolvers: [PrimeVueResolver()]
     })
@@ -26,4 +26,4 @@ export default defineConfig({
   build: {
     outDir: 'build'
   }
-})
+}))

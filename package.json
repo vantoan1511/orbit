@@ -16,7 +16,8 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "test": "node --experimental-strip-types --test \"src/**/__tests__/*.test.ts\"",
-    "lint": "eslint . --fix --max-warnings 0",
+    "lint": "eslint . --cache --fix --max-warnings 0",
+    "lint:check": "eslint . --cache --max-warnings 0",
     "format": "prettier --write ."
   },
   "dependencies": {

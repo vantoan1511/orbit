@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "npm run build && node --experimental-strip-types scripts/build-gpui-sidecar.ts",
+    "beforeBuildCommand": "node --experimental-strip-types scripts/build-gpui-sidecar.ts --with-frontend",
     "frontendDist": "../build"
   },
   "app": {
