@@ -2,14 +2,14 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, CursorStyle, FontWeight, MouseButton, SharedString, Styled, Window, div,
-    prelude::*, px,
+    AnyElement, App, CursorStyle, FontWeight, MouseButton, SharedString, Styled,
+    UniformListScrollHandle, Window, div, prelude::*, px,
 };
 use lucide_icons::Icon;
 
 use crate::components::resource_kind::render_resource_kind_badge;
 use crate::components::status_badge::{StatusBadgeVariant, render_status_badge_from_str};
-use crate::components::yaml_viewer::YamlLoadStatus;
+use crate::components::yaml_viewer::{YamlDocumentCache, YamlLoadStatus};
 use crate::icons::render_icon;
 use crate::state::ClusterBridgeCommand;
 use crate::theme::{OrbitTheme, apply_text_step};
@@ -199,6 +199,8 @@ pub struct ResourceDrawerState {
     pub yaml_generation: u64,
     pub yaml_status: YamlLoadStatus,
     pub yaml_content: Option<String>,
+    pub yaml_document: YamlDocumentCache,
+    pub yaml_scroll_handle: UniformListScrollHandle,
     pub yaml_error: Option<String>,
     pub yaml_copied: bool,
     pub revealed_secret_keys: BTreeSet<String>,
@@ -216,6 +218,8 @@ impl Default for ResourceDrawerState {
             yaml_generation: 0,
             yaml_status: YamlLoadStatus::Idle,
             yaml_content: None,
+            yaml_document: YamlDocumentCache::default(),
+            yaml_scroll_handle: UniformListScrollHandle::new(),
             yaml_error: None,
             yaml_copied: false,
             revealed_secret_keys: BTreeSet::new(),
@@ -224,6 +228,11 @@ impl Default for ResourceDrawerState {
 }
 
 impl ResourceDrawerState {
+    fn clear_yaml_cache(&mut self) {
+        self.yaml_document.clear();
+        self.yaml_scroll_handle = UniformListScrollHandle::new();
+    }
+
     pub fn open_or_switch(
         &mut self,
         cluster_id: Option<&str>,
@@ -244,6 +253,7 @@ impl ResourceDrawerState {
             self.yaml_generation = self.yaml_generation.saturating_add(1);
             self.yaml_status = YamlLoadStatus::Idle;
             self.yaml_content = None;
+            self.clear_yaml_cache();
             self.yaml_error = None;
             self.revealed_secret_keys.clear();
         }
@@ -294,6 +304,7 @@ impl ResourceDrawerState {
         let Some(cid) = cluster_id.filter(|s| !s.trim().is_empty()) else {
             self.yaml_status = YamlLoadStatus::Error;
             self.yaml_content = None;
+            self.clear_yaml_cache();
             self.yaml_error = Some("No active cluster connected.".to_string());
             return None;
         };
@@ -302,6 +313,7 @@ impl ResourceDrawerState {
         self.yaml_generation = self.yaml_generation.saturating_add(1);
         self.yaml_status = YamlLoadStatus::Loading;
         self.yaml_content = None;
+        self.clear_yaml_cache();
         self.yaml_error = None;
         self.yaml_copied = false;
 
@@ -345,6 +357,8 @@ impl ResourceDrawerState {
         if !self.matches_yaml_response(cluster_id, generation, kind, namespace, name) {
             return false;
         }
+        self.yaml_document.get_or_build(generation, &yaml);
+        self.yaml_scroll_handle = UniformListScrollHandle::new();
         self.yaml_status = YamlLoadStatus::Loaded;
         self.yaml_content = Some(yaml);
         self.yaml_error = None;
@@ -365,6 +379,7 @@ impl ResourceDrawerState {
         }
         self.yaml_status = YamlLoadStatus::Error;
         self.yaml_content = None;
+        self.clear_yaml_cache();
         self.yaml_error = Some(message);
         true
     }
@@ -395,6 +410,7 @@ impl ResourceDrawerState {
         self.yaml_generation = self.yaml_generation.saturating_add(1);
         self.yaml_status = YamlLoadStatus::Idle;
         self.yaml_content = None;
+        self.clear_yaml_cache();
         self.yaml_error = None;
         self.yaml_copied = false;
         self.revealed_secret_keys.clear();
@@ -1076,5 +1092,120 @@ mod tests {
                 name: "allow-api".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn test_resource_drawer_caches_tokenized_yaml_per_generation_and_clears_on_reset() {
+        let mut state = ResourceDrawerState::default();
+        let dep_a = ResourceDrawerTarget::Deployment {
+            name: "api".to_string(),
+            namespace: "default".to_string(),
+        };
+        let dep_b = ResourceDrawerTarget::Deployment {
+            name: "web".to_string(),
+            namespace: "prod".to_string(),
+        };
+
+        let _ = state.open_or_switch(Some("c1"), dep_a.clone(), ResourceDrawerTabId::Yaml);
+        let g1 = state.yaml_generation;
+        assert!(state.yaml_document.current().is_none());
+
+        assert!(state.apply_yaml_loaded(
+            "c1",
+            g1,
+            "Deployment",
+            Some("default"),
+            "api",
+            "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\n".to_string(),
+        ));
+
+        let doc1 = state
+            .yaml_document
+            .current()
+            .expect("cached YAML document should be populated");
+        assert_eq!(doc1.revision(), g1);
+        assert_eq!(doc1.line_count(), 4);
+
+        let doc1_again = state
+            .yaml_document
+            .current()
+            .expect("cached YAML document should remain available");
+        assert!(Rc::ptr_eq(&doc1, &doc1_again));
+
+        // Stale response with older generation must be ignored and leave cache intact.
+        assert!(!state.apply_yaml_loaded(
+            "c1",
+            g1.saturating_sub(1),
+            "Deployment",
+            Some("default"),
+            "api",
+            "kind: Stale\n".to_string(),
+        ));
+        let doc_after_stale = state
+            .yaml_document
+            .current()
+            .expect("cache should be unchanged after stale response");
+        assert!(Rc::ptr_eq(&doc1, &doc_after_stale));
+
+        // retry_yaml clears cache and advances generation.
+        let _ = state.retry_yaml(Some("c1"));
+        assert!(state.yaml_document.current().is_none());
+        let g2 = state.yaml_generation;
+        assert!(g2 > g1);
+
+        assert!(state.apply_yaml_loaded(
+            "c1",
+            g2,
+            "Deployment",
+            Some("default"),
+            "api",
+            "kind: Deployment\n".to_string(),
+        ));
+        let doc2 = state
+            .yaml_document
+            .current()
+            .expect("cached YAML document should rebuild for g2");
+        assert_eq!(doc2.revision(), g2);
+        assert_eq!(doc2.line_count(), 1);
+
+        // Switching target clears cache.
+        let _ = state.open_or_switch(Some("c1"), dep_b, ResourceDrawerTabId::Yaml);
+        assert!(state.yaml_document.current().is_none());
+        let g3 = state.yaml_generation;
+        assert!(state.apply_yaml_loaded(
+            "c1",
+            g3,
+            "Deployment",
+            Some("prod"),
+            "web",
+            "kind: Deployment\n".to_string(),
+        ));
+        assert!(state.yaml_document.current().is_some());
+
+        // apply_yaml_failed clears cache.
+        assert!(state.apply_yaml_failed(
+            "c1",
+            g3,
+            "Deployment",
+            Some("prod"),
+            "web",
+            "timeout".to_string(),
+        ));
+        assert!(state.yaml_document.current().is_none());
+
+        // Re-populate then verify reset_for_context_change clears cache.
+        let _ = state.retry_yaml(Some("c1"));
+        let g4 = state.yaml_generation;
+        assert!(state.apply_yaml_loaded(
+            "c1",
+            g4,
+            "Deployment",
+            Some("prod"),
+            "web",
+            "kind: Deployment\n".to_string(),
+        ));
+        assert!(state.yaml_document.current().is_some());
+        state.reset_for_context_change();
+        assert!(state.yaml_document.current().is_none());
     }
 }

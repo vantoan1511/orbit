@@ -1599,6 +1599,8 @@ impl OrbitShell {
             YamlViewerProps {
                 status: self.drawer.yaml_status,
                 yaml_content: self.drawer.yaml_content.as_deref(),
+                cached_document: self.drawer.yaml_document.current(),
+                scroll_handle: Some(self.drawer.yaml_scroll_handle.clone()),
                 error_message: self.drawer.yaml_error.as_deref(),
                 copied: self.drawer.yaml_copied,
                 subtitle: subtitle.into(),
@@ -2104,6 +2106,8 @@ impl OrbitShell {
                             YamlViewerProps {
                                 status: YamlLoadStatus::Loaded,
                                 yaml_content: Some(&formatted),
+                                cached_document: None,
+                                scroll_handle: Some(self.drawer.yaml_scroll_handle.clone()),
                                 error_message: None,
                                 copied: self.drawer.yaml_copied,
                                 subtitle: SharedString::from(format!(
