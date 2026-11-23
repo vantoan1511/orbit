@@ -459,6 +459,8 @@ pub fn render_empty_tabs_workspace(
                         .cursor_pointer()
                         .hover(|s| s.bg(theme.accent.hover))
                         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                            window.prevent_default();
+                            cx.stop_propagation();
                             on_open_picker(window, cx);
                         })
                         .child(render_icon(Icon::Plus, px(14.0), theme.surface.bg_app))

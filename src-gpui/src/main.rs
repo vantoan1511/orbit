@@ -36,7 +36,7 @@ use crate::state::{
     EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
     NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
-    PersistentVolumeClaimsState, PersistentVolumesState, PodsState,
+    PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodsState,
     SecretsState, ServicesState, StatefulSetsState,
     TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
@@ -44,6 +44,20 @@ use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex,
     sync_native_titlebar_appearance,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellFocusTarget {
+    ShellRoot,
+    PickerSearch,
+}
+
+pub const fn focus_target_for_picker_transition(picker_open: bool) -> ShellFocusTarget {
+    if picker_open {
+        ShellFocusTarget::PickerSearch
+    } else {
+        ShellFocusTarget::ShellRoot
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct StatusPresentation {
@@ -1193,6 +1207,9 @@ impl OrbitShell {
 
         let resolved_system_is_dark = ThemeMode::System.resolve_is_dark(window.appearance());
 
+        let focus_handle = cx.focus_handle();
+        focus_handle.focus(window);
+
         Self {
             state: ClusterSwitcherState::new(),
             sidebar: SidebarLayoutState::new(),
@@ -1217,7 +1234,7 @@ impl OrbitShell {
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
             tabs: WorkspaceTabsState::from_config(config),
-            focus_handle: cx.focus_handle(),
+            focus_handle,
             namespace_search_focus: cx.focus_handle(),
             picker_search_focus: cx.focus_handle(),
             command_tx,
@@ -6129,13 +6146,23 @@ impl OrbitShell {
         self.namespaces.close_dropdown();
     }
 
+    fn apply_focus_target(&self, target: ShellFocusTarget, window: &mut Window) {
+        match target {
+            ShellFocusTarget::ShellRoot => self.focus_handle.focus(window),
+            ShellFocusTarget::PickerSearch => self.picker_search_focus.focus(window),
+        }
+    }
+
     fn open_or_toggle_picker(&mut self, toggle: bool, window: &mut Window, cx: &mut Context<Self>) {
         let should_open = if toggle { !self.tabs.picker_open } else { true };
         self.dismiss_overlays();
         if should_open {
             self.tabs.open_picker();
-            self.picker_search_focus.focus(window);
         }
+        self.apply_focus_target(
+            focus_target_for_picker_transition(self.tabs.picker_open),
+            window,
+        );
         cx.notify();
     }
 
@@ -6507,13 +6534,34 @@ impl Render for OrbitShell {
                         return;
                     }
                 }
-                if this.tabs.picker_open
-                    && this.tabs.handle_picker_search_key(
+                if this.tabs.picker_open {
+                    let has_shortcut_modifier = event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.alt
+                        || event.keystroke.modifiers.platform;
+                    match this.tabs.handle_picker_key(
                         &event.keystroke.key,
                         event.keystroke.key_char.as_deref(),
-                    )
-                {
-                    cx.notify();
+                        has_shortcut_modifier,
+                    ) {
+                        PickerKeyAction::Selected(view) => {
+                            this.apply_focus_target(
+                                focus_target_for_picker_transition(false),
+                                window,
+                            );
+                            this.select_workspace_view(view, cx);
+                        }
+                        PickerKeyAction::Closed => {
+                            this.apply_focus_target(
+                                focus_target_for_picker_transition(false),
+                                window,
+                            );
+                            cx.notify();
+                        }
+                        PickerKeyAction::Updated => {
+                            cx.notify();
+                        }
+                        PickerKeyAction::Ignored => {}
+                    }
                     return;
                 }
                 if this.namespaces.dropdown_open
@@ -6653,20 +6701,40 @@ impl Render for OrbitShell {
             })
             .when(self.tabs.picker_open, |el| {
                 let select_entity = cx.entity().clone();
+                let clear_entity = cx.entity().clone();
                 let close_entity = cx.entity().clone();
                 el.child(render_tab_resource_picker_overlay(
                     &self.tabs,
                     &theme,
                     &self.picker_search_focus,
-                    std::rc::Rc::new(move |view, _window, cx| {
+                    self.picker_search_focus.is_focused(window),
+                    std::rc::Rc::new(move |view, window, cx| {
                         select_entity.update(cx, |shell, cx| {
                             shell.tabs.close_picker();
+                            shell.apply_focus_target(
+                                focus_target_for_picker_transition(false),
+                                window,
+                            );
                             shell.select_workspace_view(view, cx);
                         });
                     }),
-                    std::rc::Rc::new(move |_window, cx| {
+                    std::rc::Rc::new(move |window, cx| {
+                        clear_entity.update(cx, |shell, cx| {
+                            shell.tabs.clear_picker_query();
+                            shell.apply_focus_target(
+                                focus_target_for_picker_transition(true),
+                                window,
+                            );
+                            cx.notify();
+                        });
+                    }),
+                    std::rc::Rc::new(move |window, cx| {
                         close_entity.update(cx, |shell, cx| {
                             shell.tabs.close_picker();
+                            shell.apply_focus_target(
+                                focus_target_for_picker_transition(false),
+                                window,
+                            );
                             cx.notify();
                         });
                     }),
@@ -13191,5 +13259,17 @@ mod tests {
             c,
             ClusterBridgeCommand::LoadNetworkPolicies { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
+    }
+
+    #[test]
+    fn test_focus_target_for_picker_transition_switches_between_picker_and_shell_root() {
+        assert_eq!(
+            focus_target_for_picker_transition(true),
+            ShellFocusTarget::PickerSearch
+        );
+        assert_eq!(
+            focus_target_for_picker_transition(false),
+            ShellFocusTarget::ShellRoot
+        );
     }
 }

@@ -2638,6 +2638,14 @@ pub struct ClusterTabsState {
     pub active_tab: Option<WorkspaceView>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickerKeyAction {
+    Ignored,
+    Updated,
+    Closed,
+    Selected(WorkspaceView),
+}
+
 #[derive(Debug, Clone)]
 pub struct WorkspaceTabsState {
     by_cluster: HashMap<String, ClusterTabsState>,
@@ -2646,6 +2654,7 @@ pub struct WorkspaceTabsState {
     pub pending_scroll_to_active: bool,
     pub picker_open: bool,
     pub picker_query: String,
+    pub picker_selected_index: usize,
     pub drop_target: Option<(usize, TabDropPosition)>,
     pub dragging_index: Option<usize>,
 }
@@ -2665,6 +2674,7 @@ impl WorkspaceTabsState {
             pending_scroll_to_active: false,
             picker_open: false,
             picker_query: String::new(),
+            picker_selected_index: 0,
             drop_target: None,
             dragging_index: None,
         }
@@ -2909,11 +2919,18 @@ impl WorkspaceTabsState {
     pub fn open_picker(&mut self) {
         self.picker_open = true;
         self.picker_query.clear();
+        self.picker_selected_index = 0;
     }
 
     pub fn close_picker(&mut self) {
         self.picker_open = false;
         self.picker_query.clear();
+        self.picker_selected_index = 0;
+    }
+
+    pub fn clear_picker_query(&mut self) {
+        self.picker_query.clear();
+        self.picker_selected_index = 0;
     }
 
     pub fn toggle_picker(&mut self) {
@@ -2924,29 +2941,88 @@ impl WorkspaceTabsState {
         }
     }
 
-    pub fn handle_picker_search_key(&mut self, key: &str, key_char: Option<&str>) -> bool {
+    pub fn handle_picker_key(
+        &mut self,
+        key: &str,
+        key_char: Option<&str>,
+        has_shortcut_modifier: bool,
+    ) -> PickerKeyAction {
         if !self.picker_open {
-            return false;
+            return PickerKeyAction::Ignored;
         }
-        match key {
-            "escape" => {
-                self.close_picker();
-                true
-            }
+        let normalized_key = key.to_ascii_lowercase();
+        if normalized_key == "escape" {
+            self.close_picker();
+            return PickerKeyAction::Closed;
+        }
+        if has_shortcut_modifier {
+            return PickerKeyAction::Ignored;
+        }
+        match normalized_key.as_str() {
             "backspace" => {
                 self.picker_query.pop();
-                true
+                self.picker_selected_index = 0;
+                PickerKeyAction::Updated
+            }
+            "down" => {
+                let len = self.filtered_picker_views().len();
+                if len > 0 {
+                    self.picker_selected_index = (self.picker_selected_index + 1) % len;
+                }
+                PickerKeyAction::Updated
+            }
+            "up" => {
+                let len = self.filtered_picker_views().len();
+                if len > 0 {
+                    self.picker_selected_index = if self.picker_selected_index == 0 {
+                        len - 1
+                    } else {
+                        self.picker_selected_index - 1
+                    };
+                }
+                PickerKeyAction::Updated
+            }
+            "enter" | "return" => {
+                let filtered = self.filtered_picker_views();
+                let selected = filtered
+                    .get(self.picker_selected_index)
+                    .copied()
+                    .or_else(|| filtered.first().copied());
+                if let Some(view) = selected {
+                    self.close_picker();
+                    PickerKeyAction::Selected(view)
+                } else {
+                    PickerKeyAction::Updated
+                }
+            }
+            "space" => {
+                self.picker_query.push(' ');
+                self.picker_selected_index = 0;
+                PickerKeyAction::Updated
             }
             _ => {
                 if let Some(ch) = key_char {
-                    if !ch.is_empty() && !ch.chars().all(char::is_control) {
+                    if !ch.is_empty() && !ch.chars().any(char::is_control) {
                         self.picker_query.push_str(ch);
-                        return true;
+                        self.picker_selected_index = 0;
+                        return PickerKeyAction::Updated;
                     }
                 }
-                false
+                if key.chars().count() == 1 && !key.chars().any(char::is_control) {
+                    self.picker_query.push_str(key);
+                    self.picker_selected_index = 0;
+                    return PickerKeyAction::Updated;
+                }
+                PickerKeyAction::Ignored
             }
         }
+    }
+
+    pub fn handle_picker_search_key(&mut self, key: &str, key_char: Option<&str>) -> bool {
+        !matches!(
+            self.handle_picker_key(key, key_char, false),
+            PickerKeyAction::Ignored
+        )
     }
 
     pub fn filtered_picker_views(&self) -> Vec<WorkspaceView> {
@@ -4239,6 +4315,123 @@ mod tests {
         tabs.handle_picker_search_key("escape", None);
         assert!(!tabs.picker_open);
         assert_eq!(tabs.picker_query, "");
+    }
+
+    #[test]
+    fn test_workspace_tabs_picker_handles_space_key_and_key_fallback_without_key_char() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.open_picker();
+
+        assert_eq!(
+            tabs.handle_picker_key("p", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(
+            tabs.handle_picker_key("o", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(
+            tabs.handle_picker_key("d", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(
+            tabs.handle_picker_key("space", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(tabs.picker_query, "pod ");
+
+        // Shortcut-modified keys must be ignored and must not mutate picker_query
+        assert_eq!(
+            tabs.handle_picker_key("w", Some("w"), true),
+            PickerKeyAction::Ignored
+        );
+        assert_eq!(tabs.picker_query, "pod ");
+    }
+
+    #[test]
+    fn test_workspace_tabs_picker_arrow_navigation_and_enter_selects_filtered_view() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.open_picker();
+
+        for ch in ["d", "e", "p", "l"] {
+            assert_eq!(
+                tabs.handle_picker_key(ch, Some(ch), false),
+                PickerKeyAction::Updated
+            );
+        }
+        assert_eq!(
+            tabs.handle_picker_key("enter", None, false),
+            PickerKeyAction::Selected(WorkspaceView::Deployments)
+        );
+        assert!(!tabs.picker_open);
+        assert!(tabs.picker_query.is_empty());
+        assert_eq!(tabs.picker_selected_index, 0);
+
+        // Multi-match navigation wrapping with Down / Up
+        tabs.open_picker();
+        for ch in ["n", "e", "t", "w", "o", "r", "k"] {
+            assert_eq!(
+                tabs.handle_picker_key(ch, Some(ch), false),
+                PickerKeyAction::Updated
+            );
+        }
+        let filtered = tabs.filtered_picker_views();
+        assert!(filtered.len() >= 2);
+        assert_eq!(tabs.picker_selected_index, 0);
+
+        // Up from 0 wraps to last item
+        assert_eq!(
+            tabs.handle_picker_key("up", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(tabs.picker_selected_index, filtered.len() - 1);
+
+        // Down from last wraps back to 0
+        assert_eq!(
+            tabs.handle_picker_key("down", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(tabs.picker_selected_index, 0);
+
+        // Down to index 1 and Enter selects filtered[1]
+        assert_eq!(
+            tabs.handle_picker_key("down", None, false),
+            PickerKeyAction::Updated
+        );
+        assert_eq!(tabs.picker_selected_index, 1);
+        assert_eq!(
+            tabs.handle_picker_key("enter", None, false),
+            PickerKeyAction::Selected(filtered[1])
+        );
+        assert!(!tabs.picker_open);
+        assert_eq!(tabs.picker_selected_index, 0);
+
+        // Zero matches + Enter keeps picker open
+        tabs.open_picker();
+        for ch in ["z", "z", "z", "z"] {
+            tabs.handle_picker_key(ch, Some(ch), false);
+        }
+        assert!(tabs.filtered_picker_views().is_empty());
+        assert_eq!(
+            tabs.handle_picker_key("enter", None, false),
+            PickerKeyAction::Updated
+        );
+        assert!(tabs.picker_open);
+    }
+
+    #[test]
+    fn test_workspace_tabs_picker_clear_query_resets_text_and_selection() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.open_picker();
+        tabs.handle_picker_key("n", Some("n"), false);
+        tabs.handle_picker_key("down", None, false);
+        assert_eq!(tabs.picker_query, "n");
+        assert_eq!(tabs.picker_selected_index, 1);
+
+        tabs.clear_picker_query();
+        assert_eq!(tabs.picker_query, "");
+        assert_eq!(tabs.picker_selected_index, 0);
+        assert!(tabs.picker_open);
     }
 
     #[test]
