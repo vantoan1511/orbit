@@ -588,6 +588,21 @@ pub async fn run_gpui_launch_flow<F>(
     .await;
 }
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+#[cfg(windows)]
+fn build_gpui_launch_command(path: &Path) -> tokio::process::Command {
+    let mut cmd = tokio::process::Command::new(path);
+    cmd.creation_flags(CREATE_NO_WINDOW);
+    cmd
+}
+
+#[cfg(not(windows))]
+fn build_gpui_launch_command(path: &Path) -> tokio::process::Command {
+    tokio::process::Command::new(path)
+}
+
 fn find_gpui_binary_with_candidates() -> (Option<PathBuf>, Vec<PathBuf>) {
     let Ok(current_exe) = std::env::current_exe() else {
         return (None, Vec::new());
@@ -617,7 +632,7 @@ pub fn launch_gpui_shell(writer: Arc<Mutex<WsWriter>>, token: String) {
                     "Could not locate orbit GPUI binary in resolved candidate paths"
                 );
             }
-            binary_path.map(|path| (path, |p: &Path| tokio::process::Command::new(p)))
+            binary_path.map(|path| (path, build_gpui_launch_command))
         };
 
         run_gpui_launch_flow(
@@ -1685,6 +1700,69 @@ mod tests {
         assert!(
             error_msg.is_some_and(|m| m.to_lowercase().contains("already running")),
             "Duplicate launch must emit already-running feedback, got: {error_msg:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_build_gpui_launch_command_preserves_program_and_stderr_capture() {
+        let _guard = crate::ipc::emitter::TEST_EMITTER_LOCK.lock().await;
+        let mock_emitter = Arc::new(MockEventEmitter::new());
+        set_global_emitter(mock_emitter.clone());
+
+        let expected_path = Path::new("orbit-gpui.exe");
+        let cmd = build_gpui_launch_command(expected_path);
+        assert_eq!(cmd.as_std().get_program(), expected_path.as_os_str());
+
+        let state = GpuiLauncherState::new();
+        let controller = Arc::new(MockMainWindowController::new());
+        let writer = Arc::new(Mutex::new(WsWriter::Emitter));
+
+        run_gpui_launch_flow(
+            &state,
+            controller.clone(),
+            Some((PathBuf::from("mock-gpui"), |_path: &Path| {
+                #[cfg(windows)]
+                {
+                    let mut cmd = build_gpui_launch_command(Path::new("cmd"));
+                    cmd.args([
+                        "/C",
+                        "echo Failed to open Orbit GPUI window: DX12 unavailable 1>&2 & exit /B 1",
+                    ]);
+                    cmd
+                }
+                #[cfg(not(windows))]
+                {
+                    let mut cmd = build_gpui_launch_command(Path::new("sh"));
+                    cmd.args([
+                        "-c",
+                        "echo 'Failed to open Orbit GPUI window: Vulkan unavailable' >&2; exit 1",
+                    ]);
+                    cmd
+                }
+            })),
+            Duration::from_secs(2),
+            GPUI_STARTUP_CRASH_THRESHOLD,
+            writer,
+            "token".to_string(),
+        )
+        .await;
+
+        assert!(!state.is_running());
+        assert_eq!(controller.hides(), 0);
+
+        let emitted = mock_emitter.get_emitted_events().await;
+        let error_msg = emitted
+            .iter()
+            .find(|(name, _)| name == "errorOccurred")
+            .and_then(|(_, data)| data.get("message").and_then(|m| m.as_str()));
+        assert!(
+            error_msg.is_some(),
+            "Crash via build_gpui_launch_command must emit errorOccurred event"
+        );
+        let lower = error_msg.unwrap().to_lowercase();
+        assert!(
+            lower.contains("graphics") || lower.contains("gpu"),
+            "Piped stderr diagnostic must be captured with CREATE_NO_WINDOW: {lower}"
         );
     }
 }

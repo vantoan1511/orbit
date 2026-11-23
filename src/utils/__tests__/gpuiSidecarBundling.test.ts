@@ -7,6 +7,8 @@ import {
   GPUI_CARGO_BIN_NAME,
   GPUI_PACKAGE_NAME,
   GPUI_SIDECAR_BASENAME,
+  IMAGE_SUBSYSTEM_WINDOWS_CUI,
+  IMAGE_SUBSYSTEM_WINDOWS_GUI,
   TAURI_EXTERNAL_BIN_ENTRY,
   computeFileSha256,
   hasCaseInsensitiveFilenameCollision,
@@ -14,6 +16,8 @@ import {
   parse7zListingHasEntry,
   parseMsiFileTableHasEntry,
   parseNsisScriptHasSidecar,
+  parsePeSubsystem,
+  readPeSubsystem,
   resolveBuildProfile,
   resolveSidecarPaths,
   resolveTargetTriple
@@ -24,6 +28,30 @@ import {
   stageGpuiSidecarFile
 } from '../../../scripts/build-gpui-sidecar.ts'
 import { verifyStagedSidecarArtifacts } from '../../../scripts/verify-gpui-bundle.ts'
+
+function createMinimalPeBinary(subsystem: number, pe32Plus = true): Buffer {
+  const peOffset = 0x80
+  const optionalHeaderOffset = peOffset + 24
+  const optionalHeaderSize = pe32Plus ? 240 : 224
+  const buffer = Buffer.alloc(optionalHeaderOffset + optionalHeaderSize)
+
+  // DOS header magic ("MZ") and e_lfanew pointer to PE signature
+  buffer[0] = 0x4d
+  buffer[1] = 0x5a
+  buffer.writeUInt32LE(peOffset, 0x3c)
+
+  // PE signature ("PE\0\0")
+  buffer.write('PE\0\0', peOffset, 'ascii')
+
+  // COFF header SizeOfOptionalHeader (at peOffset + 20)
+  buffer.writeUInt16LE(optionalHeaderSize, peOffset + 20)
+
+  // Optional header magic (0x020B = PE32+, 0x010B = PE32) and Subsystem (at +68)
+  buffer.writeUInt16LE(pe32Plus ? 0x020b : 0x010b, optionalHeaderOffset)
+  buffer.writeUInt16LE(subsystem, optionalHeaderOffset + 68)
+
+  return buffer
+}
 
 describe('GPUI Sidecar & Bundle Helper Library (scripts/lib/gpuiSidecar.ts)', () => {
   it('exports expected canonical GPUI sidecar constants', () => {
@@ -196,6 +224,47 @@ describe('GPUI Sidecar & Bundle Helper Library (scripts/lib/gpuiSidecar.ts)', ()
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
   })
+
+  it('parsePeSubsystem parses PE32 and PE32+ GUI and CUI subsystems and rejects invalid/truncated buffers', () => {
+    assert.equal(
+      parsePeSubsystem(createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_GUI, true)),
+      IMAGE_SUBSYSTEM_WINDOWS_GUI
+    )
+    assert.equal(
+      parsePeSubsystem(createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_CUI, true)),
+      IMAGE_SUBSYSTEM_WINDOWS_CUI
+    )
+    assert.equal(
+      parsePeSubsystem(createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_GUI, false)),
+      IMAGE_SUBSYSTEM_WINDOWS_GUI
+    )
+    assert.equal(
+      parsePeSubsystem(createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_CUI, false)),
+      IMAGE_SUBSYSTEM_WINDOWS_CUI
+    )
+
+    // Rejects non-PE, empty, truncated, and bad-magic buffers
+    assert.equal(parsePeSubsystem(new Uint8Array(0)), null)
+    assert.equal(parsePeSubsystem(Buffer.from('not-a-pe-binary')), null)
+    assert.equal(
+      parsePeSubsystem(createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_GUI, true).subarray(0, 128)),
+      null
+    )
+
+    const badMagic = createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_GUI, true)
+    badMagic.writeUInt16LE(0x9999, 0x80 + 24)
+    assert.equal(parsePeSubsystem(badMagic), null)
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-gpui-pe-'))
+    try {
+      const pePath = path.join(tmpDir, 'orbit-gpui.exe')
+      fs.writeFileSync(pePath, createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_GUI, true))
+      assert.equal(readPeSubsystem(pePath), IMAGE_SUBSYSTEM_WINDOWS_GUI)
+      assert.equal(readPeSubsystem(path.join(tmpDir, 'missing.exe')), null)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
 })
 
 describe('GPUI Sidecar Build & Staging Script (scripts/build-gpui-sidecar.ts)', () => {
@@ -283,7 +352,7 @@ describe('GPUI Packaged Bundle Verification Script (scripts/verify-gpui-bundle.t
     try {
       const triple = 'x86_64-pc-windows-msvc'
       const paths = resolveSidecarPaths(tmpDir, 'release', triple)
-      const payload = 'MZ-orbit-gpui-release-binary-v1'
+      const payload = createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_GUI)
 
       for (const filePath of [
         paths.cargoBinaryPath,
@@ -296,7 +365,7 @@ describe('GPUI Packaged Bundle Verification Script (scripts/verify-gpui-bundle.t
 
       const okResult = verifyStagedSidecarArtifacts(tmpDir, 'release', triple)
       assert.equal(okResult.ok, true, okResult.message)
-      assert.ok(okResult.details.length >= 3)
+      assert.ok(okResult.details.length >= 4)
 
       // Stale target sidecar -> hash mismatch
       fs.writeFileSync(paths.targetSidecarPath, 'MZ-stale-gpui-binary')
@@ -316,6 +385,44 @@ describe('GPUI Packaged Bundle Verification Script (scripts/verify-gpui-bundle.t
       const missingResult = verifyStagedSidecarArtifacts(tmpDir, 'release', triple)
       assert.equal(missingResult.ok, false)
       assert.match(missingResult.message, /not found|missing/i)
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
+  })
+
+  it('verifyStagedSidecarArtifacts fails on release Windows binary with console subsystem (CUI) and allows console subsystem for debug builds', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orbit-gpui-subsystem-'))
+    try {
+      const triple = 'x86_64-pc-windows-msvc'
+      const cuiPayload = createMinimalPeBinary(IMAGE_SUBSYSTEM_WINDOWS_CUI)
+
+      const releasePaths = resolveSidecarPaths(tmpDir, 'release', triple)
+      for (const filePath of [
+        releasePaths.cargoBinaryPath,
+        releasePaths.stagedSidecarPath,
+        releasePaths.targetSidecarPath
+      ]) {
+        fs.mkdirSync(path.dirname(filePath), { recursive: true })
+        fs.writeFileSync(filePath, cuiPayload)
+      }
+
+      const releaseResult = verifyStagedSidecarArtifacts(tmpDir, 'release', triple)
+      assert.equal(releaseResult.ok, false)
+      assert.match(releaseResult.message, /IMAGE_SUBSYSTEM_WINDOWS_CUI/i)
+      assert.match(releaseResult.message, /IMAGE_SUBSYSTEM_WINDOWS_GUI/i)
+
+      const debugPaths = resolveSidecarPaths(tmpDir, 'debug', triple)
+      for (const filePath of [
+        debugPaths.cargoBinaryPath,
+        debugPaths.stagedSidecarPath,
+        debugPaths.targetSidecarPath
+      ]) {
+        fs.mkdirSync(path.dirname(filePath), { recursive: true })
+        fs.writeFileSync(filePath, cuiPayload)
+      }
+
+      const debugResult = verifyStagedSidecarArtifacts(tmpDir, 'debug', triple)
+      assert.equal(debugResult.ok, true, debugResult.message)
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
@@ -371,6 +478,15 @@ describe('Tauri & Package Configuration Contracts for GPUI Sidecar', () => {
     assert.ok(
       matches.length >= 2,
       `installer.nsi must contain {{#each binaries}} in both Install and Uninstall sections (found ${matches.length})`
+    )
+  })
+
+  it('src-gpui/src/main.rs sets windows_subsystem = "windows" for non-debug builds', () => {
+    const mainRs = fs.readFileSync(path.resolve('src-gpui/src/main.rs'), 'utf8')
+    assert.match(
+      mainRs,
+      /^#!\[cfg_attr\(not\(debug_assertions\),\s*windows_subsystem\s*=\s*"windows"\)\]/m,
+      'src-gpui/src/main.rs must set #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]'
     )
   })
 })

@@ -3,11 +3,15 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  IMAGE_SUBSYSTEM_WINDOWS_CUI,
+  IMAGE_SUBSYSTEM_WINDOWS_GUI,
   computeFileSha256,
+  isWindowsTargetTriple,
   parse7zListingHasEntry,
   parseFlagValue,
   parseMsiFileTableHasEntry,
   parseNsisScriptHasSidecar,
+  readPeSubsystem,
   resolveBuildProfile,
   resolveSidecarPaths,
   resolveTargetTriple,
@@ -92,6 +96,26 @@ export function verifyStagedSidecarArtifacts(
     if (err) {
       return { ok: false, message: err, details }
     }
+  }
+
+  if (profile === 'release' && isWindowsTargetTriple(targetTriple)) {
+    const subsystem = readPeSubsystem(paths.cargoBinaryPath)
+    if (subsystem !== IMAGE_SUBSYSTEM_WINDOWS_GUI) {
+      const actualLabel =
+        subsystem === IMAGE_SUBSYSTEM_WINDOWS_CUI
+          ? `IMAGE_SUBSYSTEM_WINDOWS_CUI (${subsystem})`
+          : subsystem === null
+            ? 'invalid or unreadable PE header'
+            : `unexpected subsystem (${subsystem})`
+      return {
+        ok: false,
+        message: `Compiled GPUI release binary ${paths.cargoBinaryPath} has ${actualLabel}; expected IMAGE_SUBSYSTEM_WINDOWS_GUI (${IMAGE_SUBSYSTEM_WINDOWS_GUI}) so Windows does not open an extra console window.`,
+        details
+      }
+    }
+    details.push(
+      `PE subsystem verified: IMAGE_SUBSYSTEM_WINDOWS_GUI (${IMAGE_SUBSYSTEM_WINDOWS_GUI})`
+    )
   }
 
   return {
