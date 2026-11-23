@@ -7,7 +7,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.19.1"
+version = "0.20.0"
 edition = "2024"
 authors = ["Toan Nguyen"]
 rust-version = "1.85"
