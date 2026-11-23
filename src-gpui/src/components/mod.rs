@@ -38,6 +38,8 @@ pub use tab_bar::{
     render_workspace_tab_bar, tab_icon_color, tab_item_presentation,
 };
 pub use yaml_viewer::{
-    YamlLoadStatus, YamlToken, YamlTokenKind, YamlViewerProps, render_yaml_viewer,
-    tokenize_yaml_line, yaml_token_color,
+    CachedYamlDocument, CachedYamlLine, YAML_LINE_HEIGHT, YAML_MIN_GUTTER_DIGITS,
+    YamlDocumentCache, YamlHighlightSpan, YamlLoadStatus, YamlToken, YamlTokenKind,
+    YamlViewerProps, render_yaml_viewer, tokenize_yaml_line, tokenize_yaml_line_spans,
+    yaml_token_color,
 };
