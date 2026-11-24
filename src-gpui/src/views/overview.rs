@@ -225,7 +225,7 @@ pub fn render_overview_view(
         .or_else(|| active_cluster.and_then(|c| c.server_url.clone()))
         .unwrap_or_else(|| "Unknown".to_string());
 
-    let mut root = div().flex().flex_col().gap_5().child(render_status_bar(
+    let mut root = div().flex().flex_col().gap_4().child(render_status_bar(
         cluster_id,
         &version_label,
         &server_url,
@@ -268,7 +268,7 @@ pub fn render_overview_view(
             .child(render_health_breakdowns(summary, theme));
     } else if overview.status == OverviewLoadStatus::Loading {
         root = root.child(
-            theme.style_card(div()).p_5().child(
+            theme.style_card(div()).p_4().child(
                 apply_text_step(div(), theme.typography.size_sm)
                     .text_color(theme.text.muted)
                     .child("Loading cluster overview metrics..."),
@@ -559,7 +559,7 @@ fn render_cluster_profile(
 
     let mut card = theme
         .style_card(div())
-        .p_5()
+        .p_4()
         .flex()
         .flex_col()
         .gap_3()

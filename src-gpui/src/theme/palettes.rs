@@ -143,9 +143,9 @@ pub fn resolve_noir_tokens(is_dark: bool) -> (SurfaceTokens, BorderTokens, TextT
         (
             SurfaceTokens {
                 bg_app: rgb_hex(0x0b0d0f),
-                bg_sidebar: rgb_hex(0x0d1012),
-                bg_panel: rgb_hex(0x0b0d0f),
-                bg_card: rgb_hex(0x0e1012),
+                bg_sidebar: rgb_hex(0x0f1216),
+                bg_panel: rgb_hex(0x111419),
+                bg_card: rgb_hex(0x13171d),
                 bg_hover: rgb_hex(0x1e2228),
                 bg_active: rgb_hex(0x15181c),
                 control_bg: rgb_hex(0x1a1d21),
@@ -776,5 +776,21 @@ mod tests {
         for kind in K8sResourceKind::ALL {
             assert_ne!(k8s_light.get(kind), k8s_dark.get(kind));
         }
+    }
+
+    #[test]
+    fn test_noir_dark_and_light_surface_tiers_are_distinct() {
+        let (dark_noir, _, _) = resolve_noir_tokens(true);
+        assert_eq!(dark_noir.bg_app, rgb_hex(0x0b0d0f));
+        assert_eq!(dark_noir.bg_sidebar, rgb_hex(0x0f1216));
+        assert_eq!(dark_noir.bg_panel, rgb_hex(0x111419));
+        assert_eq!(dark_noir.bg_card, rgb_hex(0x13171d));
+        assert_ne!(dark_noir.bg_app, dark_noir.bg_sidebar);
+        assert_ne!(dark_noir.bg_app, dark_noir.bg_panel);
+        assert_ne!(dark_noir.bg_panel, dark_noir.bg_card);
+
+        let (light_noir, _, _) = resolve_noir_tokens(false);
+        assert_ne!(light_noir.bg_app, light_noir.bg_panel);
+        assert_ne!(light_noir.bg_panel, light_noir.bg_sidebar);
     }
 }

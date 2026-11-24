@@ -160,7 +160,7 @@ pub fn render_workloads_overview_view(
     let mode = resolve_workloads_overview_mode(state, namespaces);
     let is_loading = state.status == WorkloadsOverviewLoadStatus::Loading;
 
-    let mut root = div().flex().flex_col().gap_5().child(render_summary_toolbar(
+    let mut root = div().flex().flex_col().gap_4().child(render_summary_toolbar(
         state,
         namespaces,
         is_loading,
@@ -298,7 +298,7 @@ fn render_summary_toolbar(
             div()
                 .flex()
                 .items_center()
-                .gap_5()
+                .gap_4()
                 .flex_wrap()
                 .child(render_summary_metric(
                     "Workloads Health",
@@ -344,7 +344,7 @@ fn render_loading_state(theme: &OrbitTheme) -> AnyElement {
         .flex()
         .items_center()
         .justify_center()
-        .gap_2p5()
+        .gap_2()
         .child(render_icon(Icon::LoaderCircle, px(16.0), theme.text.muted))
         .child(
             apply_text_step(div(), theme.typography.size_sm)
@@ -364,7 +364,7 @@ fn render_error_state(
     let message = error_message.unwrap_or("Failed to load workload health summary.");
     div()
         .w_full()
-        .p_5()
+        .p_4()
         .rounded(theme.style.radius_control)
         .bg(theme.semantic.danger.soft)
         .border_1()
@@ -377,7 +377,7 @@ fn render_error_state(
             div()
                 .flex()
                 .items_center()
-                .gap_2p5()
+                .gap_2()
                 .child(render_icon(
                     Icon::TriangleAlert,
                     px(16.0),

@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, SharedString, Window, div, prelude::*,
-    px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::ingresses::parse_ingress_rule_summary;
@@ -12,11 +12,15 @@ use orbit_core::kubernetes::models::{EventInfo, IngressInfo};
 use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
-use crate::components::{ContextMenuEntry, ContextMenuItem};
-use crate::icons::render_icon;
+use crate::components::{ContextMenuEntry, ContextMenuItem, TextTooltip};
+use crate::navigation::WorkspaceView;
 use crate::state::{IngressesLoadStatus, IngressesState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button, table_numeric_font};
+pub use crate::views::{
+    parse_age_seconds, render_action_button, render_resource_error_banner,
+    render_resource_error_state, render_resource_view_header, render_truncated_cell,
+    table_numeric_font,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IngressesPresentationMode {
@@ -140,19 +144,31 @@ pub fn ingresses_presentation_mode(state: &IngressesState) -> IngressesPresentat
     }
 }
 
-fn render_ingress_cell(ing: &IngressInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
+fn render_ingress_cell(
+    row_idx: usize,
+    ing: &IngressInfo,
+    col: &TableColumn,
+    theme: &OrbitTheme,
+) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(ing.name.clone())
-            .into_any_element(),
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(ing.namespace.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ing-name"), row_idx as u64),
+            ing.name.clone(),
+            Some(SharedString::from(ing.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ing-ns"), row_idx as u64),
+            ing.namespace.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
         "class_name" => match ing.class_name.as_deref().filter(|c| !c.is_empty()) {
             Some(class_name) => apply_text_step(div(), theme.typography.size_2xs)
                 .px_1p5()
@@ -174,24 +190,40 @@ fn render_ingress_cell(ing: &IngressInfo, col: &TableColumn, theme: &OrbitTheme)
         "hosts" => {
             let (primary, extra) = format_ingress_hosts_summary(&ing.hosts);
             if extra == 0 {
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::NORMAL))
-                    .text_color(if primary == "*" {
+                render_truncated_cell(
+                    ElementId::NamedInteger(SharedString::from("ing-hosts"), row_idx as u64),
+                    primary.clone(),
+                    (primary != "*").then(|| SharedString::from(primary.clone())),
+                    if primary == "*" {
                         theme.text.muted
                     } else {
                         theme.text.primary
-                    })
-                    .truncate()
-                    .child(primary)
-                    .into_any_element()
+                    },
+                    FontWeight::NORMAL,
+                    true,
+                    theme,
+                )
             } else {
+                let full_hosts = SharedString::from(ing.hosts.clone());
                 div()
+                    .id(ElementId::NamedInteger(
+                        SharedString::from("ing-hosts"),
+                        row_idx as u64,
+                    ))
                     .flex()
                     .items_center()
                     .gap_1p5()
                     .min_w(px(0.0))
+                    .flex_1()
+                    .overflow_hidden()
+                    .tooltip(move |_window, cx| {
+                        cx.new(|_| TextTooltip::new(full_hosts.clone()).monospace(true))
+                            .into()
+                    })
                     .child(
                         apply_text_step(div(), theme.typography.size_xs)
+                            .min_w(px(0.0))
+                            .flex_1()
                             .font(theme.typography.mono_font(FontWeight::NORMAL))
                             .text_color(theme.text.primary)
                             .truncate()
@@ -213,22 +245,28 @@ fn render_ingress_cell(ing: &IngressInfo, col: &TableColumn, theme: &OrbitTheme)
                     .into_any_element()
             }
         }
-        "address" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if ing.address == "-" {
+        "address" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ing-addr"), row_idx as u64),
+            ing.address.clone(),
+            None,
+            if ing.address == "-" {
                 theme.text.muted
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(ing.address.clone())
-            .into_any_element(),
-        "ports" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(ing.ports.clone())
-            .into_any_element(),
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
+        "ports" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ing-ports"), row_idx as u64),
+            ing.ports.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "age" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(theme.text.muted)
@@ -286,8 +324,6 @@ pub fn build_ingress_context_menu_entries(
     ]
 }
 
-type RefreshCallback = Rc<dyn Fn(&mut Window, &mut App)>;
-
 #[allow(clippy::too_many_arguments)]
 pub fn render_ingresses_view(
     state: &IngressesState,
@@ -295,6 +331,7 @@ pub fn render_ingresses_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static + Fn(SharedString, &IngressInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
@@ -306,7 +343,7 @@ pub fn render_ingresses_view(
     let total_count = state.ingresses.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == IngressesLoadStatus::Loading;
-    let on_refresh_rc: RefreshCallback = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = if namespaces.is_all_namespaces() {
         format!("{total_count} ingresses")
@@ -314,76 +351,23 @@ pub fn render_ingresses_view(
         format!("{visible_count} of {total_count} ingresses")
     };
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        );
+    let header = render_resource_view_header(
+        WorkspaceView::Ingresses.label(),
+        WorkspaceView::Ingresses.description(),
+        count_label,
+        Some(namespaces),
+        None,
+        theme,
+    );
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load ingresses: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "ingresses-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "ingresses-retry-btn",
+            format!("Failed to load ingresses: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let mode = ingresses_presentation_mode(state);
@@ -393,45 +377,14 @@ pub fn render_ingresses_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Ingresses"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "ingresses-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "ingresses-retry-btn",
+                "Unable to Load Ingresses",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         IngressesPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -451,12 +404,13 @@ pub fn render_ingresses_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|ing| render_ingress_cell(ing, col, col_theme))
+                        .map(|ing| render_ingress_cell(idx, ing, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(ing) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, ing, event, window, cx);
@@ -479,8 +433,8 @@ pub fn render_ingresses_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_4()
-        .child(toolbar)
+        .gap_0()
+        .child(header)
         .when(mode == IngressesPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })

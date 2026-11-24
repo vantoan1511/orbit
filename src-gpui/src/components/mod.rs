@@ -4,6 +4,7 @@ pub mod resource_drawer;
 pub mod resource_kind;
 pub mod status_badge;
 pub mod tab_bar;
+pub mod tooltip;
 pub mod yaml_viewer;
 
 pub use context_menu::{
@@ -14,10 +15,12 @@ pub use context_menu::{
 };
 
 pub use data_table::{
-    ColumnAlign, ColumnWidth, DataTableCallbacks, DataTableState, RowClickCallback,
-    RowContextMenuCallback, SortCallback, SortDirection, SortState, TableBodyMode, TableColumn,
-    apply_column_alignment, apply_column_width, render_data_table, render_empty_state,
-    render_loading_skeleton, render_table_cell, render_table_header, sort_rows_stable,
+    ColumnAlign, ColumnWidth, DataTableCallbacks, DataTableState, DataTableSurfaceStyle,
+    RowClickCallback, RowContextMenuCallback, RowHoverActionSpec, SortCallback, SortDirection,
+    SortState, TableBodyMode, TableColumn, apply_column_alignment, apply_column_width,
+    render_data_table, render_empty_state, render_loading_skeleton, render_table_cell,
+    render_table_header, resolve_data_table_surface_style, resolve_row_hover_actions,
+    sort_rows_stable,
 };
 pub use resource_drawer::{
     DRAWER_MIN_WORKSPACE_MARGIN, DEFAULT_DRAWER_WIDTH, MAX_DRAWER_WIDTH, MIN_DRAWER_WIDTH,
@@ -37,6 +40,7 @@ pub use tab_bar::{
     TabItemPresentation, build_tab_context_menu_entries, render_tab_resource_picker_overlay,
     render_workspace_tab_bar, tab_icon_color, tab_item_presentation,
 };
+pub use tooltip::TextTooltip;
 pub use yaml_viewer::{
     CachedYamlDocument, CachedYamlLine, YAML_LINE_HEIGHT, YAML_MIN_GUTTER_DIGITS,
     YamlDocumentCache, YamlHighlightSpan, YamlLoadStatus, YamlToken, YamlTokenKind,

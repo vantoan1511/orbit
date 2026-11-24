@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
-    prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
+    div, prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::NamespaceInfo;
@@ -16,10 +16,13 @@ use crate::components::{
     ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
     render_status_badge_from_str,
 };
-use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState};
 use crate::theme::{OrbitTheme, apply_text_step};
-use crate::views::{parse_age_seconds, render_action_button};
+use crate::views::{
+    parse_age_seconds, render_resource_error_banner, render_resource_error_state,
+    render_resource_view_header, render_truncated_cell,
+};
 
 pub const MAX_VISIBLE_LABELS: usize = 2;
 
@@ -219,17 +222,21 @@ fn render_label_chip(text: String, muted: bool, theme: &OrbitTheme) -> AnyElemen
 }
 
 fn render_namespace_cell(
+    row_idx: usize,
     ns: &NamespaceInfo,
     col: &TableColumn,
     theme: &OrbitTheme,
 ) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(ns.name.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ns-name"), row_idx as u64),
+            ns.name.clone(),
+            Some(SharedString::from(ns.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
         "status" => render_status_badge_from_str(&ns.status, StatusBadgeVariant::Inline, theme),
         "system" => {
             if ns.is_system {
@@ -376,6 +383,7 @@ pub fn render_namespaces_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
         + Fn(SharedString, &NamespaceInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
@@ -391,58 +399,30 @@ pub fn render_namespaces_view(
     let is_loading = state.status == NamespaceLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
+    let header = render_resource_view_header(
+        WorkspaceView::Namespaces.label(),
+        WorkspaceView::Namespaces.description(),
+        format!("{total_count} namespaces"),
+        None,
+        None,
+        theme,
+    );
+
+    let summary_row = div()
+        .w_full()
+        .px_4()
+        .pb_3()
         .flex_shrink_0()
-        .child(
-            apply_text_step(div(), theme.typography.size_xs)
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(theme.text.secondary)
-                .child(format!("{total_count} namespaces")),
-        );
+        .child(render_summary_cards_row(&state.namespaces, theme));
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load namespaces: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "namespaces-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "namespaces-retry-btn",
+            format!("Failed to load namespaces: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let body = match namespaces_presentation_mode(state) {
@@ -451,45 +431,14 @@ pub fn render_namespaces_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Namespaces"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "namespaces-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "namespaces-retry-btn",
+                "Unable to Load Namespaces",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         NamespacesPresentationMode::Table => {
             let mut table_state = view_state.table.clone();
@@ -509,12 +458,13 @@ pub fn render_namespaces_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|ns| render_namespace_cell(ns, col, col_theme))
+                        .map(|ns| render_namespace_cell(idx, ns, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(ns) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, ns, event, window, cx);
@@ -537,9 +487,9 @@ pub fn render_namespaces_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_3()
-        .child(render_summary_cards_row(&state.namespaces, theme))
-        .child(toolbar)
+        .gap_0()
+        .child(header)
+        .child(summary_row)
         .when(
             namespaces_presentation_mode(state) == NamespacesPresentationMode::Table,
             |el| el.when_some(error_banner, |inner, banner| inner.child(banner)),
@@ -589,7 +539,7 @@ pub fn render_namespace_drawer_overview(ns: &NamespaceInfo, theme: &OrbitTheme) 
         .p_4()
         .flex()
         .flex_col()
-        .gap_5()
+        .gap_4()
         .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
         .child(crate::views::render_drawer_kv_badges(
             "LABELS",

@@ -9,10 +9,11 @@ use gpui::{
 };
 use lucide_icons::Icon;
 
+use crate::components::tooltip::TextTooltip;
 use crate::icons::render_icon;
 use crate::theme::{OrbitTheme, apply_text_step};
 
-pub const TABLE_HEADER_HEIGHT: f32 = 34.0;
+pub const TABLE_HEADER_HEIGHT: f32 = 32.0;
 pub const TABLE_ROW_HEIGHT: f32 = 36.0;
 pub const DEFAULT_SKELETON_ROWS: usize = 6;
 pub const DEFAULT_EMPTY_MESSAGE: &str = "No resources found.";
@@ -280,6 +281,49 @@ pub fn resolve_table_cell_font(col: &TableColumn, theme: &OrbitTheme) -> Option<
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DataTableSurfaceStyle {
+    pub background: Rgba,
+    pub header_background: Rgba,
+    pub top_hairline: Rgba,
+    pub header_separator: Rgba,
+    pub row_separator: Rgba,
+    pub uses_card_chrome: bool,
+}
+
+pub fn resolve_data_table_surface_style(theme: &OrbitTheme) -> DataTableSurfaceStyle {
+    DataTableSurfaceStyle {
+        background: theme.surface.bg_app,
+        header_background: theme.surface.bg_panel,
+        top_hairline: theme.border.default,
+        header_separator: theme.border.default,
+        row_separator: theme.border.subtle,
+        uses_card_chrome: false,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RowHoverActionSpec {
+    pub show_quick_yaml: bool,
+    pub show_more_actions: bool,
+}
+
+impl RowHoverActionSpec {
+    pub const fn is_visible(&self) -> bool {
+        self.show_quick_yaml || self.show_more_actions
+    }
+}
+
+pub const fn resolve_row_hover_actions(
+    has_quick_yaml: bool,
+    has_context_menu: bool,
+) -> RowHoverActionSpec {
+    RowHoverActionSpec {
+        show_quick_yaml: has_quick_yaml,
+        show_more_actions: has_context_menu,
+    }
+}
+
 pub type SortCallback = Rc<dyn Fn(SharedString, &ClickEvent, &mut Window, &mut App)>;
 pub type RowClickCallback = Rc<dyn Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App)>;
 pub type RowContextMenuCallback =
@@ -295,6 +339,7 @@ where
     pub on_sort: Option<SortCallback>,
     pub on_row_click: Option<RowClickCallback>,
     pub on_row_context_menu: Option<RowContextMenuCallback>,
+    pub on_row_quick_yaml: Option<RowClickCallback>,
 }
 
 impl<K, C> DataTableCallbacks<K, C>
@@ -309,6 +354,7 @@ where
             on_sort: None,
             on_row_click: None,
             on_row_context_menu: None,
+            on_row_quick_yaml: None,
         }
     }
 
@@ -335,6 +381,14 @@ where
         self.on_row_context_menu = Some(Rc::new(callback));
         self
     }
+
+    pub fn on_row_quick_yaml(
+        mut self,
+        callback: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    ) -> Self {
+        self.on_row_quick_yaml = Some(Rc::new(callback));
+        self
+    }
 }
 
 pub fn render_table_header(
@@ -344,6 +398,7 @@ pub fn render_table_header(
     theme: &OrbitTheme,
     on_sort: Option<SortCallback>,
 ) -> AnyElement {
+    let surface = resolve_data_table_surface_style(theme);
     let hover_bg = theme.surface.bg_hover;
     let mut header_row = div()
         .id(SharedString::from(format!("{table_id}-header")))
@@ -352,9 +407,9 @@ pub fn render_table_header(
         .w_full()
         .flex()
         .items_center()
-        .bg(theme.surface.bg_panel)
+        .bg(surface.header_background)
         .border_b_1()
-        .border_color(theme.border.default);
+        .border_color(surface.header_separator);
 
     for (col_idx, col) in columns.iter().enumerate() {
         let is_active_sort = state
@@ -424,17 +479,20 @@ pub fn render_table_cell(
     content: impl IntoElement,
 ) -> Div {
     let cell_font = resolve_table_cell_font(col, theme);
-    apply_column_alignment(apply_column_width(div(), col.width), col.align)
-        .h_full()
-        .px_3()
-        .flex()
-        .items_center()
-        .overflow_hidden()
-        .text_size(theme.typography.size_xs.font_size)
-        .line_height(theme.typography.size_xs.line_height)
-        .text_color(theme.text.primary)
-        .when_some(cell_font, |el, font| el.font(font))
-        .child(content)
+    apply_column_alignment(
+        apply_column_width(div().min_w(px(0.0)), col.width),
+        col.align,
+    )
+    .h_full()
+    .px_3()
+    .flex()
+    .items_center()
+    .overflow_hidden()
+    .text_size(theme.typography.size_xs.font_size)
+    .line_height(theme.typography.size_xs.line_height)
+    .text_color(theme.text.primary)
+    .when_some(cell_font, |el, font| el.font(font))
+    .child(content)
 }
 
 pub fn render_loading_skeleton(
@@ -551,28 +609,39 @@ where
             let render_cell_fn = Rc::new(callbacks.render_cell);
             let on_row_click = callbacks.on_row_click.clone();
             let on_row_context_menu = callbacks.on_row_context_menu.clone();
+            let on_row_quick_yaml = callbacks.on_row_quick_yaml.clone();
+            let hover_actions = resolve_row_hover_actions(
+                on_row_quick_yaml.is_some(),
+                on_row_context_menu.is_some(),
+            );
             let selected_key = state.selected_row_key.clone();
             let theme_snapshot = theme.clone();
             let list_id = SharedString::from(format!("{table_id_str}-rows"));
             let row_prefix = SharedString::from(format!("{table_id_str}-row"));
+            let row_group_prefix = SharedString::from(format!("{table_id_str}-row-grp"));
+            let yaml_btn_prefix = SharedString::from(format!("{table_id_str}-row-yaml"));
+            let more_btn_prefix = SharedString::from(format!("{table_id_str}-row-more"));
 
             uniform_list(
                 ElementId::Name(list_id),
                 row_count,
                 move |range: Range<usize>, _window: &mut Window, _cx: &mut App| {
                     let mut items = Vec::with_capacity(range.len());
+                    let surface = resolve_data_table_surface_style(&theme_snapshot);
                     let hover_bg = theme_snapshot.surface.bg_hover;
                     let selected_bg = theme_snapshot.accent.soft;
-                    let border_subtle = theme_snapshot.border.subtle;
+                    let border_subtle = surface.row_separator;
                     let accent_bar = theme_snapshot.accent.accent;
 
                     for row_idx in range {
                         let key = (row_key_fn)(row_idx);
                         let is_selected = selected_key.as_deref() == Some(key.as_str());
                         let key_shared = SharedString::from(key);
+                        let row_group = SharedString::from(format!("{row_group_prefix}-{row_idx}"));
 
                         let mut row_el = div()
                             .id(ElementId::NamedInteger(row_prefix.clone(), row_idx as u64))
+                            .group(row_group.clone())
                             .relative()
                             .h(px(TABLE_ROW_HEIGHT))
                             .w_full()
@@ -625,6 +694,109 @@ where
                                 row_el.child(render_table_cell(col, &theme_snapshot, cell_content));
                         }
 
+                        if hover_actions.is_visible() {
+                            let pill_bg = theme_snapshot.surface.bg_hover;
+                            let pill_border = theme_snapshot.border.default;
+                            let btn_hover_bg = theme_snapshot.surface.bg_active;
+                            let icon_color = theme_snapshot.text.secondary;
+
+                            let mut pill = div()
+                                .h(px(24.0))
+                                .px_1()
+                                .gap_1()
+                                .flex()
+                                .items_center()
+                                .rounded(theme_snapshot.style.radius_control)
+                                .bg(pill_bg)
+                                .border_1()
+                                .border_color(pill_border)
+                                .opacity(0.0)
+                                .group_hover(row_group, |s| s.opacity(1.0));
+
+                            if let Some(yaml_cb) = on_row_quick_yaml.clone() {
+                                let row_key_for_yaml = key_shared.clone();
+                                pill = pill.child(
+                                    div()
+                                        .id(ElementId::NamedInteger(
+                                            yaml_btn_prefix.clone(),
+                                            row_idx as u64,
+                                        ))
+                                        .w(px(20.0))
+                                        .h(px(20.0))
+                                        .rounded(theme_snapshot.style.radius_control)
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .cursor_pointer()
+                                        .hover(move |s| s.bg(btn_hover_bg))
+                                        .tooltip(|_window, cx| {
+                                            cx.new(|_| TextTooltip::new("View YAML")).into()
+                                        })
+                                        .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                                            cx.stop_propagation();
+                                        })
+                                        .on_click(move |event, window, cx| {
+                                            cx.stop_propagation();
+                                            yaml_cb(
+                                                row_idx,
+                                                row_key_for_yaml.clone(),
+                                                event,
+                                                window,
+                                                cx,
+                                            );
+                                        })
+                                        .child(render_icon(Icon::FileCode, px(13.0), icon_color)),
+                                );
+                            }
+
+                            if let Some(ctx_cb) = on_row_context_menu.clone() {
+                                let row_key_for_more = key_shared.clone();
+                                pill = pill.child(
+                                    div()
+                                        .id(ElementId::NamedInteger(
+                                            more_btn_prefix.clone(),
+                                            row_idx as u64,
+                                        ))
+                                        .w(px(20.0))
+                                        .h(px(20.0))
+                                        .rounded(theme_snapshot.style.radius_control)
+                                        .flex()
+                                        .items_center()
+                                        .justify_center()
+                                        .cursor_pointer()
+                                        .hover(move |s| s.bg(btn_hover_bg))
+                                        .tooltip(|_window, cx| {
+                                            cx.new(|_| TextTooltip::new("More actions")).into()
+                                        })
+                                        .on_mouse_down(
+                                            MouseButton::Left,
+                                            move |event, window, cx| {
+                                                cx.stop_propagation();
+                                                ctx_cb(
+                                                    row_idx,
+                                                    row_key_for_more.clone(),
+                                                    event,
+                                                    window,
+                                                    cx,
+                                                );
+                                            },
+                                        )
+                                        .child(render_icon(Icon::Ellipsis, px(13.0), icon_color)),
+                                );
+                            }
+
+                            row_el = row_el.child(
+                                div()
+                                    .absolute()
+                                    .right_2()
+                                    .top_0()
+                                    .bottom_0()
+                                    .flex()
+                                    .items_center()
+                                    .child(pill),
+                            );
+                        }
+
                         items.push(row_el);
                     }
                     items
@@ -638,8 +810,12 @@ where
         }
     };
 
-    theme
-        .style_card(div().id(table_id_str))
+    let surface = resolve_data_table_surface_style(theme);
+    div()
+        .id(table_id_str)
+        .bg(surface.background)
+        .border_t_1()
+        .border_color(surface.top_hairline)
         .flex()
         .flex_col()
         .flex_1()
@@ -918,5 +1094,64 @@ mod tests {
                 .iter()
                 .any(|(tag, val)| tag == "tnum" && *val == 1)
         );
+    }
+
+    #[test]
+    fn test_table_dimensions_follow_4pt_8pt_scale() {
+        assert_eq!(TABLE_HEADER_HEIGHT % 4.0, 0.0);
+        assert_eq!(TABLE_ROW_HEIGHT % 4.0, 0.0);
+        assert_eq!(TABLE_HEADER_HEIGHT, 32.0);
+        assert!((32.0..=36.0).contains(&TABLE_ROW_HEIGHT));
+    }
+
+    #[test]
+    fn test_data_table_surface_style_uses_full_bleed_hairlines_without_card_chrome() {
+        use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+
+        for (mode, appearance) in [
+            (ThemeMode::Light, gpui::WindowAppearance::Light),
+            (ThemeMode::Dark, gpui::WindowAppearance::Dark),
+        ] {
+            let theme = OrbitTheme::resolve(
+                mode,
+                UiStyle::Flat,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                appearance,
+            );
+            let style = resolve_data_table_surface_style(&theme);
+            assert!(!style.uses_card_chrome);
+            assert_eq!(style.background, theme.surface.bg_app);
+            assert_eq!(style.header_background, theme.surface.bg_panel);
+            assert_eq!(style.top_hairline, theme.border.default);
+            assert_eq!(style.header_separator, theme.border.default);
+            assert_eq!(style.row_separator, theme.border.subtle);
+            assert_ne!(style.background, style.header_background);
+        }
+    }
+
+    #[test]
+    fn test_row_hover_actions_and_quick_yaml_callback_builder() {
+        let none = resolve_row_hover_actions(false, false);
+        assert!(!none.is_visible());
+        assert!(!none.show_quick_yaml);
+        assert!(!none.show_more_actions);
+
+        let both = resolve_row_hover_actions(true, true);
+        assert!(both.is_visible());
+        assert!(both.show_quick_yaml);
+        assert!(both.show_more_actions);
+
+        let more_only = resolve_row_hover_actions(false, true);
+        assert!(more_only.is_visible());
+        assert!(!more_only.show_quick_yaml);
+        assert!(more_only.show_more_actions);
+
+        let callbacks = DataTableCallbacks::new(
+            |idx| format!("row-{idx}"),
+            |_, _, _| div().into_any_element(),
+        )
+        .on_row_quick_yaml(|_, _, _, _, _| {});
+        assert!(callbacks.on_row_quick_yaml.is_some());
     }
 }

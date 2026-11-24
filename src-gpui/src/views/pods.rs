@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
-    prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
+    div, prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, PodInfo};
@@ -14,12 +14,13 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, PodsLoadStatus, PodsState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
 pub use crate::views::{
     nonzero_metric_text_color, numeric_metric_text_color, parse_age_seconds, render_action_button,
-    render_ratio_metric_cell, table_numeric_font,
+    render_ratio_metric_cell, render_resource_error_banner, render_resource_error_state,
+    render_resource_view_header, render_truncated_cell, table_numeric_font,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -267,19 +268,31 @@ pub fn pods_presentation_mode(state: &PodsState) -> PodsPresentationMode {
     }
 }
 
-fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
+fn render_pod_cell(
+    row_idx: usize,
+    pod: &PodInfo,
+    col: &TableColumn,
+    theme: &OrbitTheme,
+) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(pod.name.clone())
-            .into_any_element(),
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(pod.namespace.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pod-name"), row_idx as u64),
+            pod.name.clone(),
+            Some(SharedString::from(pod.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pod-ns"), row_idx as u64),
+            pod.namespace.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
         "status" => render_status_badge_from_str(&pod.status, StatusBadgeVariant::Inline, theme),
         "ready" => {
             let (ready, total) = pod_ready_counts(pod);
@@ -298,26 +311,32 @@ fn render_pod_cell(pod: &PodInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyE
             .text_color(nonzero_metric_text_color(pod.restarts, theme))
             .child(pod.restarts.to_string())
             .into_any_element(),
-        "node" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if pod.node.is_some() {
+        "node" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pod-node"), row_idx as u64),
+            pod.node.as_deref().unwrap_or("-").to_string(),
+            pod.node.clone().map(SharedString::from),
+            if pod.node.is_some() {
                 theme.text.secondary
             } else {
                 theme.text.muted
-            })
-            .truncate()
-            .child(pod.node.as_deref().unwrap_or("-").to_string())
-            .into_any_element(),
-        "ip" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if pod.ip.is_some() {
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
+        "ip" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pod-ip"), row_idx as u64),
+            pod.ip.as_deref().unwrap_or("-").to_string(),
+            None,
+            if pod.ip.is_some() {
                 theme.text.secondary
             } else {
                 theme.text.muted
-            })
-            .truncate()
-            .child(pod.ip.as_deref().unwrap_or("-").to_string())
-            .into_any_element(),
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "cpu" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(if pod.cpu.is_some() {
@@ -447,12 +466,18 @@ pub fn render_pods_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static + Fn(SharedString, &PodInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = pod_columns();
     let filtered_refs = filter_and_sort_pods(&state.pods, namespaces, state.table.sort.as_ref());
-    let summary_row = render_summary_cards_row(&filtered_refs, namespaces, theme);
+    let summary_row = div()
+        .w_full()
+        .px_4()
+        .pb_3()
+        .flex_shrink_0()
+        .child(render_summary_cards_row(&filtered_refs, namespaces, theme));
     let filtered_rows: Rc<Vec<PodInfo>> = Rc::new(filtered_refs.into_iter().cloned().collect());
     let total_count = state.pods.len();
     let visible_count = filtered_rows.len();
@@ -465,76 +490,23 @@ pub fn render_pods_view(
         format!("{visible_count} of {total_count} pods")
     };
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        );
+    let header = render_resource_view_header(
+        WorkspaceView::Pods.label(),
+        WorkspaceView::Pods.description(),
+        count_label,
+        Some(namespaces),
+        None,
+        theme,
+    );
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load pods: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "pods-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "pods-retry-btn",
+            format!("Failed to load pods: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let mode = pods_presentation_mode(state);
@@ -544,45 +516,14 @@ pub fn render_pods_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Pods"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "pods-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "pods-retry-btn",
+                "Unable to Load Pods",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         PodsPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -602,12 +543,13 @@ pub fn render_pods_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|p| render_pod_cell(p, col, col_theme))
+                        .map(|p| render_pod_cell(idx, p, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(pod) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, pod, event, window, cx);
@@ -630,9 +572,9 @@ pub fn render_pods_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_4()
+        .gap_0()
+        .child(header)
         .child(summary_row)
-        .child(toolbar)
         .when(mode == PodsPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })

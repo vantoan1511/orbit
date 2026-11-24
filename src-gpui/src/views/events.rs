@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
-    prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
+    div, prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::EventInfo;
@@ -12,13 +12,17 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{
-    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
-    resource_kind_meta_from_str,
+    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, TextTooltip,
+    render_status_badge_from_str, resource_kind_meta_from_str,
 };
 use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{EventTypeFilter, EventsLoadStatus, EventsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
-use crate::views::{parse_age_seconds, render_action_button, table_numeric_font};
+use crate::views::{
+    parse_age_seconds, render_resource_error_banner, render_resource_error_state,
+    render_resource_view_header, render_truncated_cell, table_numeric_font,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventsPresentationMode {
@@ -240,30 +244,48 @@ fn display_last_seen(ev: &EventInfo) -> String {
     }
 }
 
-fn render_event_cell(ev: &EventInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
+fn render_event_cell(
+    row_idx: usize,
+    ev: &EventInfo,
+    col: &TableColumn,
+    theme: &OrbitTheme,
+) -> AnyElement {
     match col.id.as_ref() {
         "type" => render_status_badge_from_str(&ev.r#type, StatusBadgeVariant::Inline, theme),
-        "reason" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(if ev.reason.is_empty() {
+        "reason" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ev-reason"), row_idx as u64),
+            if ev.reason.is_empty() {
                 "-".to_string()
             } else {
                 ev.reason.clone()
-            })
-            .into_any_element(),
+            },
+            None,
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
         "object" => {
             let meta = resource_kind_meta_from_str(&ev.object_kind, theme);
             let label = format_involved_object(&ev.object_kind, &ev.object_name);
+            let tip = SharedString::from(label.clone());
             div()
+                .id(ElementId::NamedInteger(
+                    SharedString::from("ev-obj"),
+                    row_idx as u64,
+                ))
                 .flex()
                 .items_center()
                 .gap_2()
                 .min_w(px(0.0))
+                .flex_1()
+                .overflow_hidden()
+                .tooltip(move |_window, cx| cx.new(|_| TextTooltip::new(tip.clone())).into())
                 .child(render_icon(meta.icon, px(14.0), theme.text.muted))
                 .child(
                     apply_text_step(div(), theme.typography.size_xs)
+                        .min_w(px(0.0))
+                        .flex_1()
                         .font_weight(FontWeight::NORMAL)
                         .text_color(theme.text.primary)
                         .truncate()
@@ -271,28 +293,40 @@ fn render_event_cell(ev: &EventInfo, col: &TableColumn, theme: &OrbitTheme) -> A
                 )
                 .into_any_element()
         }
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(if ev.namespace.is_empty() {
-                theme.text.muted
-            } else {
-                theme.text.secondary
-            })
-            .truncate()
-            .child(if ev.namespace.is_empty() {
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("ev-ns"), row_idx as u64),
+            if ev.namespace.is_empty() {
                 "-".to_string()
             } else {
                 ev.namespace.clone()
-            })
-            .into_any_element(),
-        "message" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(if ev.message.is_empty() {
+            },
+            None,
+            if ev.namespace.is_empty() {
+                theme.text.muted
+            } else {
+                theme.text.secondary
+            },
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
+        "message" => {
+            let text = if ev.message.is_empty() {
                 "-".to_string()
             } else {
                 ev.message.clone()
-            })
-            .into_any_element(),
+            };
+            let tip = (!ev.message.is_empty()).then(|| SharedString::from(ev.message.clone()));
+            render_truncated_cell(
+                ElementId::NamedInteger(SharedString::from("ev-msg"), row_idx as u64),
+                text,
+                tip,
+                theme.text.secondary,
+                FontWeight::NORMAL,
+                false,
+                theme,
+            )
+        }
         "count" => apply_text_step(div(), theme.typography.size_xs)
             .font(table_numeric_font(theme))
             .text_color(theme.text.primary)
@@ -500,89 +534,34 @@ pub fn render_events_view(
         format!("{visible_count} of {total_ns_count} events")
     };
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        )
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(render_type_filter_pills(
-                    state.type_filter,
-                    theme,
-                    on_type_filter_rc,
-                )),
-        );
+    let header = render_resource_view_header(
+        WorkspaceView::Events.label(),
+        WorkspaceView::Events.description(),
+        count_label,
+        Some(namespaces),
+        Some(render_type_filter_pills(
+            state.type_filter,
+            theme,
+            on_type_filter_rc,
+        )),
+        theme,
+    );
 
-    let summary_row = render_summary_cards_row(&ns_filtered, namespaces, theme);
+    let summary_row = div()
+        .w_full()
+        .px_4()
+        .pb_3()
+        .flex_shrink_0()
+        .child(render_summary_cards_row(&ns_filtered, namespaces, theme));
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load events: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "events-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "events-retry-btn",
+            format!("Failed to load events: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let body = match events_presentation_mode(state) {
@@ -591,45 +570,14 @@ pub fn render_events_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Events"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "events-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "events-retry-btn",
+                "Unable to Load Events",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         EventsPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -651,8 +599,8 @@ pub fn render_events_view(
                     filtered_rows.len(),
                     &table_state,
                     theme,
-                    DataTableCallbacks {
-                        row_key: move |idx| {
+                    DataTableCallbacks::new(
+                        move |idx| {
                             let ev = &key_rows[idx];
                             if !ev.uid.is_empty() {
                                 ev.uid.clone()
@@ -660,19 +608,17 @@ pub fn render_events_view(
                                 format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
                             }
                         },
-                        render_cell: move |row_idx, col, theme| {
-                            render_event_cell(&cell_rows[row_idx], col, theme)
+                        move |row_idx, col, theme| {
+                            render_event_cell(row_idx, &cell_rows[row_idx], col, theme)
                         },
-                        on_sort: Some(Rc::new(on_sort)),
-                        on_row_click: Some(Rc::new(on_row_click)),
-                        on_row_context_menu: Some(Rc::new(
-                            move |idx, row_key, event, window, cx| {
-                                if let Some(ev) = ctx_rows.get(idx) {
-                                    on_row_context_menu(row_key, ev, event, window, cx);
-                                }
-                            },
-                        )),
-                    },
+                    )
+                    .on_sort(on_sort)
+                    .on_row_click(on_row_click)
+                    .on_row_context_menu(move |idx, row_key, event, window, cx| {
+                        if let Some(ev) = ctx_rows.get(idx) {
+                            on_row_context_menu(row_key, ev, event, window, cx);
+                        }
+                    }),
                 ))
                 .into_any_element()
         }
@@ -683,10 +629,13 @@ pub fn render_events_view(
         .min_h(px(0.0))
         .flex()
         .flex_col()
-        .gap_3()
+        .gap_0()
+        .child(header)
         .child(summary_row)
-        .child(toolbar)
-        .when_some(error_banner, |el, banner| el.child(banner))
+        .when(
+            events_presentation_mode(state) == EventsPresentationMode::Table,
+            |el| el.when_some(error_banner, |el, banner| el.child(banner)),
+        )
         .child(body)
         .into_any_element()
 }
@@ -745,7 +694,7 @@ pub fn render_event_drawer_overview(event: &EventInfo, theme: &OrbitTheme) -> An
         .p_4()
         .flex()
         .flex_col()
-        .gap_5()
+        .gap_4()
         .child(message_box)
         .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
         .child(crate::views::render_drawer_kv_badges(

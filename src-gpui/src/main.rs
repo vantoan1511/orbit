@@ -162,6 +162,31 @@ pub const fn should_show_header_kind_badge(_view: WorkspaceView) -> bool {
     false
 }
 
+pub const fn is_full_bleed_table_view(view: WorkspaceView) -> bool {
+    matches!(
+        view,
+        WorkspaceView::Namespaces
+            | WorkspaceView::Deployments
+            | WorkspaceView::StatefulSets
+            | WorkspaceView::DaemonSets
+            | WorkspaceView::ReplicaSets
+            | WorkspaceView::Jobs
+            | WorkspaceView::CronJobs
+            | WorkspaceView::Pods
+            | WorkspaceView::Services
+            | WorkspaceView::Ingresses
+            | WorkspaceView::ConfigMaps
+            | WorkspaceView::Secrets
+            | WorkspaceView::PersistentVolumes
+            | WorkspaceView::PersistentVolumeClaims
+            | WorkspaceView::NetworkPolicies
+            | WorkspaceView::PodSecurity
+            | WorkspaceView::ResourceQuotas
+            | WorkspaceView::Nodes
+            | WorkspaceView::Events
+    )
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct WorkspaceLoadingFlags {
     pub overview: bool,
@@ -4416,7 +4441,6 @@ impl OrbitShell {
 
     fn render_workspace_view_header(&self, theme: &OrbitTheme) -> AnyElement {
         let view = self.sidebar.active_view;
-        let (cat_label, _) = view.breadcrumb();
         let resource_kind = should_show_header_kind_badge(view)
             .then(|| view.resource_kind())
             .flatten();
@@ -4426,18 +4450,12 @@ impl OrbitShell {
             .flex_col()
             .gap_1()
             .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .text_color(theme.text.muted)
-                    .child(cat_label.to_ascii_uppercase()),
-            )
-            .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap_2p5()
+                    .gap_2()
                     .child(
-                        apply_text_step(div(), theme.typography.size_xl)
+                        apply_text_step(div(), theme.typography.size_lg)
                             .font_weight(FontWeight::BOLD)
                             .text_color(theme.text.primary)
                             .child(view.label()),
@@ -4466,7 +4484,7 @@ impl OrbitShell {
                     }),
             )
             .child(
-                apply_text_step(div(), theme.typography.size_sm)
+                apply_text_step(div(), theme.typography.size_xs)
                     .text_color(theme.text.secondary)
                     .child(view.description()),
             )
@@ -4817,12 +4835,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.deployments.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Deployment {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::deployments::render_deployments_view(
                 &self.deployments,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -4931,12 +4970,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::StatefulSet {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::statefulsets::render_statefulsets_view(
                 &self.statefulsets,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5045,12 +5105,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.replicasets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::ReplicaSet {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::replicasets::render_replicasets_view(
                 &self.replicasets,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5159,12 +5240,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::DaemonSet {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::daemonsets::render_daemonsets_view(
                 &self.daemonsets,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5272,12 +5374,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.jobs.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Job {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::jobs::render_jobs_view(
                 &self.jobs,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5385,12 +5508,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::CronJob {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::cronjobs::render_cronjobs_view(
                 &self.cronjobs,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5517,12 +5661,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.services.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Service {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::services::render_services_view(
                 &self.services,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_type_filter,
                 on_refresh,
@@ -5640,12 +5805,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.ingresses.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Ingress {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::ingresses::render_ingresses_view(
                 &self.ingresses,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5762,12 +5948,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.configmaps.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::ConfigMap {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::configmaps::render_configmaps_view(
                 &self.configmaps,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5884,12 +6091,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.secrets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Secret {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::secrets::render_secrets_view(
                 &self.secrets,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -5997,12 +6225,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.pods.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Pod {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::pods::render_pods_view(
                 &self.pods,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6104,12 +6353,28 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
+                    let target = ResourceDrawerTarget::Namespace {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                });
+            };
+
             return views::namespaces::render_namespaces_view(
                 &self.namespaces,
                 &self.namespaces_view,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6207,11 +6472,27 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.persistent_volumes.table.selected_row_key = Some(row_key.to_string());
+                    let target = ResourceDrawerTarget::PersistentVolume {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                });
+            };
+
             return views::persistent_volumes::render_persistent_volumes_view(
                 &self.persistent_volumes,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6325,12 +6606,34 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.persistent_volume_claims.table.selected_row_key =
+                        Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::PersistentVolumeClaim {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::persistent_volume_claims::render_persistent_volume_claims_view(
                 &self.persistent_volume_claims,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6438,12 +6741,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.network_policies.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::NetworkPolicy {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::network_policies::render_network_policies_view(
                 &self.network_policies,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6537,11 +6861,27 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.nodes.table.selected_row_key = Some(row_key.to_string());
+                    let target = ResourceDrawerTarget::Node {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                });
+            };
+
             return views::nodes::render_nodes_view(
                 &self.nodes,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6697,12 +7037,33 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.pod_security.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::PodSecurity {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::pod_security::render_pod_security_view(
                 &self.pod_security,
                 &self.namespaces,
                 theme,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -6837,6 +7198,36 @@ impl OrbitShell {
                 });
             };
 
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
+                    let mut parts = row_key.as_ref().splitn(3, '/');
+                    if let (Some(kind), Some(ns), Some(name)) =
+                        (parts.next(), parts.next(), parts.next())
+                    {
+                        let target = if kind.eq_ignore_ascii_case("LimitRange") {
+                            ResourceDrawerTarget::LimitRange {
+                                name: name.to_string(),
+                                namespace: ns.to_string(),
+                            }
+                        } else {
+                            ResourceDrawerTarget::ResourceQuota {
+                                name: name.to_string(),
+                                namespace: ns.to_string(),
+                            }
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
             return views::resource_quotas::render_resource_quotas_view(
                 &self.resource_quotas,
                 &self.namespaces,
@@ -6844,6 +7235,7 @@ impl OrbitShell {
                 on_kind_filter,
                 on_sort,
                 on_row_click,
+                on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
             );
@@ -7150,42 +7542,36 @@ impl OrbitShell {
             }
         };
 
-        let fill_viewport = matches!(
-            self.sidebar.active_view,
-            WorkspaceView::Namespaces
-                | WorkspaceView::Deployments
-                | WorkspaceView::Pods
-                | WorkspaceView::Services
-                | WorkspaceView::Ingresses
-                | WorkspaceView::ConfigMaps
-                | WorkspaceView::Secrets
-                | WorkspaceView::PersistentVolumes
-                | WorkspaceView::PersistentVolumeClaims
-                | WorkspaceView::NetworkPolicies
-                | WorkspaceView::PodSecurity
-                | WorkspaceView::ResourceQuotas
-                | WorkspaceView::Nodes
-                | WorkspaceView::Events
-        ) && matches!(
-            self.state.connection_state,
-            ClusterConnectionState::Connected { .. }
-        );
+        let is_full_bleed = is_full_bleed_table_view(self.sidebar.active_view)
+            && matches!(
+                self.state.connection_state,
+                ClusterConnectionState::Connected { .. }
+            )
+            && !self.tabs.open_tabs().is_empty();
 
-        let container = div().id("orbit-workspace-scroll").flex_1();
-        let container = if fill_viewport {
-            container.min_h(px(0.0)).overflow_hidden()
+        let workspace_main = if is_full_bleed {
+            div()
+                .id("orbit-workspace-scroll")
+                .flex_1()
+                .min_h(px(0.0))
+                .overflow_hidden()
+                .bg(theme.surface.bg_app)
+                .flex()
+                .flex_col()
+                .child(body)
         } else {
-            container.overflow_y_scroll()
+            div()
+                .id("orbit-workspace-scroll")
+                .flex_1()
+                .overflow_y_scroll()
+                .p_4()
+                .bg(theme.surface.bg_app)
+                .flex()
+                .flex_col()
+                .gap_4()
+                .child(self.render_workspace_view_header(&theme))
+                .child(body)
         };
-
-        let workspace_main = container
-            .p_6()
-            .bg(theme.surface.bg_app)
-            .flex()
-            .flex_col()
-            .gap_6()
-            .child(self.render_workspace_view_header(&theme))
-            .child(body);
 
         let drawer = self.render_active_drawer(window_width, &theme, cx);
 
@@ -15050,5 +15436,49 @@ mod tests {
             focus_target_for_picker_transition(false),
             ShellFocusTarget::ShellRoot
         );
+    }
+
+    #[test]
+    fn test_is_full_bleed_table_view_covers_all_19_resource_table_views() {
+        let table_views = [
+            WorkspaceView::Namespaces,
+            WorkspaceView::Deployments,
+            WorkspaceView::StatefulSets,
+            WorkspaceView::DaemonSets,
+            WorkspaceView::ReplicaSets,
+            WorkspaceView::Jobs,
+            WorkspaceView::CronJobs,
+            WorkspaceView::Pods,
+            WorkspaceView::Services,
+            WorkspaceView::Ingresses,
+            WorkspaceView::ConfigMaps,
+            WorkspaceView::Secrets,
+            WorkspaceView::PersistentVolumes,
+            WorkspaceView::PersistentVolumeClaims,
+            WorkspaceView::NetworkPolicies,
+            WorkspaceView::PodSecurity,
+            WorkspaceView::ResourceQuotas,
+            WorkspaceView::Nodes,
+            WorkspaceView::Events,
+        ];
+        for view in table_views {
+            assert!(
+                is_full_bleed_table_view(view),
+                "{view:?} must render as a full-bleed table view"
+            );
+        }
+
+        for non_table_view in [
+            WorkspaceView::Overview,
+            WorkspaceView::WorkloadsOverview,
+            WorkspaceView::StorageOverview,
+            WorkspaceView::Settings,
+            WorkspaceView::Logs,
+        ] {
+            assert!(
+                !is_full_bleed_table_view(non_table_view),
+                "{non_table_view:?} must not render as a full-bleed table view"
+            );
+        }
     }
 }

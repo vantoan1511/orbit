@@ -268,7 +268,7 @@ pub fn render_storage_overview_view(
     let mode = resolve_storage_overview_mode(state, namespaces);
     let is_loading = state.status == StorageOverviewLoadStatus::Loading;
 
-    let mut root = div().flex().flex_col().gap_5().child(render_summary_toolbar(
+    let mut root = div().flex().flex_col().gap_4().child(render_summary_toolbar(
         state,
         namespaces,
         is_loading,
@@ -510,7 +510,7 @@ fn render_summary_body(
         .w_full()
         .flex()
         .flex_col()
-        .gap_5()
+        .gap_4()
         .child(kpi_strip)
         .child(resource_cards_grid)
         .child(breakdown_panel)
