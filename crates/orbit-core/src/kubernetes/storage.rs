@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use k8s_openapi::api::core::v1::{PersistentVolume, PersistentVolumeClaim};
+use k8s_openapi::api::storage::v1::StorageClass;
 use kube::{
     api::{Api, ListParams},
     Client,
@@ -196,6 +197,60 @@ pub async fn fetch_pvcs(
     }
 }
 
+/// Formats a Kubernetes `StorageClass` into `models::StorageClassInfo`.
+pub fn format_storage_class(sc: &StorageClass) -> models::StorageClassInfo {
+    let name = sc.metadata.name.clone().unwrap_or_default();
+    let age = format_age(&sc.metadata.creation_timestamp);
+    let provisioner = sc.provisioner.clone();
+
+    let reclaim_policy = sc
+        .reclaim_policy
+        .clone()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "Delete".to_string());
+
+    let volume_binding_mode = sc
+        .volume_binding_mode
+        .clone()
+        .filter(|v| !v.is_empty())
+        .unwrap_or_else(|| "Immediate".to_string());
+
+    let allow_volume_expansion = sc.allow_volume_expansion.unwrap_or(false);
+
+    models::StorageClassInfo {
+        name,
+        provisioner,
+        reclaim_policy,
+        volume_binding_mode,
+        allow_volume_expansion,
+        age,
+    }
+}
+
+/// Lists all StorageClasses in the cluster.
+pub async fn list_storage_classes(
+    client: &Client,
+) -> Result<Vec<models::StorageClassInfo>, kube::Error> {
+    let api: Api<StorageClass> = Api::all(client.clone());
+    let mut list = Vec::new();
+    for sc in api.list(&ListParams::default()).await? {
+        list.push(format_storage_class(&sc));
+    }
+    Ok(list)
+}
+
+/// Fetches all StorageClasses with a bounded timeout and human-readable error mapping.
+pub async fn fetch_storage_classes(
+    client: &Client,
+) -> Result<Vec<models::StorageClassInfo>, String> {
+    match tokio::time::timeout(STORAGE_FETCH_TIMEOUT, list_storage_classes(client)).await {
+        Ok(Ok(list)) => Ok(list),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Timed out fetching storage classes after 10s".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -368,5 +423,68 @@ mod tests {
         assert_eq!(empty_info.access_mode, "-");
         assert_eq!(empty_info.storage_class, "-");
         assert_eq!(empty_info.status, "Unknown");
+    }
+
+    #[test]
+    fn test_format_storage_class_extracts_fields_and_defaults_missing_optional_values() {
+        use k8s_openapi::api::storage::v1::StorageClass;
+
+        let creation_time = Utc.with_ymd_and_hms(2026, 7, 12, 12, 0, 0).unwrap();
+
+        let explicit = StorageClass {
+            metadata: ObjectMeta {
+                name: Some("gp3".to_string()),
+                creation_timestamp: Some(Time(creation_time)),
+                ..Default::default()
+            },
+            provisioner: "ebs.csi.aws.com".to_string(),
+            reclaim_policy: Some("Retain".to_string()),
+            volume_binding_mode: Some("WaitForFirstConsumer".to_string()),
+            allow_volume_expansion: Some(true),
+            ..Default::default()
+        };
+
+        let info = format_storage_class(&explicit);
+        assert_eq!(info.name, "gp3");
+        assert_eq!(info.provisioner, "ebs.csi.aws.com");
+        assert_eq!(info.reclaim_policy, "Retain");
+        assert_eq!(info.volume_binding_mode, "WaitForFirstConsumer");
+        assert!(info.allow_volume_expansion);
+        assert!(!info.age.is_empty());
+
+        let defaults = StorageClass {
+            metadata: ObjectMeta {
+                name: Some("standard".to_string()),
+                ..Default::default()
+            },
+            provisioner: "kubernetes.io/no-provisioner".to_string(),
+            reclaim_policy: None,
+            volume_binding_mode: None,
+            allow_volume_expansion: None,
+            ..Default::default()
+        };
+
+        let default_info = format_storage_class(&defaults);
+        assert_eq!(default_info.name, "standard");
+        assert_eq!(default_info.reclaim_policy, "Delete");
+        assert_eq!(default_info.volume_binding_mode, "Immediate");
+        assert!(!default_info.allow_volume_expansion);
+    }
+
+    #[tokio::test]
+    async fn test_fetch_storage_classes_propagates_connection_error() {
+        let Ok(cluster_url) = "http://127.0.0.1:1".parse::<http::Uri>() else {
+            panic!("static URI should parse");
+        };
+        let config = kube::Config::new(cluster_url);
+        let Ok(client) = Client::try_from(config) else {
+            panic!("client should build from static config");
+        };
+
+        let result = fetch_storage_classes(&client).await;
+        match result {
+            Ok(_) => panic!("expected connection error against closed local port"),
+            Err(message) => assert!(!message.trim().is_empty()),
+        }
     }
 }

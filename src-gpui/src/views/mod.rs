@@ -12,12 +12,15 @@ pub mod offline;
 pub mod overview;
 pub mod persistent_volume_claims;
 pub mod persistent_volumes;
+pub mod pod_security;
 pub mod pods;
 pub mod replicasets;
+pub mod resource_quotas;
 pub mod secrets;
 pub mod services;
 pub mod settings;
 pub mod statefulsets;
+pub mod storage_overview;
 pub mod welcome;
 pub mod workloads_overview;
 
@@ -519,10 +522,11 @@ mod tests {
             "last_schedule",
             "count",
             "last_seen",
+            "violations",
             "age",
         ];
 
-        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 17] = [
+        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 19] = [
             ("configmaps", configmaps::configmap_columns()),
             ("cronjobs", cronjobs::cronjob_columns()),
             ("daemonsets", daemonsets::daemonset_columns()),
@@ -541,8 +545,10 @@ mod tests {
                 "persistent_volumes",
                 persistent_volumes::persistent_volume_columns(),
             ),
+            ("pod_security", pod_security::pod_security_columns()),
             ("pods", pods::pod_columns()),
             ("replicasets", replicasets::replicaset_columns()),
+            ("resource_quotas", resource_quotas::resource_quota_columns()),
             ("secrets", secrets::secret_columns()),
             ("services", services::service_columns()),
             ("statefulsets", statefulsets::statefulset_columns()),

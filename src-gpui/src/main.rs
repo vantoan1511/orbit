@@ -36,9 +36,10 @@ use crate::state::{
     EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
     NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
-    PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodsState,
-    ReplicaSetsState, SecretsState, ServicesState, StatefulSetsState,
-    TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
+    PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodSecurityState,
+    PodsState, ReplicaSetsState, ResourceQuotaKindFilter, ResourceQuotasState, SecretsState,
+    ServicesState, StatefulSetsState, StorageOverviewState, TabDropPosition,
+    WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex,
@@ -179,7 +180,10 @@ pub struct WorkspaceLoadingFlags {
     pub secrets: bool,
     pub persistent_volumes: bool,
     pub persistent_volume_claims: bool,
+    pub storage_overview: bool,
     pub network_policies: bool,
+    pub pod_security: bool,
+    pub resource_quotas: bool,
     pub nodes: bool,
     pub events: bool,
 }
@@ -205,7 +209,10 @@ pub const fn is_workspace_view_loading(
         WorkspaceView::Secrets => loading.secrets,
         WorkspaceView::PersistentVolumes => loading.persistent_volumes,
         WorkspaceView::PersistentVolumeClaims => loading.persistent_volume_claims,
+        WorkspaceView::StorageOverview => loading.storage_overview,
         WorkspaceView::NetworkPolicies => loading.network_policies,
+        WorkspaceView::PodSecurity => loading.pod_security,
+        WorkspaceView::ResourceQuotas => loading.resource_quotas,
         WorkspaceView::Nodes => loading.nodes,
         WorkspaceView::Events => loading.events,
         _ => false,
@@ -300,6 +307,9 @@ pub fn select_workspace_view_with_state(
     persistent_volumes: &mut PersistentVolumesState,
     persistent_volume_claims: &mut PersistentVolumeClaimsState,
     network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: WorkspaceView,
@@ -323,6 +333,9 @@ pub fn select_workspace_view_with_state(
         persistent_volumes,
         persistent_volume_claims,
         network_policies,
+        storage_overview,
+        pod_security,
+        resource_quotas,
         nodes,
         events,
         Some(view),
@@ -349,6 +362,9 @@ pub fn select_workspace_view_with_tabs(
     persistent_volumes: &mut PersistentVolumesState,
     persistent_volume_claims: &mut PersistentVolumeClaimsState,
     network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -375,6 +391,9 @@ pub fn select_workspace_view_with_tabs(
         persistent_volumes,
         persistent_volume_claims,
         network_policies,
+        storage_overview,
+        pod_security,
+        resource_quotas,
         nodes,
         events,
         view,
@@ -406,6 +425,9 @@ fn load_command_for_active_view(
     persistent_volumes: &mut PersistentVolumesState,
     persistent_volume_claims: &mut PersistentVolumeClaimsState,
     network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: Option<WorkspaceView>,
@@ -470,6 +492,19 @@ fn load_command_for_active_view(
     {
         return Some(network_policies.begin_load_for_cluster(cluster_id));
     }
+    if view == WorkspaceView::StorageOverview
+        && storage_overview.needs_load_for_cluster(cluster_id)
+    {
+        return Some(storage_overview.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::PodSecurity && pod_security.needs_load_for_cluster(cluster_id) {
+        return Some(pod_security.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::ResourceQuotas
+        && resource_quotas.needs_load_for_cluster(cluster_id)
+    {
+        return Some(resource_quotas.begin_load_for_cluster(cluster_id));
+    }
     if view == WorkspaceView::Nodes && nodes.needs_load_for_cluster(cluster_id) {
         return Some(nodes.begin_load_for_cluster(cluster_id));
     }
@@ -501,6 +536,9 @@ pub fn apply_cluster_event_with_tabs(
     persistent_volumes: &mut PersistentVolumesState,
     persistent_volume_claims: &mut PersistentVolumeClaimsState,
     network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -528,6 +566,9 @@ pub fn apply_cluster_event_with_tabs(
         persistent_volumes,
         persistent_volume_claims,
         network_policies,
+        storage_overview,
+        pod_security,
+        resource_quotas,
         nodes,
         events,
         event,
@@ -555,6 +596,9 @@ pub fn apply_cluster_event_with_tabs(
                 persistent_volumes,
                 persistent_volume_claims,
                 network_policies,
+                storage_overview,
+                pod_security,
+                resource_quotas,
                 nodes,
                 events,
                 restored,
@@ -589,6 +633,9 @@ pub fn handle_tab_shortcut_with_state(
     persistent_volumes: &mut PersistentVolumesState,
     persistent_volume_claims: &mut PersistentVolumeClaimsState,
     network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -641,6 +688,9 @@ pub fn handle_tab_shortcut_with_state(
         persistent_volumes,
         persistent_volume_claims,
         network_policies,
+        storage_overview,
+        pod_security,
+        resource_quotas,
         nodes,
         events,
         active,
@@ -676,6 +726,9 @@ pub fn apply_cluster_event_with_workspace(
     persistent_volumes: &mut PersistentVolumesState,
     persistent_volume_claims: &mut PersistentVolumeClaimsState,
     network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
     nodes: &mut NodesState,
     events: &mut EventsState,
     event: ClusterBridgeEvent,
@@ -764,6 +817,21 @@ pub fn apply_cluster_event_with_workspace(
                 } else {
                     network_policies.reset_for_cluster(id);
                 }
+                if sidebar.active_view == WorkspaceView::StorageOverview {
+                    commands.push(storage_overview.begin_load_for_cluster(id));
+                } else {
+                    storage_overview.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::PodSecurity {
+                    commands.push(pod_security.begin_load_for_cluster(id));
+                } else {
+                    pod_security.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::ResourceQuotas {
+                    commands.push(resource_quotas.begin_load_for_cluster(id));
+                } else {
+                    resource_quotas.reset_for_cluster(id);
+                }
                 if sidebar.active_view == WorkspaceView::Nodes {
                     commands.push(nodes.begin_load_for_cluster(id));
                 } else {
@@ -797,6 +865,9 @@ pub fn apply_cluster_event_with_workspace(
             persistent_volumes.reset_for_disconnected();
             persistent_volume_claims.reset_for_disconnected();
             network_policies.reset_for_disconnected();
+            storage_overview.reset_for_disconnected();
+            pod_security.reset_for_disconnected();
+            resource_quotas.reset_for_disconnected();
             nodes.reset_for_disconnected();
             events.reset_for_disconnected();
         }
@@ -1076,6 +1147,48 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             network_policies.apply_failed(&cluster_id, generation, message);
         }
+        ClusterBridgeEvent::StorageOverviewLoaded {
+            cluster_id,
+            generation,
+            snapshot,
+        } => {
+            storage_overview.apply_loaded(&cluster_id, generation, snapshot);
+        }
+        ClusterBridgeEvent::StorageOverviewLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            storage_overview.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::PodSecurityLoaded {
+            cluster_id,
+            generation,
+            policies,
+        } => {
+            pod_security.apply_loaded(&cluster_id, generation, policies);
+        }
+        ClusterBridgeEvent::PodSecurityLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            pod_security.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::ResourceQuotasLoaded {
+            cluster_id,
+            generation,
+            policies,
+        } => {
+            resource_quotas.apply_loaded(&cluster_id, generation, policies);
+        }
+        ClusterBridgeEvent::ResourceQuotasLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            resource_quotas.apply_failed(&cluster_id, generation, message);
+        }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
@@ -1152,6 +1265,9 @@ pub struct OrbitShell {
     persistent_volumes: PersistentVolumesState,
     persistent_volume_claims: PersistentVolumeClaimsState,
     network_policies: NetworkPoliciesState,
+    storage_overview: StorageOverviewState,
+    pod_security: PodSecurityState,
+    resource_quotas: ResourceQuotasState,
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
@@ -1208,6 +1324,9 @@ impl OrbitShell {
                             &mut shell.persistent_volumes,
                             &mut shell.persistent_volume_claims,
                             &mut shell.network_policies,
+                            &mut shell.storage_overview,
+                            &mut shell.pod_security,
+                            &mut shell.resource_quotas,
                             &mut shell.nodes,
                             &mut shell.events,
                             &mut shell.tabs,
@@ -1273,6 +1392,9 @@ impl OrbitShell {
             persistent_volumes: PersistentVolumesState::default(),
             persistent_volume_claims: PersistentVolumeClaimsState::default(),
             network_policies: NetworkPoliciesState::default(),
+            storage_overview: StorageOverviewState::default(),
+            pod_security: PodSecurityState::default(),
+            resource_quotas: ResourceQuotasState::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
@@ -1349,6 +1471,9 @@ impl OrbitShell {
             &mut self.persistent_volumes,
             &mut self.persistent_volume_claims,
             &mut self.network_policies,
+            &mut self.storage_overview,
+            &mut self.pod_security,
+            &mut self.resource_quotas,
             &mut self.nodes,
             &mut self.events,
             &mut self.tabs,
@@ -1389,6 +1514,9 @@ impl OrbitShell {
             &mut self.persistent_volumes,
             &mut self.persistent_volume_claims,
             &mut self.network_policies,
+            &mut self.storage_overview,
+            &mut self.pod_security,
+            &mut self.resource_quotas,
             &mut self.nodes,
             &mut self.events,
             active,
@@ -1487,6 +1615,9 @@ impl OrbitShell {
                 | ResourceDrawerTarget::PersistentVolume { .. }
                 | ResourceDrawerTarget::PersistentVolumeClaim { .. }
                 | ResourceDrawerTarget::NetworkPolicy { .. }
+                | ResourceDrawerTarget::PodSecurity { .. }
+                | ResourceDrawerTarget::ResourceQuota { .. }
+                | ResourceDrawerTarget::LimitRange { .. }
                 | ResourceDrawerTarget::Node { .. }
         ) {
             if let Some(cid) = cluster_id.as_deref() {
@@ -1636,6 +1767,29 @@ impl OrbitShell {
                 .network_policies
                 .iter()
                 .any(|p| p.name == *name && p.namespace == *namespace),
+            ResourceDrawerTarget::PodSecurity { name, namespace } => self
+                .pod_security
+                .policies
+                .iter()
+                .any(|p| p.name == *name && p.namespace == *namespace),
+            ResourceDrawerTarget::ResourceQuota { name, namespace } => self
+                .resource_quotas
+                .policies
+                .iter()
+                .any(|p| {
+                    p.kind.eq_ignore_ascii_case("ResourceQuota")
+                        && p.name == *name
+                        && p.namespace == *namespace
+                }),
+            ResourceDrawerTarget::LimitRange { name, namespace } => self
+                .resource_quotas
+                .policies
+                .iter()
+                .any(|p| {
+                    p.kind.eq_ignore_ascii_case("LimitRange")
+                        && p.name == *name
+                        && p.namespace == *namespace
+                }),
         };
         if !exists {
             self.drawer.close();
@@ -2634,6 +2788,120 @@ impl OrbitShell {
                     body,
                 ))
             }
+            ResourceDrawerTarget::PodSecurity { name, namespace } => {
+                let policy = self
+                    .pod_security
+                    .policies
+                    .iter()
+                    .find(|p| p.name == *name && p.namespace == *namespace)?;
+                let matched_events = views::pod_security::filter_events_for_pod_security(
+                    &self.events.events,
+                    policy,
+                );
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::pod_security::render_pod_security_drawer_overview(policy, theme)
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::pod_security::render_pod_security_drawer_events(
+                            &matched_events,
+                            events_loading,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("Namespace/{}", policy.namespace),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(policy.name.clone()),
+                    SharedString::from("PodSecurity"),
+                    Some(SharedString::from(policy.namespace.clone())),
+                    Some(SharedString::from(policy.last_updated.clone())),
+                    Some(SharedString::from(policy.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::ResourceQuota { name, namespace }
+            | ResourceDrawerTarget::LimitRange { name, namespace } => {
+                let target_kind = target.kind();
+                let policy = self.resource_quotas.policies.iter().find(|p| {
+                    p.kind.eq_ignore_ascii_case(target_kind)
+                        && p.name == *name
+                        && p.namespace == *namespace
+                })?;
+                let matched_events = views::resource_quotas::filter_events_for_resource_policy(
+                    &self.events.events,
+                    policy,
+                );
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::resource_quotas::render_resource_policy_drawer_overview(
+                            policy, theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::resource_quotas::render_resource_policy_drawer_events(
+                            &matched_events,
+                            events_loading,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", policy.namespace, policy.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(policy.name.clone()),
+                    SharedString::from(policy.kind.clone()),
+                    Some(SharedString::from(policy.namespace.clone())),
+                    Some(SharedString::from(policy.last_updated.clone())),
+                    Some(SharedString::from(policy.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
         }
     }
 
@@ -2719,8 +2987,14 @@ impl OrbitShell {
                     == crate::state::PersistentVolumesLoadStatus::Loading,
                 persistent_volume_claims: self.persistent_volume_claims.status
                     == crate::state::PersistentVolumeClaimsLoadStatus::Loading,
+                storage_overview: self.storage_overview.status
+                    == crate::state::StorageOverviewLoadStatus::Loading,
                 network_policies: self.network_policies.status
                     == crate::state::NetworkPoliciesLoadStatus::Loading,
+                pod_security: self.pod_security.status
+                    == crate::state::PodSecurityLoadStatus::Loading,
+                resource_quotas: self.resource_quotas.status
+                    == crate::state::ResourceQuotasLoadStatus::Loading,
                 nodes: self.nodes.status == crate::state::NodesLoadStatus::Loading,
                 events: self.events.status == EventsLoadStatus::Loading,
             },
@@ -2870,6 +3144,33 @@ impl OrbitShell {
                     .network_policies
                     .begin_refresh()
                     .unwrap_or_else(|| self.network_policies.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::StorageOverview
+                || self.storage_overview.cluster_id.is_some()
+            {
+                let cmd = self
+                    .storage_overview
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.storage_overview.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::PodSecurity
+                || self.pod_security.cluster_id.is_some()
+            {
+                let cmd = self
+                    .pod_security
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.pod_security.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::ResourceQuotas
+                || self.resource_quotas.cluster_id.is_some()
+            {
+                let cmd = self
+                    .resource_quotas
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.resource_quotas.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
@@ -6270,6 +6571,284 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::StorageOverview {
+            let nav_entity = cx.entity().clone();
+            let on_navigate = std::rc::Rc::new(
+                move |view: WorkspaceView, _window: &mut Window, cx: &mut App| {
+                    nav_entity.update(cx, |shell, cx| {
+                        shell.select_workspace_view(view, cx);
+                    });
+                },
+            );
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+            return views::storage_overview::render_storage_overview_view(
+                &self.storage_overview,
+                &self.namespaces,
+                theme,
+                on_navigate,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::PodSecurity {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.pod_security.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.pod_security.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::PodSecurity {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = policy.name.clone();
+                let namespace = policy.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::PodSecurity {
+                    name: policy.name.clone(),
+                    namespace: policy.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::pod_security::build_pod_security_context_menu_entries(
+                    policy,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.pod_security.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::pod_security::render_pod_security_view(
+                &self.pod_security,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::ResourceQuotas {
+            let kind_entity = cx.entity().clone();
+            let on_kind_filter = move |filter: ResourceQuotaKindFilter,
+                                       _window: &mut Window,
+                                       cx: &mut App| {
+                kind_entity.update(cx, |shell, cx| {
+                    shell.resource_quotas.set_kind_filter(filter);
+                    cx.notify();
+                });
+            };
+
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.resource_quotas.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
+                    let mut parts = row_key.as_ref().splitn(3, '/');
+                    if let (Some(kind), Some(ns), Some(name)) =
+                        (parts.next(), parts.next(), parts.next())
+                    {
+                        let target = if kind.eq_ignore_ascii_case("LimitRange") {
+                            ResourceDrawerTarget::LimitRange {
+                                name: name.to_string(),
+                                namespace: ns.to_string(),
+                            }
+                        } else {
+                            ResourceDrawerTarget::ResourceQuota {
+                                name: name.to_string(),
+                                namespace: ns.to_string(),
+                            }
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = policy.name.clone();
+                let namespace = policy.namespace.clone();
+                let drawer_target = if policy.kind.eq_ignore_ascii_case("LimitRange") {
+                    ResourceDrawerTarget::LimitRange {
+                        name: policy.name.clone(),
+                        namespace: policy.namespace.clone(),
+                    }
+                } else {
+                    ResourceDrawerTarget::ResourceQuota {
+                        name: policy.name.clone(),
+                        namespace: policy.namespace.clone(),
+                    }
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::resource_quotas::build_resource_policy_context_menu_entries(
+                    policy,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::resource_quotas::render_resource_quotas_view(
+                &self.resource_quotas,
+                &self.namespaces,
+                theme,
+                on_kind_filter,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view != WorkspaceView::Overview {
             let view = self.sidebar.active_view;
             return theme
@@ -6583,6 +7162,8 @@ impl OrbitShell {
                 | WorkspaceView::PersistentVolumes
                 | WorkspaceView::PersistentVolumeClaims
                 | WorkspaceView::NetworkPolicies
+                | WorkspaceView::PodSecurity
+                | WorkspaceView::ResourceQuotas
                 | WorkspaceView::Nodes
                 | WorkspaceView::Events
         ) && matches!(
@@ -6787,6 +7368,9 @@ impl Render for OrbitShell {
                     &mut this.persistent_volumes,
                     &mut this.persistent_volume_claims,
                     &mut this.network_policies,
+                    &mut this.storage_overview,
+                    &mut this.pod_security,
+                    &mut this.resource_quotas,
                     &mut this.nodes,
                     &mut this.events,
                     &mut this.tabs,
@@ -7310,6 +7894,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut throwaway_nodes,
             &mut EventsState::default(),
             event,
@@ -7440,7 +8027,10 @@ mod tests {
                 secrets: true,
                 persistent_volumes: true,
                 persistent_volume_claims: true,
+                storage_overview: true,
                 network_policies: true,
+                pod_security: true,
+                resource_quotas: true,
                 nodes: true,
                 events: true,
             },
@@ -7605,6 +8195,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -7651,6 +8244,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::OverviewLoaded {
@@ -7683,6 +8279,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NamespacesLoaded {
@@ -7730,6 +8329,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -7858,6 +8460,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Pods
@@ -7890,6 +8495,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Deployments,
@@ -7927,6 +8535,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -7951,6 +8562,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -8016,6 +8630,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -8054,6 +8671,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -8085,6 +8705,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -8177,6 +8800,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -8209,6 +8835,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -8247,6 +8876,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoadFailed {
@@ -8299,6 +8931,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Nodes,
@@ -8333,6 +8968,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -8357,6 +8995,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -8423,6 +9064,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -8458,6 +9102,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -8489,6 +9136,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -8583,6 +9233,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -8615,6 +9268,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -8650,6 +9306,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoadFailed {
@@ -8699,6 +9358,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Namespaces,
@@ -8732,6 +9394,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -8756,6 +9421,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -8785,6 +9453,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -8833,6 +9504,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -8878,6 +9552,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -8940,6 +9617,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Events,
@@ -8974,6 +9654,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Overview,
@@ -8998,6 +9681,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -9027,6 +9713,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -9076,6 +9765,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -9128,6 +9820,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -9177,6 +9872,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -9583,6 +10281,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9617,6 +10318,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9646,6 +10350,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9712,6 +10419,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9764,6 +10474,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9836,6 +10549,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9868,6 +10584,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9899,6 +10618,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -9935,6 +10657,9 @@ mod tests {
                 &mut PersistentVolumesState::default(),
                 &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -10016,6 +10741,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10050,6 +10778,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10117,6 +10848,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoaded {
@@ -10151,6 +10885,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoadFailed {
@@ -10183,6 +10920,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -10312,6 +11052,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10347,6 +11090,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10416,6 +11162,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -10448,6 +11197,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -10482,6 +11234,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoadFailed {
@@ -10543,6 +11298,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10590,6 +11348,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -10711,6 +11472,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::ConfigMaps,
@@ -10772,6 +11536,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -10804,6 +11571,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -10840,6 +11610,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoadFailed {
@@ -10914,6 +11687,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -10944,6 +11720,9 @@ mod tests {
             &mut PersistentVolumesState::default(),
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -11075,6 +11854,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Secrets,
@@ -11135,6 +11917,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoaded {
@@ -11167,6 +11952,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoaded {
@@ -11200,6 +11988,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoadFailed {
@@ -11276,6 +12067,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -11306,6 +12100,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -11467,6 +12264,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::StatefulSets,
@@ -11526,6 +12326,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::StatefulSetsLoaded {
@@ -11562,6 +12365,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::StatefulSetsLoadFailed {
@@ -11622,6 +12428,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11706,6 +12515,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::WorkloadsOverview,
@@ -11755,6 +12567,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
@@ -11787,6 +12602,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
@@ -11823,6 +12641,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -11857,6 +12678,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11932,6 +12756,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11959,6 +12786,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11991,6 +12821,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -12023,6 +12856,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -12055,6 +12891,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -12087,6 +12926,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -12119,6 +12961,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -12216,6 +13061,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ReplicaSetsLoaded {
@@ -12252,6 +13100,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ReplicaSetsLoadFailed {
@@ -12339,6 +13190,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::DaemonSets,
@@ -12374,6 +13228,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::DaemonSetsLoaded {
@@ -12410,6 +13267,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::DaemonSetsLoadFailed {
@@ -12468,6 +13328,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -12560,6 +13423,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Jobs,
@@ -12595,6 +13461,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::JobsLoaded {
@@ -12628,6 +13497,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::JobsLoadFailed {
@@ -12686,6 +13558,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -12779,6 +13654,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::CronJobs,
@@ -12814,6 +13692,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::CronJobsLoaded {
@@ -12847,6 +13728,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::CronJobsLoadFailed {
@@ -12905,6 +13789,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13000,6 +13887,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13034,6 +13924,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::IngressesLoaded {
@@ -13081,6 +13974,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -13114,6 +14010,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13208,6 +14107,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13242,6 +14144,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PersistentVolumesLoaded {
@@ -13289,6 +14194,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -13325,6 +14233,9 @@ mod tests {
             &mut persistent_volumes,
             &mut PersistentVolumeClaimsState::default(),
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13402,6 +14313,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13439,6 +14353,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
@@ -13490,6 +14407,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -13526,6 +14446,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13604,6 +14527,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut network_policies,
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13638,6 +14564,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut network_policies,
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::NetworkPoliciesLoaded {
@@ -13688,6 +14617,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut network_policies,
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -13724,6 +14656,9 @@ mod tests {
             &mut persistent_volumes,
             &mut persistent_volume_claims,
             &mut network_policies,
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13748,6 +14683,360 @@ mod tests {
         assert!(connect_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadNetworkPolicies { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_pod_security_view_navigation_refresh_and_connect_dispatch() {
+        let mut state = ClusterSwitcherState::new();
+        state.active_cluster_id = Some("prod-ctx".to_string());
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut pod_security = PodSecurityState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut DeploymentsState::default(),
+            &mut StatefulSetsState::default(),
+            &mut DaemonSetsState::default(),
+            &mut ReplicaSetsState::default(),
+            &mut JobsState::default(),
+            &mut CronJobsState::default(),
+            &mut PodsState::default(),
+            &mut ServicesState::default(),
+            &mut IngressesState::default(),
+            &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
+            &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut pod_security,
+            &mut ResourceQuotasState::default(),
+            &mut NodesState::default(),
+            &mut EventsState::default(),
+            &mut tabs,
+            WorkspaceView::PodSecurity,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::PodSecurity);
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPodSecurity { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::PodSecurity,
+            WorkspaceLoadingFlags {
+                pod_security: true,
+                ..WorkspaceLoadingFlags::default()
+            }
+        ));
+
+        let refresh_cmd = pod_security.begin_refresh();
+        assert_eq!(
+            refresh_cmd,
+            Some(ClusterBridgeCommand::LoadPodSecurity {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+            })
+        );
+
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut DeploymentsState::default(),
+            &mut StatefulSetsState::default(),
+            &mut DaemonSetsState::default(),
+            &mut ReplicaSetsState::default(),
+            &mut JobsState::default(),
+            &mut CronJobsState::default(),
+            &mut PodsState::default(),
+            &mut ServicesState::default(),
+            &mut IngressesState::default(),
+            &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
+            &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut pod_security,
+            &mut ResourceQuotasState::default(),
+            &mut NodesState::default(),
+            &mut EventsState::default(),
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadPodSecurity { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_resource_quotas_view_navigation_refresh_and_connect_dispatch() {
+        let mut state = ClusterSwitcherState::new();
+        state.active_cluster_id = Some("prod-ctx".to_string());
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut resource_quotas = ResourceQuotasState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut DeploymentsState::default(),
+            &mut StatefulSetsState::default(),
+            &mut DaemonSetsState::default(),
+            &mut ReplicaSetsState::default(),
+            &mut JobsState::default(),
+            &mut CronJobsState::default(),
+            &mut PodsState::default(),
+            &mut ServicesState::default(),
+            &mut IngressesState::default(),
+            &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
+            &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut resource_quotas,
+            &mut NodesState::default(),
+            &mut EventsState::default(),
+            &mut tabs,
+            WorkspaceView::ResourceQuotas,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::ResourceQuotas);
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadResourceQuotas { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::ResourceQuotas,
+            WorkspaceLoadingFlags {
+                resource_quotas: true,
+                ..WorkspaceLoadingFlags::default()
+            }
+        ));
+
+        let refresh_cmd = resource_quotas.begin_refresh();
+        assert_eq!(
+            refresh_cmd,
+            Some(ClusterBridgeCommand::LoadResourceQuotas {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+            })
+        );
+
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut DeploymentsState::default(),
+            &mut StatefulSetsState::default(),
+            &mut DaemonSetsState::default(),
+            &mut ReplicaSetsState::default(),
+            &mut JobsState::default(),
+            &mut CronJobsState::default(),
+            &mut PodsState::default(),
+            &mut ServicesState::default(),
+            &mut IngressesState::default(),
+            &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
+            &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut StorageOverviewState::default(),
+            &mut PodSecurityState::default(),
+            &mut resource_quotas,
+            &mut NodesState::default(),
+            &mut EventsState::default(),
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadResourceQuotas { cluster_id, .. } if cluster_id == "prod-ctx"
+        )));
+    }
+
+    #[test]
+    fn test_storage_overview_view_navigation_refresh_and_connect_dispatch() {
+        let mut state = ClusterSwitcherState::new();
+        state.active_cluster_id = Some("prod-ctx".to_string());
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut storage_overview = StorageOverviewState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.activate_cluster("prod-ctx");
+
+        let cmds = select_workspace_view_with_tabs(
+            &state,
+            &mut sidebar,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut DeploymentsState::default(),
+            &mut StatefulSetsState::default(),
+            &mut DaemonSetsState::default(),
+            &mut ReplicaSetsState::default(),
+            &mut JobsState::default(),
+            &mut CronJobsState::default(),
+            &mut PodsState::default(),
+            &mut ServicesState::default(),
+            &mut IngressesState::default(),
+            &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
+            &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut storage_overview,
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
+            &mut NodesState::default(),
+            &mut EventsState::default(),
+            &mut tabs,
+            WorkspaceView::StorageOverview,
+        );
+        assert_eq!(sidebar.active_view, WorkspaceView::StorageOverview);
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadStorageOverview { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
+        )));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::StorageOverview,
+            WorkspaceLoadingFlags {
+                storage_overview: true,
+                ..WorkspaceLoadingFlags::default()
+            }
+        ));
+
+        let refresh_cmd = storage_overview.begin_refresh();
+        assert_eq!(
+            refresh_cmd,
+            Some(ClusterBridgeCommand::LoadStorageOverview {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+            })
+        );
+
+        let connect_cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut DeploymentsState::default(),
+            &mut StatefulSetsState::default(),
+            &mut DaemonSetsState::default(),
+            &mut ReplicaSetsState::default(),
+            &mut JobsState::default(),
+            &mut CronJobsState::default(),
+            &mut PodsState::default(),
+            &mut ServicesState::default(),
+            &mut IngressesState::default(),
+            &mut ConfigMapsState::default(),
+            &mut SecretsState::default(),
+            &mut PersistentVolumesState::default(),
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut storage_overview,
+            &mut PodSecurityState::default(),
+            &mut ResourceQuotasState::default(),
+            &mut NodesState::default(),
+            &mut EventsState::default(),
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "prod-ctx".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: vec![],
+                profile: orbit_core::kubernetes::models::UserProfileInfo {
+                    active_context: Some("prod-ctx".to_string()),
+                    cluster_name: Some("Prod".to_string()),
+                    server_url: None,
+                    user_name: None,
+                    auth_type: "token".to_string(),
+                    kubeconfig_paths: vec![],
+                    k8s_version: Some("v1.31.2".to_string()),
+                },
+            },
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::LoadStorageOverview { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
     }
 

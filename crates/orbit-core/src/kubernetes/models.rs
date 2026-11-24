@@ -377,7 +377,7 @@ pub struct SecretInfo {
     pub data: std::collections::BTreeMap<String, String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistentVolumeInfo {
     pub name: String,
@@ -391,7 +391,7 @@ pub struct PersistentVolumeInfo {
     pub reason: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistentVolumeClaimInfo {
     pub name: String,
@@ -404,7 +404,7 @@ pub struct PersistentVolumeClaimInfo {
     pub age: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct StorageClassInfo {
     pub name: String,

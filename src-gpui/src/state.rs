@@ -9,6 +9,7 @@ use orbit_core::kubernetes::models::{
     PolicyInfo, ReplicaSetInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
+use orbit_core::kubernetes::storage_overview::StorageOverviewSnapshot;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
 
 use crate::components::data_table::DataTableState;
@@ -111,7 +112,19 @@ pub enum ClusterBridgeCommand {
         cluster_id: String,
         generation: u64,
     },
+    LoadStorageOverview {
+        cluster_id: String,
+        generation: u64,
+    },
     LoadNetworkPolicies {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadPodSecurity {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadResourceQuotas {
         cluster_id: String,
         generation: u64,
     },
@@ -335,12 +348,42 @@ pub enum ClusterBridgeEvent {
         generation: u64,
         message: String,
     },
+    StorageOverviewLoaded {
+        cluster_id: String,
+        generation: u64,
+        snapshot: StorageOverviewSnapshot,
+    },
+    StorageOverviewLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
     NetworkPoliciesLoaded {
         cluster_id: String,
         generation: u64,
         network_policies: Vec<PolicyInfo>,
     },
     NetworkPoliciesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    PodSecurityLoaded {
+        cluster_id: String,
+        generation: u64,
+        policies: Vec<PolicyInfo>,
+    },
+    PodSecurityLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    ResourceQuotasLoaded {
+        cluster_id: String,
+        generation: u64,
+        policies: Vec<PolicyInfo>,
+    },
+    ResourceQuotasLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -2263,6 +2306,333 @@ impl NetworkPoliciesState {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PodSecurityLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PodSecurityState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: PodSecurityLoadStatus,
+    pub policies: Vec<PolicyInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl PodSecurityState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PodSecurityLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.policies.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.policies.is_empty();
+        ClusterBridgeCommand::LoadPodSecurity {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = PodSecurityLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.policies.is_empty();
+        Some(ClusterBridgeCommand::LoadPodSecurity {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PodSecurityLoadStatus::Idle;
+        self.policies.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = PodSecurityLoadStatus::Idle;
+        self.policies.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        policies: Vec<PolicyInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PodSecurityLoadStatus::Loaded;
+            self.policies = policies;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PodSecurityLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == PodSecurityLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ResourceQuotasLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ResourceQuotaKindFilter {
+    #[default]
+    All,
+    ResourceQuota,
+    LimitRange,
+}
+
+impl ResourceQuotaKindFilter {
+    pub const ALL_OPTIONS: [Self; 3] = [Self::All, Self::ResourceQuota, Self::LimitRange];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::All => "All",
+            Self::ResourceQuota => "ResourceQuota",
+            Self::LimitRange => "LimitRange",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ResourceQuotasState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: ResourceQuotasLoadStatus,
+    pub policies: Vec<PolicyInfo>,
+    pub kind_filter: ResourceQuotaKindFilter,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl ResourceQuotasState {
+    pub fn set_kind_filter(&mut self, filter: ResourceQuotaKindFilter) {
+        self.kind_filter = filter;
+    }
+
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = ResourceQuotasLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.policies.clear();
+            self.kind_filter = ResourceQuotaKindFilter::All;
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.policies.is_empty();
+        ClusterBridgeCommand::LoadResourceQuotas {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = ResourceQuotasLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.policies.is_empty();
+        Some(ClusterBridgeCommand::LoadResourceQuotas {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = ResourceQuotasLoadStatus::Idle;
+        self.policies.clear();
+        self.kind_filter = ResourceQuotaKindFilter::All;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = ResourceQuotasLoadStatus::Idle;
+        self.policies.clear();
+        self.kind_filter = ResourceQuotaKindFilter::All;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        policies: Vec<PolicyInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = ResourceQuotasLoadStatus::Loaded;
+            self.policies = policies;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = ResourceQuotasLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == ResourceQuotasLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum StorageOverviewLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct StorageOverviewState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: StorageOverviewLoadStatus,
+    pub snapshot: Option<StorageOverviewSnapshot>,
+    pub error_message: Option<String>,
+}
+
+impl StorageOverviewState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = StorageOverviewLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.snapshot = None;
+        }
+        ClusterBridgeCommand::LoadStorageOverview {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = StorageOverviewLoadStatus::Loading;
+        self.error_message = None;
+        Some(ClusterBridgeCommand::LoadStorageOverview {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = StorageOverviewLoadStatus::Idle;
+        self.snapshot = None;
+        self.error_message = None;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = StorageOverviewLoadStatus::Idle;
+        self.snapshot = None;
+        self.error_message = None;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        snapshot: StorageOverviewSnapshot,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = StorageOverviewLoadStatus::Loaded;
+            self.snapshot = Some(snapshot);
+            self.error_message = None;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = StorageOverviewLoadStatus::Error;
+            self.error_message = Some(message);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == StorageOverviewLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NodesLoadStatus {
     #[default]
     Idle,
@@ -2691,8 +3061,14 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::PersistentVolumesLoadFailed { .. }
             | ClusterBridgeEvent::PersistentVolumeClaimsLoaded { .. }
             | ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed { .. }
+            | ClusterBridgeEvent::StorageOverviewLoaded { .. }
+            | ClusterBridgeEvent::StorageOverviewLoadFailed { .. }
             | ClusterBridgeEvent::NetworkPoliciesLoaded { .. }
             | ClusterBridgeEvent::NetworkPoliciesLoadFailed { .. }
+            | ClusterBridgeEvent::PodSecurityLoaded { .. }
+            | ClusterBridgeEvent::PodSecurityLoadFailed { .. }
+            | ClusterBridgeEvent::ResourceQuotasLoaded { .. }
+            | ClusterBridgeEvent::ResourceQuotasLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
             | ClusterBridgeEvent::NodesLoadFailed { .. }
             | ClusterBridgeEvent::EventsLoaded { .. }
@@ -5426,5 +5802,185 @@ mod tests {
         assert!(state.network_policies.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
+    }
+
+    fn sample_pod_security_policy(namespace: &str) -> PolicyInfo {
+        PolicyInfo {
+            uid: format!("uid-psa-{namespace}"),
+            name: format!("psa-{namespace}"),
+            r#type: "Pod Security".to_string(),
+            scope: "Namespaced".to_string(),
+            namespace: namespace.to_string(),
+            status: "Enforced".to_string(),
+            mode: "enforce: restricted".to_string(),
+            violations: 0,
+            last_updated: "5d".to_string(),
+            description: "PSA: enforce=restricted".to_string(),
+            rules: "pod-security.kubernetes.io/enforce: restricted\n".to_string(),
+            kind: "Namespace".to_string(),
+        }
+    }
+
+    fn sample_resource_quota_policy(name: &str, namespace: &str, kind: &str) -> PolicyInfo {
+        PolicyInfo {
+            uid: format!("uid-{namespace}-{name}"),
+            name: name.to_string(),
+            r#type: if kind == "LimitRange" {
+                "Limit Range".to_string()
+            } else {
+                "Resource Quota".to_string()
+            },
+            scope: "Namespaced".to_string(),
+            namespace: namespace.to_string(),
+            status: "Enforced".to_string(),
+            mode: "enforce".to_string(),
+            violations: 0,
+            last_updated: "1d".to_string(),
+            description: "Resource limits (2/4 tracked)".to_string(),
+            rules: "hard:\n  cpu: '4'\n".to_string(),
+            kind: kind.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_pod_security_state_lifecycle_and_generation_guard() {
+        let mut state = PodSecurityState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadPodSecurity {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, PodSecurityLoadStatus::Loading);
+        assert!(state.table.loading);
+
+        let policy = sample_pod_security_policy("prod");
+        assert!(!state.apply_loaded("ctx-other", 1, vec![policy.clone()]));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![policy.clone()]));
+        assert!(!state.apply_failed("ctx-other", 1, "err".to_string()));
+
+        assert!(state.apply_loaded("ctx-a", 1, vec![policy]));
+        assert_eq!(state.status, PodSecurityLoadStatus::Loaded);
+        assert_eq!(state.policies.len(), 1);
+        assert!(!state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadPodSecurity {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert!(!state.table.loading);
+        assert!(state.apply_failed("ctx-a", 2, "forbidden".to_string()));
+        assert_eq!(state.status, PodSecurityLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("forbidden"));
+        assert_eq!(state.policies.len(), 1);
+
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, PodSecurityLoadStatus::Idle);
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert!(state.policies.is_empty());
+
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert!(state.policies.is_empty());
+    }
+
+    #[test]
+    fn test_resource_quotas_state_lifecycle_kind_filter_and_generation_guard() {
+        let mut state = ResourceQuotasState::default();
+        assert_eq!(state.kind_filter, ResourceQuotaKindFilter::All);
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadResourceQuotas {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+
+        let rq = sample_resource_quota_policy("compute-quota", "prod", "ResourceQuota");
+        let lr = sample_resource_quota_policy("default-limits", "prod", "LimitRange");
+        assert!(!state.apply_loaded("ctx-a", 2, vec![rq.clone()]));
+        assert!(state.apply_loaded("ctx-a", 1, vec![rq, lr]));
+        assert_eq!(state.policies.len(), 2);
+
+        state.set_kind_filter(ResourceQuotaKindFilter::LimitRange);
+        assert_eq!(state.kind_filter, ResourceQuotaKindFilter::LimitRange);
+
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadResourceQuotas {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, ResourceQuotasLoadStatus::Error);
+
+        // Switching cluster resets kind_filter to All
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.kind_filter, ResourceQuotaKindFilter::All);
+        assert!(state.policies.is_empty());
+
+        state.set_kind_filter(ResourceQuotaKindFilter::ResourceQuota);
+        state.reset_for_disconnected();
+        assert_eq!(state.kind_filter, ResourceQuotaKindFilter::All);
+        assert!(state.cluster_id.is_none());
+    }
+
+    #[test]
+    fn test_storage_overview_state_lifecycle_and_generation_guard() {
+        let mut state = StorageOverviewState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadStorageOverview {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, StorageOverviewLoadStatus::Loading);
+
+        let snapshot = StorageOverviewSnapshot::default();
+        assert!(!state.apply_loaded("ctx-other", 1, snapshot.clone()));
+        assert!(!state.apply_loaded("ctx-a", 99, snapshot.clone()));
+        assert!(state.apply_loaded("ctx-a", 1, snapshot));
+        assert_eq!(state.status, StorageOverviewLoadStatus::Loaded);
+        assert!(state.snapshot.is_some());
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadStorageOverview {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert!(state.apply_failed("ctx-a", 2, "rpc error".to_string()));
+        assert_eq!(state.status, StorageOverviewLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("rpc error"));
+        assert!(state.snapshot.is_some());
+
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.status, StorageOverviewLoadStatus::Idle);
+        assert!(state.snapshot.is_none());
+
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert!(state.snapshot.is_none());
     }
 }
