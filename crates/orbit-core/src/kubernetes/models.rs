@@ -45,7 +45,7 @@ pub struct PodInfo {
     pub containers: Vec<PodContainer>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterCustomization {
     #[serde(skip_serializing_if = "Option::is_none")]

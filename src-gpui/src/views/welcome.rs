@@ -80,6 +80,7 @@ pub fn render_welcome_view(
     theme: &OrbitTheme,
     on_select_cluster: SelectClusterCallback,
     on_refresh_contexts: impl Fn(&mut Window, &mut App) + 'static,
+    on_add_cluster: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     div()
         .flex()
@@ -92,6 +93,7 @@ pub fn render_welcome_view(
             theme,
             on_select_cluster,
             on_refresh_contexts,
+            on_add_cluster,
         ))
         .child(render_walkthrough_grid(theme))
         .into_any_element()
@@ -132,9 +134,28 @@ fn render_cluster_section(
     theme: &OrbitTheme,
     on_select_cluster: SelectClusterCallback,
     on_refresh_contexts: impl Fn(&mut Window, &mut App) + 'static,
+    on_add_cluster: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let prompt = welcome_cluster_prompt_state(clusters.len());
     let control_hover = theme.surface.control_hover;
+
+    let add_cluster_btn = theme
+        .style_control(div().id("welcome-add-cluster-btn"))
+        .px_3()
+        .py_1p5()
+        .bg(theme.accent.accent)
+        .text_color(crate::theme::rgb_hex(0xffffff))
+        .font_weight(FontWeight::MEDIUM)
+        .cursor_pointer()
+        .hover(|s| s.bg(theme.accent.hover))
+        .flex()
+        .items_center()
+        .gap_1p5()
+        .child(render_icon(Icon::Plus, px(12.0), crate::theme::rgb_hex(0xffffff)))
+        .child(apply_text_step(div(), theme.typography.size_xs).child("Add Cluster"))
+        .on_click(move |_, window, cx| {
+            on_add_cluster(window, cx);
+        });
 
     let refresh_btn = theme
         .style_control(div().id("welcome-refresh-contexts-btn"))
@@ -182,7 +203,14 @@ fn render_cluster_section(
                                 .child(prompt.subtitle),
                         ),
                 )
-                .child(refresh_btn),
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(add_cluster_btn)
+                        .child(refresh_btn),
+                ),
         );
 
     if let Some(err) = kubeconfig_error {
@@ -519,5 +547,16 @@ mod tests {
             assert!(!item.title.trim().is_empty());
             assert!(!item.description.trim().is_empty());
         }
+    }
+
+    #[test]
+    fn test_welcome_cluster_prompt_state_supports_add_cluster_when_empty_or_populated() {
+        let empty = welcome_cluster_prompt_state(0);
+        assert!(empty.is_empty);
+        assert_eq!(empty.cluster_count, 0);
+
+        let populated = welcome_cluster_prompt_state(3);
+        assert!(!populated.is_empty);
+        assert_eq!(populated.cluster_count, 3);
     }
 }

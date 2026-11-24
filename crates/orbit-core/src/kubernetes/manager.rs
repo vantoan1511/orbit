@@ -1,11 +1,17 @@
 use std::collections::HashMap;
 use http::Uri;
 use kube::{Client, config::{Kubeconfig, KubeConfigOptions, Config}};
+use serde::{Deserialize, Serialize};
+use crate::kubernetes::kubeconfig_import::{
+    AddClusterOutcome, AddClusterRequest, AddClusterSource, filter_kubeconfig_yaml,
+    parse_kubeconfig_contexts,
+};
 use crate::kubernetes::models::{ClusterInfo, UserProfileInfo};
 use crate::config::OrbitConfig;
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ClusterSwitchOutcome {
     pub context_name: String,
     pub healthy: bool,
@@ -151,21 +157,7 @@ impl KubeManager {
                 if let Some(u_name) = &user_name {
                     let named_auth = config.auth_infos.iter().find(|a| &a.name == u_name);
                     let auth = named_auth.and_then(|a| a.auth_info.as_ref());
-                    if let Some(auth) = auth {
-                        if auth.client_certificate.is_some() || auth.client_certificate_data.is_some() {
-                            auth_type = "Certificate".to_string();
-                        } else if auth.token.is_some() || auth.token_file.is_some() {
-                            auth_type = "Token".to_string();
-                        } else if auth.exec.is_some() {
-                            auth_type = "Exec Plugin".to_string();
-                        } else if auth.auth_provider.is_some() {
-                            auth_type = "OIDC".to_string();
-                        } else if auth.username.is_some() {
-                            auth_type = "Basic Auth".to_string();
-                        } else {
-                            auth_type = "Configured".to_string();
-                        }
-                    }
+                    auth_type = crate::kubernetes::kubeconfig_import::detect_auth_type(auth).to_string();
                 }
 
                 if let Some(c_name) = &cluster_name {
@@ -409,13 +401,19 @@ impl KubeManager {
         Ok(())
     }
 
-    pub async fn add_kubeconfig_file(&mut self, file_path: &str) -> Result<(), String> {
+    pub fn add_kubeconfig_file_without_switch(&mut self, file_path: &str) -> Result<(), String> {
         self.merge_kubeconfig_from_path(file_path)?;
 
         if let Err(e) = self.config.add_kubeconfig_path(file_path) {
             tracing::warn!(path = %file_path, error = %e, "Failed to persist kubeconfig path");
         }
-        
+
+        Ok(())
+    }
+
+    pub async fn add_kubeconfig_file(&mut self, file_path: &str) -> Result<(), String> {
+        self.add_kubeconfig_file_without_switch(file_path)?;
+
         // Try to switch to the new config's current context if none is active
         if self.active_context.is_none() {
             let next_ctx = if let Some(ref config) = self.kubeconfig {
@@ -427,7 +425,7 @@ impl KubeManager {
                 let _ = self.switch_context(&ctx).await;
             }
         }
-        
+
         Ok(())
     }
 
@@ -441,7 +439,7 @@ impl KubeManager {
         }
     }
 
-    pub async fn add_kubeconfig_content(&mut self, content: &str) -> Result<String, String> {
+    pub fn add_kubeconfig_content_without_switch(&mut self, content: &str) -> Result<String, String> {
         // Validate YAML syntax and Kubeconfig schema
         Kubeconfig::from_yaml(content)
             .map_err(|e| format!("Invalid kubeconfig content: {}", e))?;
@@ -461,9 +459,105 @@ impl KubeManager {
         std::fs::write(&file_path, content)
             .map_err(|e| format!("Failed to write kubeconfig file: {}", e))?;
 
-        self.add_kubeconfig_file(&file_path_str).await?;
+        self.add_kubeconfig_file_without_switch(&file_path_str)?;
 
         Ok(file_path_str)
+    }
+
+    pub async fn add_kubeconfig_content(&mut self, content: &str) -> Result<String, String> {
+        let file_path_str = self.add_kubeconfig_content_without_switch(content)?;
+
+        if self.active_context.is_none() {
+            let next_ctx = self.kubeconfig.as_ref().and_then(|config| {
+                config
+                    .current_context
+                    .clone()
+                    .or_else(|| config.contexts.first().map(|c| c.name.clone()))
+            });
+            if let Some(ctx) = next_ctx {
+                let _ = self.switch_context(&ctx).await;
+            }
+        }
+
+        Ok(file_path_str)
+    }
+
+    pub async fn register_kubeconfig(
+        &mut self,
+        request: AddClusterRequest,
+    ) -> Result<AddClusterOutcome, String> {
+        let mut selected = Vec::new();
+        for ctx in request.selected_contexts {
+            let trimmed = ctx.trim().to_string();
+            if !trimmed.is_empty() && !selected.contains(&trimmed) {
+                selected.push(trimmed);
+            }
+        }
+        if selected.is_empty() {
+            return Err("At least one context must be selected".to_string());
+        }
+
+        let raw_yaml = match &request.source {
+            AddClusterSource::FilePath(path) => std::fs::read_to_string(path)
+                .map_err(|e| format!("Failed to read kubeconfig file '{path}': {e}"))?,
+            AddClusterSource::YamlContent(yaml) => yaml.clone(),
+        };
+
+        let discovered = parse_kubeconfig_contexts(&raw_yaml)?;
+        for sel in &selected {
+            if !discovered.iter().any(|d| d.name == *sel) {
+                return Err(format!("Context '{sel}' not found in kubeconfig"));
+            }
+        }
+
+        if let Some(ref existing) = self.kubeconfig {
+            for sel in &selected {
+                if existing.contexts.iter().any(|c| c.name == *sel) {
+                    return Err(format!("Context '{sel}' already exists in Orbit"));
+                }
+            }
+        }
+
+        match &request.source {
+            AddClusterSource::FilePath(path) if selected.len() == discovered.len() => {
+                self.add_kubeconfig_file_without_switch(path)?;
+            }
+            _ => {
+                let filtered_yaml = filter_kubeconfig_yaml(&raw_yaml, &selected)?;
+                self.add_kubeconfig_content_without_switch(&filtered_yaml)?;
+            }
+        }
+
+        if let Some(customization) = request.customization {
+            self.config
+                .set_cluster_customization(&selected[0], customization);
+            if let Err(e) = self.config.save() {
+                tracing::warn!(error = %e, "Failed to save cluster customization");
+            }
+        }
+
+        let (switch_outcome, profile) = if request.switch_context {
+            let outcome = match self.switch_context_with_status(&selected[0]).await {
+                Ok(outcome) => outcome,
+                Err(err) => ClusterSwitchOutcome {
+                    context_name: selected[0].clone(),
+                    healthy: false,
+                    k8s_version: None,
+                    error_message: Some(err),
+                },
+            };
+            let profile = Some(self.get_user_profile());
+            (Some(outcome), profile)
+        } else {
+            (None, None)
+        };
+
+        Ok(AddClusterOutcome {
+            added_contexts: selected,
+            clusters: self.get_clusters(),
+            switch_outcome,
+            profile,
+        })
     }
 }
 
@@ -569,6 +663,183 @@ users:
         // Check it was added to customKubeconfigPaths
         let persisted_paths = manager.config.custom_kubeconfig_paths();
         assert!(persisted_paths.iter().any(|p| p.contains("orbit_cluster_")));
+    }
+
+    #[tokio::test]
+    async fn test_register_kubeconfig_yaml_persists_customization_and_respects_switch_flag() {
+        let _guard = crate::config::TestConfigDirGuard::new("register_yaml_no_switch");
+        let mut manager = KubeManager::new_empty(OrbitConfig::load());
+
+        let yaml = r#"
+apiVersion: v1
+kind: Config
+current-context: ctx-a
+clusters:
+  - name: cl-a
+    cluster:
+      server: https://10.0.0.10:6443
+  - name: cl-b
+    cluster:
+      server: https://10.0.0.11:6443
+contexts:
+  - name: ctx-a
+    context:
+      cluster: cl-a
+      user: u-a
+  - name: ctx-b
+    context:
+      cluster: cl-b
+      user: u-b
+users:
+  - name: u-a
+    user:
+      token: tok-a
+  - name: u-b
+    user:
+      token: tok-b
+"#;
+
+        let req = AddClusterRequest {
+            source: AddClusterSource::YamlContent(yaml.to_string()),
+            selected_contexts: vec!["ctx-b".to_string()],
+            customization: Some(crate::kubernetes::models::ClusterCustomization {
+                alias: Some("Staging B".to_string()),
+                tags: vec!["staging".to_string()],
+                color: Some("#3b82f6".to_string()),
+                description: None,
+            }),
+            switch_context: false,
+        };
+
+        let outcome = manager
+            .register_kubeconfig(req)
+            .await
+            .expect("register_kubeconfig should succeed");
+
+        assert_eq!(outcome.added_contexts, vec!["ctx-b".to_string()]);
+        assert!(outcome.switch_outcome.is_none());
+        assert!(manager.active_context.is_none(), "must not switch when switch_context == false");
+        assert_eq!(outcome.clusters.len(), 1);
+        assert_eq!(outcome.clusters[0].name, "ctx-b");
+        assert_eq!(outcome.clusters[0].alias.as_deref(), Some("Staging B"));
+        assert_eq!(outcome.clusters[0].tags, vec!["staging".to_string()]);
+        assert_eq!(outcome.clusters[0].color.as_deref(), Some("#3b82f6"));
+        assert!(
+            manager
+                .config
+                .custom_kubeconfig_paths()
+                .iter()
+                .any(|p| p.contains("orbit_cluster_"))
+        );
+        assert!(manager.config.cluster_customizations().contains_key("ctx-b"));
+    }
+
+    #[tokio::test]
+    async fn test_register_kubeconfig_rejects_duplicate_context_without_mutating_state() {
+        let _guard = crate::config::TestConfigDirGuard::new("register_duplicate");
+        let mut manager = KubeManager::new_empty(OrbitConfig::load());
+
+        let yaml = r#"
+apiVersion: v1
+kind: Config
+clusters:
+  - name: cl-dup
+    cluster:
+      server: https://10.0.0.20:6443
+contexts:
+  - name: dup-ctx
+    context:
+      cluster: cl-dup
+      user: u-dup
+users:
+  - name: u-dup
+    user:
+      token: tok
+"#;
+
+        manager
+            .register_kubeconfig(AddClusterRequest {
+                source: AddClusterSource::YamlContent(yaml.to_string()),
+                selected_contexts: vec!["dup-ctx".to_string()],
+                customization: None,
+                switch_context: false,
+            })
+            .await
+            .expect("first registration should succeed");
+
+        let count_before = manager.get_clusters().len();
+        let paths_before = manager.config.custom_kubeconfig_paths().len();
+
+        let err = manager
+            .register_kubeconfig(AddClusterRequest {
+                source: AddClusterSource::YamlContent(yaml.to_string()),
+                selected_contexts: vec!["dup-ctx".to_string()],
+                customization: None,
+                switch_context: false,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(err.contains("already exists"), "got: {err}");
+        assert_eq!(manager.get_clusters().len(), count_before);
+        assert_eq!(manager.config.custom_kubeconfig_paths().len(), paths_before);
+    }
+
+    #[tokio::test]
+    async fn test_register_kubeconfig_missing_file_returns_clear_error() {
+        let _guard = crate::config::TestConfigDirGuard::new("register_missing_file");
+        let mut manager = KubeManager::new_empty(OrbitConfig::load());
+
+        let err = manager
+            .register_kubeconfig(AddClusterRequest {
+                source: AddClusterSource::FilePath("/nonexistent/orbit-missing-kubeconfig.yaml".to_string()),
+                selected_contexts: vec!["ctx".to_string()],
+                customization: None,
+                switch_context: false,
+            })
+            .await
+            .unwrap_err();
+
+        assert!(err.contains("Failed to read"), "got: {err}");
+    }
+
+    #[tokio::test]
+    async fn test_register_kubeconfig_unreachable_endpoint_registers_cluster_and_surfaces_unhealthy_outcome() {
+        let _guard = crate::config::TestConfigDirGuard::new("register_unreachable");
+        let mut manager = KubeManager::new_empty(OrbitConfig::load());
+
+        let yaml = r#"
+apiVersion: v1
+kind: Config
+clusters:
+  - name: unreachable-cl
+    cluster:
+      server: http://127.0.0.1:1
+contexts:
+  - name: unreachable-ctx
+    context:
+      cluster: unreachable-cl
+      user: u
+users:
+  - name: u
+    user:
+      token: tok
+"#;
+
+        let outcome = manager
+            .register_kubeconfig(AddClusterRequest {
+                source: AddClusterSource::YamlContent(yaml.to_string()),
+                selected_contexts: vec!["unreachable-ctx".to_string()],
+                customization: None,
+                switch_context: true,
+            })
+            .await
+            .expect("registration should succeed even when endpoint is unreachable");
+
+        assert_eq!(outcome.added_contexts, vec!["unreachable-ctx".to_string()]);
+        let switch = outcome.switch_outcome.expect("switch_outcome should be present");
+        assert!(!switch.healthy);
+        assert!(switch.error_message.as_deref().is_some_and(|m| !m.is_empty()));
     }
 
     #[test]

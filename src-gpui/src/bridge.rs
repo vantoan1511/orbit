@@ -1170,6 +1170,22 @@ pub async fn handle_bridge_command(
                 let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
             }
         }
+        ClusterBridgeCommand::AddCluster(request) => {
+            let mut guard = manager.write().await;
+            match guard.register_kubeconfig(request).await {
+                Ok(outcome) => {
+                    let _ = event_tx.send(ClusterBridgeEvent::ClusterAdded {
+                        added_contexts: outcome.added_contexts,
+                        clusters: outcome.clusters,
+                        switch_outcome: outcome.switch_outcome,
+                        profile: outcome.profile,
+                    });
+                }
+                Err(message) => {
+                    let _ = event_tx.send(ClusterBridgeEvent::AddClusterFailed { message });
+                }
+            }
+        }
     }
 }
 
@@ -2118,6 +2134,75 @@ users:
                 "expected {expected}, got {rendered}"
             );
             assert!(rendered.contains("missing-ctx"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_add_cluster_emits_cluster_added_and_failed_events() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_bridge_add_cluster");
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::load())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        let valid_yaml = r#"
+apiVersion: v1
+kind: Config
+clusters:
+  - name: bridge-cl
+    cluster:
+      server: https://10.0.0.50:6443
+contexts:
+  - name: bridge-ctx
+    context:
+      cluster: bridge-cl
+      user: bridge-u
+users:
+  - name: bridge-u
+    user:
+      token: tok
+"#;
+
+        let req = orbit_core::kubernetes::kubeconfig_import::AddClusterRequest {
+            source: orbit_core::kubernetes::kubeconfig_import::AddClusterSource::YamlContent(
+                valid_yaml.to_string(),
+            ),
+            selected_contexts: vec!["bridge-ctx".to_string()],
+            customization: None,
+            switch_context: false,
+        };
+
+        handle_bridge_command(
+            ClusterBridgeCommand::AddCluster(req.clone()),
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let ev1 = event_rx.recv().await.expect("ClusterAdded event expected");
+        match ev1 {
+            ClusterBridgeEvent::ClusterAdded {
+                added_contexts,
+                clusters,
+                switch_outcome,
+                ..
+            } => {
+                assert_eq!(added_contexts, vec!["bridge-ctx".to_string()]);
+                assert_eq!(clusters.len(), 1);
+                assert!(switch_outcome.is_none());
+            }
+            other => panic!("expected ClusterAdded, got {other:?}"),
+        }
+
+        // Duplicate context should emit AddClusterFailed
+        handle_bridge_command(ClusterBridgeCommand::AddCluster(req), &manager, &event_tx).await;
+        let ev2 = event_rx
+            .recv()
+            .await
+            .expect("AddClusterFailed event expected");
+        match ev2 {
+            ClusterBridgeEvent::AddClusterFailed { message } => {
+                assert!(message.contains("already exists"), "got: {message}");
+            }
+            other => panic!("expected AddClusterFailed, got {other:?}"),
         }
     }
 }

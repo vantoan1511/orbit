@@ -1,3 +1,4 @@
+pub mod add_cluster_modal;
 pub mod context_menu;
 pub mod data_table;
 pub mod resource_drawer;
@@ -8,6 +9,9 @@ pub mod titlebar;
 pub mod tooltip;
 pub mod yaml_viewer;
 
+pub use add_cluster_modal::{
+    AddClusterModalCallbacks, parse_hex_color, render_add_cluster_modal,
+};
 pub use context_menu::{
     CONTEXT_MENU_ITEM_HEIGHT, CONTEXT_MENU_PADDING_Y, CONTEXT_MENU_SEPARATOR_HEIGHT,
     CONTEXT_MENU_VIEWPORT_MARGIN, CONTEXT_MENU_WIDTH, ContextMenuCallback, ContextMenuEntry,

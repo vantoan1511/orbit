@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 
 use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
+use orbit_core::kubernetes::kubeconfig_import::AddClusterRequest;
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, HpaInfo,
@@ -13,6 +14,7 @@ use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::storage_overview::StorageOverviewSnapshot;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
 
+pub use crate::add_cluster_state::*;
 use crate::components::data_table::DataTableState;
 use crate::navigation::{SidebarCategory, WorkspaceView};
 
@@ -182,6 +184,7 @@ pub enum ClusterBridgeCommand {
         enabled: bool,
     },
     ResetAppearanceDefaults,
+    AddCluster(AddClusterRequest),
 }
 
 #[derive(Debug, Clone)]
@@ -482,6 +485,15 @@ pub enum ClusterBridgeEvent {
         message: String,
     },
     SettingsSaveFailed {
+        message: String,
+    },
+    ClusterAdded {
+        added_contexts: Vec<String>,
+        clusters: Vec<ClusterInfo>,
+        switch_outcome: Option<ClusterSwitchOutcome>,
+        profile: Option<UserProfileInfo>,
+    },
+    AddClusterFailed {
         message: String,
     },
 }
@@ -3440,7 +3452,48 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::EventsLoaded { .. }
             | ClusterBridgeEvent::EventsLoadFailed { .. }
             | ClusterBridgeEvent::ResourceYamlLoaded { .. }
-            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
+            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
+            ClusterBridgeEvent::ClusterAdded {
+                clusters,
+                switch_outcome,
+                profile,
+                ..
+            } => {
+                self.clusters = clusters;
+                if let Some(outcome) = switch_outcome {
+                    self.active_cluster_id = Some(outcome.context_name.clone());
+                    let display_name = self.cluster_display_name(&outcome.context_name);
+                    if let Some(p) = profile.clone() {
+                        self.active_profile = Some(p);
+                    }
+                    if outcome.healthy {
+                        self.connection_state = ClusterConnectionState::Connected {
+                            cluster_id: outcome.context_name,
+                            display_name,
+                            k8s_version: outcome.k8s_version,
+                        };
+                    } else {
+                        let server_url = profile
+                            .and_then(|p| p.server_url)
+                            .or_else(|| {
+                                self.clusters
+                                    .iter()
+                                    .find(|c| c.id == outcome.context_name)
+                                    .and_then(|c| c.server_url.clone())
+                            });
+                        self.connection_state = ClusterConnectionState::Unreachable {
+                            cluster_id: outcome.context_name,
+                            display_name,
+                            server_url,
+                            error_message: outcome
+                                .error_message
+                                .unwrap_or_else(|| "Cluster API server is unreachable".to_string()),
+                        };
+                    }
+                    self.error_banner_dismissed = false;
+                }
+            }
+            ClusterBridgeEvent::AddClusterFailed { .. }
             | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
         }
     }

@@ -6,6 +6,7 @@ pub mod kubernetes {
     pub mod events;
     pub mod hpa;
     pub mod ingresses;
+    pub mod kubeconfig_import;
     pub mod manager;
     pub mod metrics;
     pub mod models;
