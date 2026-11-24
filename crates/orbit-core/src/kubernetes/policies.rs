@@ -76,6 +76,111 @@ pub async fn fetch_network_policies(
     }
 }
 
+/// Lists Pod Security Admission policies extracted from Namespace `pod-security.kubernetes.io/*` labels.
+pub async fn list_pod_security_policies(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<PolicyInfo>, kube::Error> {
+    let ns_api: Api<Namespace> = Api::all(client.clone());
+    let namespaces = if let Some(ref ns) = namespace {
+        vec![ns_api.get(ns).await?]
+    } else {
+        ns_api.list(&ListParams::default()).await?.items
+    };
+
+    Ok(namespaces
+        .iter()
+        .filter_map(format_pod_security_namespace)
+        .collect())
+}
+
+pub async fn fetch_pod_security_policies(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<PolicyInfo>, String> {
+    match tokio::time::timeout(
+        POLICIES_FETCH_TIMEOUT,
+        list_pod_security_policies(client, namespace),
+    )
+    .await
+    {
+        Ok(Ok(list)) => Ok(list),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Timed out fetching pod security policies after 10s".to_string()),
+    }
+}
+
+pub(crate) fn combine_resource_policy_results<E: std::fmt::Display>(
+    quota_res: Result<Vec<ResourceQuota>, E>,
+    limit_res: Result<Vec<LimitRange>, E>,
+) -> Result<Vec<PolicyInfo>, E> {
+    match (quota_res, limit_res) {
+        (Ok(quotas), Ok(limits)) => {
+            let mut policies = Vec::with_capacity(quotas.len() + limits.len());
+            policies.extend(quotas.iter().map(format_resource_quota));
+            policies.extend(limits.iter().map(format_limit_range));
+            Ok(policies)
+        }
+        (Ok(quotas), Err(err)) => {
+            tracing::warn!(error = %err, "Failed to list LimitRanges");
+            Ok(quotas.iter().map(format_resource_quota).collect())
+        }
+        (Err(err), Ok(limits)) => {
+            tracing::warn!(error = %err, "Failed to list ResourceQuotas");
+            Ok(limits.iter().map(format_limit_range).collect())
+        }
+        (Err(quota_err), Err(limit_err)) => {
+            tracing::warn!(error = %limit_err, "Failed to list LimitRanges");
+            Err(quota_err)
+        }
+    }
+}
+
+/// Lists ResourceQuotas and LimitRanges in parallel.
+/// If both fail, returns Err with the primary API/transport error.
+/// If one succeeds and the other fails, logs a warning and returns the available rows.
+pub async fn list_resource_quotas_and_limits(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<PolicyInfo>, kube::Error> {
+    let quota_api: Api<ResourceQuota> = if let Some(ref ns) = namespace {
+        Api::namespaced(client.clone(), ns)
+    } else {
+        Api::all(client.clone())
+    };
+    let limit_api: Api<LimitRange> = if let Some(ref ns) = namespace {
+        Api::namespaced(client.clone(), ns)
+    } else {
+        Api::all(client.clone())
+    };
+
+    let lp = ListParams::default();
+    let (quota_res, limit_res) = join!(quota_api.list(&lp), limit_api.list(&lp));
+
+    combine_resource_policy_results(
+        quota_res.map(|list| list.items),
+        limit_res.map(|list| list.items),
+    )
+}
+
+pub async fn fetch_resource_quotas_and_limits(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<PolicyInfo>, String> {
+    match tokio::time::timeout(
+        POLICIES_FETCH_TIMEOUT,
+        list_resource_quotas_and_limits(client, namespace),
+    )
+    .await
+    {
+        Ok(Ok(list)) => Ok(list),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Timed out fetching resource quotas and limits after 10s".to_string()),
+    }
+}
+
 pub async fn fetch_policies(
     client: &Client,
     namespace: Option<String>,
@@ -1012,5 +1117,87 @@ mod tests {
         assert!(psa
             .rules
             .contains("pod-security.kubernetes.io/enforce: restricted"));
+    }
+
+    #[test]
+    fn test_combine_resource_policy_results_merges_quotas_and_limits_and_surfaces_dual_error() {
+        let quota = ResourceQuota {
+            metadata: ObjectMeta {
+                name: Some("compute-quota".to_string()),
+                namespace: Some("prod".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let limit = LimitRange {
+            metadata: ObjectMeta {
+                name: Some("default-limits".to_string()),
+                namespace: Some("prod".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        // Both Ok -> merges into 2 PolicyInfo rows
+        let combined = combine_resource_policy_results::<&str>(
+            Ok(vec![quota.clone()]),
+            Ok(vec![limit.clone()]),
+        );
+        let Ok(rows) = combined else {
+            panic!("expected Ok when both succeed");
+        };
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].kind, "ResourceQuota");
+        assert_eq!(rows[1].kind, "LimitRange");
+
+        // Partial error (quota Ok, limit Err) -> preserves quota row
+        let partial = combine_resource_policy_results::<&str>(Ok(vec![quota]), Err("limit denied"));
+        let Ok(partial_rows) = partial else {
+            panic!("expected Ok when one source succeeds");
+        };
+        assert_eq!(partial_rows.len(), 1);
+        assert_eq!(partial_rows[0].kind, "ResourceQuota");
+
+        // Both Err -> returns Err
+        let dual_err =
+            combine_resource_policy_results::<&str>(Err("quota denied"), Err("limit denied"));
+        match dual_err {
+            Ok(_) => panic!("expected Err when both sources fail"),
+            Err(err) => assert_eq!(err, "quota denied"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_pod_security_policies_propagates_connection_error() {
+        let Ok(cluster_url) = "http://127.0.0.1:1".parse::<http::Uri>() else {
+            panic!("static URI should parse");
+        };
+        let config = kube::Config::new(cluster_url);
+        let Ok(client) = Client::try_from(config) else {
+            panic!("client should build from static config");
+        };
+
+        let result = fetch_pod_security_policies(&client, None).await;
+        match result {
+            Ok(_) => panic!("expected connection error against closed local port"),
+            Err(message) => assert!(!message.trim().is_empty()),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fetch_resource_quotas_and_limits_propagates_connection_error() {
+        let Ok(cluster_url) = "http://127.0.0.1:1".parse::<http::Uri>() else {
+            panic!("static URI should parse");
+        };
+        let config = kube::Config::new(cluster_url);
+        let Ok(client) = Client::try_from(config) else {
+            panic!("client should build from static config");
+        };
+
+        let result = fetch_resource_quotas_and_limits(&client, None).await;
+        match result {
+            Ok(_) => panic!("expected connection error against closed local port"),
+            Err(message) => assert!(!message.trim().is_empty()),
+        }
     }
 }

@@ -1,50 +1,11 @@
-use kube::{
-    api::{Api, ListParams},
-    Client,
+pub use orbit_core::kubernetes::storage::{
+    format_pv, format_pvc, format_storage_class, list_pvcs, list_pvs, list_storage_classes,
 };
-use k8s_openapi::api::storage::v1::StorageClass;
-use crate::kubernetes::models::StorageClassInfo;
-use crate::kubernetes::format_age;
-
-pub use orbit_core::kubernetes::storage::{format_pv, format_pvc, list_pvcs, list_pvs};
-
-/// Formats a Kubernetes `StorageClass` into `StorageClassInfo`.
-pub fn format_storage_class(sc: &StorageClass) -> StorageClassInfo {
-    let name = sc.metadata.name.clone().unwrap_or_default();
-    let age = format_age(&sc.metadata.creation_timestamp);
-    let provisioner = sc.provisioner.clone();
-    
-    let reclaim_policy = sc.reclaim_policy.clone()
-        .unwrap_or_else(|| "Delete".to_string());
-
-    let volume_binding_mode = sc.volume_binding_mode.clone()
-        .unwrap_or_else(|| "Immediate".to_string());
-
-    let allow_volume_expansion = sc.allow_volume_expansion.unwrap_or(false);
-
-    StorageClassInfo {
-        name,
-        provisioner,
-        reclaim_policy,
-        volume_binding_mode,
-        allow_volume_expansion,
-        age,
-    }
-}
-
-/// Lists all StorageClasses in the cluster.
-pub async fn list_storage_classes(client: &Client) -> Result<Vec<StorageClassInfo>, kube::Error> {
-    let api: Api<StorageClass> = Api::all(client.clone());
-    let mut list = Vec::new();
-    for sc in api.list(&ListParams::default()).await? {
-        list.push(format_storage_class(&sc));
-    }
-    Ok(list)
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use k8s_openapi::api::storage::v1::StorageClass;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, Time};
     use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
     use k8s_openapi::api::core::v1::{PersistentVolume, PersistentVolumeClaim, PersistentVolumeSpec, PersistentVolumeStatus, PersistentVolumeClaimSpec, PersistentVolumeClaimStatus, VolumeResourceRequirements};

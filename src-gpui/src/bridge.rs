@@ -8,10 +8,13 @@ use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
-use orbit_core::kubernetes::policies::fetch_network_policies;
+use orbit_core::kubernetes::policies::{
+    fetch_network_policies, fetch_pod_security_policies, fetch_resource_quotas_and_limits,
+};
 use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
 use orbit_core::kubernetes::storage::{fetch_pvcs, fetch_pvs};
+use orbit_core::kubernetes::storage_overview::fetch_storage_overview;
 use orbit_core::kubernetes::workloads::{
     fetch_daemonsets, fetch_deployments, fetch_pods, fetch_replicasets, fetch_statefulsets,
 };
@@ -676,6 +679,33 @@ pub async fn handle_bridge_command(
                 });
             }
         }
+        ClusterBridgeCommand::LoadStorageOverview {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    let snapshot = fetch_storage_overview(&client).await;
+                    let _ = tx.send(ClusterBridgeEvent::StorageOverviewLoaded {
+                        cluster_id,
+                        generation,
+                        snapshot,
+                    });
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::StorageOverviewLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
         ClusterBridgeCommand::LoadNetworkPolicies {
             cluster_id,
             generation,
@@ -707,6 +737,80 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::NetworkPoliciesLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadPodSecurity {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_pod_security_policies(&client, None).await {
+                        Ok(policies) => {
+                            let _ = tx.send(ClusterBridgeEvent::PodSecurityLoaded {
+                                cluster_id,
+                                generation,
+                                policies,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::PodSecurityLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::PodSecurityLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadResourceQuotas {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_resource_quotas_and_limits(&client, None).await {
+                        Ok(policies) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceQuotasLoaded {
+                                cluster_id,
+                                generation,
+                                policies,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::ResourceQuotasLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::ResourceQuotasLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -1747,6 +1851,78 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected NetworkPoliciesLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_emits_load_failed_when_no_active_client_for_new_views() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadPodSecurity {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 20,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+        match event_rx.recv().await {
+            Some(ClusterBridgeEvent::PodSecurityLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            }) => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 20);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected PodSecurityLoadFailed, got {other:?}"),
+        }
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadResourceQuotas {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 21,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+        match event_rx.recv().await {
+            Some(ClusterBridgeEvent::ResourceQuotasLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            }) => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 21);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected ResourceQuotasLoadFailed, got {other:?}"),
+        }
+
+        handle_bridge_command(
+            ClusterBridgeCommand::LoadStorageOverview {
+                cluster_id: "missing-ctx".to_string(),
+                generation: 22,
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+        match event_rx.recv().await {
+            Some(ClusterBridgeEvent::StorageOverviewLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            }) => {
+                assert_eq!(cluster_id, "missing-ctx");
+                assert_eq!(generation, 22);
+                assert!(!message.trim().is_empty());
+            }
+            other => panic!("Expected StorageOverviewLoadFailed, got {other:?}"),
         }
     }
 }

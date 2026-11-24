@@ -113,14 +113,18 @@ pub fn resource_kind_meta_from_str(kind: &str, theme: &OrbitTheme) -> ResourceKi
             color: theme.text.secondary,
             k8s_kind: None,
         },
-        "resourcequota" | "resourcequotas" | "quota" | "limitrange" | "limitranges" => {
-            ResourceKindMeta {
-                label: "ResourceQuota",
-                icon: Icon::Sliders,
-                color: theme.text.secondary,
-                k8s_kind: None,
-            }
-        }
+        "resourcequota" | "resourcequotas" | "quota" => ResourceKindMeta {
+            label: "ResourceQuota",
+            icon: Icon::Sliders,
+            color: theme.text.secondary,
+            k8s_kind: None,
+        },
+        "limitrange" | "limitranges" => ResourceKindMeta {
+            label: "LimitRange",
+            icon: Icon::Sliders,
+            color: theme.text.secondary,
+            k8s_kind: None,
+        },
         "validatingwebhookconfiguration"
         | "mutatingwebhookconfiguration"
         | "admissionwebhook"
@@ -280,5 +284,22 @@ mod tests {
         assert_eq!(char::from(unknown_meta.icon), char::from(Icon::Box));
         assert_eq!(unknown_meta.color, theme.text.secondary);
         assert_eq!(unknown_meta.k8s_kind, None);
+    }
+
+    #[test]
+    fn test_resource_kind_meta_distinguishes_resource_quota_and_limit_range() {
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+
+        let rq = resource_kind_meta_from_str("ResourceQuota", &theme);
+        assert_eq!(rq.label, "ResourceQuota");
+
+        let lr = resource_kind_meta_from_str("LimitRange", &theme);
+        assert_eq!(lr.label, "LimitRange");
     }
 }

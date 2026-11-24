@@ -91,6 +91,18 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    PodSecurity {
+        name: String,
+        namespace: String,
+    },
+    ResourceQuota {
+        name: String,
+        namespace: String,
+    },
+    LimitRange {
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -121,6 +133,9 @@ impl ResourceDrawerTarget {
             Self::PersistentVolume { .. } => "PersistentVolume",
             Self::PersistentVolumeClaim { .. } => "PersistentVolumeClaim",
             Self::NetworkPolicy { .. } => "NetworkPolicy",
+            Self::PodSecurity { .. } => "Namespace",
+            Self::ResourceQuota { .. } => "ResourceQuota",
+            Self::LimitRange { .. } => "LimitRange",
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -143,8 +158,11 @@ impl ResourceDrawerTarget {
             | Self::PersistentVolume { name }
             | Self::PersistentVolumeClaim { name, .. }
             | Self::NetworkPolicy { name, .. }
+            | Self::ResourceQuota { name, .. }
+            | Self::LimitRange { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
+            Self::PodSecurity { namespace, .. } => namespace.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
         }
     }
@@ -165,6 +183,9 @@ impl ResourceDrawerTarget {
             | Self::PersistentVolume { name }
             | Self::PersistentVolumeClaim { name, .. }
             | Self::NetworkPolicy { name, .. }
+            | Self::PodSecurity { name, .. }
+            | Self::ResourceQuota { name, .. }
+            | Self::LimitRange { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -186,8 +207,13 @@ impl ResourceDrawerTarget {
             | Self::Secret { namespace, .. }
             | Self::PersistentVolumeClaim { namespace, .. }
             | Self::NetworkPolicy { namespace, .. }
+            | Self::ResourceQuota { namespace, .. }
+            | Self::LimitRange { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
-            Self::PersistentVolume { .. } | Self::Node { .. } | Self::Namespace { .. } => None,
+            Self::PersistentVolume { .. }
+            | Self::PodSecurity { .. }
+            | Self::Node { .. }
+            | Self::Namespace { .. } => None,
         }
     }
 
@@ -1228,5 +1254,66 @@ mod tests {
         assert!(state.yaml_document.current().is_some());
         state.reset_for_context_change();
         assert!(state.yaml_document.current().is_none());
+    }
+
+    #[test]
+    fn test_resource_drawer_pod_security_and_quota_limit_yaml_targets() {
+        let mut state = ResourceDrawerState::default();
+
+        let psa_target = ResourceDrawerTarget::PodSecurity {
+            name: "psa-prod".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(psa_target.kind(), "Namespace");
+        assert_eq!(psa_target.name(), "prod");
+        assert_eq!(psa_target.display_title(), "psa-prod");
+        assert_eq!(psa_target.namespace(), None);
+        let cmd = state.open_or_switch(Some("ctx-a"), psa_target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: state.yaml_generation,
+                kind: "Namespace".to_string(),
+                namespace: None,
+                name: "prod".to_string(),
+            })
+        );
+
+        let rq_target = ResourceDrawerTarget::ResourceQuota {
+            name: "compute-quota".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(rq_target.kind(), "ResourceQuota");
+        assert_eq!(rq_target.namespace(), Some("prod"));
+        let cmd = state.open_or_switch(Some("ctx-a"), rq_target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: state.yaml_generation,
+                kind: "ResourceQuota".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "compute-quota".to_string(),
+            })
+        );
+
+        let lr_target = ResourceDrawerTarget::LimitRange {
+            name: "default-limits".to_string(),
+            namespace: "prod".to_string(),
+        };
+        assert_eq!(lr_target.kind(), "LimitRange");
+        assert_eq!(lr_target.namespace(), Some("prod"));
+        let cmd = state.open_or_switch(Some("ctx-a"), lr_target, ResourceDrawerTabId::Yaml);
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadResourceYaml {
+                cluster_id: "ctx-a".to_string(),
+                generation: state.yaml_generation,
+                kind: "LimitRange".to_string(),
+                namespace: Some("prod".to_string()),
+                name: "default-limits".to_string(),
+            })
+        );
     }
 }
