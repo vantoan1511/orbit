@@ -8,8 +8,7 @@ pub use palettes::{
     SemanticTokens, StyleBundle, StyleTokens, SurfaceTokens, TextTokens,
 };
 pub use titlebar::{
-    TitlebarDwmConfig, resolve_titlebar_dwm_config, rgba_to_win32_colorref,
-    sync_native_titlebar_appearance,
+    TitlebarDwmConfig, resolve_titlebar_dwm_config, sync_native_titlebar_appearance,
 };
 pub use tokens::{
     AccentColor, K8sResourceKind, SemanticColorsPreference, SemanticPreset, SemanticRole,

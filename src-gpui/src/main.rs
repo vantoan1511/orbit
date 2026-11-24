@@ -24,9 +24,10 @@ use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, ResourceDrawerProps,
     ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
-    TabBarCallbacks, TabContextMenuCallbacks, YamlLoadStatus, YamlViewerProps,
-    build_tab_context_menu_entries, render_context_menu_overlay, render_resource_drawer,
-    render_tab_resource_picker_overlay, render_workspace_tab_bar, render_yaml_viewer,
+    TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks, YamlLoadStatus, YamlViewerProps,
+    build_tab_context_menu_entries, render_context_menu_overlay, render_custom_titlebar,
+    render_resource_drawer, render_tab_resource_picker_overlay, render_workspace_tab_bar,
+    render_yaml_viewer, resolve_window_chrome_style,
 };
 use crate::icons::render_icon;
 use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView};
@@ -1347,8 +1348,17 @@ impl OrbitShell {
     pub const WINDOW_TITLE: &'static str = "Orbit";
     pub const DEFAULT_WIDTH: f32 = 1200.0;
     pub const DEFAULT_HEIGHT: f32 = 800.0;
+    pub const TITLEBAR_HEIGHT: f32 = crate::components::TITLEBAR_HEIGHT;
     pub const HEADER_HEIGHT: f32 = 48.0;
     pub const FOOTER_HEIGHT: f32 = 26.0;
+
+    pub const fn header_dropdown_top_offset() -> f32 {
+        Self::TITLEBAR_HEIGHT + Self::HEADER_HEIGHT + 4.0
+    }
+
+    pub const fn tab_picker_top_offset() -> f32 {
+        Self::TITLEBAR_HEIGHT + Self::HEADER_HEIGHT + crate::components::TAB_BAR_HEIGHT + 4.0
+    }
 
     pub fn new(config: &OrbitConfig, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let ClusterBridge {
@@ -3637,10 +3647,10 @@ impl OrbitShell {
             window_background: theme.style.window_background,
             titlebar: Some(gpui::TitlebarOptions {
                 title: Some(SharedString::from(Self::WINDOW_TITLE)),
-                appears_transparent: false,
-                traffic_light_position: None,
+                appears_transparent: true,
+                traffic_light_position: Some(gpui::point(px(12.0), px(10.0))),
             }),
-            window_decorations: Some(WindowDecorations::Server),
+            window_decorations: Some(WindowDecorations::Client),
             is_movable: true,
             is_resizable: true,
             ..Default::default()
@@ -4376,7 +4386,7 @@ impl OrbitShell {
                     theme
                         .style_overlay(div().id("cluster-dropdown-menu"))
                         .absolute()
-                        .top(px(Self::HEADER_HEIGHT + 4.0))
+                        .top(px(Self::header_dropdown_top_offset()))
                         .left(px(dropdown_left))
                         .w(px(400.0))
                         .max_h(px(420.0))
@@ -4758,7 +4768,7 @@ impl OrbitShell {
                     theme
                         .style_overlay(div().id("namespace-dropdown-menu"))
                         .absolute()
-                        .top(px(Self::HEADER_HEIGHT + 4.0))
+                        .top(px(Self::header_dropdown_top_offset()))
                         .left(px(dropdown_left))
                         .w(px(320.0))
                         .on_click(|_event, _window, cx| {
@@ -8549,6 +8559,11 @@ impl Render for OrbitShell {
             },
         );
 
+        let is_window_active = window.is_window_active();
+        let is_maximized = window.is_maximized();
+        let decorations = window.window_decorations();
+        let chrome = resolve_window_chrome_style(&theme, is_window_active, is_maximized);
+
         div()
             .id("orbit-shell-root")
             .track_focus(&self.focus_handle)
@@ -8706,6 +8721,17 @@ impl Render for OrbitShell {
             .font(theme.typography.ui_font(FontWeight::NORMAL))
             .bg(theme.surface.bg_app)
             .text_color(theme.text.primary)
+            .when_some(chrome.outer_border_color, |el, c| {
+                el.border_1().border_color(c)
+            })
+            .child(render_custom_titlebar(
+                Self::WINDOW_TITLE,
+                is_window_active,
+                is_maximized,
+                decorations,
+                &theme,
+                window,
+            ))
             .child(
                 div()
                     .flex()
@@ -8743,39 +8769,131 @@ impl Render for OrbitShell {
                     &theme,
                     &self.picker_search_focus,
                     self.picker_search_focus.is_focused(window),
-                    std::rc::Rc::new(move |view, window, cx| {
-                        select_entity.update(cx, |shell, cx| {
-                            shell.tabs.close_picker();
-                            shell.apply_focus_target(
-                                focus_target_for_picker_transition(false),
-                                window,
-                            );
-                            shell.select_workspace_view(view, cx);
-                        });
-                    }),
-                    std::rc::Rc::new(move |window, cx| {
-                        clear_entity.update(cx, |shell, cx| {
-                            shell.tabs.clear_picker_query();
-                            shell.apply_focus_target(
-                                focus_target_for_picker_transition(true),
-                                window,
-                            );
-                            cx.notify();
-                        });
-                    }),
-                    std::rc::Rc::new(move |window, cx| {
-                        close_entity.update(cx, |shell, cx| {
-                            shell.tabs.close_picker();
-                            shell.apply_focus_target(
-                                focus_target_for_picker_transition(false),
-                                window,
-                            );
-                            cx.notify();
-                        });
-                    }),
+                    px(Self::tab_picker_top_offset()),
+                    TabPickerCallbacks {
+                        on_select_view: std::rc::Rc::new(move |view, window, cx| {
+                            select_entity.update(cx, |shell, cx| {
+                                shell.tabs.close_picker();
+                                shell.apply_focus_target(
+                                    focus_target_for_picker_transition(false),
+                                    window,
+                                );
+                                shell.select_workspace_view(view, cx);
+                            });
+                        }),
+                        on_clear_query: std::rc::Rc::new(move |window, cx| {
+                            clear_entity.update(cx, |shell, cx| {
+                                shell.tabs.clear_picker_query();
+                                shell.apply_focus_target(
+                                    focus_target_for_picker_transition(true),
+                                    window,
+                                );
+                                cx.notify();
+                            });
+                        }),
+                        on_close: std::rc::Rc::new(move |window, cx| {
+                            close_entity.update(cx, |shell, cx| {
+                                shell.tabs.close_picker();
+                                shell.apply_focus_target(
+                                    focus_target_for_picker_transition(false),
+                                    window,
+                                );
+                                cx.notify();
+                            });
+                        }),
+                    },
                 ))
             })
             .when_some(context_menu_overlay, |el, overlay| el.child(overlay))
+            .when(
+                cfg!(target_os = "linux")
+                    && matches!(decorations, gpui::Decorations::Client { .. })
+                    && !is_maximized,
+                |el| {
+                    #[cfg(target_os = "linux")]
+                    {
+                        use gpui::ResizeEdge;
+                        const EDGE: f32 = 5.0;
+                        const CORNER: f32 = 10.0;
+                        let resize_edge = |id: &'static str, edge: ResizeEdge| {
+                            div().id(id).absolute().on_mouse_down(
+                                MouseButton::Left,
+                                move |_ev, window, _cx| {
+                                    window.start_window_resize(edge);
+                                },
+                            )
+                        };
+                        el.child(
+                            resize_edge("resize-top", ResizeEdge::Top)
+                                .top_0()
+                                .left(px(CORNER))
+                                .right(px(CORNER))
+                                .h(px(EDGE))
+                                .cursor(CursorStyle::ResizeUpDown),
+                        )
+                        .child(
+                            resize_edge("resize-bottom", ResizeEdge::Bottom)
+                                .bottom_0()
+                                .left(px(CORNER))
+                                .right(px(CORNER))
+                                .h(px(EDGE))
+                                .cursor(CursorStyle::ResizeUpDown),
+                        )
+                        .child(
+                            resize_edge("resize-left", ResizeEdge::Left)
+                                .left_0()
+                                .top(px(CORNER))
+                                .bottom(px(CORNER))
+                                .w(px(EDGE))
+                                .cursor(CursorStyle::ResizeLeftRight),
+                        )
+                        .child(
+                            resize_edge("resize-right", ResizeEdge::Right)
+                                .right_0()
+                                .top(px(CORNER))
+                                .bottom(px(CORNER))
+                                .w(px(EDGE))
+                                .cursor(CursorStyle::ResizeLeftRight),
+                        )
+                        .child(
+                            resize_edge("resize-top-left", ResizeEdge::TopLeft)
+                                .top_0()
+                                .left_0()
+                                .w(px(CORNER))
+                                .h(px(CORNER))
+                                .cursor(CursorStyle::ResizeUpLeftDownRight),
+                        )
+                        .child(
+                            resize_edge("resize-top-right", ResizeEdge::TopRight)
+                                .top_0()
+                                .right_0()
+                                .w(px(CORNER))
+                                .h(px(CORNER))
+                                .cursor(CursorStyle::ResizeUpRightDownLeft),
+                        )
+                        .child(
+                            resize_edge("resize-bottom-left", ResizeEdge::BottomLeft)
+                                .bottom_0()
+                                .left_0()
+                                .w(px(CORNER))
+                                .h(px(CORNER))
+                                .cursor(CursorStyle::ResizeUpRightDownLeft),
+                        )
+                        .child(
+                            resize_edge("resize-bottom-right", ResizeEdge::BottomRight)
+                                .bottom_0()
+                                .right_0()
+                                .w(px(CORNER))
+                                .h(px(CORNER))
+                                .cursor(CursorStyle::ResizeUpLeftDownRight),
+                        )
+                    }
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        el
+                    }
+                },
+            )
     }
 }
 
@@ -8871,7 +8989,17 @@ mod tests {
             ),
         );
         let opts = OrbitShell::window_options_for_theme(bounds, &theme);
-        assert_eq!(opts.window_decorations, Some(WindowDecorations::Server));
+        assert_eq!(opts.window_decorations, Some(WindowDecorations::Client));
+        assert_eq!(
+            opts.titlebar.as_ref().map(|t| t.appears_transparent),
+            Some(true)
+        );
+        assert!(
+            opts.titlebar
+                .as_ref()
+                .and_then(|t| t.traffic_light_position)
+                .is_some()
+        );
         assert!(opts.is_resizable);
         assert!(opts.is_movable);
         match opts.window_bounds {
@@ -8887,6 +9015,23 @@ mod tests {
             .and_then(|t| t.title.as_ref())
             .map(|s| s.as_ref());
         assert_eq!(title, Some("Orbit"));
+    }
+
+    #[test]
+    fn test_shell_overlay_top_offsets_account_for_titlebar() {
+        assert_eq!(
+            OrbitShell::header_dropdown_top_offset(),
+            OrbitShell::TITLEBAR_HEIGHT + OrbitShell::HEADER_HEIGHT + 4.0
+        );
+        assert_eq!(OrbitShell::header_dropdown_top_offset(), 84.0);
+        assert_eq!(
+            OrbitShell::tab_picker_top_offset(),
+            OrbitShell::TITLEBAR_HEIGHT
+                + OrbitShell::HEADER_HEIGHT
+                + crate::components::TAB_BAR_HEIGHT
+                + 4.0
+        );
+        assert_eq!(OrbitShell::tab_picker_top_offset(), 116.0);
     }
 
     #[test]

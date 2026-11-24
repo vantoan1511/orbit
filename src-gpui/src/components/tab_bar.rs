@@ -459,15 +459,29 @@ pub fn picker_input_presentation(query: &str, is_focused: bool) -> PickerInputPr
     }
 }
 
+pub const fn picker_popover_top_offset(top_offset: Pixels) -> Pixels {
+    top_offset
+}
+
+pub struct TabPickerCallbacks {
+    pub on_select_view: TabViewCallback,
+    pub on_clear_query: TabActionCallback,
+    pub on_close: TabActionCallback,
+}
+
 pub fn render_tab_resource_picker_overlay(
     tabs: &WorkspaceTabsState,
     theme: &OrbitTheme,
     search_focus: &FocusHandle,
     is_search_focused: bool,
-    on_select_view: TabViewCallback,
-    on_clear_query: TabActionCallback,
-    on_close: TabActionCallback,
+    top_offset: Pixels,
+    callbacks: TabPickerCallbacks,
 ) -> AnyElement {
+    let TabPickerCallbacks {
+        on_select_view,
+        on_clear_query,
+        on_close,
+    } = callbacks;
     let views = tabs.filtered_picker_views();
     let input_pres = picker_input_presentation(&tabs.picker_query, is_search_focused);
     let caret = || {
@@ -593,7 +607,7 @@ pub fn render_tab_resource_picker_overlay(
         .child(
             div()
                 .absolute()
-                .top(px(82.0))
+                .top(picker_popover_top_offset(top_offset))
                 .right(px(16.0))
                 .child(popover),
         )
@@ -789,5 +803,11 @@ mod tests {
         assert!(populated_focused.show_caret);
         assert!(populated_focused.show_clear_button);
         assert_eq!(populated_focused.display_text, "pod ");
+    }
+
+    #[test]
+    fn test_tab_picker_top_offset_matches_supplied_value() {
+        assert_eq!(picker_popover_top_offset(px(116.0)), px(116.0));
+        assert_eq!(picker_popover_top_offset(px(82.0)), px(82.0));
     }
 }
