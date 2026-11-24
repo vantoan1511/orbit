@@ -565,8 +565,23 @@ pub struct ResourceDrawerProps {
     pub body: AnyElement,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct DrawerOverlayStyle {
+    pub panel_bg: gpui::Rgba,
+    pub border_color: gpui::Rgba,
+    pub shadows: Vec<gpui::BoxShadow>,
+}
+
+pub fn resolve_drawer_overlay_style(theme: &OrbitTheme) -> DrawerOverlayStyle {
+    DrawerOverlayStyle {
+        panel_bg: theme.surface.overlay_bg,
+        border_color: theme.border.strong,
+        shadows: theme.style.overlay_shadows.clone(),
+    }
+}
+
 pub fn drawer_uses_drop_shadow(theme: &OrbitTheme) -> bool {
-    theme.style.is_translucent && !theme.style.overlay_shadows.is_empty()
+    !theme.style.overlay_shadows.is_empty()
 }
 
 pub fn render_resource_drawer(
@@ -579,8 +594,9 @@ pub fn render_resource_drawer(
     }
     let props = props?;
     let drawer_width = effective_drawer_width(props.width, props.window_width);
+    let overlay_style = resolve_drawer_overlay_style(theme);
 
-    let on_close = props.on_close.clone();
+    let on_close = props.on_close;
     let close_button = div()
         .id("resource-drawer-close-btn")
         .w(px(28.0))
@@ -734,15 +750,19 @@ pub fn render_resource_drawer(
             on_start_resize(window, cx);
         });
 
-    let mut container = div()
+    let container = div()
         .id("resource-drawer-shell")
-        .relative()
-        .h_full()
+        .absolute()
+        .top_0()
+        .right_0()
+        .bottom_0()
         .w(px(drawer_width))
-        .flex_shrink_0()
-        .bg(theme.surface.bg_card)
+        .bg(overlay_style.panel_bg)
         .border_l_1()
-        .border_color(theme.border.default)
+        .border_color(overlay_style.border_color)
+        .when(!overlay_style.shadows.is_empty(), |el| {
+            el.shadow(overlay_style.shadows.clone())
+        })
         .flex()
         .flex_col()
         .on_mouse_down(MouseButton::Left, |_, _, cx| {
@@ -763,10 +783,6 @@ pub fn render_resource_drawer(
                 .flex_col()
                 .child(props.body),
         );
-
-    if drawer_uses_drop_shadow(theme) {
-        container = container.shadow(theme.style.overlay_shadows.clone());
-    }
 
     Some(container.into_any_element())
 }
@@ -1388,7 +1404,7 @@ mod tests {
     }
 
     #[test]
-    fn test_drawer_uses_drop_shadow_only_for_translucent_styles() {
+    fn test_drawer_uses_overlay_drop_shadow_across_styles() {
         use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
         use gpui::WindowAppearance;
 
@@ -1414,8 +1430,75 @@ mod tests {
             WindowAppearance::Dark,
         );
 
-        assert!(!drawer_uses_drop_shadow(&flat_dark));
-        assert!(!drawer_uses_drop_shadow(&paper_light));
+        assert!(drawer_uses_drop_shadow(&flat_dark));
+        assert!(drawer_uses_drop_shadow(&paper_light));
         assert!(drawer_uses_drop_shadow(&glass_dark));
+    }
+
+    #[test]
+    fn test_drawer_overlay_style_uses_theme_layering_tokens_and_shadows() {
+        use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+        use gpui::WindowAppearance;
+
+        let themes = [
+            OrbitTheme::resolve(
+                ThemeMode::Dark,
+                UiStyle::Flat,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                WindowAppearance::Dark,
+            ),
+            OrbitTheme::resolve(
+                ThemeMode::Light,
+                UiStyle::Paper,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                WindowAppearance::Light,
+            ),
+            OrbitTheme::resolve(
+                ThemeMode::Dark,
+                UiStyle::Glass,
+                AccentColor::Blue,
+                SemanticColorsPreference::default(),
+                WindowAppearance::Dark,
+            ),
+        ];
+
+        for theme in &themes {
+            let style = resolve_drawer_overlay_style(theme);
+            assert_eq!(style.panel_bg, theme.surface.overlay_bg);
+            assert_eq!(style.border_color, theme.border.strong);
+            assert_eq!(style.shadows, theme.style.overlay_shadows);
+        }
+    }
+
+    #[test]
+    fn test_render_resource_drawer_returns_none_when_closed_and_preserves_width_constraints() {
+        use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+        use gpui::WindowAppearance;
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+
+        assert!(render_resource_drawer(false, None, &theme).is_none());
+
+        assert_eq!(effective_drawer_width(200.0, 1400.0), MIN_DRAWER_WIDTH);
+        assert_eq!(effective_drawer_width(1200.0, 2000.0), MAX_DRAWER_WIDTH);
+        assert_eq!(
+            effective_drawer_width(700.0, 800.0),
+            800.0 - DRAWER_MIN_WORKSPACE_MARGIN
+        );
+
+        let mut state = ResourceDrawerState::default();
+        state.start_resize();
+        state.update_resize_from_window_x(1280.0, 640.0);
+        assert_eq!(state.width, 640.0);
+        state.stop_resize();
+        assert!(!state.is_resizing);
     }
 }
