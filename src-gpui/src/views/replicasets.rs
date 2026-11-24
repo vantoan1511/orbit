@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, SharedString, Window, div, prelude::*,
-    px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, ReplicaSetInfo};
@@ -14,12 +14,12 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, ReplicaSetsLoadStatus, ReplicaSetsState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
-    format_images_summary, parse_age_seconds, render_action_button, render_ratio_metric_cell,
-    table_numeric_font,
+    parse_age_seconds, render_images_cell, render_ratio_metric_cell, render_resource_error_banner,
+    render_resource_error_state, render_resource_view_header, render_truncated_cell,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,57 +131,41 @@ pub fn replicasets_presentation_mode(state: &ReplicaSetsState) -> ReplicaSetsPre
 }
 
 fn render_replicaset_cell(
+    row_idx: usize,
     rs: &ReplicaSetInfo,
     col: &TableColumn,
     theme: &OrbitTheme,
 ) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(rs.name.clone())
-            .into_any_element(),
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(rs.namespace.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("rs-name"), row_idx as u64),
+            rs.name.clone(),
+            Some(SharedString::from(rs.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("rs-ns"), row_idx as u64),
+            rs.namespace.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
         "status" => render_status_badge_from_str(&rs.status, StatusBadgeVariant::Inline, theme),
         "replicas" => render_ratio_metric_cell(
             rs.replicas.current.to_string(),
             rs.replicas.desired.to_string(),
             theme,
         ),
-        "images" => {
-            let (primary, extra) = format_images_summary(&rs.images);
-            div()
-                .flex()
-                .items_center()
-                .gap_1p5()
-                .min_w(px(0.0))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font(theme.typography.mono_font(FontWeight::NORMAL))
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(primary),
-                )
-                .when(extra > 0, |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_1p5()
-                            .py_0p5()
-                            .flex_shrink_0()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.surface.bg_hover)
-                            .font(table_numeric_font(theme))
-                            .text_color(theme.text.muted)
-                            .child(format!("+{extra}")),
-                    )
-                })
-                .into_any_element()
-        }
+        "images" => render_images_cell(
+            ElementId::NamedInteger(SharedString::from("rs-img"), row_idx as u64),
+            &rs.images,
+            theme,
+        ),
         "age" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(theme.text.muted)
@@ -246,6 +230,7 @@ pub fn render_replicasets_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
     + Fn(SharedString, &ReplicaSetInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
@@ -260,8 +245,7 @@ pub fn render_replicasets_view(
     let total_count = state.replicasets.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == ReplicaSetsLoadStatus::Loading;
-    type RefreshCallback = Rc<dyn Fn(&mut Window, &mut App)>;
-    let on_refresh_rc: RefreshCallback = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = if namespaces.is_all_namespaces() {
         format!("{total_count} replicasets")
@@ -269,76 +253,23 @@ pub fn render_replicasets_view(
         format!("{visible_count} of {total_count} replicasets")
     };
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        );
+    let header = render_resource_view_header(
+        WorkspaceView::ReplicaSets.label(),
+        WorkspaceView::ReplicaSets.description(),
+        count_label,
+        Some(namespaces),
+        None,
+        theme,
+    );
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load replicasets: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "replicasets-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "replicasets-retry-btn",
+            format!("Failed to load replicasets: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let body = match replicasets_presentation_mode(state) {
@@ -347,45 +278,14 @@ pub fn render_replicasets_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load ReplicaSets"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "replicasets-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "replicasets-retry-btn",
+                "Unable to Load ReplicaSets",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         ReplicaSetsPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -405,12 +305,13 @@ pub fn render_replicasets_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|rs| render_replicaset_cell(rs, col, col_theme))
+                        .map(|rs| render_replicaset_cell(idx, rs, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(replicaset) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, replicaset, event, window, cx);
@@ -433,8 +334,8 @@ pub fn render_replicasets_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_4()
-        .child(toolbar)
+        .gap_0()
+        .child(header)
         .when(
             replicasets_presentation_mode(state) == ReplicaSetsPresentationMode::Table,
             |el| el.when_some(error_banner, |el, banner| el.child(banner)),
@@ -495,7 +396,7 @@ pub fn render_replicaset_drawer_overview(
         .p_4()
         .flex()
         .flex_col()
-        .gap_5()
+        .gap_4()
         .child(crate::views::render_drawer_section(
             "SUMMARY", summary, theme,
         ))

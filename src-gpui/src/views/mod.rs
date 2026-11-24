@@ -27,12 +27,14 @@ pub mod workloads_overview;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, FontWeight, Rgba, Window, div, prelude::*, px};
+use gpui::{AnyElement, App, ElementId, FontWeight, Rgba, SharedString, Window, div, prelude::*, px};
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{ContainerImageInfo, EventInfo};
 
 use crate::components::status_badge::{StatusBadgeVariant, render_status_badge_from_str};
+use crate::components::tooltip::TextTooltip;
 use crate::icons::render_icon;
+use crate::state::NamespaceFilterState;
 use crate::theme::{OrbitTheme, apply_text_step};
 
 pub fn parse_age_seconds(age: &str) -> u64 {
@@ -60,17 +62,292 @@ pub fn parse_age_seconds(age: &str) -> u64 {
         .unwrap_or(u64::MAX)
 }
 
-pub fn format_short_image(image: &str) -> &str {
-    image.rsplit('/').next().unwrap_or(image)
+pub fn format_short_image(image: &str) -> String {
+    let basename = image.rsplit('/').next().unwrap_or(image);
+    if let Some((name_part, digest_part)) = basename.split_once('@') {
+        if name_part.contains(':') {
+            return name_part.to_string();
+        }
+        if let Some((algo, hash)) = digest_part.split_once(':') {
+            if hash.chars().count() > 8 {
+                let short_hash: String = hash.chars().take(8).collect();
+                return format!("{name_part}@{algo}:{short_hash}…");
+            }
+            return format!("{name_part}@{algo}:{hash}");
+        }
+        if digest_part.chars().count() > 8 {
+            let short_digest: String = digest_part.chars().take(8).collect();
+            return format!("{name_part}@{short_digest}…");
+        }
+    }
+    basename.to_string()
 }
 
 pub fn format_images_summary(images: &[String]) -> (String, usize) {
     let Some(first) = images.first() else {
         return ("-".to_string(), 0);
     };
-    let short = format_short_image(first).to_string();
+    let short = format_short_image(first);
     let extra = images.len().saturating_sub(1);
     (short, extra)
+}
+
+pub fn format_images_tooltip(images: &[String]) -> Option<String> {
+    let first = images.first()?;
+    if images.len() > 1 || format_short_image(first) != *first {
+        Some(images.join("\n"))
+    } else {
+        None
+    }
+}
+
+pub fn render_truncated_cell(
+    id: ElementId,
+    text: impl Into<SharedString>,
+    tooltip_text: Option<SharedString>,
+    text_color: Rgba,
+    weight: FontWeight,
+    monospace: bool,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let text_shared = text.into();
+    div()
+        .id(id)
+        .min_w(px(0.0))
+        .flex_1()
+        .truncate()
+        .text_color(text_color)
+        .font_weight(weight)
+        .when(monospace, |el| el.font(theme.typography.mono_font(weight)))
+        .when_some(tooltip_text, |el, tip| {
+            el.tooltip(move |_window, cx| {
+                cx.new(|_| TextTooltip::new(tip.clone()).monospace(monospace))
+                    .into()
+            })
+        })
+        .child(text_shared)
+        .into_any_element()
+}
+
+pub fn render_images_cell(id: ElementId, images: &[String], theme: &OrbitTheme) -> AnyElement {
+    let (primary, extra) = format_images_summary(images);
+    let tooltip_text = format_images_tooltip(images).map(SharedString::from);
+
+    div()
+        .id(id)
+        .min_w(px(0.0))
+        .flex_1()
+        .flex()
+        .items_center()
+        .gap_1p5()
+        .overflow_hidden()
+        .when_some(tooltip_text, |el, tip| {
+            el.tooltip(move |_window, cx| {
+                cx.new(|_| TextTooltip::new(tip.clone()).monospace(true))
+                    .into()
+            })
+        })
+        .child(
+            div()
+                .min_w(px(0.0))
+                .flex_1()
+                .truncate()
+                .font(theme.typography.mono_font(FontWeight::NORMAL))
+                .text_color(theme.text.secondary)
+                .child(primary),
+        )
+        .when(extra > 0, |el| {
+            el.child(
+                apply_text_step(div(), theme.typography.size_3xs)
+                    .flex_shrink_0()
+                    .px_1p5()
+                    .py(px(1.0))
+                    .rounded(theme.style.radius_control)
+                    .bg(theme.surface.control_bg)
+                    .text_color(theme.text.muted)
+                    .child(format!("+{extra}")),
+            )
+        })
+        .into_any_element()
+}
+
+pub fn render_resource_view_header(
+    title: impl Into<SharedString>,
+    subtitle: impl Into<SharedString>,
+    count_label: impl Into<SharedString>,
+    namespaces: Option<&NamespaceFilterState>,
+    extra_controls: Option<AnyElement>,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let namespace_chip = namespaces
+        .filter(|ns| !ns.is_all_namespaces())
+        .map(|ns| {
+            apply_text_step(div(), theme.typography.size_xs)
+                .px_2()
+                .py_0p5()
+                .rounded(theme.style.radius_control)
+                .bg(theme.accent.soft)
+                .text_color(theme.accent.accent)
+                .font_weight(FontWeight::MEDIUM)
+                .child(format!("Namespace: {}", ns.summary_label()))
+        });
+
+    div()
+        .w_full()
+        .px_4()
+        .py_3()
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_3()
+        .child(
+            div()
+                .min_w(px(0.0))
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(
+                    apply_text_step(div(), theme.typography.size_lg)
+                        .font_weight(FontWeight::BOLD)
+                        .text_color(theme.text.primary)
+                        .truncate()
+                        .child(title.into()),
+                )
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .text_color(theme.text.secondary)
+                        .truncate()
+                        .child(subtitle.into()),
+                ),
+        )
+        .child(
+            div()
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font(table_numeric_font(theme))
+                        .text_color(theme.text.muted)
+                        .child(count_label.into()),
+                )
+                .when_some(namespace_chip, |el, chip| el.child(chip))
+                .when_some(extra_controls, |el, controls| el.child(controls)),
+        )
+        .into_any_element()
+}
+
+pub fn render_resource_error_banner(
+    retry_btn_id: &'static str,
+    message: impl Into<SharedString>,
+    is_loading: bool,
+    theme: &OrbitTheme,
+    on_retry: ActionCallback,
+) -> AnyElement {
+    div()
+        .w_full()
+        .px_4()
+        .pb_3()
+        .flex_shrink_0()
+        .child(
+            div()
+                .w_full()
+                .px_3()
+                .py_2()
+                .rounded(theme.style.radius_control)
+                .bg(theme.semantic.danger.soft)
+                .border_1()
+                .border_color(theme.semantic.danger.solid)
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .min_w(px(0.0))
+                        .child(render_icon(
+                            Icon::AlertTriangle,
+                            px(14.0),
+                            theme.semantic.danger.solid,
+                        ))
+                        .child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .text_color(theme.text.primary)
+                                .truncate()
+                                .child(message.into()),
+                        ),
+                )
+                .child(render_action_button(
+                    retry_btn_id,
+                    Icon::RotateCcw,
+                    "Retry",
+                    is_loading,
+                    theme,
+                    on_retry,
+                )),
+        )
+        .into_any_element()
+}
+
+pub fn render_resource_error_state(
+    retry_btn_id: &'static str,
+    title: impl Into<SharedString>,
+    message: impl Into<SharedString>,
+    is_loading: bool,
+    theme: &OrbitTheme,
+    on_retry: ActionCallback,
+) -> AnyElement {
+    div()
+        .w_full()
+        .p_4()
+        .child(
+            theme
+                .style_card(div())
+                .w_full()
+                .p_4()
+                .bg(theme.surface.bg_panel)
+                .flex()
+                .flex_col()
+                .items_start()
+                .gap_3()
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(render_icon(
+                            Icon::AlertTriangle,
+                            px(16.0),
+                            theme.semantic.danger.solid,
+                        ))
+                        .child(
+                            apply_text_step(div(), theme.typography.size_sm)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(theme.text.primary)
+                                .child(title.into()),
+                        ),
+                )
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .text_color(theme.text.secondary)
+                        .child(message.into()),
+                )
+                .child(render_action_button(
+                    retry_btn_id,
+                    Icon::RotateCcw,
+                    "Retry",
+                    is_loading,
+                    theme,
+                    on_retry,
+                )),
+        )
+        .into_any_element()
 }
 
 pub fn numeric_metric_text_color(theme: &OrbitTheme) -> Rgba {
@@ -586,5 +863,39 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_format_short_image_strips_registry_and_digest_preserving_tag() {
+        assert_eq!(
+            format_short_image(
+                "registry.k8s.io/ingress-nginx/controller:v1.15.1@sha256:d94ceea78b0123456789abcdef"
+            ),
+            "controller:v1.15.1"
+        );
+        assert_eq!(format_short_image("ghcr.io/org/api:v1.2.3"), "api:v1.2.3");
+        assert_eq!(format_short_image("nginx:latest"), "nginx:latest");
+        assert_eq!(
+            format_short_image("registry.k8s.io/pause@sha256:d94ceea78b0123456789abcdef"),
+            "pause@sha256:d94ceea7…"
+        );
+        assert_eq!(
+            format_short_image("localhost:5000/my-app:v2@sha256:abcdef0123456789"),
+            "my-app:v2"
+        );
+    }
+
+    #[test]
+    fn test_format_images_tooltip_discloses_full_references_when_truncated_or_multiple() {
+        assert_eq!(format_images_tooltip(&[]), None);
+        assert_eq!(format_images_tooltip(&["nginx:latest".to_string()]), None);
+        assert_eq!(
+            format_images_tooltip(&["ghcr.io/org/api:v1.2.3@sha256:deadbeef".to_string()]),
+            Some("ghcr.io/org/api:v1.2.3@sha256:deadbeef".to_string())
+        );
+        assert_eq!(
+            format_images_tooltip(&["nginx:1.25".to_string(), "envoy:1.30".to_string()]),
+            Some("nginx:1.25\nenvoy:1.30".to_string())
+        );
     }
 }

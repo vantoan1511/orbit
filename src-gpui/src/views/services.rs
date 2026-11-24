@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
-    prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
+    div, prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, ServiceInfo};
@@ -12,12 +12,17 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{
-    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
+    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, TextTooltip,
+    render_status_badge_from_str,
 };
-use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, ServiceTypeFilter, ServicesLoadStatus, ServicesState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-pub use crate::views::{parse_age_seconds, render_action_button, table_numeric_font};
+pub use crate::views::{
+    parse_age_seconds, render_action_button, render_resource_error_banner,
+    render_resource_error_state, render_resource_view_header, render_truncated_cell,
+    table_numeric_font,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServicesPresentationMode {
@@ -243,63 +248,97 @@ pub fn services_presentation_mode(state: &ServicesState) -> ServicesPresentation
     }
 }
 
-fn render_service_cell(svc: &ServiceInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
+fn render_service_cell(
+    row_idx: usize,
+    svc: &ServiceInfo,
+    col: &TableColumn,
+    theme: &OrbitTheme,
+) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(svc.name.clone())
-            .into_any_element(),
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(svc.namespace.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("svc-name"), row_idx as u64),
+            svc.name.clone(),
+            Some(SharedString::from(svc.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("svc-ns"), row_idx as u64),
+            svc.namespace.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
         "type" => render_status_badge_from_str(&svc.r#type, StatusBadgeVariant::Inline, theme),
-        "cluster_ip" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if svc.cluster_ip == "-" || svc.cluster_ip == "None" {
+        "cluster_ip" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("svc-cip"), row_idx as u64),
+            svc.cluster_ip.clone(),
+            None,
+            if svc.cluster_ip == "-" || svc.cluster_ip == "None" {
                 theme.text.muted
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(svc.cluster_ip.clone())
-            .into_any_element(),
-        "external_ip" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if svc.external_ip == "-" {
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
+        "external_ip" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("svc-eip"), row_idx as u64),
+            svc.external_ip.clone(),
+            (svc.external_ip != "-").then(|| SharedString::from(svc.external_ip.clone())),
+            if svc.external_ip == "-" {
                 theme.text.muted
             } else if svc.external_ip == "<pending>" {
                 theme.semantic.warning.solid
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(svc.external_ip.clone())
-            .into_any_element(),
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "ports" => {
             let (primary, extra) = format_service_ports_summary(&svc.ports);
             if extra == 0 {
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font(theme.typography.mono_font(FontWeight::NORMAL))
-                    .text_color(if primary == "-" {
+                render_truncated_cell(
+                    ElementId::NamedInteger(SharedString::from("svc-ports"), row_idx as u64),
+                    primary.clone(),
+                    (primary != "-").then(|| SharedString::from(primary)),
+                    if svc.ports.is_empty() {
                         theme.text.muted
                     } else {
                         theme.text.primary
-                    })
-                    .truncate()
-                    .child(primary)
-                    .into_any_element()
+                    },
+                    FontWeight::NORMAL,
+                    true,
+                    theme,
+                )
             } else {
+                let full_ports = SharedString::from(svc.ports.clone());
                 div()
+                    .id(ElementId::NamedInteger(
+                        SharedString::from("svc-ports"),
+                        row_idx as u64,
+                    ))
                     .flex()
                     .items_center()
                     .gap_1p5()
                     .min_w(px(0.0))
+                    .flex_1()
+                    .overflow_hidden()
+                    .tooltip(move |_window, cx| {
+                        cx.new(|_| TextTooltip::new(full_ports.clone()).monospace(true))
+                            .into()
+                    })
                     .child(
                         apply_text_step(div(), theme.typography.size_xs)
+                            .min_w(px(0.0))
+                            .flex_1()
                             .font(theme.typography.mono_font(FontWeight::NORMAL))
                             .text_color(theme.text.primary)
                             .truncate()
@@ -321,16 +360,19 @@ fn render_service_cell(svc: &ServiceInfo, col: &TableColumn, theme: &OrbitTheme)
                     .into_any_element()
             }
         }
-        "endpoints" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if svc.endpoints == "-" {
+        "endpoints" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("svc-ep"), row_idx as u64),
+            svc.endpoints.clone(),
+            None,
+            if svc.endpoints == "-" {
                 theme.text.muted
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(svc.endpoints.clone())
-            .into_any_element(),
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "age" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(theme.text.muted)
@@ -442,6 +484,7 @@ pub fn render_services_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static + Fn(SharedString, &ServiceInfo, &MouseDownEvent, &mut Window, &mut App),
     on_type_filter: impl 'static + Fn(ServiceTypeFilter, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
@@ -453,7 +496,12 @@ pub fn render_services_view(
         state.type_filter,
         state.table.sort.as_ref(),
     );
-    let summary_row = render_summary_cards_row(&filtered_refs, namespaces, theme);
+    let summary_row = div()
+        .w_full()
+        .px_4()
+        .pb_3()
+        .flex_shrink_0()
+        .child(render_summary_cards_row(&filtered_refs, namespaces, theme));
     let filtered_rows: Rc<Vec<ServiceInfo>> =
         Rc::new(filtered_refs.into_iter().cloned().collect());
     let total_count = state.services.len();
@@ -510,77 +558,23 @@ pub fn render_services_view(
                 )
         }));
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        )
-        .child(div().flex().items_center().gap_2().child(type_chips));
+    let header = render_resource_view_header(
+        WorkspaceView::Services.label(),
+        WorkspaceView::Services.description(),
+        count_label,
+        Some(namespaces),
+        Some(type_chips.into_any_element()),
+        theme,
+    );
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load services: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "services-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "services-retry-btn",
+            format!("Failed to load services: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let mode = services_presentation_mode(state);
@@ -590,45 +584,14 @@ pub fn render_services_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Services"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "services-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "services-retry-btn",
+                "Unable to Load Services",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         ServicesPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -648,12 +611,13 @@ pub fn render_services_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|s| render_service_cell(s, col, col_theme))
+                        .map(|s| render_service_cell(idx, s, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(svc) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, svc, event, window, cx);
@@ -676,9 +640,9 @@ pub fn render_services_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_4()
+        .gap_0()
+        .child(header)
         .child(summary_row)
-        .child(toolbar)
         .when(mode == ServicesPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })

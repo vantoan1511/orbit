@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, SharedString, Window, div, prelude::*,
-    px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::DeploymentInfo;
@@ -14,12 +14,14 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{DeploymentsLoadStatus, DeploymentsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
     format_images_summary, format_short_image, numeric_metric_text_color, parse_age_seconds,
-    render_action_button, render_ratio_metric_cell, table_numeric_font,
+    render_action_button, render_images_cell, render_ratio_metric_cell,
+    render_resource_error_banner, render_resource_error_state, render_resource_view_header,
+    render_truncated_cell, table_numeric_font,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,22 +149,30 @@ pub fn deployments_presentation_mode(state: &DeploymentsState) -> DeploymentsPre
 }
 
 fn render_deployment_cell(
+    row_idx: usize,
     dep: &DeploymentInfo,
     col: &TableColumn,
     theme: &OrbitTheme,
 ) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(dep.name.clone())
-            .into_any_element(),
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(dep.namespace.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("dep-name"), row_idx as u64),
+            dep.name.clone(),
+            Some(SharedString::from(dep.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("dep-ns"), row_idx as u64),
+            dep.namespace.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
         "status" => render_status_badge_from_str(&dep.status, StatusBadgeVariant::Inline, theme),
         "replicas" => render_ratio_metric_cell(
             dep.replicas.current.to_string(),
@@ -179,40 +189,20 @@ fn render_deployment_cell(
             .text_color(numeric_metric_text_color(theme))
             .child(dep.available.to_string())
             .into_any_element(),
-        "strategy" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(dep.strategy.as_deref().unwrap_or("-").to_string())
-            .into_any_element(),
-        "images" => {
-            let (primary, extra) = format_images_summary(&dep.images);
-            div()
-                .flex()
-                .items_center()
-                .gap_1p5()
-                .min_w(px(0.0))
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font(theme.typography.mono_font(FontWeight::NORMAL))
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(primary),
-                )
-                .when(extra > 0, |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_1p5()
-                            .py_0p5()
-                            .flex_shrink_0()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.surface.bg_hover)
-                            .font(table_numeric_font(theme))
-                            .text_color(theme.text.muted)
-                            .child(format!("+{extra}")),
-                    )
-                })
-                .into_any_element()
-        }
+        "strategy" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("dep-strat"), row_idx as u64),
+            dep.strategy.as_deref().unwrap_or("-").to_string(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
+        "images" => render_images_cell(
+            ElementId::NamedInteger(SharedString::from("dep-img"), row_idx as u64),
+            &dep.images,
+            theme,
+        ),
         "age" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(theme.text.muted)
@@ -277,6 +267,7 @@ pub fn render_deployments_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
         + Fn(SharedString, &DeploymentInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
@@ -299,76 +290,23 @@ pub fn render_deployments_view(
         format!("{visible_count} of {total_count} deployments")
     };
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        );
+    let header = render_resource_view_header(
+        WorkspaceView::Deployments.label(),
+        WorkspaceView::Deployments.description(),
+        count_label,
+        Some(namespaces),
+        None,
+        theme,
+    );
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load deployments: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "deployments-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "deployments-retry-btn",
+            format!("Failed to load deployments: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let body = match deployments_presentation_mode(state) {
@@ -377,45 +315,14 @@ pub fn render_deployments_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Deployments"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "deployments-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "deployments-retry-btn",
+                "Unable to Load Deployments",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         DeploymentsPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -435,12 +342,13 @@ pub fn render_deployments_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|d| render_deployment_cell(d, col, col_theme))
+                        .map(|d| render_deployment_cell(idx, d, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(deployment) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, deployment, event, window, cx);
@@ -463,8 +371,8 @@ pub fn render_deployments_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_4()
-        .child(toolbar)
+        .gap_0()
+        .child(header)
         .when(
             deployments_presentation_mode(state) == DeploymentsPresentationMode::Table,
             |el| el.when_some(error_banner, |el, banner| el.child(banner)),
@@ -675,7 +583,7 @@ pub fn render_deployment_drawer_overview(
         .p_4()
         .flex()
         .flex_col()
-        .gap_5()
+        .gap_4()
         .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
         .child(containers_section)
         .when_some(ports_section, |el, sec| el.child(sec))

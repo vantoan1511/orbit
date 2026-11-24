@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, SharedString, Window, div, prelude::*,
-    px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, PersistentVolumeClaimInfo};
@@ -12,17 +12,20 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{
-    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
+    ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, TextTooltip,
+    render_status_badge_from_str,
 };
 use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{
     NamespaceFilterState, PersistentVolumeClaimsLoadStatus, PersistentVolumeClaimsState,
 };
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::persistent_volumes::parse_storage_capacity_gib;
 use crate::views::{
-    parse_age_seconds, render_action_button, render_drawer_events_list, render_drawer_key_values,
-    render_drawer_section,
+    parse_age_seconds, render_drawer_events_list, render_drawer_key_values, render_drawer_section,
+    render_resource_error_banner, render_resource_error_state, render_resource_view_header,
+    render_truncated_cell,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,6 +158,7 @@ pub fn persistent_volume_claims_presentation_mode(
 }
 
 fn render_persistent_volume_claim_cell(
+    row_idx: usize,
     pvc: &PersistentVolumeClaimInfo,
     col: &TableColumn,
     theme: &OrbitTheme,
@@ -162,41 +166,60 @@ fn render_persistent_volume_claim_cell(
     let is_lost = pvc.status.eq_ignore_ascii_case("lost");
 
     match col.id.as_ref() {
-        "name" => div()
-            .flex()
-            .items_center()
-            .gap_1p5()
-            .min_w(px(0.0))
-            .when(is_lost, |el| {
-                el.child(render_icon(
-                    Icon::AlertCircle,
-                    px(13.0),
-                    theme.semantic.danger.solid,
+        "name" => {
+            let tip = SharedString::from(pvc.name.clone());
+            div()
+                .id(ElementId::NamedInteger(
+                    SharedString::from("pvc-name"),
+                    row_idx as u64,
                 ))
-            })
-            .child(
-                apply_text_step(div(), theme.typography.size_xs)
-                    .font_weight(FontWeight::MEDIUM)
-                    .text_color(theme.text.primary)
-                    .truncate()
-                    .child(pvc.name.clone()),
-            )
-            .into_any_element(),
-        "namespace" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(pvc.namespace.clone())
-            .into_any_element(),
-        "volume" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if pvc.volume == "-" {
+                .flex()
+                .items_center()
+                .gap_1p5()
+                .min_w(px(0.0))
+                .flex_1()
+                .overflow_hidden()
+                .tooltip(move |_window, cx| cx.new(|_| TextTooltip::new(tip.clone())).into())
+                .when(is_lost, |el| {
+                    el.child(render_icon(
+                        Icon::AlertCircle,
+                        px(13.0),
+                        theme.semantic.danger.solid,
+                    ))
+                })
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .min_w(px(0.0))
+                        .flex_1()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.text.primary)
+                        .truncate()
+                        .child(pvc.name.clone()),
+                )
+                .into_any_element()
+        }
+        "namespace" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pvc-ns"), row_idx as u64),
+            pvc.namespace.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
+        "volume" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pvc-vol"), row_idx as u64),
+            pvc.volume.clone(),
+            (pvc.volume != "-").then(|| SharedString::from(pvc.volume.clone())),
+            if pvc.volume == "-" {
                 theme.text.muted
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(pvc.volume.clone())
-            .into_any_element(),
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "capacity" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(if pvc.capacity == "-" {
@@ -207,25 +230,32 @@ fn render_persistent_volume_claim_cell(
             .truncate()
             .child(pvc.capacity.clone())
             .into_any_element(),
-        "access_mode" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(if pvc.access_mode == "-" {
+        "access_mode" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pvc-mode"), row_idx as u64),
+            pvc.access_mode.clone(),
+            None,
+            if pvc.access_mode == "-" {
                 theme.text.muted
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(pvc.access_mode.clone())
-            .into_any_element(),
-        "storage_class" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(if pvc.storage_class == "-" {
+            },
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
+        "storage_class" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("pvc-sc"), row_idx as u64),
+            pvc.storage_class.clone(),
+            None,
+            if pvc.storage_class == "-" {
                 theme.text.muted
             } else {
                 theme.text.secondary
-            })
-            .truncate()
-            .child(pvc.storage_class.clone())
-            .into_any_element(),
+            },
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "status" => render_status_badge_from_str(&pvc.status, StatusBadgeVariant::Inline, theme),
         "age" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
@@ -287,8 +317,6 @@ pub fn build_persistent_volume_claim_context_menu_entries(
     ]
 }
 
-type RefreshCallback = Rc<dyn Fn(&mut Window, &mut App)>;
-
 #[allow(clippy::too_many_arguments)]
 pub fn render_persistent_volume_claims_view(
     state: &PersistentVolumeClaimsState,
@@ -296,6 +324,7 @@ pub fn render_persistent_volume_claims_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
         + Fn(SharedString, &PersistentVolumeClaimInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
@@ -315,7 +344,7 @@ pub fn render_persistent_volume_claims_view(
     let visible_count = filtered_rows.len();
     let is_loading = state.status == PersistentVolumeClaimsLoadStatus::Loading;
     let presentation_mode = persistent_volume_claims_presentation_mode(state);
-    let on_refresh_rc: RefreshCallback = Rc::new(on_refresh);
+    let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = if namespaces.is_all_namespaces() {
         format!("{total_count} claims")
@@ -323,79 +352,24 @@ pub fn render_persistent_volume_claims_view(
         format!("{visible_count} of {total_count} claims")
     };
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .flex_shrink_0()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .font_weight(FontWeight::MEDIUM)
-                        .text_color(theme.text.secondary)
-                        .child(count_label),
-                )
-                .when(!namespaces.is_all_namespaces(), |el| {
-                    el.child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .px_2()
-                            .py_0p5()
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.accent.soft)
-                            .text_color(theme.accent.accent)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(format!("Namespace: {}", namespaces.summary_label())),
-                    )
-                }),
-        );
+    let header = render_resource_view_header(
+        WorkspaceView::PersistentVolumeClaims.label(),
+        WorkspaceView::PersistentVolumeClaims.description(),
+        count_label,
+        Some(namespaces),
+        None,
+        theme,
+    );
 
     let error_banner = if presentation_mode == PersistentVolumeClaimsPresentationMode::Table {
         state.error_message.as_ref().map(|message| {
-            div()
-                .flex_shrink_0()
-                .px_3()
-                .py_2()
-                .rounded(theme.style.radius_control)
-                .border_1()
-                .border_color(theme.semantic.danger.solid)
-                .bg(theme.semantic.danger.soft)
-                .flex()
-                .items_center()
-                .justify_between()
-                .gap_3()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .min_w(px(0.0))
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(14.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .text_color(theme.text.primary)
-                                .truncate()
-                                .child(format!(
-                                    "Failed to load persistent volume claims: {message}"
-                                )),
-                        ),
-                )
-                .child(render_action_button(
-                    "persistent-volume-claims-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc.clone(),
-                ))
+            render_resource_error_banner(
+                "persistent-volume-claims-retry-btn",
+                format!("Failed to load persistent volume claims: {message}"),
+                is_loading,
+                theme,
+                on_refresh_rc.clone(),
+            )
         })
     } else {
         None
@@ -407,45 +381,14 @@ pub fn render_persistent_volume_claims_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Volume Claims"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "persistent-volume-claims-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "persistent-volume-claims-retry-btn",
+                "Unable to Load Volume Claims",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         PersistentVolumeClaimsPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -466,12 +409,13 @@ pub fn render_persistent_volume_claims_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|pvc| render_persistent_volume_claim_cell(pvc, col, col_theme))
+                        .map(|pvc| render_persistent_volume_claim_cell(idx, pvc, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(pvc) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, pvc, event, window, cx);
@@ -494,8 +438,8 @@ pub fn render_persistent_volume_claims_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_3()
-        .child(toolbar)
+        .gap_0()
+        .child(header)
         .when_some(error_banner, |el, banner| el.child(banner))
         .child(body)
         .into_any_element()

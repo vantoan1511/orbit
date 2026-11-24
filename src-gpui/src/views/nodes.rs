@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, FontWeight, MouseDownEvent, Rgba, SharedString, Window, div,
-    prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
+    div, prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::NodeInfo;
@@ -16,10 +16,13 @@ use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge,
     render_status_badge_from_str,
 };
-use crate::icons::render_icon;
+use crate::navigation::WorkspaceView;
 use crate::state::{NodesLoadStatus, NodesState};
 use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
-use crate::views::{parse_age_seconds, render_action_button};
+use crate::views::{
+    parse_age_seconds, render_resource_error_banner, render_resource_error_state,
+    render_resource_view_header, render_truncated_cell,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodesPresentationMode {
@@ -254,14 +257,22 @@ pub fn nodes_presentation_mode(state: &NodesState) -> NodesPresentationMode {
     }
 }
 
-fn render_node_cell(node: &NodeInfo, col: &TableColumn, theme: &OrbitTheme) -> AnyElement {
+fn render_node_cell(
+    row_idx: usize,
+    node: &NodeInfo,
+    col: &TableColumn,
+    theme: &OrbitTheme,
+) -> AnyElement {
     match col.id.as_ref() {
-        "name" => apply_text_step(div(), theme.typography.size_xs)
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(theme.text.primary)
-            .truncate()
-            .child(node.name.clone())
-            .into_any_element(),
+        "name" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("node-name"), row_idx as u64),
+            node.name.clone(),
+            Some(SharedString::from(node.name.clone())),
+            theme.text.primary,
+            FontWeight::MEDIUM,
+            false,
+            theme,
+        ),
         "status" => div()
             .flex()
             .items_center()
@@ -281,17 +292,24 @@ fn render_node_cell(node: &NodeInfo, col: &TableColumn, theme: &OrbitTheme) -> A
                 ))
             })
             .into_any_element(),
-        "role" => apply_text_step(div(), theme.typography.size_xs)
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(node.role.clone())
-            .into_any_element(),
-        "version" => apply_text_step(div(), theme.typography.size_xs)
-            .font(theme.typography.mono_font(FontWeight::NORMAL))
-            .text_color(theme.text.secondary)
-            .truncate()
-            .child(node.version.clone())
-            .into_any_element(),
+        "role" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("node-role"), row_idx as u64),
+            node.role.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            false,
+            theme,
+        ),
+        "version" => render_truncated_cell(
+            ElementId::NamedInteger(SharedString::from("node-ver"), row_idx as u64),
+            node.version.clone(),
+            None,
+            theme.text.secondary,
+            FontWeight::NORMAL,
+            true,
+            theme,
+        ),
         "cpu" => apply_text_step(div(), theme.typography.size_xs)
             .font(theme.typography.mono_font(FontWeight::NORMAL))
             .text_color(theme.text.primary)
@@ -412,6 +430,7 @@ pub fn render_nodes_view(
     theme: &OrbitTheme,
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
+    on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
         + Fn(SharedString, &NodeInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
@@ -427,58 +446,30 @@ pub fn render_nodes_view(
     let is_loading = state.status == NodesLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let toolbar = div()
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
+    let header = render_resource_view_header(
+        WorkspaceView::Nodes.label(),
+        WorkspaceView::Nodes.description(),
+        format!("{total_count} nodes"),
+        None,
+        None,
+        theme,
+    );
+
+    let summary_row = div()
+        .w_full()
+        .px_4()
+        .pb_3()
         .flex_shrink_0()
-        .child(
-            apply_text_step(div(), theme.typography.size_xs)
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(theme.text.secondary)
-                .child(format!("{total_count} nodes")),
-        );
+        .child(render_summary_cards_row(&state.nodes, theme));
 
     let error_banner = state.error_message.as_ref().map(|message| {
-        div()
-            .flex_shrink_0()
-            .px_3()
-            .py_2()
-            .rounded(theme.style.radius_control)
-            .border_1()
-            .border_color(theme.semantic.danger.solid)
-            .bg(theme.semantic.danger.soft)
-            .flex()
-            .items_center()
-            .justify_between()
-            .gap_3()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_2()
-                    .min_w(px(0.0))
-                    .child(render_icon(
-                        Icon::AlertTriangle,
-                        px(14.0),
-                        theme.semantic.danger.solid,
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.primary)
-                            .truncate()
-                            .child(format!("Failed to load nodes: {message}")),
-                    ),
-            )
-            .child(render_action_button(
-                "nodes-retry-btn",
-                Icon::RotateCcw,
-                "Retry",
-                is_loading,
-                theme,
-                on_refresh_rc.clone(),
-            ))
+        render_resource_error_banner(
+            "nodes-retry-btn",
+            format!("Failed to load nodes: {message}"),
+            is_loading,
+            theme,
+            on_refresh_rc.clone(),
+        )
     });
 
     let body = match nodes_presentation_mode(state) {
@@ -487,45 +478,14 @@ pub fn render_nodes_view(
                 .error_message
                 .clone()
                 .unwrap_or_else(|| "Unknown error".to_string());
-            theme
-                .style_card(div())
-                .flex()
-                .flex_col()
-                .items_start()
-                .gap_3()
-                .p_6()
-                .bg(theme.surface.bg_panel)
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(render_icon(
-                            Icon::AlertTriangle,
-                            px(16.0),
-                            theme.semantic.danger.solid,
-                        ))
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Unable to Load Nodes"),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(message),
-                )
-                .child(render_action_button(
-                    "nodes-retry-btn",
-                    Icon::RotateCcw,
-                    "Retry",
-                    is_loading,
-                    theme,
-                    on_refresh_rc,
-                ))
-                .into_any_element()
+            render_resource_error_state(
+                "nodes-retry-btn",
+                "Unable to Load Nodes",
+                message,
+                is_loading,
+                theme,
+                on_refresh_rc,
+            )
         }
         NodesPresentationMode::Table => {
             let mut table_state = state.table.clone();
@@ -545,12 +505,13 @@ pub fn render_nodes_view(
                 move |idx, col, col_theme| {
                     cell_rows
                         .get(idx)
-                        .map(|node| render_node_cell(node, col, col_theme))
+                        .map(|node| render_node_cell(idx, node, col, col_theme))
                         .unwrap_or_else(|| div().into_any_element())
                 },
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_row_quick_yaml(on_row_quick_yaml)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(node) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, node, event, window, cx);
@@ -573,9 +534,9 @@ pub fn render_nodes_view(
         .flex_col()
         .flex_1()
         .min_h(px(0.0))
-        .gap_3()
-        .child(render_summary_cards_row(&state.nodes, theme))
-        .child(toolbar)
+        .gap_0()
+        .child(header)
+        .child(summary_row)
         .when(
             nodes_presentation_mode(state) == NodesPresentationMode::Table,
             |el| el.when_some(error_banner, |inner, banner| inner.child(banner)),
@@ -839,7 +800,7 @@ pub fn render_node_drawer_overview(node: &NodeInfo, theme: &OrbitTheme) -> AnyEl
         .p_4()
         .flex()
         .flex_col()
-        .gap_5()
+        .gap_4()
         .child(crate::views::render_drawer_section(
             "RESOURCE UTILIZATION",
             utilization,

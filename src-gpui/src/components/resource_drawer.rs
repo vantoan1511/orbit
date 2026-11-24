@@ -499,6 +499,10 @@ pub struct ResourceDrawerProps {
     pub body: AnyElement,
 }
 
+pub fn drawer_uses_drop_shadow(theme: &OrbitTheme) -> bool {
+    theme.style.is_translucent && !theme.style.overlay_shadows.is_empty()
+}
+
 pub fn render_resource_drawer(
     is_open: bool,
     props: Option<ResourceDrawerProps>,
@@ -538,7 +542,7 @@ pub fn render_resource_drawer(
     let header = div()
         .w_full()
         .px_4()
-        .pt_3p5()
+        .pt_3()
         .pb_3()
         .border_b_1()
         .border_color(theme.border.default)
@@ -672,7 +676,7 @@ pub fn render_resource_drawer(
         .flex_shrink_0()
         .bg(theme.surface.bg_card)
         .border_l_1()
-        .border_color(theme.border.strong)
+        .border_color(theme.border.default)
         .flex()
         .flex_col()
         .on_mouse_down(MouseButton::Left, |_, _, cx| {
@@ -694,7 +698,7 @@ pub fn render_resource_drawer(
                 .child(props.body),
         );
 
-    if !theme.style.overlay_shadows.is_empty() {
+    if drawer_uses_drop_shadow(theme) {
         container = container.shadow(theme.style.overlay_shadows.clone());
     }
 
@@ -1315,5 +1319,37 @@ mod tests {
                 name: "default-limits".to_string(),
             })
         );
+    }
+
+    #[test]
+    fn test_drawer_uses_drop_shadow_only_for_translucent_styles() {
+        use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
+        use gpui::WindowAppearance;
+
+        let flat_dark = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+        let paper_light = OrbitTheme::resolve(
+            ThemeMode::Light,
+            UiStyle::Paper,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Light,
+        );
+        let glass_dark = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Glass,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+
+        assert!(!drawer_uses_drop_shadow(&flat_dark));
+        assert!(!drawer_uses_drop_shadow(&paper_light));
+        assert!(drawer_uses_drop_shadow(&glass_dark));
     }
 }
