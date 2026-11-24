@@ -4,9 +4,10 @@ use gpui::ScrollHandle;
 use orbit_core::config::{OrbitConfig, SelectedNamespacesMap};
 use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
-    ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, IngressInfo,
-    JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeClaimInfo, PersistentVolumeInfo, PodInfo,
-    PolicyInfo, ReplicaSetInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
+    ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, HpaInfo,
+    IngressInfo, JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeClaimInfo, PersistentVolumeInfo,
+    PodInfo, PolicyInfo, ReplicaSetInfo, SecretInfo, ServiceInfo, StatefulSetInfo,
+    StorageClassInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::storage_overview::StorageOverviewSnapshot;
@@ -125,6 +126,22 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadResourceQuotas {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadHpas {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadStorageClasses {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadSecurityOverview {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadAdmissionWebhooks {
         cluster_id: String,
         generation: u64,
     },
@@ -374,6 +391,46 @@ pub enum ClusterBridgeEvent {
         policies: Vec<PolicyInfo>,
     },
     PodSecurityLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    HpasLoaded {
+        cluster_id: String,
+        generation: u64,
+        hpas: Vec<HpaInfo>,
+    },
+    HpasLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    StorageClassesLoaded {
+        cluster_id: String,
+        generation: u64,
+        classes: Vec<StorageClassInfo>,
+    },
+    StorageClassesLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    SecurityOverviewLoaded {
+        cluster_id: String,
+        generation: u64,
+        policies: Vec<PolicyInfo>,
+    },
+    SecurityOverviewLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    AdmissionWebhooksLoaded {
+        cluster_id: String,
+        generation: u64,
+        policies: Vec<PolicyInfo>,
+    },
+    AdmissionWebhooksLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -1139,8 +1196,7 @@ impl ReplicaSetsState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == ReplicaSetsLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == ReplicaSetsLoadStatus::Idle
     }
 }
 
@@ -2403,8 +2459,310 @@ impl PodSecurityState {
     }
 
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
-        self.cluster_id.as_deref() != Some(cluster_id)
-            || self.status == PodSecurityLoadStatus::Idle
+        self.cluster_id.as_deref() != Some(cluster_id) || self.status == PodSecurityLoadStatus::Idle
+    }
+}
+
+/// Defines a cluster-scoped, generation-guarded list state machine.
+/// Namespace filtering is applied client-side by the views (see `NamespaceFilterState`).
+macro_rules! cluster_list_state {
+    ($state:ident, $status:ident, $field:ident, $item:ty, $cmd:ident) => {
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+        pub enum $status {
+            #[default]
+            Idle,
+            Loading,
+            Loaded,
+            Error,
+        }
+
+        #[derive(Debug, Clone, Default)]
+        pub struct $state {
+            pub cluster_id: Option<String>,
+            pub generation: u64,
+            pub status: $status,
+            pub $field: Vec<$item>,
+            pub error_message: Option<String>,
+            pub table: DataTableState,
+        }
+
+        impl $state {
+            pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+                let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+                self.generation += 1;
+                self.cluster_id = Some(cluster_id.to_string());
+                self.status = $status::Loading;
+                self.error_message = None;
+                if switching_cluster {
+                    self.$field.clear();
+                    self.table.selected_row_key = None;
+                }
+                self.table.loading = self.$field.is_empty();
+                ClusterBridgeCommand::$cmd {
+                    cluster_id: cluster_id.to_string(),
+                    generation: self.generation,
+                }
+            }
+
+            pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+                let cluster_id = self.cluster_id.clone()?;
+                self.generation += 1;
+                self.status = $status::Loading;
+                self.error_message = None;
+                self.table.loading = self.$field.is_empty();
+                Some(ClusterBridgeCommand::$cmd {
+                    cluster_id,
+                    generation: self.generation,
+                })
+            }
+
+            pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+                self.generation += 1;
+                self.cluster_id = Some(cluster_id.to_string());
+                self.clear_to_idle();
+            }
+
+            pub fn reset_for_disconnected(&mut self) {
+                self.generation += 1;
+                self.cluster_id = None;
+                self.clear_to_idle();
+            }
+
+            fn clear_to_idle(&mut self) {
+                self.status = $status::Idle;
+                self.$field.clear();
+                self.error_message = None;
+                self.table.selected_row_key = None;
+                self.table.loading = false;
+            }
+
+            pub fn apply_loaded(
+                &mut self,
+                cluster_id: &str,
+                generation: u64,
+                items: Vec<$item>,
+            ) -> bool {
+                if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+                    self.status = $status::Loaded;
+                    self.$field = items;
+                    self.error_message = None;
+                    self.table.loading = false;
+                    true
+                } else {
+                    false
+                }
+            }
+
+            pub fn apply_failed(
+                &mut self,
+                cluster_id: &str,
+                generation: u64,
+                message: String,
+            ) -> bool {
+                if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+                    self.status = $status::Error;
+                    self.error_message = Some(message);
+                    self.table.loading = false;
+                    true
+                } else {
+                    false
+                }
+            }
+
+            pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+                self.cluster_id.as_deref() != Some(cluster_id) || self.status == $status::Idle
+            }
+        }
+    };
+}
+
+cluster_list_state!(HpasState, HpasLoadStatus, hpas, HpaInfo, LoadHpas);
+cluster_list_state!(
+    StorageClassesState,
+    StorageClassesLoadStatus,
+    classes,
+    StorageClassInfo,
+    LoadStorageClasses
+);
+cluster_list_state!(
+    SecurityOverviewState,
+    SecurityOverviewLoadStatus,
+    policies,
+    PolicyInfo,
+    LoadSecurityOverview
+);
+cluster_list_state!(
+    AdmissionWebhooksState,
+    AdmissionWebhooksLoadStatus,
+    policies,
+    PolicyInfo,
+    LoadAdmissionWebhooks
+);
+
+/// Read-only list views that share the same cluster-scoped load lifecycle
+/// (HPAs, StorageClasses, Security Overview, Admission Webhooks).
+#[derive(Debug, Clone, Default)]
+pub struct ClusterListViews {
+    pub hpas: HpasState,
+    pub storage_classes: StorageClassesState,
+    pub security_overview: SecurityOverviewState,
+    pub admission_webhooks: AdmissionWebhooksState,
+}
+
+impl ClusterListViews {
+    /// Returns the load command when `view` is one of these views and its data is stale.
+    pub fn load_command(
+        &mut self,
+        view: WorkspaceView,
+        cluster_id: &str,
+    ) -> Option<ClusterBridgeCommand> {
+        match view {
+            WorkspaceView::Hpas if self.hpas.needs_load_for_cluster(cluster_id) => {
+                Some(self.hpas.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::StorageClasses
+                if self.storage_classes.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.storage_classes.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::SecurityOverview
+                if self.security_overview.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.security_overview.begin_load_for_cluster(cluster_id))
+            }
+            WorkspaceView::AdmissionWebhooks
+                if self.admission_webhooks.needs_load_for_cluster(cluster_id) =>
+            {
+                Some(self.admission_webhooks.begin_load_for_cluster(cluster_id))
+            }
+            _ => None,
+        }
+    }
+
+    /// Loads the active view and resets the others when a cluster connects.
+    pub fn on_cluster_connected(
+        &mut self,
+        active_view: WorkspaceView,
+        cluster_id: &str,
+        commands: &mut Vec<ClusterBridgeCommand>,
+    ) {
+        macro_rules! connect {
+            ($state:expr, $view:expr) => {
+                if active_view == $view {
+                    commands.push($state.begin_load_for_cluster(cluster_id));
+                } else {
+                    $state.reset_for_cluster(cluster_id);
+                }
+            };
+        }
+        connect!(self.hpas, WorkspaceView::Hpas);
+        connect!(self.storage_classes, WorkspaceView::StorageClasses);
+        connect!(self.security_overview, WorkspaceView::SecurityOverview);
+        connect!(self.admission_webhooks, WorkspaceView::AdmissionWebhooks);
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.hpas.reset_for_disconnected();
+        self.storage_classes.reset_for_disconnected();
+        self.security_overview.reset_for_disconnected();
+        self.admission_webhooks.reset_for_disconnected();
+    }
+
+    /// Refresh commands for views that are active or already loaded for this cluster.
+    pub fn refresh_commands(
+        &mut self,
+        active_view: WorkspaceView,
+        cluster_id: &str,
+    ) -> Vec<ClusterBridgeCommand> {
+        let mut commands = Vec::new();
+        macro_rules! refresh {
+            ($state:expr, $view:expr) => {
+                if active_view == $view || $state.cluster_id.is_some() {
+                    commands.push(
+                        $state
+                            .begin_refresh()
+                            .unwrap_or_else(|| $state.begin_load_for_cluster(cluster_id)),
+                    );
+                }
+            };
+        }
+        refresh!(self.hpas, WorkspaceView::Hpas);
+        refresh!(self.storage_classes, WorkspaceView::StorageClasses);
+        refresh!(self.security_overview, WorkspaceView::SecurityOverview);
+        refresh!(self.admission_webhooks, WorkspaceView::AdmissionWebhooks);
+        commands
+    }
+
+    /// Applies a bridge event. Returns `true` when the event belonged to one of these views.
+    pub fn apply_event(&mut self, event: &ClusterBridgeEvent) -> bool {
+        match event {
+            ClusterBridgeEvent::HpasLoaded {
+                cluster_id,
+                generation,
+                hpas,
+            } => {
+                self.hpas
+                    .apply_loaded(cluster_id, *generation, hpas.clone());
+            }
+            ClusterBridgeEvent::HpasLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                self.hpas
+                    .apply_failed(cluster_id, *generation, message.clone());
+            }
+            ClusterBridgeEvent::StorageClassesLoaded {
+                cluster_id,
+                generation,
+                classes,
+            } => {
+                self.storage_classes
+                    .apply_loaded(cluster_id, *generation, classes.clone());
+            }
+            ClusterBridgeEvent::StorageClassesLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                self.storage_classes
+                    .apply_failed(cluster_id, *generation, message.clone());
+            }
+            ClusterBridgeEvent::SecurityOverviewLoaded {
+                cluster_id,
+                generation,
+                policies,
+            } => {
+                self.security_overview
+                    .apply_loaded(cluster_id, *generation, policies.clone());
+            }
+            ClusterBridgeEvent::SecurityOverviewLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                self.security_overview
+                    .apply_failed(cluster_id, *generation, message.clone());
+            }
+            ClusterBridgeEvent::AdmissionWebhooksLoaded {
+                cluster_id,
+                generation,
+                policies,
+            } => {
+                self.admission_webhooks
+                    .apply_loaded(cluster_id, *generation, policies.clone());
+            }
+            ClusterBridgeEvent::AdmissionWebhooksLoadFailed {
+                cluster_id,
+                generation,
+                message,
+            } => {
+                self.admission_webhooks
+                    .apply_failed(cluster_id, *generation, message.clone());
+            }
+            _ => return false,
+        }
+        true
     }
 }
 
@@ -3067,6 +3425,14 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::NetworkPoliciesLoadFailed { .. }
             | ClusterBridgeEvent::PodSecurityLoaded { .. }
             | ClusterBridgeEvent::PodSecurityLoadFailed { .. }
+            | ClusterBridgeEvent::HpasLoaded { .. }
+            | ClusterBridgeEvent::HpasLoadFailed { .. }
+            | ClusterBridgeEvent::StorageClassesLoaded { .. }
+            | ClusterBridgeEvent::StorageClassesLoadFailed { .. }
+            | ClusterBridgeEvent::SecurityOverviewLoaded { .. }
+            | ClusterBridgeEvent::SecurityOverviewLoadFailed { .. }
+            | ClusterBridgeEvent::AdmissionWebhooksLoaded { .. }
+            | ClusterBridgeEvent::AdmissionWebhooksLoadFailed { .. }
             | ClusterBridgeEvent::ResourceQuotasLoaded { .. }
             | ClusterBridgeEvent::ResourceQuotasLoadFailed { .. }
             | ClusterBridgeEvent::NodesLoaded { .. }
@@ -4163,11 +4529,7 @@ mod tests {
             1,
             vec![sample_replicaset("wrong-cluster", "default")],
         ));
-        assert!(!state.apply_loaded(
-            "ctx-a",
-            99,
-            vec![sample_replicaset("wrong-gen", "default")],
-        ));
+        assert!(!state.apply_loaded("ctx-a", 99, vec![sample_replicaset("wrong-gen", "default")],));
         assert!(state.replicasets.is_empty());
 
         // Matching cluster and generation is accepted.
@@ -5789,11 +6151,7 @@ mod tests {
         assert!(state.network_policies.is_empty());
         assert!(state.error_message.is_none());
         assert!(state.table.selected_row_key.is_none());
-        assert!(!state.apply_loaded(
-            "ctx-a",
-            2,
-            vec![sample_network_policy("stale", "prod")]
-        ));
+        assert!(!state.apply_loaded("ctx-a", 2, vec![sample_network_policy("stale", "prod")]));
 
         // Reset for disconnected clears cluster_id and rows
         state.reset_for_disconnected();
@@ -5840,6 +6198,164 @@ mod tests {
             rules: "hard:\n  cpu: '4'\n".to_string(),
             kind: kind.to_string(),
         }
+    }
+
+    fn sample_hpa(name: &str, namespace: &str) -> HpaInfo {
+        HpaInfo {
+            kind: "HorizontalPodAutoscaler".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Active".to_string(),
+            scale_target_ref: orbit_core::kubernetes::models::HpaTargetRef {
+                kind: "Deployment".to_string(),
+                name: name.to_string(),
+                api_version: None,
+            },
+            min_replicas: 1,
+            max_replicas: 5,
+            current_replicas: 2,
+            desired_replicas: 2,
+            metrics: Vec::new(),
+            metrics_summary: Vec::new(),
+            conditions: Vec::new(),
+            last_scale_time: None,
+            age: "1d".to_string(),
+            created: String::new(),
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    fn sample_storage_class(name: &str) -> StorageClassInfo {
+        StorageClassInfo {
+            name: name.to_string(),
+            provisioner: "kubernetes.io/aws-ebs".to_string(),
+            reclaim_policy: "Delete".to_string(),
+            volume_binding_mode: "Immediate".to_string(),
+            allow_volume_expansion: true,
+            age: "3d".to_string(),
+        }
+    }
+
+    macro_rules! list_state_test {
+        ($name:ident, $state:ident, $status:ident, $field:ident, $cmd:ident, $item:expr) => {
+            #[test]
+            fn $name() {
+                let mut state = $state::default();
+                assert!(state.needs_load_for_cluster("ctx-a"));
+                let cmd = state.begin_load_for_cluster("ctx-a");
+                assert_eq!(
+                    cmd,
+                    ClusterBridgeCommand::$cmd {
+                        cluster_id: "ctx-a".to_string(),
+                        generation: 1,
+                    }
+                );
+                assert_eq!(state.status, $status::Loading);
+                assert!(state.table.loading);
+
+                assert!(!state.apply_loaded("ctx-other", 1, vec![$item]));
+                assert!(!state.apply_loaded("ctx-a", 99, vec![$item]));
+                assert!(!state.apply_failed("ctx-a", 99, "stale".to_string()));
+
+                assert!(state.apply_loaded("ctx-a", 1, vec![$item]));
+                assert_eq!(state.status, $status::Loaded);
+                assert_eq!(state.$field.len(), 1);
+                assert!(!state.needs_load_for_cluster("ctx-a"));
+
+                assert!(state.begin_refresh().is_some());
+                assert!(state.apply_failed("ctx-a", 2, "forbidden".to_string()));
+                assert_eq!(state.status, $status::Error);
+                assert_eq!(state.error_message.as_deref(), Some("forbidden"));
+                assert_eq!(state.$field.len(), 1);
+
+                state.reset_for_cluster("ctx-b");
+                assert_eq!(state.status, $status::Idle);
+                assert!(state.$field.is_empty());
+                state.reset_for_disconnected();
+                assert!(state.cluster_id.is_none());
+            }
+        };
+    }
+
+    list_state_test!(
+        test_hpas_state_load_success_error_and_stale_generation,
+        HpasState,
+        HpasLoadStatus,
+        hpas,
+        LoadHpas,
+        sample_hpa("web", "prod")
+    );
+    list_state_test!(
+        test_storage_classes_state_load_success_error_and_stale_generation,
+        StorageClassesState,
+        StorageClassesLoadStatus,
+        classes,
+        LoadStorageClasses,
+        sample_storage_class("fast")
+    );
+    list_state_test!(
+        test_security_overview_state_load_success_error_and_stale_generation,
+        SecurityOverviewState,
+        SecurityOverviewLoadStatus,
+        policies,
+        LoadSecurityOverview,
+        sample_pod_security_policy("prod")
+    );
+    list_state_test!(
+        test_admission_webhooks_state_load_success_error_and_stale_generation,
+        AdmissionWebhooksState,
+        AdmissionWebhooksLoadStatus,
+        policies,
+        LoadAdmissionWebhooks,
+        sample_pod_security_policy("prod")
+    );
+
+    #[test]
+    fn test_cluster_list_views_load_apply_and_cluster_switch_reset() {
+        let mut views = ClusterListViews::default();
+        assert!(views.load_command(WorkspaceView::Pods, "ctx-a").is_none());
+        let cmd = views.load_command(WorkspaceView::Hpas, "ctx-a");
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::LoadHpas {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            })
+        );
+        assert!(views.apply_event(&ClusterBridgeEvent::HpasLoaded {
+            cluster_id: "ctx-a".to_string(),
+            generation: 1,
+            hpas: vec![sample_hpa("web", "prod")],
+        }));
+        assert!(!views.apply_event(&ClusterBridgeEvent::NodesLoadFailed {
+            cluster_id: "ctx-a".to_string(),
+            generation: 1,
+            message: "x".to_string(),
+        }));
+        assert_eq!(views.hpas.status, HpasLoadStatus::Loaded);
+
+        let mut commands = Vec::new();
+        views.on_cluster_connected(WorkspaceView::StorageClasses, "ctx-b", &mut commands);
+        assert_eq!(commands.len(), 1);
+        assert_eq!(views.hpas.status, HpasLoadStatus::Idle);
+        assert!(views.hpas.hpas.is_empty());
+        assert_eq!(
+            views.admission_webhooks.status,
+            AdmissionWebhooksLoadStatus::Idle
+        );
+        assert_eq!(
+            views.storage_classes.status,
+            StorageClassesLoadStatus::Loading
+        );
+
+        views.reset_for_disconnected();
+        assert_eq!(views.storage_classes.status, StorageClassesLoadStatus::Idle);
+        assert!(
+            views
+                .refresh_commands(WorkspaceView::Pods, "ctx-b")
+                .is_empty()
+        );
     }
 
     #[test]

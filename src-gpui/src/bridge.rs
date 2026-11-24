@@ -3,17 +3,19 @@ use std::sync::Arc;
 use orbit_core::kubernetes::batch::{fetch_cronjobs, fetch_jobs};
 use orbit_core::kubernetes::configmaps::fetch_configmaps;
 use orbit_core::kubernetes::events::fetch_events;
+use orbit_core::kubernetes::hpa::fetch_hpas;
 use orbit_core::kubernetes::ingresses::fetch_ingresses;
 use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::nodes::fetch_nodes;
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use orbit_core::kubernetes::policies::{
-    fetch_network_policies, fetch_pod_security_policies, fetch_resource_quotas_and_limits,
+    fetch_admission_webhooks, fetch_network_policies, fetch_pod_security_policies, fetch_policies,
+    fetch_resource_quotas_and_limits,
 };
 use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
-use orbit_core::kubernetes::storage::{fetch_pvcs, fetch_pvs};
+use orbit_core::kubernetes::storage::{fetch_pvcs, fetch_pvs, fetch_storage_classes};
 use orbit_core::kubernetes::storage_overview::fetch_storage_overview;
 use orbit_core::kubernetes::workloads::{
     fetch_daemonsets, fetch_deployments, fetch_pods, fetch_replicasets, fetch_statefulsets,
@@ -662,12 +664,11 @@ pub async fn handle_bridge_command(
                             });
                         }
                         Err(message) => {
-                            let _ =
-                                tx.send(ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed {
-                                    cluster_id,
-                                    generation,
-                                    message,
-                                });
+                            let _ = tx.send(ClusterBridgeEvent::PersistentVolumeClaimsLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
                         }
                     }
                 });
@@ -774,6 +775,154 @@ pub async fn handle_bridge_command(
                 });
             } else {
                 let _ = event_tx.send(ClusterBridgeEvent::PodSecurityLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadHpas {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_hpas(&client, None).await {
+                        Ok(hpas) => {
+                            let _ = tx.send(ClusterBridgeEvent::HpasLoaded {
+                                cluster_id,
+                                generation,
+                                hpas,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::HpasLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::HpasLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadStorageClasses {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_storage_classes(&client).await {
+                        Ok(classes) => {
+                            let _ = tx.send(ClusterBridgeEvent::StorageClassesLoaded {
+                                cluster_id,
+                                generation,
+                                classes,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::StorageClassesLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::StorageClassesLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadSecurityOverview {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_policies(&client, None).await {
+                        Ok(policies) => {
+                            let _ = tx.send(ClusterBridgeEvent::SecurityOverviewLoaded {
+                                cluster_id,
+                                generation,
+                                policies,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::SecurityOverviewLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::SecurityOverviewLoadFailed {
+                    cluster_id: cluster_id.clone(),
+                    generation,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::LoadAdmissionWebhooks {
+            cluster_id,
+            generation,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tokio::spawn(async move {
+                    match fetch_admission_webhooks(&client).await {
+                        Ok(policies) => {
+                            let _ = tx.send(ClusterBridgeEvent::AdmissionWebhooksLoaded {
+                                cluster_id,
+                                generation,
+                                policies,
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::AdmissionWebhooksLoadFailed {
+                                cluster_id,
+                                generation,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::AdmissionWebhooksLoadFailed {
                     cluster_id: cluster_id.clone(),
                     generation,
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
@@ -1923,6 +2072,52 @@ users:
                 assert!(!message.trim().is_empty());
             }
             other => panic!("Expected StorageOverviewLoadFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_load_hpas_storage_classes_security_webhooks_without_client_emit_failed() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let cases = [
+            (
+                ClusterBridgeCommand::LoadHpas {
+                    cluster_id: "missing-ctx".to_string(),
+                    generation: 30,
+                },
+                "HpasLoadFailed",
+            ),
+            (
+                ClusterBridgeCommand::LoadStorageClasses {
+                    cluster_id: "missing-ctx".to_string(),
+                    generation: 30,
+                },
+                "StorageClassesLoadFailed",
+            ),
+            (
+                ClusterBridgeCommand::LoadSecurityOverview {
+                    cluster_id: "missing-ctx".to_string(),
+                    generation: 30,
+                },
+                "SecurityOverviewLoadFailed",
+            ),
+            (
+                ClusterBridgeCommand::LoadAdmissionWebhooks {
+                    cluster_id: "missing-ctx".to_string(),
+                    generation: 30,
+                },
+                "AdmissionWebhooksLoadFailed",
+            ),
+        ];
+        for (command, expected) in cases {
+            handle_bridge_command(command, &manager, &event_tx).await;
+            let event = event_rx.recv().await;
+            let rendered = format!("{event:?}");
+            assert!(
+                rendered.contains(expected),
+                "expected {expected}, got {rendered}"
+            );
+            assert!(rendered.contains("missing-ctx"));
         }
     }
 }

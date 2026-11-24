@@ -6,8 +6,8 @@ use k8s_openapi::api::admissionregistration::v1::{
 use k8s_openapi::api::core::v1::{LimitRange, Namespace, ResourceQuota};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::{
-    api::{Api, ListParams},
     Client,
+    api::{Api, ListParams},
 };
 use tokio::join;
 
@@ -190,6 +190,65 @@ pub async fn fetch_policies(
         Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
         Ok(Err(err)) => Err(err.to_string()),
         Err(_) => Err("Timed out fetching policies after 10s".to_string()),
+    }
+}
+
+/// Maps Validating and Mutating webhook configurations to policy rows sorted by name.
+pub fn collect_admission_webhooks(
+    validating: &[ValidatingWebhookConfiguration],
+    mutating: &[MutatingWebhookConfiguration],
+) -> Vec<PolicyInfo> {
+    let mut rows: Vec<PolicyInfo> = validating
+        .iter()
+        .map(format_val_webhook)
+        .chain(mutating.iter().map(format_mut_webhook))
+        .collect();
+    rows.sort_by(|a, b| a.name.cmp(&b.name));
+    rows
+}
+
+/// Combines Validating and Mutating webhook list results.
+/// If both fail, returns Err with the primary API/transport error.
+/// If one succeeds and the other fails (e.g. partial RBAC), logs a warning and returns available rows.
+pub(crate) fn combine_admission_webhook_results<E: std::fmt::Display>(
+    val_res: Result<Vec<ValidatingWebhookConfiguration>, E>,
+    mut_res: Result<Vec<MutatingWebhookConfiguration>, E>,
+) -> Result<Vec<PolicyInfo>, E> {
+    match (val_res, mut_res) {
+        (Ok(val), Ok(mutating)) => Ok(collect_admission_webhooks(&val, &mutating)),
+        (Ok(val), Err(err)) => {
+            tracing::warn!(error = %err, "Failed to list MutatingWebhookConfigurations");
+            Ok(collect_admission_webhooks(&val, &[]))
+        }
+        (Err(err), Ok(mutating)) => {
+            tracing::warn!(error = %err, "Failed to list ValidatingWebhookConfigurations");
+            Ok(collect_admission_webhooks(&[], &mutating))
+        }
+        (Err(val_err), Err(mut_err)) => {
+            tracing::warn!(error = %mut_err, "Failed to list MutatingWebhookConfigurations");
+            Err(val_err)
+        }
+    }
+}
+
+/// Lists cluster-wide Validating and Mutating admission webhook configurations.
+pub async fn list_admission_webhooks(client: &Client) -> Result<Vec<PolicyInfo>, kube::Error> {
+    let lp = ListParams::default();
+    let val_api: Api<ValidatingWebhookConfiguration> = Api::all(client.clone());
+    let mut_api: Api<MutatingWebhookConfiguration> = Api::all(client.clone());
+    let (val_res, mut_res) = join!(val_api.list(&lp), mut_api.list(&lp));
+    combine_admission_webhook_results(
+        val_res.map(|list| list.items),
+        mut_res.map(|list| list.items),
+    )
+}
+
+pub async fn fetch_admission_webhooks(client: &Client) -> Result<Vec<PolicyInfo>, String> {
+    match tokio::time::timeout(POLICIES_FETCH_TIMEOUT, list_admission_webhooks(client)).await {
+        Ok(Ok(list)) => Ok(list),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Timed out fetching admission webhooks after 10s".to_string()),
     }
 }
 
@@ -792,6 +851,49 @@ mod tests {
     }
 
     #[test]
+    fn test_admission_webhook_policy_rows_have_webhook_kind() {
+        let val = ValidatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("b-validating".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mutating = MutatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("a-mutating".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let rows = collect_admission_webhooks(&[val], &[mutating]);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].name, "a-mutating");
+        assert_eq!(rows[0].kind, "MutatingWebhookConfiguration");
+        assert_eq!(rows[1].name, "b-validating");
+        assert_eq!(rows[1].kind, "ValidatingWebhookConfiguration");
+    }
+
+    #[test]
+    fn test_combine_admission_webhook_results_handles_partial_and_dual_error() {
+        let val = ValidatingWebhookConfiguration {
+            metadata: ObjectMeta {
+                name: Some("val-only".to_string()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let partial = combine_admission_webhook_results(Ok(vec![val]), Err("forbidden"));
+        let rows = partial.expect("partial success should return available rows");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "val-only");
+
+        let dual: Result<Vec<PolicyInfo>, &str> =
+            combine_admission_webhook_results(Err("val-err"), Err("mut-err"));
+        assert_eq!(dual.unwrap_err(), "val-err");
+    }
+
+    #[test]
     fn test_format_mut_webhook_sets_kind() {
         let p = MutatingWebhookConfiguration {
             metadata: ObjectMeta {
@@ -1052,9 +1154,11 @@ mod tests {
                 ..Default::default()
             }),
         };
-        assert!(format_network_policy(&netpol)
-            .rules
-            .contains("policyTypes:"));
+        assert!(
+            format_network_policy(&netpol)
+                .rules
+                .contains("policyTypes:")
+        );
 
         let limit_range = LimitRange {
             metadata: ObjectMeta {
@@ -1080,9 +1184,11 @@ mod tests {
                 ..Default::default()
             }]),
         };
-        assert!(format_val_webhook(&val_wh)
-            .rules
-            .contains("val.example.com"));
+        assert!(
+            format_val_webhook(&val_wh)
+                .rules
+                .contains("val.example.com")
+        );
 
         let mut_wh = MutatingWebhookConfiguration {
             metadata: ObjectMeta {
@@ -1094,9 +1200,11 @@ mod tests {
                 ..Default::default()
             }]),
         };
-        assert!(format_mut_webhook(&mut_wh)
-            .rules
-            .contains("mut.example.com"));
+        assert!(
+            format_mut_webhook(&mut_wh)
+                .rules
+                .contains("mut.example.com")
+        );
 
         let mut labels = BTreeMap::new();
         labels.insert(
@@ -1114,9 +1222,10 @@ mod tests {
         let Some(psa) = format_pod_security_namespace(&ns) else {
             panic!("should format PSA policy");
         };
-        assert!(psa
-            .rules
-            .contains("pod-security.kubernetes.io/enforce: restricted"));
+        assert!(
+            psa.rules
+                .contains("pod-security.kubernetes.io/enforce: restricted")
+        );
     }
 
     #[test]
