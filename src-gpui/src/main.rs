@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod add_cluster_state;
 mod bridge;
 pub mod components;
 pub mod icons;
@@ -11,9 +12,9 @@ pub mod views;
 
 use gpui::{
     AnyElement, App, Application, Bounds, ClipboardItem, Context, CursorStyle, FocusHandle,
-    FontWeight, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, Pixels, Point, Rgba,
-    SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations, WindowOptions, div,
-    prelude::*, px, size,
+    FontWeight, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, PathPromptOptions,
+    Pixels, Point, Rgba, SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations,
+    WindowOptions, div, prelude::*, px, size,
 };
 use lucide_icons::Icon;
 use orbit_core::config::OrbitConfig;
@@ -22,17 +23,19 @@ use tokio::sync::mpsc;
 
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
-    ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, ResourceDrawerProps,
-    ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
-    TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks, YamlLoadStatus, YamlViewerProps,
-    build_tab_context_menu_entries, render_context_menu_overlay, render_custom_titlebar,
-    render_resource_drawer, render_tab_resource_picker_overlay, render_workspace_tab_bar,
-    render_yaml_viewer, resolve_window_chrome_style,
+    AddClusterModalCallbacks, ContextMenuEntry, ContextMenuKeyAction, ContextMenuState,
+    ResourceDrawerProps, ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId,
+    ResourceDrawerTarget, TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks,
+    YamlLoadStatus, YamlViewerProps, build_tab_context_menu_entries, parse_hex_color,
+    render_add_cluster_modal, render_context_menu_overlay, render_custom_titlebar, render_resource_drawer,
+    render_tab_resource_picker_overlay, render_workspace_tab_bar, render_yaml_viewer,
+    resolve_window_chrome_style,
 };
 use crate::icons::render_icon;
 use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView};
 use crate::state::{
-    ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState, ClusterOverviewState,
+    AddClusterKeyResult, AddClusterModalState, ClusterBridgeCommand, ClusterBridgeEvent,
+    ClusterConnectionState, ClusterOverviewState,
     ClusterSwitcherState, ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState,
     EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
@@ -113,16 +116,6 @@ pub fn format_cluster_status(
     }
 }
 
-fn parse_hex_color(hex: Option<&str>) -> Option<Rgba> {
-    let trimmed = hex?.trim();
-    let raw = trimmed.strip_prefix('#').unwrap_or(trimmed);
-    if raw.len() == 6 {
-        u32::from_str_radix(raw, 16).ok().map(rgb_hex)
-    } else {
-        None
-    }
-}
-
 fn cluster_display_label(cluster: &ClusterInfo) -> String {
     cluster
         .alias
@@ -134,7 +127,12 @@ fn cluster_display_label(cluster: &ClusterInfo) -> String {
 }
 
 fn cluster_dot_color(cluster: &ClusterInfo, theme: &OrbitTheme) -> Rgba {
-    parse_hex_color(cluster.color.as_deref()).unwrap_or_else(|| {
+    cluster
+        .color
+        .as_deref()
+        .map(str::trim)
+        .and_then(parse_hex_color)
+        .unwrap_or_else(|| {
         if cluster.status == "healthy" {
             theme.semantic.success.solid
         } else {
@@ -588,7 +586,17 @@ pub fn apply_cluster_event_with_tabs(
     tabs: &mut WorkspaceTabsState,
     event: ClusterBridgeEvent,
 ) -> Vec<ClusterBridgeCommand> {
-    let is_connected = matches!(&event, ClusterBridgeEvent::ClusterConnected { .. });
+    let is_connected = matches!(
+        &event,
+        ClusterBridgeEvent::ClusterConnected { .. }
+            | ClusterBridgeEvent::ClusterAdded {
+                switch_outcome: Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    healthy: true,
+                    ..
+                }),
+                ..
+            }
+    );
     let mut commands = apply_cluster_event_with_workspace(
         state,
         sidebar,
@@ -784,7 +792,14 @@ pub fn apply_cluster_event_with_workspace(
 ) -> Vec<ClusterBridgeCommand> {
     let mut commands = Vec::new();
     match event {
-        ClusterBridgeEvent::ClusterConnected { .. } => {
+        ClusterBridgeEvent::ClusterConnected { .. }
+        | ClusterBridgeEvent::ClusterAdded {
+            switch_outcome:
+                Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    healthy: true, ..
+                }),
+            ..
+        } => {
             state.apply_event(event);
             sidebar.on_cluster_connected();
             namespaces_view.reset_for_cluster();
@@ -895,7 +910,14 @@ pub fn apply_cluster_event_with_workspace(
             }
         }
         ClusterBridgeEvent::ClusterUnreachable { .. }
-        | ClusterBridgeEvent::ConnectionError { .. } => {
+        | ClusterBridgeEvent::ConnectionError { .. }
+        | ClusterBridgeEvent::ClusterAdded {
+            switch_outcome:
+                Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    healthy: false, ..
+                }),
+            ..
+        } => {
             state.apply_event(event);
             overview.reset_for_disconnected();
             workloads_overview.reset_for_disconnected();
@@ -1252,9 +1274,29 @@ pub fn apply_cluster_event_with_workspace(
         }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
+        | ClusterBridgeEvent::AddClusterFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
+        ClusterBridgeEvent::ClusterAdded { .. } => {
+            state.apply_event(event);
+        }
     }
     commands
+}
+
+pub fn apply_add_cluster_modal_event(
+    modal: &mut AddClusterModalState,
+    event: &ClusterBridgeEvent,
+) {
+    match event {
+        ClusterBridgeEvent::ClusterAdded { .. } => {
+            modal.close();
+        }
+        ClusterBridgeEvent::AddClusterFailed { message } => {
+            modal.is_submitting = false;
+            modal.submit_error = Some(message.clone());
+        }
+        _ => {}
+    }
 }
 
 pub fn apply_drawer_lifecycle_for_event(
@@ -1264,7 +1306,11 @@ pub fn apply_drawer_lifecycle_for_event(
     match event {
         ClusterBridgeEvent::ClusterConnected { .. }
         | ClusterBridgeEvent::ClusterUnreachable { .. }
-        | ClusterBridgeEvent::ConnectionError { .. } => {
+        | ClusterBridgeEvent::ConnectionError { .. }
+        | ClusterBridgeEvent::ClusterAdded {
+            switch_outcome: Some(_),
+            ..
+        } => {
             drawer.reset_for_context_change();
         }
         ClusterBridgeEvent::ResourceYamlLoaded {
@@ -1342,6 +1388,7 @@ pub struct OrbitShell {
     resolved_system_is_dark: bool,
     settings_error: Option<String>,
     context_menu: ContextMenuState,
+    add_cluster: AddClusterModalState,
 }
 
 impl OrbitShell {
@@ -1373,6 +1420,7 @@ impl OrbitShell {
                         if let ClusterBridgeEvent::SettingsSaveFailed { ref message } = event {
                             shell.settings_error = Some(message.clone());
                         }
+                        apply_add_cluster_modal_event(&mut shell.add_cluster, &event);
                         apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
                         for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
@@ -1480,7 +1528,242 @@ impl OrbitShell {
             resolved_system_is_dark,
             settings_error: None,
             context_menu: ContextMenuState::new(),
+            add_cluster: AddClusterModalState::default(),
         }
+    }
+
+    fn open_add_cluster_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.state.close_dropdown();
+        self.namespaces.close_dropdown();
+        self.context_menu.close();
+        self.add_cluster.open(&self.state.clusters);
+        self.focus_handle.focus(window);
+        cx.notify();
+    }
+
+    fn browse_kubeconfig_file(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        let paths_rx = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Select Kubeconfig File".into()),
+        });
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(paths))) = paths_rx.await else {
+                return;
+            };
+            let Some(path) = paths.into_iter().next() else {
+                return;
+            };
+            let path_str = path.to_string_lossy().to_string();
+            let read_result = cx
+                .background_executor()
+                .spawn(async move {
+                    std::fs::read_to_string(&path)
+                        .map_err(|e| format!("Failed to read kubeconfig file: {e}"))
+                })
+                .await;
+            let _ = this.update(cx, |shell, cx| {
+                shell.add_cluster.set_file_loaded(path_str, read_result);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn paste_into_add_cluster(&mut self, cx: &mut Context<Self>, target_yaml_tab: bool) {
+        let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) else {
+            return;
+        };
+        if target_yaml_tab {
+            self.add_cluster.set_yaml_content(text);
+        } else {
+            self.add_cluster.append_text_to_focused_field(&text);
+        }
+        cx.notify();
+    }
+
+    fn submit_add_cluster(&mut self, cx: &mut Context<Self>) {
+        if self.add_cluster.is_submitting {
+            return;
+        }
+        match self.add_cluster.build_request() {
+            Ok(req) => {
+                self.add_cluster.is_submitting = true;
+                self.add_cluster.submit_error = None;
+                self.dispatch_command(ClusterBridgeCommand::AddCluster(req));
+                cx.notify();
+            }
+            Err(err) => {
+                self.add_cluster.submit_error = Some(err);
+                cx.notify();
+            }
+        }
+    }
+
+    fn render_add_cluster_modal_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if !self.add_cluster.is_open {
+            return None;
+        }
+        let theme = OrbitTheme::get(cx).clone();
+        let entity = cx.entity().clone();
+
+        let callbacks = AddClusterModalCallbacks {
+            on_close: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.close();
+                        cx.notify();
+                    });
+                })
+            },
+            on_select_tab: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |tab, _, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.set_tab(tab);
+                        cx.notify();
+                    });
+                })
+            },
+            on_browse_file: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |window, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.browse_kubeconfig_file(window, cx);
+                    });
+                })
+            },
+            on_paste_yaml: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.paste_into_add_cluster(cx, true);
+                    });
+                })
+            },
+            on_clear_yaml: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.set_yaml_content(String::new());
+                        cx.notify();
+                    });
+                })
+            },
+            on_focus_field: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |field, window, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.focused_field = Some(field);
+                        shell.focus_handle.focus(window);
+                        cx.notify();
+                    });
+                })
+            },
+            on_select_auth_type: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |auth, _, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.set_manual_auth_type(auth);
+                        cx.notify();
+                    });
+                })
+            },
+            on_toggle_insecure_tls: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.toggle_insecure_skip_tls();
+                        cx.notify();
+                    });
+                })
+            },
+            on_toggle_context: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |name, _, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.toggle_context(&name);
+                        cx.notify();
+                    });
+                })
+            },
+            on_select_all_contexts: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.select_all_contexts();
+                        cx.notify();
+                    });
+                })
+            },
+            on_deselect_all_contexts: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.deselect_all_contexts();
+                        cx.notify();
+                    });
+                })
+            },
+            on_toggle_customization: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.customization_expanded =
+                            !shell.add_cluster.customization_expanded;
+                        cx.notify();
+                    });
+                })
+            },
+            on_select_color: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |color, _, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.color = color;
+                        cx.notify();
+                    });
+                })
+            },
+            on_add_tag: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.commit_tag_input();
+                        cx.notify();
+                    });
+                })
+            },
+            on_remove_tag: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |tag, _, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.remove_tag(&tag);
+                        cx.notify();
+                    });
+                })
+            },
+            on_toggle_switch_context: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.add_cluster.switch_context = !shell.add_cluster.switch_context;
+                        cx.notify();
+                    });
+                })
+            },
+            on_submit: {
+                let e = entity.clone();
+                std::rc::Rc::new(move |_, cx| {
+                    e.update(cx, |shell, cx| {
+                        shell.submit_add_cluster(cx);
+                    });
+                })
+            },
+        };
+
+        Some(render_add_cluster_modal(&self.add_cluster, &theme, &callbacks))
     }
 
     fn open_context_menu(
@@ -3789,10 +4072,43 @@ impl OrbitShell {
         let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
 
         if self.state.clusters.is_empty() {
-            return apply_text_step(div(), theme.typography.size_xs)
-                .p_3()
-                .text_color(theme.text.muted)
-                .child("No kubeconfig contexts found.")
+            return div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .p_2()
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .px_1()
+                        .text_color(theme.text.muted)
+                        .child("No kubeconfig contexts found."),
+                )
+                .child(
+                    theme
+                        .style_control(div())
+                        .id("sidebar-empty-add-cluster-btn")
+                        .px_2p5()
+                        .py_1p5()
+                        .bg(theme.accent.accent)
+                        .text_color(crate::theme::rgb_hex(0xffffff))
+                        .cursor_pointer()
+                        .hover(|s| s.bg(theme.accent.hover))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .gap_1p5()
+                        .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
+                        .on_click(cx.listener(|this, _event, window, cx| {
+                            this.open_add_cluster_modal(window, cx);
+                        }))
+                        .child(render_icon(
+                            Icon::Plus,
+                            px(12.0),
+                            crate::theme::rgb_hex(0xffffff),
+                        ))
+                        .child("Add Cluster"),
+                )
                 .into_any_element();
         }
 
@@ -3864,6 +4180,28 @@ impl OrbitShell {
                     ),
             );
         }
+
+        list = list.child(
+            div()
+                .id("sidebar-add-cluster-btn")
+                .mt_1()
+                .flex()
+                .items_center()
+                .gap_2()
+                .px_2p5()
+                .py_1p5()
+                .rounded(theme.style.radius_control)
+                .cursor_pointer()
+                .text_xs()
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(theme.accent.accent)
+                .hover(move |style| style.bg(hover_bg))
+                .on_click(cx.listener(|this, _event, window, cx| {
+                    this.open_add_cluster_modal(window, cx);
+                }))
+                .child(render_icon(Icon::Plus, px(12.0), theme.accent.accent))
+                .child("Add Cluster"),
+        );
 
         list.into_any_element()
     }
@@ -4407,7 +4745,28 @@ impl OrbitShell {
                                     self.state.clusters.len()
                                 )),
                         )
-                        .child(list),
+                        .child(list)
+                        .child(
+                            div()
+                                .id("dropdown-add-cluster-btn")
+                                .px_3()
+                                .py_2()
+                                .border_t_1()
+                                .border_color(theme.border.default)
+                                .flex()
+                                .items_center()
+                                .gap_2()
+                                .cursor_pointer()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(theme.accent.accent)
+                                .hover(move |s| s.bg(control_hover))
+                                .on_click(cx.listener(|this, _event, window, cx| {
+                                    this.open_add_cluster_modal(window, cx);
+                                }))
+                                .child(render_icon(Icon::Plus, px(12.0), theme.accent.accent))
+                                .child("Add Cluster"),
+                        ),
                 )
                 .into_any_element(),
         )
@@ -8351,12 +8710,19 @@ impl OrbitShell {
                             shell.refresh_workspace(cx);
                         });
                     };
+                    let add_entity = cx.entity().clone();
+                    let on_add_cluster = move |window: &mut Window, cx: &mut App| {
+                        add_entity.update(cx, |shell, cx| {
+                            shell.open_add_cluster_modal(window, cx);
+                        });
+                    };
                     views::welcome::render_welcome_view(
                         &self.state.clusters,
                         self.state.kubeconfig_error.as_deref(),
                         &theme,
                         on_select,
                         on_refresh,
+                        on_add_cluster,
                     )
                 }
                 ClusterConnectionState::Connecting {
@@ -8569,6 +8935,41 @@ impl Render for OrbitShell {
             .id("orbit-shell-root")
             .track_focus(&self.focus_handle)
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
+                if this.add_cluster.is_open {
+                    let key = event.keystroke.key.to_ascii_lowercase();
+                    let is_paste = (event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.platform)
+                        && key == "v";
+                    if is_paste {
+                        this.paste_into_add_cluster(cx, false);
+                        return;
+                    }
+                    if !(event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.alt
+                        || event.keystroke.modifiers.platform)
+                    {
+                        match this.add_cluster.handle_key_input(
+                            &key,
+                            event.keystroke.key_char.as_deref(),
+                        ) {
+                            AddClusterKeyResult::CloseModal => {
+                                this.add_cluster.close();
+                                cx.notify();
+                                return;
+                            }
+                            AddClusterKeyResult::Submit => {
+                                this.submit_add_cluster(cx);
+                                return;
+                            }
+                            AddClusterKeyResult::Consumed => {
+                                cx.notify();
+                                return;
+                            }
+                            AddClusterKeyResult::Ignored => {}
+                        }
+                    }
+                    return;
+                }
                 if this.context_menu.is_open {
                     let key = event.keystroke.key.to_ascii_lowercase();
                     let (action, callback) = this.context_menu.handle_key(&key);
@@ -8761,6 +9162,9 @@ impl Render for OrbitShell {
             .when_some(self.render_namespace_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
+            .when_some(self.render_add_cluster_modal_overlay(cx), |el, overlay| {
+                el.child(overlay)
+            })
             .when(self.tabs.picker_open, |el| {
                 let select_entity = cx.entity().clone();
                 let clear_entity = cx.entity().clone();
@@ -8951,6 +9355,167 @@ mod tests {
     use super::*;
     use crate::theme::{AccentColor, SemanticColorsPreference};
     use gpui::WindowBackgroundAppearance;
+
+    #[test]
+    fn test_apply_bridge_event_cluster_added_updates_clusters_and_handles_unreachable_outcome() {
+        let mut state = ClusterSwitcherState::default();
+        let mut sidebar = SidebarLayoutState::default();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut replicasets = ReplicaSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut ingresses = IngressesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut persistent_volumes = PersistentVolumesState::default();
+        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
+        let mut network_policies = NetworkPoliciesState::default();
+        let mut storage_overview = StorageOverviewState::default();
+        let mut pod_security = PodSecurityState::default();
+        let mut resource_quotas = ResourceQuotasState::default();
+        let mut list_views = ClusterListViews::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        let cluster = ClusterInfo {
+            id: "added-ctx".to_string(),
+            name: "added-ctx".to_string(),
+            status: "disconnected".to_string(),
+            alias: None,
+            tags: Vec::new(),
+            color: None,
+            description: None,
+            server_url: Some("https://127.0.0.1:6443".to_string()),
+        };
+
+        let mut modal = AddClusterModalState::default();
+        modal.open(&[]);
+        modal.is_submitting = true;
+
+        // 1. Healthy switch outcome
+        let healthy_event = ClusterBridgeEvent::ClusterAdded {
+            added_contexts: vec!["added-ctx".to_string()],
+            clusters: vec![cluster.clone()],
+            switch_outcome: Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                context_name: "added-ctx".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.0".to_string()),
+                error_message: None,
+            }),
+            profile: None,
+        };
+        apply_add_cluster_modal_event(&mut modal, &healthy_event);
+        assert!(!modal.is_open);
+
+        let cmds = apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut network_policies,
+            &mut storage_overview,
+            &mut pod_security,
+            &mut resource_quotas,
+            &mut list_views,
+            &mut nodes,
+            &mut events,
+            healthy_event,
+        );
+        assert_eq!(state.clusters.len(), 1);
+        assert!(matches!(
+            state.connection_state,
+            ClusterConnectionState::Connected { .. }
+        ));
+        assert!(!cmds.is_empty());
+
+        // 2. Unreachable switch outcome
+        let unreachable_event = ClusterBridgeEvent::ClusterAdded {
+            added_contexts: vec!["added-ctx".to_string()],
+            clusters: vec![cluster],
+            switch_outcome: Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                context_name: "added-ctx".to_string(),
+                healthy: false,
+                k8s_version: None,
+                error_message: Some("connection refused".to_string()),
+            }),
+            profile: None,
+        };
+        apply_cluster_event_with_workspace(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut network_policies,
+            &mut storage_overview,
+            &mut pod_security,
+            &mut resource_quotas,
+            &mut list_views,
+            &mut nodes,
+            &mut events,
+            unreachable_event,
+        );
+        assert!(matches!(
+            state.connection_state,
+            ClusterConnectionState::Unreachable { .. }
+        ));
+    }
+
+    #[test]
+    fn test_apply_bridge_event_add_cluster_failed_preserves_modal_open_with_error() {
+        let mut modal = AddClusterModalState::default();
+        modal.open(&[]);
+        modal.is_submitting = true;
+
+        let failed_event = ClusterBridgeEvent::AddClusterFailed {
+            message: "Context 'dup' already exists in Orbit".to_string(),
+        };
+        apply_add_cluster_modal_event(&mut modal, &failed_event);
+
+        assert!(modal.is_open);
+        assert!(!modal.is_submitting);
+        assert_eq!(
+            modal.submit_error.as_deref(),
+            Some("Context 'dup' already exists in Orbit")
+        );
+    }
 
     #[test]
     fn test_gpui_exit_code_for_window_open_returns_failure_on_error() {
