@@ -495,6 +495,12 @@ impl SidebarLayoutState {
             self.active_view = WorkspaceView::Overview;
         }
     }
+
+    pub fn on_cluster_disconnected(&mut self) {
+        if !self.is_collapsed && self.active_view != WorkspaceView::Settings {
+            self.active_category = SidebarCategory::Clusters;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -749,5 +755,30 @@ mod tests {
         sidebar.sync_for_view(None);
         assert_eq!(sidebar.active_view, WorkspaceView::Overview);
         assert_eq!(sidebar.active_category, SidebarCategory::Workloads);
+    }
+
+    #[test]
+    fn test_sidebar_on_cluster_disconnected_returns_to_clusters_unless_collapsed_or_settings() {
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.select_view(WorkspaceView::Deployments);
+        assert_eq!(sidebar.active_category, SidebarCategory::Workloads);
+
+        sidebar.on_cluster_disconnected();
+        assert_eq!(sidebar.active_category, SidebarCategory::Clusters);
+
+        // Collapsed sidebar keeps its active_category
+        let mut collapsed = SidebarLayoutState::new();
+        collapsed.select_view(WorkspaceView::WorkloadsOverview);
+        collapsed.toggle_collapse();
+        collapsed.on_cluster_disconnected();
+        assert_eq!(collapsed.active_category, SidebarCategory::Workloads);
+
+        // Settings view keeps active_view / active_category undisturbed
+        let mut settings = SidebarLayoutState::new();
+        settings.select_view(WorkspaceView::WorkloadsOverview);
+        settings.select_view(WorkspaceView::Settings);
+        settings.on_cluster_disconnected();
+        assert_eq!(settings.active_view, WorkspaceView::Settings);
+        assert_eq!(settings.active_category, SidebarCategory::Workloads);
     }
 }

@@ -19,6 +19,12 @@ pub struct ClusterSwitchOutcome {
     pub error_message: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterDisconnectOutcome {
+    pub previous_context: Option<String>,
+}
+
 pub struct KubeManager {
     pub kubeconfig: Option<Kubeconfig>,
     pub active_context: Option<String>,
@@ -337,6 +343,7 @@ impl KubeManager {
             ),
         };
 
+        self.cancel_active_tasks();
         self.active_context = Some(context_name.to_string());
         self.active_client = Some(client);
         self.active_context_healthy = healthy;
@@ -347,6 +354,27 @@ impl KubeManager {
             k8s_version,
             error_message,
         })
+    }
+
+    pub fn cancel_active_tasks(&mut self) {
+        if let Some(tx) = self.watch_cancel.take() {
+            let _ = tx.send(true);
+        }
+        for tx in self.log_cancel.drain(..) {
+            let _ = tx.send(());
+        }
+        for (_, (tx, handle)) in self.port_forward_cancel.drain() {
+            let _ = tx.send(());
+            handle.abort();
+        }
+    }
+
+    pub fn disconnect_active_cluster(&mut self) -> ClusterDisconnectOutcome {
+        self.cancel_active_tasks();
+        let previous_context = self.active_context.take();
+        self.active_client = None;
+        self.active_context_healthy = false;
+        ClusterDisconnectOutcome { previous_context }
     }
 
     pub async fn reconnect_active_cluster(&mut self) -> Result<ClusterSwitchOutcome, String> {
@@ -1007,6 +1035,84 @@ users:
         let mut manager = KubeManager::new_from_kubeconfig(None, OrbitConfig::default());
         let result = manager.reconnect_active_cluster().await;
         assert_eq!(result, Err("No active cluster selected".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_disconnect_active_cluster_cancels_tasks_clears_state_and_allows_reconnect() {
+        let kc = sample_kubeconfig_with_contexts(&[("dev-ctx", "http://127.0.0.1:1")]);
+        let mut manager = KubeManager::new_from_kubeconfig(Some(kc), OrbitConfig::default());
+
+        let switch_outcome = manager
+            .switch_context_with_status("dev-ctx")
+            .await
+            .expect("switch should return Ok");
+        assert_eq!(switch_outcome.context_name, "dev-ctx");
+        assert_eq!(manager.active_context.as_deref(), Some("dev-ctx"));
+        assert!(manager.active_client.is_some());
+
+        let (watch_tx, watch_rx) = tokio::sync::watch::channel(false);
+        manager.watch_cancel = Some(watch_tx);
+
+        let (log_tx, log_rx) = tokio::sync::oneshot::channel();
+        manager.log_cancel.push(log_tx);
+
+        let (pf_tx, pf_rx) = tokio::sync::oneshot::channel();
+        let pf_handle = tokio::spawn(async move {
+            let _ = pf_rx.await;
+            std::future::pending::<()>().await;
+        });
+        manager
+            .port_forward_cancel
+            .insert("pf-1".to_string(), (pf_tx, pf_handle));
+
+        let outcome = manager.disconnect_active_cluster();
+        assert_eq!(
+            outcome,
+            ClusterDisconnectOutcome {
+                previous_context: Some("dev-ctx".to_string()),
+            }
+        );
+
+        assert!(*watch_rx.borrow(), "watch_cancel should signal true");
+        assert!(manager.watch_cancel.is_none());
+        assert!(log_rx.await.is_ok(), "log_cancel oneshot should fire");
+        assert!(manager.log_cancel.is_empty());
+        assert!(manager.port_forward_cancel.is_empty());
+        assert!(manager.active_context.is_none());
+        assert!(manager.active_client.is_none());
+        assert!(!manager.active_context_healthy);
+        assert!(manager.get_clusters().iter().all(|c| c.status == "offline"));
+
+        let reconnect = manager
+            .switch_context_with_status("dev-ctx")
+            .await
+            .expect("re-selecting context after disconnect should succeed");
+        assert_eq!(reconnect.context_name, "dev-ctx");
+        assert_eq!(manager.active_context.as_deref(), Some("dev-ctx"));
+    }
+
+    #[test]
+    fn test_disconnect_active_cluster_is_idempotent_when_already_disconnected() {
+        let kc = sample_kubeconfig_with_contexts(&[("dev-ctx", "http://127.0.0.1:1")]);
+        let mut manager = KubeManager::new_from_kubeconfig(Some(kc), OrbitConfig::default());
+
+        let first = manager.disconnect_active_cluster();
+        assert_eq!(
+            first,
+            ClusterDisconnectOutcome {
+                previous_context: None,
+            }
+        );
+        let second = manager.disconnect_active_cluster();
+        assert_eq!(
+            second,
+            ClusterDisconnectOutcome {
+                previous_context: None,
+            }
+        );
+        assert!(manager.active_context.is_none());
+        assert!(manager.active_client.is_none());
+        assert!(!manager.active_context_healthy);
     }
 
     #[test]

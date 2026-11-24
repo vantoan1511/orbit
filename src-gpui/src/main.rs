@@ -46,7 +46,7 @@ use crate::state::{
     WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{
-    AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, rgb_hex,
+    AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step,
     sync_native_titlebar_appearance,
 };
 
@@ -555,6 +555,168 @@ fn load_command_for_active_view(
     list_views.load_command(view, cluster_id)
 }
 
+pub fn dropdown_can_disconnect(state: &ClusterSwitcherState) -> bool {
+    state.active_cluster_id.is_some()
+        || matches!(
+            state.connection_state,
+            ClusterConnectionState::Connecting { .. }
+                | ClusterConnectionState::Unreachable { .. }
+                | ClusterConnectionState::Error {
+                    cluster_id: Some(_),
+                    ..
+                }
+        )
+}
+
+pub fn build_cluster_sidebar_context_menu_entries(
+    is_active: bool,
+    can_reconnect: bool,
+    on_connect: impl 'static + Fn(&mut Window, &mut App),
+    on_reconnect: impl 'static + Fn(&mut Window, &mut App),
+    on_disconnect: impl 'static + Fn(&mut Window, &mut App),
+) -> Vec<ContextMenuEntry> {
+    if is_active {
+        vec![
+            ContextMenuEntry::Item(
+                crate::components::ContextMenuItem::new("cluster-reconnect", "Reconnect")
+                    .icon(Icon::RefreshCw)
+                    .disabled(!can_reconnect)
+                    .on_select(on_reconnect),
+            ),
+            ContextMenuEntry::Separator,
+            ContextMenuEntry::Item(
+                crate::components::ContextMenuItem::new("cluster-disconnect", "Disconnect")
+                    .icon(Icon::Unplug)
+                    .danger(true)
+                    .on_select(on_disconnect),
+            ),
+        ]
+    } else {
+        vec![ContextMenuEntry::Item(
+            crate::components::ContextMenuItem::new("cluster-connect", "Connect")
+                .icon(Icon::Server)
+                .on_select(on_connect),
+        )]
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn reset_all_workspace_states_for_disconnect(
+    overview: &mut ClusterOverviewState,
+    workloads_overview: &mut WorkloadsOverviewState,
+    namespaces: &mut NamespaceFilterState,
+    namespaces_view: &mut NamespacesViewState,
+    deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
+    jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
+    pods: &mut PodsState,
+    services: &mut ServicesState,
+    ingresses: &mut IngressesState,
+    configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
+    persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
+    network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
+    nodes: &mut NodesState,
+    events: &mut EventsState,
+    list_views: &mut ClusterListViews,
+) {
+    overview.reset_for_disconnected();
+    workloads_overview.reset_for_disconnected();
+    namespaces.reset_for_disconnected();
+    namespaces_view.reset_for_disconnected();
+    deployments.reset_for_disconnected();
+    statefulsets.reset_for_disconnected();
+    daemonsets.reset_for_disconnected();
+    replicasets.reset_for_disconnected();
+    jobs.reset_for_disconnected();
+    cronjobs.reset_for_disconnected();
+    pods.reset_for_disconnected();
+    services.reset_for_disconnected();
+    ingresses.reset_for_disconnected();
+    configmaps.reset_for_disconnected();
+    secrets.reset_for_disconnected();
+    persistent_volumes.reset_for_disconnected();
+    persistent_volume_claims.reset_for_disconnected();
+    network_policies.reset_for_disconnected();
+    storage_overview.reset_for_disconnected();
+    pod_security.reset_for_disconnected();
+    resource_quotas.reset_for_disconnected();
+    nodes.reset_for_disconnected();
+    events.reset_for_disconnected();
+    list_views.reset_for_disconnected();
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn disconnect_cluster_with_state(
+    state: &mut ClusterSwitcherState,
+    sidebar: &mut SidebarLayoutState,
+    overview: &mut ClusterOverviewState,
+    workloads_overview: &mut WorkloadsOverviewState,
+    namespaces: &mut NamespaceFilterState,
+    namespaces_view: &mut NamespacesViewState,
+    deployments: &mut DeploymentsState,
+    statefulsets: &mut StatefulSetsState,
+    daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
+    jobs: &mut JobsState,
+    cronjobs: &mut CronJobsState,
+    pods: &mut PodsState,
+    services: &mut ServicesState,
+    ingresses: &mut IngressesState,
+    configmaps: &mut ConfigMapsState,
+    secrets: &mut SecretsState,
+    persistent_volumes: &mut PersistentVolumesState,
+    persistent_volume_claims: &mut PersistentVolumeClaimsState,
+    network_policies: &mut NetworkPoliciesState,
+    storage_overview: &mut StorageOverviewState,
+    pod_security: &mut PodSecurityState,
+    resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
+    nodes: &mut NodesState,
+    events: &mut EventsState,
+    tabs: &mut WorkspaceTabsState,
+    drawer: &mut ResourceDrawerState,
+) -> Option<ClusterBridgeCommand> {
+    let cmd = state.begin_disconnect()?;
+    reset_all_workspace_states_for_disconnect(
+        overview,
+        workloads_overview,
+        namespaces,
+        namespaces_view,
+        deployments,
+        statefulsets,
+        daemonsets,
+        replicasets,
+        jobs,
+        cronjobs,
+        pods,
+        services,
+        ingresses,
+        configmaps,
+        secrets,
+        persistent_volumes,
+        persistent_volume_claims,
+        network_policies,
+        storage_overview,
+        pod_security,
+        resource_quotas,
+        nodes,
+        events,
+        list_views,
+    );
+    tabs.clear_active_cluster();
+    drawer.reset_for_context_change();
+    sidebar.on_cluster_disconnected();
+    Some(cmd)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn apply_cluster_event_with_tabs(
     state: &mut ClusterSwitcherState,
@@ -597,6 +759,7 @@ pub fn apply_cluster_event_with_tabs(
                 ..
             }
     );
+    let is_disconnected = matches!(&event, ClusterBridgeEvent::ClusterDisconnected { .. });
     let mut commands = apply_cluster_event_with_workspace(
         state,
         sidebar,
@@ -662,6 +825,9 @@ pub fn apply_cluster_event_with_tabs(
                 }
             }
         }
+    } else if is_disconnected {
+        tabs.clear_active_cluster();
+        sidebar.on_cluster_disconnected();
     }
 
     commands
@@ -911,6 +1077,7 @@ pub fn apply_cluster_event_with_workspace(
         }
         ClusterBridgeEvent::ClusterUnreachable { .. }
         | ClusterBridgeEvent::ConnectionError { .. }
+        | ClusterBridgeEvent::ClusterDisconnected { .. }
         | ClusterBridgeEvent::ClusterAdded {
             switch_outcome:
                 Some(orbit_core::kubernetes::manager::ClusterSwitchOutcome {
@@ -919,30 +1086,32 @@ pub fn apply_cluster_event_with_workspace(
             ..
         } => {
             state.apply_event(event);
-            overview.reset_for_disconnected();
-            workloads_overview.reset_for_disconnected();
-            namespaces.reset_for_disconnected();
-            namespaces_view.reset_for_disconnected();
-            deployments.reset_for_disconnected();
-            statefulsets.reset_for_disconnected();
-            daemonsets.reset_for_disconnected();
-            replicasets.reset_for_disconnected();
-            jobs.reset_for_disconnected();
-            cronjobs.reset_for_disconnected();
-            pods.reset_for_disconnected();
-            services.reset_for_disconnected();
-            ingresses.reset_for_disconnected();
-            configmaps.reset_for_disconnected();
-            secrets.reset_for_disconnected();
-            persistent_volumes.reset_for_disconnected();
-            persistent_volume_claims.reset_for_disconnected();
-            network_policies.reset_for_disconnected();
-            storage_overview.reset_for_disconnected();
-            pod_security.reset_for_disconnected();
-            resource_quotas.reset_for_disconnected();
-            nodes.reset_for_disconnected();
-            events.reset_for_disconnected();
-            list_views.reset_for_disconnected();
+            reset_all_workspace_states_for_disconnect(
+                overview,
+                workloads_overview,
+                namespaces,
+                namespaces_view,
+                deployments,
+                statefulsets,
+                daemonsets,
+                replicasets,
+                jobs,
+                cronjobs,
+                pods,
+                services,
+                ingresses,
+                configmaps,
+                secrets,
+                persistent_volumes,
+                persistent_volume_claims,
+                network_policies,
+                storage_overview,
+                pod_security,
+                resource_quotas,
+                nodes,
+                events,
+                list_views,
+            );
         }
         ClusterBridgeEvent::OverviewLoaded {
             cluster_id,
@@ -1307,6 +1476,7 @@ pub fn apply_drawer_lifecycle_for_event(
         ClusterBridgeEvent::ClusterConnected { .. }
         | ClusterBridgeEvent::ClusterUnreachable { .. }
         | ClusterBridgeEvent::ConnectionError { .. }
+        | ClusterBridgeEvent::ClusterDisconnected { .. }
         | ClusterBridgeEvent::ClusterAdded {
             switch_outcome: Some(_),
             ..
@@ -3858,6 +4028,44 @@ impl OrbitShell {
         cx.notify();
     }
 
+    fn disconnect_cluster(&mut self, cx: &mut Context<Self>) {
+        if let Some(cmd) = disconnect_cluster_with_state(
+            &mut self.state,
+            &mut self.sidebar,
+            &mut self.overview,
+            &mut self.workloads_overview,
+            &mut self.namespaces,
+            &mut self.namespaces_view,
+            &mut self.deployments,
+            &mut self.statefulsets,
+            &mut self.daemonsets,
+            &mut self.replicasets,
+            &mut self.jobs,
+            &mut self.cronjobs,
+            &mut self.pods,
+            &mut self.services,
+            &mut self.ingresses,
+            &mut self.configmaps,
+            &mut self.secrets,
+            &mut self.persistent_volumes,
+            &mut self.persistent_volume_claims,
+            &mut self.network_policies,
+            &mut self.storage_overview,
+            &mut self.pod_security,
+            &mut self.resource_quotas,
+            &mut self.list_views,
+            &mut self.nodes,
+            &mut self.events,
+            &mut self.tabs,
+            &mut self.drawer,
+        ) {
+            self.dispatch_command(cmd);
+        }
+        self.namespaces.close_dropdown();
+        self.context_menu.close();
+        cx.notify();
+    }
+
     fn select_theme_mode(&mut self, mode: ThemeMode, window: &mut Window, cx: &mut Context<Self>) {
         let updated = OrbitTheme::get(cx).with_mode(mode, window.appearance());
         apply_theme(updated, window, cx);
@@ -4115,7 +4323,14 @@ impl OrbitShell {
         let mut list = div().flex().flex_col().gap_1();
         for (idx, cluster) in self.state.clusters.iter().enumerate() {
             let cluster_id = cluster.id.clone();
+            let click_cluster_id = cluster_id.clone();
+            let menu_cluster_id = cluster_id.clone();
             let is_active = self.state.active_cluster_id.as_deref() == Some(cluster_id.as_str());
+            let can_reconnect = is_active
+                && !matches!(
+                    self.state.connection_state,
+                    ClusterConnectionState::Connecting { .. }
+                );
             let display = cluster_display_label(cluster);
             let dot_color = cluster_dot_color(cluster, &theme);
 
@@ -4133,8 +4348,38 @@ impl OrbitShell {
                     .when(is_active, |el| el.bg(nav.active_bg))
                     .hover(move |style| style.bg(hover_bg))
                     .on_click(cx.listener(move |this, _event, _window, cx| {
-                        this.select_cluster(&cluster_id, cx);
+                        this.select_cluster(&click_cluster_id, cx);
                     }))
+                    .on_mouse_down(
+                        MouseButton::Right,
+                        cx.listener(move |this, event: &gpui::MouseDownEvent, _window, cx| {
+                            cx.stop_propagation();
+                            let connect_entity = cx.entity().clone();
+                            let connect_id = menu_cluster_id.clone();
+                            let reconnect_entity = cx.entity().clone();
+                            let disconnect_entity = cx.entity().clone();
+                            let entries = build_cluster_sidebar_context_menu_entries(
+                                is_active,
+                                can_reconnect,
+                                move |_window, cx| {
+                                    connect_entity.update(cx, |shell, cx| {
+                                        shell.select_cluster(&connect_id, cx);
+                                    });
+                                },
+                                move |_window, cx| {
+                                    reconnect_entity.update(cx, |shell, cx| {
+                                        shell.reconnect_cluster(cx);
+                                    });
+                                },
+                                move |_window, cx| {
+                                    disconnect_entity.update(cx, |shell, cx| {
+                                        shell.disconnect_cluster(cx);
+                                    });
+                                },
+                            );
+                            this.open_context_menu(event.position, entries, cx);
+                        }),
+                    )
                     .child(
                         div()
                             .flex()
@@ -4748,24 +4993,59 @@ impl OrbitShell {
                         .child(list)
                         .child(
                             div()
-                                .id("dropdown-add-cluster-btn")
-                                .px_3()
-                                .py_2()
                                 .border_t_1()
                                 .border_color(theme.border.default)
                                 .flex()
                                 .items_center()
-                                .gap_2()
-                                .cursor_pointer()
-                                .text_xs()
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.accent.accent)
-                                .hover(move |s| s.bg(control_hover))
-                                .on_click(cx.listener(|this, _event, window, cx| {
-                                    this.open_add_cluster_modal(window, cx);
-                                }))
-                                .child(render_icon(Icon::Plus, px(12.0), theme.accent.accent))
-                                .child("Add Cluster"),
+                                .justify_between()
+                                .child(
+                                    div()
+                                        .id("dropdown-add-cluster-btn")
+                                        .px_3()
+                                        .py_2()
+                                        .flex()
+                                        .items_center()
+                                        .gap_2()
+                                        .cursor_pointer()
+                                        .text_xs()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(theme.accent.accent)
+                                        .hover(move |s| s.bg(control_hover))
+                                        .on_click(cx.listener(|this, _event, window, cx| {
+                                            this.open_add_cluster_modal(window, cx);
+                                        }))
+                                        .child(render_icon(
+                                            Icon::Plus,
+                                            px(12.0),
+                                            theme.accent.accent,
+                                        ))
+                                        .child("Add Cluster"),
+                                )
+                                .when(dropdown_can_disconnect(&self.state), |el| {
+                                    el.child(
+                                        div()
+                                            .id("dropdown-disconnect-cluster-btn")
+                                            .px_3()
+                                            .py_2()
+                                            .flex()
+                                            .items_center()
+                                            .gap_1p5()
+                                            .cursor_pointer()
+                                            .text_xs()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(theme.semantic.danger.solid)
+                                            .hover(move |s| s.bg(control_hover))
+                                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                                this.disconnect_cluster(cx);
+                                            }))
+                                            .child(render_icon(
+                                                Icon::Unplug,
+                                                px(12.0),
+                                                theme.semantic.danger.solid,
+                                            ))
+                                            .child("Disconnect"),
+                                    )
+                                }),
                         ),
                 )
                 .into_any_element(),
@@ -8783,7 +9063,19 @@ impl OrbitShell {
                                 cx.notify();
                             });
                         };
-                        views::offline::render_offline_view(&model, &theme, on_retry, on_switch)
+                        let disconnect_entity = cx.entity().clone();
+                        let on_disconnect = move |_window: &mut Window, cx: &mut App| {
+                            disconnect_entity.update(cx, |shell, cx| {
+                                shell.disconnect_cluster(cx);
+                            });
+                        };
+                        views::offline::render_offline_view(
+                            &model,
+                            &theme,
+                            on_retry,
+                            on_switch,
+                            on_disconnect,
+                        )
                     } else {
                         div().into_any_element()
                     }
@@ -17262,5 +17554,313 @@ mod tests {
         drawer.close();
         assert!(!drawer.is_open);
         assert_eq!(deployments.table.sort, sort_before);
+    }
+
+    #[test]
+    fn test_disconnect_resets_workspace_tabs_drawer_sidebar_and_resource_caches_without_stale_data()
+    {
+        use crate::components::ResourceDrawerTabId;
+
+        let mut state = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut workloads_overview = WorkloadsOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut replicasets = ReplicaSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut ingresses = IngressesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut persistent_volumes = PersistentVolumesState::default();
+        let mut persistent_volume_claims = PersistentVolumeClaimsState::default();
+        let mut network_policies = NetworkPoliciesState::default();
+        let mut storage_overview = StorageOverviewState::default();
+        let mut pod_security = PodSecurityState::default();
+        let mut resource_quotas = ResourceQuotasState::default();
+        let mut list_views = ClusterListViews::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+        let mut tabs = WorkspaceTabsState::default();
+        let mut drawer = ResourceDrawerState::default();
+
+        let clusters = vec![orbit_core::kubernetes::models::ClusterInfo {
+            id: "ctx-a".to_string(),
+            name: "ctx-a".to_string(),
+            alias: None,
+            server_url: Some("https://10.0.0.1".to_string()),
+            status: "connected".to_string(),
+            tags: Vec::new(),
+            color: None,
+            description: None,
+        }];
+        let profile = orbit_core::kubernetes::models::UserProfileInfo {
+            user_name: Some("admin".to_string()),
+            cluster_name: Some("ctx-a".to_string()),
+            active_context: Some("ctx-a".to_string()),
+            auth_type: "token".to_string(),
+            server_url: Some("https://10.0.0.1".to_string()),
+            k8s_version: Some("v1.31.2".to_string()),
+            kubeconfig_paths: Vec::new(),
+        };
+
+        let _ = apply_cluster_event_with_tabs(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut network_policies,
+            &mut storage_overview,
+            &mut pod_security,
+            &mut resource_quotas,
+            &mut list_views,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            ClusterBridgeEvent::ClusterConnected {
+                outcome: orbit_core::kubernetes::manager::ClusterSwitchOutcome {
+                    context_name: "ctx-a".to_string(),
+                    healthy: true,
+                    k8s_version: Some("v1.31.2".to_string()),
+                    error_message: None,
+                },
+                clusters: clusters.clone(),
+                profile,
+            },
+        );
+        sidebar.select_view(WorkspaceView::Pods);
+        let _ = pods.begin_load_for_cluster("ctx-a");
+        let gen_before = pods.generation;
+        let _ = drawer.open_or_switch(
+            Some("ctx-a"),
+            ResourceDrawerTarget::Deployment {
+                name: "web".to_string(),
+                namespace: "default".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(tabs.active_cluster_id().is_some());
+        assert!(drawer.is_open);
+
+        let cmd = disconnect_cluster_with_state(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut network_policies,
+            &mut storage_overview,
+            &mut pod_security,
+            &mut resource_quotas,
+            &mut list_views,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            &mut drawer,
+        );
+        assert_eq!(cmd, Some(ClusterBridgeCommand::DisconnectCluster));
+        assert!(state.active_cluster_id.is_none());
+        assert_eq!(state.connection_state, ClusterConnectionState::Disconnected);
+        assert_eq!(sidebar.active_category, SidebarCategory::Clusters);
+        assert!(tabs.active_cluster_id().is_none());
+        assert!(tabs.activate_cluster("ctx-a").is_some());
+        tabs.clear_active_cluster();
+        assert!(!drawer.is_open);
+
+        // Late PodsLoaded from the old generation must be ignored
+        let _ = apply_cluster_event_with_tabs(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut network_policies,
+            &mut storage_overview,
+            &mut pod_security,
+            &mut resource_quotas,
+            &mut list_views,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            ClusterBridgeEvent::PodsLoaded {
+                cluster_id: "ctx-a".to_string(),
+                generation: gen_before,
+                pods: Vec::new(),
+            },
+        );
+        assert!(pods.pods.is_empty());
+
+        // ClusterDisconnected event keeps tabs cleared and sidebar on Clusters
+        let _ = apply_cluster_event_with_tabs(
+            &mut state,
+            &mut sidebar,
+            &mut overview,
+            &mut workloads_overview,
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut ingresses,
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut persistent_volume_claims,
+            &mut network_policies,
+            &mut storage_overview,
+            &mut pod_security,
+            &mut resource_quotas,
+            &mut list_views,
+            &mut nodes,
+            &mut events,
+            &mut tabs,
+            ClusterBridgeEvent::ClusterDisconnected {
+                previous_cluster_id: Some("ctx-a".to_string()),
+                clusters,
+            },
+        );
+        assert!(tabs.active_cluster_id().is_none());
+        assert_eq!(sidebar.active_category, SidebarCategory::Clusters);
+    }
+
+    #[test]
+    fn test_build_cluster_sidebar_context_menu_entries_for_active_and_inactive_clusters() {
+        let inactive = build_cluster_sidebar_context_menu_entries(
+            false,
+            false,
+            |_w, _cx| {},
+            |_w, _cx| {},
+            |_w, _cx| {},
+        );
+        assert_eq!(inactive.len(), 1);
+        match &inactive[0] {
+            ContextMenuEntry::Item(item) => {
+                assert_eq!(item.label.as_ref(), "Connect");
+                assert!(!item.danger);
+            }
+            ContextMenuEntry::Separator => panic!("expected Connect item"),
+        }
+
+        let active = build_cluster_sidebar_context_menu_entries(
+            true,
+            true,
+            |_w, _cx| {},
+            |_w, _cx| {},
+            |_w, _cx| {},
+        );
+        assert_eq!(active.len(), 3);
+        match &active[0] {
+            ContextMenuEntry::Item(item) => {
+                assert_eq!(item.label.as_ref(), "Reconnect");
+                assert!(!item.disabled);
+                assert!(!item.danger);
+            }
+            ContextMenuEntry::Separator => panic!("expected Reconnect item"),
+        }
+        assert!(matches!(active[1], ContextMenuEntry::Separator));
+        match &active[2] {
+            ContextMenuEntry::Item(item) => {
+                assert_eq!(item.label.as_ref(), "Disconnect");
+                assert!(item.danger);
+                assert!(item.on_select.is_some());
+            }
+            ContextMenuEntry::Separator => panic!("expected Disconnect item"),
+        }
+    }
+
+    #[test]
+    fn test_header_dropdown_and_sidebar_wire_disconnect_action() {
+        let mut state = ClusterSwitcherState::new();
+        assert!(!dropdown_can_disconnect(&state));
+
+        state.connection_state = ClusterConnectionState::Connecting {
+            cluster_id: "ctx-1".to_string(),
+            display_name: "Ctx 1".to_string(),
+        };
+        assert!(dropdown_can_disconnect(&state));
+
+        state.connection_state = ClusterConnectionState::Unreachable {
+            cluster_id: "ctx-1".to_string(),
+            display_name: "Ctx 1".to_string(),
+            server_url: None,
+            error_message: "down".to_string(),
+        };
+        assert!(dropdown_can_disconnect(&state));
+
+        state.connection_state = ClusterConnectionState::Error {
+            cluster_id: None,
+            display_name: None,
+            error_message: "bridge error".to_string(),
+        };
+        assert!(!dropdown_can_disconnect(&state));
+
+        state.connection_state = ClusterConnectionState::Error {
+            cluster_id: Some("ctx-1".to_string()),
+            display_name: Some("Ctx 1".to_string()),
+            error_message: "bad cert".to_string(),
+        };
+        assert!(dropdown_can_disconnect(&state));
+
+        state.active_cluster_id = Some("ctx-1".to_string());
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "ctx-1".to_string(),
+            display_name: "Ctx 1".to_string(),
+            k8s_version: None,
+        };
+        assert!(dropdown_can_disconnect(&state));
     }
 }
