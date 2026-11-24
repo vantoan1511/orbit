@@ -1,8 +1,10 @@
+pub mod admission_webhooks;
 pub mod configmaps;
 pub mod cronjobs;
 pub mod daemonsets;
 pub mod deployments;
 pub mod events;
+pub mod hpas;
 pub mod ingresses;
 pub mod jobs;
 pub mod namespaces;
@@ -17,9 +19,11 @@ pub mod pods;
 pub mod replicasets;
 pub mod resource_quotas;
 pub mod secrets;
+pub mod security_overview;
 pub mod services;
 pub mod settings;
 pub mod statefulsets;
+pub mod storage_classes;
 pub mod storage_overview;
 pub mod welcome;
 pub mod workloads_overview;
@@ -27,7 +31,9 @@ pub mod workloads_overview;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, ElementId, FontWeight, Rgba, SharedString, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, App, ElementId, FontWeight, Rgba, SharedString, Window, div, prelude::*, px,
+};
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{ContainerImageInfo, EventInfo};
 
@@ -179,18 +185,16 @@ pub fn render_resource_view_header(
     extra_controls: Option<AnyElement>,
     theme: &OrbitTheme,
 ) -> AnyElement {
-    let namespace_chip = namespaces
-        .filter(|ns| !ns.is_all_namespaces())
-        .map(|ns| {
-            apply_text_step(div(), theme.typography.size_xs)
-                .px_2()
-                .py_0p5()
-                .rounded(theme.style.radius_control)
-                .bg(theme.accent.soft)
-                .text_color(theme.accent.accent)
-                .font_weight(FontWeight::MEDIUM)
-                .child(format!("Namespace: {}", ns.summary_label()))
-        });
+    let namespace_chip = namespaces.filter(|ns| !ns.is_all_namespaces()).map(|ns| {
+        apply_text_step(div(), theme.typography.size_xs)
+            .px_2()
+            .py_0p5()
+            .rounded(theme.style.radius_control)
+            .bg(theme.accent.soft)
+            .text_color(theme.accent.accent)
+            .font_weight(FontWeight::MEDIUM)
+            .child(format!("Namespace: {}", ns.summary_label()))
+    });
 
     div()
         .w_full()
@@ -800,19 +804,32 @@ mod tests {
             "count",
             "last_seen",
             "violations",
+            "min",
+            "max",
+            "current",
+            "desired",
+            "last_updated",
             "age",
         ];
 
-        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 19] = [
+        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 23] = [
+            (
+                "admission_webhooks",
+                admission_webhooks::admission_webhook_columns(),
+            ),
             ("configmaps", configmaps::configmap_columns()),
             ("cronjobs", cronjobs::cronjob_columns()),
             ("daemonsets", daemonsets::daemonset_columns()),
             ("deployments", deployments::deployment_columns()),
             ("events", events::event_columns()),
+            ("hpas", hpas::hpa_columns()),
             ("ingresses", ingresses::ingress_columns()),
             ("jobs", jobs::job_columns()),
             ("namespaces", namespaces::namespace_columns()),
-            ("network_policies", network_policies::network_policy_columns()),
+            (
+                "network_policies",
+                network_policies::network_policy_columns(),
+            ),
             ("nodes", nodes::node_columns()),
             (
                 "persistent_volume_claims",
@@ -827,8 +844,13 @@ mod tests {
             ("replicasets", replicasets::replicaset_columns()),
             ("resource_quotas", resource_quotas::resource_quota_columns()),
             ("secrets", secrets::secret_columns()),
+            (
+                "security_overview",
+                security_overview::security_policy_columns(),
+            ),
             ("services", services::service_columns()),
             ("statefulsets", statefulsets::statefulset_columns()),
+            ("storage_classes", storage_classes::storage_class_columns()),
         ];
 
         for (view_name, cols) in all_views {

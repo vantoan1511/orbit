@@ -37,9 +37,6 @@ pub use delete::delete_resource;
 pub use edit::{get_resource_raw, apply_resource, create_resource};
 pub use hpa::{list_hpas, map_hpa, update_hpa_replicas};
 
-/// Formats a Kubernetes creation timestamp into a human-readable age string.
-pub(crate) use orbit_core::kubernetes::namespaces::format_age;
-
 /// Formats a Kubernetes API or client error into a user-friendly message,
 /// extracting clean messages from Api error responses.
 pub(crate) fn format_error(e: &kube::Error) -> String {

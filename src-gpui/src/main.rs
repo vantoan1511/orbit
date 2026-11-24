@@ -36,7 +36,7 @@ use crate::state::{
     EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
     NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
-    PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodSecurityState,
+    ClusterListViews, PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodSecurityState,
     PodsState, ReplicaSetsState, ResourceQuotaKindFilter, ResourceQuotasState, SecretsState,
     ServicesState, StatefulSetsState, StorageOverviewState, TabDropPosition,
     WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
@@ -182,6 +182,10 @@ pub const fn is_full_bleed_table_view(view: WorkspaceView) -> bool {
             | WorkspaceView::NetworkPolicies
             | WorkspaceView::PodSecurity
             | WorkspaceView::ResourceQuotas
+            | WorkspaceView::Hpas
+            | WorkspaceView::StorageClasses
+            | WorkspaceView::SecurityOverview
+            | WorkspaceView::AdmissionWebhooks
             | WorkspaceView::Nodes
             | WorkspaceView::Events
     )
@@ -209,6 +213,10 @@ pub struct WorkspaceLoadingFlags {
     pub network_policies: bool,
     pub pod_security: bool,
     pub resource_quotas: bool,
+    pub hpas: bool,
+    pub storage_classes: bool,
+    pub security_overview: bool,
+    pub admission_webhooks: bool,
     pub nodes: bool,
     pub events: bool,
 }
@@ -238,6 +246,10 @@ pub const fn is_workspace_view_loading(
         WorkspaceView::NetworkPolicies => loading.network_policies,
         WorkspaceView::PodSecurity => loading.pod_security,
         WorkspaceView::ResourceQuotas => loading.resource_quotas,
+        WorkspaceView::Hpas => loading.hpas,
+        WorkspaceView::StorageClasses => loading.storage_classes,
+        WorkspaceView::SecurityOverview => loading.security_overview,
+        WorkspaceView::AdmissionWebhooks => loading.admission_webhooks,
         WorkspaceView::Nodes => loading.nodes,
         WorkspaceView::Events => loading.events,
         _ => false,
@@ -335,6 +347,7 @@ pub fn select_workspace_view_with_state(
     storage_overview: &mut StorageOverviewState,
     pod_security: &mut PodSecurityState,
     resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: WorkspaceView,
@@ -361,6 +374,7 @@ pub fn select_workspace_view_with_state(
         storage_overview,
         pod_security,
         resource_quotas,
+        list_views,
         nodes,
         events,
         Some(view),
@@ -390,6 +404,7 @@ pub fn select_workspace_view_with_tabs(
     storage_overview: &mut StorageOverviewState,
     pod_security: &mut PodSecurityState,
     resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -419,6 +434,7 @@ pub fn select_workspace_view_with_tabs(
         storage_overview,
         pod_security,
         resource_quotas,
+        list_views,
         nodes,
         events,
         view,
@@ -453,6 +469,7 @@ fn load_command_for_active_view(
     storage_overview: &mut StorageOverviewState,
     pod_security: &mut PodSecurityState,
     resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
     nodes: &mut NodesState,
     events: &mut EventsState,
     view: Option<WorkspaceView>,
@@ -536,7 +553,7 @@ fn load_command_for_active_view(
     if view == WorkspaceView::Events && events.needs_load_for_cluster(cluster_id) {
         return Some(events.begin_load_for_cluster(cluster_id));
     }
-    None
+    list_views.load_command(view, cluster_id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -564,6 +581,7 @@ pub fn apply_cluster_event_with_tabs(
     storage_overview: &mut StorageOverviewState,
     pod_security: &mut PodSecurityState,
     resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -594,6 +612,7 @@ pub fn apply_cluster_event_with_tabs(
         storage_overview,
         pod_security,
         resource_quotas,
+        list_views,
         nodes,
         events,
         event,
@@ -624,6 +643,7 @@ pub fn apply_cluster_event_with_tabs(
                 storage_overview,
                 pod_security,
                 resource_quotas,
+                list_views,
                 nodes,
                 events,
                 restored,
@@ -661,6 +681,7 @@ pub fn handle_tab_shortcut_with_state(
     storage_overview: &mut StorageOverviewState,
     pod_security: &mut PodSecurityState,
     resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
     nodes: &mut NodesState,
     events: &mut EventsState,
     tabs: &mut WorkspaceTabsState,
@@ -716,6 +737,7 @@ pub fn handle_tab_shortcut_with_state(
         storage_overview,
         pod_security,
         resource_quotas,
+        list_views,
         nodes,
         events,
         active,
@@ -754,6 +776,7 @@ pub fn apply_cluster_event_with_workspace(
     storage_overview: &mut StorageOverviewState,
     pod_security: &mut PodSecurityState,
     resource_quotas: &mut ResourceQuotasState,
+    list_views: &mut ClusterListViews,
     nodes: &mut NodesState,
     events: &mut EventsState,
     event: ClusterBridgeEvent,
@@ -867,6 +890,7 @@ pub fn apply_cluster_event_with_workspace(
                 } else {
                     events.reset_for_cluster(id);
                 }
+                list_views.on_cluster_connected(sidebar.active_view, id, &mut commands);
             }
         }
         ClusterBridgeEvent::ClusterUnreachable { .. }
@@ -895,6 +919,7 @@ pub fn apply_cluster_event_with_workspace(
             resource_quotas.reset_for_disconnected();
             nodes.reset_for_disconnected();
             events.reset_for_disconnected();
+            list_views.reset_for_disconnected();
         }
         ClusterBridgeEvent::OverviewLoaded {
             cluster_id,
@@ -1214,6 +1239,16 @@ pub fn apply_cluster_event_with_workspace(
         } => {
             resource_quotas.apply_failed(&cluster_id, generation, message);
         }
+        other @ (ClusterBridgeEvent::HpasLoaded { .. }
+        | ClusterBridgeEvent::HpasLoadFailed { .. }
+        | ClusterBridgeEvent::StorageClassesLoaded { .. }
+        | ClusterBridgeEvent::StorageClassesLoadFailed { .. }
+        | ClusterBridgeEvent::SecurityOverviewLoaded { .. }
+        | ClusterBridgeEvent::SecurityOverviewLoadFailed { .. }
+        | ClusterBridgeEvent::AdmissionWebhooksLoaded { .. }
+        | ClusterBridgeEvent::AdmissionWebhooksLoadFailed { .. }) => {
+            list_views.apply_event(&other);
+        }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
@@ -1293,6 +1328,7 @@ pub struct OrbitShell {
     storage_overview: StorageOverviewState,
     pod_security: PodSecurityState,
     resource_quotas: ResourceQuotasState,
+    list_views: ClusterListViews,
     nodes: NodesState,
     events: EventsState,
     drawer: ResourceDrawerState,
@@ -1352,6 +1388,7 @@ impl OrbitShell {
                             &mut shell.storage_overview,
                             &mut shell.pod_security,
                             &mut shell.resource_quotas,
+                            &mut shell.list_views,
                             &mut shell.nodes,
                             &mut shell.events,
                             &mut shell.tabs,
@@ -1420,6 +1457,7 @@ impl OrbitShell {
             storage_overview: StorageOverviewState::default(),
             pod_security: PodSecurityState::default(),
             resource_quotas: ResourceQuotasState::default(),
+            list_views: ClusterListViews::default(),
             nodes: NodesState::default(),
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
@@ -1499,6 +1537,7 @@ impl OrbitShell {
             &mut self.storage_overview,
             &mut self.pod_security,
             &mut self.resource_quotas,
+            &mut self.list_views,
             &mut self.nodes,
             &mut self.events,
             &mut self.tabs,
@@ -1542,6 +1581,7 @@ impl OrbitShell {
             &mut self.storage_overview,
             &mut self.pod_security,
             &mut self.resource_quotas,
+            &mut self.list_views,
             &mut self.nodes,
             &mut self.events,
             active,
@@ -1643,6 +1683,10 @@ impl OrbitShell {
                 | ResourceDrawerTarget::PodSecurity { .. }
                 | ResourceDrawerTarget::ResourceQuota { .. }
                 | ResourceDrawerTarget::LimitRange { .. }
+                | ResourceDrawerTarget::Hpa { .. }
+                | ResourceDrawerTarget::StorageClass { .. }
+                | ResourceDrawerTarget::AdmissionWebhook { .. }
+                | ResourceDrawerTarget::SecurityPolicy { .. }
                 | ResourceDrawerTarget::Node { .. }
         ) {
             if let Some(cid) = cluster_id.as_deref() {
@@ -1815,6 +1859,39 @@ impl OrbitShell {
                         && p.name == *name
                         && p.namespace == *namespace
                 }),
+            ResourceDrawerTarget::Hpa { name, namespace } => self
+                .list_views
+                .hpas
+                .hpas
+                .iter()
+                .any(|h| h.name == *name && h.namespace == *namespace),
+            ResourceDrawerTarget::StorageClass { name } => self
+                .list_views
+                .storage_classes
+                .classes
+                .iter()
+                .any(|sc| sc.name == *name),
+            ResourceDrawerTarget::AdmissionWebhook { is_mutating, name } => {
+                let target_kind = if *is_mutating {
+                    "MutatingWebhookConfiguration"
+                } else {
+                    "ValidatingWebhookConfiguration"
+                };
+                self.list_views
+                    .admission_webhooks
+                    .policies
+                    .iter()
+                    .any(|p| p.kind.eq_ignore_ascii_case(target_kind) && p.name == *name)
+            }
+            ResourceDrawerTarget::SecurityPolicy {
+                kind,
+                name,
+                namespace,
+            } => self.list_views.security_overview.policies.iter().any(|p| {
+                p.kind.eq_ignore_ascii_case(kind)
+                    && p.name == *name
+                    && p.namespace == *namespace
+            }),
         };
         if !exists {
             self.drawer.close();
@@ -2927,6 +3004,248 @@ impl OrbitShell {
                     body,
                 ))
             }
+            ResourceDrawerTarget::Hpa { name, namespace } => {
+                let hpa = self
+                    .list_views
+                    .hpas
+                    .hpas
+                    .iter()
+                    .find(|h| h.name == *name && h.namespace == *namespace)?;
+                let matched_events = views::hpas::filter_events_for_hpa(&self.events.events, hpa);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::hpas::render_hpa_drawer_overview(hpa, theme)
+                    }
+                    ResourceDrawerTabId::Events => views::hpas::render_hpa_drawer_events(
+                        &matched_events,
+                        events_loading,
+                        theme,
+                    ),
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", hpa.namespace, hpa.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(hpa.name.clone()),
+                    SharedString::from("HorizontalPodAutoscaler"),
+                    Some(SharedString::from(hpa.namespace.clone())),
+                    Some(SharedString::from(hpa.age.clone())),
+                    Some(SharedString::from(hpa.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::StorageClass { name } => {
+                let sc = self
+                    .list_views
+                    .storage_classes
+                    .classes
+                    .iter()
+                    .find(|c| c.name == *name)?;
+                let matched_events = views::storage_classes::filter_events_for_storage_class(
+                    &self.events.events,
+                    sc,
+                );
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::storage_classes::render_storage_class_drawer_overview(sc, theme)
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::storage_classes::render_storage_class_drawer_events(
+                            &matched_events,
+                            events_loading,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("StorageClass/{}", sc.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(sc.name.clone()),
+                    SharedString::from("StorageClass"),
+                    None,
+                    Some(SharedString::from(sc.age.clone())),
+                    None,
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::AdmissionWebhook { is_mutating, name } => {
+                let target_kind = if *is_mutating {
+                    "MutatingWebhookConfiguration"
+                } else {
+                    "ValidatingWebhookConfiguration"
+                };
+                let policy = self
+                    .list_views
+                    .admission_webhooks
+                    .policies
+                    .iter()
+                    .find(|p| p.kind.eq_ignore_ascii_case(target_kind) && p.name == *name)?;
+                let matched_events =
+                    views::admission_webhooks::filter_events_for_admission_webhook(
+                        &self.events.events,
+                        policy,
+                    );
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::admission_webhooks::render_admission_webhook_drawer_overview(
+                            policy, theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::admission_webhooks::render_admission_webhook_drawer_events(
+                            &matched_events,
+                            events_loading,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", policy.kind, policy.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(policy.name.clone()),
+                    SharedString::from(policy.kind.clone()),
+                    None,
+                    Some(SharedString::from(policy.last_updated.clone())),
+                    Some(SharedString::from(policy.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::SecurityPolicy {
+                kind,
+                name,
+                namespace,
+            } => {
+                let policy = self
+                    .list_views
+                    .security_overview
+                    .policies
+                    .iter()
+                    .find(|p| {
+                        p.kind.eq_ignore_ascii_case(kind)
+                            && p.name == *name
+                            && p.namespace == *namespace
+                    })?;
+                let matched_events = views::security_overview::filter_events_for_security_policy(
+                    &self.events.events,
+                    policy,
+                );
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::security_overview::render_security_policy_drawer_overview(
+                            policy, theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::security_overview::render_security_policy_drawer_events(
+                            &matched_events,
+                            events_loading,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", policy.kind, policy.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                let ns_opt = if policy.namespace.is_empty() || policy.namespace == "-" {
+                    None
+                } else {
+                    Some(SharedString::from(policy.namespace.clone()))
+                };
+                Some((
+                    SharedString::from(policy.name.clone()),
+                    SharedString::from(policy.kind.clone()),
+                    ns_opt,
+                    Some(SharedString::from(policy.last_updated.clone())),
+                    Some(SharedString::from(policy.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
         }
     }
 
@@ -3020,6 +3339,13 @@ impl OrbitShell {
                     == crate::state::PodSecurityLoadStatus::Loading,
                 resource_quotas: self.resource_quotas.status
                     == crate::state::ResourceQuotasLoadStatus::Loading,
+                hpas: self.list_views.hpas.status == crate::state::HpasLoadStatus::Loading,
+                storage_classes: self.list_views.storage_classes.status
+                    == crate::state::StorageClassesLoadStatus::Loading,
+                security_overview: self.list_views.security_overview.status
+                    == crate::state::SecurityOverviewLoadStatus::Loading,
+                admission_webhooks: self.list_views.admission_webhooks.status
+                    == crate::state::AdmissionWebhooksLoadStatus::Loading,
                 nodes: self.nodes.status == crate::state::NodesLoadStatus::Loading,
                 events: self.events.status == EventsLoadStatus::Loading,
             },
@@ -3196,6 +3522,12 @@ impl OrbitShell {
                     .resource_quotas
                     .begin_refresh()
                     .unwrap_or_else(|| self.resource_quotas.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            for cmd in self
+                .list_views
+                .refresh_commands(self.sidebar.active_view, cluster_id)
+            {
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Nodes || self.nodes.cluster_id.is_some() {
@@ -7241,6 +7573,547 @@ impl OrbitShell {
             );
         }
 
+        if self.sidebar.active_view == WorkspaceView::Hpas {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.list_views.hpas.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.list_views.hpas.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Hpa {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.list_views.hpas.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::Hpa {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            hpa: &orbit_core::kubernetes::models::HpaInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = hpa.name.clone();
+                let namespace = hpa.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::Hpa {
+                    name: hpa.name.clone(),
+                    namespace: hpa.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                    filter_entity.update(cx, |shell, cx| {
+                        shell.filter_by_namespace(&namespace, cx);
+                    });
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_ctx_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_ctx_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::hpas::build_hpa_context_menu_entries(
+                    hpa,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.list_views.hpas.table.selected_row_key = Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::hpas::render_hpas_view(
+                &self.list_views.hpas,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_quick_yaml,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::StorageClasses {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell
+                        .list_views
+                        .storage_classes
+                        .table
+                        .toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.list_views.storage_classes.table.selected_row_key =
+                        Some(row_key.to_string());
+                    let target = ResourceDrawerTarget::StorageClass {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                });
+            };
+
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.list_views.storage_classes.table.selected_row_key =
+                        Some(row_key.to_string());
+                    let target = ResourceDrawerTarget::StorageClass {
+                        name: row_key.to_string(),
+                    };
+                    shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            sc: &orbit_core::kubernetes::models::StorageClassInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = sc.name.clone();
+                let drawer_target = ResourceDrawerTarget::StorageClass {
+                    name: sc.name.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_ctx_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_ctx_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::storage_classes::build_storage_class_context_menu_entries(
+                    copy_name,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.list_views.storage_classes.table.selected_row_key =
+                        Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::storage_classes::render_storage_classes_view(
+                &self.list_views.storage_classes,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_quick_yaml,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::AdmissionWebhooks {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell
+                        .list_views
+                        .admission_webhooks
+                        .table
+                        .toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.list_views.admission_webhooks.table.selected_row_key =
+                        Some(row_key.to_string());
+                    if let Some((kind, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::AdmissionWebhook {
+                            is_mutating: kind.eq_ignore_ascii_case("MutatingWebhookConfiguration"),
+                            name: name.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.list_views.admission_webhooks.table.selected_row_key =
+                        Some(row_key.to_string());
+                    if let Some((kind, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::AdmissionWebhook {
+                            is_mutating: kind.eq_ignore_ascii_case("MutatingWebhookConfiguration"),
+                            name: name.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = policy.name.clone();
+                let drawer_target = ResourceDrawerTarget::AdmissionWebhook {
+                    is_mutating: policy
+                        .kind
+                        .eq_ignore_ascii_case("MutatingWebhookConfiguration"),
+                    name: policy.name.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_ctx_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_ctx_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries =
+                    views::admission_webhooks::build_admission_webhook_context_menu_entries(
+                        copy_name,
+                        refresh_cb,
+                        view_details,
+                        view_yaml,
+                    );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.list_views.admission_webhooks.table.selected_row_key =
+                        Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::admission_webhooks::render_admission_webhooks_view(
+                &self.list_views.admission_webhooks,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_quick_yaml,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::SecurityOverview {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell
+                        .list_views
+                        .security_overview
+                        .table
+                        .toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.list_views.security_overview.table.selected_row_key =
+                        Some(row_key.to_string());
+                    let mut parts = row_key.as_ref().splitn(3, '/');
+                    if let (Some(kind), Some(ns), Some(name)) =
+                        (parts.next(), parts.next(), parts.next())
+                    {
+                        let target = ResourceDrawerTarget::SecurityPolicy {
+                            kind: kind.to_string(),
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let yaml_entity = cx.entity().clone();
+            let on_row_quick_yaml = move |_row_idx: usize,
+                                          row_key: SharedString,
+                                          _event: &gpui::ClickEvent,
+                                          _window: &mut Window,
+                                          cx: &mut App| {
+                yaml_entity.update(cx, |shell, cx| {
+                    shell.list_views.security_overview.table.selected_row_key =
+                        Some(row_key.to_string());
+                    let mut parts = row_key.as_ref().splitn(3, '/');
+                    if let (Some(kind), Some(ns), Some(name)) =
+                        (parts.next(), parts.next(), parts.next())
+                    {
+                        let target = ResourceDrawerTarget::SecurityPolicy {
+                            kind: kind.to_string(),
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Yaml, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = move |row_key: SharedString,
+                                            policy: &orbit_core::kubernetes::models::PolicyInfo,
+                                            event: &MouseDownEvent,
+                                            _window: &mut Window,
+                                            cx: &mut App| {
+                let name = policy.name.clone();
+                let namespace = policy.namespace.clone();
+                let drawer_target = ResourceDrawerTarget::SecurityPolicy {
+                    kind: policy.kind.clone(),
+                    name: policy.name.clone(),
+                    namespace: policy.namespace.clone(),
+                };
+                let anchor = event.position;
+                let copy_name = move |_w: &mut Window, cx: &mut App| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                };
+                let filter_entity = ctx_entity.clone();
+                let filter_ns = (!namespace.is_empty() && namespace != "-").then(move || {
+                    let ns_clone = namespace.clone();
+                    move |_w: &mut Window, cx: &mut App| {
+                        filter_entity.update(cx, |shell, cx| {
+                            shell.filter_by_namespace(&ns_clone, cx);
+                        });
+                    }
+                });
+                let refresh_ctx_entity = ctx_entity.clone();
+                let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                    refresh_ctx_entity.update(cx, |shell, cx| {
+                        shell.refresh_workspace(cx);
+                    });
+                };
+                let details_entity = ctx_entity.clone();
+                let details_target = drawer_target.clone();
+                let view_details = move |_w: &mut Window, cx: &mut App| {
+                    details_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            details_target.clone(),
+                            ResourceDrawerTabId::Overview,
+                            cx,
+                        );
+                    });
+                };
+                let yaml_ctx_entity = ctx_entity.clone();
+                let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                    yaml_ctx_entity.update(cx, |shell, cx| {
+                        shell.open_resource_drawer(
+                            drawer_target.clone(),
+                            ResourceDrawerTabId::Yaml,
+                            cx,
+                        );
+                    });
+                };
+                let entries = views::security_overview::build_security_policy_context_menu_entries(
+                    policy,
+                    copy_name,
+                    filter_ns,
+                    refresh_cb,
+                    view_details,
+                    view_yaml,
+                );
+                ctx_entity.update(cx, |shell, cx| {
+                    shell.list_views.security_overview.table.selected_row_key =
+                        Some(row_key.to_string());
+                    shell.open_context_menu(anchor, entries, cx);
+                });
+            };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::security_overview::render_security_overview_view(
+                &self.list_views.security_overview,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_quick_yaml,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
         if self.sidebar.active_view != WorkspaceView::Overview {
             let view = self.sidebar.active_view;
             return theme
@@ -7757,6 +8630,7 @@ impl Render for OrbitShell {
                     &mut this.storage_overview,
                     &mut this.pod_security,
                     &mut this.resource_quotas,
+                    &mut this.list_views,
                     &mut this.nodes,
                     &mut this.events,
                     &mut this.tabs,
@@ -8283,6 +9157,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut throwaway_nodes,
             &mut EventsState::default(),
             event,
@@ -8417,6 +9292,10 @@ mod tests {
                 network_policies: true,
                 pod_security: true,
                 resource_quotas: true,
+                hpas: true,
+                storage_classes: true,
+                security_overview: true,
+                admission_webhooks: true,
                 nodes: true,
                 events: true,
             },
@@ -8584,6 +9463,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -8633,6 +9513,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::OverviewLoaded {
@@ -8668,6 +9549,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NamespacesLoaded {
@@ -8718,6 +9600,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -8849,6 +9732,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Pods
@@ -8884,6 +9768,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Deployments,
@@ -8924,6 +9809,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -8951,6 +9837,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Deployments
@@ -9019,6 +9906,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -9060,6 +9948,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -9094,6 +9983,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -9189,6 +10079,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -9224,6 +10115,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoaded {
@@ -9265,6 +10157,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::DeploymentsLoadFailed {
@@ -9320,6 +10213,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Nodes,
@@ -9357,6 +10251,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -9384,6 +10279,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Nodes
@@ -9453,6 +10349,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event.clone(),
@@ -9491,6 +10388,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             connect_event,
@@ -9525,6 +10423,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -9622,6 +10521,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -9657,6 +10557,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoaded {
@@ -9695,6 +10596,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::NodesLoadFailed {
@@ -9747,6 +10649,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Namespaces,
@@ -9783,6 +10686,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             WorkspaceView::Overview,
@@ -9810,6 +10714,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -9842,6 +10747,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut EventsState::default(),
                 WorkspaceView::Namespaces,
@@ -9893,6 +10799,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -9941,6 +10848,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterUnreachable {
@@ -10006,6 +10914,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Events,
@@ -10043,6 +10952,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Overview,
@@ -10070,6 +10980,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -10102,6 +11013,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut events,
                 WorkspaceView::Events,
@@ -10154,6 +11066,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10209,6 +11122,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -10261,6 +11175,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -10670,6 +11585,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10707,6 +11623,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10739,6 +11656,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10808,6 +11726,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10863,6 +11782,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10938,6 +11858,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -10973,6 +11894,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11007,6 +11929,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11046,6 +11969,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
                 &mut nodes,
                 &mut events,
                 &mut tabs,
@@ -11130,6 +12054,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11167,6 +12092,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11237,6 +12163,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoaded {
@@ -11274,6 +12201,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PodsLoadFailed {
@@ -11309,6 +12237,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -11441,6 +12370,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -11479,6 +12409,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11551,6 +12482,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -11586,6 +12518,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoaded {
@@ -11623,6 +12556,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ServicesLoadFailed {
@@ -11687,6 +12621,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -11737,6 +12672,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -11861,6 +12797,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::ConfigMaps,
@@ -11925,6 +12862,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -11960,6 +12898,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoaded {
@@ -11999,6 +12938,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConfigMapsLoadFailed {
@@ -12076,6 +13016,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -12109,6 +13050,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -12243,6 +13185,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Secrets,
@@ -12306,6 +13249,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoaded {
@@ -12341,6 +13285,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoaded {
@@ -12377,6 +13322,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::SecretsLoadFailed {
@@ -12456,6 +13402,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             connect_event,
@@ -12489,6 +13436,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterUnreachable {
@@ -12653,6 +13601,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::StatefulSets,
@@ -12715,6 +13664,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::StatefulSetsLoaded {
@@ -12754,6 +13704,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::StatefulSetsLoadFailed {
@@ -12817,6 +13768,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -12904,6 +13856,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::WorkloadsOverview,
@@ -12956,6 +13909,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
@@ -12991,6 +13945,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::WorkloadsOverviewLoaded {
@@ -13030,6 +13985,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -13067,6 +14023,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13145,6 +14102,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13175,6 +14133,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13210,6 +14169,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13245,6 +14205,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13280,6 +14241,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13315,6 +14277,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13350,6 +14313,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -13450,6 +14414,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ReplicaSetsLoaded {
@@ -13489,6 +14454,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ReplicaSetsLoadFailed {
@@ -13579,6 +14545,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::DaemonSets,
@@ -13617,6 +14584,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::DaemonSetsLoaded {
@@ -13656,6 +14624,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::DaemonSetsLoadFailed {
@@ -13717,6 +14686,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -13812,6 +14782,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::Jobs,
@@ -13850,6 +14821,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::JobsLoaded {
@@ -13886,6 +14858,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::JobsLoadFailed {
@@ -13947,6 +14920,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -14043,6 +15017,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             WorkspaceView::CronJobs,
@@ -14081,6 +15056,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::CronJobsLoaded {
@@ -14117,6 +15093,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::CronJobsLoadFailed {
@@ -14178,6 +15155,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -14276,6 +15254,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -14313,6 +15292,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::IngressesLoaded {
@@ -14363,6 +15343,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -14399,6 +15380,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -14496,6 +15478,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -14533,6 +15516,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PersistentVolumesLoaded {
@@ -14583,6 +15567,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -14622,6 +15607,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -14702,6 +15688,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -14742,6 +15729,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
@@ -14796,6 +15784,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -14835,6 +15824,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -14916,6 +15906,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             &mut tabs,
@@ -14953,6 +15944,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::NetworkPoliciesLoaded {
@@ -15006,6 +15998,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ConnectionError {
@@ -15045,6 +16038,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut nodes,
             &mut events,
             ClusterBridgeEvent::ClusterConnected {
@@ -15112,6 +16106,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut pod_security,
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut NodesState::default(),
             &mut EventsState::default(),
             &mut tabs,
@@ -15163,6 +16158,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut pod_security,
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut NodesState::default(),
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -15230,6 +16226,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut resource_quotas,
+            &mut ClusterListViews::default(),
             &mut NodesState::default(),
             &mut EventsState::default(),
             &mut tabs,
@@ -15244,6 +16241,10 @@ mod tests {
             WorkspaceView::ResourceQuotas,
             WorkspaceLoadingFlags {
                 resource_quotas: true,
+                hpas: true,
+                storage_classes: true,
+                security_overview: true,
+                admission_webhooks: true,
                 ..WorkspaceLoadingFlags::default()
             }
         ));
@@ -15281,6 +16282,7 @@ mod tests {
             &mut StorageOverviewState::default(),
             &mut PodSecurityState::default(),
             &mut resource_quotas,
+            &mut ClusterListViews::default(),
             &mut NodesState::default(),
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {
@@ -15348,6 +16350,7 @@ mod tests {
             &mut storage_overview,
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut NodesState::default(),
             &mut EventsState::default(),
             &mut tabs,
@@ -15399,6 +16402,7 @@ mod tests {
             &mut storage_overview,
             &mut PodSecurityState::default(),
             &mut ResourceQuotasState::default(),
+            &mut ClusterListViews::default(),
             &mut NodesState::default(),
             &mut EventsState::default(),
             ClusterBridgeEvent::ClusterConnected {

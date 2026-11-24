@@ -103,6 +103,22 @@ pub enum ResourceDrawerTarget {
         name: String,
         namespace: String,
     },
+    Hpa {
+        name: String,
+        namespace: String,
+    },
+    StorageClass {
+        name: String,
+    },
+    AdmissionWebhook {
+        is_mutating: bool,
+        name: String,
+    },
+    SecurityPolicy {
+        kind: String,
+        name: String,
+        namespace: String,
+    },
     Node {
         name: String,
     },
@@ -136,6 +152,23 @@ impl ResourceDrawerTarget {
             Self::PodSecurity { .. } => "Namespace",
             Self::ResourceQuota { .. } => "ResourceQuota",
             Self::LimitRange { .. } => "LimitRange",
+            Self::Hpa { .. } => "HorizontalPodAutoscaler",
+            Self::StorageClass { .. } => "StorageClass",
+            Self::AdmissionWebhook {
+                is_mutating: true, ..
+            } => "MutatingWebhookConfiguration",
+            Self::AdmissionWebhook {
+                is_mutating: false, ..
+            } => "ValidatingWebhookConfiguration",
+            Self::SecurityPolicy { kind, .. } => match kind.as_str() {
+                "NetworkPolicy" => "NetworkPolicy",
+                "ResourceQuota" => "ResourceQuota",
+                "LimitRange" => "LimitRange",
+                "Namespace" => "Namespace",
+                "ValidatingWebhookConfiguration" => "ValidatingWebhookConfiguration",
+                "MutatingWebhookConfiguration" => "MutatingWebhookConfiguration",
+                _ => "Policy",
+            },
             Self::Node { .. } => "Node",
             Self::Namespace { .. } => "Namespace",
             Self::Event { .. } => "Event",
@@ -160,8 +193,22 @@ impl ResourceDrawerTarget {
             | Self::NetworkPolicy { name, .. }
             | Self::ResourceQuota { name, .. }
             | Self::LimitRange { name, .. }
+            | Self::Hpa { name, .. }
+            | Self::StorageClass { name }
+            | Self::AdmissionWebhook { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
+            Self::SecurityPolicy {
+                kind,
+                name,
+                namespace,
+            } => {
+                if kind.eq_ignore_ascii_case("Namespace") {
+                    namespace.as_str()
+                } else {
+                    name.as_str()
+                }
+            }
             Self::PodSecurity { namespace, .. } => namespace.as_str(),
             Self::Event { uid, .. } => uid.as_str(),
         }
@@ -186,6 +233,10 @@ impl ResourceDrawerTarget {
             | Self::PodSecurity { name, .. }
             | Self::ResourceQuota { name, .. }
             | Self::LimitRange { name, .. }
+            | Self::Hpa { name, .. }
+            | Self::StorageClass { name }
+            | Self::AdmissionWebhook { name, .. }
+            | Self::SecurityPolicy { name, .. }
             | Self::Node { name }
             | Self::Namespace { name } => name.as_str(),
             Self::Event { reason, .. } => reason.as_str(),
@@ -209,8 +260,23 @@ impl ResourceDrawerTarget {
             | Self::NetworkPolicy { namespace, .. }
             | Self::ResourceQuota { namespace, .. }
             | Self::LimitRange { namespace, .. }
+            | Self::Hpa { namespace, .. }
             | Self::Event { namespace, .. } => Some(namespace.as_str()),
+            Self::SecurityPolicy {
+                kind, namespace, ..
+            } => {
+                if kind.eq_ignore_ascii_case("Namespace")
+                    || namespace.is_empty()
+                    || namespace == "-"
+                {
+                    None
+                } else {
+                    Some(namespace.as_str())
+                }
+            }
             Self::PersistentVolume { .. }
+            | Self::StorageClass { .. }
+            | Self::AdmissionWebhook { .. }
             | Self::PodSecurity { .. }
             | Self::Node { .. }
             | Self::Namespace { .. } => None,
