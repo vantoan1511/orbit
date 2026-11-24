@@ -215,9 +215,11 @@ pub const fn is_workspace_view_loading(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub struct ShellChromeLayout {
+    pub show_activity_brand_badge: bool,
     pub show_activity_settings_btn: bool,
     pub show_header_settings_btn: bool,
     pub show_footer_settings_btn: bool,
+    pub show_footer_sidebar_width_debug: bool,
     pub show_header_breadcrumb: bool,
     pub show_footer_breadcrumb: bool,
     pub show_sidebar_panel_collapse_btn: bool,
@@ -225,9 +227,11 @@ pub struct ShellChromeLayout {
 }
 
 pub const ORBIT_SHELL_CHROME: ShellChromeLayout = ShellChromeLayout {
+    show_activity_brand_badge: false,
     show_activity_settings_btn: true,
     show_header_settings_btn: false,
     show_footer_settings_btn: false,
+    show_footer_sidebar_width_debug: false,
     show_header_breadcrumb: false,
     show_footer_breadcrumb: false,
     show_sidebar_panel_collapse_btn: false,
@@ -3058,24 +3062,6 @@ impl OrbitShell {
             .bg(theme.surface.bg_sidebar)
             .border_r_1()
             .border_color(theme.border.default)
-            .child(
-                div()
-                    .w(px(32.0))
-                    .h(px(32.0))
-                    .rounded(theme.style.radius_control)
-                    .bg(theme.surface.bg_active)
-                    .border_1()
-                    .border_color(theme.border.default)
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .child(
-                        apply_text_step(div(), theme.typography.size_sm)
-                            .font_weight(FontWeight::BOLD)
-                            .text_color(theme.text.primary)
-                            .child("O"),
-                    ),
-            )
             .child(categories_col)
             .child(
                 div()
@@ -6636,11 +6622,6 @@ impl OrbitShell {
     fn render_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
         let presentation = format_cluster_status(&self.state, &theme);
-        let sidebar_status = if self.sidebar.is_collapsed {
-            "Sidebar: Collapsed".to_string()
-        } else {
-            format!("Sidebar: {:.0}px", self.sidebar.panel_width)
-        };
         let k8s_version = match &self.state.connection_state {
             ClusterConnectionState::Connected { k8s_version, .. } => k8s_version.clone(),
             _ => None,
@@ -6657,24 +6638,7 @@ impl OrbitShell {
             .flex()
             .items_center()
             .justify_between()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .child(render_icon(Icon::PanelLeft, px(11.0), theme.text.muted))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .text_color(theme.text.muted)
-                                    .child(sidebar_status),
-                            ),
-                    ),
-            )
+            .child(div().flex().items_center().gap_3())
             .child(
                 div()
                     .flex()
@@ -7498,9 +7462,11 @@ mod tests {
     #[test]
     fn test_shell_chrome_removes_redundant_controls() {
         const {
+            assert!(!ORBIT_SHELL_CHROME.show_activity_brand_badge);
             assert!(ORBIT_SHELL_CHROME.show_activity_settings_btn);
             assert!(!ORBIT_SHELL_CHROME.show_header_settings_btn);
             assert!(!ORBIT_SHELL_CHROME.show_footer_settings_btn);
+            assert!(!ORBIT_SHELL_CHROME.show_footer_sidebar_width_debug);
             assert!(!ORBIT_SHELL_CHROME.show_header_breadcrumb);
             assert!(!ORBIT_SHELL_CHROME.show_footer_breadcrumb);
             assert!(!ORBIT_SHELL_CHROME.show_sidebar_panel_collapse_btn);
@@ -7522,6 +7488,57 @@ mod tests {
         assert!(sidebar.is_collapsed);
         sidebar.toggle_category(active_category);
         assert!(!sidebar.is_collapsed);
+    }
+
+    #[test]
+    fn test_activity_bar_omits_brand_badge_and_keeps_settings() {
+        const {
+            assert!(!ORBIT_SHELL_CHROME.show_activity_brand_badge);
+            assert!(ORBIT_SHELL_CHROME.show_activity_settings_btn);
+        }
+
+        assert!(!SidebarCategory::ALL.is_empty());
+
+        let mut sidebar = SidebarLayoutState::new();
+        let active_category = sidebar.active_category;
+        sidebar.toggle_category(active_category);
+        assert!(sidebar.is_collapsed);
+        sidebar.toggle_category(active_category);
+        assert!(!sidebar.is_collapsed);
+    }
+
+    #[test]
+    fn test_footer_omits_sidebar_width_debug_and_preserves_cluster_status() {
+        const {
+            assert!(!ORBIT_SHELL_CHROME.show_footer_sidebar_width_debug);
+        }
+
+        let theme = OrbitTheme::from_config(&OrbitConfig::default(), WindowAppearance::Dark);
+        let mut state = ClusterSwitcherState::new();
+        let disconnected = format_cluster_status(&state, &theme);
+        assert_eq!(disconnected.pill_label, "Select Cluster");
+        assert_eq!(disconnected.status_label, "Disconnected");
+
+        state.connection_state = ClusterConnectionState::Connected {
+            cluster_id: "prod-ctx".to_string(),
+            display_name: "Prod US".to_string(),
+            k8s_version: Some("v1.31.2".to_string()),
+        };
+        let connected = format_cluster_status(&state, &theme);
+        assert_eq!(connected.pill_label, "Prod US");
+        assert_eq!(connected.status_label, "Connected");
+
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.toggle_collapse();
+        assert!(sidebar.is_collapsed);
+        sidebar.toggle_collapse();
+        assert!(!sidebar.is_collapsed);
+
+        sidebar.begin_resize();
+        sidebar.update_resize_from_window_x(ACTIVITY_BAR_WIDTH + 300.0);
+        sidebar.end_resize();
+        assert!(!sidebar.is_collapsed);
+        assert_eq!(sidebar.panel_width, 300.0);
     }
 
     #[test]
