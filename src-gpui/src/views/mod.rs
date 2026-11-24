@@ -13,6 +13,7 @@ pub mod overview;
 pub mod persistent_volume_claims;
 pub mod persistent_volumes;
 pub mod pods;
+pub mod replicasets;
 pub mod secrets;
 pub mod services;
 pub mod settings;
@@ -521,7 +522,7 @@ mod tests {
             "age",
         ];
 
-        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 16] = [
+        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 17] = [
             ("configmaps", configmaps::configmap_columns()),
             ("cronjobs", cronjobs::cronjob_columns()),
             ("daemonsets", daemonsets::daemonset_columns()),
@@ -541,6 +542,7 @@ mod tests {
                 persistent_volumes::persistent_volume_columns(),
             ),
             ("pods", pods::pod_columns()),
+            ("replicasets", replicasets::replicaset_columns()),
             ("secrets", secrets::secret_columns()),
             ("services", services::service_columns()),
             ("statefulsets", statefulsets::statefulset_columns()),
