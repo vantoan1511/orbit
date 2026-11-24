@@ -50,6 +50,7 @@ pub enum ClusterBridgeCommand {
         cluster_id: String,
     },
     ReconnectActiveCluster,
+    DisconnectCluster,
     RefreshClusters,
     LoadOverview {
         cluster_id: String,
@@ -206,6 +207,10 @@ pub enum ClusterBridgeEvent {
     ConnectionError {
         cluster_id: Option<String>,
         message: String,
+        clusters: Vec<ClusterInfo>,
+    },
+    ClusterDisconnected {
+        previous_cluster_id: Option<String>,
         clusters: Vec<ClusterInfo>,
     },
     OverviewLoaded {
@@ -3326,6 +3331,21 @@ impl ClusterSwitcherState {
         }
     }
 
+    pub fn begin_disconnect(&mut self) -> Option<ClusterBridgeCommand> {
+        if self.connection_state == ClusterConnectionState::Disconnected
+            && self.active_cluster_id.is_none()
+        {
+            return None;
+        }
+
+        self.dropdown_open = false;
+        self.active_cluster_id = None;
+        self.active_profile = None;
+        self.connection_state = ClusterConnectionState::Disconnected;
+        self.error_banner_dismissed = false;
+        Some(ClusterBridgeCommand::DisconnectCluster)
+    }
+
     pub fn dismiss_error_banner(&mut self) {
         self.error_banner_dismissed = true;
     }
@@ -3492,6 +3512,13 @@ impl ClusterSwitcherState {
                     }
                     self.error_banner_dismissed = false;
                 }
+            }
+            ClusterBridgeEvent::ClusterDisconnected { clusters, .. } => {
+                self.clusters = clusters;
+                self.active_cluster_id = None;
+                self.active_profile = None;
+                self.connection_state = ClusterConnectionState::Disconnected;
+                self.dropdown_open = false;
             }
             ClusterBridgeEvent::AddClusterFailed { .. }
             | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
@@ -4165,6 +4192,111 @@ mod tests {
         assert_eq!(state.cluster_display_name("dev-ctx"), "dev-ctx");
         assert_eq!(state.cluster_display_name("staging-ctx"), "staging-ctx");
         assert_eq!(state.cluster_display_name("unknown-ctx"), "unknown-ctx");
+    }
+
+    #[test]
+    fn test_cluster_switcher_begin_disconnect_clears_active_state_and_is_idempotent() {
+        let mut state = ClusterSwitcherState::new();
+        assert_eq!(state.begin_disconnect(), None);
+
+        let clusters = vec![sample_cluster("ctx-1", Some("Prod"), Some("https://10.0.0.1"))];
+        let profile = sample_profile("ctx-1", Some("https://10.0.0.1"));
+        state.apply_event(ClusterBridgeEvent::ClusterConnected {
+            outcome: ClusterSwitchOutcome {
+                context_name: "ctx-1".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.2".to_string()),
+                error_message: None,
+            },
+            clusters: clusters.clone(),
+            profile: profile.clone(),
+        });
+        state.dropdown_open = true;
+        state.error_banner_dismissed = true;
+
+        assert_eq!(
+            state.begin_disconnect(),
+            Some(ClusterBridgeCommand::DisconnectCluster)
+        );
+        assert!(state.active_cluster_id.is_none());
+        assert!(state.active_profile.is_none());
+        assert!(!state.dropdown_open);
+        assert!(!state.error_banner_dismissed);
+        assert_eq!(state.connection_state, ClusterConnectionState::Disconnected);
+        assert_eq!(state.begin_disconnect(), None);
+
+        // Connecting, Unreachable, and Error states with a cluster_id can also disconnect
+        state.connection_state = ClusterConnectionState::Connecting {
+            cluster_id: "ctx-1".to_string(),
+            display_name: "Prod".to_string(),
+        };
+        assert_eq!(
+            state.begin_disconnect(),
+            Some(ClusterBridgeCommand::DisconnectCluster)
+        );
+
+        state.apply_event(ClusterBridgeEvent::ClusterUnreachable {
+            outcome: ClusterSwitchOutcome {
+                context_name: "ctx-1".to_string(),
+                healthy: false,
+                k8s_version: None,
+                error_message: Some("timeout".to_string()),
+            },
+            clusters: clusters.clone(),
+            profile,
+        });
+        assert_eq!(
+            state.begin_disconnect(),
+            Some(ClusterBridgeCommand::DisconnectCluster)
+        );
+
+        state.apply_event(ClusterBridgeEvent::ConnectionError {
+            cluster_id: Some("ctx-1".to_string()),
+            message: "bad cert".to_string(),
+            clusters,
+        });
+        assert_eq!(
+            state.begin_disconnect(),
+            Some(ClusterBridgeCommand::DisconnectCluster)
+        );
+    }
+
+    #[test]
+    fn test_cluster_switcher_applies_cluster_disconnected_and_allows_reconnect() {
+        let mut state = ClusterSwitcherState::new();
+        let clusters = vec![sample_cluster("ctx-1", Some("Prod"), Some("https://10.0.0.1"))];
+        let profile = sample_profile("ctx-1", Some("https://10.0.0.1"));
+
+        state.apply_event(ClusterBridgeEvent::ClusterConnected {
+            outcome: ClusterSwitchOutcome {
+                context_name: "ctx-1".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.2".to_string()),
+                error_message: None,
+            },
+            clusters: clusters.clone(),
+            profile,
+        });
+        state.dropdown_open = true;
+
+        state.apply_event(ClusterBridgeEvent::ClusterDisconnected {
+            previous_cluster_id: Some("ctx-1".to_string()),
+            clusters: clusters.clone(),
+        });
+
+        assert!(state.active_cluster_id.is_none());
+        assert!(state.active_profile.is_none());
+        assert!(!state.dropdown_open);
+        assert_eq!(state.connection_state, ClusterConnectionState::Disconnected);
+        assert_eq!(state.clusters.len(), 1);
+
+        let cmd = state.begin_switch("ctx-1");
+        assert_eq!(
+            cmd,
+            Some(ClusterBridgeCommand::SwitchCluster {
+                cluster_id: "ctx-1".to_string()
+            })
+        );
     }
 
     #[test]

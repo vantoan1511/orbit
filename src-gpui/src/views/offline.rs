@@ -14,6 +14,7 @@ pub struct OfflineViewModel {
     pub server_url: Option<String>,
     pub error_message: String,
     pub can_retry: bool,
+    pub can_disconnect: bool,
     pub icon: Icon,
 }
 
@@ -31,6 +32,7 @@ pub fn offline_view_model(state: &ClusterConnectionState) -> Option<OfflineViewM
             server_url: server_url.clone(),
             error_message: error_message.clone(),
             can_retry: true,
+            can_disconnect: true,
             icon: Icon::ServerOff,
         }),
         ClusterConnectionState::Error {
@@ -47,6 +49,7 @@ pub fn offline_view_model(state: &ClusterConnectionState) -> Option<OfflineViewM
             server_url: None,
             error_message: error_message.clone(),
             can_retry: cluster_id.is_some(),
+            can_disconnect: cluster_id.is_some(),
             icon: Icon::ServerOff,
         }),
         _ => None,
@@ -58,6 +61,7 @@ pub fn render_offline_view(
     theme: &OrbitTheme,
     on_retry: impl Fn(&mut Window, &mut App) + 'static,
     on_switch_cluster: impl Fn(&mut Window, &mut App) + 'static,
+    on_disconnect: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let mut card = theme
         .style_card(div())
@@ -99,9 +103,11 @@ pub fn render_offline_view(
         )
         .child(render_offline_actions(
             model.can_retry,
+            model.can_disconnect,
             theme,
             on_retry,
             on_switch_cluster,
+            on_disconnect,
         ));
 
     card.into_any_element()
@@ -150,9 +156,11 @@ fn render_offline_header(model: &OfflineViewModel, theme: &OrbitTheme) -> AnyEle
 
 fn render_offline_actions(
     can_retry: bool,
+    can_disconnect: bool,
     theme: &OrbitTheme,
     on_retry: impl Fn(&mut Window, &mut App) + 'static,
     on_switch_cluster: impl Fn(&mut Window, &mut App) + 'static,
+    on_disconnect: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let control_hover = theme.surface.control_hover;
     let mut actions = div().flex().items_center().gap_2p5();
@@ -203,6 +211,32 @@ fn render_offline_actions(
             }),
     );
 
+    if can_disconnect {
+        actions = actions.child(
+            theme
+                .style_control(div().id("offline-disconnect-cluster-btn"))
+                .px_3()
+                .py_1p5()
+                .border_color(theme.semantic.danger.solid)
+                .text_color(theme.semantic.danger.solid)
+                .font_weight(FontWeight::MEDIUM)
+                .cursor_pointer()
+                .hover(move |s| s.bg(control_hover))
+                .flex()
+                .items_center()
+                .gap_1p5()
+                .child(render_icon(
+                    Icon::Unplug,
+                    px(12.0),
+                    theme.semantic.danger.solid,
+                ))
+                .child(apply_text_step(div(), theme.typography.size_xs).child("Disconnect"))
+                .on_click(move |_, window, cx| {
+                    on_disconnect(window, cx);
+                }),
+        );
+    }
+
     actions.into_any_element()
 }
 
@@ -223,6 +257,7 @@ mod tests {
             offline_view_model(&unreachable).expect("Unreachable should produce OfflineViewModel");
         assert_eq!(vm_unreachable.badge_label, "Cluster Offline");
         assert!(vm_unreachable.can_retry);
+        assert!(vm_unreachable.can_disconnect);
         assert_eq!(
             vm_unreachable.server_url.as_deref(),
             Some("https://10.0.0.10:6443")
@@ -239,6 +274,7 @@ mod tests {
             offline_view_model(&err_with_id).expect("Error should produce OfflineViewModel");
         assert_eq!(vm_err_with_id.badge_label, "Cluster Offline");
         assert!(vm_err_with_id.can_retry);
+        assert!(vm_err_with_id.can_disconnect);
         assert_eq!(vm_err_with_id.error_message, "Invalid cert");
         assert_eq!(icon_char(vm_err_with_id.icon), icon_char(Icon::ServerOff));
 
@@ -251,11 +287,33 @@ mod tests {
             offline_view_model(&err_without_id).expect("Error should produce OfflineViewModel");
         assert_eq!(vm_err_without_id.badge_label, "Cluster Offline");
         assert!(!vm_err_without_id.can_retry);
+        assert!(!vm_err_without_id.can_disconnect);
         assert!(vm_err_without_id.server_url.is_none());
         assert_eq!(vm_err_without_id.error_message, "Bridge thread failed");
         assert_eq!(
             icon_char(vm_err_without_id.icon),
             icon_char(Icon::ServerOff)
         );
+    }
+
+    #[test]
+    fn test_offline_view_model_sets_can_disconnect_for_cluster_states() {
+        let disconnected = offline_view_model(&ClusterConnectionState::Disconnected);
+        assert!(disconnected.is_none());
+
+        let connecting = offline_view_model(&ClusterConnectionState::Connecting {
+            cluster_id: "ctx-1".to_string(),
+            display_name: "Ctx 1".to_string(),
+        });
+        assert!(connecting.is_none());
+
+        let unreachable = offline_view_model(&ClusterConnectionState::Unreachable {
+            cluster_id: "ctx-1".to_string(),
+            display_name: "Ctx 1".to_string(),
+            server_url: None,
+            error_message: "down".to_string(),
+        })
+        .expect("unreachable model");
+        assert!(unreachable.can_disconnect);
     }
 }

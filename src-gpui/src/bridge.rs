@@ -30,10 +30,43 @@ pub struct ClusterBridge {
     pub event_rx: mpsc::UnboundedReceiver<ClusterBridgeEvent>,
 }
 
+#[derive(Default)]
+pub struct BridgeTaskTracker {
+    handles: Vec<tokio::task::AbortHandle>,
+}
+
+impl BridgeTaskTracker {
+    pub fn spawn<F>(&mut self, future: F)
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        self.handles.retain(|h| !h.is_finished());
+        let handle = tokio::spawn(future).abort_handle();
+        self.handles.push(handle);
+    }
+
+    pub fn cancel_all(&mut self) {
+        for handle in self.handles.drain(..) {
+            handle.abort();
+        }
+    }
+}
+
+#[cfg(test)]
 pub async fn handle_bridge_command(
     cmd: ClusterBridgeCommand,
     manager: &Arc<RwLock<KubeManager>>,
     event_tx: &mpsc::UnboundedSender<ClusterBridgeEvent>,
+) {
+    let mut tracker = BridgeTaskTracker::default();
+    handle_bridge_command_with_tracker(cmd, manager, event_tx, &mut tracker).await;
+}
+
+pub async fn handle_bridge_command_with_tracker(
+    cmd: ClusterBridgeCommand,
+    manager: &Arc<RwLock<KubeManager>>,
+    event_tx: &mpsc::UnboundedSender<ClusterBridgeEvent>,
+    tracker: &mut BridgeTaskTracker,
 ) {
     match cmd {
         ClusterBridgeCommand::LoadContexts | ClusterBridgeCommand::RefreshClusters => {
@@ -46,6 +79,7 @@ pub async fn handle_bridge_command(
             });
         }
         ClusterBridgeCommand::SwitchCluster { cluster_id } => {
+            tracker.cancel_all();
             let mut guard = manager.write().await;
             let result = guard.switch_context_with_status(&cluster_id).await;
             let clusters = guard.get_clusters();
@@ -76,6 +110,7 @@ pub async fn handle_bridge_command(
             }
         }
         ClusterBridgeCommand::ReconnectActiveCluster => {
+            tracker.cancel_all();
             let mut guard = manager.write().await;
             let active_id = guard.active_context.clone();
             let result = guard.reconnect_active_cluster().await;
@@ -106,6 +141,16 @@ pub async fn handle_bridge_command(
                 }
             }
         }
+        ClusterBridgeCommand::DisconnectCluster => {
+            tracker.cancel_all();
+            let mut guard = manager.write().await;
+            let outcome = guard.disconnect_active_cluster();
+            let clusters = guard.get_clusters();
+            let _ = event_tx.send(ClusterBridgeEvent::ClusterDisconnected {
+                previous_cluster_id: outcome.previous_context,
+                clusters,
+            });
+        }
         ClusterBridgeCommand::LoadOverview {
             cluster_id,
             generation,
@@ -119,7 +164,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     let summary = fetch_cluster_overview(&client, k8s_version).await;
                     let _ = tx.send(ClusterBridgeEvent::OverviewLoaded {
                         cluster_id,
@@ -146,7 +191,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     let snapshot = fetch_workloads_overview(&client).await;
                     let _ = tx.send(ClusterBridgeEvent::WorkloadsOverviewLoaded {
                         cluster_id,
@@ -173,7 +218,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_namespaces(&client).await {
                         Ok(namespaces) => {
                             let _ = tx.send(ClusterBridgeEvent::NamespacesLoaded {
@@ -210,7 +255,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_deployments(&client, None).await {
                         Ok(deployments) => {
                             let _ = tx.send(ClusterBridgeEvent::DeploymentsLoaded {
@@ -247,7 +292,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_statefulsets(&client, None).await {
                         Ok(statefulsets) => {
                             let _ = tx.send(ClusterBridgeEvent::StatefulSetsLoaded {
@@ -284,7 +329,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_replicasets(&client, None).await {
                         Ok(replicasets) => {
                             let _ = tx.send(ClusterBridgeEvent::ReplicaSetsLoaded {
@@ -321,7 +366,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_daemonsets(&client, None).await {
                         Ok(daemonsets) => {
                             let _ = tx.send(ClusterBridgeEvent::DaemonSetsLoaded {
@@ -358,7 +403,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_jobs(&client, None).await {
                         Ok(jobs) => {
                             let _ = tx.send(ClusterBridgeEvent::JobsLoaded {
@@ -395,7 +440,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_cronjobs(&client, None).await {
                         Ok(cronjobs) => {
                             let _ = tx.send(ClusterBridgeEvent::CronJobsLoaded {
@@ -432,7 +477,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_pods(&client, None).await {
                         Ok(pods) => {
                             let _ = tx.send(ClusterBridgeEvent::PodsLoaded {
@@ -469,7 +514,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_services(&client, None).await {
                         Ok(services) => {
                             let _ = tx.send(ClusterBridgeEvent::ServicesLoaded {
@@ -506,7 +551,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_ingresses(&client, None).await {
                         Ok(ingresses) => {
                             let _ = tx.send(ClusterBridgeEvent::IngressesLoaded {
@@ -543,7 +588,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_configmaps(&client, None).await {
                         Ok(configmaps) => {
                             let _ = tx.send(ClusterBridgeEvent::ConfigMapsLoaded {
@@ -580,7 +625,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_secrets(&client, None).await {
                         Ok(secrets) => {
                             let _ = tx.send(ClusterBridgeEvent::SecretsLoaded {
@@ -617,7 +662,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_pvs(&client).await {
                         Ok(persistent_volumes) => {
                             let _ = tx.send(ClusterBridgeEvent::PersistentVolumesLoaded {
@@ -654,7 +699,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_pvcs(&client, None).await {
                         Ok(persistent_volume_claims) => {
                             let _ = tx.send(ClusterBridgeEvent::PersistentVolumeClaimsLoaded {
@@ -691,7 +736,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     let snapshot = fetch_storage_overview(&client).await;
                     let _ = tx.send(ClusterBridgeEvent::StorageOverviewLoaded {
                         cluster_id,
@@ -718,7 +763,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_network_policies(&client, None).await {
                         Ok(network_policies) => {
                             let _ = tx.send(ClusterBridgeEvent::NetworkPoliciesLoaded {
@@ -755,7 +800,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_pod_security_policies(&client, None).await {
                         Ok(policies) => {
                             let _ = tx.send(ClusterBridgeEvent::PodSecurityLoaded {
@@ -792,7 +837,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_hpas(&client, None).await {
                         Ok(hpas) => {
                             let _ = tx.send(ClusterBridgeEvent::HpasLoaded {
@@ -829,7 +874,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_storage_classes(&client).await {
                         Ok(classes) => {
                             let _ = tx.send(ClusterBridgeEvent::StorageClassesLoaded {
@@ -866,7 +911,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_policies(&client, None).await {
                         Ok(policies) => {
                             let _ = tx.send(ClusterBridgeEvent::SecurityOverviewLoaded {
@@ -903,7 +948,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_admission_webhooks(&client).await {
                         Ok(policies) => {
                             let _ = tx.send(ClusterBridgeEvent::AdmissionWebhooksLoaded {
@@ -940,7 +985,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_resource_quotas_and_limits(&client, None).await {
                         Ok(policies) => {
                             let _ = tx.send(ClusterBridgeEvent::ResourceQuotasLoaded {
@@ -977,7 +1022,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_nodes(&client).await {
                         Ok(nodes) => {
                             let _ = tx.send(ClusterBridgeEvent::NodesLoaded {
@@ -1014,7 +1059,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match fetch_events(&client, None).await {
                         Ok(events) => {
                             let _ = tx.send(ClusterBridgeEvent::EventsLoaded {
@@ -1054,7 +1099,7 @@ pub async fn handle_bridge_command(
 
             if let Some(client) = client {
                 let tx = event_tx.clone();
-                tokio::spawn(async move {
+                tracker.spawn(async move {
                     match orbit_core::kubernetes::raw::fetch_resource_yaml(
                         &client,
                         namespace.as_deref(),
@@ -1215,15 +1260,18 @@ pub fn start_cluster_bridge() -> ClusterBridge {
 
             rt.block_on(async move {
                 let manager = Arc::new(RwLock::new(KubeManager::new().await));
-                handle_bridge_command(
+                let mut tracker = BridgeTaskTracker::default();
+                handle_bridge_command_with_tracker(
                     ClusterBridgeCommand::LoadContexts,
                     &manager,
                     &thread_event_tx,
+                    &mut tracker,
                 )
                 .await;
 
                 while let Some(cmd) = command_rx.recv().await {
-                    handle_bridge_command(cmd, &manager, &thread_event_tx).await;
+                    handle_bridge_command_with_tracker(cmd, &manager, &thread_event_tx, &mut tracker)
+                        .await;
                 }
             });
         });
@@ -2204,5 +2252,147 @@ users:
             }
             other => panic!("expected AddClusterFailed, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_disconnect_clears_active_context_and_emits_event() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::SwitchCluster {
+                cluster_id: "dev-ctx".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+        let _ = event_rx.recv().await.expect("switch event expected");
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DisconnectCluster,
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("ClusterDisconnected event expected");
+        match ev {
+            ClusterBridgeEvent::ClusterDisconnected {
+                previous_cluster_id,
+                clusters,
+            } => {
+                assert_eq!(previous_cluster_id.as_deref(), Some("dev-ctx"));
+                assert!(clusters.iter().all(|c| c.status == "offline"));
+            }
+            other => panic!("expected ClusterDisconnected, got {other:?}"),
+        }
+
+        let guard = manager.read().await;
+        assert!(guard.active_context.is_none());
+        assert!(guard.active_client.is_none());
+        assert!(!guard.active_context_healthy);
+    }
+
+    #[tokio::test]
+    async fn test_bridge_task_tracker_aborts_in_flight_requests_on_disconnect() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let dropped_clone = Arc::clone(&dropped);
+        struct AbortGuard(Arc<std::sync::atomic::AtomicBool>);
+        impl Drop for AbortGuard {
+            fn drop(&mut self) {
+                self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+
+        tracker.spawn(async move {
+            let _guard = AbortGuard(dropped_clone);
+            std::future::pending::<()>().await;
+        });
+        tokio::task::yield_now().await;
+        assert!(!dropped.load(std::sync::atomic::Ordering::SeqCst));
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DisconnectCluster,
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+        tokio::task::yield_now().await;
+
+        assert!(
+            dropped.load(std::sync::atomic::Ordering::SeqCst),
+            "in-flight tracked task should be aborted on DisconnectCluster"
+        );
+        let ev = event_rx.recv().await.expect("ClusterDisconnected expected");
+        assert!(matches!(ev, ClusterBridgeEvent::ClusterDisconnected { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_handle_bridge_command_disconnect_then_switch_reconnects_cleanly() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::SwitchCluster {
+                cluster_id: "dev-ctx".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+        let _ = event_rx.recv().await.expect("first switch event");
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DisconnectCluster,
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+        let _ = event_rx.recv().await.expect("disconnect event");
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::SwitchCluster {
+                cluster_id: "dev-ctx".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx.recv().await.expect("second switch event");
+        match ev {
+            ClusterBridgeEvent::ClusterUnreachable { outcome, .. }
+            | ClusterBridgeEvent::ClusterConnected { outcome, .. } => {
+                assert_eq!(outcome.context_name, "dev-ctx");
+            }
+            other => panic!("expected ClusterConnected or ClusterUnreachable, got {other:?}"),
+        }
+        let guard = manager.read().await;
+        assert_eq!(guard.active_context.as_deref(), Some("dev-ctx"));
     }
 }
