@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     Client,
@@ -14,6 +14,7 @@ pub const DEPLOYMENT_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const POD_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const STATEFULSET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DAEMONSET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+pub const REPLICASET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub fn map_pod(p: &Pod) -> models::PodInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
@@ -514,12 +515,100 @@ pub async fn fetch_daemonsets(
     }
 }
 
+pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
+    let name = rs.metadata.name.clone().unwrap_or_default();
+    let namespace_name = rs.metadata.namespace.clone().unwrap_or_default();
+    let age = format_age(&rs.metadata.creation_timestamp);
+
+    let desired = rs.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
+    let status_rs = rs.status.as_ref();
+    let current = status_rs.and_then(|s| s.ready_replicas).unwrap_or(0);
+    let replicas = models::Replicas { current, desired };
+
+    let status = if desired == current {
+        "Running".to_string()
+    } else {
+        "Progressing".to_string()
+    };
+
+    let mut images = Vec::new();
+    let mut containers = Vec::new();
+    if let Some(template) = rs.spec.as_ref().and_then(|spec| spec.template.as_ref()) {
+        for c in &template
+            .spec
+            .as_ref()
+            .map(|s| s.containers.clone())
+            .unwrap_or_default()
+        {
+            if let Some(img) = &c.image {
+                images.push(img.clone());
+            }
+            containers.push(models::ContainerImageInfo {
+                name: c.name.clone(),
+                image: c.image.clone().unwrap_or_default(),
+            });
+        }
+    }
+
+    let labels = rs.metadata.labels.clone().unwrap_or_default();
+    let annotations = rs.metadata.annotations.clone().unwrap_or_default();
+
+    models::ReplicaSetInfo {
+        kind: "ReplicaSet".to_string(),
+        name,
+        namespace: namespace_name,
+        status,
+        replicas,
+        age,
+        images,
+        containers,
+        labels,
+        annotations,
+    }
+}
+
+pub async fn list_replicasets(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<models::ReplicaSetInfo>, kube::Error> {
+    let api: Api<ReplicaSet> = if let Some(ns) = namespace {
+        Api::namespaced(client.clone(), &ns)
+    } else {
+        Api::all(client.clone())
+    };
+
+    let mut list = Vec::new();
+    for rs in api.list(&ListParams::default()).await? {
+        list.push(map_replicaset(&rs));
+    }
+
+    Ok(list)
+}
+
+pub async fn fetch_replicasets(
+    client: &Client,
+    namespace: Option<String>,
+) -> Result<Vec<models::ReplicaSetInfo>, String> {
+    match tokio::time::timeout(
+        REPLICASET_FETCH_TIMEOUT,
+        list_replicasets(client, namespace),
+    )
+    .await
+    {
+        Ok(Ok(list)) => Ok(list),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err("Timed out fetching replicasets after 10s".to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use k8s_openapi::api::apps::v1::{
         DaemonSet, DaemonSetSpec, DaemonSetStatus, DeploymentCondition, DeploymentSpec,
-        DeploymentStatus, DeploymentStrategy, StatefulSet, StatefulSetSpec, StatefulSetStatus,
+        DeploymentStatus, DeploymentStrategy, ReplicaSet, ReplicaSetSpec, ReplicaSetStatus,
+        StatefulSet, StatefulSetSpec, StatefulSetStatus,
     };
     use k8s_openapi::api::core::v1::{Container, ContainerPort, PodSpec, PodTemplateSpec};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -1124,5 +1213,91 @@ mod tests {
         assert!(mapped.containers.is_empty());
         assert!(mapped.labels.is_empty());
         assert!(mapped.annotations.is_empty());
+    }
+
+    #[test]
+    fn test_map_replicaset_status_replicas_and_containers() {
+        let mut labels = std::collections::BTreeMap::new();
+        labels.insert("app".to_string(), "web".to_string());
+        let mut annotations = std::collections::BTreeMap::new();
+        annotations.insert("owner".to_string(), "frontend".to_string());
+
+        let running = ReplicaSet {
+            metadata: ObjectMeta {
+                name: Some("web-7f8b9c".to_string()),
+                namespace: Some("prod".to_string()),
+                labels: Some(labels),
+                annotations: Some(annotations),
+                ..Default::default()
+            },
+            spec: Some(ReplicaSetSpec {
+                replicas: Some(3),
+                template: Some(PodTemplateSpec {
+                    spec: Some(PodSpec {
+                        containers: vec![Container {
+                            name: "nginx".to_string(),
+                            image: Some("nginx:1.25".to_string()),
+                            ..Default::default()
+                        }],
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            status: Some(ReplicaSetStatus {
+                ready_replicas: Some(3),
+                ..Default::default()
+            }),
+        };
+
+        let mapped_running = map_replicaset(&running);
+        assert_eq!(mapped_running.kind, "ReplicaSet");
+        assert_eq!(mapped_running.name, "web-7f8b9c");
+        assert_eq!(mapped_running.namespace, "prod");
+        assert_eq!(mapped_running.status, "Running");
+        assert_eq!(mapped_running.replicas.current, 3);
+        assert_eq!(mapped_running.replicas.desired, 3);
+        assert_eq!(mapped_running.images, vec!["nginx:1.25"]);
+        assert_eq!(mapped_running.containers.len(), 1);
+        assert_eq!(
+            mapped_running.containers[0],
+            models::ContainerImageInfo {
+                name: "nginx".to_string(),
+                image: "nginx:1.25".to_string(),
+            }
+        );
+        assert_eq!(
+            mapped_running.labels.get("app").map(String::as_str),
+            Some("web")
+        );
+        assert_eq!(
+            mapped_running.annotations.get("owner").map(String::as_str),
+            Some("frontend")
+        );
+
+        let progressing = ReplicaSet {
+            metadata: ObjectMeta {
+                name: Some("web-rolling".to_string()),
+                namespace: Some("prod".to_string()),
+                ..Default::default()
+            },
+            spec: Some(ReplicaSetSpec {
+                replicas: Some(3),
+                template: None,
+                ..Default::default()
+            }),
+            status: Some(ReplicaSetStatus {
+                ready_replicas: Some(1),
+                ..Default::default()
+            }),
+        };
+
+        let mapped_progressing = map_replicaset(&progressing);
+        assert_eq!(mapped_progressing.status, "Progressing");
+        assert_eq!(mapped_progressing.replicas.current, 1);
+        assert_eq!(mapped_progressing.replicas.desired, 3);
+        assert!(mapped_progressing.images.is_empty());
+        assert!(mapped_progressing.containers.is_empty());
     }
 }

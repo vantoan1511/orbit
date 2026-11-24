@@ -5,74 +5,12 @@ use kube::{
 use k8s_openapi::api::core::v1::Pod;
 use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
 use k8s_openapi::api::batch::v1::{CronJob, Job};
-use crate::kubernetes::{models, format_age};
+use crate::kubernetes::models;
 
 pub use orbit_core::kubernetes::workloads::{
-    list_daemonsets, list_deployments, list_pods, list_statefulsets, map_daemonset, map_deployment,
-    map_pod, map_statefulset,
+    list_daemonsets, list_deployments, list_pods, list_replicasets, list_statefulsets,
+    map_daemonset, map_deployment, map_pod, map_replicaset, map_statefulset,
 };
-
-pub fn map_replicaset(rs: &ReplicaSet) -> models::ReplicaSetInfo {
-    let name = rs.metadata.name.clone().unwrap_or_default();
-    let namespace_name = rs.metadata.namespace.clone().unwrap_or_default();
-    let age = format_age(&rs.metadata.creation_timestamp);
-
-    let desired = rs.spec.as_ref().and_then(|s| s.replicas).unwrap_or(0);
-    let status_rs = rs.status.as_ref();
-    let current = status_rs.and_then(|s| s.ready_replicas).unwrap_or(0);
-    let replicas = models::Replicas { current, desired };
-
-    let status = if desired == current {
-        "Running".to_string()
-    } else {
-        "Progressing".to_string()
-    };
-
-    let mut images = Vec::new();
-    let mut containers = Vec::new();
-    if let Some(template) = rs.spec.as_ref().and_then(|spec| spec.template.as_ref()) {
-        for c in &template.spec.as_ref().map(|s| s.containers.clone()).unwrap_or_default() {
-            if let Some(img) = &c.image {
-                images.push(img.clone());
-            }
-            containers.push(models::ContainerImageInfo {
-                name: c.name.clone(),
-                image: c.image.clone().unwrap_or_default(),
-            });
-        }
-    }
-
-    let labels = rs.metadata.labels.clone().unwrap_or_default();
-    let annotations = rs.metadata.annotations.clone().unwrap_or_default();
-
-    models::ReplicaSetInfo {
-        kind: "ReplicaSet".to_string(),
-        name,
-        namespace: namespace_name,
-        status,
-        replicas,
-        age,
-        images,
-        containers,
-        labels,
-        annotations,
-    }
-}
-
-pub async fn list_replicasets(client: &Client, namespace: Option<String>) -> Result<Vec<models::ReplicaSetInfo>, kube::Error> {
-    let api: Api<ReplicaSet> = if let Some(ns) = namespace {
-        Api::namespaced(client.clone(), &ns)
-    } else {
-        Api::all(client.clone())
-    };
-
-    let mut list = Vec::new();
-    for rs in api.list(&ListParams::default()).await? {
-        list.push(map_replicaset(&rs));
-    }
-
-    Ok(list)
-}
 
 pub async fn scale_resource(
     client: &Client,

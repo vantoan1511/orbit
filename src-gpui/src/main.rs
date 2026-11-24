@@ -37,7 +37,7 @@ use crate::state::{
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
     NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
     PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodsState,
-    SecretsState, ServicesState, StatefulSetsState,
+    ReplicaSetsState, SecretsState, ServicesState, StatefulSetsState,
     TabDropPosition, WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{
@@ -169,6 +169,7 @@ pub struct WorkspaceLoadingFlags {
     pub deployments: bool,
     pub statefulsets: bool,
     pub daemonsets: bool,
+    pub replicasets: bool,
     pub jobs: bool,
     pub cronjobs: bool,
     pub pods: bool,
@@ -194,6 +195,7 @@ pub const fn is_workspace_view_loading(
         WorkspaceView::Deployments => loading.deployments,
         WorkspaceView::StatefulSets => loading.statefulsets,
         WorkspaceView::DaemonSets => loading.daemonsets,
+        WorkspaceView::ReplicaSets => loading.replicasets,
         WorkspaceView::Jobs => loading.jobs,
         WorkspaceView::CronJobs => loading.cronjobs,
         WorkspaceView::Pods => loading.pods,
@@ -283,6 +285,7 @@ pub fn select_workspace_view_with_state(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
     jobs: &mut JobsState,
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
@@ -305,6 +308,7 @@ pub fn select_workspace_view_with_state(
         deployments,
         statefulsets,
         daemonsets,
+        replicasets,
         jobs,
         cronjobs,
         pods,
@@ -330,6 +334,7 @@ pub fn select_workspace_view_with_tabs(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
     jobs: &mut JobsState,
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
@@ -355,6 +360,7 @@ pub fn select_workspace_view_with_tabs(
         deployments,
         statefulsets,
         daemonsets,
+        replicasets,
         jobs,
         cronjobs,
         pods,
@@ -385,6 +391,7 @@ fn load_command_for_active_view(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
     jobs: &mut JobsState,
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
@@ -419,6 +426,9 @@ fn load_command_for_active_view(
     }
     if view == WorkspaceView::DaemonSets && daemonsets.needs_load_for_cluster(cluster_id) {
         return Some(daemonsets.begin_load_for_cluster(cluster_id));
+    }
+    if view == WorkspaceView::ReplicaSets && replicasets.needs_load_for_cluster(cluster_id) {
+        return Some(replicasets.begin_load_for_cluster(cluster_id));
     }
     if view == WorkspaceView::Jobs && jobs.needs_load_for_cluster(cluster_id) {
         return Some(jobs.begin_load_for_cluster(cluster_id));
@@ -476,6 +486,7 @@ pub fn apply_cluster_event_with_tabs(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
     jobs: &mut JobsState,
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
@@ -502,6 +513,7 @@ pub fn apply_cluster_event_with_tabs(
         deployments,
         statefulsets,
         daemonsets,
+        replicasets,
         jobs,
         cronjobs,
         pods,
@@ -528,6 +540,7 @@ pub fn apply_cluster_event_with_tabs(
                 deployments,
                 statefulsets,
                 daemonsets,
+                replicasets,
                 jobs,
                 cronjobs,
                 pods,
@@ -561,6 +574,7 @@ pub fn handle_tab_shortcut_with_state(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
     jobs: &mut JobsState,
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
@@ -612,6 +626,7 @@ pub fn handle_tab_shortcut_with_state(
         deployments,
         statefulsets,
         daemonsets,
+        replicasets,
         jobs,
         cronjobs,
         pods,
@@ -646,6 +661,7 @@ pub fn apply_cluster_event_with_workspace(
     deployments: &mut DeploymentsState,
     statefulsets: &mut StatefulSetsState,
     daemonsets: &mut DaemonSetsState,
+    replicasets: &mut ReplicaSetsState,
     jobs: &mut JobsState,
     cronjobs: &mut CronJobsState,
     pods: &mut PodsState,
@@ -688,6 +704,11 @@ pub fn apply_cluster_event_with_workspace(
                     commands.push(daemonsets.begin_load_for_cluster(id));
                 } else {
                     daemonsets.reset_for_cluster(id);
+                }
+                if sidebar.active_view == WorkspaceView::ReplicaSets {
+                    commands.push(replicasets.begin_load_for_cluster(id));
+                } else {
+                    replicasets.reset_for_cluster(id);
                 }
                 if sidebar.active_view == WorkspaceView::Jobs {
                     commands.push(jobs.begin_load_for_cluster(id));
@@ -761,6 +782,7 @@ pub fn apply_cluster_event_with_workspace(
             deployments.reset_for_disconnected();
             statefulsets.reset_for_disconnected();
             daemonsets.reset_for_disconnected();
+            replicasets.reset_for_disconnected();
             jobs.reset_for_disconnected();
             cronjobs.reset_for_disconnected();
             pods.reset_for_disconnected();
@@ -850,6 +872,20 @@ pub fn apply_cluster_event_with_workspace(
             message,
         } => {
             daemonsets.apply_failed(&cluster_id, generation, message);
+        }
+        ClusterBridgeEvent::ReplicaSetsLoaded {
+            cluster_id,
+            generation,
+            replicasets: loaded_replicasets,
+        } => {
+            replicasets.apply_loaded(&cluster_id, generation, loaded_replicasets);
+        }
+        ClusterBridgeEvent::ReplicaSetsLoadFailed {
+            cluster_id,
+            generation,
+            message,
+        } => {
+            replicasets.apply_failed(&cluster_id, generation, message);
         }
         ClusterBridgeEvent::JobsLoaded {
             cluster_id,
@@ -1101,6 +1137,7 @@ pub struct OrbitShell {
     deployments: DeploymentsState,
     statefulsets: StatefulSetsState,
     daemonsets: DaemonSetsState,
+    replicasets: ReplicaSetsState,
     jobs: JobsState,
     cronjobs: CronJobsState,
     pods: PodsState,
@@ -1156,6 +1193,7 @@ impl OrbitShell {
                             &mut shell.deployments,
                             &mut shell.statefulsets,
                             &mut shell.daemonsets,
+                            &mut shell.replicasets,
                             &mut shell.jobs,
                             &mut shell.cronjobs,
                             &mut shell.pods,
@@ -1220,6 +1258,7 @@ impl OrbitShell {
             deployments: DeploymentsState::default(),
             statefulsets: StatefulSetsState::default(),
             daemonsets: DaemonSetsState::default(),
+            replicasets: ReplicaSetsState::default(),
             jobs: JobsState::default(),
             cronjobs: CronJobsState::default(),
             pods: PodsState::default(),
@@ -1295,6 +1334,7 @@ impl OrbitShell {
             &mut self.deployments,
             &mut self.statefulsets,
             &mut self.daemonsets,
+            &mut self.replicasets,
             &mut self.jobs,
             &mut self.cronjobs,
             &mut self.pods,
@@ -1334,6 +1374,7 @@ impl OrbitShell {
             &mut self.deployments,
             &mut self.statefulsets,
             &mut self.daemonsets,
+            &mut self.replicasets,
             &mut self.jobs,
             &mut self.cronjobs,
             &mut self.pods,
@@ -1431,6 +1472,7 @@ impl OrbitShell {
             ResourceDrawerTarget::Deployment { .. }
                 | ResourceDrawerTarget::StatefulSet { .. }
                 | ResourceDrawerTarget::DaemonSet { .. }
+                | ResourceDrawerTarget::ReplicaSet { .. }
                 | ResourceDrawerTarget::Job { .. }
                 | ResourceDrawerTarget::CronJob { .. }
                 | ResourceDrawerTarget::Pod { .. }
@@ -1526,6 +1568,11 @@ impl OrbitShell {
                 .daemonsets
                 .iter()
                 .any(|d| d.name == *name && d.namespace == *namespace),
+            ResourceDrawerTarget::ReplicaSet { name, namespace } => self
+                .replicasets
+                .replicasets
+                .iter()
+                .any(|r| r.name == *name && r.namespace == *namespace),
             ResourceDrawerTarget::Job { name, namespace } => self
                 .jobs
                 .jobs
@@ -1741,6 +1788,60 @@ impl OrbitShell {
                     Some(SharedString::from(ss.namespace.clone())),
                     Some(SharedString::from(ss.age.clone())),
                     Some(SharedString::from(ss.status.clone())),
+                    tabs,
+                    body,
+                ))
+            }
+            ResourceDrawerTarget::ReplicaSet { name, namespace } => {
+                let rs = self
+                    .replicasets
+                    .replicasets
+                    .iter()
+                    .find(|r| r.name == *name && r.namespace == *namespace)?;
+                let matched_events =
+                    views::replicasets::filter_events_for_replicaset(&self.events.events, rs);
+                let tabs = vec![
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Overview,
+                        label: SharedString::from("Overview"),
+                        badge: None,
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Events,
+                        label: SharedString::from("Events"),
+                        badge: Some(SharedString::from(matched_events.len().to_string())),
+                    },
+                    ResourceDrawerTabDef {
+                        id: ResourceDrawerTabId::Yaml,
+                        label: SharedString::from("YAML"),
+                        badge: None,
+                    },
+                ];
+                let body = match self.drawer.active_tab {
+                    ResourceDrawerTabId::Overview => {
+                        views::replicasets::render_replicaset_drawer_overview(rs, theme)
+                    }
+                    ResourceDrawerTabId::Events => {
+                        views::replicasets::render_replicaset_drawer_events(
+                            &self.events.events,
+                            events_loading,
+                            rs,
+                            theme,
+                        )
+                    }
+                    ResourceDrawerTabId::Yaml => self.render_live_yaml_tab(
+                        format!("{}/{}", rs.namespace, rs.name),
+                        theme,
+                        cx,
+                    ),
+                    ResourceDrawerTabId::Custom(_) => div().into_any_element(),
+                };
+                Some((
+                    SharedString::from(rs.name.clone()),
+                    SharedString::from("ReplicaSet"),
+                    Some(SharedString::from(rs.namespace.clone())),
+                    Some(SharedString::from(rs.age.clone())),
+                    Some(SharedString::from(rs.status.clone())),
                     tabs,
                     body,
                 ))
@@ -2601,6 +2702,8 @@ impl OrbitShell {
                 statefulsets: self.statefulsets.status
                     == crate::state::StatefulSetsLoadStatus::Loading,
                 daemonsets: self.daemonsets.status == crate::state::DaemonSetsLoadStatus::Loading,
+                replicasets: self.replicasets.status
+                    == crate::state::ReplicaSetsLoadStatus::Loading,
                 jobs: self.jobs.status == crate::state::JobsLoadStatus::Loading,
                 cronjobs: self.cronjobs.status == crate::state::CronJobsLoadStatus::Loading,
                 pods: self.pods.status == crate::state::PodsLoadStatus::Loading,
@@ -2665,6 +2768,15 @@ impl OrbitShell {
                     .daemonsets
                     .begin_refresh()
                     .unwrap_or_else(|| self.daemonsets.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::ReplicaSets
+                || self.replicasets.cluster_id.is_some()
+            {
+                let cmd = self
+                    .replicasets
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.replicasets.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::Jobs || self.jobs.cluster_id.is_some() {
@@ -4534,6 +4646,120 @@ impl OrbitShell {
 
             return views::statefulsets::render_statefulsets_view(
                 &self.statefulsets,
+                &self.namespaces,
+                theme,
+                on_sort,
+                on_row_click,
+                on_row_context_menu,
+                on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::ReplicaSets {
+            let sort_entity = cx.entity().clone();
+            let on_sort = move |col_id: SharedString,
+                                _event: &gpui::ClickEvent,
+                                _window: &mut Window,
+                                cx: &mut App| {
+                sort_entity.update(cx, |shell, cx| {
+                    shell.replicasets.table.toggle_sort(col_id.as_ref());
+                    cx.notify();
+                });
+            };
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = move |_row_idx: usize,
+                                     row_key: SharedString,
+                                     _event: &gpui::ClickEvent,
+                                     _window: &mut Window,
+                                     cx: &mut App| {
+                row_entity.update(cx, |shell, cx| {
+                    shell.replicasets.table.selected_row_key = Some(row_key.to_string());
+                    if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                        let target = ResourceDrawerTarget::ReplicaSet {
+                            name: name.to_string(),
+                            namespace: ns.to_string(),
+                        };
+                        shell.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+                    } else {
+                        cx.notify();
+                    }
+                });
+            };
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu =
+                move |row_key: SharedString,
+                      replicaset: &orbit_core::kubernetes::models::ReplicaSetInfo,
+                      event: &MouseDownEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    let name = replicaset.name.clone();
+                    let namespace = replicaset.namespace.clone();
+                    let drawer_target = ResourceDrawerTarget::ReplicaSet {
+                        name: replicaset.name.clone(),
+                        namespace: replicaset.namespace.clone(),
+                    };
+                    let anchor = event.position;
+                    let copy_name = move |_w: &mut Window, cx: &mut App| {
+                        cx.write_to_clipboard(ClipboardItem::new_string(name.clone()));
+                    };
+                    let filter_entity = ctx_entity.clone();
+                    let filter_ns = move |_w: &mut Window, cx: &mut App| {
+                        filter_entity.update(cx, |shell, cx| {
+                            shell.filter_by_namespace(&namespace, cx);
+                        });
+                    };
+                    let refresh_ctx_entity = ctx_entity.clone();
+                    let refresh_cb = move |_w: &mut Window, cx: &mut App| {
+                        refresh_ctx_entity.update(cx, |shell, cx| {
+                            shell.refresh_workspace(cx);
+                        });
+                    };
+                    let details_entity = ctx_entity.clone();
+                    let details_target = drawer_target.clone();
+                    let view_details = move |_w: &mut Window, cx: &mut App| {
+                        details_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                details_target.clone(),
+                                ResourceDrawerTabId::Overview,
+                                cx,
+                            );
+                        });
+                    };
+                    let yaml_entity = ctx_entity.clone();
+                    let view_yaml = move |_w: &mut Window, cx: &mut App| {
+                        yaml_entity.update(cx, |shell, cx| {
+                            shell.open_resource_drawer(
+                                drawer_target.clone(),
+                                ResourceDrawerTabId::Yaml,
+                                cx,
+                            );
+                        });
+                    };
+                    let entries = views::replicasets::build_replicaset_context_menu_entries(
+                        replicaset,
+                        copy_name,
+                        filter_ns,
+                        refresh_cb,
+                        view_details,
+                        view_yaml,
+                    );
+                    ctx_entity.update(cx, |shell, cx| {
+                        shell.replicasets.table.selected_row_key = Some(row_key.to_string());
+                        shell.open_context_menu(anchor, entries, cx);
+                    });
+                };
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    shell.refresh_workspace(cx);
+                });
+            };
+
+            return views::replicasets::render_replicasets_view(
+                &self.replicasets,
                 &self.namespaces,
                 theme,
                 on_sort,
@@ -6586,6 +6812,7 @@ impl Render for OrbitShell {
                     &mut this.deployments,
                     &mut this.statefulsets,
                     &mut this.daemonsets,
+                    &mut this.replicasets,
                     &mut this.jobs,
                     &mut this.cronjobs,
                     &mut this.pods,
@@ -7108,6 +7335,7 @@ mod tests {
             &mut throwaway_deployments,
             &mut throwaway_statefulsets,
             &mut throwaway_daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut throwaway_jobs,
             &mut throwaway_cronjobs,
             &mut throwaway_pods,
@@ -7238,6 +7466,7 @@ mod tests {
                 deployments: true,
                 statefulsets: true,
                 daemonsets: true,
+                replicasets: true,
                 jobs: true,
                 cronjobs: true,
                 pods: true,
@@ -7348,6 +7577,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7393,6 +7623,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7424,6 +7655,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7470,6 +7702,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7597,6 +7830,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -7628,6 +7862,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7664,6 +7899,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7687,6 +7923,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -7751,6 +7988,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7788,6 +8026,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7818,6 +8057,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7909,6 +8149,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7940,6 +8181,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -7977,6 +8219,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8028,6 +8271,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8061,6 +8305,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8084,6 +8329,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -8149,6 +8395,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8183,6 +8430,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8213,6 +8461,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8306,6 +8555,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8337,6 +8587,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8371,6 +8622,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8419,6 +8671,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8451,6 +8704,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8474,6 +8728,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -8502,6 +8757,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -8549,6 +8805,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8593,6 +8850,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8654,6 +8912,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8687,6 +8946,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8710,6 +8970,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -8738,6 +8999,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -8786,6 +9048,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8837,6 +9100,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -8885,6 +9149,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9290,6 +9555,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9323,6 +9589,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9351,6 +9618,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9416,6 +9684,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9467,6 +9736,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9538,6 +9808,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9569,6 +9840,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9599,6 +9871,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9634,6 +9907,7 @@ mod tests {
                 &mut deployments,
                 &mut statefulsets,
                 &mut daemonsets,
+                &mut ReplicaSetsState::default(),
                 &mut jobs,
             &mut cronjobs,
                 &mut pods,
@@ -9714,6 +9988,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9747,6 +10022,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods_on_connect,
@@ -9813,6 +10089,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9846,6 +10123,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -9877,6 +10155,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10005,6 +10284,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10039,6 +10319,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10107,6 +10388,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10138,6 +10420,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10171,6 +10454,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10231,6 +10515,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10277,6 +10562,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10397,6 +10683,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10457,6 +10744,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10488,6 +10776,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10523,6 +10812,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10596,6 +10886,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10625,6 +10916,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10755,6 +11047,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10814,6 +11107,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10845,6 +11139,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10877,6 +11172,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10952,6 +11248,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -10981,6 +11278,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11141,6 +11439,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11199,6 +11498,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11234,6 +11534,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11293,6 +11594,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11376,6 +11678,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11424,6 +11727,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11455,6 +11759,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11490,6 +11795,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11523,6 +11829,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11597,6 +11904,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11623,6 +11931,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11654,6 +11963,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11685,6 +11995,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11716,6 +12027,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11747,6 +12059,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11769,7 +12082,7 @@ mod tests {
             ClusterBridgeCommand::LoadJobs { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
 
-        // Navigate to ReplicaSets (unimplemented list view — activates tab without panicking)
+        // Navigate to ReplicaSets
         let rs_cmds = select_workspace_view_with_tabs(
             &switcher,
             &mut sidebar,
@@ -11778,6 +12091,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11795,14 +12109,145 @@ mod tests {
         );
         assert_eq!(sidebar.active_view, WorkspaceView::ReplicaSets);
         assert_eq!(tabs.active_tab(), Some(WorkspaceView::ReplicaSets));
-        assert!(!rs_cmds.iter().any(|c| matches!(
+        assert!(rs_cmds.iter().any(|c| matches!(
             c,
-            ClusterBridgeCommand::LoadPods { .. }
-                | ClusterBridgeCommand::LoadDeployments { .. }
-                | ClusterBridgeCommand::LoadStatefulSets { .. }
-                | ClusterBridgeCommand::LoadDaemonSets { .. }
-                | ClusterBridgeCommand::LoadJobs { .. }
+            ClusterBridgeCommand::LoadReplicaSets { cluster_id, .. } if cluster_id == "prod-ctx"
         )));
+    }
+
+    fn make_test_replicaset(
+        name: &str,
+        namespace: &str,
+    ) -> orbit_core::kubernetes::models::ReplicaSetInfo {
+        orbit_core::kubernetes::models::ReplicaSetInfo {
+            kind: "ReplicaSet".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 3,
+                desired: 3,
+            },
+            age: "2d".to_string(),
+            images: vec!["nginx:1.25".to_string()],
+            containers: vec![orbit_core::kubernetes::models::ContainerImageInfo {
+                name: "nginx".to_string(),
+                image: "nginx:1.25".to_string(),
+            }],
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_replicasets_loaded_and_failed_events_and_loading_flag() {
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut overview = ClusterOverviewState::default();
+        let mut namespaces = NamespaceFilterState::default();
+        let mut namespaces_view = NamespacesViewState::default();
+        let mut deployments = DeploymentsState::default();
+        let mut statefulsets = StatefulSetsState::default();
+        let mut daemonsets = DaemonSetsState::default();
+        let mut replicasets = ReplicaSetsState::default();
+        let mut jobs = JobsState::default();
+        let mut cronjobs = CronJobsState::default();
+        let mut pods = PodsState::default();
+        let mut services = ServicesState::default();
+        let mut configmaps = ConfigMapsState::default();
+        let mut secrets = SecretsState::default();
+        let mut persistent_volumes = PersistentVolumesState::default();
+        let mut nodes = NodesState::default();
+        let mut events = EventsState::default();
+
+        assert!(is_workspace_view_loading(
+            WorkspaceView::ReplicaSets,
+            WorkspaceLoadingFlags {
+                replicasets: true,
+                ..Default::default()
+            },
+        ));
+        assert!(!is_workspace_view_loading(
+            WorkspaceView::ReplicaSets,
+            WorkspaceLoadingFlags {
+                deployments: true,
+                ..Default::default()
+            },
+        ));
+
+        let _ = replicasets.begin_load_for_cluster("prod-ctx");
+        let rs = make_test_replicaset("web-7f8b", "prod");
+
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut WorkloadsOverviewState::default(),
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut IngressesState::default(),
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ReplicaSetsLoaded {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 1,
+                replicasets: vec![rs],
+            },
+        );
+        assert_eq!(replicasets.replicasets.len(), 1);
+        assert_eq!(
+            replicasets.status,
+            crate::state::ReplicaSetsLoadStatus::Loaded
+        );
+
+        let _ = replicasets.begin_refresh();
+        apply_cluster_event_with_workspace(
+            &mut switcher,
+            &mut sidebar,
+            &mut overview,
+            &mut WorkloadsOverviewState::default(),
+            &mut namespaces,
+            &mut namespaces_view,
+            &mut deployments,
+            &mut statefulsets,
+            &mut daemonsets,
+            &mut replicasets,
+            &mut jobs,
+            &mut cronjobs,
+            &mut pods,
+            &mut services,
+            &mut IngressesState::default(),
+            &mut configmaps,
+            &mut secrets,
+            &mut persistent_volumes,
+            &mut PersistentVolumeClaimsState::default(),
+            &mut NetworkPoliciesState::default(),
+            &mut nodes,
+            &mut events,
+            ClusterBridgeEvent::ReplicaSetsLoadFailed {
+                cluster_id: "prod-ctx".to_string(),
+                generation: 2,
+                message: "forbidden".to_string(),
+            },
+        );
+        assert_eq!(
+            replicasets.status,
+            crate::state::ReplicaSetsLoadStatus::Error
+        );
+        assert_eq!(replicasets.error_message.as_deref(), Some("forbidden"));
     }
 
     fn make_test_daemonset(
@@ -11866,6 +12311,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11900,6 +12346,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11935,6 +12382,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -11992,6 +12440,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12083,6 +12532,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12117,6 +12567,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12149,6 +12600,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12206,6 +12658,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12298,6 +12751,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12332,6 +12786,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12364,6 +12819,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12421,6 +12877,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12515,6 +12972,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12548,6 +13006,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12594,6 +13053,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12626,6 +13086,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12719,6 +13180,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12752,6 +13214,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12798,6 +13261,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12833,6 +13297,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12909,6 +13374,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12945,6 +13411,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -12995,6 +13462,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -13030,6 +13498,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -13107,6 +13576,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -13140,6 +13610,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -13189,6 +13660,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,
@@ -13224,6 +13696,7 @@ mod tests {
             &mut deployments,
             &mut statefulsets,
             &mut daemonsets,
+            &mut ReplicaSetsState::default(),
             &mut jobs,
             &mut cronjobs,
             &mut pods,

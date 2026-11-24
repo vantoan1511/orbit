@@ -6,7 +6,7 @@ use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, IngressInfo,
     JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeClaimInfo, PersistentVolumeInfo, PodInfo,
-    PolicyInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
+    PolicyInfo, ReplicaSetInfo, SecretInfo, ServiceInfo, StatefulSetInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
@@ -68,6 +68,10 @@ pub enum ClusterBridgeCommand {
         generation: u64,
     },
     LoadDaemonSets {
+        cluster_id: String,
+        generation: u64,
+    },
+    LoadReplicaSets {
         cluster_id: String,
         generation: u64,
     },
@@ -227,6 +231,16 @@ pub enum ClusterBridgeEvent {
         daemonsets: Vec<DaemonSetInfo>,
     },
     DaemonSetsLoadFailed {
+        cluster_id: String,
+        generation: u64,
+        message: String,
+    },
+    ReplicaSetsLoaded {
+        cluster_id: String,
+        generation: u64,
+        replicasets: Vec<ReplicaSetInfo>,
+    },
+    ReplicaSetsLoadFailed {
         cluster_id: String,
         generation: u64,
         message: String,
@@ -981,6 +995,109 @@ impl StatefulSetsState {
     pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
         self.cluster_id.as_deref() != Some(cluster_id)
             || self.status == StatefulSetsLoadStatus::Idle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ReplicaSetsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ReplicaSetsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: ReplicaSetsLoadStatus,
+    pub replicasets: Vec<ReplicaSetInfo>,
+    pub error_message: Option<String>,
+    pub table: DataTableState,
+}
+
+impl ReplicaSetsState {
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = ReplicaSetsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.replicasets.clear();
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.replicasets.is_empty();
+        ClusterBridgeCommand::LoadReplicaSets {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = ReplicaSetsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.replicasets.is_empty();
+        Some(ClusterBridgeCommand::LoadReplicaSets {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = ReplicaSetsLoadStatus::Idle;
+        self.replicasets.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = ReplicaSetsLoadStatus::Idle;
+        self.replicasets.clear();
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        replicasets: Vec<ReplicaSetInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = ReplicaSetsLoadStatus::Loaded;
+            self.replicasets = replicasets;
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = ReplicaSetsLoadStatus::Error;
+            self.error_message = Some(message);
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == ReplicaSetsLoadStatus::Idle
     }
 }
 
@@ -2554,6 +2671,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::StatefulSetsLoadFailed { .. }
             | ClusterBridgeEvent::DaemonSetsLoaded { .. }
             | ClusterBridgeEvent::DaemonSetsLoadFailed { .. }
+            | ClusterBridgeEvent::ReplicaSetsLoaded { .. }
+            | ClusterBridgeEvent::ReplicaSetsLoadFailed { .. }
             | ClusterBridgeEvent::JobsLoaded { .. }
             | ClusterBridgeEvent::JobsLoadFailed { .. }
             | ClusterBridgeEvent::CronJobsLoaded { .. }
@@ -3621,6 +3740,97 @@ mod tests {
         state.reset_for_disconnected();
         assert!(state.cluster_id.is_none());
         assert_eq!(state.status, StatefulSetsLoadStatus::Idle);
+        assert!(state.generation > gen_before_disconnect);
+    }
+
+    fn sample_replicaset(name: &str, namespace: &str) -> ReplicaSetInfo {
+        ReplicaSetInfo {
+            kind: "ReplicaSet".to_string(),
+            name: name.to_string(),
+            namespace: namespace.to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 3,
+                desired: 3,
+            },
+            age: "2d".to_string(),
+            images: vec!["nginx:1.25".to_string()],
+            containers: vec![orbit_core::kubernetes::models::ContainerImageInfo {
+                name: "nginx".to_string(),
+                image: "nginx:1.25".to_string(),
+            }],
+            labels: Default::default(),
+            annotations: Default::default(),
+        }
+    }
+
+    #[test]
+    fn test_replicasets_state_lifecycle_and_generation_guard() {
+        let mut state = ReplicaSetsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadReplicaSets {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+        assert_eq!(state.status, ReplicaSetsLoadStatus::Loading);
+        assert!(state.table.loading);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // Stale cluster or generation is rejected.
+        assert!(!state.apply_loaded(
+            "ctx-other",
+            1,
+            vec![sample_replicaset("wrong-cluster", "default")],
+        ));
+        assert!(!state.apply_loaded(
+            "ctx-a",
+            99,
+            vec![sample_replicaset("wrong-gen", "default")],
+        ));
+        assert!(state.replicasets.is_empty());
+
+        // Matching cluster and generation is accepted.
+        assert!(state.apply_loaded("ctx-a", 1, vec![sample_replicaset("web-rs", "default")]));
+        assert_eq!(state.status, ReplicaSetsLoadStatus::Loaded);
+        assert!(!state.table.loading);
+        assert_eq!(state.replicasets.len(), 1);
+        assert_eq!(state.replicasets[0].name, "web-rs");
+
+        // Refresh retains cached rows while loading.
+        let refresh = state.begin_refresh();
+        assert_eq!(
+            refresh,
+            Some(ClusterBridgeCommand::LoadReplicaSets {
+                cluster_id: "ctx-a".to_string(),
+                generation: 2,
+            })
+        );
+        assert_eq!(state.status, ReplicaSetsLoadStatus::Loading);
+        assert_eq!(state.replicasets.len(), 1);
+
+        assert!(state.apply_failed("ctx-a", 2, "timeout".to_string()));
+        assert_eq!(state.status, ReplicaSetsLoadStatus::Error);
+        assert_eq!(state.error_message.as_deref(), Some("timeout"));
+
+        // Reset for new cluster clears rows, selection, and returns to Idle.
+        state.reset_for_cluster("ctx-b");
+        assert_eq!(state.cluster_id.as_deref(), Some("ctx-b"));
+        assert_eq!(state.status, ReplicaSetsLoadStatus::Idle);
+        assert!(state.replicasets.is_empty());
+        assert!(state.error_message.is_none());
+        assert!(state.table.selected_row_key.is_none());
+        assert!(state.needs_load_for_cluster("ctx-b"));
+
+        // Disconnect clears cluster_id and invalidates in-flight replies.
+        let gen_before_disconnect = state.generation;
+        state.reset_for_disconnected();
+        assert!(state.cluster_id.is_none());
+        assert_eq!(state.status, ReplicaSetsLoadStatus::Idle);
         assert!(state.generation > gen_before_disconnect);
     }
 
