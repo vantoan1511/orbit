@@ -8459,6 +8459,7 @@ impl OrbitShell {
         let drawer = self.render_active_drawer(window_width, &theme, cx);
 
         div()
+            .relative()
             .flex_1()
             .min_h(px(0.0))
             .min_w(px(0.0))
@@ -8939,6 +8940,10 @@ fn main() -> std::process::ExitCode {
     });
 
     gpui_exit_code_for_window_open(open_failed.load(std::sync::atomic::Ordering::SeqCst))
+}
+
+pub const fn workspace_drawer_stacks_as_overlay() -> bool {
+    true
 }
 
 #[cfg(test)]
@@ -16629,5 +16634,68 @@ mod tests {
                 "{non_table_view:?} must not render as a full-bleed table view"
             );
         }
+    }
+
+    #[test]
+    fn test_workspace_drawer_overlay_stacking_and_escape_dismissal() {
+        assert!(workspace_drawer_stacks_as_overlay());
+
+        let main_src = include_str!("main.rs");
+        let render_workspace_idx = main_src
+            .find("fn render_workspace(")
+            .expect("render_workspace must exist");
+        let render_footer_idx = main_src
+            .find("fn render_footer(")
+            .expect("render_footer must exist");
+        let render_workspace_body = &main_src[render_workspace_idx..render_footer_idx];
+        assert!(
+            render_workspace_body.contains(".relative()"),
+            "render_workspace must attach .relative() to stack the drawer as an overlay"
+        );
+        assert!(
+            render_workspace_body.contains(".child(workspace_main)"),
+            "render_workspace must render workspace_main as the flex child"
+        );
+        assert!(
+            render_workspace_body.contains(".when_some(drawer, |el, panel| el.child(panel))"),
+            "render_workspace must mount drawer as an overlay sibling"
+        );
+
+        use crate::components::{ContextMenuItem, ResourceDrawerTabId};
+
+        let mut drawer = ResourceDrawerState::default();
+        let target = ResourceDrawerTarget::Deployment {
+            name: "api".to_string(),
+            namespace: "default".to_string(),
+        };
+        let _ = drawer.open_or_switch(Some("ctx-a"), target, ResourceDrawerTabId::Overview);
+        assert!(drawer.is_open);
+
+        let mut context_menu = ContextMenuState::default();
+        context_menu.open(
+            gpui::point(px(10.0), px(10.0)),
+            vec![ContextMenuEntry::Item(ContextMenuItem::new(
+                "inspect",
+                "Inspect",
+            ))],
+        );
+        let (ctx_action, _) = context_menu.handle_key("escape");
+        assert_eq!(ctx_action, ContextMenuKeyAction::Closed);
+        assert!(!context_menu.is_open);
+        assert!(drawer.is_open);
+
+        let mut tabs = WorkspaceTabsState::default();
+        tabs.open_picker();
+        let picker_action = tabs.handle_picker_key("escape", None, false);
+        assert_eq!(picker_action, PickerKeyAction::Closed);
+        assert!(!tabs.picker_open);
+        assert!(drawer.is_open);
+
+        let mut deployments = DeploymentsState::default();
+        deployments.table.toggle_sort("name");
+        let sort_before = deployments.table.sort.clone();
+        drawer.close();
+        assert!(!drawer.is_open);
+        assert_eq!(deployments.table.sort, sort_before);
     }
 }
