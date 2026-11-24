@@ -567,7 +567,6 @@ pub struct ResourceDrawerProps {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DrawerOverlayStyle {
-    pub backdrop_bg: gpui::Rgba,
     pub panel_bg: gpui::Rgba,
     pub border_color: gpui::Rgba,
     pub shadows: Vec<gpui::BoxShadow>,
@@ -575,7 +574,6 @@ pub struct DrawerOverlayStyle {
 
 pub fn resolve_drawer_overlay_style(theme: &OrbitTheme) -> DrawerOverlayStyle {
     DrawerOverlayStyle {
-        backdrop_bg: theme.surface.mask_bg,
         panel_bg: theme.surface.overlay_bg,
         border_color: theme.border.strong,
         shadows: theme.style.overlay_shadows.clone(),
@@ -598,9 +596,7 @@ pub fn render_resource_drawer(
     let drawer_width = effective_drawer_width(props.width, props.window_width);
     let overlay_style = resolve_drawer_overlay_style(theme);
 
-    let on_close = props.on_close.clone();
-    let on_backdrop_left = props.on_close.clone();
-    let on_backdrop_right = props.on_close;
+    let on_close = props.on_close;
     let close_button = div()
         .id("resource-drawer-close-btn")
         .w(px(28.0))
@@ -756,10 +752,11 @@ pub fn render_resource_drawer(
 
     let container = div()
         .id("resource-drawer-shell")
-        .relative()
-        .h_full()
+        .absolute()
+        .top_0()
+        .right_0()
+        .bottom_0()
         .w(px(drawer_width))
-        .flex_shrink_0()
         .bg(overlay_style.panel_bg)
         .border_l_1()
         .border_color(overlay_style.border_color)
@@ -787,31 +784,7 @@ pub fn render_resource_drawer(
                 .child(props.body),
         );
 
-    let backdrop = div()
-        .id("resource-drawer-backdrop")
-        .absolute()
-        .inset_0()
-        .bg(overlay_style.backdrop_bg)
-        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-            cx.stop_propagation();
-            on_backdrop_left(window, cx);
-        })
-        .on_mouse_down(MouseButton::Right, move |_, window, cx| {
-            cx.stop_propagation();
-            on_backdrop_right(window, cx);
-        });
-
-    Some(
-        div()
-            .id("resource-drawer-overlay")
-            .absolute()
-            .inset_0()
-            .flex()
-            .justify_end()
-            .child(backdrop)
-            .child(container)
-            .into_any_element(),
-    )
+    Some(container.into_any_element())
 }
 
 #[cfg(test)]
@@ -1493,7 +1466,6 @@ mod tests {
 
         for theme in &themes {
             let style = resolve_drawer_overlay_style(theme);
-            assert_eq!(style.backdrop_bg, theme.surface.mask_bg);
             assert_eq!(style.panel_bg, theme.surface.overlay_bg);
             assert_eq!(style.border_color, theme.border.strong);
             assert_eq!(style.shadows, theme.style.overlay_shadows);
