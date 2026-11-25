@@ -7,6 +7,7 @@ pub mod events;
 pub mod hpas;
 pub mod ingresses;
 pub mod jobs;
+pub mod logs;
 pub mod namespaces;
 pub mod network_policies;
 pub mod nodes;

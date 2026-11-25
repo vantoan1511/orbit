@@ -183,6 +183,7 @@ pub fn build_replicaset_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_view_logs: impl 'static + Fn(&mut Window, &mut App),
     on_scale: impl 'static + Fn(&mut Window, &mut App),
     on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
@@ -215,6 +216,11 @@ pub fn build_replicaset_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("view-logs", "View Logs")
+                .icon(Icon::FileText)
+                .on_select(on_view_logs),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -709,6 +715,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let ids: Vec<&str> = entries
             .iter()
@@ -725,6 +732,7 @@ mod tests {
                 "refresh",
                 "view-details",
                 "view-yaml",
+                "view-logs",
                 "scale",
                 "delete-replicaset",
             ]

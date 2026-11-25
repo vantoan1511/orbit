@@ -5355,6 +5355,7 @@ version = "0.20.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
+ "futures-util",
  "http",
  "k8s-openapi",
  "kube",

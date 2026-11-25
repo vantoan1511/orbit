@@ -161,6 +161,72 @@ pub enum WorkspaceView {
     Settings,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct LogsTabTarget {
+    pub kind: String,
+    pub namespace: String,
+    pub name: String,
+}
+
+impl LogsTabTarget {
+    pub fn tab_id(&self) -> String {
+        format!("logs:{}:{}:{}", self.kind, self.namespace, self.name)
+    }
+
+    pub fn tab_label(&self) -> String {
+        format!("Logs of {}", self.name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum WorkspaceTab {
+    View(WorkspaceView),
+    Logs(LogsTabTarget),
+}
+
+impl WorkspaceTab {
+    pub fn tab_id(&self) -> String {
+        match self {
+            Self::View(view) => view.id().to_string(),
+            Self::Logs(target) => target.tab_id(),
+        }
+    }
+
+    pub fn label(&self) -> String {
+        match self {
+            Self::View(view) => view.label().to_string(),
+            Self::Logs(target) => target.tab_label(),
+        }
+    }
+
+    pub fn icon(&self) -> Icon {
+        match self {
+            Self::View(view) => view.icon(),
+            Self::Logs(_) => Icon::ScrollText,
+        }
+    }
+
+    pub fn as_view(&self) -> Option<WorkspaceView> {
+        match self {
+            Self::View(view) => Some(*view),
+            Self::Logs(_) => None,
+        }
+    }
+
+    pub fn as_logs(&self) -> Option<&LogsTabTarget> {
+        match self {
+            Self::View(_) => None,
+            Self::Logs(target) => Some(target),
+        }
+    }
+}
+
+impl From<WorkspaceView> for WorkspaceTab {
+    fn from(view: WorkspaceView) -> Self {
+        Self::View(view)
+    }
+}
+
 impl WorkspaceView {
     pub const ALL: [WorkspaceView; 29] = [
         Self::Overview,

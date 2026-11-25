@@ -10,6 +10,8 @@ mod state;
 pub mod theme;
 pub mod views;
 
+use std::collections::HashMap;
+
 use gpui::{
     AnyElement, App, Application, Bounds, ClipboardItem, Context, CursorStyle, FocusHandle,
     FontWeight, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, PathPromptOptions,
@@ -18,6 +20,7 @@ use gpui::{
 };
 use lucide_icons::Icon;
 use orbit_core::config::OrbitConfig;
+use orbit_core::kubernetes::logs::{format_logs_as_csv, format_logs_as_json};
 use orbit_core::kubernetes::models::ClusterInfo;
 use tokio::sync::mpsc;
 
@@ -35,7 +38,10 @@ use crate::components::{
     resolve_window_chrome_style,
 };
 use crate::icons::render_icon;
-use crate::navigation::{ACTIVITY_BAR_WIDTH, SidebarCategory, SidebarLayoutState, WorkspaceView};
+use crate::navigation::{
+    ACTIVITY_BAR_WIDTH, LogsTabTarget, SidebarCategory, SidebarLayoutState, WorkspaceTab,
+    WorkspaceView,
+};
 use crate::state::{
     AddClusterKeyResult, AddClusterModalState, ClusterBridgeCommand, ClusterBridgeEvent,
     ClusterConnectionState, ClusterListViews, ClusterOverviewState, ClusterSwitcherState,
@@ -884,7 +890,7 @@ pub fn handle_tab_shortcut_with_state(
         return (false, Vec::new());
     }
 
-    let active = tabs.active_tab();
+    let active = tabs.active_view();
     sidebar.sync_for_view(active);
 
     let mut commands = Vec::new();
@@ -1439,12 +1445,148 @@ pub fn apply_cluster_event_with_workspace(
         | ClusterBridgeEvent::AddClusterFailed { .. }
         | ClusterBridgeEvent::SettingsSaveFailed { .. }
         | ClusterBridgeEvent::WorkloadActionSucceeded { .. }
-        | ClusterBridgeEvent::WorkloadActionFailed { .. } => {}
+        | ClusterBridgeEvent::WorkloadActionFailed { .. }
+        | ClusterBridgeEvent::LogTargetsResolved { .. }
+        | ClusterBridgeEvent::LogLinesReceived { .. }
+        | ClusterBridgeEvent::LogStreamStatus { .. }
+        | ClusterBridgeEvent::LogStreamEnded { .. } => {}
         ClusterBridgeEvent::ClusterAdded { .. } => {
             state.apply_event(event);
         }
     }
     commands
+}
+
+pub fn open_logs_tab_in_state(
+    tabs: &mut WorkspaceTabsState,
+    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
+    next_stream_id: &mut u64,
+    cluster_id: Option<&str>,
+    kind: &str,
+    namespace: &str,
+    name: &str,
+) -> Option<ClusterBridgeCommand> {
+    let target = LogsTabTarget {
+        kind: kind.to_string(),
+        namespace: namespace.to_string(),
+        name: name.to_string(),
+    };
+    let is_new = tabs.open_logs_tab(target.clone());
+    if !is_new && log_tabs.contains_key(&target) {
+        return None;
+    }
+    let stream_id = *next_stream_id;
+    *next_stream_id = next_stream_id.saturating_add(1);
+    let viewer = views::logs::LogViewerState::new(target.clone(), stream_id);
+    let tail_lines = viewer.tail_lines;
+    let include_unavailable_pods = viewer.include_unavailable_pods;
+    log_tabs.insert(target.clone(), viewer);
+
+    let cluster_id = cluster_id?.to_string();
+    Some(ClusterBridgeCommand::StartLogStream {
+        cluster_id,
+        stream_id,
+        namespace: target.namespace,
+        workload_kind: target.kind,
+        workload_name: target.name,
+        pod_filter: None,
+        container_filter: None,
+        tail_lines,
+        include_unavailable_pods,
+    })
+}
+
+pub fn cleanup_closed_log_tabs_in_state(
+    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
+    closed: Vec<LogsTabTarget>,
+) -> Vec<ClusterBridgeCommand> {
+    closed
+        .into_iter()
+        .filter_map(|target| {
+            log_tabs
+                .remove(&target)
+                .map(|state| ClusterBridgeCommand::StopLogStream {
+                    stream_id: state.stream_id,
+                })
+        })
+        .collect()
+}
+
+pub fn clear_all_log_tabs_in_state(
+    tabs: &mut WorkspaceTabsState,
+    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
+) -> Vec<ClusterBridgeCommand> {
+    tabs.strip_logs_tabs();
+    log_tabs
+        .drain()
+        .map(|(_, state)| ClusterBridgeCommand::StopLogStream {
+            stream_id: state.stream_id,
+        })
+        .collect()
+}
+
+pub fn apply_log_bridge_event(
+    log_tabs: &mut HashMap<LogsTabTarget, views::logs::LogViewerState>,
+    active_cluster_id: Option<&str>,
+    event: &ClusterBridgeEvent,
+) {
+    match event {
+        ClusterBridgeEvent::LogTargetsResolved {
+            cluster_id,
+            stream_id,
+            pods,
+            excluded_unavailable_count,
+            ..
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return;
+            }
+            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
+                state.pods = pods.clone();
+                state.excluded_unavailable_count = *excluded_unavailable_count;
+            }
+        }
+        ClusterBridgeEvent::LogLinesReceived {
+            cluster_id,
+            stream_id,
+            pod,
+            container,
+            lines,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return;
+            }
+            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
+                state.push_lines(pod, container, lines.clone());
+            }
+        }
+        ClusterBridgeEvent::LogStreamStatus {
+            cluster_id,
+            stream_id,
+            message,
+            is_error,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return;
+            }
+            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
+                state.status_message = Some(message.clone());
+                state.status_is_error = *is_error;
+            }
+        }
+        ClusterBridgeEvent::LogStreamEnded {
+            cluster_id,
+            stream_id,
+        } => {
+            if active_cluster_id != Some(cluster_id.as_str()) {
+                return;
+            }
+            if let Some(state) = log_tabs.values_mut().find(|s| s.stream_id == *stream_id) {
+                state.is_streaming = false;
+            }
+        }
+        _ => {}
+    }
 }
 
 pub fn apply_add_cluster_modal_event(modal: &mut AddClusterModalState, event: &ClusterBridgeEvent) {
@@ -1731,9 +1873,12 @@ pub struct OrbitShell {
     events: EventsState,
     drawer: ResourceDrawerState,
     tabs: WorkspaceTabsState,
+    log_tabs: HashMap<LogsTabTarget, views::logs::LogViewerState>,
+    next_log_stream_id: u64,
     focus_handle: FocusHandle,
     namespace_search_focus: FocusHandle,
     picker_search_focus: FocusHandle,
+    log_search_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
     enable_experience_features: bool,
     resolved_system_is_dark: bool,
@@ -1809,6 +1954,23 @@ impl OrbitShell {
                             }
                             shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
                         }
+                        if matches!(
+                            event,
+                            ClusterBridgeEvent::ClusterConnected { .. }
+                                | ClusterBridgeEvent::ClusterDisconnected { .. }
+                                | ClusterBridgeEvent::ClusterUnreachable { .. }
+                        ) {
+                            let stop_cmds =
+                                clear_all_log_tabs_in_state(&mut shell.tabs, &mut shell.log_tabs);
+                            for cmd in stop_cmds {
+                                shell.dispatch_command(cmd);
+                            }
+                        }
+                        apply_log_bridge_event(
+                            &mut shell.log_tabs,
+                            shell.state.active_cluster_id.as_deref(),
+                            &event,
+                        );
                         for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
                             &mut shell.sidebar,
@@ -1907,9 +2069,12 @@ impl OrbitShell {
             events: EventsState::default(),
             drawer: ResourceDrawerState::default(),
             tabs: WorkspaceTabsState::from_config(config),
+            log_tabs: HashMap::new(),
+            next_log_stream_id: 1,
             focus_handle,
             namespace_search_focus: cx.focus_handle(),
             picker_search_focus: cx.focus_handle(),
+            log_search_focus: cx.focus_handle(),
             command_tx,
             enable_experience_features: config.enable_experience_features(),
             resolved_system_is_dark,
@@ -2479,7 +2644,7 @@ impl OrbitShell {
     }
 
     fn sync_active_tab_view(&mut self, prev_view: WorkspaceView) {
-        let active = self.tabs.active_tab();
+        let active = self.tabs.active_view();
         self.sidebar.sync_for_view(active);
         if self.sidebar.active_view != prev_view {
             self.drawer.reset_for_context_change();
@@ -2515,49 +2680,329 @@ impl OrbitShell {
         self.persist_tabs();
     }
 
-    fn activate_tab(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+    fn activate_tab(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
         let prev_view = self.sidebar.active_view;
-        self.tabs.set_active_tab(view);
+        self.tabs.set_active_tab(tab);
         self.sync_active_tab_view(prev_view);
         cx.notify();
     }
 
-    fn close_tab(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+    fn close_tab(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
         let prev_view = self.sidebar.active_view;
-        self.tabs.close_tab(view);
+        let closed = self.tabs.close_tab(tab);
+        self.cleanup_closed_log_tabs(closed);
         self.sync_active_tab_view(prev_view);
         cx.notify();
     }
 
-    fn close_other_tabs(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+    fn close_other_tabs(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
         let prev_view = self.sidebar.active_view;
-        self.tabs.close_other_tabs(view);
+        let closed = self.tabs.close_other_tabs(tab);
+        self.cleanup_closed_log_tabs(closed);
         self.sync_active_tab_view(prev_view);
         cx.notify();
     }
 
-    fn close_tabs_to_right(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+    fn close_tabs_to_right(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
         let prev_view = self.sidebar.active_view;
-        self.tabs.close_tabs_to_right(view);
+        let closed = self.tabs.close_tabs_to_right(tab);
+        self.cleanup_closed_log_tabs(closed);
         self.sync_active_tab_view(prev_view);
         cx.notify();
     }
 
     fn close_all_tabs(&mut self, cx: &mut Context<Self>) {
         let prev_view = self.sidebar.active_view;
-        self.tabs.close_all_tabs();
+        let closed = self.tabs.close_all_tabs();
+        self.cleanup_closed_log_tabs(closed);
         self.sync_active_tab_view(prev_view);
         cx.notify();
     }
 
-    fn move_tab_left(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
-        self.tabs.move_tab_left(view);
+    fn open_logs_tab(
+        &mut self,
+        kind: &str,
+        namespace: &str,
+        name: &str,
+        cx: &mut Context<Self>,
+    ) {
+        let cluster_id = self.active_cluster_id().map(str::to_string);
+        if let Some(cmd) = open_logs_tab_in_state(
+            &mut self.tabs,
+            &mut self.log_tabs,
+            &mut self.next_log_stream_id,
+            cluster_id.as_deref(),
+            kind,
+            namespace,
+            name,
+        ) {
+            self.dispatch_command(cmd);
+        }
+        cx.notify();
+    }
+
+    fn restart_log_stream_for_tab(
+        &mut self,
+        target: &LogsTabTarget,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(cluster_id) = self.active_cluster_id().map(str::to_string) else {
+            return;
+        };
+        let Some(log_state) = self.log_tabs.get_mut(target) else {
+            return;
+        };
+        let prev_stream_id = log_state.stream_id;
+        let new_stream_id = self.next_log_stream_id;
+        self.next_log_stream_id = self.next_log_stream_id.saturating_add(1);
+        log_state.reset_for_restart(new_stream_id);
+        let cmd = ClusterBridgeCommand::StartLogStream {
+            cluster_id,
+            stream_id: new_stream_id,
+            namespace: target.namespace.clone(),
+            workload_kind: target.kind.clone(),
+            workload_name: target.name.clone(),
+            pod_filter: log_state.selected_pod.clone(),
+            container_filter: log_state.selected_container.clone(),
+            tail_lines: log_state.tail_lines,
+            include_unavailable_pods: log_state.include_unavailable_pods,
+        };
+        self.dispatch_command(ClusterBridgeCommand::StopLogStream {
+            stream_id: prev_stream_id,
+        });
+        self.dispatch_command(cmd);
+        cx.notify();
+    }
+
+    fn cleanup_closed_log_tabs(&mut self, closed: Vec<LogsTabTarget>) {
+        for cmd in cleanup_closed_log_tabs_in_state(&mut self.log_tabs, closed) {
+            self.dispatch_command(cmd);
+        }
+    }
+
+    fn export_logs(
+        &mut self,
+        target: LogsTabTarget,
+        format: views::logs::LogExportFormat,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(log_state) = self.log_tabs.get(&target) else {
+            return;
+        };
+        let rows = log_state.build_export_rows();
+        let (ext, payload_res) = match format {
+            views::logs::LogExportFormat::Json => (
+                "json",
+                format_logs_as_json(&rows).map_err(|e| format!("Failed to serialize JSON: {e}")),
+            ),
+            views::logs::LogExportFormat::Csv => ("csv", Ok(format_logs_as_csv(&rows))),
+        };
+        let payload = match payload_res {
+            Ok(p) => p,
+            Err(err) => {
+                let id = self.action_toast.show_error("Export Logs Failed", err);
+                self.schedule_toast_dismiss(id, ActionToastKind::Error, cx);
+                cx.notify();
+                return;
+            }
+        };
+
+        let suggested_name = format!("{}-logs.{ext}", target.name);
+        let directory = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let rx = cx.prompt_for_new_path(&directory, Some(&suggested_name));
+        cx.spawn(async move |this, cx| {
+            let Ok(Ok(Some(path))) = rx.await else {
+                return;
+            };
+            let write_res = cx
+                .background_executor()
+                .spawn(async move { std::fs::write(&path, payload).map(|()| path) })
+                .await;
+            let _ = this.update(cx, |shell, cx| {
+                match write_res {
+                    Ok(saved_path) => {
+                        let id = shell.action_toast.show_success(
+                            "Logs Exported",
+                            format!("Saved to {}", saved_path.display()),
+                        );
+                        shell.schedule_toast_dismiss(id, ActionToastKind::Success, cx);
+                    }
+                    Err(err) => {
+                        let id = shell.action_toast.show_error(
+                            "Export Logs Failed",
+                            format!("Failed to write file: {err}"),
+                        );
+                        shell.schedule_toast_dismiss(id, ActionToastKind::Error, cx);
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    fn copy_logs_for_tab(&mut self, target: &LogsTabTarget, cx: &mut Context<Self>) {
+        if let Some(s) = self.log_tabs.get(target) {
+            let text = s.copy_text();
+            if !text.is_empty() {
+                cx.write_to_clipboard(ClipboardItem::new_string(text));
+                let id = self
+                    .action_toast
+                    .show_success("Copied Logs", "Copied log lines to clipboard");
+                self.schedule_toast_dismiss(id, ActionToastKind::Success, cx);
+                cx.notify();
+            }
+        }
+    }
+
+    fn render_logs_tab_content(
+        &mut self,
+        target: &LogsTabTarget,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let search_focus = self.log_search_focus.clone();
+        let make_cb = |f: fn(&mut Self, &LogsTabTarget, &mut Window, &mut Context<Self>)| {
+            let entity = cx.entity().clone();
+            let target = target.clone();
+            std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
+                entity.update(cx, |shell, cx| f(shell, &target, window, cx));
+            })
+        };
+
+        let callbacks = views::logs::LogViewerCallbacks {
+            on_cycle_pod: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.cycle_pod();
+                }
+                shell.restart_log_stream_for_tab(target, cx);
+            }),
+            on_cycle_container: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.cycle_container();
+                }
+                shell.restart_log_stream_for_tab(target, cx);
+            }),
+            on_toggle_include_unavailable: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.include_unavailable_pods = !s.include_unavailable_pods;
+                }
+                shell.restart_log_stream_for_tab(target, cx);
+            }),
+            on_cycle_tail_lines: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.cycle_tail_lines();
+                }
+                shell.restart_log_stream_for_tab(target, cx);
+            }),
+            on_focus_search: make_cb(|shell, target, window, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.search_focused = true;
+                }
+                shell.log_search_focus.focus(window);
+                cx.notify();
+            }),
+            on_clear_search: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.set_search_query(String::new());
+                }
+                cx.notify();
+            }),
+            on_prev_match: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.prev_match();
+                }
+                cx.notify();
+            }),
+            on_next_match: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.next_match();
+                }
+                cx.notify();
+            }),
+            on_toggle_pause: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.toggle_pause();
+                }
+                cx.notify();
+            }),
+            on_toggle_follow: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.toggle_follow();
+                }
+                cx.notify();
+            }),
+            on_toggle_wrap: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target) {
+                    s.toggle_wrap();
+                }
+                cx.notify();
+            }),
+            on_copy: make_cb(|shell, target, _w, cx| {
+                shell.copy_logs_for_tab(target, cx);
+            }),
+            on_export: {
+                let entity = cx.entity().clone();
+                let target = target.clone();
+                std::rc::Rc::new(move |format, _w, cx| {
+                    entity.update(cx, |shell, cx| {
+                        shell.export_logs(target.clone(), format, cx);
+                    });
+                })
+            },
+            on_line_mouse_down: {
+                let entity = cx.entity().clone();
+                let target = target.clone();
+                std::rc::Rc::new(move |visible_idx, shift, _w, cx| {
+                    entity.update(cx, |shell, cx| {
+                        if let Some(s) = shell.log_tabs.get_mut(&target) {
+                            s.search_focused = false;
+                            s.select_line(visible_idx, shift);
+                            s.is_dragging_selection = true;
+                        }
+                        cx.notify();
+                    });
+                })
+            },
+            on_line_mouse_move: {
+                let entity = cx.entity().clone();
+                let target = target.clone();
+                std::rc::Rc::new(move |visible_idx, _w, cx| {
+                    entity.update(cx, |shell, cx| {
+                        if let Some(s) = shell.log_tabs.get_mut(&target)
+                            && s.is_dragging_selection
+                        {
+                            s.extend_drag_selection(visible_idx);
+                            cx.notify();
+                        }
+                    });
+                })
+            },
+            on_scroll_wheel_up: make_cb(|shell, target, _w, cx| {
+                if let Some(s) = shell.log_tabs.get_mut(target)
+                    && s.is_following
+                {
+                    s.is_following = false;
+                    cx.notify();
+                }
+            }),
+        };
+
+        if let Some(log_state) = self.log_tabs.get_mut(target) {
+            views::logs::render_logs_view(log_state, theme, &search_focus, callbacks)
+        } else {
+            div().into_any_element()
+        }
+    }
+
+    fn move_tab_left(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
+        self.tabs.move_tab_left(tab);
         self.persist_tabs();
         cx.notify();
     }
 
-    fn move_tab_right(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
-        self.tabs.move_tab_right(view);
+    fn move_tab_right(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
+        self.tabs.move_tab_right(tab);
         self.persist_tabs();
         cx.notify();
     }
@@ -6020,13 +6465,16 @@ impl OrbitShell {
     }
 
     fn render_connected_workspace(
-        &self,
+        &mut self,
         cluster_id: &str,
         display_name: &str,
         k8s_version: Option<&str>,
         theme: &OrbitTheme,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab() {
+            return self.render_logs_tab_content(&target, theme, cx);
+        }
         let version_label = k8s_version.unwrap_or("Connected").to_string();
 
         if self.sidebar.active_view == WorkspaceView::Events {
@@ -6318,6 +6766,16 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let view_logs = {
+                        let entity = ctx_entity.clone();
+                        let name = deployment.name.clone();
+                        let ns = deployment.namespace.clone();
+                        move |_window: &mut Window, cx: &mut App| {
+                            entity.update(cx, |shell, cx| {
+                                shell.open_logs_tab("Deployment", &ns, &name, cx);
+                            });
+                        }
+                    };
                     let entries = views::deployments::build_deployment_context_menu_entries(
                         deployment,
                         copy_name,
@@ -6325,6 +6783,7 @@ impl OrbitShell {
                         refresh_cb,
                         view_details,
                         view_yaml,
+                        view_logs,
                         move |w, cx| scale_action(w, cx),
                         move |w, cx| restart_action(w, cx),
                         delete_action,
@@ -6507,6 +6966,16 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let view_logs = {
+                        let entity = ctx_entity.clone();
+                        let name = statefulset.name.clone();
+                        let ns = statefulset.namespace.clone();
+                        move |_window: &mut Window, cx: &mut App| {
+                            entity.update(cx, |shell, cx| {
+                                shell.open_logs_tab("StatefulSet", &ns, &name, cx);
+                            });
+                        }
+                    };
                     let entries = views::statefulsets::build_statefulset_context_menu_entries(
                         statefulset,
                         copy_name,
@@ -6514,6 +6983,7 @@ impl OrbitShell {
                         refresh_cb,
                         view_details,
                         view_yaml,
+                        view_logs,
                         move |w, cx| scale_action(w, cx),
                         move |w, cx| restart_action(w, cx),
                         delete_action,
@@ -6679,6 +7149,16 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let view_logs = {
+                        let entity = ctx_entity.clone();
+                        let name = replicaset.name.clone();
+                        let ns = replicaset.namespace.clone();
+                        move |_window: &mut Window, cx: &mut App| {
+                            entity.update(cx, |shell, cx| {
+                                shell.open_logs_tab("ReplicaSet", &ns, &name, cx);
+                            });
+                        }
+                    };
                     let entries = views::replicasets::build_replicaset_context_menu_entries(
                         replicaset,
                         copy_name,
@@ -6686,6 +7166,7 @@ impl OrbitShell {
                         refresh_cb,
                         view_details,
                         view_yaml,
+                        view_logs,
                         move |w, cx| scale_action(w, cx),
                         delete_action,
                     );
@@ -6849,6 +7330,16 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let view_logs = {
+                        let entity = ctx_entity.clone();
+                        let name = daemonset.name.clone();
+                        let ns = daemonset.namespace.clone();
+                        move |_window: &mut Window, cx: &mut App| {
+                            entity.update(cx, |shell, cx| {
+                                shell.open_logs_tab("DaemonSet", &ns, &name, cx);
+                            });
+                        }
+                    };
                     let entries = views::daemonsets::build_daemonset_context_menu_entries(
                         daemonset,
                         copy_name,
@@ -6856,6 +7347,7 @@ impl OrbitShell {
                         refresh_cb,
                         view_details,
                         view_yaml,
+                        view_logs,
                         move |w, cx| restart_action(w, cx),
                         delete_action,
                     );
@@ -7001,6 +7493,16 @@ impl OrbitShell {
                         });
                     }
                 };
+                let view_logs = {
+                    let entity = ctx_entity.clone();
+                    let name = job.name.clone();
+                    let ns = job.namespace.clone();
+                    move |_window: &mut Window, cx: &mut App| {
+                        entity.update(cx, |shell, cx| {
+                            shell.open_logs_tab("Job", &ns, &name, cx);
+                        });
+                    }
+                };
                 let entries = views::jobs::build_job_context_menu_entries(
                     job,
                     copy_name,
@@ -7008,6 +7510,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    view_logs,
                     delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
@@ -7982,6 +8485,16 @@ impl OrbitShell {
                         });
                     }
                 };
+                let view_logs = {
+                    let entity = ctx_entity.clone();
+                    let name = pod.name.clone();
+                    let ns = pod.namespace.clone();
+                    move |_window: &mut Window, cx: &mut App| {
+                        entity.update(cx, |shell, cx| {
+                            shell.open_logs_tab("Pod", &ns, &name, cx);
+                        });
+                    }
+                };
                 let entries = views::pods::build_pod_context_menu_entries(
                     pod,
                     copy_name,
@@ -7989,6 +8502,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    view_logs,
                     move |w, cx| restart_pod_action(w, cx),
                     delete_action,
                 );
@@ -9867,10 +10381,12 @@ impl OrbitShell {
         Some(render_workspace_tab_bar(&mut self.tabs, &theme, callbacks))
     }
 
-    fn render_workspace(&self, window_width: f32, cx: &mut Context<Self>) -> AnyElement {
+    fn render_workspace(&mut self, window_width: f32, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
 
-        let body = if self.sidebar.active_view == WorkspaceView::Settings {
+        let body = if self.sidebar.active_view == WorkspaceView::Settings
+            && !matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_)))
+        {
             self.render_settings_workspace(&theme, cx)
         } else {
             match &self.state.connection_state {
@@ -9934,9 +10450,12 @@ impl OrbitShell {
                             on_open_picker,
                         )
                     } else {
+                        let cluster_id = cluster_id.clone();
+                        let display_name = display_name.clone();
+                        let k8s_version = k8s_version.clone();
                         self.render_connected_workspace(
-                            cluster_id,
-                            display_name,
+                            &cluster_id,
+                            &display_name,
                             k8s_version.as_deref(),
                             &theme,
                             cx,
@@ -9981,7 +10500,8 @@ impl OrbitShell {
             }
         };
 
-        let is_full_bleed = is_full_bleed_table_view(self.sidebar.active_view)
+        let is_full_bleed = (is_full_bleed_table_view(self.sidebar.active_view)
+            || matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))))
             && matches!(
                 self.state.connection_state,
                 ClusterConnectionState::Connected { .. }
@@ -10239,6 +10759,68 @@ impl Render for OrbitShell {
                     this.dismiss_resource_drawer(cx);
                     return;
                 }
+                if let Some(WorkspaceTab::Logs(target)) = this.tabs.active_tab() {
+                    let key = event.keystroke.key.to_ascii_lowercase();
+                    let has_ctrl_or_cmd =
+                        event.keystroke.modifiers.control || event.keystroke.modifiers.platform;
+                    if has_ctrl_or_cmd && key == "w" {
+                        this.close_tab(WorkspaceTab::Logs(target), cx);
+                        return;
+                    }
+                    if has_ctrl_or_cmd && key == "f" {
+                        if let Some(log_state) = this.log_tabs.get_mut(&target) {
+                            log_state.search_focused = true;
+                        }
+                        this.log_search_focus.focus(window);
+                        cx.notify();
+                        return;
+                    }
+                    if has_ctrl_or_cmd && key == "c" {
+                        this.copy_logs_for_tab(&target, cx);
+                        return;
+                    }
+                    if let Some(log_state) = this.log_tabs.get_mut(&target)
+                        && log_state.search_focused
+                        && !has_ctrl_or_cmd
+                        && !event.keystroke.modifiers.alt
+                    {
+                        match key.as_str() {
+                            "escape" => {
+                                log_state.search_focused = false;
+                                this.focus_handle.focus(window);
+                                cx.notify();
+                                return;
+                            }
+                            "enter" => {
+                                if event.keystroke.modifiers.shift {
+                                    log_state.prev_match();
+                                } else {
+                                    log_state.next_match();
+                                }
+                                cx.notify();
+                                return;
+                            }
+                            "backspace" => {
+                                let mut q = log_state.search_query.clone();
+                                q.pop();
+                                log_state.set_search_query(q);
+                                cx.notify();
+                                return;
+                            }
+                            _ => {
+                                if let Some(ch) = event.keystroke.key_char.as_deref()
+                                    && !ch.chars().any(char::is_control)
+                                {
+                                    let mut q = log_state.search_query.clone();
+                                    q.push_str(ch);
+                                    log_state.set_search_query(q);
+                                    cx.notify();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
                 let prev_view = this.sidebar.active_view;
                 let (tab_handled, tab_cmds) = handle_tab_shortcut_with_state(
                     &this.state,
@@ -10313,6 +10895,12 @@ impl Render for OrbitShell {
                 MouseButton::Left,
                 cx.listener(|this, _event, _window, cx| {
                     let mut changed = false;
+                    for log_state in this.log_tabs.values_mut() {
+                        if log_state.is_dragging_selection {
+                            log_state.is_dragging_selection = false;
+                            changed = true;
+                        }
+                    }
                     if this.sidebar.is_resizing {
                         this.sidebar.end_resize();
                         changed = true;
@@ -13231,6 +13819,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert!(
             dep_entries
@@ -13616,14 +14205,14 @@ mod tests {
         );
 
         assert_eq!(
-            tabs.open_tabs(),
-            &[
+            tabs.open_views(),
+            vec![
                 WorkspaceView::Overview,
                 WorkspaceView::Deployments,
                 WorkspaceView::Nodes,
             ]
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Deployments));
         assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
     }
 
@@ -13703,7 +14292,7 @@ mod tests {
         );
 
         assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Deployments));
         assert!(cmds_a.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "c1"
@@ -13758,7 +14347,7 @@ mod tests {
             },
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Overview);
-        assert_eq!(tabs.open_tabs(), &[WorkspaceView::Overview]);
+        assert_eq!(tabs.open_views(), vec![WorkspaceView::Overview]);
     }
 
     #[test]
@@ -13785,7 +14374,7 @@ mod tests {
         tabs.open_tab(WorkspaceView::Deployments);
         tabs.open_tab(WorkspaceView::Nodes);
         tabs.set_active_tab(WorkspaceView::Overview);
-        sidebar.sync_for_view(tabs.active_tab());
+        sidebar.sync_for_view(tabs.active_view());
 
         // Ctrl+Tab -> Deployments
         let (handled, _) = handle_tab_shortcut_with_state(
@@ -13820,7 +14409,7 @@ mod tests {
             false,
         );
         assert!(handled);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Deployments));
         assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
 
         // Ctrl+Shift+Tab -> Overview
@@ -13856,7 +14445,7 @@ mod tests {
             false,
         );
         assert!(handled);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Overview));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Overview));
 
         // Ctrl+W -> closes Overview, activates Deployments
         let (handled, _) = handle_tab_shortcut_with_state(
@@ -13892,10 +14481,10 @@ mod tests {
         );
         assert!(handled);
         assert_eq!(
-            tabs.open_tabs(),
-            &[WorkspaceView::Deployments, WorkspaceView::Nodes]
+            tabs.open_views(),
+            vec![WorkspaceView::Deployments, WorkspaceView::Nodes]
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Deployments));
 
         // Close remaining two tabs
         for _ in 0..2 {
@@ -13932,7 +14521,7 @@ mod tests {
             );
         }
         assert!(tabs.open_tabs().is_empty());
-        assert_eq!(tabs.active_tab(), None);
+        assert_eq!(tabs.active_view(), None);
         assert!(!tabs.is_bar_visible(true));
     }
 
@@ -14012,7 +14601,7 @@ mod tests {
             &mut tabs,
             WorkspaceView::Pods,
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Pods));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Pods));
         assert!(cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadPods { cluster_id, generation: 1 } if cluster_id == "prod-ctx"
@@ -14228,6 +14817,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -14245,6 +14835,7 @@ mod tests {
                 "refresh",
                 "view-details",
                 "view-yaml",
+                "view-logs",
                 "restart-pod",
                 "delete-pod",
             ]
@@ -14331,7 +14922,7 @@ mod tests {
             &mut tabs,
             WorkspaceView::Services,
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Services));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Services));
         assert_eq!(sidebar.active_view, WorkspaceView::Services);
         assert!(cmds.iter().any(|c| matches!(
             c,
@@ -16098,7 +16689,7 @@ mod tests {
             WorkspaceView::Pods,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Pods);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Pods));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Pods));
         assert!(pods_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadPods { cluster_id, .. } if cluster_id == "prod-ctx"
@@ -16134,7 +16725,7 @@ mod tests {
             WorkspaceView::Deployments,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Deployments);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Deployments));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Deployments));
         assert!(dep_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadDeployments { cluster_id, .. } if cluster_id == "prod-ctx"
@@ -16170,7 +16761,7 @@ mod tests {
             WorkspaceView::StatefulSets,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::StatefulSets);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::StatefulSets));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::StatefulSets));
         assert!(sts_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadStatefulSets { cluster_id, .. } if cluster_id == "prod-ctx"
@@ -16206,7 +16797,7 @@ mod tests {
             WorkspaceView::DaemonSets,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::DaemonSets);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::DaemonSets));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::DaemonSets));
         assert!(ds_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadDaemonSets { cluster_id, .. } if cluster_id == "prod-ctx"
@@ -16242,7 +16833,7 @@ mod tests {
             WorkspaceView::Jobs,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::Jobs);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Jobs));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Jobs));
         assert!(jobs_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadJobs { cluster_id, .. } if cluster_id == "prod-ctx"
@@ -16278,7 +16869,7 @@ mod tests {
             WorkspaceView::ReplicaSets,
         );
         assert_eq!(sidebar.active_view, WorkspaceView::ReplicaSets);
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::ReplicaSets));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::ReplicaSets));
         assert!(rs_cmds.iter().any(|c| matches!(
             c,
             ClusterBridgeCommand::LoadReplicaSets { cluster_id, .. } if cluster_id == "prod-ctx"
@@ -17218,7 +17809,7 @@ mod tests {
             &mut tabs,
             WorkspaceView::Ingresses,
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::Ingresses));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::Ingresses));
         assert_eq!(sidebar.active_view, WorkspaceView::Ingresses);
         assert!(cmds.iter().any(|c| matches!(
             c,
@@ -17442,7 +18033,7 @@ mod tests {
             &mut tabs,
             WorkspaceView::PersistentVolumes,
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::PersistentVolumes));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::PersistentVolumes));
         assert_eq!(sidebar.active_view, WorkspaceView::PersistentVolumes);
         assert!(cmds.iter().any(|c| matches!(
             c,
@@ -17653,7 +18244,7 @@ mod tests {
             WorkspaceView::PersistentVolumeClaims,
         );
         assert_eq!(
-            tabs.active_tab(),
+            tabs.active_view(),
             Some(WorkspaceView::PersistentVolumeClaims)
         );
         assert_eq!(sidebar.active_view, WorkspaceView::PersistentVolumeClaims);
@@ -17870,7 +18461,7 @@ mod tests {
             &mut tabs,
             WorkspaceView::NetworkPolicies,
         );
-        assert_eq!(tabs.active_tab(), Some(WorkspaceView::NetworkPolicies));
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::NetworkPolicies));
         assert_eq!(sidebar.active_view, WorkspaceView::NetworkPolicies);
         assert!(cmds.iter().any(|c| matches!(
             c,
@@ -19225,5 +19816,153 @@ mod tests {
         }
         assert_eq!(res.1, ActionToastKind::Error);
         assert!(res.2.is_empty());
+    }
+
+    #[test]
+    fn test_open_and_close_logs_tab_dispatches_start_and_stop_log_stream() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut log_tabs = HashMap::new();
+        let mut next_id = 1_u64;
+
+        let cmd1 = open_logs_tab_in_state(
+            &mut tabs,
+            &mut log_tabs,
+            &mut next_id,
+            Some("prod"),
+            "Deployment",
+            "default",
+            "api",
+        );
+        assert!(matches!(
+            cmd1,
+            Some(ClusterBridgeCommand::StartLogStream {
+                stream_id: 1,
+                tail_lines: 50,
+                include_unavailable_pods: false,
+                ..
+            })
+        ));
+        assert_eq!(log_tabs.len(), 1);
+
+        // Re-opening same target focuses without starting a duplicate stream
+        let cmd2 = open_logs_tab_in_state(
+            &mut tabs,
+            &mut log_tabs,
+            &mut next_id,
+            Some("prod"),
+            "Deployment",
+            "default",
+            "api",
+        );
+        assert!(cmd2.is_none());
+        assert_eq!(log_tabs.len(), 1);
+
+        let target = LogsTabTarget {
+            kind: "Deployment".to_string(),
+            namespace: "default".to_string(),
+            name: "api".to_string(),
+        };
+        let closed = tabs.close_tab(WorkspaceTab::Logs(target));
+        let stop_cmds = cleanup_closed_log_tabs_in_state(&mut log_tabs, closed);
+        assert_eq!(
+            stop_cmds,
+            vec![ClusterBridgeCommand::StopLogStream { stream_id: 1 }]
+        );
+        assert!(log_tabs.is_empty());
+    }
+
+    #[test]
+    fn test_apply_log_bridge_events_updates_tab_state_and_ignores_stale_stream_id() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut log_tabs = HashMap::new();
+        let mut next_id = 10_u64;
+        let _ = open_logs_tab_in_state(
+            &mut tabs,
+            &mut log_tabs,
+            &mut next_id,
+            Some("prod"),
+            "Pod",
+            "default",
+            "web-0",
+        );
+
+        let target = LogsTabTarget {
+            kind: "Pod".to_string(),
+            namespace: "default".to_string(),
+            name: "web-0".to_string(),
+        };
+
+        apply_log_bridge_event(
+            &mut log_tabs,
+            Some("prod"),
+            &ClusterBridgeEvent::LogTargetsResolved {
+                cluster_id: "prod".to_string(),
+                stream_id: 10,
+                pods: vec![orbit_core::kubernetes::logs::WorkloadPodTarget {
+                    name: "web-0".to_string(),
+                    containers: vec!["app".to_string()],
+                    phase: "Running".to_string(),
+                    is_terminating: false,
+                    is_available: true,
+                }],
+                active_pod_count: 1,
+                excluded_unavailable_count: 2,
+            },
+        );
+        apply_log_bridge_event(
+            &mut log_tabs,
+            Some("prod"),
+            &ClusterBridgeEvent::LogLinesReceived {
+                cluster_id: "prod".to_string(),
+                stream_id: 10,
+                pod: "web-0".to_string(),
+                container: "app".to_string(),
+                lines: vec!["2026-11-25T12:00:00Z ready".to_string()],
+            },
+        );
+        // Stale stream_id should be ignored
+        apply_log_bridge_event(
+            &mut log_tabs,
+            Some("prod"),
+            &ClusterBridgeEvent::LogLinesReceived {
+                cluster_id: "prod".to_string(),
+                stream_id: 999,
+                pod: "web-0".to_string(),
+                container: "app".to_string(),
+                lines: vec!["stale".to_string()],
+            },
+        );
+
+        let state = &log_tabs[&target];
+        assert_eq!(state.excluded_unavailable_count, 2);
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.entries[0].message, "ready");
+    }
+
+    #[test]
+    fn test_disconnect_cluster_clears_log_tabs_and_stops_streams() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        let mut log_tabs = HashMap::new();
+        let mut next_id = 5_u64;
+        let _ = open_logs_tab_in_state(
+            &mut tabs,
+            &mut log_tabs,
+            &mut next_id,
+            Some("prod"),
+            "Job",
+            "batch",
+            "nightly",
+        );
+
+        let stop_cmds = clear_all_log_tabs_in_state(&mut tabs, &mut log_tabs);
+        assert_eq!(
+            stop_cmds,
+            vec![ClusterBridgeCommand::StopLogStream { stream_id: 5 }]
+        );
+        assert!(log_tabs.is_empty());
+        assert!(tabs.open_tabs().iter().all(|t| t.as_logs().is_none()));
     }
 }

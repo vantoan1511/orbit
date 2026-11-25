@@ -12,6 +12,7 @@ test-utils = []
 [dependencies]
 base64.workspace = true
 chrono.workspace = true
+futures-util.workspace = true
 http.workspace = true
 k8s-openapi.workspace = true
 kube = { workspace = true, default-features = true, features = ["runtime", "derive", "client", "ws"] }

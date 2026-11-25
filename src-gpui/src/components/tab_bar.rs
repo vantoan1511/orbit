@@ -9,13 +9,13 @@ use lucide_icons::Icon;
 
 use crate::components::context_menu::{ContextMenuEntry, ContextMenuItem};
 use crate::icons::render_icon;
-use crate::navigation::WorkspaceView;
+use crate::navigation::{WorkspaceTab, WorkspaceView};
 use crate::state::{TabDropPosition, WorkspaceTabsState};
 use crate::theme::{OrbitTheme, apply_text_step};
 
 pub const TAB_BAR_HEIGHT: f32 = 32.0;
 
-pub fn tab_icon_color(_view: WorkspaceView, is_active: bool, theme: &OrbitTheme) -> Rgba {
+pub fn tab_icon_color(_tab: impl Into<WorkspaceTab>, is_active: bool, theme: &OrbitTheme) -> Rgba {
     let nav = theme.nav_selection();
     if is_active {
         nav.active_fg
@@ -36,14 +36,16 @@ pub struct TabItemPresentation {
 }
 
 pub fn tab_item_presentation(
-    view: WorkspaceView,
+    tab: impl Into<WorkspaceTab>,
     is_active: bool,
     theme: &OrbitTheme,
 ) -> TabItemPresentation {
+    let tab = tab.into();
+    let icon = tab.icon();
     if is_active {
         TabItemPresentation {
-            icon: view.icon(),
-            icon_color: tab_icon_color(view, true, theme),
+            icon,
+            icon_color: tab_icon_color(tab, true, theme),
             text_color: theme.text.primary,
             surface: theme.surface.bg_app,
             has_bottom_border: false,
@@ -52,7 +54,7 @@ pub fn tab_item_presentation(
         }
     } else {
         TabItemPresentation {
-            icon: view.icon(),
+            icon,
             icon_color: theme.text.muted,
             text_color: theme.text.muted,
             surface: theme.surface.bg_sidebar,
@@ -65,9 +67,9 @@ pub fn tab_item_presentation(
 
 #[derive(Clone)]
 pub struct DraggedWorkspaceTab {
-    pub view: WorkspaceView,
+    pub tab: WorkspaceTab,
     pub index: usize,
-    pub label: &'static str,
+    pub label: String,
     pub icon: Icon,
     pub icon_color: Rgba,
     pub theme: OrbitTheme,
@@ -91,26 +93,27 @@ impl Render for DraggedWorkspaceTab {
                 apply_text_step(div(), self.theme.typography.size_xs)
                     .font_weight(FontWeight::MEDIUM)
                     .text_color(self.theme.text.primary)
-                    .child(self.label),
+                    .child(self.label.clone()),
             )
     }
 }
 
 pub type TabActionCallback = Rc<dyn Fn(&mut Window, &mut App)>;
 pub type TabViewCallback = Rc<dyn Fn(WorkspaceView, &mut Window, &mut App)>;
+pub type TabCallback = Rc<dyn Fn(WorkspaceTab, &mut Window, &mut App)>;
 pub type TabContextMenuCallback =
-    Rc<dyn Fn(WorkspaceView, usize, Point<Pixels>, &mut Window, &mut App)>;
+    Rc<dyn Fn(WorkspaceTab, usize, Point<Pixels>, &mut Window, &mut App)>;
 pub type TabDragStartCallback = Rc<dyn Fn(usize, &mut Window, &mut App)>;
 pub type TabDragMoveCallback = Rc<dyn Fn(usize, TabDropPosition, &mut Window, &mut App)>;
 pub type TabDropCallback = Rc<dyn Fn(usize, usize, TabDropPosition, &mut Window, &mut App)>;
 
 #[derive(Clone)]
 pub struct TabContextMenuCallbacks {
-    pub on_move_left: TabViewCallback,
-    pub on_move_right: TabViewCallback,
-    pub on_close: TabViewCallback,
-    pub on_close_others: TabViewCallback,
-    pub on_close_right: TabViewCallback,
+    pub on_move_left: TabCallback,
+    pub on_move_right: TabCallback,
+    pub on_close: TabCallback,
+    pub on_close_others: TabCallback,
+    pub on_close_right: TabCallback,
     pub on_close_all: TabActionCallback,
 }
 
@@ -128,11 +131,12 @@ impl TabContextMenuCallbacks {
 }
 
 pub fn build_tab_context_menu_entries(
-    view: WorkspaceView,
+    tab: impl Into<WorkspaceTab>,
     index: usize,
     total: usize,
     callbacks: &TabContextMenuCallbacks,
 ) -> Vec<ContextMenuEntry> {
+    let tab = tab.into();
     let close_shortcut = if cfg!(target_os = "macos") {
         "⌘W"
     } else {
@@ -149,35 +153,40 @@ pub fn build_tab_context_menu_entries(
     let on_close_right = callbacks.on_close_right.clone();
     let on_close_all = callbacks.on_close_all.clone();
 
+    let tab_left = tab.clone();
+    let tab_right = tab.clone();
+    let tab_close = tab.clone();
+    let tab_others = tab.clone();
+
     vec![
         ContextMenuEntry::Item(
             ContextMenuItem::new("move-left", "Move Tab Left")
                 .icon(Icon::ArrowLeft)
                 .disabled(is_first)
-                .on_select(move |window, cx| on_move_left(view, window, cx)),
+                .on_select(move |window, cx| on_move_left(tab_left.clone(), window, cx)),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("move-right", "Move Tab Right")
                 .icon(Icon::ArrowRight)
                 .disabled(is_last)
-                .on_select(move |window, cx| on_move_right(view, window, cx)),
+                .on_select(move |window, cx| on_move_right(tab_right.clone(), window, cx)),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
             ContextMenuItem::new("close", "Close Tab")
                 .icon(Icon::X)
                 .shortcut(close_shortcut)
-                .on_select(move |window, cx| on_close(view, window, cx)),
+                .on_select(move |window, cx| on_close(tab_close.clone(), window, cx)),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("close-others", "Close Others")
                 .disabled(is_only)
-                .on_select(move |window, cx| on_close_others(view, window, cx)),
+                .on_select(move |window, cx| on_close_others(tab_others.clone(), window, cx)),
         ),
         ContextMenuEntry::Item(
             ContextMenuItem::new("close-right", "Close Tabs to the Right")
                 .disabled(is_last)
-                .on_select(move |window, cx| on_close_right(view, window, cx)),
+                .on_select(move |window, cx| on_close_right(tab.clone(), window, cx)),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -190,8 +199,8 @@ pub fn build_tab_context_menu_entries(
 
 #[derive(Clone)]
 pub struct TabBarCallbacks {
-    pub on_select: TabViewCallback,
-    pub on_close: TabViewCallback,
+    pub on_select: TabCallback,
+    pub on_close: TabCallback,
     pub on_context_menu: TabContextMenuCallback,
     pub on_drag_start: TabDragStartCallback,
     pub on_drag_move: TabDragMoveCallback,
@@ -210,7 +219,10 @@ pub fn render_workspace_tab_bar(
     let dragging_index = tabs.dragging_index;
 
     if tabs.pending_scroll_to_active {
-        if let Some(active_idx) = active_tab.and_then(|a| open_tabs.iter().position(|v| *v == a)) {
+        if let Some(active_idx) = active_tab
+            .as_ref()
+            .and_then(|a| open_tabs.iter().position(|t| t == a))
+        {
             tabs.scroll_handle.scroll_to_item(active_idx);
         }
         tabs.pending_scroll_to_active = false;
@@ -237,10 +249,10 @@ pub fn render_workspace_tab_bar(
             cx.stop_propagation();
         });
 
-    for (index, view) in open_tabs.into_iter().enumerate() {
-        let is_active = active_tab == Some(view);
+    for (index, tab) in open_tabs.into_iter().enumerate() {
+        let is_active = active_tab.as_ref() == Some(&tab);
         strip = strip.child(render_tab_item(
-            view,
+            tab,
             index,
             is_active,
             dragging_index == Some(index),
@@ -295,7 +307,7 @@ pub fn render_workspace_tab_bar(
 }
 
 fn render_tab_item(
-    view: WorkspaceView,
+    tab: WorkspaceTab,
     index: usize,
     is_active: bool,
     is_being_dragged: bool,
@@ -303,10 +315,12 @@ fn render_tab_item(
     theme: &OrbitTheme,
     callbacks: &TabBarCallbacks,
 ) -> AnyElement {
-    let pres = tab_item_presentation(view, is_active, theme);
-    let group_name: SharedString = format!("workspace-tab-{}", view.id()).into();
-    let tab_id: SharedString = format!("workspace-tab-item-{}", view.id()).into();
-    let close_id: SharedString = format!("workspace-tab-close-{}", view.id()).into();
+    let pres = tab_item_presentation(tab.clone(), is_active, theme);
+    let id_slug = tab.tab_id();
+    let label = tab.label();
+    let group_name: SharedString = format!("workspace-tab-{id_slug}").into();
+    let tab_id: SharedString = format!("workspace-tab-item-{id_slug}").into();
+    let close_id: SharedString = format!("workspace-tab-close-{id_slug}").into();
 
     let on_select = callbacks.on_select.clone();
     let on_close_middle = callbacks.on_close.clone();
@@ -343,14 +357,15 @@ fn render_tab_item(
     }
 
     let drag_payload = DraggedWorkspaceTab {
-        view,
+        tab: tab.clone(),
         index,
-        label: view.label(),
+        label: label.clone(),
         icon: pres.icon,
         icon_color: pres.icon_color,
         theme: theme.clone(),
     };
 
+    let tab_for_close = tab.clone();
     let mut close_btn = div()
         .id(close_id)
         .w(px(16.0))
@@ -363,7 +378,7 @@ fn render_tab_item(
         .hover(move |s| s.bg(hover_bg))
         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
             cx.stop_propagation();
-            on_close_btn(view, window, cx);
+            on_close_btn(tab_for_close.clone(), window, cx);
         })
         .child(render_icon(Icon::X, px(11.0), theme.text.muted));
 
@@ -375,19 +390,21 @@ fn render_tab_item(
             .group_hover(group_name, |s| s.opacity(1.0))
     };
 
+    let tab_for_select = tab.clone();
+    let tab_for_middle = tab.clone();
     tab_el = tab_el
         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
-            on_select(view, window, cx);
+            on_select(tab_for_select.clone(), window, cx);
         })
         .on_mouse_down(MouseButton::Middle, move |_event, window, cx| {
             cx.stop_propagation();
-            on_close_middle(view, window, cx);
+            on_close_middle(tab_for_middle.clone(), window, cx);
         })
         .on_mouse_down(
             MouseButton::Right,
             move |event: &MouseDownEvent, window, cx| {
                 cx.stop_propagation();
-                on_context_menu(view, index, event.position, window, cx);
+                on_context_menu(tab.clone(), index, event.position, window, cx);
             },
         )
         .on_drag(drag_payload, move |dragged, _position, window, cx| {
@@ -416,7 +433,7 @@ fn render_tab_item(
                     FontWeight::NORMAL
                 })
                 .text_color(pres.text_color)
-                .child(view.label()),
+                .child(label),
         )
         .child(close_btn);
 
@@ -809,5 +826,38 @@ mod tests {
     fn test_tab_picker_top_offset_matches_supplied_value() {
         assert_eq!(picker_popover_top_offset(px(116.0)), px(116.0));
         assert_eq!(picker_popover_top_offset(px(82.0)), px(82.0));
+    }
+
+    #[test]
+    fn test_tab_item_presentation_for_dynamic_logs_tab() {
+        use crate::navigation::LogsTabTarget;
+
+        let target = LogsTabTarget {
+            kind: "Deployment".to_string(),
+            namespace: "default".to_string(),
+            name: "api".to_string(),
+        };
+        let tab = WorkspaceTab::Logs(target.clone());
+        assert_eq!(tab.label(), "Logs of api");
+        assert_eq!(tab.tab_id(), "logs:Deployment:default:api");
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::default(),
+            SemanticColorsPreference::default(),
+            gpui::WindowAppearance::Dark,
+        );
+        let active = tab_item_presentation(tab.clone(), true, &theme);
+        assert_eq!(active.surface, theme.surface.bg_app);
+        assert!(!active.has_bottom_border);
+        assert!(!active.has_top_accent_stripe);
+        assert!(active.close_always_visible);
+        assert_eq!(active.icon_color, theme.text.primary);
+
+        let inactive = tab_item_presentation(tab, false, &theme);
+        assert_eq!(inactive.surface, theme.surface.bg_sidebar);
+        assert!(inactive.has_bottom_border);
+        assert_eq!(inactive.icon_color, theme.text.muted);
     }
 }
