@@ -127,6 +127,7 @@ pub enum ResourceDrawerTarget {
     },
     Event {
         uid: String,
+        name: String,
         reason: String,
         namespace: String,
     },
@@ -210,7 +211,31 @@ impl ResourceDrawerTarget {
                 }
             }
             Self::PodSecurity { namespace, .. } => namespace.as_str(),
-            Self::Event { uid, .. } => uid.as_str(),
+            Self::Event { name, uid, .. } => {
+                if name.is_empty() {
+                    uid.as_str()
+                } else {
+                    name.as_str()
+                }
+            }
+        }
+    }
+
+    pub fn matches_deleted_resource(&self, kind: &str, namespace: &str, name: &str) -> bool {
+        if self.kind() != kind {
+            return false;
+        }
+        let target_ns = self.namespace().unwrap_or_default();
+        if target_ns != namespace {
+            return false;
+        }
+        match self {
+            Self::Event {
+                name: event_name,
+                uid,
+                ..
+            } => event_name == name || uid == name,
+            _ => self.name() == name,
         }
     }
 
@@ -500,6 +525,20 @@ impl ResourceDrawerState {
         self.yaml_copied = false;
         self.yaml_generation = self.yaml_generation.saturating_add(1);
         self.revealed_secret_keys.clear();
+    }
+
+    pub fn close_if_deleted(&mut self, kind: &str, namespace: &str, name: &str) -> bool {
+        if !self.is_open {
+            return false;
+        }
+        let matches = self
+            .target
+            .as_ref()
+            .is_some_and(|target| target.matches_deleted_resource(kind, namespace, name));
+        if matches {
+            self.close();
+        }
+        matches
     }
 
     pub fn reset_for_context_change(&mut self) {
@@ -919,6 +958,7 @@ mod tests {
         let mut state = ResourceDrawerState::default();
         let event = ResourceDrawerTarget::Event {
             uid: "evt-1".to_string(),
+            name: "pod.12345".to_string(),
             reason: "Scheduled".to_string(),
             namespace: "default".to_string(),
         };
@@ -1500,5 +1540,58 @@ mod tests {
         assert_eq!(state.width, 640.0);
         state.stop_resize();
         assert!(!state.is_resizing);
+    }
+
+    #[test]
+    fn test_close_if_deleted_matches_namespaced_cluster_scoped_and_event_targets() {
+        let mut state = ResourceDrawerState::default();
+        state.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Deployment {
+                name: "api".to_string(),
+                namespace: "prod".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(!state.close_if_deleted("Deployment", "staging", "api"));
+        assert!(!state.close_if_deleted("Pod", "prod", "api"));
+        assert!(state.is_open);
+        assert!(state.close_if_deleted("Deployment", "prod", "api"));
+        assert!(!state.is_open);
+
+        state.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Node {
+                name: "worker-1".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(state.close_if_deleted("Node", "", "worker-1"));
+        assert!(!state.is_open);
+
+        state.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Namespace {
+                name: "staging".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(state.close_if_deleted("Namespace", "", "staging"));
+        assert!(!state.is_open);
+
+        state.open_or_switch(
+            Some("c1"),
+            ResourceDrawerTarget::Event {
+                uid: "u1".to_string(),
+                name: "api.123".to_string(),
+                reason: "Pulled".to_string(),
+                namespace: "prod".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(!state.close_if_deleted("Event", "default", "api.123"));
+        assert!(state.is_open);
+        assert!(state.close_if_deleted("Event", "prod", "api.123"));
+        assert!(!state.is_open);
     }
 }

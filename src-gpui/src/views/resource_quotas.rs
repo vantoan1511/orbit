@@ -253,6 +253,7 @@ pub fn build_resource_policy_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     let delete_label = if policy.kind.eq_ignore_ascii_case("LimitRange") {
         "Delete LimitRange"
@@ -295,7 +296,7 @@ pub fn build_resource_policy_context_menu_entries(
             ContextMenuItem::new("delete-resource-policy", delete_label)
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -811,6 +812,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "e1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Warning".to_string(),
                 reason: "ExceededQuota".to_string(),
@@ -827,6 +829,7 @@ mod tests {
             },
             EventInfo {
                 uid: "e2".to_string(),
+                name: String::new(),
                 time: "2m".to_string(),
                 r#type: "Warning".to_string(),
                 reason: "ExceededQuota".to_string(),
@@ -846,5 +849,41 @@ mod tests {
         let matched = filter_events_for_resource_policy(&events, &rq);
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].uid, "e1");
+    }
+
+    #[test]
+    fn test_build_resource_policy_context_menu_entries_enables_delete() {
+        let rq = sample_policy(
+            "compute-quota",
+            "prod",
+            "ResourceQuota",
+            "Resource Quota",
+            "Active",
+            0,
+            "CPU/Mem quota",
+            "1d",
+        );
+        let entries = build_resource_policy_context_menu_entries(
+            &rq,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-resource-policy" => {
+                    Some(item)
+                }
+                _ => None,
+            })
+            .expect("delete-resource-policy item");
+        assert_eq!(delete_item.label.as_ref(), "Delete ResourceQuota");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

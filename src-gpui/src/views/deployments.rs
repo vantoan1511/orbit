@@ -222,6 +222,7 @@ pub fn build_deployment_context_menu_entries(
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
     on_scale: impl 'static + Fn(&mut Window, &mut App),
     on_restart: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -269,7 +270,7 @@ pub fn build_deployment_context_menu_entries(
             ContextMenuItem::new("delete-deployment", "Delete Deployment")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -926,6 +927,7 @@ mod tests {
         let events = vec![
             orbit_core::kubernetes::models::EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "ScalingReplicaSet".to_string(),
@@ -942,6 +944,7 @@ mod tests {
             },
             orbit_core::kubernetes::models::EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Started".to_string(),
@@ -958,6 +961,7 @@ mod tests {
             },
             orbit_core::kubernetes::models::EventInfo {
                 uid: "3".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Started".to_string(),
@@ -1003,6 +1007,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let ids: Vec<&str> = entries
             .iter()
@@ -1024,5 +1029,15 @@ mod tests {
                 "delete-deployment",
             ]
         );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-deployment" => Some(item),
+                _ => None,
+            })
+            .expect("delete-deployment item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

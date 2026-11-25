@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use orbit_core::kubernetes::batch::{execute_trigger_cronjob, fetch_cronjobs, fetch_jobs};
 use orbit_core::kubernetes::configmaps::fetch_configmaps;
+use orbit_core::kubernetes::delete::{execute_delete_resource, format_target_label};
 use orbit_core::kubernetes::events::fetch_events;
 use orbit_core::kubernetes::hpa::fetch_hpas;
 use orbit_core::kubernetes::ingresses::fetch_ingresses;
@@ -1430,6 +1431,63 @@ pub async fn handle_bridge_command_with_tracker(
                 });
             }
         }
+        ClusterBridgeCommand::DeleteResource {
+            cluster_id,
+            namespace,
+            kind,
+            name,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+            let normalized_ns = namespace
+                .as_deref()
+                .map(str::trim)
+                .filter(|ns| !ns.is_empty())
+                .map(str::to_string);
+            let event_namespace = normalized_ns.clone().unwrap_or_default();
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    let target = format_target_label(normalized_ns.as_deref(), &name);
+                    match execute_delete_resource(&client, normalized_ns.as_deref(), &kind, &name)
+                        .await
+                    {
+                        Ok(()) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionSucceeded {
+                                cluster_id,
+                                action: WorkloadActionKind::Delete,
+                                kind: kind.clone(),
+                                namespace: event_namespace,
+                                name: name.clone(),
+                                message: format!("Deleted {kind} '{target}'."),
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                                cluster_id,
+                                action: WorkloadActionKind::Delete,
+                                kind,
+                                namespace: event_namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                    cluster_id: cluster_id.clone(),
+                    action: WorkloadActionKind::Delete,
+                    kind,
+                    namespace: event_namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
     }
 }
 
@@ -2777,6 +2835,98 @@ users:
                 assert_eq!(kind, "CronJob");
                 assert_eq!(namespace, "batch");
                 assert_eq!(name, "nightly");
+                assert!(message.contains("No active Kubernetes client"));
+            }
+            other => panic!("expected WorkloadActionFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_resource_without_active_client_emits_action_failed() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DeleteResource {
+                cluster_id: "dev-ctx".to_string(),
+                namespace: Some("default".to_string()),
+                kind: "Pod".to_string(),
+                name: "web-0".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("WorkloadActionFailed expected");
+        match ev {
+            ClusterBridgeEvent::WorkloadActionFailed {
+                cluster_id,
+                action,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "dev-ctx");
+                assert_eq!(action, WorkloadActionKind::Delete);
+                assert_eq!(kind, "Pod");
+                assert_eq!(namespace, "default");
+                assert_eq!(name, "web-0");
+                assert!(message.contains("No active Kubernetes client"));
+            }
+            other => panic!("expected WorkloadActionFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_cluster_scoped_resource_without_active_client_emits_empty_namespace() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DeleteResource {
+                cluster_id: "dev-ctx".to_string(),
+                namespace: None,
+                kind: "Node".to_string(),
+                name: "worker-1".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("WorkloadActionFailed expected");
+        match ev {
+            ClusterBridgeEvent::WorkloadActionFailed {
+                cluster_id,
+                action,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "dev-ctx");
+                assert_eq!(action, WorkloadActionKind::Delete);
+                assert_eq!(kind, "Node");
+                assert_eq!(namespace, "");
+                assert_eq!(name, "worker-1");
                 assert!(message.contains("No active Kubernetes client"));
             }
             other => panic!("expected WorkloadActionFailed, got {other:?}"),

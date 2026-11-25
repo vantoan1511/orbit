@@ -238,6 +238,7 @@ pub fn build_persistent_volume_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -266,7 +267,7 @@ pub fn build_persistent_volume_context_menu_entries(
             ContextMenuItem::new("delete-persistent-volume", "Delete PersistentVolume")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -733,6 +734,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "ev-1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "ProvisioningSucceeded".to_string(),
                 message: "Successfully provisioned volume".to_string(),
@@ -749,6 +751,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-2".to_string(),
+                name: String::new(),
                 r#type: "Warning".to_string(),
                 reason: "FailedMount".to_string(),
                 message: "Unable to attach pv-data-01 to node-1".to_string(),
@@ -765,6 +768,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-3".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),
                 message: "Successfully assigned pod".to_string(),
@@ -804,6 +808,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
 
         let item_ids: Vec<&str> = entries
@@ -837,6 +842,7 @@ mod tests {
             })
             .unwrap();
         assert!(delete_item.danger);
-        assert!(delete_item.disabled);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

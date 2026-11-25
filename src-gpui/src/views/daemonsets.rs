@@ -211,6 +211,7 @@ fn render_daemonset_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_daemonset_context_menu_entries(
     daemonset: &DaemonSetInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -219,6 +220,7 @@ pub fn build_daemonset_context_menu_entries(
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
     on_restart: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -261,7 +263,7 @@ pub fn build_daemonset_context_menu_entries(
             ContextMenuItem::new("delete-daemonset", "Delete DaemonSet")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -824,6 +826,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "SuccessfulCreate".to_string(),
@@ -840,6 +843,7 @@ mod tests {
             },
             EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Started".to_string(),
@@ -856,6 +860,7 @@ mod tests {
             },
             EventInfo {
                 uid: "3".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Warning".to_string(),
                 reason: "Failed".to_string(),
@@ -872,6 +877,7 @@ mod tests {
             },
             EventInfo {
                 uid: "4".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
@@ -888,6 +894,7 @@ mod tests {
             },
             EventInfo {
                 uid: "5".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Started".to_string(),
@@ -931,6 +938,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert_eq!(entries.len(), 10);
         assert!(matches!(entries[3], ContextMenuEntry::Separator));
@@ -959,7 +967,7 @@ mod tests {
                 ("view-details", "View Details", false, false),
                 ("view-yaml", "View YAML", false, false),
                 ("restart", "Restart", false, false),
-                ("delete-daemonset", "Delete DaemonSet", true, true),
+                ("delete-daemonset", "Delete DaemonSet", true, false),
             ]
         );
     }

@@ -338,6 +338,7 @@ pub fn build_namespace_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -371,7 +372,7 @@ pub fn build_namespace_context_menu_entries(
             ContextMenuItem::new("delete-namespace", "Delete Namespace")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -772,5 +773,31 @@ mod tests {
             namespaces_presentation_mode(&state),
             NamespacesPresentationMode::Table
         );
+    }
+
+    #[test]
+    fn test_build_namespace_context_menu_entries_enables_delete() {
+        let ns = sample_ns("staging", "Active", true, "1d", &[]);
+        let entries = build_namespace_context_menu_entries(
+            &ns,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-namespace" => {
+                    Some(item)
+                }
+                _ => None,
+            })
+            .expect("delete-namespace item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

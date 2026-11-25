@@ -14,6 +14,7 @@ pub const EVENT_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 /// Formats a Kubernetes `Event` into `EventInfo`.
 pub fn format_event(e: &Event) -> EventInfo {
     let uid = e.metadata.uid.clone().unwrap_or_default();
+    let name = e.metadata.name.clone().unwrap_or_default();
 
     // Determine the most representative timestamp for age/time
     let last_seen_time = e
@@ -57,6 +58,7 @@ pub fn format_event(e: &Event) -> EventInfo {
 
     EventInfo {
         uid,
+        name,
         time,
         r#type,
         reason,
@@ -124,6 +126,7 @@ mod tests {
         let event = Event {
             metadata: ObjectMeta {
                 uid: Some("event-uid-123".to_string()),
+                name: Some("pod-scheduled.12345".to_string()),
                 namespace: Some("test-namespace".to_string()),
                 creation_timestamp: Some(Time(first_seen_time)),
                 labels: Some(labels),
@@ -150,6 +153,7 @@ mod tests {
         let info = format_event(&event);
 
         assert_eq!(info.uid, "event-uid-123");
+        assert_eq!(info.name, "pod-scheduled.12345");
         assert_eq!(info.r#type, "Normal");
         assert_eq!(info.reason, "Scheduled");
         assert_eq!(info.object_name, "test-pod");

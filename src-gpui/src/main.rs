@@ -1460,18 +1460,33 @@ pub fn apply_add_cluster_modal_event(modal: &mut AddClusterModalState, event: &C
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+pub struct WorkloadActionRefreshTargets<'a> {
+    pub drawer: &'a mut ResourceDrawerState,
+    pub deployments: &'a mut DeploymentsState,
+    pub statefulsets: &'a mut StatefulSetsState,
+    pub daemonsets: &'a mut DaemonSetsState,
+    pub replicasets: &'a mut ReplicaSetsState,
+    pub pods: &'a mut PodsState,
+    pub cronjobs: &'a mut CronJobsState,
+    pub jobs: &'a mut JobsState,
+    pub services: &'a mut ServicesState,
+    pub ingresses: &'a mut IngressesState,
+    pub configmaps: &'a mut ConfigMapsState,
+    pub secrets: &'a mut SecretsState,
+    pub network_policies: &'a mut NetworkPoliciesState,
+    pub resource_quotas: &'a mut ResourceQuotasState,
+    pub namespaces: &'a mut NamespaceFilterState,
+    pub persistent_volumes: &'a mut PersistentVolumesState,
+    pub persistent_volume_claims: &'a mut PersistentVolumeClaimsState,
+    pub nodes: &'a mut NodesState,
+    pub events: &'a mut EventsState,
+}
+
 pub fn apply_workload_action_event(
     active_cluster_id: Option<&str>,
     modal: &mut WorkloadActionModalState,
     toast: &mut ActionToastState,
-    deployments: &mut DeploymentsState,
-    statefulsets: &mut StatefulSetsState,
-    daemonsets: &mut DaemonSetsState,
-    replicasets: &mut ReplicaSetsState,
-    pods: &mut PodsState,
-    cronjobs: &mut CronJobsState,
-    jobs: &mut JobsState,
+    targets: WorkloadActionRefreshTargets<'_>,
     event: &ClusterBridgeEvent,
 ) -> Option<(u64, ActionToastKind, Vec<ClusterBridgeCommand>)> {
     match event {
@@ -1487,54 +1502,119 @@ pub fn apply_workload_action_event(
             cluster_id,
             action,
             kind,
+            namespace,
+            name,
             message,
-            ..
         } => {
             if active_cluster_id != Some(cluster_id.as_str()) {
                 return None;
             }
             modal.close();
+            if *action == WorkloadActionKind::Delete {
+                targets.drawer.close_if_deleted(kind, namespace, name);
+            }
             let title = match action {
                 WorkloadActionKind::Scale => format!("Scaled {kind}"),
                 WorkloadActionKind::Restart => format!("Restarted {kind}"),
                 WorkloadActionKind::RestartPod => "Restarted Pod".to_string(),
                 WorkloadActionKind::TriggerCronJob => "Triggered CronJob".to_string(),
+                WorkloadActionKind::Delete => format!("Deleted {kind}"),
             };
             let toast_id = toast.show_success(title, message.clone());
             let mut refresh_commands = Vec::new();
             match kind.as_str() {
                 "Deployment" => {
-                    if let Some(cmd) = deployments.begin_refresh() {
+                    if let Some(cmd) = targets.deployments.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
                 }
                 "StatefulSet" => {
-                    if let Some(cmd) = statefulsets.begin_refresh() {
+                    if let Some(cmd) = targets.statefulsets.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
                 }
                 "DaemonSet" => {
-                    if let Some(cmd) = daemonsets.begin_refresh() {
+                    if let Some(cmd) = targets.daemonsets.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
                 }
                 "ReplicaSet" => {
-                    if let Some(cmd) = replicasets.begin_refresh() {
+                    if let Some(cmd) = targets.replicasets.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
                 }
                 "Pod" => {
-                    if let Some(cmd) = pods.begin_refresh() {
+                    if let Some(cmd) = targets.pods.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
                 }
                 "CronJob" => {
-                    if let Some(cmd) = cronjobs.begin_refresh() {
+                    if let Some(cmd) = targets.cronjobs.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
-                    if !jobs.jobs.is_empty()
-                        && let Some(cmd) = jobs.begin_refresh()
+                    if !targets.jobs.jobs.is_empty()
+                        && let Some(cmd) = targets.jobs.begin_refresh()
                     {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Job" => {
+                    if let Some(cmd) = targets.jobs.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Service" => {
+                    if let Some(cmd) = targets.services.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Ingress" => {
+                    if let Some(cmd) = targets.ingresses.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "ConfigMap" => {
+                    if let Some(cmd) = targets.configmaps.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Secret" => {
+                    if let Some(cmd) = targets.secrets.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "NetworkPolicy" => {
+                    if let Some(cmd) = targets.network_policies.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "ResourceQuota" | "LimitRange" => {
+                    if let Some(cmd) = targets.resource_quotas.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Namespace" => {
+                    if let Some(cmd) = targets.namespaces.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "PersistentVolume" => {
+                    if let Some(cmd) = targets.persistent_volumes.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "PersistentVolumeClaim" => {
+                    if let Some(cmd) = targets.persistent_volume_claims.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Node" => {
+                    if let Some(cmd) = targets.nodes.begin_refresh() {
+                        refresh_commands.push(cmd);
+                    }
+                }
+                "Event" => {
+                    if let Some(cmd) = targets.events.begin_refresh() {
                         refresh_commands.push(cmd);
                     }
                 }
@@ -1560,6 +1640,7 @@ pub fn apply_workload_action_event(
                 WorkloadActionKind::Restart => format!("Restart {kind} Failed"),
                 WorkloadActionKind::RestartPod => "Restart Pod Failed".to_string(),
                 WorkloadActionKind::TriggerCronJob => "Trigger CronJob Failed".to_string(),
+                WorkloadActionKind::Delete => format!("Delete {kind} Failed"),
             };
             let toast_id = toast.show_error(title, message.clone());
             Some((toast_id, ActionToastKind::Error, Vec::new()))
@@ -1699,13 +1780,27 @@ impl OrbitShell {
                                 shell.state.active_cluster_id.as_deref(),
                                 &mut shell.workload_action_modal,
                                 &mut shell.action_toast,
-                                &mut shell.deployments,
-                                &mut shell.statefulsets,
-                                &mut shell.daemonsets,
-                                &mut shell.replicasets,
-                                &mut shell.pods,
-                                &mut shell.cronjobs,
-                                &mut shell.jobs,
+                                WorkloadActionRefreshTargets {
+                                    drawer: &mut shell.drawer,
+                                    deployments: &mut shell.deployments,
+                                    statefulsets: &mut shell.statefulsets,
+                                    daemonsets: &mut shell.daemonsets,
+                                    replicasets: &mut shell.replicasets,
+                                    pods: &mut shell.pods,
+                                    cronjobs: &mut shell.cronjobs,
+                                    jobs: &mut shell.jobs,
+                                    services: &mut shell.services,
+                                    ingresses: &mut shell.ingresses,
+                                    configmaps: &mut shell.configmaps,
+                                    secrets: &mut shell.secrets,
+                                    network_policies: &mut shell.network_policies,
+                                    resource_quotas: &mut shell.resource_quotas,
+                                    namespaces: &mut shell.namespaces,
+                                    persistent_volumes: &mut shell.persistent_volumes,
+                                    persistent_volume_claims: &mut shell.persistent_volume_claims,
+                                    nodes: &mut shell.nodes,
+                                    events: &mut shell.events,
+                                },
                                 &event,
                             )
                         {
@@ -2096,6 +2191,31 @@ impl OrbitShell {
         cx.notify();
     }
 
+    fn open_delete_confirm_modal(
+        &mut self,
+        kind: &str,
+        namespace: Option<&str>,
+        name: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((_, cluster_name)) = self.active_cluster_context_and_name() else {
+            return;
+        };
+        self.state.close_dropdown();
+        self.namespaces.close_dropdown();
+        self.context_menu.close();
+        self.workload_action_modal.open_confirm(
+            cluster_name,
+            WorkloadActionKind::Delete,
+            kind,
+            namespace.unwrap_or_default(),
+            name,
+        );
+        self.focus_handle.focus(window);
+        cx.notify();
+    }
+
     fn open_restart_confirm_modal(
         &mut self,
         action: WorkloadActionKind,
@@ -2164,6 +2284,13 @@ impl OrbitShell {
                     WorkloadActionKind::RestartPod => ClusterBridgeCommand::RestartPod {
                         cluster_id,
                         namespace: confirm.namespace.clone(),
+                        name: confirm.name.clone(),
+                    },
+                    WorkloadActionKind::Delete => ClusterBridgeCommand::DeleteResource {
+                        cluster_id,
+                        namespace: (!confirm.namespace.trim().is_empty())
+                            .then(|| confirm.namespace.clone()),
+                        kind: confirm.kind.clone(),
                         name: confirm.name.clone(),
                     },
                     _ => return,
@@ -2597,6 +2724,7 @@ impl OrbitShell {
                 uid,
                 reason,
                 namespace,
+                ..
             } => self.find_event_for_target(uid, reason, namespace).is_some(),
             ResourceDrawerTarget::Pod { name, namespace } => self
                 .pods
@@ -3246,6 +3374,7 @@ impl OrbitShell {
                 uid,
                 reason,
                 namespace,
+                ..
             } => {
                 let ev = self.find_event_for_target(uid, reason, namespace)?;
                 let tabs = vec![
@@ -5930,6 +6059,7 @@ impl OrbitShell {
                     }) {
                         let target = ResourceDrawerTarget::Event {
                             uid: ev.uid.clone(),
+                            name: ev.name.clone(),
                             reason: ev.reason.clone(),
                             namespace: ev.namespace.clone(),
                         };
@@ -5960,6 +6090,7 @@ impl OrbitShell {
                 let namespace = ev.namespace.clone();
                 let drawer_target = ResourceDrawerTarget::Event {
                     uid: ev.uid.clone(),
+                    name: ev.name.clone(),
                     reason: ev.reason.clone(),
                     namespace: ev.namespace.clone(),
                 };
@@ -6003,6 +6134,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = ev.namespace.clone();
+                    let name = ev.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Event",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::events::build_event_context_menu_entries(
                     ev,
                     copy_obj,
@@ -6011,6 +6158,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.events.table.selected_row_key = Some(row_key.to_string());
@@ -6154,6 +6302,22 @@ impl OrbitShell {
                             });
                         })
                     };
+                    let delete_action = {
+                        let e = ctx_entity.clone();
+                        let ns = deployment.namespace.clone();
+                        let name = deployment.name.clone();
+                        move |window: &mut Window, cx: &mut App| {
+                            e.update(cx, |shell, cx| {
+                                shell.open_delete_confirm_modal(
+                                    "Deployment",
+                                    Some(&ns),
+                                    &name,
+                                    window,
+                                    cx,
+                                );
+                            });
+                        }
+                    };
                     let entries = views::deployments::build_deployment_context_menu_entries(
                         deployment,
                         copy_name,
@@ -6163,6 +6327,7 @@ impl OrbitShell {
                         view_yaml,
                         move |w, cx| scale_action(w, cx),
                         move |w, cx| restart_action(w, cx),
+                        delete_action,
                     );
                     ctx_entity.update(cx, |shell, cx| {
                         shell.deployments.table.selected_row_key = Some(row_key.to_string());
@@ -6326,6 +6491,22 @@ impl OrbitShell {
                             });
                         })
                     };
+                    let delete_action = {
+                        let e = ctx_entity.clone();
+                        let ns = statefulset.namespace.clone();
+                        let name = statefulset.name.clone();
+                        move |window: &mut Window, cx: &mut App| {
+                            e.update(cx, |shell, cx| {
+                                shell.open_delete_confirm_modal(
+                                    "StatefulSet",
+                                    Some(&ns),
+                                    &name,
+                                    window,
+                                    cx,
+                                );
+                            });
+                        }
+                    };
                     let entries = views::statefulsets::build_statefulset_context_menu_entries(
                         statefulset,
                         copy_name,
@@ -6335,6 +6516,7 @@ impl OrbitShell {
                         view_yaml,
                         move |w, cx| scale_action(w, cx),
                         move |w, cx| restart_action(w, cx),
+                        delete_action,
                     );
                     ctx_entity.update(cx, |shell, cx| {
                         shell.statefulsets.table.selected_row_key = Some(row_key.to_string());
@@ -6481,6 +6663,22 @@ impl OrbitShell {
                             });
                         })
                     };
+                    let delete_action = {
+                        let e = ctx_entity.clone();
+                        let ns = replicaset.namespace.clone();
+                        let name = replicaset.name.clone();
+                        move |window: &mut Window, cx: &mut App| {
+                            e.update(cx, |shell, cx| {
+                                shell.open_delete_confirm_modal(
+                                    "ReplicaSet",
+                                    Some(&ns),
+                                    &name,
+                                    window,
+                                    cx,
+                                );
+                            });
+                        }
+                    };
                     let entries = views::replicasets::build_replicaset_context_menu_entries(
                         replicaset,
                         copy_name,
@@ -6489,6 +6687,7 @@ impl OrbitShell {
                         view_details,
                         view_yaml,
                         move |w, cx| scale_action(w, cx),
+                        delete_action,
                     );
                     ctx_entity.update(cx, |shell, cx| {
                         shell.replicasets.table.selected_row_key = Some(row_key.to_string());
@@ -6634,6 +6833,22 @@ impl OrbitShell {
                             });
                         })
                     };
+                    let delete_action = {
+                        let e = ctx_entity.clone();
+                        let ns = daemonset.namespace.clone();
+                        let name = daemonset.name.clone();
+                        move |window: &mut Window, cx: &mut App| {
+                            e.update(cx, |shell, cx| {
+                                shell.open_delete_confirm_modal(
+                                    "DaemonSet",
+                                    Some(&ns),
+                                    &name,
+                                    window,
+                                    cx,
+                                );
+                            });
+                        }
+                    };
                     let entries = views::daemonsets::build_daemonset_context_menu_entries(
                         daemonset,
                         copy_name,
@@ -6642,6 +6857,7 @@ impl OrbitShell {
                         view_details,
                         view_yaml,
                         move |w, cx| restart_action(w, cx),
+                        delete_action,
                     );
                     ctx_entity.update(cx, |shell, cx| {
                         shell.daemonsets.table.selected_row_key = Some(row_key.to_string());
@@ -6769,6 +6985,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = job.namespace.clone();
+                    let name = job.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Job",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::jobs::build_job_context_menu_entries(
                     job,
                     copy_name,
@@ -6776,6 +7008,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.jobs.table.selected_row_key = Some(row_key.to_string());
@@ -6913,6 +7146,22 @@ impl OrbitShell {
                         });
                     })
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = cj.namespace.clone();
+                    let name = cj.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "CronJob",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::cronjobs::build_cronjob_context_menu_entries(
                     cj,
                     copy_name,
@@ -6921,6 +7170,7 @@ impl OrbitShell {
                     view_details,
                     view_yaml,
                     move |w, cx| trigger_action(w, cx),
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.cronjobs.table.selected_row_key = Some(row_key.to_string());
@@ -7048,6 +7298,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = svc.namespace.clone();
+                    let name = svc.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Service",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::services::build_service_context_menu_entries(
                     svc,
                     copy_name,
@@ -7055,6 +7321,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.services.table.selected_row_key = Some(row_key.to_string());
@@ -7202,6 +7469,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = ing.namespace.clone();
+                    let name = ing.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Ingress",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::ingresses::build_ingress_context_menu_entries(
                     ing,
                     copy_name,
@@ -7209,6 +7492,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.ingresses.table.selected_row_key = Some(row_key.to_string());
@@ -7345,6 +7629,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = cm.namespace.clone();
+                    let name = cm.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "ConfigMap",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::configmaps::build_configmap_context_menu_entries(
                     cm,
                     copy_name,
@@ -7352,6 +7652,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.configmaps.table.selected_row_key = Some(row_key.to_string());
@@ -7488,6 +7789,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = sec.namespace.clone();
+                    let name = sec.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Secret",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::secrets::build_secret_context_menu_entries(
                     sec,
                     copy_name,
@@ -7495,6 +7812,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.secrets.table.selected_row_key = Some(row_key.to_string());
@@ -7648,6 +7966,22 @@ impl OrbitShell {
                         });
                     })
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = pod.namespace.clone();
+                    let name = pod.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Pod",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::pods::build_pod_context_menu_entries(
                     pod,
                     copy_name,
@@ -7656,6 +7990,7 @@ impl OrbitShell {
                     view_details,
                     view_yaml,
                     move |w, cx| restart_pod_action(w, cx),
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.pods.table.selected_row_key = Some(row_key.to_string());
@@ -7777,6 +8112,21 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let name = ns.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Namespace",
+                                None,
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::namespaces::build_namespace_context_menu_entries(
                     ns,
                     copy_name,
@@ -7784,6 +8134,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.namespaces_view.table.selected_row_key = Some(row_key.to_string());
@@ -7894,6 +8245,21 @@ impl OrbitShell {
                             );
                         });
                     };
+                    let delete_action = {
+                        let e = ctx_entity.clone();
+                        let name = pv.name.clone();
+                        move |window: &mut Window, cx: &mut App| {
+                            e.update(cx, |shell, cx| {
+                                shell.open_delete_confirm_modal(
+                                    "PersistentVolume",
+                                    None,
+                                    &name,
+                                    window,
+                                    cx,
+                                );
+                            });
+                        }
+                    };
                     let entries =
                         views::persistent_volumes::build_persistent_volume_context_menu_entries(
                             pv,
@@ -7901,6 +8267,7 @@ impl OrbitShell {
                             refresh_cb,
                             view_details,
                             view_yaml,
+                            delete_action,
                         );
                     ctx_entity.update(cx, |shell, cx| {
                         shell.persistent_volumes.table.selected_row_key = Some(row_key.to_string());
@@ -8027,6 +8394,22 @@ impl OrbitShell {
                             );
                         });
                     };
+                    let delete_action = {
+                        let e = ctx_entity.clone();
+                        let ns = pvc.namespace.clone();
+                        let name = pvc.name.clone();
+                        move |window: &mut Window, cx: &mut App| {
+                            e.update(cx, |shell, cx| {
+                                shell.open_delete_confirm_modal(
+                                    "PersistentVolumeClaim",
+                                    Some(&ns),
+                                    &name,
+                                    window,
+                                    cx,
+                                );
+                            });
+                        }
+                    };
                     let entries =
                     views::persistent_volume_claims::build_persistent_volume_claim_context_menu_entries(
                         pvc,
@@ -8035,6 +8418,7 @@ impl OrbitShell {
                         refresh_cb,
                         view_details,
                         view_yaml,
+                        delete_action,
                     );
                     ctx_entity.update(cx, |shell, cx| {
                         shell.persistent_volume_claims.table.selected_row_key =
@@ -8164,6 +8548,22 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let ns = policy.namespace.clone();
+                    let name = policy.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "NetworkPolicy",
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::network_policies::build_network_policy_context_menu_entries(
                     policy,
                     copy_name,
@@ -8171,6 +8571,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.network_policies.table.selected_row_key = Some(row_key.to_string());
@@ -8285,12 +8686,28 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let name = node.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                "Node",
+                                None,
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::nodes::build_node_context_menu_entries(
                     node,
                     copy_name,
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.nodes.table.selected_row_key = Some(row_key.to_string());
@@ -8620,6 +9037,23 @@ impl OrbitShell {
                         );
                     });
                 };
+                let delete_action = {
+                    let e = ctx_entity.clone();
+                    let kind = policy.kind.clone();
+                    let ns = policy.namespace.clone();
+                    let name = policy.name.clone();
+                    move |window: &mut Window, cx: &mut App| {
+                        e.update(cx, |shell, cx| {
+                            shell.open_delete_confirm_modal(
+                                &kind,
+                                Some(&ns),
+                                &name,
+                                window,
+                                cx,
+                            );
+                        });
+                    }
+                };
                 let entries = views::resource_quotas::build_resource_policy_context_menu_entries(
                     policy,
                     copy_name,
@@ -8627,6 +9061,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
                     shell.resource_quotas.table.selected_row_key = Some(row_key.to_string());
@@ -12795,6 +13230,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert!(
             dep_entries
@@ -12827,7 +13263,7 @@ mod tests {
         )));
         assert!(dep_entries.iter().any(|e| matches!(
             e,
-            ContextMenuEntry::Item(item) if item.danger && item.disabled
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-deployment" && item.danger && !item.disabled
         )));
 
         let node = NodeInfo {
@@ -12863,6 +13299,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert!(
             node_entries
@@ -12883,7 +13320,7 @@ mod tests {
         )));
         assert!(node_entries.iter().any(|e| matches!(
             e,
-            ContextMenuEntry::Item(item) if item.danger && item.disabled
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-node" && item.danger && !item.disabled
         )));
 
         let ns = NamespaceInfo {
@@ -12898,6 +13335,7 @@ mod tests {
         };
         let ns_entries = views::namespaces::build_namespace_context_menu_entries(
             &ns,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},
@@ -12923,11 +13361,12 @@ mod tests {
         )));
         assert!(ns_entries.iter().any(|e| matches!(
             e,
-            ContextMenuEntry::Item(item) if item.danger && item.disabled
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-namespace" && item.danger && !item.disabled
         )));
 
         let ev = EventInfo {
             uid: "ev-1".to_string(),
+            name: "api-server-abc.12345".to_string(),
             time: "2m".to_string(),
             r#type: "Normal".to_string(),
             reason: "ScalingReplicaSet".to_string(),
@@ -12944,6 +13383,7 @@ mod tests {
         };
         let ev_entries = views::events::build_event_context_menu_entries(
             &ev,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},
@@ -12974,7 +13414,7 @@ mod tests {
         )));
         assert!(ev_entries.iter().any(|e| matches!(
             e,
-            ContextMenuEntry::Item(item) if item.danger && item.disabled
+            ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-event" && item.danger && !item.disabled
         )));
     }
 
@@ -13787,6 +14227,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -13809,7 +14250,7 @@ mod tests {
             ]
         );
         let delete_item = items.iter().find(|i| i.id == "delete-pod").unwrap();
-        assert!(delete_item.disabled);
+        assert!(!delete_item.disabled);
         assert!(delete_item.danger);
     }
 
@@ -14234,6 +14675,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -14243,7 +14685,7 @@ mod tests {
             })
             .collect();
         let delete_item = items.iter().find(|i| i.id == "delete-service").unwrap();
-        assert!(delete_item.disabled);
+        assert!(!delete_item.disabled);
         assert!(delete_item.danger);
     }
 
@@ -14620,6 +15062,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -14629,7 +15072,7 @@ mod tests {
             })
             .collect();
         let delete_item = items.iter().find(|i| i.id == "delete-configmap").unwrap();
-        assert!(delete_item.disabled);
+        assert!(!delete_item.disabled);
         assert!(delete_item.danger);
     }
 
@@ -15013,6 +15456,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -15022,7 +15466,7 @@ mod tests {
             })
             .collect();
         let delete_item = items.iter().find(|i| i.id == "delete-secret").unwrap();
-        assert!(delete_item.disabled);
+        assert!(!delete_item.disabled);
         assert!(delete_item.danger);
     }
 
@@ -18370,6 +18814,79 @@ mod tests {
         assert!(dropdown_can_disconnect(&state));
     }
 
+    #[derive(Default)]
+    struct TestWorkloadActionTargets {
+        drawer: ResourceDrawerState,
+        deployments: DeploymentsState,
+        statefulsets: StatefulSetsState,
+        daemonsets: DaemonSetsState,
+        replicasets: ReplicaSetsState,
+        pods: PodsState,
+        cronjobs: CronJobsState,
+        jobs: JobsState,
+        services: ServicesState,
+        ingresses: IngressesState,
+        configmaps: ConfigMapsState,
+        secrets: SecretsState,
+        network_policies: NetworkPoliciesState,
+        resource_quotas: ResourceQuotasState,
+        namespaces: NamespaceFilterState,
+        persistent_volumes: PersistentVolumesState,
+        persistent_volume_claims: PersistentVolumeClaimsState,
+        nodes: NodesState,
+        events: EventsState,
+    }
+
+    impl TestWorkloadActionTargets {
+        fn with_cluster(cluster_id: &str) -> Self {
+            let mut this = Self::default();
+            let cid = Some(cluster_id.to_string());
+            this.deployments.cluster_id = cid.clone();
+            this.statefulsets.cluster_id = cid.clone();
+            this.daemonsets.cluster_id = cid.clone();
+            this.replicasets.cluster_id = cid.clone();
+            this.pods.cluster_id = cid.clone();
+            this.cronjobs.cluster_id = cid.clone();
+            this.jobs.cluster_id = cid.clone();
+            this.services.cluster_id = cid.clone();
+            this.ingresses.cluster_id = cid.clone();
+            this.configmaps.cluster_id = cid.clone();
+            this.secrets.cluster_id = cid.clone();
+            this.network_policies.cluster_id = cid.clone();
+            this.resource_quotas.cluster_id = cid.clone();
+            this.namespaces.cluster_id = cid.clone();
+            this.persistent_volumes.cluster_id = cid.clone();
+            this.persistent_volume_claims.cluster_id = cid.clone();
+            this.nodes.cluster_id = cid.clone();
+            this.events.cluster_id = cid;
+            this
+        }
+
+        fn as_targets(&mut self) -> WorkloadActionRefreshTargets<'_> {
+            WorkloadActionRefreshTargets {
+                drawer: &mut self.drawer,
+                deployments: &mut self.deployments,
+                statefulsets: &mut self.statefulsets,
+                daemonsets: &mut self.daemonsets,
+                replicasets: &mut self.replicasets,
+                pods: &mut self.pods,
+                cronjobs: &mut self.cronjobs,
+                jobs: &mut self.jobs,
+                services: &mut self.services,
+                ingresses: &mut self.ingresses,
+                configmaps: &mut self.configmaps,
+                secrets: &mut self.secrets,
+                network_policies: &mut self.network_policies,
+                resource_quotas: &mut self.resource_quotas,
+                namespaces: &mut self.namespaces,
+                persistent_volumes: &mut self.persistent_volumes,
+                persistent_volume_claims: &mut self.persistent_volume_claims,
+                nodes: &mut self.nodes,
+                events: &mut self.events,
+            }
+        }
+    }
+
     #[test]
     fn test_workload_action_succeeded_closes_modal_shows_toast_and_queues_targeted_refresh() {
         let mut modal = WorkloadActionModalState::default();
@@ -18377,48 +18894,29 @@ mod tests {
         modal.set_submitting(true);
         let mut toast = ActionToastState::default();
 
-        let mut deployments = DeploymentsState {
-            cluster_id: Some("prod-ctx".to_string()),
-            deployments: vec![orbit_core::kubernetes::models::DeploymentInfo {
-                kind: "Deployment".to_string(),
-                name: "web".to_string(),
-                namespace: "default".to_string(),
-                status: "Running".to_string(),
-                replicas: orbit_core::kubernetes::models::Replicas {
-                    current: 3,
-                    desired: 3,
-                },
-                up_to_date: 3,
-                available: 3,
-                strategy: None,
-                images: Vec::new(),
-                containers: Vec::new(),
-                age: "1d".to_string(),
-                conditions: None,
-                min_ready_seconds: 0,
-                revision_history: None,
-                labels: Default::default(),
-                annotations: Default::default(),
-                ports: Vec::new(),
-            }],
-            ..Default::default()
-        };
-
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState {
-            cluster_id: Some("prod-ctx".to_string()),
-            ..Default::default()
-        };
-        let mut replicasets = ReplicaSetsState::default();
-        let mut pods = PodsState {
-            cluster_id: Some("prod-ctx".to_string()),
-            ..Default::default()
-        };
-        let mut cronjobs = CronJobsState {
-            cluster_id: Some("prod-ctx".to_string()),
-            ..Default::default()
-        };
-        let mut jobs = JobsState::default();
+        let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
+        targets.deployments.deployments = vec![orbit_core::kubernetes::models::DeploymentInfo {
+            kind: "Deployment".to_string(),
+            name: "web".to_string(),
+            namespace: "default".to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 3,
+                desired: 3,
+            },
+            up_to_date: 3,
+            available: 3,
+            strategy: None,
+            images: Vec::new(),
+            containers: Vec::new(),
+            age: "1d".to_string(),
+            conditions: None,
+            min_ready_seconds: 0,
+            revision_history: None,
+            labels: Default::default(),
+            annotations: Default::default(),
+            ports: Vec::new(),
+        }];
 
         let scale_event = ClusterBridgeEvent::WorkloadActionSucceeded {
             cluster_id: "prod-ctx".to_string(),
@@ -18432,13 +18930,7 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut pods,
-            &mut cronjobs,
-            &mut jobs,
+            targets.as_targets(),
             &scale_event,
         )
         .expect("should handle success event");
@@ -18447,12 +18939,12 @@ mod tests {
         assert_eq!(res.1, ActionToastKind::Success);
         assert!(toast.current().is_some());
         assert_eq!(
-            deployments.deployments.len(),
+            targets.deployments.deployments.len(),
             1,
             "existing rows must not be cleared"
         );
         assert!(
-            !deployments.table.loading,
+            !targets.deployments.table.loading,
             "in-place refresh must not show skeleton"
         );
         assert!(matches!(
@@ -18472,13 +18964,7 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut pods,
-            &mut cronjobs,
-            &mut jobs,
+            targets.as_targets(),
             &ds_event,
         )
         .unwrap();
@@ -18499,13 +18985,7 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut pods,
-            &mut cronjobs,
-            &mut jobs,
+            targets.as_targets(),
             &pod_event,
         )
         .unwrap();
@@ -18526,13 +19006,7 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut pods,
-            &mut cronjobs,
-            &mut jobs,
+            targets.as_targets(),
             &cj_event,
         )
         .unwrap();
@@ -18549,39 +19023,29 @@ mod tests {
         modal.set_submitting(true);
         let mut toast = ActionToastState::default();
 
-        let mut deployments = DeploymentsState {
-            cluster_id: Some("prod-ctx".to_string()),
-            deployments: vec![orbit_core::kubernetes::models::DeploymentInfo {
-                kind: "Deployment".to_string(),
-                name: "web".to_string(),
-                namespace: "default".to_string(),
-                status: "Running".to_string(),
-                replicas: orbit_core::kubernetes::models::Replicas {
-                    current: 3,
-                    desired: 3,
-                },
-                up_to_date: 3,
-                available: 3,
-                strategy: None,
-                images: Vec::new(),
-                containers: Vec::new(),
-                age: "1d".to_string(),
-                conditions: None,
-                min_ready_seconds: 0,
-                revision_history: None,
-                labels: Default::default(),
-                annotations: Default::default(),
-                ports: Vec::new(),
-            }],
-            ..Default::default()
-        };
-
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut replicasets = ReplicaSetsState::default();
-        let mut pods = PodsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut jobs = JobsState::default();
+        let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
+        targets.deployments.deployments = vec![orbit_core::kubernetes::models::DeploymentInfo {
+            kind: "Deployment".to_string(),
+            name: "web".to_string(),
+            namespace: "default".to_string(),
+            status: "Running".to_string(),
+            replicas: orbit_core::kubernetes::models::Replicas {
+                current: 3,
+                desired: 3,
+            },
+            up_to_date: 3,
+            available: 3,
+            strategy: None,
+            images: Vec::new(),
+            containers: Vec::new(),
+            age: "1d".to_string(),
+            conditions: None,
+            min_ready_seconds: 0,
+            revision_history: None,
+            labels: Default::default(),
+            annotations: Default::default(),
+            ports: Vec::new(),
+        }];
 
         let failed_event = ClusterBridgeEvent::WorkloadActionFailed {
             cluster_id: "prod-ctx".to_string(),
@@ -18595,13 +19059,7 @@ mod tests {
             Some("prod-ctx"),
             &mut modal,
             &mut toast,
-            &mut deployments,
-            &mut statefulsets,
-            &mut daemonsets,
-            &mut replicasets,
-            &mut pods,
-            &mut cronjobs,
-            &mut jobs,
+            targets.as_targets(),
             &failed_event,
         )
         .expect("should handle failure event");
@@ -18616,7 +19074,7 @@ mod tests {
         }
         assert_eq!(res.1, ActionToastKind::Error);
         assert!(res.2.is_empty());
-        assert_eq!(deployments.deployments.len(), 1);
+        assert_eq!(targets.deployments.deployments.len(), 1);
     }
 
     #[test]
@@ -18632,13 +19090,7 @@ mod tests {
         let mut toast = ActionToastState::default();
         toast.show_success("Scaled", "Done");
 
-        let mut deployments = DeploymentsState::default();
-        let mut statefulsets = StatefulSetsState::default();
-        let mut daemonsets = DaemonSetsState::default();
-        let mut replicasets = ReplicaSetsState::default();
-        let mut pods = PodsState::default();
-        let mut cronjobs = CronJobsState::default();
-        let mut jobs = JobsState::default();
+        let mut targets = TestWorkloadActionTargets::default();
 
         let disconnect_event = ClusterBridgeEvent::ClusterDisconnected {
             previous_cluster_id: Some("prod-ctx".to_string()),
@@ -18649,18 +19101,129 @@ mod tests {
                 Some("prod-ctx"),
                 &mut modal,
                 &mut toast,
-                &mut deployments,
-                &mut statefulsets,
-                &mut daemonsets,
-                &mut replicasets,
-                &mut pods,
-                &mut cronjobs,
-                &mut jobs,
+                targets.as_targets(),
                 &disconnect_event,
             )
             .is_none()
         );
         assert!(!modal.is_open());
         assert!(toast.current().is_none());
+    }
+
+    #[test]
+    fn test_apply_delete_succeeded_refreshes_resource_and_closes_matching_drawer() {
+        let mut modal = WorkloadActionModalState::default();
+        modal.open_confirm("prod", WorkloadActionKind::Delete, "Service", "prod", "api");
+        modal.set_submitting(true);
+        let mut toast = ActionToastState::default();
+        let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
+
+        targets.drawer.open_or_switch(
+            Some("prod-ctx"),
+            ResourceDrawerTarget::Service {
+                name: "api".to_string(),
+                namespace: "prod".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        assert!(targets.drawer.is_open);
+
+        let delete_svc_event = ClusterBridgeEvent::WorkloadActionSucceeded {
+            cluster_id: "prod-ctx".to_string(),
+            action: WorkloadActionKind::Delete,
+            kind: "Service".to_string(),
+            namespace: "prod".to_string(),
+            name: "api".to_string(),
+            message: "Deleted Service 'prod/api'.".to_string(),
+        };
+        let res = apply_workload_action_event(
+            Some("prod-ctx"),
+            &mut modal,
+            &mut toast,
+            targets.as_targets(),
+            &delete_svc_event,
+        )
+        .expect("should handle delete success");
+
+        assert!(!modal.is_open());
+        assert!(!targets.drawer.is_open);
+        assert_eq!(res.1, ActionToastKind::Success);
+        assert!(matches!(
+            res.2.as_slice(),
+            [ClusterBridgeCommand::LoadServices { cluster_id, .. }] if cluster_id == "prod-ctx"
+        ));
+
+        targets.drawer.open_or_switch(
+            Some("prod-ctx"),
+            ResourceDrawerTarget::Node {
+                name: "worker-2".to_string(),
+            },
+            ResourceDrawerTabId::Overview,
+        );
+        let delete_node_event = ClusterBridgeEvent::WorkloadActionSucceeded {
+            cluster_id: "prod-ctx".to_string(),
+            action: WorkloadActionKind::Delete,
+            kind: "Node".to_string(),
+            namespace: "".to_string(),
+            name: "worker-1".to_string(),
+            message: "Deleted Node 'worker-1'.".to_string(),
+        };
+        let node_res = apply_workload_action_event(
+            Some("prod-ctx"),
+            &mut modal,
+            &mut toast,
+            targets.as_targets(),
+            &delete_node_event,
+        )
+        .expect("should handle cluster-scoped delete success");
+        assert!(
+            targets.drawer.is_open,
+            "non-matching drawer target must stay open"
+        );
+        assert!(matches!(
+            node_res.2.as_slice(),
+            [ClusterBridgeCommand::LoadNodes { cluster_id, .. }] if cluster_id == "prod-ctx"
+        ));
+    }
+
+    #[test]
+    fn test_apply_delete_failed_sets_modal_error_without_stale_loading() {
+        let mut modal = WorkloadActionModalState::default();
+        modal.open_confirm("prod", WorkloadActionKind::Delete, "Pod", "default", "web-0");
+        modal.set_submitting(true);
+        let mut toast = ActionToastState::default();
+        let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
+
+        let failed_event = ClusterBridgeEvent::WorkloadActionFailed {
+            cluster_id: "prod-ctx".to_string(),
+            action: WorkloadActionKind::Delete,
+            kind: "Pod".to_string(),
+            namespace: "default".to_string(),
+            name: "web-0".to_string(),
+            message: "Permission denied: pods \"web-0\" is forbidden".to_string(),
+        };
+        let res = apply_workload_action_event(
+            Some("prod-ctx"),
+            &mut modal,
+            &mut toast,
+            targets.as_targets(),
+            &failed_event,
+        )
+        .expect("should handle delete failure");
+
+        assert!(modal.is_open());
+        match &modal.dialog {
+            WorkloadActionDialogState::Confirm(confirm) => {
+                assert!(!confirm.submitting);
+                assert_eq!(
+                    confirm.error.as_deref(),
+                    Some("Permission denied: pods \"web-0\" is forbidden")
+                );
+                assert!(confirm.can_submit());
+            }
+            other => panic!("expected Confirm modal, got {other:?}"),
+        }
+        assert_eq!(res.1, ActionToastKind::Error);
+        assert!(res.2.is_empty());
     }
 }

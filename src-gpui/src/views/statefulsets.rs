@@ -185,6 +185,7 @@ pub fn build_statefulset_context_menu_entries(
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
     on_scale: impl 'static + Fn(&mut Window, &mut App),
     on_restart: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -232,7 +233,7 @@ pub fn build_statefulset_context_menu_entries(
             ContextMenuItem::new("delete-statefulset", "Delete StatefulSet")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -629,6 +630,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "SuccessfulCreate".to_string(),
@@ -645,6 +647,7 @@ mod tests {
             },
             EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Started".to_string(),
@@ -661,6 +664,7 @@ mod tests {
             },
             EventInfo {
                 uid: "3".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Warning".to_string(),
                 reason: "Failed".to_string(),
@@ -677,6 +681,7 @@ mod tests {
             },
             EventInfo {
                 uid: "4".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Scaling".to_string(),
@@ -710,6 +715,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let ids: Vec<&str> = entries
             .iter()
@@ -731,5 +737,15 @@ mod tests {
                 "delete-statefulset",
             ]
         );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-statefulset" => Some(item),
+                _ => None,
+            })
+            .expect("delete-statefulset item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

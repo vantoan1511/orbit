@@ -436,6 +436,7 @@ pub fn build_service_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -472,7 +473,7 @@ pub fn build_service_context_menu_entries(
             ContextMenuItem::new("delete-service", "Delete Service")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -992,6 +993,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let ids: Vec<&str> = entries
             .iter()
@@ -1011,6 +1013,16 @@ mod tests {
                 "delete-service",
             ]
         );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-service" => Some(item),
+                _ => None,
+            })
+            .expect("delete-service item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 
     #[test]
@@ -1019,6 +1031,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "e1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "UpdatedLoadBalancer".to_string(),
                 object_kind: "Service".to_string(),
@@ -1035,6 +1048,7 @@ mod tests {
             },
             EventInfo {
                 uid: "e2".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),
                 object_kind: "Pod".to_string(),

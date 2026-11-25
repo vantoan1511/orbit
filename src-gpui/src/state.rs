@@ -209,6 +209,12 @@ pub enum ClusterBridgeCommand {
         namespace: String,
         name: String,
     },
+    DeleteResource {
+        cluster_id: String,
+        namespace: Option<String>,
+        kind: String,
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -217,6 +223,7 @@ pub enum WorkloadActionKind {
     Restart,
     RestartPod,
     TriggerCronJob,
+    Delete,
 }
 
 #[derive(Debug, Clone)]
@@ -5127,6 +5134,7 @@ mod tests {
     fn sample_event(uid: &str, event_type: &str, reason: &str, namespace: &str) -> EventInfo {
         EventInfo {
             uid: uid.to_string(),
+            name: String::new(),
             time: "2m".to_string(),
             r#type: event_type.to_string(),
             reason: reason.to_string(),

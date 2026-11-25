@@ -391,6 +391,7 @@ pub fn build_node_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -419,7 +420,7 @@ pub fn build_node_context_menu_entries(
             ContextMenuItem::new("delete-node", "Delete Node")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -1204,6 +1205,7 @@ mod tests {
         let events = vec![
             orbit_core::kubernetes::models::EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "NodeReady".to_string(),
@@ -1220,6 +1222,7 @@ mod tests {
             },
             orbit_core::kubernetes::models::EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),
@@ -1236,6 +1239,7 @@ mod tests {
             },
             orbit_core::kubernetes::models::EventInfo {
                 uid: "3".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),
@@ -1256,5 +1260,43 @@ mod tests {
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0].uid, "1");
         assert_eq!(filtered[1].uid, "2");
+    }
+
+    #[test]
+    fn test_build_node_context_menu_entries_enables_delete() {
+        let node = make_node(
+            "worker-1",
+            "Ready",
+            "worker",
+            "v1.30.0",
+            false,
+            10.0,
+            "1",
+            "8",
+            20.0,
+            "4",
+            "16",
+            5,
+            110,
+            "5d",
+        );
+        let entries = build_node_context_menu_entries(
+            &node,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-node" => Some(item),
+                _ => None,
+            })
+            .expect("delete-node item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

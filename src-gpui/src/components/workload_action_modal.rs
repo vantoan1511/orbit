@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, FontWeight, MouseButton, SharedString, Window, div, prelude::*, px};
+use gpui::{
+    AnyElement, App, FontWeight, MouseButton, Rgba, SharedString, Window, div, prelude::*, px,
+};
 use lucide_icons::Icon;
 
 use crate::icons::render_icon;
@@ -162,6 +164,64 @@ pub struct ConfirmModalState {
 impl ConfirmModalState {
     pub fn can_submit(&self) -> bool {
         !self.submitting
+    }
+
+    pub fn is_danger(&self) -> bool {
+        matches!(
+            self.action,
+            WorkloadActionKind::Delete | WorkloadActionKind::RestartPod
+        )
+    }
+
+    pub fn header_icon(&self) -> Icon {
+        match self.action {
+            WorkloadActionKind::Delete => Icon::Trash2,
+            _ => Icon::RotateCw,
+        }
+    }
+
+    pub fn title(&self) -> String {
+        match self.action {
+            WorkloadActionKind::Delete => format!("Delete {}", self.kind),
+            WorkloadActionKind::RestartPod => "Restart Pod".to_string(),
+            _ => format!("Restart {}", self.kind),
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self.action {
+            WorkloadActionKind::Delete if self.namespace.trim().is_empty() => {
+                "Permanently deletes this cluster-scoped resource. This action is destructive and cannot be undone."
+            }
+            WorkloadActionKind::Delete => {
+                "Permanently deletes this resource from the cluster. This action is destructive and cannot be undone."
+            }
+            WorkloadActionKind::RestartPod => {
+                "Deleting this pod allows its managing controller to recreate a fresh replacement pod."
+            }
+            _ => {
+                "Triggers a rolling restart by patching the pod template's kubectl.kubernetes.io/restartedAt annotation."
+            }
+        }
+    }
+
+    pub fn submit_label(&self) -> String {
+        if self.submitting {
+            match self.action {
+                WorkloadActionKind::Delete => "Deleting...".to_string(),
+                _ => "Restarting...".to_string(),
+            }
+        } else {
+            match self.action {
+                WorkloadActionKind::Delete => format!("Delete {}", self.kind),
+                WorkloadActionKind::RestartPod => "Delete & Restart Pod".to_string(),
+                _ => "Trigger Restart".to_string(),
+            }
+        }
+    }
+
+    pub fn formatted_target(&self) -> String {
+        format_modal_target(&self.namespace, &self.name)
     }
 
     pub fn handle_key_input(&mut self, key: &str) -> WorkloadActionModalKeyResult {
@@ -365,6 +425,7 @@ fn render_scale_modal_card(
         })
         .child(render_modal_header(
             Icon::SlidersHorizontal,
+            theme.accent.accent,
             format!("Scale {}", scale.kind),
             theme,
             on_close_btn,
@@ -517,24 +578,15 @@ fn render_confirm_modal_card(
     let on_close_btn = callbacks.on_close.clone();
     let on_cancel_btn = callbacks.on_close.clone();
     let on_submit_btn = callbacks.on_submit.clone();
-    let is_pod_restart = confirm.action == WorkloadActionKind::RestartPod;
-    let title = if is_pod_restart {
-        "Restart Pod".to_string()
+    let is_danger = confirm.is_danger();
+    let header_icon_color = if confirm.action == WorkloadActionKind::Delete {
+        theme.semantic.danger.solid
     } else {
-        format!("Restart {}", confirm.kind)
+        theme.accent.accent
     };
-    let description = if is_pod_restart {
-        "Deleting this pod allows its managing controller to recreate a fresh replacement pod."
-    } else {
-        "Triggers a rolling restart by patching the pod template's kubectl.kubernetes.io/restartedAt annotation."
-    };
-    let submit_label = if confirm.submitting {
-        "Restarting..."
-    } else if is_pod_restart {
-        "Delete & Restart Pod"
-    } else {
-        "Trigger Restart"
-    };
+    let title = confirm.title();
+    let description = confirm.description();
+    let submit_label = confirm.submit_label();
 
     theme
         .style_card(div())
@@ -552,7 +604,8 @@ fn render_confirm_modal_card(
             cx.stop_propagation();
         })
         .child(render_modal_header(
-            Icon::RotateCw,
+            confirm.header_icon(),
+            header_icon_color,
             title,
             theme,
             on_close_btn,
@@ -582,10 +635,10 @@ fn render_confirm_modal_card(
                 }),
         )
         .child(render_modal_footer(
-            submit_label,
+            &submit_label,
             confirm.can_submit(),
             confirm.submitting,
-            is_pod_restart,
+            is_danger,
             theme,
             on_cancel_btn,
             on_submit_btn,
@@ -595,6 +648,7 @@ fn render_confirm_modal_card(
 
 fn render_modal_header(
     icon: Icon,
+    icon_color: Rgba,
     title: impl Into<SharedString>,
     theme: &OrbitTheme,
     on_close: ModalActionCallback,
@@ -612,7 +666,7 @@ fn render_modal_header(
                 .flex()
                 .items_center()
                 .gap_2()
-                .child(render_icon(icon, px(15.0), theme.accent.accent))
+                .child(render_icon(icon, px(15.0), icon_color))
                 .child(
                     div()
                         .text_sm()
@@ -642,6 +696,15 @@ fn render_modal_header(
         .into_any_element()
 }
 
+fn format_modal_target(namespace: &str, name: &str) -> String {
+    let trimmed_ns = namespace.trim();
+    if trimmed_ns.is_empty() {
+        name.to_string()
+    } else {
+        format!("{trimmed_ns}/{name}")
+    }
+}
+
 fn render_target_summary(
     cluster_name: &str,
     kind: &str,
@@ -649,6 +712,18 @@ fn render_target_summary(
     name: &str,
     theme: &OrbitTheme,
 ) -> AnyElement {
+    let trimmed_ns = namespace.trim();
+    let scope_row_label = if trimmed_ns.is_empty() {
+        "Scope"
+    } else {
+        "Namespace"
+    };
+    let scope_row_value = if trimmed_ns.is_empty() {
+        "Cluster-scoped".to_string()
+    } else {
+        trimmed_ns.to_string()
+    };
+
     div()
         .px_3()
         .py_2p5()
@@ -677,6 +752,20 @@ fn render_target_summary(
                 .items_center()
                 .justify_between()
                 .text_xs()
+                .child(div().text_color(theme.text.muted).child(scope_row_label))
+                .child(
+                    div()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.text.primary)
+                        .child(scope_row_value),
+                ),
+        )
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .justify_between()
+                .text_xs()
                 .child(div().text_color(theme.text.muted).child(kind.to_string()))
                 .child(
                     div()
@@ -684,7 +773,7 @@ fn render_target_summary(
                         .text_xs()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(theme.text.primary)
-                        .child(format!("{namespace}/{name}")),
+                        .child(format_modal_target(namespace, name)),
                 ),
         )
         .into_any_element()
@@ -921,5 +1010,81 @@ mod tests {
             confirm.handle_key_input("escape"),
             WorkloadActionModalKeyResult::Handled
         );
+    }
+
+    #[test]
+    fn test_delete_confirm_modal_state_lifecycle_and_keys() {
+        let mut modal = WorkloadActionModalState::default();
+        modal.open_confirm("prod-ctx", WorkloadActionKind::Delete, "Deployment", "prod", "api");
+        let WorkloadActionDialogState::Confirm(ref confirm) = modal.dialog else {
+            panic!("expected Confirm dialog");
+        };
+        assert!(confirm.can_submit());
+        assert_eq!(confirm.formatted_target(), "prod/api");
+
+        assert_eq!(
+            modal.handle_key_input("enter", None),
+            WorkloadActionModalKeyResult::Submit
+        );
+        modal.set_submitting(true);
+        assert_eq!(
+            modal.handle_key_input("escape", None),
+            WorkloadActionModalKeyResult::Handled
+        );
+
+        modal.set_error("Permission denied");
+        let WorkloadActionDialogState::Confirm(ref confirm) = modal.dialog else {
+            panic!("expected Confirm dialog");
+        };
+        assert!(!confirm.submitting);
+        assert_eq!(confirm.error.as_deref(), Some("Permission denied"));
+        assert!(confirm.can_submit());
+        assert_eq!(
+            modal.handle_key_input("escape", None),
+            WorkloadActionModalKeyResult::Cancel
+        );
+
+        modal.open_confirm("prod-ctx", WorkloadActionKind::Delete, "Node", "", "worker-1");
+        let WorkloadActionDialogState::Confirm(ref node_confirm) = modal.dialog else {
+            panic!("expected Confirm dialog for Node");
+        };
+        assert!(node_confirm.can_submit());
+        assert_eq!(node_confirm.formatted_target(), "worker-1");
+    }
+
+    #[test]
+    fn test_confirm_modal_copy_and_target_format_for_delete() {
+        let namespaced = ConfirmModalState {
+            cluster_name: "prod-ctx".to_string(),
+            action: WorkloadActionKind::Delete,
+            kind: "Deployment".to_string(),
+            namespace: "prod".to_string(),
+            name: "api".to_string(),
+            submitting: false,
+            error: None,
+        };
+        assert_eq!(namespaced.title(), "Delete Deployment");
+        assert!(namespaced.is_danger());
+        assert_eq!(namespaced.submit_label(), "Delete Deployment");
+        assert_eq!(namespaced.formatted_target(), "prod/api");
+        assert!(namespaced.description().contains("cannot be undone"));
+
+        let mut cluster_scoped = ConfirmModalState {
+            cluster_name: "prod-ctx".to_string(),
+            action: WorkloadActionKind::Delete,
+            kind: "Node".to_string(),
+            namespace: "".to_string(),
+            name: "worker-1".to_string(),
+            submitting: false,
+            error: None,
+        };
+        assert_eq!(cluster_scoped.title(), "Delete Node");
+        assert!(cluster_scoped.is_danger());
+        assert_eq!(cluster_scoped.submit_label(), "Delete Node");
+        assert_eq!(cluster_scoped.formatted_target(), "worker-1");
+        assert!(cluster_scoped.description().contains("cluster-scoped"));
+
+        cluster_scoped.submitting = true;
+        assert_eq!(cluster_scoped.submit_label(), "Deleting...");
     }
 }

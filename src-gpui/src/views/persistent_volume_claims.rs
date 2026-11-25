@@ -273,6 +273,7 @@ pub fn build_persistent_volume_claim_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -312,7 +313,7 @@ pub fn build_persistent_volume_claim_context_menu_entries(
             )
             .icon(Icon::Trash2)
             .danger(true)
-            .disabled(true),
+            .on_select(on_delete),
         ),
     ]
 }
@@ -811,6 +812,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert_eq!(entries.len(), 8);
 
@@ -838,7 +840,8 @@ mod tests {
         match &entries[7] {
             ContextMenuEntry::Item(item) => {
                 assert!(item.danger);
-                assert!(item.disabled);
+                assert!(!item.disabled);
+                assert!(item.on_select.is_some());
             }
             ContextMenuEntry::Separator => panic!("Expected Delete item at index 7"),
         }
@@ -859,6 +862,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "ev-1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "ProvisioningSucceeded".to_string(),
                 message: "Successfully provisioned volume".to_string(),
@@ -875,6 +879,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-2".to_string(),
+                name: String::new(),
                 r#type: "Warning".to_string(),
                 reason: "ProvisioningFailed".to_string(),
                 message: "Same name in other namespace".to_string(),
@@ -891,6 +896,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-3".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Attached".to_string(),
                 message: "Pod mounted claim data-pg-0".to_string(),
