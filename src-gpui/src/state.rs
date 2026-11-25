@@ -186,6 +186,37 @@ pub enum ClusterBridgeCommand {
     },
     ResetAppearanceDefaults,
     AddCluster(AddClusterRequest),
+    ScaleWorkload {
+        cluster_id: String,
+        namespace: String,
+        kind: String,
+        name: String,
+        replicas: i32,
+    },
+    RestartWorkload {
+        cluster_id: String,
+        namespace: String,
+        kind: String,
+        name: String,
+    },
+    RestartPod {
+        cluster_id: String,
+        namespace: String,
+        name: String,
+    },
+    TriggerCronJob {
+        cluster_id: String,
+        namespace: String,
+        name: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkloadActionKind {
+    Scale,
+    Restart,
+    RestartPod,
+    TriggerCronJob,
 }
 
 #[derive(Debug, Clone)]
@@ -499,6 +530,22 @@ pub enum ClusterBridgeEvent {
         profile: Option<UserProfileInfo>,
     },
     AddClusterFailed {
+        message: String,
+    },
+    WorkloadActionSucceeded {
+        cluster_id: String,
+        action: WorkloadActionKind,
+        kind: String,
+        namespace: String,
+        name: String,
+        message: String,
+    },
+    WorkloadActionFailed {
+        cluster_id: String,
+        action: WorkloadActionKind,
+        kind: String,
+        namespace: String,
+        name: String,
         message: String,
     },
 }
@@ -3472,7 +3519,9 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::EventsLoaded { .. }
             | ClusterBridgeEvent::EventsLoadFailed { .. }
             | ClusterBridgeEvent::ResourceYamlLoaded { .. }
-            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. } => {}
+            | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
+            | ClusterBridgeEvent::WorkloadActionSucceeded { .. }
+            | ClusterBridgeEvent::WorkloadActionFailed { .. } => {}
             ClusterBridgeEvent::ClusterAdded {
                 clusters,
                 switch_outcome,
@@ -3493,14 +3542,12 @@ impl ClusterSwitcherState {
                             k8s_version: outcome.k8s_version,
                         };
                     } else {
-                        let server_url = profile
-                            .and_then(|p| p.server_url)
-                            .or_else(|| {
-                                self.clusters
-                                    .iter()
-                                    .find(|c| c.id == outcome.context_name)
-                                    .and_then(|c| c.server_url.clone())
-                            });
+                        let server_url = profile.and_then(|p| p.server_url).or_else(|| {
+                            self.clusters
+                                .iter()
+                                .find(|c| c.id == outcome.context_name)
+                                .and_then(|c| c.server_url.clone())
+                        });
                         self.connection_state = ClusterConnectionState::Unreachable {
                             cluster_id: outcome.context_name,
                             display_name,
@@ -4199,7 +4246,11 @@ mod tests {
         let mut state = ClusterSwitcherState::new();
         assert_eq!(state.begin_disconnect(), None);
 
-        let clusters = vec![sample_cluster("ctx-1", Some("Prod"), Some("https://10.0.0.1"))];
+        let clusters = vec![sample_cluster(
+            "ctx-1",
+            Some("Prod"),
+            Some("https://10.0.0.1"),
+        )];
         let profile = sample_profile("ctx-1", Some("https://10.0.0.1"));
         state.apply_event(ClusterBridgeEvent::ClusterConnected {
             outcome: ClusterSwitchOutcome {
@@ -4264,7 +4315,11 @@ mod tests {
     #[test]
     fn test_cluster_switcher_applies_cluster_disconnected_and_allows_reconnect() {
         let mut state = ClusterSwitcherState::new();
-        let clusters = vec![sample_cluster("ctx-1", Some("Prod"), Some("https://10.0.0.1"))];
+        let clusters = vec![sample_cluster(
+            "ctx-1",
+            Some("Prod"),
+            Some("https://10.0.0.1"),
+        )];
         let profile = sample_profile("ctx-1", Some("https://10.0.0.1"));
 
         state.apply_event(ClusterBridgeEvent::ClusterConnected {

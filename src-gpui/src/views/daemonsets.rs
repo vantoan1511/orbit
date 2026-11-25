@@ -218,6 +218,7 @@ pub fn build_daemonset_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_restart: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -248,6 +249,12 @@ pub fn build_daemonset_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("restart", "Restart")
+                .icon(Icon::RotateCw)
+                .on_select(on_restart),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -923,10 +930,12 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
-        assert_eq!(entries.len(), 8);
+        assert_eq!(entries.len(), 10);
         assert!(matches!(entries[3], ContextMenuEntry::Separator));
         assert!(matches!(entries[6], ContextMenuEntry::Separator));
+        assert!(matches!(entries[8], ContextMenuEntry::Separator));
 
         let item_meta: Vec<(&str, &str, bool, bool)> = entries
             .iter()
@@ -949,6 +958,7 @@ mod tests {
                 ("refresh", "Refresh", false, false),
                 ("view-details", "View Details", false, false),
                 ("view-yaml", "View YAML", false, false),
+                ("restart", "Restart", false, false),
                 ("delete-daemonset", "Delete DaemonSet", true, true),
             ]
         );

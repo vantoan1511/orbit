@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use orbit_core::kubernetes::batch::{fetch_cronjobs, fetch_jobs};
+use orbit_core::kubernetes::batch::{execute_trigger_cronjob, fetch_cronjobs, fetch_jobs};
 use orbit_core::kubernetes::configmaps::fetch_configmaps;
 use orbit_core::kubernetes::events::fetch_events;
 use orbit_core::kubernetes::hpa::fetch_hpas;
@@ -18,12 +18,13 @@ use orbit_core::kubernetes::services::fetch_services;
 use orbit_core::kubernetes::storage::{fetch_pvcs, fetch_pvs, fetch_storage_classes};
 use orbit_core::kubernetes::storage_overview::fetch_storage_overview;
 use orbit_core::kubernetes::workloads::{
-    fetch_daemonsets, fetch_deployments, fetch_pods, fetch_replicasets, fetch_statefulsets,
+    execute_restart_pod, execute_restart_resource, execute_scale_resource, fetch_daemonsets,
+    fetch_deployments, fetch_pods, fetch_replicasets, fetch_statefulsets,
 };
 use orbit_core::kubernetes::workloads_overview::fetch_workloads_overview;
 use tokio::sync::{RwLock, mpsc};
 
-use crate::state::{ClusterBridgeCommand, ClusterBridgeEvent};
+use crate::state::{ClusterBridgeCommand, ClusterBridgeEvent, WorkloadActionKind};
 
 pub struct ClusterBridge {
     pub command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
@@ -1231,6 +1232,204 @@ pub async fn handle_bridge_command_with_tracker(
                 }
             }
         }
+        ClusterBridgeCommand::ScaleWorkload {
+            cluster_id,
+            namespace,
+            kind,
+            name,
+            replicas,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    match execute_scale_resource(&client, &namespace, &kind, &name, replicas).await
+                    {
+                        Ok(()) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionSucceeded {
+                                cluster_id,
+                                action: WorkloadActionKind::Scale,
+                                kind: kind.clone(),
+                                namespace: namespace.clone(),
+                                name: name.clone(),
+                                message: format!(
+                                    "Scaled {kind} '{namespace}/{name}' to {replicas} replica(s)."
+                                ),
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                                cluster_id,
+                                action: WorkloadActionKind::Scale,
+                                kind,
+                                namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                    cluster_id: cluster_id.clone(),
+                    action: WorkloadActionKind::Scale,
+                    kind,
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::RestartWorkload {
+            cluster_id,
+            namespace,
+            kind,
+            name,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    match execute_restart_resource(&client, &namespace, &kind, &name).await {
+                        Ok(()) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionSucceeded {
+                                cluster_id,
+                                action: WorkloadActionKind::Restart,
+                                kind: kind.clone(),
+                                namespace: namespace.clone(),
+                                name: name.clone(),
+                                message: format!(
+                                    "Triggered rollout restart for {kind} '{namespace}/{name}'."
+                                ),
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                                cluster_id,
+                                action: WorkloadActionKind::Restart,
+                                kind,
+                                namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                    cluster_id: cluster_id.clone(),
+                    action: WorkloadActionKind::Restart,
+                    kind,
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::RestartPod {
+            cluster_id,
+            namespace,
+            name,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    match execute_restart_pod(&client, &namespace, &name).await {
+                        Ok(()) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionSucceeded {
+                                cluster_id,
+                                action: WorkloadActionKind::RestartPod,
+                                kind: "Pod".to_string(),
+                                namespace: namespace.clone(),
+                                name: name.clone(),
+                                message: format!("Deleted Pod '{namespace}/{name}' for restart."),
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                                cluster_id,
+                                action: WorkloadActionKind::RestartPod,
+                                kind: "Pod".to_string(),
+                                namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                    cluster_id: cluster_id.clone(),
+                    action: WorkloadActionKind::RestartPod,
+                    kind: "Pod".to_string(),
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
+        ClusterBridgeCommand::TriggerCronJob {
+            cluster_id,
+            namespace,
+            name,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+
+            if let Some(client) = client {
+                let tx = event_tx.clone();
+                tracker.spawn(async move {
+                    match execute_trigger_cronjob(&client, &namespace, &name).await {
+                        Ok(job_name) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionSucceeded {
+                                cluster_id,
+                                action: WorkloadActionKind::TriggerCronJob,
+                                kind: "CronJob".to_string(),
+                                namespace: namespace.clone(),
+                                name: name.clone(),
+                                message: format!(
+                                    "Triggered CronJob '{namespace}/{name}' as Job '{job_name}'."
+                                ),
+                            });
+                        }
+                        Err(message) => {
+                            let _ = tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                                cluster_id,
+                                action: WorkloadActionKind::TriggerCronJob,
+                                kind: "CronJob".to_string(),
+                                namespace,
+                                name,
+                                message,
+                            });
+                        }
+                    }
+                });
+            } else {
+                let _ = event_tx.send(ClusterBridgeEvent::WorkloadActionFailed {
+                    cluster_id: cluster_id.clone(),
+                    action: WorkloadActionKind::TriggerCronJob,
+                    kind: "CronJob".to_string(),
+                    namespace,
+                    name,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                });
+            }
+        }
     }
 }
 
@@ -1270,8 +1469,13 @@ pub fn start_cluster_bridge() -> ClusterBridge {
                 .await;
 
                 while let Some(cmd) = command_rx.recv().await {
-                    handle_bridge_command_with_tracker(cmd, &manager, &thread_event_tx, &mut tracker)
-                        .await;
+                    handle_bridge_command_with_tracker(
+                        cmd,
+                        &manager,
+                        &thread_event_tx,
+                        &mut tracker,
+                    )
+                    .await;
                 }
             });
         });
@@ -2394,5 +2598,188 @@ users:
         }
         let guard = manager.read().await;
         assert_eq!(guard.active_context.as_deref(), Some("dev-ctx"));
+    }
+
+    #[tokio::test]
+    async fn test_scale_workload_without_active_client_emits_action_failed() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::ScaleWorkload {
+                cluster_id: "dev-ctx".to_string(),
+                namespace: "default".to_string(),
+                kind: "Deployment".to_string(),
+                name: "web".to_string(),
+                replicas: 3,
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("WorkloadActionFailed expected");
+        match ev {
+            ClusterBridgeEvent::WorkloadActionFailed {
+                cluster_id,
+                action,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "dev-ctx");
+                assert_eq!(action, WorkloadActionKind::Scale);
+                assert_eq!(kind, "Deployment");
+                assert_eq!(namespace, "default");
+                assert_eq!(name, "web");
+                assert!(message.contains("No active Kubernetes client"));
+            }
+            other => panic!("expected WorkloadActionFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_restart_workload_without_active_client_emits_action_failed() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::RestartWorkload {
+                cluster_id: "dev-ctx".to_string(),
+                namespace: "prod".to_string(),
+                kind: "StatefulSet".to_string(),
+                name: "db".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("WorkloadActionFailed expected");
+        match ev {
+            ClusterBridgeEvent::WorkloadActionFailed {
+                cluster_id,
+                action,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "dev-ctx");
+                assert_eq!(action, WorkloadActionKind::Restart);
+                assert_eq!(kind, "StatefulSet");
+                assert_eq!(namespace, "prod");
+                assert_eq!(name, "db");
+                assert!(message.contains("No active Kubernetes client"));
+            }
+            other => panic!("expected WorkloadActionFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_restart_pod_without_active_client_emits_action_failed() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::RestartPod {
+                cluster_id: "dev-ctx".to_string(),
+                namespace: "default".to_string(),
+                name: "api-0".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("WorkloadActionFailed expected");
+        match ev {
+            ClusterBridgeEvent::WorkloadActionFailed {
+                cluster_id,
+                action,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "dev-ctx");
+                assert_eq!(action, WorkloadActionKind::RestartPod);
+                assert_eq!(kind, "Pod");
+                assert_eq!(namespace, "default");
+                assert_eq!(name, "api-0");
+                assert!(message.contains("No active Kubernetes client"));
+            }
+            other => panic!("expected WorkloadActionFailed, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_trigger_cronjob_without_active_client_emits_action_failed() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::TriggerCronJob {
+                cluster_id: "dev-ctx".to_string(),
+                namespace: "batch".to_string(),
+                name: "nightly".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = event_rx
+            .recv()
+            .await
+            .expect("WorkloadActionFailed expected");
+        match ev {
+            ClusterBridgeEvent::WorkloadActionFailed {
+                cluster_id,
+                action,
+                kind,
+                namespace,
+                name,
+                message,
+            } => {
+                assert_eq!(cluster_id, "dev-ctx");
+                assert_eq!(action, WorkloadActionKind::TriggerCronJob);
+                assert_eq!(kind, "CronJob");
+                assert_eq!(namespace, "batch");
+                assert_eq!(name, "nightly");
+                assert!(message.contains("No active Kubernetes client"));
+            }
+            other => panic!("expected WorkloadActionFailed, got {other:?}"),
+        }
     }
 }

@@ -175,6 +175,7 @@ fn render_statefulset_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_statefulset_context_menu_entries(
     statefulset: &StatefulSetInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -182,6 +183,8 @@ pub fn build_statefulset_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_scale: impl 'static + Fn(&mut Window, &mut App),
+    on_restart: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -212,6 +215,17 @@ pub fn build_statefulset_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("scale", "Scale...")
+                .icon(Icon::SlidersHorizontal)
+                .on_select(on_scale),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("restart", "Restart")
+                .icon(Icon::RotateCw)
+                .on_select(on_restart),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -682,5 +696,40 @@ mod tests {
         let matched = filter_events_for_statefulset(&events, &ss);
         let uids: Vec<&str> = matched.iter().map(|e| e.uid.as_str()).collect();
         assert_eq!(uids, vec!["1", "2", "4"]);
+    }
+
+    #[test]
+    fn test_build_statefulset_context_menu_entries_structure() {
+        let ss = make_statefulset("db", "prod", "Running", 3, 3, "postgres:16", "1d");
+        let entries = build_statefulset_context_menu_entries(
+            &ss,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let ids: Vec<&str> = entries
+            .iter()
+            .filter_map(|e| match e {
+                ContextMenuEntry::Item(item) => Some(item.id.as_ref()),
+                ContextMenuEntry::Separator => None,
+            })
+            .collect();
+        assert_eq!(
+            ids,
+            vec![
+                "copy-name",
+                "filter-namespace",
+                "refresh",
+                "view-details",
+                "view-yaml",
+                "scale",
+                "restart",
+                "delete-statefulset",
+            ]
+        );
     }
 }

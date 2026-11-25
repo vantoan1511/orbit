@@ -212,6 +212,7 @@ fn render_deployment_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_deployment_context_menu_entries(
     deployment: &DeploymentInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -219,6 +220,8 @@ pub fn build_deployment_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_scale: impl 'static + Fn(&mut Window, &mut App),
+    on_restart: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -252,6 +255,17 @@ pub fn build_deployment_context_menu_entries(
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
+            ContextMenuItem::new("scale", "Scale...")
+                .icon(Icon::SlidersHorizontal)
+                .on_select(on_scale),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("restart", "Restart")
+                .icon(Icon::RotateCw)
+                .on_select(on_restart),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
             ContextMenuItem::new("delete-deployment", "Delete Deployment")
                 .icon(Icon::Trash2)
                 .danger(true)
@@ -269,7 +283,7 @@ pub fn render_deployments_view(
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_context_menu: impl 'static
-        + Fn(SharedString, &DeploymentInfo, &MouseDownEvent, &mut Window, &mut App),
+    + Fn(SharedString, &DeploymentInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = deployment_columns();
@@ -409,7 +423,10 @@ pub fn render_deployment_drawer_overview(
             ("Status", deployment.status.clone(), false),
             (
                 "Ready Replicas",
-                format!("{}/{}", deployment.replicas.current, deployment.replicas.desired),
+                format!(
+                    "{}/{}",
+                    deployment.replicas.current, deployment.replicas.desired
+                ),
                 true,
             ),
             ("Available", deployment.available.to_string(), true),
@@ -525,55 +542,59 @@ pub fn render_deployment_drawer_overview(
         ))
     };
 
-    let conditions_section = deployment.conditions.as_ref().filter(|c| !c.is_empty()).map(|conds| {
-        crate::views::render_drawer_section(
-            "CONDITIONS",
-            div()
-                .w_full()
-                .flex()
-                .flex_col()
-                .gap_2()
-                .children(conds.iter().map(|cond| {
-                    div()
-                        .w_full()
-                        .p_2p5()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.surface.bg_panel)
-                        .border_1()
-                        .border_color(theme.border.default)
-                        .flex()
-                        .flex_col()
-                        .gap_1()
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .gap_2()
-                                .child(
-                                    apply_text_step(div(), theme.typography.size_xs)
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(theme.text.primary)
-                                        .child(cond.type_.clone()),
-                                )
-                                .child(
-                                    apply_text_step(div(), theme.typography.size_2xs)
-                                        .text_color(theme.text.secondary)
-                                        .child(cond.status.clone()),
-                                ),
-                        )
-                        .when_some(cond.message.as_ref(), |el, msg| {
-                            el.child(
-                                apply_text_step(div(), theme.typography.size_2xs)
-                                    .text_color(theme.text.muted)
-                                    .child(msg.clone()),
+    let conditions_section = deployment
+        .conditions
+        .as_ref()
+        .filter(|c| !c.is_empty())
+        .map(|conds| {
+            crate::views::render_drawer_section(
+                "CONDITIONS",
+                div()
+                    .w_full()
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .children(conds.iter().map(|cond| {
+                        div()
+                            .w_full()
+                            .p_2p5()
+                            .rounded(theme.style.radius_control)
+                            .bg(theme.surface.bg_panel)
+                            .border_1()
+                            .border_color(theme.border.default)
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .justify_between()
+                                    .gap_2()
+                                    .child(
+                                        apply_text_step(div(), theme.typography.size_xs)
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .text_color(theme.text.primary)
+                                            .child(cond.type_.clone()),
+                                    )
+                                    .child(
+                                        apply_text_step(div(), theme.typography.size_2xs)
+                                            .text_color(theme.text.secondary)
+                                            .child(cond.status.clone()),
+                                    ),
                             )
-                        })
-                }))
-                .into_any_element(),
-            theme,
-        )
-    });
+                            .when_some(cond.message.as_ref(), |el, msg| {
+                                el.child(
+                                    apply_text_step(div(), theme.typography.size_2xs)
+                                        .text_color(theme.text.muted)
+                                        .child(msg.clone()),
+                                )
+                            })
+                    }))
+                    .into_any_element(),
+                theme,
+            )
+        });
 
     div()
         .id("deployment-drawer-overview")
@@ -584,7 +605,9 @@ pub fn render_deployment_drawer_overview(
         .flex()
         .flex_col()
         .gap_4()
-        .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
+        .child(crate::views::render_drawer_section(
+            "SUMMARY", summary, theme,
+        ))
         .child(containers_section)
         .when_some(ports_section, |el, sec| el.child(sec))
         .when_some(conditions_section, |el, sec| el.child(sec))
@@ -955,5 +978,51 @@ mod tests {
         assert_eq!(filtered.len(), 2);
         assert_eq!(filtered[0].uid, "1");
         assert_eq!(filtered[1].uid, "2");
+    }
+
+    #[test]
+    fn test_build_deployment_context_menu_entries_structure() {
+        let dep = make_deployment(
+            "web",
+            "prod",
+            "Running",
+            3,
+            3,
+            3,
+            3,
+            Some("RollingUpdate"),
+            vec!["nginx:1.25"],
+            "1d",
+        );
+        let entries = build_deployment_context_menu_entries(
+            &dep,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let ids: Vec<&str> = entries
+            .iter()
+            .filter_map(|e| match e {
+                ContextMenuEntry::Item(item) => Some(item.id.as_ref()),
+                ContextMenuEntry::Separator => None,
+            })
+            .collect();
+        assert_eq!(
+            ids,
+            vec![
+                "copy-name",
+                "filter-namespace",
+                "refresh",
+                "view-details",
+                "view-yaml",
+                "scale",
+                "restart",
+                "delete-deployment",
+            ]
+        );
     }
 }

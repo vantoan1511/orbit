@@ -1,112 +1,19 @@
-use kube::{
-    api::{Api, ListParams, Patch, PatchParams, DeleteParams, PostParams},
-    Client,
-};
-use k8s_openapi::api::core::v1::Pod;
-use k8s_openapi::api::apps::v1::{Deployment, StatefulSet, DaemonSet, ReplicaSet};
-use k8s_openapi::api::batch::v1::{CronJob, Job};
 use crate::kubernetes::models;
-
-pub use orbit_core::kubernetes::workloads::{
-    list_daemonsets, list_deployments, list_pods, list_replicasets, list_statefulsets,
-    map_daemonset, map_deployment, map_pod, map_replicaset, map_statefulset,
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
+use k8s_openapi::api::batch::v1::CronJob;
+use kube::{
+    Client,
+    api::{Api, ListParams, Patch, PatchParams, PostParams},
 };
 
-pub async fn scale_resource(
-    client: &Client,
-    namespace: &str,
-    kind: &str,
-    name: &str,
-    replicas: i32,
-) -> Result<(), kube::Error> {
-    tracing::info!(kind = %kind, namespace = %namespace, name = %name, replicas = replicas, "Sending request to Kubernetes: scale resource");
-    let patch = serde_json::json!({
-        "spec": {
-            "replicas": replicas
-        }
-    });
-    let patch_params = PatchParams::default();
-
-    match kind {
-        "Deployment" => {
-            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-        }
-        "StatefulSet" => {
-            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-        }
-        "ReplicaSet" => {
-            let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-        }
-        _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
-            status: "Failure".to_string(),
-            message: format!("Unsupported scale resource kind: {}", kind),
-            reason: "BadRequest".to_string(),
-            code: 400,
-        })),
-    }
-    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Kubernetes request completed: scale resource");
-    Ok(())
-}
-
-pub async fn redeploy_resource(
-    client: &Client,
-    namespace: &str,
-    kind: &str,
-    name: &str,
-) -> Result<(), kube::Error> {
-    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Sending request to Kubernetes: redeploy/restart resource");
-    let now = chrono::Utc::now().to_rfc3339();
-    let patch = serde_json::json!({
-        "spec": {
-            "template": {
-                "metadata": {
-                    "annotations": {
-                        "kubectl.kubernetes.io/restartedAt": now
-                    }
-                }
-            }
-        }
-    });
-    let patch_params = PatchParams::default();
-
-    match kind {
-        "Deployment" => {
-            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-        }
-        "StatefulSet" => {
-            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-        }
-        "DaemonSet" => {
-            let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
-        }
-        _ => return Err(kube::Error::Api(kube::error::ErrorResponse {
-            status: "Failure".to_string(),
-            message: format!("Unsupported redeploy resource kind: {}", kind),
-            reason: "BadRequest".to_string(),
-            code: 400,
-        })),
-    }
-    tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Kubernetes request completed: redeploy resource");
-    Ok(())
-}
-
-pub async fn delete_pod(
-    client: &Client,
-    namespace: &str,
-    name: &str,
-) -> Result<(), kube::Error> {
-    tracing::info!(namespace = %namespace, name = %name, "Sending request to Kubernetes: delete pod");
-    let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
-    api.delete(name, &DeleteParams::default()).await?;
-    tracing::info!(namespace = %namespace, name = %name, "Kubernetes request completed: delete pod");
-    Ok(())
-}
+pub use orbit_core::kubernetes::batch::{
+    CRONJOB_INSTANTIATE_ANNOTATION, build_job_from_cronjob, format_manual_job_name, trigger_cronjob,
+};
+pub use orbit_core::kubernetes::workloads::{
+    delete_pod, list_daemonsets, list_deployments, list_pods, list_replicasets, list_statefulsets,
+    map_daemonset, map_deployment, map_pod, map_replicaset, map_statefulset, redeploy_resource,
+    scale_resource,
+};
 
 pub async fn update_images_resource(
     client: &Client,
@@ -140,19 +47,23 @@ pub async fn update_images_resource(
     match kind {
         "Deployment" => {
             let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+            api.patch(name, &patch_params, &Patch::Strategic(&patch))
+                .await?;
         }
         "StatefulSet" => {
             let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+            api.patch(name, &patch_params, &Patch::Strategic(&patch))
+                .await?;
         }
         "DaemonSet" => {
             let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+            api.patch(name, &patch_params, &Patch::Strategic(&patch))
+                .await?;
         }
         "ReplicaSet" => {
             let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
-            api.patch(name, &patch_params, &Patch::Strategic(&patch)).await?;
+            api.patch(name, &patch_params, &Patch::Strategic(&patch))
+                .await?;
         }
         _ => {
             return Err(kube::Error::Api(kube::error::ErrorResponse {
@@ -160,7 +71,7 @@ pub async fn update_images_resource(
                 message: format!("Unsupported update images resource kind: {}", kind),
                 reason: "BadRequest".to_string(),
                 code: 400,
-            }))
+            }));
         }
     }
     tracing::info!(kind = %kind, namespace = %namespace, name = %name, "Kubernetes request completed: update container images");
@@ -210,7 +121,12 @@ pub async fn clone_deployment(
             }
         }
 
-        if let Some(template_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
+        if let Some(template_labels) = spec
+            .template
+            .metadata
+            .as_mut()
+            .and_then(|m| m.labels.as_mut())
+        {
             for val in template_labels.values_mut() {
                 if val == source_name {
                     *val = new_name.to_string();
@@ -241,7 +157,8 @@ pub fn find_rollback_replicaset<'a>(
             rs.metadata.owner_references.as_ref().is_some_and(|owners| {
                 owners.iter().any(|owner| {
                     owner.kind == "Deployment"
-                        && (owner.name == deploy_name || (!deploy_uid.is_empty() && owner.uid == deploy_uid))
+                        && (owner.name == deploy_name
+                            || (!deploy_uid.is_empty() && owner.uid == deploy_uid))
                 })
             })
         })
@@ -277,7 +194,9 @@ pub fn find_rollback_replicaset<'a>(
         .and_then(|a| a.get(REVISION_ANNOTATION))
         .and_then(|r| r.parse::<i64>().ok());
 
-    if let Some((rs, _)) = current_revision.and_then(|curr| matching_rs.iter().find(|(_, rev)| *rev < curr)) {
+    if let Some((rs, _)) =
+        current_revision.and_then(|curr| matching_rs.iter().find(|(_, rev)| *rev < curr))
+    {
         return Ok(rs);
     }
 
@@ -307,14 +226,15 @@ pub async fn rollback_deployment(
     let rs_api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
     let rs_list = rs_api.list(&ListParams::default()).await?;
 
-    let target_rs = find_rollback_replicaset(&deployment, &rs_list.items, target_revision).map_err(|msg| {
-        kube::Error::Api(kube::error::ErrorResponse {
-            status: "Failure".to_string(),
-            message: msg,
-            reason: "BadRequest".to_string(),
-            code: 400,
-        })
-    })?;
+    let target_rs = find_rollback_replicaset(&deployment, &rs_list.items, target_revision)
+        .map_err(|msg| {
+            kube::Error::Api(kube::error::ErrorResponse {
+                status: "Failure".to_string(),
+                message: msg,
+                reason: "BadRequest".to_string(),
+                code: 400,
+            })
+        })?;
 
     let mut template = match target_rs.spec.as_ref().and_then(|s| s.template.clone()) {
         Some(t) => t,
@@ -324,7 +244,7 @@ pub async fn rollback_deployment(
                 message: "Target ReplicaSet has no pod template".to_string(),
                 reason: "InternalError".to_string(),
                 code: 500,
-            }))
+            }));
         }
     };
 
@@ -337,12 +257,12 @@ pub async fn rollback_deployment(
     });
 
     let patch_params = PatchParams::default();
-    deploy_api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+    deploy_api
+        .patch(name, &patch_params, &Patch::Merge(&patch))
+        .await?;
     tracing::info!(namespace = %namespace, name = %name, "Kubernetes request completed: rollback deployment");
     Ok(())
 }
-
-pub const CRONJOB_INSTANTIATE_ANNOTATION: &str = "cronjob.kubernetes.io/instantiate";
 
 pub fn build_cronjob_suspend_patch(suspend: bool) -> serde_json::Value {
     serde_json::json!({
@@ -350,113 +270,6 @@ pub fn build_cronjob_suspend_patch(suspend: bool) -> serde_json::Value {
             "suspend": suspend
         }
     })
-}
-
-pub fn format_manual_job_name(cronjob_name: &str, suffix: &str) -> String {
-    let suffix_len = suffix.len() + "-manual-".len(); // e.g. 8 for 3-char suffix or 13 for 5-char suffix
-    let max_base_len = 63usize.saturating_sub(suffix_len);
-    let mut base = cronjob_name;
-    if base.len() > max_base_len {
-        base = &base[..max_base_len];
-    }
-    let trimmed = base.trim_end_matches('-');
-    format!("{}-manual-{}", trimmed, suffix)
-}
-
-pub fn build_job_from_cronjob(
-    cronjob: &CronJob,
-    job_name: String,
-) -> Result<Job, String> {
-    let spec = cronjob
-        .spec
-        .as_ref()
-        .ok_or_else(|| "CronJob has no spec".to_string())?;
-
-    let job_template = &spec.job_template;
-    let job_spec = job_template
-        .spec
-        .clone()
-        .ok_or_else(|| "CronJob jobTemplate has no spec".to_string())?;
-
-    let mut annotations = job_template
-        .metadata
-        .as_ref()
-        .and_then(|m| m.annotations.clone())
-        .unwrap_or_default();
-    annotations.insert(CRONJOB_INSTANTIATE_ANNOTATION.to_string(), "manual".to_string());
-
-    let labels = job_template
-        .metadata
-        .as_ref()
-        .and_then(|m| m.labels.clone());
-
-    let cronjob_name = cronjob
-        .metadata
-        .name
-        .clone()
-        .unwrap_or_default();
-    let cronjob_uid = cronjob
-        .metadata
-        .uid
-        .clone()
-        .unwrap_or_default();
-
-    let owner_references = if !cronjob_name.is_empty() && !cronjob_uid.is_empty() {
-        Some(vec![k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference {
-            api_version: "batch/v1".to_string(),
-            kind: "CronJob".to_string(),
-            name: cronjob_name,
-            uid: cronjob_uid,
-            controller: Some(true),
-            block_owner_deletion: Some(true),
-        }])
-    } else {
-        None
-    };
-
-    let namespace = cronjob.metadata.namespace.clone();
-
-    Ok(Job {
-        metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
-            name: Some(job_name),
-            namespace,
-            labels,
-            annotations: Some(annotations),
-            owner_references,
-            ..Default::default()
-        },
-        spec: Some(job_spec),
-        status: None,
-    })
-}
-
-pub async fn trigger_cronjob(
-    client: &Client,
-    namespace: &str,
-    name: &str,
-) -> Result<String, kube::Error> {
-    tracing::info!(namespace = %namespace, name = %name, "Triggering CronJob manually");
-    let cj_api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
-    let cronjob = cj_api.get(name).await?;
-
-    let random_suffix = uuid::Uuid::new_v4().to_string().replace('-', "")[..5].to_lowercase();
-    let job_name = format_manual_job_name(name, &random_suffix);
-
-    let job = build_job_from_cronjob(&cronjob, job_name.clone()).map_err(|e| {
-        kube::Error::Api(kube::error::ErrorResponse {
-            status: "Failure".to_string(),
-            message: e,
-            reason: "Invalid".to_string(),
-            code: 400,
-        })
-    })?;
-
-    let job_api: Api<Job> = Api::namespaced(client.clone(), namespace);
-    let post_params = PostParams::default();
-    job_api.create(&post_params, &job).await?;
-    tracing::info!(namespace = %namespace, name = %name, job_name = %job_name, "Successfully created manual Job from CronJob");
-
-    Ok(job_name)
 }
 
 pub async fn set_cronjob_suspend(
@@ -469,7 +282,9 @@ pub async fn set_cronjob_suspend(
     let cj_api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
     let patch = build_cronjob_suspend_patch(suspend);
     let patch_params = PatchParams::default();
-    cj_api.patch(name, &patch_params, &Patch::Merge(&patch)).await?;
+    cj_api
+        .patch(name, &patch_params, &Patch::Merge(&patch))
+        .await?;
     tracing::info!(namespace = %namespace, name = %name, suspend = %suspend, "Successfully updated CronJob suspend state");
 
     Ok(())
@@ -480,7 +295,9 @@ mod tests {
     use super::*;
     use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec, ReplicaSet, ReplicaSetSpec};
     use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
-    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta, OwnerReference};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::{
+        LabelSelector, ObjectMeta, OwnerReference,
+    };
     use std::collections::BTreeMap;
 
     #[test]
@@ -539,7 +356,12 @@ mod tests {
                 }
             }
 
-            if let Some(t_labels) = spec.template.metadata.as_mut().and_then(|m| m.labels.as_mut()) {
+            if let Some(t_labels) = spec
+                .template
+                .metadata
+                .as_mut()
+                .and_then(|m| m.labels.as_mut())
+            {
                 for val in t_labels.values_mut() {
                     if val == source_name {
                         *val = new_name.to_string();
@@ -549,14 +371,39 @@ mod tests {
         }
 
         assert_eq!(dep.metadata.name.as_deref(), Some("my-service-copy"));
-        assert_eq!(dep.metadata.labels.as_ref().unwrap().get("app").unwrap(), "my-service-copy");
-        assert_eq!(dep.metadata.labels.as_ref().unwrap().get("tier").unwrap(), "backend");
         assert_eq!(
-            dep.spec.as_ref().unwrap().selector.match_labels.as_ref().unwrap().get("app").unwrap(),
+            dep.metadata.labels.as_ref().unwrap().get("app").unwrap(),
             "my-service-copy"
         );
         assert_eq!(
-            dep.spec.as_ref().unwrap().template.metadata.as_ref().unwrap().labels.as_ref().unwrap().get("app").unwrap(),
+            dep.metadata.labels.as_ref().unwrap().get("tier").unwrap(),
+            "backend"
+        );
+        assert_eq!(
+            dep.spec
+                .as_ref()
+                .unwrap()
+                .selector
+                .match_labels
+                .as_ref()
+                .unwrap()
+                .get("app")
+                .unwrap(),
+            "my-service-copy"
+        );
+        assert_eq!(
+            dep.spec
+                .as_ref()
+                .unwrap()
+                .template
+                .metadata
+                .as_ref()
+                .unwrap()
+                .labels
+                .as_ref()
+                .unwrap()
+                .get("app")
+                .unwrap(),
             "my-service-copy"
         );
     }
@@ -628,11 +475,13 @@ mod tests {
         let replicasets = vec![rs1, rs2, rs3, rs_other];
 
         // Should find revision 2 when target_revision is None
-        let target = find_rollback_replicaset(&dep, &replicasets, None).expect("Should find target RS");
+        let target =
+            find_rollback_replicaset(&dep, &replicasets, None).expect("Should find target RS");
         assert_eq!(target.metadata.name.as_deref(), Some("web-rs-2"));
 
         // Should find revision 1 when target_revision is Some(1)
-        let target_rev1 = find_rollback_replicaset(&dep, &replicasets, Some(1)).expect("Should find target RS rev 1");
+        let target_rev1 = find_rollback_replicaset(&dep, &replicasets, Some(1))
+            .expect("Should find target RS rev 1");
         assert_eq!(target_rev1.metadata.name.as_deref(), Some("web-rs-1"));
 
         // Should fail when target_revision does not exist
@@ -663,7 +512,7 @@ mod tests {
 
     #[test]
     fn test_map_deployment_conditions() {
-        use k8s_openapi::api::apps::v1::{DeploymentStatus, DeploymentCondition};
+        use k8s_openapi::api::apps::v1::{DeploymentCondition, DeploymentStatus};
 
         let dep = Deployment {
             metadata: ObjectMeta {
@@ -702,7 +551,10 @@ mod tests {
         assert_eq!(conditions.len(), 2);
         assert_eq!(conditions[0].type_, "Available");
         assert_eq!(conditions[0].status, "True");
-        assert_eq!(conditions[0].reason.as_deref(), Some("MinimumReplicasAvailable"));
+        assert_eq!(
+            conditions[0].reason.as_deref(),
+            Some("MinimumReplicasAvailable")
+        );
         assert_eq!(conditions[1].type_, "Progressing");
     }
 
@@ -828,13 +680,11 @@ mod tests {
             spec: Some(DaemonSetSpec {
                 template: PodTemplateSpec {
                     spec: Some(PodSpec {
-                        containers: vec![
-                            Container {
-                                name: "fluentd".to_string(),
-                                image: Some("fluentd:v1.16".to_string()),
-                                ..Default::default()
-                            },
-                        ],
+                        containers: vec![Container {
+                            name: "fluentd".to_string(),
+                            image: Some("fluentd:v1.16".to_string()),
+                            ..Default::default()
+                        }],
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -848,12 +698,10 @@ mod tests {
         assert_eq!(mapped.images, vec!["fluentd:v1.16"]);
         assert_eq!(
             mapped.containers,
-            vec![
-                models::ContainerImageInfo {
-                    name: "fluentd".to_string(),
-                    image: "fluentd:v1.16".to_string(),
-                },
-            ]
+            vec![models::ContainerImageInfo {
+                name: "fluentd".to_string(),
+                image: "fluentd:v1.16".to_string(),
+            },]
         );
     }
 
@@ -871,13 +719,11 @@ mod tests {
             spec: Some(ReplicaSetSpec {
                 template: Some(PodTemplateSpec {
                     spec: Some(PodSpec {
-                        containers: vec![
-                            Container {
-                                name: "web".to_string(),
-                                image: Some("nginx:1.25".to_string()),
-                                ..Default::default()
-                            },
-                        ],
+                        containers: vec![Container {
+                            name: "web".to_string(),
+                            image: Some("nginx:1.25".to_string()),
+                            ..Default::default()
+                        }],
                         ..Default::default()
                     }),
                     ..Default::default()
@@ -891,12 +737,10 @@ mod tests {
         assert_eq!(mapped.images, vec!["nginx:1.25"]);
         assert_eq!(
             mapped.containers,
-            vec![
-                models::ContainerImageInfo {
-                    name: "web".to_string(),
-                    image: "nginx:1.25".to_string(),
-                },
-            ]
+            vec![models::ContainerImageInfo {
+                name: "web".to_string(),
+                image: "nginx:1.25".to_string(),
+            },]
         );
     }
 
@@ -970,11 +814,16 @@ mod tests {
         let job = build_job_from_cronjob(&cronjob, "nightly-backup-manual-123".to_string())
             .expect("Should build job");
 
-        assert_eq!(job.metadata.name.as_deref(), Some("nightly-backup-manual-123"));
+        assert_eq!(
+            job.metadata.name.as_deref(),
+            Some("nightly-backup-manual-123")
+        );
         assert_eq!(job.metadata.namespace.as_deref(), Some("default"));
         let annotations = job.metadata.annotations.unwrap();
         assert_eq!(
-            annotations.get(CRONJOB_INSTANTIATE_ANNOTATION).map(|s| s.as_str()),
+            annotations
+                .get(CRONJOB_INSTANTIATE_ANNOTATION)
+                .map(|s| s.as_str()),
             Some("manual")
         );
         let owners = job.metadata.owner_references.unwrap();
@@ -987,4 +836,3 @@ mod tests {
         assert!(job.spec.is_some());
     }
 }
-

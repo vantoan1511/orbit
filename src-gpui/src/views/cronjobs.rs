@@ -57,11 +57,7 @@ pub fn parse_last_schedule_seconds(last_schedule: Option<&str>) -> u64 {
     let Some(raw) = last_schedule else {
         return u64::MAX;
     };
-    let trimmed = raw
-        .trim()
-        .strip_suffix("ago")
-        .unwrap_or(raw.trim())
-        .trim();
+    let trimmed = raw.trim().strip_suffix("ago").unwrap_or(raw.trim()).trim();
     if trimmed.is_empty() {
         return u64::MAX;
     }
@@ -225,6 +221,7 @@ pub fn build_cronjob_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_trigger_now: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -255,6 +252,12 @@ pub fn build_cronjob_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("trigger-now", "Trigger Now")
+                .icon(Icon::Play)
+                .on_select(on_trigger_now),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -418,7 +421,11 @@ pub fn render_cronjob_drawer_overview(cj: &CronJobInfo, theme: &OrbitTheme) -> A
                 },
                 true,
             ),
-            ("Status", cronjob_suspend_status(cj.suspend).to_string(), false),
+            (
+                "Status",
+                cronjob_suspend_status(cj.suspend).to_string(),
+                false,
+            ),
             ("Active Jobs", cj.active.to_string(), true),
             (
                 "Last Schedule",
@@ -812,13 +819,7 @@ mod tests {
                 "nightly-backup",
                 "Created job nightly-backup-28910",
             ),
-            mk_event(
-                "2",
-                "prod",
-                "Job",
-                "nightly-backup-28910",
-                "Job completed",
-            ),
+            mk_event("2", "prod", "Job", "nightly-backup-28910", "Job completed"),
             mk_event(
                 "3",
                 "prod",
@@ -849,15 +850,7 @@ mod tests {
 
     #[test]
     fn test_build_cronjob_context_menu_entries_structure() {
-        let cj = make_cronjob(
-            "nightly-backup",
-            "prod",
-            "0 2 * * *",
-            false,
-            0,
-            None,
-            "1d",
-        );
+        let cj = make_cronjob("nightly-backup", "prod", "0 2 * * *", false, 0, None, "1d");
         let entries = build_cronjob_context_menu_entries(
             &cj,
             |_, _| {},
@@ -865,11 +858,13 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
 
-        assert_eq!(entries.len(), 8);
+        assert_eq!(entries.len(), 10);
         assert!(matches!(entries[3], ContextMenuEntry::Separator));
         assert!(matches!(entries[6], ContextMenuEntry::Separator));
+        assert!(matches!(entries[8], ContextMenuEntry::Separator));
 
         let labels: Vec<&str> = entries
             .iter()
@@ -886,11 +881,12 @@ mod tests {
                 "Refresh",
                 "View Details",
                 "View YAML",
+                "Trigger Now",
                 "Delete CronJob",
             ]
         );
 
-        match &entries[7] {
+        match &entries[9] {
             ContextMenuEntry::Item(delete_item) => {
                 assert!(delete_item.danger);
                 assert!(delete_item.disabled);

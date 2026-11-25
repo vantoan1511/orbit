@@ -134,13 +134,13 @@ fn compare_pods_by_col(a: &PodInfo, b: &PodInfo, col_id: &str) -> Ordering {
             .to_ascii_lowercase()
             .cmp(&b.node.as_deref().unwrap_or("-").to_ascii_lowercase())
             .then_with(tie_break),
-        "ip" => a
-            .ip
-            .as_deref()
-            .unwrap_or("-")
-            .to_ascii_lowercase()
-            .cmp(&b.ip.as_deref().unwrap_or("-").to_ascii_lowercase())
-            .then_with(tie_break),
+        "ip" => {
+            a.ip.as_deref()
+                .unwrap_or("-")
+                .to_ascii_lowercase()
+                .cmp(&b.ip.as_deref().unwrap_or("-").to_ascii_lowercase())
+                .then_with(tie_break)
+        }
         "cpu" => a
             .cpu_cores
             .unwrap_or(-1.0)
@@ -393,7 +393,13 @@ fn render_summary_cards_row(
                                 .text_color(theme.text.muted)
                                 .child(card.title),
                         )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
+                        .child(
+                            div()
+                                .w(px(6.0))
+                                .h(px(6.0))
+                                .rounded_full()
+                                .bg(card.accent_color),
+                        ),
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_lg)
@@ -418,6 +424,7 @@ pub fn build_pod_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_restart_pod: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -451,6 +458,12 @@ pub fn build_pod_context_menu_entries(
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
+            ContextMenuItem::new("restart-pod", "Restart Pod")
+                .icon(Icon::RotateCw)
+                .on_select(on_restart_pod),
+        ),
+        ContextMenuEntry::Separator,
+        ContextMenuEntry::Item(
             ContextMenuItem::new("delete-pod", "Delete Pod")
                 .icon(Icon::Trash2)
                 .danger(true)
@@ -467,7 +480,8 @@ pub fn render_pods_view(
     on_sort: impl 'static + Fn(SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_click: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     on_row_quick_yaml: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
-    on_row_context_menu: impl 'static + Fn(SharedString, &PodInfo, &MouseDownEvent, &mut Window, &mut App),
+    on_row_context_menu: impl 'static
+    + Fn(SharedString, &PodInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = pod_columns();
@@ -582,10 +596,7 @@ pub fn render_pods_view(
         .into_any_element()
 }
 
-pub fn filter_events_for_pod<'a>(
-    events: &'a [EventInfo],
-    pod: &PodInfo,
-) -> Vec<&'a EventInfo> {
+pub fn filter_events_for_pod<'a>(events: &'a [EventInfo], pod: &PodInfo) -> Vec<&'a EventInfo> {
     events
         .iter()
         .filter(|ev| {
@@ -604,8 +615,16 @@ pub fn render_pod_drawer_overview(pod: &PodInfo, theme: &OrbitTheme) -> AnyEleme
             ("Status", pod.status.clone(), false),
             ("Ready", format_pod_ready(pod), true),
             ("Restarts", pod.restarts.to_string(), true),
-            ("Node", pod.node.clone().unwrap_or_else(|| "-".to_string()), true),
-            ("Pod IP", pod.ip.clone().unwrap_or_else(|| "-".to_string()), true),
+            (
+                "Node",
+                pod.node.clone().unwrap_or_else(|| "-".to_string()),
+                true,
+            ),
+            (
+                "Pod IP",
+                pod.ip.clone().unwrap_or_else(|| "-".to_string()),
+                true,
+            ),
             (
                 "Node IP",
                 pod.node_ip.clone().unwrap_or_else(|| "-".to_string()),
@@ -621,7 +640,11 @@ pub fn render_pod_drawer_overview(pod: &PodInfo, theme: &OrbitTheme) -> AnyEleme
                 pod.qos_class.clone().unwrap_or_else(|| "-".to_string()),
                 false,
             ),
-            ("CPU", pod.cpu.clone().unwrap_or_else(|| "-".to_string()), true),
+            (
+                "CPU",
+                pod.cpu.clone().unwrap_or_else(|| "-".to_string()),
+                true,
+            ),
             (
                 "Memory",
                 pod.memory.clone().unwrap_or_else(|| "-".to_string()),
@@ -719,7 +742,9 @@ pub fn render_pod_drawer_overview(pod: &PodInfo, theme: &OrbitTheme) -> AnyEleme
         .flex()
         .flex_col()
         .gap_4()
-        .child(crate::views::render_drawer_section("SUMMARY", summary, theme))
+        .child(crate::views::render_drawer_section(
+            "SUMMARY", summary, theme,
+        ))
         .child(containers_section)
         .child(crate::views::render_drawer_kv_badges(
             "LABELS",
@@ -847,12 +872,20 @@ mod tests {
         );
         for id in ["ready", "restarts", "cpu", "memory", "age"] {
             let col = cols.iter().find(|c| c.id == id).unwrap();
-            assert_eq!(col.align, ColumnAlign::Right, "column {id} should be right-aligned");
+            assert_eq!(
+                col.align,
+                ColumnAlign::Right,
+                "column {id} should be right-aligned"
+            );
             assert!(col.monospace, "column {id} should be monospace");
         }
         for id in ["name", "namespace", "status", "node", "ip"] {
             let col = cols.iter().find(|c| c.id == id).unwrap();
-            assert_eq!(col.align, ColumnAlign::Left, "column {id} should be left-aligned");
+            assert_eq!(
+                col.align,
+                ColumnAlign::Left,
+                "column {id} should be left-aligned"
+            );
         }
         for id in ["node", "ip"] {
             let col = cols.iter().find(|c| c.id == id).unwrap();
@@ -878,9 +911,39 @@ mod tests {
     #[test]
     fn test_filter_and_sort_pods_by_namespace_and_columns() {
         let pods = vec![
-            make_pod("web-b", "prod", "Running", 2, 2, 1, Some(0.5), Some(200.0), "2h"),
-            make_pod("api-a", "prod", "Pending", 1, 2, 4, Some(1.2), Some(500.0), "10m"),
-            make_pod("db-0", "staging", "Failed", 0, 1, 2, Some(0.1), Some(100.0), "3d"),
+            make_pod(
+                "web-b",
+                "prod",
+                "Running",
+                2,
+                2,
+                1,
+                Some(0.5),
+                Some(200.0),
+                "2h",
+            ),
+            make_pod(
+                "api-a",
+                "prod",
+                "Pending",
+                1,
+                2,
+                4,
+                Some(1.2),
+                Some(500.0),
+                "10m",
+            ),
+            make_pod(
+                "db-0",
+                "staging",
+                "Failed",
+                0,
+                1,
+                2,
+                Some(0.1),
+                Some(100.0),
+                "3d",
+            ),
         ];
 
         let mut ns_filter = NamespaceFilterState::default();
@@ -998,14 +1061,8 @@ mod tests {
     #[test]
     fn test_pods_empty_message_and_presentation_mode() {
         let mut state = PodsState::default();
-        assert_eq!(
-            pods_empty_message(&state),
-            "No pods found in this cluster."
-        );
-        assert_eq!(
-            pods_presentation_mode(&state),
-            PodsPresentationMode::Table
-        );
+        assert_eq!(pods_empty_message(&state), "No pods found in this cluster.");
+        assert_eq!(pods_presentation_mode(&state), PodsPresentationMode::Table);
 
         state.status = PodsLoadStatus::Error;
         state.error_message = Some("connection refused".to_string());
@@ -1015,24 +1072,13 @@ mod tests {
         );
 
         state.pods.push(make_pod(
-            "api-0",
-            "prod",
-            "Running",
-            1,
-            1,
-            0,
-            None,
-            None,
-            "1m",
+            "api-0", "prod", "Running", 1, 1, 0, None, None, "1m",
         ));
         assert_eq!(
             pods_empty_message(&state),
             "No pods found in the selected namespace(s)."
         );
-        assert_eq!(
-            pods_presentation_mode(&state),
-            PodsPresentationMode::Table
-        );
+        assert_eq!(pods_presentation_mode(&state), PodsPresentationMode::Table);
     }
 
     #[test]
