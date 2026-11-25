@@ -329,6 +329,7 @@ pub fn build_configmap_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -365,7 +366,7 @@ pub fn build_configmap_context_menu_entries(
             ContextMenuItem::new("delete-configmap", "Delete ConfigMap")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -978,6 +979,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let item_ids: Vec<&str> = entries
             .iter()
@@ -997,10 +999,21 @@ mod tests {
                 "delete-configmap",
             ]
         );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-configmap" => Some(item),
+                _ => None,
+            })
+            .expect("delete-configmap item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
 
         let events = vec![
             EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
                 object_kind: "ConfigMap".to_string(),
@@ -1017,6 +1030,7 @@ mod tests {
             },
             EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
                 object_kind: "ConfigMap".to_string(),

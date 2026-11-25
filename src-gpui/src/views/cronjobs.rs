@@ -214,6 +214,7 @@ fn render_cronjob_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_cronjob_context_menu_entries(
     cj: &CronJobInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -222,6 +223,7 @@ pub fn build_cronjob_context_menu_entries(
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
     on_trigger_now: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -264,7 +266,7 @@ pub fn build_cronjob_context_menu_entries(
             ContextMenuItem::new("delete-cronjob", "Delete CronJob")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -796,6 +798,7 @@ mod tests {
 
         let mk_event = |uid: &str, ns: &str, kind: &str, obj: &str, msg: &str| EventInfo {
             uid: uid.to_string(),
+            name: String::new(),
             time: "1m".to_string(),
             r#type: "Normal".to_string(),
             reason: "SuccessfulCreate".to_string(),
@@ -859,6 +862,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
 
         assert_eq!(entries.len(), 10);
@@ -889,7 +893,8 @@ mod tests {
         match &entries[9] {
             ContextMenuEntry::Item(delete_item) => {
                 assert!(delete_item.danger);
-                assert!(delete_item.disabled);
+                assert!(!delete_item.disabled);
+                assert!(delete_item.on_select.is_some());
             }
             ContextMenuEntry::Separator => panic!("Expected Delete CronJob item"),
         }

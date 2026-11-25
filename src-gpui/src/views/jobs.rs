@@ -254,6 +254,7 @@ pub fn build_job_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -290,7 +291,7 @@ pub fn build_job_context_menu_entries(
             ContextMenuItem::new("delete-job", "Delete Job")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -790,6 +791,7 @@ mod tests {
 
         let mk_event = |uid: &str, ns: &str, kind: &str, obj: &str, msg: &str| EventInfo {
             uid: uid.to_string(),
+            name: String::new(),
             time: "1m".to_string(),
             r#type: "Normal".to_string(),
             reason: "Completed".to_string(),
@@ -836,6 +838,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert_eq!(entries.len(), 8);
 
@@ -868,7 +871,8 @@ mod tests {
             ContextMenuEntry::Item(item) => {
                 assert_eq!(item.label.as_ref(), "Delete Job");
                 assert!(item.danger);
-                assert!(item.disabled);
+                assert!(!item.disabled);
+                assert!(item.on_select.is_some());
             }
             ContextMenuEntry::Separator => panic!("Expected delete-job item"),
         }

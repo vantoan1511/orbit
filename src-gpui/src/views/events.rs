@@ -441,6 +441,7 @@ fn render_type_filter_pills(
         .into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_event_context_menu_entries(
     _event: &EventInfo,
     on_copy_object: impl 'static + Fn(&mut Window, &mut App),
@@ -449,6 +450,7 @@ pub fn build_event_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -487,7 +489,7 @@ pub fn build_event_context_menu_entries(
             ContextMenuItem::new("delete-event", "Delete Event")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -732,6 +734,7 @@ mod tests {
     ) -> EventInfo {
         EventInfo {
             uid: uid.to_string(),
+            name: String::new(),
             time: time.to_string(),
             r#type: event_type.to_string(),
             reason: reason.to_string(),
@@ -922,5 +925,39 @@ mod tests {
             events_empty_message(&state, &ns),
             "No events match the active namespace and type filters."
         );
+    }
+
+    #[test]
+    fn test_build_event_context_menu_entries_enables_delete() {
+        let ev = sample_event(
+            "u1",
+            "Normal",
+            "Scheduled",
+            "Pod",
+            "web-1",
+            "default",
+            1,
+            "1m",
+        );
+        let entries = build_event_context_menu_entries(
+            &ev,
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+            |_, _| {},
+        );
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-event" => Some(item),
+                _ => None,
+            })
+            .expect("delete-event item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

@@ -175,6 +175,7 @@ fn render_replicaset_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_replicaset_context_menu_entries(
     replicaset: &ReplicaSetInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -183,6 +184,7 @@ pub fn build_replicaset_context_menu_entries(
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
     on_scale: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -225,7 +227,7 @@ pub fn build_replicaset_context_menu_entries(
             ContextMenuItem::new("delete-replicaset", "Delete ReplicaSet")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -622,6 +624,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "SuccessfulCreate".to_string(),
@@ -638,6 +641,7 @@ mod tests {
             },
             EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Started".to_string(),
@@ -654,6 +658,7 @@ mod tests {
             },
             EventInfo {
                 uid: "3".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Warning".to_string(),
                 reason: "Failed".to_string(),
@@ -670,6 +675,7 @@ mod tests {
             },
             EventInfo {
                 uid: "4".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "ScalingReplicaSet".to_string(),
@@ -702,6 +708,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let ids: Vec<&str> = entries
             .iter()
@@ -723,5 +730,15 @@ mod tests {
             ]
         );
         assert!(!ids.contains(&"restart"));
+        let delete_item = entries
+            .iter()
+            .find_map(|e| match e {
+                ContextMenuEntry::Item(item) if item.id.as_ref() == "delete-replicaset" => Some(item),
+                _ => None,
+            })
+            .expect("delete-replicaset item");
+        assert!(delete_item.danger);
+        assert!(!delete_item.disabled);
+        assert!(delete_item.on_select.is_some());
     }
 }

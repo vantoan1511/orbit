@@ -417,6 +417,7 @@ fn render_summary_cards_row(
         .into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_pod_context_menu_entries(
     pod: &PodInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -425,6 +426,7 @@ pub fn build_pod_context_menu_entries(
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
     on_restart_pod: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -467,7 +469,7 @@ pub fn build_pod_context_menu_entries(
             ContextMenuItem::new("delete-pod", "Delete Pod")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -1087,6 +1089,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),
                 message: "Successfully assigned prod/api-0 to node-1".to_string(),
@@ -1103,6 +1106,7 @@ mod tests {
             },
             EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Created".to_string(),
                 message: "Created pod api-0".to_string(),
@@ -1119,6 +1123,7 @@ mod tests {
             },
             EventInfo {
                 uid: "3".to_string(),
+                name: String::new(),
                 r#type: "Warning".to_string(),
                 reason: "Failed".to_string(),
                 message: "Error in other namespace".to_string(),

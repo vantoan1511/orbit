@@ -426,6 +426,7 @@ mod tests {
 
         let event = EventInfo {
             uid: "evt-123".to_string(),
+            name: "web-abc.12345".to_string(),
             time: "2m".to_string(),
             r#type: "Normal".to_string(),
             reason: "Scheduled".to_string(),

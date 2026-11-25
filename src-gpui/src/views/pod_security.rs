@@ -678,6 +678,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "e1".to_string(),
+                name: String::new(),
                 time: "1m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
@@ -694,6 +695,7 @@ mod tests {
             },
             EventInfo {
                 uid: "e2".to_string(),
+                name: String::new(),
                 time: "2m".to_string(),
                 r#type: "Warning".to_string(),
                 reason: "FailedCreate".to_string(),
@@ -710,6 +712,7 @@ mod tests {
             },
             EventInfo {
                 uid: "e3".to_string(),
+                name: String::new(),
                 time: "3m".to_string(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),

@@ -432,6 +432,8 @@ pub struct NamespaceInfo {
 #[serde(rename_all = "camelCase")]
 pub struct EventInfo {
     pub uid: String,
+    #[serde(default)]
+    pub name: String,
     pub time: String,
     pub r#type: String,
     pub reason: String,

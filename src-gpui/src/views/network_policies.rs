@@ -227,6 +227,7 @@ pub fn build_network_policy_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -263,7 +264,7 @@ pub fn build_network_policy_context_menu_entries(
             ContextMenuItem::new("delete-network-policy", "Delete NetworkPolicy")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -795,6 +796,7 @@ mod tests {
         let events = vec![
             EventInfo {
                 uid: "ev-1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
                 message: "Applied policy rules".to_string(),
@@ -811,6 +813,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-2".to_string(),
+                name: String::new(),
                 r#type: "Warning".to_string(),
                 reason: "PolicyMismatch".to_string(),
                 message: "Pod blocked by allow-api selector".to_string(),
@@ -827,6 +830,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-3".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
                 message: "Applied policy rules".to_string(),
@@ -843,6 +847,7 @@ mod tests {
             },
             EventInfo {
                 uid: "ev-4".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Scheduled".to_string(),
                 message: "Successfully assigned pod".to_string(),
@@ -885,6 +890,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
 
         let item_ids: Vec<&str> = entries
@@ -921,6 +927,6 @@ mod tests {
             }
             _ => None,
         });
-        assert!(delete_item.is_some_and(|item| item.danger && item.disabled));
+        assert!(delete_item.is_some_and(|item| item.danger && !item.disabled && item.on_select.is_some()));
     }
 }

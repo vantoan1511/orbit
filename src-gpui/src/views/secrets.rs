@@ -360,6 +360,7 @@ pub fn build_secret_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
         ContextMenuEntry::Item(
@@ -396,7 +397,7 @@ pub fn build_secret_context_menu_entries(
             ContextMenuItem::new("delete-secret", "Delete Secret")
                 .icon(Icon::Trash2)
                 .danger(true)
-                .disabled(true),
+                .on_select(on_delete),
         ),
     ]
 }
@@ -1078,6 +1079,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let item_ids: Vec<&str> = entries
             .iter()
@@ -1104,12 +1106,14 @@ mod tests {
                 _ => None,
             })
             .unwrap();
-        assert!(delete_item.disabled);
+        assert!(!delete_item.disabled);
         assert!(delete_item.danger);
+        assert!(delete_item.on_select.is_some());
 
         let events = vec![
             EventInfo {
                 uid: "1".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
                 message: "Secret updated".to_string(),
@@ -1126,6 +1130,7 @@ mod tests {
             },
             EventInfo {
                 uid: "2".to_string(),
+                name: String::new(),
                 r#type: "Normal".to_string(),
                 reason: "Updated".to_string(),
                 message: "Secret updated".to_string(),
