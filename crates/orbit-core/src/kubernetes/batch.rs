@@ -3,7 +3,7 @@ use std::time::Duration;
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use kube::{
     Client,
-    api::{Api, ListParams},
+    api::{Api, ListParams, PostParams},
 };
 
 use crate::kubernetes::models;
@@ -11,6 +11,135 @@ use crate::kubernetes::namespaces::format_age;
 
 pub const JOB_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const CRONJOB_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+pub const CRONJOB_INSTANTIATE_ANNOTATION: &str = "cronjob.kubernetes.io/instantiate";
+pub const CRONJOB_MUTATION_TIMEOUT: Duration = Duration::from_secs(15);
+
+pub fn format_manual_job_name(cronjob_name: &str, suffix: &str) -> String {
+    let suffix_len = suffix.len() + "-manual-".len();
+    let max_base_len = 63usize.saturating_sub(suffix_len);
+    let mut base = cronjob_name;
+    if base.len() > max_base_len {
+        base = &base[..max_base_len];
+    }
+    let trimmed = base.trim_end_matches('-');
+    format!("{}-manual-{}", trimmed, suffix)
+}
+
+pub fn build_job_from_cronjob(cronjob: &CronJob, job_name: String) -> Result<Job, String> {
+    let spec = cronjob
+        .spec
+        .as_ref()
+        .ok_or_else(|| "CronJob has no spec".to_string())?;
+
+    let job_template = &spec.job_template;
+    let job_spec = job_template
+        .spec
+        .clone()
+        .ok_or_else(|| "CronJob jobTemplate has no spec".to_string())?;
+
+    let mut annotations = job_template
+        .metadata
+        .as_ref()
+        .and_then(|m| m.annotations.clone())
+        .unwrap_or_default();
+    annotations.insert(
+        CRONJOB_INSTANTIATE_ANNOTATION.to_string(),
+        "manual".to_string(),
+    );
+
+    let labels = job_template
+        .metadata
+        .as_ref()
+        .and_then(|m| m.labels.clone());
+
+    let cronjob_name = cronjob.metadata.name.clone().unwrap_or_default();
+    let cronjob_uid = cronjob.metadata.uid.clone().unwrap_or_default();
+
+    let owner_references = if !cronjob_name.is_empty() && !cronjob_uid.is_empty() {
+        Some(vec![
+            k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference {
+                api_version: "batch/v1".to_string(),
+                kind: "CronJob".to_string(),
+                name: cronjob_name,
+                uid: cronjob_uid,
+                controller: Some(true),
+                block_owner_deletion: Some(true),
+            },
+        ])
+    } else {
+        None
+    };
+
+    let namespace = cronjob.metadata.namespace.clone();
+
+    Ok(Job {
+        metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+            name: Some(job_name),
+            namespace,
+            labels,
+            annotations: Some(annotations),
+            owner_references,
+            ..Default::default()
+        },
+        spec: Some(job_spec),
+        status: None,
+    })
+}
+
+pub async fn trigger_cronjob(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+) -> Result<String, kube::Error> {
+    tracing::info!(namespace = %namespace, name = %name, "Triggering CronJob manually");
+    let cj_api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
+    let cronjob = cj_api.get(name).await?;
+
+    let random_suffix = uuid::Uuid::new_v4().to_string().replace('-', "")[..5].to_lowercase();
+    let job_name = format_manual_job_name(name, &random_suffix);
+
+    let job = build_job_from_cronjob(&cronjob, job_name.clone()).map_err(|e| {
+        kube::Error::Api(kube::error::ErrorResponse {
+            status: "Failure".to_string(),
+            message: e,
+            reason: "Invalid".to_string(),
+            code: 400,
+        })
+    })?;
+
+    let job_api: Api<Job> = Api::namespaced(client.clone(), namespace);
+    let post_params = PostParams::default();
+    job_api.create(&post_params, &job).await?;
+    tracing::info!(
+        namespace = %namespace,
+        name = %name,
+        job_name = %job_name,
+        "Successfully created manual Job from CronJob"
+    );
+
+    Ok(job_name)
+}
+
+pub async fn execute_trigger_cronjob(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+) -> Result<String, String> {
+    match tokio::time::timeout(
+        CRONJOB_MUTATION_TIMEOUT,
+        trigger_cronjob(client, namespace, name),
+    )
+    .await
+    {
+        Ok(Ok(job_name)) => Ok(job_name),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err(format!(
+            "Timed out triggering CronJob '{}/{}' after 15s",
+            namespace, name
+        )),
+    }
+}
 
 pub fn map_job(j: &Job) -> models::JobInfo {
     let name = j.metadata.name.clone().unwrap_or_default();
@@ -516,7 +645,10 @@ mod tests {
             }),
             ..Default::default()
         };
-        assert_eq!(map_cronjob(&hours_cj).last_schedule.as_deref(), Some("3h ago"));
+        assert_eq!(
+            map_cronjob(&hours_cj).last_schedule.as_deref(),
+            Some("3h ago")
+        );
 
         let days_cj = CronJob {
             status: Some(CronJobStatus {
@@ -525,7 +657,10 @@ mod tests {
             }),
             ..Default::default()
         };
-        assert_eq!(map_cronjob(&days_cj).last_schedule.as_deref(), Some("4d ago"));
+        assert_eq!(
+            map_cronjob(&days_cj).last_schedule.as_deref(),
+            Some("4d ago")
+        );
 
         let future_cj = CronJob {
             status: Some(CronJobStatus {
@@ -550,5 +685,88 @@ mod tests {
         assert!(mapped.containers.is_empty());
         assert!(mapped.labels.is_empty());
         assert!(mapped.annotations.is_empty());
+    }
+
+    #[test]
+    fn test_format_manual_job_name_truncates_to_63_chars_and_trims_trailing_hyphen() {
+        let name = format_manual_job_name("nightly-db-backup", "abc12");
+        assert_eq!(name, "nightly-db-backup-manual-abc12");
+
+        let long_cj_name = format!("{}-{}", "a".repeat(49), "b".repeat(10));
+        let long_job = format_manual_job_name(&long_cj_name, "abc12");
+        assert!(long_job.len() <= 63);
+        assert!(long_job.ends_with("-manual-abc12"));
+        assert!(!long_job.contains("--"));
+    }
+
+    #[test]
+    fn test_build_job_from_cronjob_sets_manual_annotation_and_owner_ref() {
+        use k8s_openapi::api::batch::v1::{CronJobSpec, JobSpec, JobTemplateSpec};
+        use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+        use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+        use std::collections::BTreeMap;
+
+        let mut job_labels = BTreeMap::new();
+        job_labels.insert("tier".to_string(), "batch".to_string());
+
+        let cronjob = CronJob {
+            metadata: ObjectMeta {
+                name: Some("nightly-backup".to_string()),
+                namespace: Some("default".to_string()),
+                uid: Some("cj-uid-1".to_string()),
+                ..Default::default()
+            },
+            spec: Some(CronJobSpec {
+                schedule: "0 0 * * *".to_string(),
+                job_template: JobTemplateSpec {
+                    metadata: Some(ObjectMeta {
+                        labels: Some(job_labels.clone()),
+                        ..Default::default()
+                    }),
+                    spec: Some(JobSpec {
+                        template: PodTemplateSpec {
+                            spec: Some(PodSpec {
+                                containers: vec![Container {
+                                    name: "worker".to_string(),
+                                    image: Some("alpine:latest".to_string()),
+                                    ..Default::default()
+                                }],
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }),
+                },
+                ..Default::default()
+            }),
+            status: None,
+        };
+
+        let job = build_job_from_cronjob(&cronjob, "nightly-backup-manual-123".to_string())
+            .expect("Should build job");
+        assert_eq!(
+            job.metadata.name.as_deref(),
+            Some("nightly-backup-manual-123")
+        );
+        assert_eq!(job.metadata.namespace.as_deref(), Some("default"));
+        let annotations = job.metadata.annotations.unwrap();
+        assert_eq!(
+            annotations
+                .get(CRONJOB_INSTANTIATE_ANNOTATION)
+                .map(|s| s.as_str()),
+            Some("manual")
+        );
+        let owners = job.metadata.owner_references.unwrap();
+        assert_eq!(owners.len(), 1);
+        assert_eq!(owners[0].kind, "CronJob");
+        assert_eq!(owners[0].name, "nightly-backup");
+        assert_eq!(owners[0].uid, "cj-uid-1");
+        assert_eq!(owners[0].controller, Some(true));
+        assert_eq!(job.metadata.labels.unwrap(), job_labels);
+        assert!(job.spec.is_some());
+
+        let missing_spec = CronJob::default();
+        assert!(build_job_from_cronjob(&missing_spec, "x".to_string()).is_err());
     }
 }

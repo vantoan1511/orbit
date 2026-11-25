@@ -1,3 +1,4 @@
+pub mod action_toast;
 pub mod add_cluster_modal;
 pub mod context_menu;
 pub mod data_table;
@@ -7,11 +8,13 @@ pub mod status_badge;
 pub mod tab_bar;
 pub mod titlebar;
 pub mod tooltip;
+pub mod workload_action_modal;
 pub mod yaml_viewer;
 
-pub use add_cluster_modal::{
-    AddClusterModalCallbacks, parse_hex_color, render_add_cluster_modal,
+pub use action_toast::{
+    ActionToast, ActionToastKind, ActionToastState, render_action_toast_overlay,
 };
+pub use add_cluster_modal::{AddClusterModalCallbacks, parse_hex_color, render_add_cluster_modal};
 pub use context_menu::{
     CONTEXT_MENU_ITEM_HEIGHT, CONTEXT_MENU_PADDING_Y, CONTEXT_MENU_SEPARATOR_HEIGHT,
     CONTEXT_MENU_VIEWPORT_MARGIN, CONTEXT_MENU_WIDTH, ContextMenuCallback, ContextMenuEntry,
@@ -28,7 +31,7 @@ pub use data_table::{
     sort_rows_stable,
 };
 pub use resource_drawer::{
-    DRAWER_MIN_WORKSPACE_MARGIN, DEFAULT_DRAWER_WIDTH, MAX_DRAWER_WIDTH, MIN_DRAWER_WIDTH,
+    DEFAULT_DRAWER_WIDTH, DRAWER_MIN_WORKSPACE_MARGIN, MAX_DRAWER_WIDTH, MIN_DRAWER_WIDTH,
     ResourceDrawerProps, ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId,
     ResourceDrawerTarget, clamp_drawer_width, effective_drawer_width, render_resource_drawer,
 };
@@ -52,6 +55,11 @@ pub use titlebar::{
     render_custom_titlebar, resolve_titlebar_layout_spec, resolve_window_chrome_style,
 };
 pub use tooltip::TextTooltip;
+pub use workload_action_modal::{
+    ConfirmModalState, MAX_SCALE_REPLICAS, ScaleModalState, WorkloadActionDialogState,
+    WorkloadActionModalCallbacks, WorkloadActionModalKeyResult, WorkloadActionModalState,
+    render_workload_action_modal,
+};
 pub use yaml_viewer::{
     CachedYamlDocument, CachedYamlLine, YAML_LINE_HEIGHT, YAML_MIN_GUTTER_DIGITS,
     YamlDocumentCache, YamlHighlightSpan, YamlLoadStatus, YamlToken, YamlTokenKind,

@@ -4,7 +4,10 @@ use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet}
 use k8s_openapi::api::core::v1::Pod;
 use kube::{
     Client,
-    api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams},
+    api::{
+        Api, ApiResource, DeleteParams, DynamicObject, GroupVersionKind, ListParams, Patch,
+        PatchParams,
+    },
 };
 
 use crate::kubernetes::models;
@@ -15,6 +18,232 @@ pub const POD_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const STATEFULSET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DAEMONSET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
 pub const REPLICASET_FETCH_TIMEOUT: Duration = Duration::from_secs(10);
+pub const WORKLOAD_MUTATION_TIMEOUT: Duration = Duration::from_secs(15);
+
+fn bad_request_error(message: impl Into<String>) -> kube::Error {
+    kube::Error::Api(kube::error::ErrorResponse {
+        status: "Failure".to_string(),
+        message: message.into(),
+        reason: "BadRequest".to_string(),
+        code: 400,
+    })
+}
+
+fn format_mutation_result<T>(
+    res: Result<Result<T, kube::Error>, tokio::time::error::Elapsed>,
+    timeout_msg: &str,
+) -> Result<T, String> {
+    match res {
+        Ok(Ok(val)) => Ok(val),
+        Ok(Err(kube::Error::Api(api_err))) => Err(api_err.message),
+        Ok(Err(err)) => Err(err.to_string()),
+        Err(_) => Err(timeout_msg.to_string()),
+    }
+}
+
+pub fn build_scale_patch(replicas: i32) -> serde_json::Value {
+    serde_json::json!({
+        "spec": {
+            "replicas": replicas
+        }
+    })
+}
+
+pub fn build_restart_patch(timestamp_rfc3339: &str) -> serde_json::Value {
+    serde_json::json!({
+        "spec": {
+            "template": {
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": timestamp_rfc3339
+                    }
+                }
+            }
+        }
+    })
+}
+
+pub fn validate_scale_input(kind: &str, replicas: i32) -> Result<(), kube::Error> {
+    if replicas < 0 {
+        return Err(bad_request_error(format!(
+            "Replicas cannot be negative: {}",
+            replicas
+        )));
+    }
+    if !matches!(kind, "Deployment" | "StatefulSet" | "ReplicaSet") {
+        return Err(bad_request_error(format!(
+            "Unsupported scale resource kind: {}",
+            kind
+        )));
+    }
+    Ok(())
+}
+
+pub async fn scale_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+    replicas: i32,
+) -> Result<(), kube::Error> {
+    validate_scale_input(kind, replicas)?;
+    tracing::info!(
+        kind = %kind,
+        namespace = %namespace,
+        name = %name,
+        replicas = replicas,
+        "Sending request to Kubernetes: scale resource"
+    );
+    let patch = build_scale_patch(replicas);
+    let patch_params = PatchParams::default();
+
+    match kind {
+        "Deployment" => {
+            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch))
+                .await?;
+        }
+        "StatefulSet" => {
+            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch))
+                .await?;
+        }
+        "ReplicaSet" => {
+            let api: Api<ReplicaSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch))
+                .await?;
+        }
+        _ => {
+            return Err(bad_request_error(format!(
+                "Unsupported scale resource kind: {}",
+                kind
+            )));
+        }
+    }
+    tracing::info!(
+        kind = %kind,
+        namespace = %namespace,
+        name = %name,
+        "Kubernetes request completed: scale resource"
+    );
+    Ok(())
+}
+
+pub async fn redeploy_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+) -> Result<(), kube::Error> {
+    tracing::info!(
+        kind = %kind,
+        namespace = %namespace,
+        name = %name,
+        "Sending request to Kubernetes: redeploy/restart resource"
+    );
+    let now = chrono::Utc::now().to_rfc3339();
+    let patch = build_restart_patch(&now);
+    let patch_params = PatchParams::default();
+
+    match kind {
+        "Deployment" => {
+            let api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch))
+                .await?;
+        }
+        "StatefulSet" => {
+            let api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch))
+                .await?;
+        }
+        "DaemonSet" => {
+            let api: Api<DaemonSet> = Api::namespaced(client.clone(), namespace);
+            api.patch(name, &patch_params, &Patch::Merge(&patch))
+                .await?;
+        }
+        _ => {
+            return Err(bad_request_error(format!(
+                "Unsupported redeploy resource kind: {}",
+                kind
+            )));
+        }
+    }
+    tracing::info!(
+        kind = %kind,
+        namespace = %namespace,
+        name = %name,
+        "Kubernetes request completed: redeploy resource"
+    );
+    Ok(())
+}
+
+pub async fn delete_pod(client: &Client, namespace: &str, name: &str) -> Result<(), kube::Error> {
+    tracing::info!(namespace = %namespace, name = %name, "Sending request to Kubernetes: delete pod");
+    let api: Api<Pod> = Api::namespaced(client.clone(), namespace);
+    api.delete(name, &DeleteParams::default()).await?;
+    tracing::info!(namespace = %namespace, name = %name, "Kubernetes request completed: delete pod");
+    Ok(())
+}
+
+pub async fn execute_scale_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+    replicas: i32,
+) -> Result<(), String> {
+    let res = tokio::time::timeout(
+        WORKLOAD_MUTATION_TIMEOUT,
+        scale_resource(client, namespace, kind, name, replicas),
+    )
+    .await;
+    format_mutation_result(
+        res,
+        &format!(
+            "Timed out scaling {} '{}/{}' after 15s",
+            kind, namespace, name
+        ),
+    )
+}
+
+pub async fn execute_restart_resource(
+    client: &Client,
+    namespace: &str,
+    kind: &str,
+    name: &str,
+) -> Result<(), String> {
+    let res = tokio::time::timeout(
+        WORKLOAD_MUTATION_TIMEOUT,
+        redeploy_resource(client, namespace, kind, name),
+    )
+    .await;
+    format_mutation_result(
+        res,
+        &format!(
+            "Timed out restarting {} '{}/{}' after 15s",
+            kind, namespace, name
+        ),
+    )
+}
+
+pub async fn execute_restart_pod(
+    client: &Client,
+    namespace: &str,
+    name: &str,
+) -> Result<(), String> {
+    let res = tokio::time::timeout(
+        WORKLOAD_MUTATION_TIMEOUT,
+        delete_pod(client, namespace, name),
+    )
+    .await;
+    format_mutation_result(
+        res,
+        &format!(
+            "Timed out restarting Pod '{}/{}' after 15s",
+            namespace, name
+        ),
+    )
+}
 
 pub fn map_pod(p: &Pod) -> models::PodInfo {
     let name = p.metadata.name.clone().unwrap_or_default();
@@ -1299,5 +1528,55 @@ mod tests {
         assert_eq!(mapped_progressing.replicas.desired, 3);
         assert!(mapped_progressing.images.is_empty());
         assert!(mapped_progressing.containers.is_empty());
+    }
+
+    #[test]
+    fn test_build_scale_patch_sets_spec_replicas() {
+        assert_eq!(
+            build_scale_patch(3),
+            serde_json::json!({ "spec": { "replicas": 3 } })
+        );
+        assert_eq!(
+            build_scale_patch(0),
+            serde_json::json!({ "spec": { "replicas": 0 } })
+        );
+    }
+
+    #[test]
+    fn test_build_restart_patch_sets_restarted_at_annotation() {
+        let ts = "2026-11-25T12:00:00Z";
+        assert_eq!(
+            build_restart_patch(ts),
+            serde_json::json!({
+                "spec": {
+                    "template": {
+                        "metadata": {
+                            "annotations": {
+                                "kubectl.kubernetes.io/restartedAt": ts
+                            }
+                        }
+                    }
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn test_validate_scale_input_rejects_negative_and_unsupported_kind() {
+        assert!(validate_scale_input("Deployment", 0).is_ok());
+        assert!(validate_scale_input("StatefulSet", 3).is_ok());
+        assert!(validate_scale_input("ReplicaSet", 1).is_ok());
+
+        let neg_err = validate_scale_input("Deployment", -1).unwrap_err();
+        assert!(matches!(
+            neg_err,
+            kube::Error::Api(ref e) if e.code == 400 && e.reason == "BadRequest"
+        ));
+
+        let kind_err = validate_scale_input("DaemonSet", 2).unwrap_err();
+        assert!(matches!(
+            kind_err,
+            kube::Error::Api(ref e) if e.code == 400 && e.reason == "BadRequest"
+        ));
     }
 }
