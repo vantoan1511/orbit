@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use orbit_core::kubernetes::batch::{execute_trigger_cronjob, fetch_cronjobs, fetch_jobs};
@@ -6,6 +7,9 @@ use orbit_core::kubernetes::delete::{execute_delete_resource, format_target_labe
 use orbit_core::kubernetes::events::fetch_events;
 use orbit_core::kubernetes::hpa::fetch_hpas;
 use orbit_core::kubernetes::ingresses::fetch_ingresses;
+use orbit_core::kubernetes::logs::{
+    LogStreamMessage, resolve_workload_pods, select_streamable_pods, stream_pod_logs,
+};
 use orbit_core::kubernetes::manager::KubeManager;
 use orbit_core::kubernetes::namespaces::fetch_namespaces;
 use orbit_core::kubernetes::nodes::fetch_nodes;
@@ -33,8 +37,61 @@ pub struct ClusterBridge {
 }
 
 #[derive(Default)]
+pub struct ActiveLogStream {
+    cancel_txs: Vec<tokio::sync::oneshot::Sender<()>>,
+    abort_handles: Vec<tokio::task::AbortHandle>,
+}
+
+#[derive(Default)]
+pub struct LogStreamRegistry {
+    streams: HashMap<u64, ActiveLogStream>,
+}
+
+impl LogStreamRegistry {
+    pub fn register(
+        &mut self,
+        stream_id: u64,
+        cancel_txs: Vec<tokio::sync::oneshot::Sender<()>>,
+        abort_handles: Vec<tokio::task::AbortHandle>,
+    ) {
+        self.stop(stream_id);
+        self.streams.insert(
+            stream_id,
+            ActiveLogStream {
+                cancel_txs,
+                abort_handles,
+            },
+        );
+    }
+
+    pub fn stop(&mut self, stream_id: u64) {
+        if let Some(active) = self.streams.remove(&stream_id) {
+            for tx in active.cancel_txs {
+                let _ = tx.send(());
+            }
+            for handle in active.abort_handles {
+                handle.abort();
+            }
+        }
+    }
+
+    pub fn stop_all(&mut self) {
+        let keys: Vec<u64> = self.streams.keys().copied().collect();
+        for stream_id in keys {
+            self.stop(stream_id);
+        }
+    }
+
+    #[cfg(test)]
+    pub fn active_count(&self) -> usize {
+        self.streams.len()
+    }
+}
+
+#[derive(Default)]
 pub struct BridgeTaskTracker {
     handles: Vec<tokio::task::AbortHandle>,
+    pub log_streams: LogStreamRegistry,
 }
 
 impl BridgeTaskTracker {
@@ -51,6 +108,7 @@ impl BridgeTaskTracker {
         for handle in self.handles.drain(..) {
             handle.abort();
         }
+        self.log_streams.stop_all();
     }
 }
 
@@ -1487,6 +1545,184 @@ pub async fn handle_bridge_command_with_tracker(
                     message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
                 });
             }
+        }
+        ClusterBridgeCommand::StartLogStream {
+            cluster_id,
+            stream_id,
+            namespace,
+            workload_kind,
+            workload_name,
+            pod_filter,
+            container_filter,
+            tail_lines,
+            include_unavailable_pods,
+        } => {
+            tracker.log_streams.stop(stream_id);
+
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client.clone()
+            };
+            let Some(client) = client else {
+                let _ = event_tx.send(ClusterBridgeEvent::LogStreamStatus {
+                    cluster_id: cluster_id.clone(),
+                    stream_id,
+                    message: format!("No active Kubernetes client for cluster '{cluster_id}'"),
+                    is_error: true,
+                });
+                let _ = event_tx.send(ClusterBridgeEvent::LogStreamEnded {
+                    cluster_id,
+                    stream_id,
+                });
+                return;
+            };
+
+            let pods = match resolve_workload_pods(&client, &namespace, &workload_name, &workload_kind).await {
+                Ok(pods) => pods,
+                Err(err) => {
+                    let _ = event_tx.send(ClusterBridgeEvent::LogStreamStatus {
+                        cluster_id: cluster_id.clone(),
+                        stream_id,
+                        message: format!("Failed to resolve pods for {workload_kind} '{workload_name}': {err}"),
+                        is_error: true,
+                    });
+                    let _ = event_tx.send(ClusterBridgeEvent::LogStreamEnded {
+                        cluster_id,
+                        stream_id,
+                    });
+                    return;
+                }
+            };
+
+            let (selected_pods, excluded_unavailable_count) =
+                select_streamable_pods(&pods, pod_filter.as_deref(), include_unavailable_pods);
+
+            let _ = event_tx.send(ClusterBridgeEvent::LogTargetsResolved {
+                cluster_id: cluster_id.clone(),
+                stream_id,
+                pods: pods.clone(),
+                active_pod_count: selected_pods.len(),
+                excluded_unavailable_count,
+            });
+
+            if selected_pods.is_empty() {
+                let msg = if excluded_unavailable_count > 0 {
+                    format!(
+                        "No available pods to stream ({excluded_unavailable_count} starting or terminating pod(s) excluded). Enable \"Include unavailable\" to stream them."
+                    )
+                } else {
+                    format!("No pods found for {workload_kind} '{workload_name}'.")
+                };
+                let _ = event_tx.send(ClusterBridgeEvent::LogStreamStatus {
+                    cluster_id: cluster_id.clone(),
+                    stream_id,
+                    message: msg,
+                    is_error: false,
+                });
+                let _ = event_tx.send(ClusterBridgeEvent::LogStreamEnded {
+                    cluster_id,
+                    stream_id,
+                });
+                return;
+            }
+
+            let normalized_container = container_filter
+                .filter(|c| !c.is_empty() && c != "All" && c != "all");
+            let normalized_tail = (tail_lines > 0).then_some(tail_lines);
+
+            let (msg_tx, mut msg_rx) = mpsc::unbounded_channel::<LogStreamMessage>();
+            let mut cancel_txs = Vec::new();
+            let mut abort_handles = Vec::new();
+
+            for pod_target in selected_pods {
+                let containers_to_stream: Vec<Option<String>> = if let Some(ref c) = normalized_container {
+                    if pod_target.containers.is_empty() || pod_target.containers.contains(c) {
+                        vec![Some(c.clone())]
+                    } else {
+                        Vec::new()
+                    }
+                } else if pod_target.containers.len() > 1 {
+                    pod_target.containers.iter().cloned().map(Some).collect()
+                } else {
+                    vec![pod_target.containers.first().cloned()]
+                };
+
+                for container in containers_to_stream {
+                    let (cancel_tx, cancel_rx) = tokio::sync::oneshot::channel();
+                    cancel_txs.push(cancel_tx);
+
+                    let handle = tokio::spawn(stream_pod_logs(
+                        client.clone(),
+                        namespace.clone(),
+                        pod_target.name.clone(),
+                        container,
+                        normalized_tail,
+                        msg_tx.clone(),
+                        cancel_rx,
+                    ))
+                    .abort_handle();
+                    abort_handles.push(handle);
+                }
+            }
+
+            drop(msg_tx);
+
+            let fwd_tx = event_tx.clone();
+            let fwd_cluster_id = cluster_id.clone();
+            let fwd_handle = tokio::spawn(async move {
+                while let Some(msg) = msg_rx.recv().await {
+                    match msg {
+                        LogStreamMessage::Lines {
+                            pod,
+                            container,
+                            lines,
+                        } => {
+                            let _ = fwd_tx.send(ClusterBridgeEvent::LogLinesReceived {
+                                cluster_id: fwd_cluster_id.clone(),
+                                stream_id,
+                                pod,
+                                container,
+                                lines,
+                            });
+                        }
+                        LogStreamMessage::SystemNotice {
+                            pod,
+                            container,
+                            message,
+                        } => {
+                            let _ = fwd_tx.send(ClusterBridgeEvent::LogLinesReceived {
+                                cluster_id: fwd_cluster_id.clone(),
+                                stream_id,
+                                pod,
+                                container,
+                                lines: vec![message],
+                            });
+                        }
+                        LogStreamMessage::Error { message, .. } => {
+                            let _ = fwd_tx.send(ClusterBridgeEvent::LogStreamStatus {
+                                cluster_id: fwd_cluster_id.clone(),
+                                stream_id,
+                                message,
+                                is_error: true,
+                            });
+                        }
+                        LogStreamMessage::Ended { .. } => {}
+                    }
+                }
+                let _ = fwd_tx.send(ClusterBridgeEvent::LogStreamEnded {
+                    cluster_id: fwd_cluster_id,
+                    stream_id,
+                });
+            })
+            .abort_handle();
+            abort_handles.push(fwd_handle);
+
+            tracker
+                .log_streams
+                .register(stream_id, cancel_txs, abort_handles);
+        }
+        ClusterBridgeCommand::StopLogStream { stream_id } => {
+            tracker.log_streams.stop(stream_id);
         }
     }
 }
@@ -2931,5 +3167,116 @@ users:
             }
             other => panic!("expected WorkloadActionFailed, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn test_log_stream_registry_stop_cancels_only_target_stream() {
+        let mut registry = LogStreamRegistry::default();
+        let (tx1, rx1) = tokio::sync::oneshot::channel::<()>();
+        let (tx2, mut rx2) = tokio::sync::oneshot::channel::<()>();
+        let h1 = tokio::spawn(std::future::pending::<()>()).abort_handle();
+        let h2 = tokio::spawn(std::future::pending::<()>()).abort_handle();
+
+        registry.register(1, vec![tx1], vec![h1]);
+        registry.register(2, vec![tx2], vec![h2]);
+        assert_eq!(registry.active_count(), 2);
+
+        registry.stop(1);
+        assert_eq!(registry.active_count(), 1);
+        assert!(rx1.await.is_ok());
+        assert!(matches!(
+            rx2.try_recv(),
+            Err(tokio::sync::oneshot::error::TryRecvError::Empty)
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_log_stream_registry_stop_all_cancels_all_streams() {
+        let mut registry = LogStreamRegistry::default();
+        let (tx1, rx1) = tokio::sync::oneshot::channel::<()>();
+        let (tx2, rx2) = tokio::sync::oneshot::channel::<()>();
+        let h1 = tokio::spawn(std::future::pending::<()>()).abort_handle();
+        let h2 = tokio::spawn(std::future::pending::<()>()).abort_handle();
+
+        registry.register(10, vec![tx1], vec![h1]);
+        registry.register(20, vec![tx2], vec![h2]);
+        registry.stop_all();
+
+        assert_eq!(registry.active_count(), 0);
+        assert!(rx1.await.is_ok());
+        assert!(rx2.await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_start_log_stream_without_active_client_emits_error_and_ended() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::StartLogStream {
+                cluster_id: "dev-ctx".to_string(),
+                stream_id: 7,
+                namespace: "default".to_string(),
+                workload_kind: "Deployment".to_string(),
+                workload_name: "api".to_string(),
+                pod_filter: None,
+                container_filter: None,
+                tail_lines: 50,
+                include_unavailable_pods: false,
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev1 = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
+            .await
+            .expect("timed out waiting for LogStreamStatus");
+        assert!(matches!(
+            ev1,
+            Some(ClusterBridgeEvent::LogStreamStatus {
+                stream_id: 7,
+                is_error: true,
+                ..
+            })
+        ));
+        let ev2 = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
+            .await
+            .expect("timed out waiting for LogStreamEnded");
+        assert!(matches!(
+            ev2,
+            Some(ClusterBridgeEvent::LogStreamEnded { stream_id: 7, .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_switch_and_disconnect_cluster_stops_active_log_streams() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        let (tx1, rx1) = tokio::sync::oneshot::channel::<()>();
+        let h1 = tokio::spawn(std::future::pending::<()>()).abort_handle();
+        tracker.log_streams.register(99, vec![tx1], vec![h1]);
+        assert_eq!(tracker.log_streams.active_count(), 1);
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DisconnectCluster,
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        assert_eq!(tracker.log_streams.active_count(), 0);
+        assert!(rx1.await.is_ok());
     }
 }
