@@ -18,6 +18,11 @@ use orbit_core::kubernetes::policies::{
     fetch_admission_webhooks, fetch_network_policies, fetch_pod_security_policies, fetch_policies,
     fetch_resource_quotas_and_limits,
 };
+use orbit_core::kubernetes::port_forward::{
+    PortForwardLifecycleEvent, PortForwardRequest, get_persisted_for_cluster,
+    restore_cluster_port_forwards, start_port_forward_tunnel, stop_all_active_port_forwards,
+    stop_cluster_port_forwards, stop_port_forward_tunnel,
+};
 use orbit_core::kubernetes::secrets::fetch_secrets;
 use orbit_core::kubernetes::services::fetch_services;
 use orbit_core::kubernetes::storage::{fetch_pvcs, fetch_pvs, fetch_storage_classes};
@@ -140,6 +145,7 @@ pub async fn handle_bridge_command_with_tracker(
         }
         ClusterBridgeCommand::SwitchCluster { cluster_id } => {
             tracker.cancel_all();
+            stop_all_active_port_forwards(manager).await;
             let mut guard = manager.write().await;
             let result = guard.switch_context_with_status(&cluster_id).await;
             let clusters = guard.get_clusters();
@@ -171,6 +177,7 @@ pub async fn handle_bridge_command_with_tracker(
         }
         ClusterBridgeCommand::ReconnectActiveCluster => {
             tracker.cancel_all();
+            stop_all_active_port_forwards(manager).await;
             let mut guard = manager.write().await;
             let active_id = guard.active_context.clone();
             let result = guard.reconnect_active_cluster().await;
@@ -203,6 +210,7 @@ pub async fn handle_bridge_command_with_tracker(
         }
         ClusterBridgeCommand::DisconnectCluster => {
             tracker.cancel_all();
+            stop_all_active_port_forwards(manager).await;
             let mut guard = manager.write().await;
             let outcome = guard.disconnect_active_cluster();
             let clusters = guard.get_clusters();
@@ -1724,7 +1732,120 @@ pub async fn handle_bridge_command_with_tracker(
         ClusterBridgeCommand::StopLogStream { stream_id } => {
             tracker.log_streams.stop(stream_id);
         }
+        ClusterBridgeCommand::LoadPortForwards {
+            cluster_id,
+            generation,
+        } => {
+            let port_forwards = get_persisted_for_cluster(&cluster_id);
+            let _ = event_tx.send(ClusterBridgeEvent::PortForwardsLoaded {
+                cluster_id: cluster_id.clone(),
+                generation,
+                port_forwards,
+            });
+            let is_active = {
+                let guard = manager.read().await;
+                guard.active_context.as_deref() == Some(cluster_id.as_str())
+            };
+            if is_active {
+                let (pf_tx, pf_rx) = mpsc::unbounded_channel();
+                spawn_port_forward_event_forwarder(
+                    cluster_id.clone(),
+                    pf_rx,
+                    event_tx.clone(),
+                );
+                let manager_clone = manager.clone();
+                tokio::spawn(async move {
+                    restore_cluster_port_forwards(manager_clone, cluster_id, pf_tx).await;
+                });
+            }
+        }
+        ClusterBridgeCommand::StartPortForward {
+            cluster_id,
+            namespace,
+            kind,
+            name,
+            local_port,
+            remote_port,
+        } => {
+            let is_active = {
+                let guard = manager.read().await;
+                guard.active_context.as_deref() == Some(cluster_id.as_str())
+            };
+            if !is_active {
+                let _ = event_tx.send(ClusterBridgeEvent::PortForwardFailed {
+                    cluster_id,
+                    id: None,
+                    message: "No active Kubernetes context for port forwarding".to_string(),
+                });
+                return;
+            }
+            let (pf_tx, pf_rx) = mpsc::unbounded_channel();
+            spawn_port_forward_event_forwarder(cluster_id, pf_rx, event_tx.clone());
+            let manager_clone = manager.clone();
+            let request = PortForwardRequest {
+                namespace,
+                kind,
+                name,
+                local_port,
+                remote_port,
+            };
+            tokio::spawn(async move {
+                start_port_forward_tunnel(manager_clone, request, pf_tx).await;
+            });
+        }
+        ClusterBridgeCommand::StopPortForward { cluster_id, id } => {
+            stop_port_forward_tunnel(manager, Some(&cluster_id), &id).await;
+            let _ = event_tx.send(ClusterBridgeEvent::PortForwardStopped { cluster_id, id });
+        }
+        ClusterBridgeCommand::StopSelectedPortForwards { cluster_id, ids } => {
+            for id in ids {
+                stop_port_forward_tunnel(manager, Some(&cluster_id), &id).await;
+                let _ = event_tx.send(ClusterBridgeEvent::PortForwardStopped {
+                    cluster_id: cluster_id.clone(),
+                    id,
+                });
+            }
+        }
+        ClusterBridgeCommand::StopAllPortForwards { cluster_id } => {
+            stop_cluster_port_forwards(manager, &cluster_id).await;
+            let _ = event_tx.send(ClusterBridgeEvent::PortForwardsCleared { cluster_id });
+        }
     }
+}
+
+fn spawn_port_forward_event_forwarder(
+    cluster_id: String,
+    mut pf_rx: mpsc::UnboundedReceiver<PortForwardLifecycleEvent>,
+    event_tx: mpsc::UnboundedSender<ClusterBridgeEvent>,
+) {
+    tokio::spawn(async move {
+        while let Some(ev) = pf_rx.recv().await {
+            let mapped = match ev {
+                PortForwardLifecycleEvent::Started(port_forward) => {
+                    ClusterBridgeEvent::PortForwardStarted {
+                        cluster_id: cluster_id.clone(),
+                        port_forward,
+                    }
+                }
+                PortForwardLifecycleEvent::Stopped { id } => {
+                    ClusterBridgeEvent::PortForwardStopped {
+                        cluster_id: cluster_id.clone(),
+                        id,
+                    }
+                }
+                PortForwardLifecycleEvent::Error { id, message } => {
+                    ClusterBridgeEvent::PortForwardFailed {
+                        cluster_id: cluster_id.clone(),
+                        id,
+                        message,
+                    }
+                }
+            };
+            if event_tx.send(mapped).is_err() {
+                break;
+            }
+        }
+    });
 }
 
 pub fn start_cluster_bridge() -> ClusterBridge {
@@ -3278,5 +3399,130 @@ users:
 
         assert_eq!(tracker.log_streams.active_count(), 0);
         assert!(rx1.await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_bridge_load_port_forwards_emits_persisted_entries_for_active_cluster() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_bridge_load_pf");
+        let pf_a = orbit_core::kubernetes::port_forward::PersistedPortForward {
+            id: "default/Service/api:8080:80".to_string(),
+            cluster_id: "ctx-a".to_string(),
+            namespace: "default".to_string(),
+            kind: "Service".to_string(),
+            name: "api".to_string(),
+            local_port: 8080,
+            remote_port: 80,
+        };
+        let pf_b = orbit_core::kubernetes::port_forward::PersistedPortForward {
+            id: "default/Pod/web:3000:3000".to_string(),
+            cluster_id: "ctx-b".to_string(),
+            namespace: "default".to_string(),
+            kind: "Pod".to_string(),
+            name: "web".to_string(),
+            local_port: 3000,
+            remote_port: 3000,
+        };
+        orbit_core::kubernetes::port_forward::add_persisted_port_forward(pf_a.clone());
+        orbit_core::kubernetes::port_forward::add_persisted_port_forward(pf_b);
+
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::LoadPortForwards {
+                cluster_id: "ctx-a".to_string(),
+                generation: 3,
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
+            .await
+            .expect("timed out waiting for PortForwardsLoaded");
+        match ev {
+            Some(ClusterBridgeEvent::PortForwardsLoaded {
+                cluster_id,
+                generation,
+                port_forwards,
+            }) => {
+                assert_eq!(cluster_id, "ctx-a");
+                assert_eq!(generation, 3);
+                assert_eq!(port_forwards, vec![pf_a]);
+            }
+            other => panic!("unexpected event: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_bridge_stop_all_port_forwards_clears_persisted_and_emits_cleared() {
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_bridge_stop_all_pf");
+        let pf = orbit_core::kubernetes::port_forward::PersistedPortForward {
+            id: "default/Service/api:8080:80".to_string(),
+            cluster_id: "ctx-a".to_string(),
+            namespace: "default".to_string(),
+            kind: "Service".to_string(),
+            name: "api".to_string(),
+            local_port: 8080,
+            remote_port: 80,
+        };
+        orbit_core::kubernetes::port_forward::add_persisted_port_forward(pf);
+
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::default())));
+        let (event_tx, mut event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::StopAllPortForwards {
+                cluster_id: "ctx-a".to_string(),
+            },
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let ev = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
+            .await
+            .expect("timed out waiting for PortForwardsCleared");
+        assert!(matches!(
+            ev,
+            Some(ClusterBridgeEvent::PortForwardsCleared { ref cluster_id }) if cluster_id == "ctx-a"
+        ));
+        assert!(orbit_core::kubernetes::port_forward::get_persisted_for_cluster("ctx-a").is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_bridge_disconnect_stops_active_port_forward_tasks() {
+        let manager = Arc::new(RwLock::new(KubeManager::new_from_kubeconfig(
+            Some(sample_kubeconfig()),
+            OrbitConfig::default(),
+        )));
+        let (tx, mut rx) = tokio::sync::oneshot::channel::<()>();
+        let handle = tokio::spawn(async move {
+            let _ = (&mut rx).await;
+        });
+        {
+            let mut guard = manager.write().await;
+            guard
+                .port_forward_cancel
+                .insert("default/Pod/demo:8080:80".to_string(), (tx, handle));
+        }
+
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+        let mut tracker = BridgeTaskTracker::default();
+        handle_bridge_command_with_tracker(
+            ClusterBridgeCommand::DisconnectCluster,
+            &manager,
+            &event_tx,
+            &mut tracker,
+        )
+        .await;
+
+        let guard = manager.read().await;
+        assert!(guard.port_forward_cancel.is_empty());
     }
 }

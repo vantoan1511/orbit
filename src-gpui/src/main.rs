@@ -27,15 +27,18 @@ use tokio::sync::mpsc;
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ActionToastKind, ActionToastState, AddClusterModalCallbacks, ContextMenuEntry,
-    ContextMenuKeyAction, ContextMenuState, ResourceDrawerProps, ResourceDrawerState,
+    ContextMenuKeyAction, ContextMenuState, PortForwardModalCallbacks, PortForwardModalKeyResult,
+    PortForwardModalState, PortForwardResourceOption, ResourceDrawerProps, ResourceDrawerState,
     ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget, TabBarCallbacks,
     TabContextMenuCallbacks, TabPickerCallbacks, WorkloadActionDialogState,
     WorkloadActionModalCallbacks, WorkloadActionModalKeyResult, WorkloadActionModalState,
-    YamlLoadStatus, YamlViewerProps, build_tab_context_menu_entries, parse_hex_color,
+    YamlLoadStatus, YamlViewerProps, build_tab_context_menu_entries,
+    extract_ports_from_deployment, extract_ports_from_pod, extract_ports_from_replicaset,
+    extract_ports_from_service, extract_ports_from_statefulset, parse_hex_color,
     render_action_toast_overlay, render_add_cluster_modal, render_context_menu_overlay,
-    render_custom_titlebar, render_resource_drawer, render_tab_resource_picker_overlay,
-    render_workload_action_modal, render_workspace_tab_bar, render_yaml_viewer,
-    resolve_window_chrome_style,
+    render_custom_titlebar, render_port_forward_modal, render_resource_drawer,
+    render_tab_resource_picker_overlay, render_workload_action_modal, render_workspace_tab_bar,
+    render_yaml_viewer, resolve_window_chrome_style,
 };
 use crate::icons::render_icon;
 use crate::navigation::{
@@ -48,6 +51,7 @@ use crate::state::{
     ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState, EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
     NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
+    PortForwardKindFilter, PortForwardsLoadStatus, PortForwardsState,
     PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodSecurityState,
     PodsState, ReplicaSetsState, ResourceQuotaKindFilter, ResourceQuotasState, SecretsState,
     ServicesState, StatefulSetsState, StorageOverviewState, TabDropPosition, WorkloadActionKind,
@@ -211,6 +215,7 @@ pub struct WorkspaceLoadingFlags {
     pub pods: bool,
     pub services: bool,
     pub ingresses: bool,
+    pub port_forwards: bool,
     pub configmaps: bool,
     pub secrets: bool,
     pub persistent_volumes: bool,
@@ -244,6 +249,7 @@ pub const fn is_workspace_view_loading(
         WorkspaceView::Pods => loading.pods,
         WorkspaceView::Services => loading.services,
         WorkspaceView::Ingresses => loading.ingresses,
+        WorkspaceView::PortForward => loading.port_forwards,
         WorkspaceView::ConfigMaps => loading.configmaps,
         WorkspaceView::Secrets => loading.secrets,
         WorkspaceView::PersistentVolumes => loading.persistent_volumes,
@@ -1449,12 +1455,106 @@ pub fn apply_cluster_event_with_workspace(
         | ClusterBridgeEvent::LogTargetsResolved { .. }
         | ClusterBridgeEvent::LogLinesReceived { .. }
         | ClusterBridgeEvent::LogStreamStatus { .. }
-        | ClusterBridgeEvent::LogStreamEnded { .. } => {}
+        | ClusterBridgeEvent::LogStreamEnded { .. }
+        | ClusterBridgeEvent::PortForwardsLoaded { .. }
+        | ClusterBridgeEvent::PortForwardStarted { .. }
+        | ClusterBridgeEvent::PortForwardStopped { .. }
+        | ClusterBridgeEvent::PortForwardsCleared { .. }
+        | ClusterBridgeEvent::PortForwardFailed { .. } => {}
         ClusterBridgeEvent::ClusterAdded { .. } => {
             state.apply_event(event);
         }
     }
     commands
+}
+
+pub type PortForwardEventOutcome = (Vec<ClusterBridgeCommand>, Option<(u64, ActionToastKind)>);
+
+pub fn apply_port_forward_event(
+    port_forwards: &mut PortForwardsState,
+    modal: &mut Option<PortForwardModalState>,
+    toast: &mut ActionToastState,
+    event: &ClusterBridgeEvent,
+) -> Option<PortForwardEventOutcome> {
+    match event {
+        ClusterBridgeEvent::ClusterConnected { outcome, .. } => {
+            if outcome.healthy {
+                let cmd = port_forwards.begin_load_for_cluster(&outcome.context_name);
+                Some((vec![cmd], None))
+            } else {
+                port_forwards.reset_for_disconnected();
+                *modal = None;
+                Some((Vec::new(), None))
+            }
+        }
+        ClusterBridgeEvent::ClusterDisconnected { .. }
+        | ClusterBridgeEvent::ClusterUnreachable { .. }
+        | ClusterBridgeEvent::ConnectionError { .. } => {
+            port_forwards.reset_for_disconnected();
+            *modal = None;
+            Some((Vec::new(), None))
+        }
+        ClusterBridgeEvent::PortForwardsLoaded {
+            cluster_id,
+            generation,
+            port_forwards: loaded,
+        } => {
+            port_forwards.apply_loaded(cluster_id, *generation, loaded.clone());
+            Some((Vec::new(), None))
+        }
+        ClusterBridgeEvent::PortForwardStarted {
+            cluster_id,
+            port_forward,
+        } => {
+            port_forwards.apply_started(cluster_id, port_forward.clone());
+            if let Some(m) = modal.as_ref()
+                && m.cluster_id == *cluster_id
+                && m.namespace == port_forward.namespace
+                && m.kind.eq_ignore_ascii_case(&port_forward.kind)
+                && m.name == port_forward.name
+                && m.parsed_local_port() == Some(port_forward.local_port)
+            {
+                *modal = None;
+            }
+            let toast_id = toast.show_success(
+                "Port Forward Active",
+                format!(
+                    "Forwarding 127.0.0.1:{} -> {}/{}:{}",
+                    port_forward.local_port,
+                    port_forward.kind,
+                    port_forward.name,
+                    port_forward.remote_port
+                ),
+            );
+            Some((Vec::new(), Some((toast_id, ActionToastKind::Success))))
+        }
+        ClusterBridgeEvent::PortForwardStopped { cluster_id, id } => {
+            port_forwards.apply_stopped(cluster_id, id);
+            Some((Vec::new(), None))
+        }
+        ClusterBridgeEvent::PortForwardsCleared { cluster_id } => {
+            port_forwards.apply_cleared(cluster_id);
+            let toast_id =
+                toast.show_success("Port Forwards Stopped", "Stopped all active port forwards");
+            Some((Vec::new(), Some((toast_id, ActionToastKind::Success))))
+        }
+        ClusterBridgeEvent::PortForwardFailed {
+            cluster_id,
+            id,
+            message,
+        } => {
+            port_forwards.apply_failed(cluster_id, id.as_deref(), message.clone());
+            if let Some(m) = modal.as_mut()
+                && m.cluster_id == *cluster_id
+            {
+                m.submitting = false;
+                m.error = Some(message.clone());
+            }
+            let toast_id = toast.show_error("Port Forward Failed", message.clone());
+            Some((Vec::new(), Some((toast_id, ActionToastKind::Error))))
+        }
+        _ => None,
+    }
 }
 
 pub fn open_logs_tab_in_state(
@@ -1860,6 +1960,7 @@ pub struct OrbitShell {
     pods: PodsState,
     services: ServicesState,
     ingresses: IngressesState,
+    port_forwards: PortForwardsState,
     configmaps: ConfigMapsState,
     secrets: SecretsState,
     persistent_volumes: PersistentVolumesState,
@@ -1886,6 +1987,7 @@ pub struct OrbitShell {
     context_menu: ContextMenuState,
     add_cluster: AddClusterModalState,
     workload_action_modal: WorkloadActionModalState,
+    port_forward_modal: Option<PortForwardModalState>,
     action_toast: ActionToastState,
 }
 
@@ -1971,6 +2073,19 @@ impl OrbitShell {
                             shell.state.active_cluster_id.as_deref(),
                             &event,
                         );
+                        if let Some((pf_cmds, toast_info)) = apply_port_forward_event(
+                            &mut shell.port_forwards,
+                            &mut shell.port_forward_modal,
+                            &mut shell.action_toast,
+                            &event,
+                        ) {
+                            for cmd in pf_cmds {
+                                shell.dispatch_command(cmd);
+                            }
+                            if let Some((toast_id, toast_kind)) = toast_info {
+                                shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
+                            }
+                        }
                         for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
                             &mut shell.sidebar,
@@ -2056,6 +2171,7 @@ impl OrbitShell {
             pods: PodsState::default(),
             services: ServicesState::default(),
             ingresses: IngressesState::default(),
+            port_forwards: PortForwardsState::default(),
             configmaps: ConfigMapsState::default(),
             secrets: SecretsState::default(),
             persistent_volumes: PersistentVolumesState::default(),
@@ -2082,6 +2198,7 @@ impl OrbitShell {
             context_menu: ContextMenuState::new(),
             add_cluster: AddClusterModalState::default(),
             workload_action_modal: WorkloadActionModalState::default(),
+            port_forward_modal: None,
             action_toast: ActionToastState::default(),
         }
     }
@@ -2546,6 +2663,297 @@ impl OrbitShell {
         render_workload_action_modal(&self.workload_action_modal, &theme, &callbacks)
     }
 
+    fn open_port_forward_target_modal(
+        &mut self,
+        namespace: &str,
+        kind: &str,
+        name: &str,
+        detected_ports: Vec<u16>,
+        cx: &mut Context<Self>,
+    ) {
+        let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state
+        else {
+            return;
+        };
+        let cluster_id = cluster_id.clone();
+        let cluster_name = self.state.cluster_display_name(&cluster_id);
+        let active_local_ports: Vec<u16> = self
+            .port_forwards
+            .port_forwards
+            .iter()
+            .map(|pf| pf.local_port)
+            .collect();
+        self.state.close_dropdown();
+        self.namespaces.close_dropdown();
+        self.context_menu.close();
+        self.port_forward_modal = Some(PortForwardModalState::new_targeted(
+            cluster_id,
+            cluster_name,
+            namespace,
+            kind,
+            name,
+            detected_ports,
+            active_local_ports,
+        ));
+        cx.notify();
+    }
+
+    fn open_port_forward_create_modal(&mut self, cx: &mut Context<Self>) {
+        let ClusterConnectionState::Connected { cluster_id, .. } = &self.state.connection_state
+        else {
+            return;
+        };
+        let cluster_id = cluster_id.clone();
+        let cluster_name = self.state.cluster_display_name(&cluster_id);
+        if self.namespaces.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.namespaces.begin_load_for_cluster(&cluster_id);
+            self.dispatch_command(cmd);
+        }
+        if self.services.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.services.begin_load_for_cluster(&cluster_id);
+            self.dispatch_command(cmd);
+        }
+        if self.pods.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.pods.begin_load_for_cluster(&cluster_id);
+            self.dispatch_command(cmd);
+        }
+        if self.deployments.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.deployments.begin_load_for_cluster(&cluster_id);
+            self.dispatch_command(cmd);
+        }
+        if self.statefulsets.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.statefulsets.begin_load_for_cluster(&cluster_id);
+            self.dispatch_command(cmd);
+        }
+        if self.replicasets.needs_load_for_cluster(&cluster_id) {
+            let cmd = self.replicasets.begin_load_for_cluster(&cluster_id);
+            self.dispatch_command(cmd);
+        }
+
+        let available_namespaces: Vec<String> = self
+            .namespaces
+            .namespaces
+            .iter()
+            .map(|ns| ns.name.clone())
+            .collect();
+        let mut resources = Vec::new();
+        for svc in &self.services.services {
+            resources.push(PortForwardResourceOption {
+                namespace: svc.namespace.clone(),
+                kind: "Service".to_string(),
+                name: svc.name.clone(),
+                ports: extract_ports_from_service(svc),
+            });
+        }
+        for pod in &self.pods.pods {
+            resources.push(PortForwardResourceOption {
+                namespace: pod.namespace.clone(),
+                kind: "Pod".to_string(),
+                name: pod.name.clone(),
+                ports: extract_ports_from_pod(pod),
+            });
+        }
+        for dep in &self.deployments.deployments {
+            resources.push(PortForwardResourceOption {
+                namespace: dep.namespace.clone(),
+                kind: "Deployment".to_string(),
+                name: dep.name.clone(),
+                ports: extract_ports_from_deployment(dep),
+            });
+        }
+        for ss in &self.statefulsets.statefulsets {
+            resources.push(PortForwardResourceOption {
+                namespace: ss.namespace.clone(),
+                kind: "StatefulSet".to_string(),
+                name: ss.name.clone(),
+                ports: extract_ports_from_statefulset(ss),
+            });
+        }
+        for rs in &self.replicasets.replicasets {
+            resources.push(PortForwardResourceOption {
+                namespace: rs.namespace.clone(),
+                kind: "ReplicaSet".to_string(),
+                name: rs.name.clone(),
+                ports: extract_ports_from_replicaset(rs),
+            });
+        }
+        let active_local_ports: Vec<u16> = self
+            .port_forwards
+            .port_forwards
+            .iter()
+            .map(|pf| pf.local_port)
+            .collect();
+
+        self.state.close_dropdown();
+        self.namespaces.close_dropdown();
+        self.context_menu.close();
+        self.port_forward_modal = Some(PortForwardModalState::new_create(
+            cluster_id,
+            cluster_name,
+            available_namespaces,
+            resources,
+            active_local_ports,
+        ));
+        cx.notify();
+    }
+
+    fn submit_port_forward_modal(&mut self, cx: &mut Context<Self>) {
+        let Some(modal) = self.port_forward_modal.as_mut() else {
+            return;
+        };
+        if !modal.can_submit() {
+            return;
+        }
+        let Some(local_port) = modal.parsed_local_port() else {
+            return;
+        };
+        let Some(remote_port) = modal.parsed_remote_port() else {
+            return;
+        };
+        modal.submitting = true;
+        modal.error = None;
+        let cmd = ClusterBridgeCommand::StartPortForward {
+            cluster_id: modal.cluster_id.clone(),
+            namespace: modal.namespace.trim().to_string(),
+            kind: modal.kind.clone(),
+            name: modal.name.trim().to_string(),
+            local_port,
+            remote_port,
+        };
+        self.dispatch_command(cmd);
+        cx.notify();
+    }
+
+    fn open_port_forward_in_browser(&mut self, local_port: u16, cx: &mut App) {
+        let url = views::port_forward::format_port_forward_url(local_port);
+        cx.open_url(&url);
+    }
+
+    fn copy_port_forward_url(&mut self, local_port: u16, cx: &mut Context<Self>) {
+        let url = views::port_forward::format_port_forward_url(local_port);
+        cx.write_to_clipboard(ClipboardItem::new_string(url.clone()));
+        let toast_id = self
+            .action_toast
+            .show_success("Copied URL", format!("Copied {url} to clipboard"));
+        self.schedule_toast_dismiss(toast_id, ActionToastKind::Success, cx);
+        cx.notify();
+    }
+
+    fn stop_port_forward(&mut self, id: String, cx: &mut Context<Self>) {
+        let Some(cluster_id) = self.state.active_cluster_id.clone() else {
+            return;
+        };
+        self.port_forwards.mark_stopping(&id);
+        self.dispatch_command(ClusterBridgeCommand::StopPortForward { cluster_id, id });
+        cx.notify();
+    }
+
+    fn stop_selected_port_forwards(&mut self, cx: &mut Context<Self>) {
+        let Some(cluster_id) = self.state.active_cluster_id.clone() else {
+            return;
+        };
+        let ids: Vec<String> = self.port_forwards.selected_ids.iter().cloned().collect();
+        if ids.is_empty() {
+            return;
+        }
+        for id in &ids {
+            self.port_forwards.mark_stopping(id);
+        }
+        self.dispatch_command(ClusterBridgeCommand::StopSelectedPortForwards { cluster_id, ids });
+        cx.notify();
+    }
+
+    fn stop_all_port_forwards(&mut self, cx: &mut Context<Self>) {
+        let Some(cluster_id) = self.state.active_cluster_id.clone() else {
+            return;
+        };
+        let ids: Vec<String> = self
+            .port_forwards
+            .port_forwards
+            .iter()
+            .map(|pf| pf.id.clone())
+            .collect();
+        for id in ids {
+            self.port_forwards.mark_stopping(&id);
+        }
+        self.dispatch_command(ClusterBridgeCommand::StopAllPortForwards { cluster_id });
+        cx.notify();
+    }
+
+    fn render_port_forward_modal_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let modal = self.port_forward_modal.as_ref()?;
+        let theme = OrbitTheme::get(cx).clone();
+        let close_entity = cx.entity().clone();
+        let submit_entity = cx.entity().clone();
+        let focus_entity = cx.entity().clone();
+        let port_entity = cx.entity().clone();
+        let kind_entity = cx.entity().clone();
+        let ns_entity = cx.entity().clone();
+        let res_entity = cx.entity().clone();
+
+        let callbacks = PortForwardModalCallbacks {
+            on_close: std::rc::Rc::new(move |_, cx| {
+                close_entity.update(cx, |shell, cx| {
+                    if !shell
+                        .port_forward_modal
+                        .as_ref()
+                        .is_some_and(|m| m.submitting)
+                    {
+                        shell.port_forward_modal = None;
+                        cx.notify();
+                    }
+                });
+            }),
+            on_submit: std::rc::Rc::new(move |_, cx| {
+                submit_entity.update(cx, |shell, cx| {
+                    shell.submit_port_forward_modal(cx);
+                });
+            }),
+            on_focus_field: std::rc::Rc::new(move |field, _, cx| {
+                focus_entity.update(cx, |shell, cx| {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        m.active_field = field;
+                        cx.notify();
+                    }
+                });
+            }),
+            on_select_detected_port: std::rc::Rc::new(move |port, _, cx| {
+                port_entity.update(cx, |shell, cx| {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        m.select_detected_port(port);
+                        cx.notify();
+                    }
+                });
+            }),
+            on_select_kind: std::rc::Rc::new(move |kind, _, cx| {
+                kind_entity.update(cx, |shell, cx| {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        m.set_kind(&kind);
+                        cx.notify();
+                    }
+                });
+            }),
+            on_select_namespace: std::rc::Rc::new(move |ns, _, cx| {
+                ns_entity.update(cx, |shell, cx| {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        m.set_namespace(&ns);
+                        cx.notify();
+                    }
+                });
+            }),
+            on_select_resource: std::rc::Rc::new(move |name, _, cx| {
+                res_entity.update(cx, |shell, cx| {
+                    if let Some(m) = shell.port_forward_modal.as_mut() {
+                        m.select_resource(&name);
+                        cx.notify();
+                    }
+                });
+            }),
+        };
+
+        Some(render_port_forward_modal(modal, &theme, &callbacks))
+    }
+
     fn render_action_toast_overlay_view(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         self.action_toast.current()?;
         let theme = OrbitTheme::get(cx).clone();
@@ -2632,6 +3040,15 @@ impl OrbitShell {
             &mut self.tabs,
             view,
         ) {
+            self.dispatch_command(cmd);
+        }
+        if view == WorkspaceView::PortForward
+            && let ClusterConnectionState::Connected { cluster_id, .. } =
+                &self.state.connection_state
+            && self.port_forwards.needs_load_for_cluster(cluster_id)
+        {
+            let cluster_id = cluster_id.clone();
+            let cmd = self.port_forwards.begin_load_for_cluster(&cluster_id);
             self.dispatch_command(cmd);
         }
         cx.notify();
@@ -4686,6 +5103,7 @@ impl OrbitShell {
                 pods: self.pods.status == crate::state::PodsLoadStatus::Loading,
                 services: self.services.status == crate::state::ServicesLoadStatus::Loading,
                 ingresses: self.ingresses.status == crate::state::IngressesLoadStatus::Loading,
+                port_forwards: self.port_forwards.status == PortForwardsLoadStatus::Loading,
                 configmaps: self.configmaps.status == crate::state::ConfigMapsLoadStatus::Loading,
                 secrets: self.secrets.status == crate::state::SecretsLoadStatus::Loading,
                 persistent_volumes: self.persistent_volumes.status
@@ -4808,6 +5226,15 @@ impl OrbitShell {
                     .ingresses
                     .begin_refresh()
                     .unwrap_or_else(|| self.ingresses.begin_load_for_cluster(cluster_id));
+                self.dispatch_command(cmd);
+            }
+            if self.sidebar.active_view == WorkspaceView::PortForward
+                || self.port_forwards.cluster_id.is_some()
+            {
+                let cmd = self
+                    .port_forwards
+                    .begin_refresh()
+                    .unwrap_or_else(|| self.port_forwards.begin_load_for_cluster(cluster_id));
                 self.dispatch_command(cmd);
             }
             if self.sidebar.active_view == WorkspaceView::ConfigMaps
@@ -6776,6 +7203,18 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let dep_ns = deployment.namespace.clone();
+                    let dep_name = deployment.name.clone();
+                    let dep_ports = extract_ports_from_deployment(deployment);
+                    let pf_entity = ctx_entity.clone();
+                    let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let ns = dep_ns.clone();
+                        let name = dep_name.clone();
+                        let ports = dep_ports.clone();
+                        pf_entity.update(cx, |shell, cx| {
+                            shell.open_port_forward_target_modal(&ns, "Deployment", &name, ports, cx);
+                        });
+                    };
                     let entries = views::deployments::build_deployment_context_menu_entries(
                         deployment,
                         copy_name,
@@ -6784,6 +7223,7 @@ impl OrbitShell {
                         view_details,
                         view_yaml,
                         view_logs,
+                        port_forward_action,
                         move |w, cx| scale_action(w, cx),
                         move |w, cx| restart_action(w, cx),
                         delete_action,
@@ -6976,6 +7416,18 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let ss_ns = statefulset.namespace.clone();
+                    let ss_name = statefulset.name.clone();
+                    let ss_ports = extract_ports_from_statefulset(statefulset);
+                    let pf_entity = ctx_entity.clone();
+                    let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let ns = ss_ns.clone();
+                        let name = ss_name.clone();
+                        let ports = ss_ports.clone();
+                        pf_entity.update(cx, |shell, cx| {
+                            shell.open_port_forward_target_modal(&ns, "StatefulSet", &name, ports, cx);
+                        });
+                    };
                     let entries = views::statefulsets::build_statefulset_context_menu_entries(
                         statefulset,
                         copy_name,
@@ -6984,6 +7436,7 @@ impl OrbitShell {
                         view_details,
                         view_yaml,
                         view_logs,
+                        port_forward_action,
                         move |w, cx| scale_action(w, cx),
                         move |w, cx| restart_action(w, cx),
                         delete_action,
@@ -7159,6 +7612,18 @@ impl OrbitShell {
                             });
                         }
                     };
+                    let rs_ns = replicaset.namespace.clone();
+                    let rs_name = replicaset.name.clone();
+                    let rs_ports = extract_ports_from_replicaset(replicaset);
+                    let pf_entity = ctx_entity.clone();
+                    let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let ns = rs_ns.clone();
+                        let name = rs_name.clone();
+                        let ports = rs_ports.clone();
+                        pf_entity.update(cx, |shell, cx| {
+                            shell.open_port_forward_target_modal(&ns, "ReplicaSet", &name, ports, cx);
+                        });
+                    };
                     let entries = views::replicasets::build_replicaset_context_menu_entries(
                         replicaset,
                         copy_name,
@@ -7167,6 +7632,7 @@ impl OrbitShell {
                         view_details,
                         view_yaml,
                         view_logs,
+                        port_forward_action,
                         move |w, cx| scale_action(w, cx),
                         delete_action,
                     );
@@ -7817,6 +8283,18 @@ impl OrbitShell {
                         });
                     }
                 };
+                let svc_ns = svc.namespace.clone();
+                let svc_name = svc.name.clone();
+                let svc_ports = extract_ports_from_service(svc);
+                let pf_entity = ctx_entity.clone();
+                let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                    let ns = svc_ns.clone();
+                    let name = svc_name.clone();
+                    let ports = svc_ports.clone();
+                    pf_entity.update(cx, |shell, cx| {
+                        shell.open_port_forward_target_modal(&ns, "Service", &name, ports, cx);
+                    });
+                };
                 let entries = views::services::build_service_context_menu_entries(
                     svc,
                     copy_name,
@@ -7824,6 +8302,7 @@ impl OrbitShell {
                     refresh_cb,
                     view_details,
                     view_yaml,
+                    port_forward_action,
                     delete_action,
                 );
                 ctx_entity.update(cx, |shell, cx| {
@@ -8048,6 +8527,216 @@ impl OrbitShell {
                 on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
+            );
+        }
+
+        if self.sidebar.active_view == WorkspaceView::PortForward {
+            let sort_entity = cx.entity().clone();
+            let on_sort = std::rc::Rc::new(
+                move |col_id: SharedString,
+                      _event: &gpui::ClickEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    sort_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.table.toggle_sort(col_id.as_ref());
+                        cx.notify();
+                    });
+                },
+            );
+
+            let row_entity = cx.entity().clone();
+            let on_row_click = std::rc::Rc::new(
+                move |_row_idx: usize,
+                      row_key: SharedString,
+                      _event: &gpui::ClickEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    row_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.table.selected_row_key = Some(row_key.to_string());
+                        shell.port_forwards.search_focused = false;
+                        cx.notify();
+                    });
+                },
+            );
+
+            let ctx_entity = cx.entity().clone();
+            let on_row_context_menu = std::rc::Rc::new(
+                move |row_key: SharedString,
+                      pf: &orbit_core::kubernetes::port_forward::PersistedPortForward,
+                      event: &MouseDownEvent,
+                      _window: &mut Window,
+                      cx: &mut App| {
+                    let local_port = pf.local_port;
+                    let pf_id = pf.id.clone();
+                    let anchor = event.position;
+
+                    let open_entity = ctx_entity.clone();
+                    let on_open_browser = move |_w: &mut Window, cx: &mut App| {
+                        open_entity.update(cx, |shell, cx| {
+                            shell.open_port_forward_in_browser(local_port, cx);
+                        });
+                    };
+                    let copy_entity = ctx_entity.clone();
+                    let on_copy_url = move |_w: &mut Window, cx: &mut App| {
+                        copy_entity.update(cx, |shell, cx| {
+                            shell.copy_port_forward_url(local_port, cx);
+                        });
+                    };
+                    let stop_entity = ctx_entity.clone();
+                    let on_stop = move |_w: &mut Window, cx: &mut App| {
+                        let id = pf_id.clone();
+                        stop_entity.update(cx, |shell, cx| {
+                            shell.stop_port_forward(id, cx);
+                        });
+                    };
+
+                    let entries = views::port_forward::build_port_forward_context_menu_entries(
+                        pf,
+                        on_open_browser,
+                        on_copy_url,
+                        on_stop,
+                    );
+                    ctx_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.table.selected_row_key = Some(row_key.to_string());
+                        shell.open_context_menu(anchor, entries, cx);
+                    });
+                },
+            );
+
+            let select_entity = cx.entity().clone();
+            let on_toggle_select = std::rc::Rc::new(
+                move |id: String, _window: &mut Window, cx: &mut App| {
+                    select_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.toggle_select(&id);
+                        cx.notify();
+                    });
+                },
+            );
+
+            let select_all_entity = cx.entity().clone();
+            let on_toggle_select_all = std::rc::Rc::new(
+                move |ids: Vec<String>, _window: &mut Window, cx: &mut App| {
+                    select_all_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.toggle_select_all_visible(&ids);
+                        cx.notify();
+                    });
+                },
+            );
+
+            let kind_entity = cx.entity().clone();
+            let on_kind_filter = std::rc::Rc::new(
+                move |filter: PortForwardKindFilter, _window: &mut Window, cx: &mut App| {
+                    kind_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.set_kind_filter(filter);
+                        cx.notify();
+                    });
+                },
+            );
+
+            let focus_entity = cx.entity().clone();
+            let on_focus_search = std::rc::Rc::new(
+                move |focused: bool, _window: &mut Window, cx: &mut App| {
+                    focus_entity.update(cx, |shell, cx| {
+                        shell.port_forwards.search_focused = focused;
+                        cx.notify();
+                    });
+                },
+            );
+
+            let clear_entity = cx.entity().clone();
+            let on_clear_search = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                clear_entity.update(cx, |shell, cx| {
+                    shell.port_forwards.search_query.clear();
+                    cx.notify();
+                });
+            });
+
+            let create_entity = cx.entity().clone();
+            let on_open_create_modal =
+                std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                    create_entity.update(cx, |shell, cx| {
+                        shell.open_port_forward_create_modal(cx);
+                    });
+                });
+
+            let browser_entity = cx.entity().clone();
+            let on_open_browser =
+                std::rc::Rc::new(move |port: u16, _window: &mut Window, cx: &mut App| {
+                    browser_entity.update(cx, |shell, cx| {
+                        shell.open_port_forward_in_browser(port, cx);
+                    });
+                });
+
+            let copy_entity = cx.entity().clone();
+            let on_copy_url =
+                std::rc::Rc::new(move |port: u16, _window: &mut Window, cx: &mut App| {
+                    copy_entity.update(cx, |shell, cx| {
+                        shell.copy_port_forward_url(port, cx);
+                    });
+                });
+
+            let stop_entity = cx.entity().clone();
+            let on_stop_tunnel =
+                std::rc::Rc::new(move |id: String, _window: &mut Window, cx: &mut App| {
+                    stop_entity.update(cx, |shell, cx| {
+                        shell.stop_port_forward(id, cx);
+                    });
+                });
+
+            let stop_sel_entity = cx.entity().clone();
+            let on_stop_selected =
+                std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                    stop_sel_entity.update(cx, |shell, cx| {
+                        shell.stop_selected_port_forwards(cx);
+                    });
+                });
+
+            let stop_all_entity = cx.entity().clone();
+            let on_stop_all = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                stop_all_entity.update(cx, |shell, cx| {
+                    shell.stop_all_port_forwards(cx);
+                });
+            });
+
+            let refresh_entity = cx.entity().clone();
+            let on_refresh = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                refresh_entity.update(cx, |shell, cx| {
+                    if let ClusterConnectionState::Connected { cluster_id, .. } =
+                        &shell.state.connection_state
+                    {
+                        let cmd = shell
+                            .port_forwards
+                            .begin_refresh()
+                            .unwrap_or_else(|| {
+                                shell.port_forwards.begin_load_for_cluster(cluster_id)
+                            });
+                        shell.dispatch_command(cmd);
+                        cx.notify();
+                    }
+                });
+            });
+
+            return views::port_forward::render_port_forward_view(
+                &self.port_forwards,
+                &self.namespaces,
+                theme,
+                views::port_forward::PortForwardViewCallbacks {
+                    on_sort,
+                    on_row_click,
+                    on_row_context_menu,
+                    on_toggle_select,
+                    on_toggle_select_all,
+                    on_kind_filter,
+                    on_focus_search,
+                    on_clear_search,
+                    on_open_create_modal,
+                    on_open_browser,
+                    on_copy_url,
+                    on_stop_tunnel,
+                    on_stop_selected,
+                    on_stop_all,
+                    on_refresh,
+                },
             );
         }
 
@@ -8495,6 +9184,18 @@ impl OrbitShell {
                         });
                     }
                 };
+                let pod_ns = pod.namespace.clone();
+                let pod_name = pod.name.clone();
+                let pod_ports = extract_ports_from_pod(pod);
+                let pf_entity = ctx_entity.clone();
+                let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                    let ns = pod_ns.clone();
+                    let name = pod_name.clone();
+                    let ports = pod_ports.clone();
+                    pf_entity.update(cx, |shell, cx| {
+                        shell.open_port_forward_target_modal(&ns, "Pod", &name, ports, cx);
+                    });
+                };
                 let entries = views::pods::build_pod_context_menu_entries(
                     pod,
                     copy_name,
@@ -8503,6 +9204,7 @@ impl OrbitShell {
                     view_details,
                     view_yaml,
                     view_logs,
+                    port_forward_action,
                     move |w, cx| restart_pod_action(w, cx),
                     delete_action,
                 );
@@ -10680,6 +11382,33 @@ impl Render for OrbitShell {
                     }
                     return;
                 }
+                if this.port_forward_modal.is_some() {
+                    if !(event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.alt
+                        || event.keystroke.modifiers.platform)
+                    {
+                        let key = event.keystroke.key.to_ascii_lowercase();
+                        let res = this
+                            .port_forward_modal
+                            .as_mut()
+                            .map(|m| m.handle_key_input(&key, event.keystroke.key_char.as_deref()))
+                            .unwrap_or(PortForwardModalKeyResult::Ignored);
+                        match res {
+                            PortForwardModalKeyResult::Cancel => {
+                                this.port_forward_modal = None;
+                                cx.notify();
+                            }
+                            PortForwardModalKeyResult::Submit => {
+                                this.submit_port_forward_modal(cx);
+                            }
+                            PortForwardModalKeyResult::Handled => {
+                                cx.notify();
+                            }
+                            PortForwardModalKeyResult::Ignored => {}
+                        }
+                    }
+                    return;
+                }
                 if this.workload_action_modal.is_open() {
                     if !(event.keystroke.modifiers.control
                         || event.keystroke.modifiers.alt
@@ -10744,6 +11473,19 @@ impl Render for OrbitShell {
                         }
                         PickerKeyAction::Ignored => {}
                     }
+                    return;
+                }
+                if this.sidebar.active_view == WorkspaceView::PortForward
+                    && this.port_forwards.search_focused
+                    && !(event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.alt
+                        || event.keystroke.modifiers.platform)
+                    && this.port_forwards.handle_search_key(
+                        &event.keystroke.key.to_ascii_lowercase(),
+                        event.keystroke.key_char.as_deref(),
+                    )
+                {
+                    cx.notify();
                     return;
                 }
                 if this.namespaces.dropdown_open
@@ -10970,6 +11712,10 @@ impl Render for OrbitShell {
             })
             .when_some(
                 self.render_workload_action_modal_overlay(cx),
+                |el, overlay| el.child(overlay),
+            )
+            .when_some(
+                self.render_port_forward_modal_overlay(cx),
                 |el, overlay| el.child(overlay),
             )
             .when_some(self.render_action_toast_overlay_view(cx), |el, overlay| {
@@ -11809,6 +12555,7 @@ mod tests {
                 pods: true,
                 services: true,
                 ingresses: true,
+                port_forwards: true,
                 configmaps: true,
                 secrets: true,
                 persistent_volumes: true,
@@ -13820,6 +14567,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         assert!(
             dep_entries
@@ -14818,6 +15566,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let items: Vec<&crate::components::ContextMenuItem> = entries
             .iter()
@@ -14836,6 +15585,7 @@ mod tests {
                 "view-details",
                 "view-yaml",
                 "view-logs",
+                "port-forward",
                 "restart-pod",
                 "delete-pod",
             ]
@@ -15261,6 +16011,7 @@ mod tests {
         let svc = make_test_service("api-svc", "prod");
         let entries = views::services::build_service_context_menu_entries(
             &svc,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},
@@ -19964,5 +20715,128 @@ mod tests {
         );
         assert!(log_tabs.is_empty());
         assert!(tabs.open_tabs().iter().all(|t| t.as_logs().is_none()));
+    }
+
+    #[test]
+    fn test_port_forward_view_loading_flag_and_tab_selection_dispatches_load() {
+        assert!(!is_workspace_view_loading(
+            WorkspaceView::PortForward,
+            WorkspaceLoadingFlags::default()
+        ));
+        assert!(is_workspace_view_loading(
+            WorkspaceView::PortForward,
+            WorkspaceLoadingFlags {
+                port_forwards: true,
+                ..WorkspaceLoadingFlags::default()
+            }
+        ));
+
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod");
+        tabs.open_tab(WorkspaceView::PortForward);
+        assert_eq!(tabs.active_view(), Some(WorkspaceView::PortForward));
+
+        let mut pf_state = PortForwardsState::default();
+        assert!(pf_state.needs_load_for_cluster("prod"));
+        let cmd = pf_state.begin_load_for_cluster("prod");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadPortForwards {
+                cluster_id: "prod".to_string(),
+                generation: 1,
+            }
+        );
+    }
+
+    #[test]
+    fn test_cluster_disconnect_resets_port_forwards_state_and_closes_modal() {
+        let mut pf_state = PortForwardsState::default();
+        let _ = pf_state.begin_load_for_cluster("prod");
+        let pf = orbit_core::kubernetes::port_forward::PersistedPortForward {
+            id: "default/Service/api:8080:80".to_string(),
+            cluster_id: "prod".to_string(),
+            namespace: "default".to_string(),
+            kind: "Service".to_string(),
+            name: "api".to_string(),
+            local_port: 8080,
+            remote_port: 80,
+        };
+        assert!(pf_state.apply_loaded("prod", 1, vec![pf]));
+
+        let mut modal = Some(PortForwardModalState::new_targeted(
+            "prod",
+            "prod",
+            "default",
+            "Service",
+            "api",
+            vec![80],
+            Vec::new(),
+        ));
+        let mut toast = ActionToastState::default();
+
+        let _ = apply_port_forward_event(
+            &mut pf_state,
+            &mut modal,
+            &mut toast,
+            &ClusterBridgeEvent::ClusterDisconnected {
+                previous_cluster_id: Some("prod".to_string()),
+                clusters: Vec::new(),
+            },
+        );
+
+        assert!(pf_state.cluster_id.is_none());
+        assert!(pf_state.port_forwards.is_empty());
+        assert!(modal.is_none());
+    }
+
+    #[test]
+    fn test_port_forward_events_update_shell_state_and_toast() {
+        let mut pf_state = PortForwardsState::default();
+        let _ = pf_state.begin_load_for_cluster("prod");
+        let mut modal = Some(PortForwardModalState::new_targeted(
+            "prod",
+            "prod",
+            "default",
+            "Service",
+            "api",
+            vec![8080],
+            Vec::new(),
+        ));
+        let mut toast = ActionToastState::default();
+
+        let pf = orbit_core::kubernetes::port_forward::PersistedPortForward {
+            id: "default/Service/api:8080:8080".to_string(),
+            cluster_id: "prod".to_string(),
+            namespace: "default".to_string(),
+            kind: "Service".to_string(),
+            name: "api".to_string(),
+            local_port: 8080,
+            remote_port: 8080,
+        };
+
+        let started = apply_port_forward_event(
+            &mut pf_state,
+            &mut modal,
+            &mut toast,
+            &ClusterBridgeEvent::PortForwardStarted {
+                cluster_id: "prod".to_string(),
+                port_forward: pf.clone(),
+            },
+        );
+        assert!(started.is_some());
+        assert!(modal.is_none());
+        assert_eq!(pf_state.port_forwards, vec![pf.clone()]);
+        assert!(toast.current().is_some());
+
+        let _ = apply_port_forward_event(
+            &mut pf_state,
+            &mut modal,
+            &mut toast,
+            &ClusterBridgeEvent::PortForwardStopped {
+                cluster_id: "prod".to_string(),
+                id: pf.id,
+            },
+        );
+        assert!(pf_state.port_forwards.is_empty());
     }
 }

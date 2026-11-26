@@ -19,7 +19,7 @@ kube = { workspace = true, default-features = true, features = ["runtime", "deri
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml_ng.workspace = true
-tokio = { workspace = true, features = ["rt"] }
+tokio = { workspace = true, features = ["rt", "process", "io-util"] }
 tracing.workspace = true
 uuid.workspace = true
 

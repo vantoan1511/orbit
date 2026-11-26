@@ -16,6 +16,7 @@ pub mod kubernetes {
     pub mod nodes;
     pub mod overview;
     pub mod policies;
+    pub mod port_forward;
     pub mod raw;
     pub mod secrets;
     pub mod services;

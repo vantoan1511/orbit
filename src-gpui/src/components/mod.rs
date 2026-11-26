@@ -2,6 +2,7 @@ pub mod action_toast;
 pub mod add_cluster_modal;
 pub mod context_menu;
 pub mod data_table;
+pub mod port_forward_modal;
 pub mod resource_drawer;
 pub mod resource_kind;
 pub mod status_badge;
@@ -59,6 +60,13 @@ pub use workload_action_modal::{
     ConfirmModalState, MAX_SCALE_REPLICAS, ScaleModalState, WorkloadActionDialogState,
     WorkloadActionModalCallbacks, WorkloadActionModalKeyResult, WorkloadActionModalState,
     render_workload_action_modal,
+};
+pub use port_forward_modal::{
+    PORT_FORWARD_KINDS, PortForwardModalCallbacks, PortForwardModalField,
+    PortForwardModalKeyResult, PortForwardModalMode, PortForwardModalState,
+    PortForwardResourceOption, extract_ports_from_deployment, extract_ports_from_pod,
+    extract_ports_from_port_str, extract_ports_from_replicaset, extract_ports_from_service,
+    extract_ports_from_statefulset, render_port_forward_modal,
 };
 pub use yaml_viewer::{
     CachedYamlDocument, CachedYamlLine, YAML_LINE_HEIGHT, YAML_MIN_GUTTER_DIGITS,

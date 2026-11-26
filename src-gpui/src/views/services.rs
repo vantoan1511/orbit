@@ -429,6 +429,7 @@ fn render_summary_cards_row(
         .into_any_element()
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_service_context_menu_entries(
     svc: &ServiceInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -436,6 +437,7 @@ pub fn build_service_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_port_forward: impl 'static + Fn(&mut Window, &mut App),
     on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
@@ -467,6 +469,11 @@ pub fn build_service_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("port-forward", "Port Forward...")
+                .icon(Icon::Cable)
+                .on_select(on_port_forward),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -994,6 +1001,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let ids: Vec<&str> = entries
             .iter()
@@ -1010,6 +1018,7 @@ mod tests {
                 "refresh",
                 "view-details",
                 "view-yaml",
+                "port-forward",
                 "delete-service",
             ]
         );
