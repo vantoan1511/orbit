@@ -271,6 +271,19 @@ impl Configuration {
                 last_updated_at: None,
             },
             Configuration {
+                key: "tablePreferences".to_string(),
+                name: "Table Preferences".to_string(),
+                description: "Per-table column, sort, and page size settings plus per-cluster table filters.".to_string(),
+                datatype: "string".to_string(),
+                default_value: Some(serde_json::json!({})),
+                value: None,
+                is_confidential: false,
+                cardinality: "0..1".to_string(),
+                enable: true,
+                created_at: Some(created.clone()),
+                last_updated_at: None,
+            },
+            Configuration {
                 key: "enableExperienceFeatures".to_string(),
                 name: "Experience Features".to_string(),
                 description: "Enable experimental preview features such as the native GPUI desktop shell.".to_string(),
@@ -297,6 +310,49 @@ pub struct PersistedClusterTabs {
 }
 
 pub type WorkspaceTabsMap = HashMap<String, PersistedClusterTabs>;
+
+pub const ALLOWED_TABLE_PAGE_SIZES: [usize; 4] = [25, 50, 100, 200];
+pub const DEFAULT_TABLE_PAGE_SIZE: usize = 25;
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PersistedSortDirection {
+    Asc,
+    Desc,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistedTableConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hidden_columns: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_column: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort_direction: Option<PersistedSortDirection>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistedClusterTableFilters {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub search_query: String,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra_filters: HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PersistedTablePreferences {
+    /// Per-table layout/config state (keyed by table_id, e.g. "pods", "deployments").
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub tables: HashMap<String, PersistedTableConfig>,
+    /// Per-cluster, per-table active filter state (cluster_id -> table_id -> filters).
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub clusters: HashMap<String, HashMap<String, PersistedClusterTableFilters>>,
+}
 
 /// Persistent user configuration storing strictly key-value pairs in `~/.orbit/config.json`.
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq)]
@@ -772,6 +828,123 @@ impl OrbitConfig {
     ) -> Result<(), String> {
         self.update_workspace_tabs_for_cluster(cluster_id, open_tabs, active_tab);
         self.save()
+    }
+
+    /// Returns the persisted DataTable preferences (per-table config + per-cluster filters).
+    pub fn table_preferences(&self) -> PersistedTablePreferences {
+        self.values
+            .get("tablePreferences")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default()
+    }
+
+    fn write_table_preferences(&mut self, prefs: PersistedTablePreferences) {
+        if prefs.tables.is_empty() && prefs.clusters.is_empty() {
+            self.values.remove("tablePreferences");
+        } else if let Ok(v) = serde_json::to_value(prefs) {
+            self.values.insert("tablePreferences".to_string(), v);
+        }
+    }
+
+    /// Updates the persisted layout/sort/page-size config for a specific table ID in memory.
+    pub fn update_table_config(&mut self, table_id: &str, config: PersistedTableConfig) {
+        let table_key = table_id.trim();
+        if table_key.is_empty() {
+            return;
+        }
+
+        let mut prefs = self.table_preferences();
+
+        let page_size = config
+            .page_size
+            .filter(|size| ALLOWED_TABLE_PAGE_SIZES.contains(size));
+
+        let mut seen = std::collections::HashSet::new();
+        let mut hidden_columns: Vec<String> = config
+            .hidden_columns
+            .into_iter()
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty() && seen.insert(c.clone()))
+            .collect();
+        hidden_columns.sort();
+
+        let sort_column = config
+            .sort_column
+            .map(|c| c.trim().to_string())
+            .filter(|c| !c.is_empty());
+        let sort_direction = if sort_column.is_some() {
+            config.sort_direction
+        } else {
+            None
+        };
+
+        let normalized = PersistedTableConfig {
+            page_size,
+            hidden_columns,
+            sort_column,
+            sort_direction,
+        };
+
+        if normalized == PersistedTableConfig::default() {
+            prefs.tables.remove(table_key);
+        } else {
+            prefs.tables.insert(table_key.to_string(), normalized);
+        }
+
+        self.write_table_preferences(prefs);
+    }
+
+    /// Updates the persisted filter state for a specific `(cluster_id, table_id)` in memory.
+    pub fn update_cluster_table_filters(
+        &mut self,
+        cluster_id: &str,
+        table_id: &str,
+        filters: PersistedClusterTableFilters,
+    ) {
+        let cluster_key = cluster_id.trim();
+        let table_key = table_id.trim();
+        if cluster_key.is_empty() || table_key.is_empty() {
+            return;
+        }
+
+        let mut prefs = self.table_preferences();
+
+        let search_query = filters.search_query.trim().to_string();
+        let extra_filters: HashMap<String, String> = filters
+            .extra_filters
+            .into_iter()
+            .filter_map(|(k, v)| {
+                let k = k.trim().to_string();
+                let v = v.trim().to_string();
+                if k.is_empty() || v.is_empty() {
+                    None
+                } else {
+                    Some((k, v))
+                }
+            })
+            .collect();
+
+        let normalized = PersistedClusterTableFilters {
+            search_query,
+            extra_filters,
+        };
+
+        if normalized == PersistedClusterTableFilters::default() {
+            if let Some(cluster_tables) = prefs.clusters.get_mut(cluster_key) {
+                cluster_tables.remove(table_key);
+                if cluster_tables.is_empty() {
+                    prefs.clusters.remove(cluster_key);
+                }
+            }
+        } else {
+            prefs
+                .clusters
+                .entry(cluster_key.to_string())
+                .or_default()
+                .insert(table_key.to_string(), normalized);
+        }
+
+        self.write_table_preferences(prefs);
     }
 
     /// Generates the unified `Configuration` model list sent to the frontend.
@@ -1573,6 +1746,124 @@ mod tests {
         assert!(!reset.values.contains_key("uiStyle"));
         assert!(!reset.values.contains_key("accentColor"));
         assert!(reset.enable_experience_features());
+    }
+
+    #[test]
+    fn test_table_preferences_system_definition_exists() {
+        let defs = Configuration::system_definitions();
+        let cfg = defs
+            .iter()
+            .find(|c| c.key == "tablePreferences")
+            .expect("tablePreferences must exist");
+        assert!(cfg.enable);
+        assert_eq!(cfg.datatype, "string");
+        assert_eq!(cfg.cardinality, "0..1");
+        assert_eq!(cfg.default_value, Some(serde_json::json!({})));
+    }
+
+    #[test]
+    fn test_orbit_config_table_config_roundtrip_and_validation() {
+        let _guard = TestConfigDirGuard::new("table_config_roundtrip");
+        let mut config = OrbitConfig::default();
+
+        config.update_table_config(
+            "pods",
+            PersistedTableConfig {
+                page_size: Some(50),
+                hidden_columns: vec![
+                    "node".to_string(),
+                    "restarts".to_string(),
+                    "node".to_string(),
+                    "  ".to_string(),
+                ],
+                sort_column: Some("name".to_string()),
+                sort_direction: Some(PersistedSortDirection::Asc),
+            },
+        );
+        config.save().expect("save should succeed");
+
+        let reloaded = OrbitConfig::load();
+        let prefs = reloaded.table_preferences();
+        assert_eq!(
+            prefs.tables.get("pods"),
+            Some(&PersistedTableConfig {
+                page_size: Some(50),
+                hidden_columns: vec!["node".to_string(), "restarts".to_string()],
+                sort_column: Some("name".to_string()),
+                sort_direction: Some(PersistedSortDirection::Asc),
+            })
+        );
+
+        // Invalid page_size (e.g. 13) is ignored/normalized to None
+        let mut next = reloaded;
+        next.update_table_config(
+            "pods",
+            PersistedTableConfig {
+                page_size: Some(13),
+                hidden_columns: vec![],
+                sort_column: Some("age".to_string()),
+                sort_direction: Some(PersistedSortDirection::Desc),
+            },
+        );
+        assert_eq!(
+            next.table_preferences().tables.get("pods"),
+            Some(&PersistedTableConfig {
+                page_size: None,
+                hidden_columns: vec![],
+                sort_column: Some("age".to_string()),
+                sort_direction: Some(PersistedSortDirection::Desc),
+            })
+        );
+
+        // Empty config prunes the table entry and removes tablePreferences if empty
+        next.update_table_config("pods", PersistedTableConfig::default());
+        assert!(!next.table_preferences().tables.contains_key("pods"));
+        assert!(!next.values.contains_key("tablePreferences"));
+    }
+
+    #[test]
+    fn test_orbit_config_cluster_table_filters_isolation_and_pruning() {
+        let _guard = TestConfigDirGuard::new("cluster_table_filters");
+        let mut config = OrbitConfig::default();
+
+        let mut extra = HashMap::new();
+        extra.insert("status".to_string(), "Running".to_string());
+        extra.insert("empty".to_string(), "  ".to_string());
+
+        config.update_cluster_table_filters(
+            "prod-ctx",
+            "pods",
+            PersistedClusterTableFilters {
+                search_query: "  nginx ".to_string(),
+                extra_filters: extra,
+            },
+        );
+        config.save().expect("save should succeed");
+
+        let reloaded = OrbitConfig::load();
+        let prefs = reloaded.table_preferences();
+        let prod_pods = prefs
+            .clusters
+            .get("prod-ctx")
+            .and_then(|t| t.get("pods"))
+            .expect("prod-ctx pods filters must exist");
+        assert_eq!(prod_pods.search_query, "nginx");
+        assert_eq!(
+            prod_pods.extra_filters.get("status").map(String::as_str),
+            Some("Running")
+        );
+        assert!(!prod_pods.extra_filters.contains_key("empty"));
+        assert!(!prefs.clusters.contains_key("dev-ctx"));
+
+        // Clearing search + extra filters prunes the empty entry
+        let mut cleared = reloaded;
+        cleared.update_cluster_table_filters(
+            "prod-ctx",
+            "pods",
+            PersistedClusterTableFilters::default(),
+        );
+        assert!(cleared.table_preferences().clusters.is_empty());
+        assert!(!cleared.values.contains_key("tablePreferences"));
     }
 }
 

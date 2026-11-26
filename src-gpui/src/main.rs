@@ -1989,6 +1989,7 @@ pub struct OrbitShell {
     workload_action_modal: WorkloadActionModalState,
     port_forward_modal: Option<PortForwardModalState>,
     action_toast: ActionToastState,
+    table_preferences: orbit_core::config::PersistedTablePreferences,
 }
 
 impl OrbitShell {
@@ -2086,6 +2087,8 @@ impl OrbitShell {
                                 shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
                             }
                         }
+                        let is_cluster_connected =
+                            matches!(event, ClusterBridgeEvent::ClusterConnected { .. });
                         for cmd in apply_cluster_event_with_tabs(
                             &mut shell.state,
                             &mut shell.sidebar,
@@ -2117,6 +2120,9 @@ impl OrbitShell {
                             event,
                         ) {
                             shell.dispatch_command(cmd);
+                        }
+                        if is_cluster_connected {
+                            shell.hydrate_exemplar_tables();
                         }
                         shell.reconcile_drawer_target_exists();
                         cx.notify();
@@ -2155,7 +2161,7 @@ impl OrbitShell {
         let focus_handle = cx.focus_handle();
         focus_handle.focus(window);
 
-        Self {
+        let mut shell = Self {
             state: ClusterSwitcherState::new(),
             sidebar: SidebarLayoutState::new(),
             overview: ClusterOverviewState::default(),
@@ -2200,7 +2206,10 @@ impl OrbitShell {
             workload_action_modal: WorkloadActionModalState::default(),
             port_forward_modal: None,
             action_toast: ActionToastState::default(),
-        }
+            table_preferences: config.table_preferences(),
+        };
+        shell.hydrate_exemplar_tables();
+        shell
     }
 
     fn open_add_cluster_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -2999,7 +3008,290 @@ impl OrbitShell {
                 namespaces: updated,
             });
         }
+        self.reset_exemplar_pages();
         cx.notify();
+    }
+
+    fn hydrate_exemplar_tables(&mut self) {
+        let cluster_id = self.state.active_cluster_id.as_deref();
+        self.pods.hydrate_table_preferences(
+            cluster_id,
+            &self.table_preferences,
+            &views::pods::pod_columns(),
+        );
+        self.deployments.hydrate_table_preferences(
+            cluster_id,
+            &self.table_preferences,
+            &views::deployments::deployment_columns(),
+        );
+        self.services.hydrate_table_preferences(
+            cluster_id,
+            &self.table_preferences,
+            &views::services::service_columns(),
+        );
+        self.events.hydrate_table_preferences(
+            cluster_id,
+            &self.table_preferences,
+            &views::events::event_columns(),
+        );
+    }
+
+    fn reset_exemplar_pages(&mut self) {
+        self.pods.table.reset_page();
+        self.deployments.table.reset_page();
+        self.services.table.reset_page();
+        self.events.table.reset_page();
+    }
+
+    fn exemplar_table_mut(
+        &mut self,
+        view: WorkspaceView,
+    ) -> Option<(
+        &'static str,
+        &mut crate::components::DataTableState,
+        Vec<crate::components::TableColumn>,
+    )> {
+        match view {
+            WorkspaceView::Pods => Some(("pods", &mut self.pods.table, views::pods::pod_columns())),
+            WorkspaceView::Deployments => Some((
+                "deployments",
+                &mut self.deployments.table,
+                views::deployments::deployment_columns(),
+            )),
+            WorkspaceView::Services => Some((
+                "services",
+                &mut self.services.table,
+                views::services::service_columns(),
+            )),
+            WorkspaceView::Events => Some((
+                "events",
+                &mut self.events.table,
+                views::events::event_columns(),
+            )),
+            _ => None,
+        }
+    }
+
+    fn persist_table_config(
+        &mut self,
+        table_id: &str,
+        config: orbit_core::config::PersistedTableConfig,
+    ) {
+        self.table_preferences
+            .tables
+            .insert(table_id.to_string(), config.clone());
+        self.dispatch_command(ClusterBridgeCommand::SaveTableConfig {
+            table_id: table_id.to_string(),
+            config,
+        });
+    }
+
+    fn persist_cluster_table_filters(
+        &mut self,
+        table_id: &str,
+        filters: orbit_core::config::PersistedClusterTableFilters,
+    ) {
+        let Some(cluster_id) = self.state.active_cluster_id.clone() else {
+            return;
+        };
+        self.table_preferences
+            .clusters
+            .entry(cluster_id.clone())
+            .or_default()
+            .insert(table_id.to_string(), filters.clone());
+        self.dispatch_command(ClusterBridgeCommand::SaveClusterTableFilters {
+            cluster_id,
+            table_id: table_id.to_string(),
+            filters,
+        });
+    }
+
+    fn handle_exemplar_table_key(
+        &mut self,
+        event: &gpui::KeyDownEvent,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if event.keystroke.modifiers.control
+            || event.keystroke.modifiers.alt
+            || event.keystroke.modifiers.platform
+        {
+            return false;
+        }
+        let active_view = self.sidebar.active_view;
+        let key_lower = event.keystroke.key.to_ascii_lowercase();
+        let Some((table_id, table, _)) = self.exemplar_table_mut(active_view) else {
+            return false;
+        };
+
+        if key_lower == "escape" && table.config_popover_open {
+            table.config_popover_open = false;
+            cx.notify();
+            return true;
+        }
+        if !table.filters.search_focused {
+            return false;
+        }
+
+        let mut changed = false;
+        if key_lower == "escape" {
+            table.filters.search_focused = false;
+            cx.notify();
+            return true;
+        } else if key_lower == "backspace" {
+            if table.filters.search_query.pop().is_some() {
+                table.reset_page();
+                changed = true;
+            }
+        } else if let Some(ch) = event.keystroke.key_char.as_deref()
+            && !ch.is_empty()
+            && !ch.chars().any(char::is_control)
+        {
+            table.filters.search_query.push_str(ch);
+            table.reset_page();
+            changed = true;
+        } else if key_lower == "space" {
+            table.filters.search_query.push(' ');
+            table.reset_page();
+            changed = true;
+        }
+
+        if changed {
+            let filters = table.to_persisted_filters();
+            self.persist_cluster_table_filters(table_id, filters);
+        }
+        cx.notify();
+        true
+    }
+
+    fn table_action_cb(
+        &self,
+        view: WorkspaceView,
+        cx: &mut Context<Self>,
+        f: impl 'static + Fn(&mut Self, &'static str, &mut crate::components::DataTableState, &[crate::components::TableColumn]),
+    ) -> crate::components::TableActionCallback {
+        let entity = cx.entity().clone();
+        std::rc::Rc::new(move |_window, cx| {
+            entity.update(cx, |shell, cx| {
+                if let Some((table_id, mut table, cols)) = shell.exemplar_table_mut(view).map(|(id, t, c)| (id, t.clone(), c)) {
+                    f(shell, table_id, &mut table, &cols);
+                    if let Some((_, dst, _)) = shell.exemplar_table_mut(view) {
+                        *dst = table;
+                    }
+                    cx.notify();
+                }
+            });
+        })
+    }
+
+    fn table_enhancement_callbacks(
+        &self,
+        view: WorkspaceView,
+        cx: &mut Context<Self>,
+    ) -> crate::components::DataTableEnhancementCallbacks {
+        use std::rc::Rc;
+
+        let page_entity = cx.entity().clone();
+        let on_page_change: crate::components::PageChangeCallback =
+            Rc::new(move |first, page_size, _window, cx| {
+                page_entity.update(cx, |shell, cx| {
+                    if let Some((table_id, table, _)) = shell.exemplar_table_mut(view) {
+                        let size_changed = table.pagination.page_size != page_size;
+                        table.pagination.first = first;
+                        table.pagination.page_size = page_size;
+                        if size_changed {
+                            let cfg = table.to_persisted_config();
+                            shell.persist_table_config(table_id, cfg);
+                        }
+                        cx.notify();
+                    }
+                });
+            });
+
+        let focus_entity = cx.entity().clone();
+        let on_focus_search: crate::components::TableBoolCallback =
+            Rc::new(move |focused, window, cx| {
+                focus_entity.update(cx, |shell, cx| {
+                    if let Some((_, table, _)) = shell.exemplar_table_mut(view) {
+                        table.filters.search_focused = focused;
+                        table.config_popover_open = false;
+                        if focused {
+                            shell.focus_handle.focus(window);
+                        }
+                        cx.notify();
+                    }
+                });
+            });
+
+        let extra_entity = cx.entity().clone();
+        let on_extra_filter: crate::components::TableExtraFilterCallback =
+            Rc::new(move |key, value, _window, cx| {
+                extra_entity.update(cx, |shell, cx| {
+                    if let Some((table_id, table, _)) = shell.exemplar_table_mut(view) {
+                        table.set_extra_filter(key, value);
+                        let filters = table.to_persisted_filters();
+                        shell.persist_cluster_table_filters(table_id, filters);
+                        cx.notify();
+                    }
+                });
+            });
+
+        let toggle_col_entity = cx.entity().clone();
+        let on_toggle_column: crate::components::TableColumnToggleCallback =
+            Rc::new(move |col_id, locked, _window, cx| {
+                toggle_col_entity.update(cx, |shell, cx| {
+                    if let Some((table_id, table, _)) = shell.exemplar_table_mut(view)
+                        && table.toggle_column(&col_id, locked)
+                    {
+                        let cfg = table.to_persisted_config();
+                        shell.persist_table_config(table_id, cfg);
+                        cx.notify();
+                    }
+                });
+            });
+
+        let toggle_all_entity = cx.entity().clone();
+        let on_toggle_all: crate::components::TableBoolCallback =
+            Rc::new(move |visible, _window, cx| {
+                toggle_all_entity.update(cx, |shell, cx| {
+                    if let Some((table_id, table, cols)) = shell.exemplar_table_mut(view) {
+                        table.set_all_columns_visible(&cols, visible);
+                        let cfg = table.to_persisted_config();
+                        shell.persist_table_config(table_id, cfg);
+                        cx.notify();
+                    }
+                });
+            });
+
+        crate::components::DataTableEnhancementCallbacks {
+            on_page_change,
+            toolbar: crate::components::TableToolbarCallbacks {
+                on_focus_search,
+                on_clear_search: self.table_action_cb(view, cx, |shell, table_id, table, _| {
+                    table.set_search_query("");
+                    shell.persist_cluster_table_filters(table_id, table.to_persisted_filters());
+                }),
+                on_extra_filter,
+                on_clear_filters: self.table_action_cb(view, cx, |shell, table_id, table, _| {
+                    table.clear_filters();
+                    shell.persist_cluster_table_filters(table_id, table.to_persisted_filters());
+                }),
+                on_toggle_columns_popover: self.table_action_cb(view, cx, |_, _, table, _| {
+                    table.config_popover_open = !table.config_popover_open;
+                    table.filters.search_focused = false;
+                }),
+            },
+            column_config: crate::components::ColumnConfigCallbacks {
+                on_close: self.table_action_cb(view, cx, |_, _, table, _| {
+                    table.config_popover_open = false;
+                }),
+                on_toggle_column,
+                on_toggle_all,
+                on_reset_defaults: self.table_action_cb(view, cx, |shell, table_id, table, cols| {
+                    table.reset_columns(cols);
+                    shell.persist_table_config(table_id, table.to_persisted_config());
+                }),
+            },
+        }
     }
 
     fn dispatch_command(&self, cmd: ClusterBridgeCommand) {
@@ -6466,6 +6758,7 @@ impl OrbitShell {
                         namespaces: cleared,
                     });
                 }
+                this.reset_exemplar_pages();
                 cx.notify();
             }))
             .child(
@@ -6533,6 +6826,7 @@ impl OrbitShell {
                         namespaces: updated,
                     });
                 }
+                this.reset_exemplar_pages();
                 cx.notify();
             }))
             .child(
@@ -6912,6 +7206,8 @@ impl OrbitShell {
                                 cx: &mut App| {
                 sort_entity.update(cx, |shell, cx| {
                     shell.events.table.toggle_sort(col_id.as_ref());
+                    let cfg = shell.events.table.to_persisted_config();
+                    shell.persist_table_config("events", cfg);
                     cx.notify();
                 });
             };
@@ -7057,6 +7353,7 @@ impl OrbitShell {
                 on_row_context_menu,
                 on_type_filter,
                 on_refresh,
+                Some(self.table_enhancement_callbacks(WorkspaceView::Events, cx)),
             );
         }
 
@@ -7068,6 +7365,8 @@ impl OrbitShell {
                                 cx: &mut App| {
                 sort_entity.update(cx, |shell, cx| {
                     shell.deployments.table.toggle_sort(col_id.as_ref());
+                    let cfg = shell.deployments.table.to_persisted_config();
+                    shell.persist_table_config("deployments", cfg);
                     cx.notify();
                 });
             };
@@ -7270,6 +7569,7 @@ impl OrbitShell {
                 on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
+                Some(self.table_enhancement_callbacks(WorkspaceView::Deployments, cx)),
             );
         }
 
@@ -8194,6 +8494,8 @@ impl OrbitShell {
                                 cx: &mut App| {
                 sort_entity.update(cx, |shell, cx| {
                     shell.services.table.toggle_sort(col_id.as_ref());
+                    let cfg = shell.services.table.to_persisted_config();
+                    shell.persist_table_config("services", cfg);
                     cx.notify();
                 });
             };
@@ -8367,6 +8669,7 @@ impl OrbitShell {
                 on_row_context_menu,
                 on_type_filter,
                 on_refresh,
+                Some(self.table_enhancement_callbacks(WorkspaceView::Services, cx)),
             );
         }
 
@@ -9068,6 +9371,8 @@ impl OrbitShell {
                                 cx: &mut App| {
                 sort_entity.update(cx, |shell, cx| {
                     shell.pods.table.toggle_sort(col_id.as_ref());
+                    let cfg = shell.pods.table.to_persisted_config();
+                    shell.persist_table_config("pods", cfg);
                     cx.notify();
                 });
             };
@@ -9250,6 +9555,7 @@ impl OrbitShell {
                 on_row_quick_yaml,
                 on_row_context_menu,
                 on_refresh,
+                Some(self.table_enhancement_callbacks(WorkspaceView::Pods, cx)),
             );
         }
 
@@ -11486,6 +11792,9 @@ impl Render for OrbitShell {
                     )
                 {
                     cx.notify();
+                    return;
+                }
+                if this.handle_exemplar_table_key(event, cx) {
                     return;
                 }
                 if this.namespaces.dropdown_open

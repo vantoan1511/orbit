@@ -1243,6 +1243,33 @@ pub async fn handle_bridge_command_with_tracker(
                 );
             }
         }
+        ClusterBridgeCommand::SaveTableConfig { table_id, config } => {
+            let mut guard = manager.write().await;
+            guard.config.update_table_config(&table_id, config);
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(table_id = %table_id, error = %message, "Failed to persist table config");
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
+        ClusterBridgeCommand::SaveClusterTableFilters {
+            cluster_id,
+            table_id,
+            filters,
+        } => {
+            let mut guard = manager.write().await;
+            guard
+                .config
+                .update_cluster_table_filters(&cluster_id, &table_id, filters);
+            if let Err(message) = guard.config.save() {
+                tracing::warn!(
+                    cluster_id = %cluster_id,
+                    table_id = %table_id,
+                    error = %message,
+                    "Failed to persist cluster table filters"
+                );
+                let _ = event_tx.send(ClusterBridgeEvent::SettingsSaveFailed { message });
+            }
+        }
         ClusterBridgeCommand::SaveThemeMode { mode } => {
             let mut guard = manager.write().await;
             guard.config.update_theme_mode(&mode);
@@ -2117,6 +2144,64 @@ users:
                 ],
                 active_tab: Some("workloads-deployments".to_string()),
             })
+        );
+    }
+
+    #[tokio::test]
+    async fn test_bridge_save_table_config_and_cluster_filters_persists_to_orbit_config() {
+        use orbit_core::config::{
+            PersistedClusterTableFilters, PersistedSortDirection, PersistedTableConfig,
+        };
+        use std::collections::HashMap;
+
+        let _guard = orbit_core::config::TestConfigDirGuard::new("gpui_table_prefs_bridge");
+        let manager = Arc::new(RwLock::new(KubeManager::new_empty(OrbitConfig::load())));
+        let (event_tx, _event_rx) = mpsc::unbounded_channel();
+
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveTableConfig {
+                table_id: "pods".to_string(),
+                config: PersistedTableConfig {
+                    page_size: Some(50),
+                    hidden_columns: vec!["node".to_string()],
+                    sort_column: Some("name".to_string()),
+                    sort_direction: Some(PersistedSortDirection::Asc),
+                },
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let mut extra = HashMap::new();
+        extra.insert("status".to_string(), "Running".to_string());
+        handle_bridge_command(
+            ClusterBridgeCommand::SaveClusterTableFilters {
+                cluster_id: "ctx-a".to_string(),
+                table_id: "pods".to_string(),
+                filters: PersistedClusterTableFilters {
+                    search_query: "nginx".to_string(),
+                    extra_filters: extra,
+                },
+            },
+            &manager,
+            &event_tx,
+        )
+        .await;
+
+        let reloaded = OrbitConfig::load();
+        let prefs = reloaded.table_preferences();
+        assert_eq!(
+            prefs.tables.get("pods").and_then(|c| c.page_size),
+            Some(50)
+        );
+        assert_eq!(
+            prefs
+                .clusters
+                .get("ctx-a")
+                .and_then(|m| m.get("pods"))
+                .map(|f| f.search_query.as_str()),
+            Some("nginx")
         );
     }
 

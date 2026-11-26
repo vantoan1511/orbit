@@ -9,7 +9,9 @@ use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, ServiceInfo};
 
 use crate::components::data_table::{
-    DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
+    DataTableCallbacks, DataTableEnhancementCallbacks, SortState, TableColumn,
+    TableFilterChipGroup, TableFilterChipOption, TableFilterState, render_enhanced_data_table,
+    sort_rows_stable,
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, TextTooltip,
@@ -49,7 +51,9 @@ pub struct ServiceMetricCard {
 
 pub fn service_columns() -> Vec<TableColumn> {
     vec![
-        TableColumn::new("name", "Name").flex_width(1.8, px(150.0)),
+        TableColumn::new("name", "Name")
+            .flex_width(1.8, px(150.0))
+            .locked(true),
         TableColumn::new("namespace", "Namespace").flex_width(1.0, px(105.0)),
         TableColumn::new("type", "Type").fixed_width(px(120.0)),
         TableColumn::new("cluster_ip", "Cluster IP")
@@ -144,11 +148,48 @@ pub fn filter_and_sort_services<'a>(
     type_filter: ServiceTypeFilter,
     sort: Option<&SortState>,
 ) -> Vec<&'a ServiceInfo> {
+    filter_and_sort_services_with_filters(
+        services,
+        namespaces,
+        type_filter,
+        &TableFilterState::default(),
+        sort,
+    )
+}
+
+pub fn filter_and_sort_services_with_filters<'a>(
+    services: &'a [ServiceInfo],
+    namespaces: &NamespaceFilterState,
+    type_filter: ServiceTypeFilter,
+    filters: &TableFilterState,
+    sort: Option<&SortState>,
+) -> Vec<&'a ServiceInfo> {
+    let query = filters.search_query.trim().to_ascii_lowercase();
+    let extra_type = filters
+        .extra_filters
+        .get("type")
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty() && s != "all");
+
     let mut rows: Vec<&'a ServiceInfo> = services
         .iter()
         .filter(|svc| {
             namespaces.matches_resource_namespace(Some(&svc.namespace))
                 && type_filter.matches(&svc.r#type)
+                && extra_type
+                    .as_deref()
+                    .is_none_or(|t| svc.r#type.to_ascii_lowercase() == t)
+        })
+        .filter(|svc| {
+            if query.is_empty() {
+                return true;
+            }
+            svc.name.to_ascii_lowercase().contains(&query)
+                || svc.namespace.to_ascii_lowercase().contains(&query)
+                || svc.r#type.to_ascii_lowercase().contains(&query)
+                || svc.cluster_ip.to_ascii_lowercase().contains(&query)
+                || svc.external_ip.to_ascii_lowercase().contains(&query)
+                || svc.ports.to_ascii_lowercase().contains(&query)
         })
         .collect();
     sort_rows_stable(&mut rows, sort, |a, b, col_id| {
@@ -496,12 +537,14 @@ pub fn render_services_view(
     on_row_context_menu: impl 'static + Fn(SharedString, &ServiceInfo, &MouseDownEvent, &mut Window, &mut App),
     on_type_filter: impl 'static + Fn(ServiceTypeFilter, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = service_columns();
-    let filtered_refs = filter_and_sort_services(
+    let filtered_refs = filter_and_sort_services_with_filters(
         &state.services,
         namespaces,
         state.type_filter,
+        &state.table.filters,
         state.table.sort.as_ref(),
     );
     let summary_row = div()
@@ -571,9 +614,25 @@ pub fn render_services_view(
         WorkspaceView::Services.description(),
         count_label,
         Some(namespaces),
-        Some(type_chips.into_any_element()),
+        if enhancements.is_some() {
+            None
+        } else {
+            Some(type_chips.into_any_element())
+        },
         theme,
     );
+
+    let filter_groups = [TableFilterChipGroup {
+        key: "type",
+        default_value: "All",
+        options: vec![
+            TableFilterChipOption { value: "All", label: "All" },
+            TableFilterChipOption { value: "ClusterIP", label: "ClusterIP" },
+            TableFilterChipOption { value: "NodePort", label: "NodePort" },
+            TableFilterChipOption { value: "LoadBalancer", label: "LoadBalancer" },
+            TableFilterChipOption { value: "ExternalName", label: "ExternalName" },
+        ],
+    }];
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -632,13 +691,16 @@ pub fn render_services_view(
                 }
             });
 
-            render_data_table(
+            render_enhanced_data_table(
                 "services-table",
+                "Filter services...",
+                &filter_groups,
                 &columns,
                 visible_count,
                 &table_state,
                 theme,
                 callbacks,
+                enhancements,
             )
         }
     };
@@ -1077,5 +1139,36 @@ mod tests {
         let matched = filter_events_for_service(&events, &svc);
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].uid, "e1");
+    }
+
+    #[test]
+    fn test_filter_and_sort_services_applies_search_query_and_type_extra_filter() {
+        let cols = service_columns();
+        let name_col = cols.iter().find(|c| c.id.as_ref() == "name").expect("name col");
+        assert!(name_col.locked);
+
+        let svcs = vec![
+            make_service("api", "default", "ClusterIP", "10.0.0.1", "-", "80/TCP", "1", "1m"),
+            make_service("api-lb", "default", "LoadBalancer", "10.0.0.2", "1.2.3.4", "443/TCP", "1", "2m"),
+            make_service("web-lb", "default", "LoadBalancer", "10.0.0.3", "1.2.3.5", "80/TCP", "1", "3m"),
+        ];
+        let ns = NamespaceFilterState::default();
+        let mut filters = crate::components::TableFilterState {
+            search_query: "api".to_string(),
+            ..Default::default()
+        };
+        filters
+            .extra_filters
+            .insert("type".to_string(), "LoadBalancer".to_string());
+
+        let matched = filter_and_sort_services_with_filters(
+            &svcs,
+            &ns,
+            ServiceTypeFilter::All,
+            &filters,
+            None,
+        );
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].name, "api-lb");
     }
 }

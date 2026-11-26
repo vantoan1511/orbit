@@ -9,7 +9,9 @@ use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, PodInfo};
 
 use crate::components::data_table::{
-    DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
+    DataTableCallbacks, DataTableEnhancementCallbacks, SortState, TableColumn,
+    TableFilterChipGroup, TableFilterChipOption, TableFilterState, render_enhanced_data_table,
+    sort_rows_stable,
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
@@ -49,7 +51,9 @@ pub struct PodMetricCard {
 
 pub fn pod_columns() -> Vec<TableColumn> {
     vec![
-        TableColumn::new("name", "Name").flex_width(2.0, px(160.0)),
+        TableColumn::new("name", "Name")
+            .flex_width(2.0, px(160.0))
+            .locked(true),
         TableColumn::new("namespace", "Namespace").flex_width(1.0, px(105.0)),
         TableColumn::new("status", "Status").fixed_width(px(125.0)),
         TableColumn::new("ready", "Ready")
@@ -165,9 +169,58 @@ pub fn filter_and_sort_pods<'a>(
     namespaces: &NamespaceFilterState,
     sort: Option<&SortState>,
 ) -> Vec<&'a PodInfo> {
+    filter_and_sort_pods_with_filters(pods, namespaces, &TableFilterState::default(), sort)
+}
+
+pub fn filter_and_sort_pods_with_filters<'a>(
+    pods: &'a [PodInfo],
+    namespaces: &NamespaceFilterState,
+    filters: &TableFilterState,
+    sort: Option<&SortState>,
+) -> Vec<&'a PodInfo> {
+    let query = filters.search_query.trim().to_ascii_lowercase();
+    let status_filter = filters
+        .extra_filters
+        .get("status")
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty() && s != "all");
+
     let mut rows: Vec<&'a PodInfo> = pods
         .iter()
         .filter(|pod| namespaces.matches_resource_namespace(Some(&pod.namespace)))
+        .filter(|pod| {
+            if let Some(status) = status_filter.as_deref() {
+                let pod_status = pod.status.to_ascii_lowercase();
+                match status {
+                    "running" => pod_status == "running",
+                    "pending" => pod_status == "pending",
+                    "failed" => matches!(
+                        pod_status.as_str(),
+                        "failed" | "error" | "crashloopbackoff" | "imagepullbackoff" | "errimagepull"
+                    ),
+                    "succeeded" => matches!(pod_status.as_str(), "succeeded" | "completed"),
+                    other => pod_status == other,
+                }
+            } else {
+                true
+            }
+        })
+        .filter(|pod| {
+            if query.is_empty() {
+                return true;
+            }
+            pod.name.to_ascii_lowercase().contains(&query)
+                || pod.namespace.to_ascii_lowercase().contains(&query)
+                || pod.status.to_ascii_lowercase().contains(&query)
+                || pod
+                    .node
+                    .as_deref()
+                    .is_some_and(|n| n.to_ascii_lowercase().contains(&query))
+                || pod
+                    .ip
+                    .as_deref()
+                    .is_some_and(|ip| ip.to_ascii_lowercase().contains(&query))
+        })
         .collect();
     sort_rows_stable(&mut rows, sort, |a, b, col_id| {
         compare_pods_by_col(a, b, col_id)
@@ -497,9 +550,15 @@ pub fn render_pods_view(
     on_row_context_menu: impl 'static
     + Fn(SharedString, &PodInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = pod_columns();
-    let filtered_refs = filter_and_sort_pods(&state.pods, namespaces, state.table.sort.as_ref());
+    let filtered_refs = filter_and_sort_pods_with_filters(
+        &state.pods,
+        namespaces,
+        &state.table.filters,
+        state.table.sort.as_ref(),
+    );
     let summary_row = div()
         .w_full()
         .px_4()
@@ -512,7 +571,7 @@ pub fn render_pods_view(
     let is_loading = state.status == PodsLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let count_label = if namespaces.is_all_namespaces() {
+    let count_label = if namespaces.is_all_namespaces() && visible_count == total_count {
         format!("{total_count} pods")
     } else {
         format!("{visible_count} of {total_count} pods")
@@ -536,6 +595,18 @@ pub fn render_pods_view(
             on_refresh_rc.clone(),
         )
     });
+
+    let filter_groups = [TableFilterChipGroup {
+        key: "status",
+        default_value: "All",
+        options: vec![
+            TableFilterChipOption { value: "All", label: "All" },
+            TableFilterChipOption { value: "Running", label: "Running" },
+            TableFilterChipOption { value: "Pending", label: "Pending" },
+            TableFilterChipOption { value: "Failed", label: "Failed" },
+            TableFilterChipOption { value: "Succeeded", label: "Succeeded" },
+        ],
+    }];
 
     let mode = pods_presentation_mode(state);
     let body = match mode {
@@ -584,13 +655,16 @@ pub fn render_pods_view(
                 }
             });
 
-            render_data_table(
+            render_enhanced_data_table(
                 "pods-table",
+                "Filter pods...",
+                &filter_groups,
                 &columns,
                 visible_count,
                 &table_state,
                 theme,
                 callbacks,
+                enhancements,
             )
         }
     };
@@ -1156,5 +1230,30 @@ mod tests {
         assert_eq!(matched.len(), 2);
         assert_eq!(matched[0].uid, "1");
         assert_eq!(matched[1].uid, "2");
+    }
+
+    #[test]
+    fn test_filter_and_sort_pods_applies_search_query_and_status_extra_filter() {
+        let cols = pod_columns();
+        let name_col = cols.iter().find(|c| c.id.as_ref() == "name").expect("name col");
+        assert!(name_col.locked);
+
+        let pods = vec![
+            make_pod("api-0", "default", "Running", 1, 1, 0, None, None, "1m"),
+            make_pod("worker-0", "default", "Pending", 0, 1, 0, None, None, "2m"),
+            make_pod("api-1", "default", "Failed", 0, 1, 3, None, None, "3m"),
+        ];
+        let ns = NamespaceFilterState::default();
+        let mut filters = crate::components::TableFilterState {
+            search_query: "api".to_string(),
+            ..Default::default()
+        };
+        filters
+            .extra_filters
+            .insert("status".to_string(), "Failed".to_string());
+
+        let matched = filter_and_sort_pods_with_filters(&pods, &ns, &filters, None);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].name, "api-1");
     }
 }

@@ -9,7 +9,9 @@ use lucide_icons::Icon;
 use orbit_core::kubernetes::models::DeploymentInfo;
 
 use crate::components::data_table::{
-    DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
+    DataTableCallbacks, DataTableEnhancementCallbacks, SortState, TableColumn,
+    TableFilterChipGroup, TableFilterChipOption, TableFilterState, render_enhanced_data_table,
+    sort_rows_stable,
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
@@ -32,7 +34,9 @@ pub enum DeploymentsPresentationMode {
 
 pub fn deployment_columns() -> Vec<TableColumn> {
     vec![
-        TableColumn::new("name", "Name").flex_width(2.0, px(160.0)),
+        TableColumn::new("name", "Name")
+            .flex_width(2.0, px(160.0))
+            .locked(true),
         TableColumn::new("namespace", "Namespace").flex_width(1.1, px(110.0)),
         TableColumn::new("status", "Status").fixed_width(px(115.0)),
         TableColumn::new("replicas", "Replicas")
@@ -122,9 +126,49 @@ pub fn filter_and_sort_deployments<'a>(
     namespaces: &NamespaceFilterState,
     sort: Option<&SortState>,
 ) -> Vec<&'a DeploymentInfo> {
+    filter_and_sort_deployments_with_filters(
+        deployments,
+        namespaces,
+        &TableFilterState::default(),
+        sort,
+    )
+}
+
+pub fn filter_and_sort_deployments_with_filters<'a>(
+    deployments: &'a [DeploymentInfo],
+    namespaces: &NamespaceFilterState,
+    filters: &TableFilterState,
+    sort: Option<&SortState>,
+) -> Vec<&'a DeploymentInfo> {
+    let query = filters.search_query.trim().to_ascii_lowercase();
+    let status_filter = filters
+        .extra_filters
+        .get("status")
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty() && s != "all");
+
     let mut rows: Vec<&'a DeploymentInfo> = deployments
         .iter()
         .filter(|dep| namespaces.matches_resource_namespace(Some(&dep.namespace)))
+        .filter(|dep| {
+            if let Some(status) = status_filter.as_deref() {
+                dep.status.to_ascii_lowercase() == status
+            } else {
+                true
+            }
+        })
+        .filter(|dep| {
+            if query.is_empty() {
+                return true;
+            }
+            dep.name.to_ascii_lowercase().contains(&query)
+                || dep.namespace.to_ascii_lowercase().contains(&query)
+                || dep.status.to_ascii_lowercase().contains(&query)
+                || dep
+                    .images
+                    .iter()
+                    .any(|img| img.to_ascii_lowercase().contains(&query))
+        })
         .collect();
     sort_rows_stable(&mut rows, sort, |a, b, col_id| {
         compare_deployments_by_col(a, b, col_id)
@@ -298,20 +342,26 @@ pub fn render_deployments_view(
     on_row_context_menu: impl 'static
     + Fn(SharedString, &DeploymentInfo, &MouseDownEvent, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = deployment_columns();
     let filtered_rows: Rc<Vec<DeploymentInfo>> = Rc::new(
-        filter_and_sort_deployments(&state.deployments, namespaces, state.table.sort.as_ref())
-            .into_iter()
-            .cloned()
-            .collect(),
+        filter_and_sort_deployments_with_filters(
+            &state.deployments,
+            namespaces,
+            &state.table.filters,
+            state.table.sort.as_ref(),
+        )
+        .into_iter()
+        .cloned()
+        .collect(),
     );
     let total_count = state.deployments.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == DeploymentsLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let count_label = if namespaces.is_all_namespaces() {
+    let count_label = if namespaces.is_all_namespaces() && visible_count == total_count {
         format!("{total_count} deployments")
     } else {
         format!("{visible_count} of {total_count} deployments")
@@ -335,6 +385,17 @@ pub fn render_deployments_view(
             on_refresh_rc.clone(),
         )
     });
+
+    let filter_groups = [TableFilterChipGroup {
+        key: "status",
+        default_value: "All",
+        options: vec![
+            TableFilterChipOption { value: "All", label: "All" },
+            TableFilterChipOption { value: "Available", label: "Available" },
+            TableFilterChipOption { value: "Progressing", label: "Progressing" },
+            TableFilterChipOption { value: "Degraded", label: "Degraded" },
+        ],
+    }];
 
     let body = match deployments_presentation_mode(state) {
         DeploymentsPresentationMode::ErrorCard => {
@@ -382,13 +443,16 @@ pub fn render_deployments_view(
                 }
             });
 
-            render_data_table(
+            render_enhanced_data_table(
                 "deployments-table",
+                "Filter deployments...",
+                &filter_groups,
                 &columns,
                 visible_count,
                 &table_state,
                 theme,
                 callbacks,
+                enhancements,
             )
         }
     };
@@ -1055,5 +1119,30 @@ mod tests {
         assert!(delete_item.danger);
         assert!(!delete_item.disabled);
         assert!(delete_item.on_select.is_some());
+    }
+
+    #[test]
+    fn test_filter_and_sort_deployments_applies_search_query_and_status_extra_filter() {
+        let cols = deployment_columns();
+        let name_col = cols.iter().find(|c| c.id.as_ref() == "name").expect("name col");
+        assert!(name_col.locked);
+
+        let deps = vec![
+            make_deployment("web", "default", "Available", 2, 2, 2, 2, None, vec![], "1m"),
+            make_deployment("api", "default", "Progressing", 1, 2, 1, 1, None, vec![], "2m"),
+            make_deployment("web-canary", "default", "Degraded", 0, 1, 0, 0, None, vec![], "3m"),
+        ];
+        let ns = NamespaceFilterState::default();
+        let mut filters = crate::components::TableFilterState {
+            search_query: "web".to_string(),
+            ..Default::default()
+        };
+        filters
+            .extra_filters
+            .insert("status".to_string(), "Degraded".to_string());
+
+        let matched = filter_and_sort_deployments_with_filters(&deps, &ns, &filters, None);
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].name, "web-canary");
     }
 }
