@@ -5,6 +5,7 @@ pub mod data_table;
 pub mod port_forward_modal;
 pub mod resource_drawer;
 pub mod resource_kind;
+pub mod shell_drawers;
 pub mod status_badge;
 pub mod tab_bar;
 pub mod titlebar;
@@ -32,8 +33,16 @@ pub use data_table::{
     TableFilterChipOption, TableFilterState, TablePaginationState, TableToolbarCallbacks,
     apply_column_alignment, apply_column_width, format_paginator_report, paginate_rows_range,
     render_column_config_popover, render_data_table, render_empty_state,
-    render_enhanced_data_table, render_loading_skeleton, render_table_cell, render_table_header, render_table_paginator, render_table_toolbar,
-    resolve_data_table_surface_style, resolve_row_hover_actions, sort_rows_stable,
+    render_enhanced_data_table, render_loading_skeleton, render_table_cell, render_table_header,
+    render_table_paginator, render_table_toolbar, resolve_data_table_surface_style,
+    resolve_row_hover_actions, sort_rows_stable,
+};
+pub use port_forward_modal::{
+    PORT_FORWARD_KINDS, PortForwardModalCallbacks, PortForwardModalField,
+    PortForwardModalKeyResult, PortForwardModalMode, PortForwardModalState,
+    PortForwardResourceOption, extract_ports_from_deployment, extract_ports_from_pod,
+    extract_ports_from_port_str, extract_ports_from_replicaset, extract_ports_from_service,
+    extract_ports_from_statefulset, render_port_forward_modal,
 };
 pub use resource_drawer::{
     DEFAULT_DRAWER_WIDTH, DRAWER_MIN_WORKSPACE_MARGIN, MAX_DRAWER_WIDTH, MIN_DRAWER_WIDTH,
@@ -43,6 +52,12 @@ pub use resource_drawer::{
 pub use resource_kind::{
     ResourceKindMeta, parse_k8s_resource_kind, render_resource_kind_badge,
     render_resource_kind_icon, resource_kind_meta, resource_kind_meta_from_str,
+};
+pub use shell_drawers::{
+    ActiveShellDrawer, MAX_NOTIFICATIONS, NotificationCenterState, NotificationDrawerCallbacks,
+    NotificationFilterTab, NotificationItem, NotificationSeverity, ProfileDrawerCallbacks,
+    SHELL_DRAWER_WIDTH, ShellDrawerVoidCallback, format_relative_time, notifications_tooltip,
+    render_notification_drawer, render_profile_drawer,
 };
 pub use status_badge::{
     SemanticStatus, StatusBadgeStyle, StatusBadgeVariant, classify_status, render_status_badge,
@@ -64,13 +79,6 @@ pub use workload_action_modal::{
     ConfirmModalState, MAX_SCALE_REPLICAS, ScaleModalState, WorkloadActionDialogState,
     WorkloadActionModalCallbacks, WorkloadActionModalKeyResult, WorkloadActionModalState,
     render_workload_action_modal,
-};
-pub use port_forward_modal::{
-    PORT_FORWARD_KINDS, PortForwardModalCallbacks, PortForwardModalField,
-    PortForwardModalKeyResult, PortForwardModalMode, PortForwardModalState,
-    PortForwardResourceOption, extract_ports_from_deployment, extract_ports_from_pod,
-    extract_ports_from_port_str, extract_ports_from_replicaset, extract_ports_from_service,
-    extract_ports_from_statefulset, render_port_forward_modal,
 };
 pub use yaml_viewer::{
     CachedYamlDocument, CachedYamlLine, YAML_LINE_HEIGHT, YAML_MIN_GUTTER_DIGITS,
