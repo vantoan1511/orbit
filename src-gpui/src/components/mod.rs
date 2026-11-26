@@ -25,13 +25,15 @@ pub use context_menu::{
 };
 
 pub use data_table::{
-    ColumnAlign, ColumnConfigCallbacks, ColumnWidth, DataTableCallbacks,
-    DataTableEnhancementCallbacks, DataTableState, DataTableSurfaceStyle, PageChangeCallback,
-    PageSlice, PaginationMode, RowClickCallback, RowContextMenuCallback, RowHoverActionSpec,
-    SortCallback, SortDirection, SortState, TableActionCallback, TableBodyMode, TableBoolCallback,
-    TableColumn, TableColumnToggleCallback, TableExtraFilterCallback, TableFilterChipGroup,
-    TableFilterChipOption, TableFilterState, TablePaginationState, TableToolbarCallbacks,
-    apply_column_alignment, apply_column_width, format_paginator_report, paginate_rows_range,
+    ActiveColumnResize, COLUMN_RESIZE_HANDLE_WIDTH, ColumnAlign, ColumnConfigCallbacks,
+    ColumnResizeStartCallback, ColumnWidth, DEFAULT_MIN_COLUMN_WIDTH, DataTableCallbacks,
+    DataTableEnhancementCallbacks, DataTableState, DataTableSurfaceStyle, MAX_COLUMN_WIDTH,
+    PageChangeCallback, PageSlice, PaginationMode, RowClickCallback, RowContextMenuCallback,
+    RowHoverActionSpec, SortCallback, SortDirection, SortState, TableActionCallback,
+    TableBodyMode, TableBoolCallback, TableColumn, TableColumnToggleCallback,
+    TableExtraFilterCallback, TableFilterChipGroup, TableFilterChipOption, TableFilterState,
+    TablePaginationState, TableToolbarCallbacks, apply_column_alignment, apply_column_width,
+    clamp_column_width, format_paginator_report, paginate_rows_range,
     render_column_config_popover, render_data_table, render_empty_state,
     render_enhanced_data_table, render_loading_skeleton, render_table_cell, render_table_header,
     render_table_paginator, render_table_toolbar, resolve_data_table_surface_style,

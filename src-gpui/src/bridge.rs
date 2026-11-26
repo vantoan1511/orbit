@@ -2166,6 +2166,7 @@ users:
                     hidden_columns: vec!["node".to_string()],
                     sort_column: Some("name".to_string()),
                     sort_direction: Some(PersistedSortDirection::Asc),
+                    ..Default::default()
                 },
             },
             &manager,
