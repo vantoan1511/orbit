@@ -11,6 +11,7 @@ pub mod theme;
 pub mod views;
 
 use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui::{
     AnyElement, App, Application, Bounds, ClipboardItem, Context, CursorStyle, FocusHandle,
@@ -26,21 +27,23 @@ use tokio::sync::mpsc;
 
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
-    ActionToastKind, ActionToastState, AddClusterModalCallbacks, ContextMenuEntry,
-    ContextMenuKeyAction, ContextMenuState, PortForwardModalCallbacks, PortForwardModalKeyResult,
-    PortForwardModalState, PortForwardResourceOption, ResourceDrawerProps, ResourceDrawerState,
-    ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget, TabBarCallbacks,
-    TabContextMenuCallbacks, TabPickerCallbacks, WorkloadActionDialogState,
-    WorkloadActionModalCallbacks, WorkloadActionModalKeyResult, WorkloadActionModalState,
-    YamlLoadStatus, YamlViewerProps, build_tab_context_menu_entries,
-    extract_ports_from_deployment, extract_ports_from_pod, extract_ports_from_replicaset,
-    extract_ports_from_service, extract_ports_from_statefulset, parse_hex_color,
-    render_action_toast_overlay, render_add_cluster_modal, render_context_menu_overlay,
-    render_custom_titlebar, render_port_forward_modal, render_resource_drawer,
+    ActionToastKind, ActionToastState, ActiveShellDrawer, AddClusterModalCallbacks,
+    ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, NotificationCenterState,
+    NotificationDrawerCallbacks, NotificationSeverity, PortForwardModalCallbacks,
+    PortForwardModalKeyResult, PortForwardModalState, PortForwardResourceOption,
+    ProfileDrawerCallbacks, ResourceDrawerProps, ResourceDrawerState, ResourceDrawerTabDef,
+    ResourceDrawerTabId, ResourceDrawerTarget, TabBarCallbacks, TabContextMenuCallbacks,
+    TabPickerCallbacks, TextTooltip, WorkloadActionDialogState, WorkloadActionModalCallbacks,
+    WorkloadActionModalKeyResult, WorkloadActionModalState, YamlLoadStatus, YamlViewerProps,
+    build_tab_context_menu_entries, extract_ports_from_deployment, extract_ports_from_pod,
+    extract_ports_from_replicaset, extract_ports_from_service, extract_ports_from_statefulset,
+    notifications_tooltip, parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
+    render_context_menu_overlay, render_custom_titlebar, render_notification_drawer,
+    render_port_forward_modal, render_profile_drawer, render_resource_drawer,
     render_tab_resource_picker_overlay, render_workload_action_modal, render_workspace_tab_bar,
     render_yaml_viewer, resolve_window_chrome_style,
 };
-use crate::icons::render_icon;
+use crate::icons::{render_icon, theme_mode_icon, theme_mode_tooltip};
 use crate::navigation::{
     ACTIVITY_BAR_WIDTH, LogsTabTarget, SidebarCategory, SidebarLayoutState, WorkspaceTab,
     WorkspaceView,
@@ -51,11 +54,11 @@ use crate::state::{
     ConfigMapsState, CronJobsState, DaemonSetsState, DeploymentsState, EventTypeFilter,
     EventsLoadStatus, EventsState, IngressesState, JobsState, NamespaceFilterState,
     NamespaceLoadStatus, NamespacesViewState, NetworkPoliciesState, NodesState,
-    PortForwardKindFilter, PortForwardsLoadStatus, PortForwardsState,
     PersistentVolumeClaimsState, PersistentVolumesState, PickerKeyAction, PodSecurityState,
-    PodsState, ReplicaSetsState, ResourceQuotaKindFilter, ResourceQuotasState, SecretsState,
-    ServicesState, StatefulSetsState, StorageOverviewState, TabDropPosition, WorkloadActionKind,
-    WorkloadsOverviewState, WorkspaceTabsState, calculate_tab_drop_index,
+    PodsState, PortForwardKindFilter, PortForwardsLoadStatus, PortForwardsState, ReplicaSetsState,
+    ResourceQuotaKindFilter, ResourceQuotasState, SecretsState, ServicesState, StatefulSetsState,
+    StorageOverviewState, TabDropPosition, WorkloadActionKind, WorkloadsOverviewState,
+    WorkspaceTabsState, calculate_tab_drop_index,
 };
 use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, sync_native_titlebar_appearance,
@@ -1944,6 +1947,71 @@ pub fn apply_drawer_lifecycle_for_event(
     }
 }
 
+pub const ORBIT_GITHUB_REPO_URL: &str = "https://github.com/vantoan1511/orbit";
+
+fn notification_from_bridge_event(
+    event: &ClusterBridgeEvent,
+) -> Option<(NotificationSeverity, String, String)> {
+    match event {
+        ClusterBridgeEvent::WorkloadActionSucceeded {
+            kind,
+            name,
+            message,
+            ..
+        } => Some((
+            NotificationSeverity::Success,
+            format!("{kind} {name}"),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::WorkloadActionFailed {
+            kind,
+            name,
+            message,
+            ..
+        } => Some((
+            NotificationSeverity::Error,
+            format!("Action failed: {kind} {name}"),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::PortForwardFailed { message, .. } => Some((
+            NotificationSeverity::Error,
+            "Port Forward Failed".to_string(),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::SettingsSaveFailed { message } => Some((
+            NotificationSeverity::Error,
+            "Settings Save Failed".to_string(),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::ConnectionError {
+            cluster_id,
+            message,
+            ..
+        } => Some((
+            NotificationSeverity::Error,
+            cluster_id
+                .as_deref()
+                .map(|id| format!("Connection Error ({id})"))
+                .unwrap_or_else(|| "Connection Error".to_string()),
+            message.clone(),
+        )),
+        ClusterBridgeEvent::ClusterUnreachable { outcome, .. } => Some((
+            NotificationSeverity::Warning,
+            format!("Cluster Unreachable ({})", outcome.context_name),
+            outcome
+                .error_message
+                .clone()
+                .unwrap_or_else(|| "Cluster did not respond.".to_string()),
+        )),
+        ClusterBridgeEvent::AddClusterFailed { message } => Some((
+            NotificationSeverity::Error,
+            "Add Cluster Failed".to_string(),
+            message.clone(),
+        )),
+        _ => None,
+    }
+}
+
 pub struct OrbitShell {
     state: ClusterSwitcherState,
     sidebar: SidebarLayoutState,
@@ -1989,6 +2057,8 @@ pub struct OrbitShell {
     workload_action_modal: WorkloadActionModalState,
     port_forward_modal: Option<PortForwardModalState>,
     action_toast: ActionToastState,
+    active_shell_drawer: ActiveShellDrawer,
+    notifications: NotificationCenterState,
     table_preferences: orbit_core::config::PersistedTablePreferences,
 }
 
@@ -2020,6 +2090,11 @@ impl OrbitShell {
                     .update(cx, |shell, cx| {
                         if let ClusterBridgeEvent::SettingsSaveFailed { ref message } = event {
                             shell.settings_error = Some(message.clone());
+                        }
+                        if let Some((severity, title, message)) =
+                            notification_from_bridge_event(&event)
+                        {
+                            shell.record_notification(severity, title, message);
                         }
                         apply_add_cluster_modal_event(&mut shell.add_cluster, &event);
                         apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
@@ -2206,6 +2281,8 @@ impl OrbitShell {
             workload_action_modal: WorkloadActionModalState::default(),
             port_forward_modal: None,
             action_toast: ActionToastState::default(),
+            active_shell_drawer: ActiveShellDrawer::default(),
+            notifications: NotificationCenterState::default(),
             table_preferences: config.table_preferences(),
         };
         shell.hydrate_exemplar_tables();
@@ -3167,12 +3244,21 @@ impl OrbitShell {
         &self,
         view: WorkspaceView,
         cx: &mut Context<Self>,
-        f: impl 'static + Fn(&mut Self, &'static str, &mut crate::components::DataTableState, &[crate::components::TableColumn]),
+        f: impl 'static
+        + Fn(
+            &mut Self,
+            &'static str,
+            &mut crate::components::DataTableState,
+            &[crate::components::TableColumn],
+        ),
     ) -> crate::components::TableActionCallback {
         let entity = cx.entity().clone();
         std::rc::Rc::new(move |_window, cx| {
             entity.update(cx, |shell, cx| {
-                if let Some((table_id, mut table, cols)) = shell.exemplar_table_mut(view).map(|(id, t, c)| (id, t.clone(), c)) {
+                if let Some((table_id, mut table, cols)) = shell
+                    .exemplar_table_mut(view)
+                    .map(|(id, t, c)| (id, t.clone(), c))
+                {
                     f(shell, table_id, &mut table, &cols);
                     if let Some((_, dst, _)) = shell.exemplar_table_mut(view) {
                         *dst = table;
@@ -3286,10 +3372,14 @@ impl OrbitShell {
                 }),
                 on_toggle_column,
                 on_toggle_all,
-                on_reset_defaults: self.table_action_cb(view, cx, |shell, table_id, table, cols| {
-                    table.reset_columns(cols);
-                    shell.persist_table_config(table_id, table.to_persisted_config());
-                }),
+                on_reset_defaults: self.table_action_cb(
+                    view,
+                    cx,
+                    |shell, table_id, table, cols| {
+                        table.reset_columns(cols);
+                        shell.persist_table_config(table_id, table.to_persisted_config());
+                    },
+                ),
             },
         }
     }
@@ -3404,7 +3494,11 @@ impl OrbitShell {
         cx.notify();
     }
 
-    fn close_other_tabs(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
+    fn close_other_tabs(
+        &mut self,
+        tab: impl Into<navigation::WorkspaceTab>,
+        cx: &mut Context<Self>,
+    ) {
         let prev_view = self.sidebar.active_view;
         let closed = self.tabs.close_other_tabs(tab);
         self.cleanup_closed_log_tabs(closed);
@@ -3412,7 +3506,11 @@ impl OrbitShell {
         cx.notify();
     }
 
-    fn close_tabs_to_right(&mut self, tab: impl Into<navigation::WorkspaceTab>, cx: &mut Context<Self>) {
+    fn close_tabs_to_right(
+        &mut self,
+        tab: impl Into<navigation::WorkspaceTab>,
+        cx: &mut Context<Self>,
+    ) {
         let prev_view = self.sidebar.active_view;
         let closed = self.tabs.close_tabs_to_right(tab);
         self.cleanup_closed_log_tabs(closed);
@@ -3428,13 +3526,7 @@ impl OrbitShell {
         cx.notify();
     }
 
-    fn open_logs_tab(
-        &mut self,
-        kind: &str,
-        namespace: &str,
-        name: &str,
-        cx: &mut Context<Self>,
-    ) {
+    fn open_logs_tab(&mut self, kind: &str, namespace: &str, name: &str, cx: &mut Context<Self>) {
         let cluster_id = self.active_cluster_id().map(str::to_string);
         if let Some(cmd) = open_logs_tab_in_state(
             &mut self.tabs,
@@ -3450,11 +3542,7 @@ impl OrbitShell {
         cx.notify();
     }
 
-    fn restart_log_stream_for_tab(
-        &mut self,
-        target: &LogsTabTarget,
-        cx: &mut Context<Self>,
-    ) {
+    fn restart_log_stream_for_tab(&mut self, target: &LogsTabTarget, cx: &mut Context<Self>) {
         let Some(cluster_id) = self.active_cluster_id().map(str::to_string) else {
             return;
         };
@@ -3509,6 +3597,11 @@ impl OrbitShell {
         let payload = match payload_res {
             Ok(p) => p,
             Err(err) => {
+                self.record_notification(
+                    NotificationSeverity::Error,
+                    "Export Logs Failed",
+                    err.clone(),
+                );
                 let id = self.action_toast.show_error("Export Logs Failed", err);
                 self.schedule_toast_dismiss(id, ActionToastKind::Error, cx);
                 cx.notify();
@@ -3530,17 +3623,23 @@ impl OrbitShell {
             let _ = this.update(cx, |shell, cx| {
                 match write_res {
                     Ok(saved_path) => {
-                        let id = shell.action_toast.show_success(
+                        let msg = format!("Saved to {}", saved_path.display());
+                        shell.record_notification(
+                            NotificationSeverity::Success,
                             "Logs Exported",
-                            format!("Saved to {}", saved_path.display()),
+                            msg.clone(),
                         );
+                        let id = shell.action_toast.show_success("Logs Exported", msg);
                         shell.schedule_toast_dismiss(id, ActionToastKind::Success, cx);
                     }
                     Err(err) => {
-                        let id = shell.action_toast.show_error(
+                        let msg = format!("Failed to write file: {err}");
+                        shell.record_notification(
+                            NotificationSeverity::Error,
                             "Export Logs Failed",
-                            format!("Failed to write file: {err}"),
+                            msg.clone(),
                         );
+                        let id = shell.action_toast.show_error("Export Logs Failed", msg);
                         shell.schedule_toast_dismiss(id, ActionToastKind::Error, cx);
                     }
                 }
@@ -5860,6 +5959,7 @@ impl OrbitShell {
                                 .cursor_pointer()
                                 .when(is_settings, |el| el.bg(nav.active_bg))
                                 .hover(move |style| style.bg(hover_bg))
+                                .tooltip(|_, cx| cx.new(|_| TextTooltip::new("Settings")).into())
                                 .on_click(cx.listener(|this, _event, _window, cx| {
                                     this.select_workspace_view(WorkspaceView::Settings, cx);
                                 }))
@@ -5885,7 +5985,153 @@ impl OrbitShell {
                                     },
                                 )),
                         )
-                    }),
+                    })
+                    .child({
+                        let tooltip_label = theme_mode_tooltip(theme.mode, theme.is_dark);
+                        div()
+                            .id("activity-theme-toggle-btn")
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(40.0))
+                            .h(px(34.0))
+                            .rounded(theme.style.radius_control)
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(hover_bg))
+                            .tooltip(move |_, cx| {
+                                cx.new(|_| TextTooltip::new(tooltip_label.clone())).into()
+                            })
+                            .on_click(cx.listener(|this, _event, window, cx| {
+                                let next_mode = OrbitTheme::get(cx).mode.next();
+                                this.select_theme_mode(next_mode, window, cx);
+                            }))
+                            .child(render_icon(
+                                theme_mode_icon(theme.mode),
+                                px(18.0),
+                                theme.text.secondary,
+                            ))
+                    })
+                    .child({
+                        let unread = self.notifications.unread_count();
+                        let is_open = self.active_shell_drawer == ActiveShellDrawer::Notifications;
+                        let tooltip_label = notifications_tooltip(unread);
+                        div()
+                            .id("activity-notifications-btn")
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(40.0))
+                            .h(px(34.0))
+                            .rounded(theme.style.radius_control)
+                            .cursor_pointer()
+                            .when(is_open, |el| el.bg(nav.active_bg))
+                            .hover(move |style| style.bg(hover_bg))
+                            .tooltip(move |_, cx| {
+                                cx.new(|_| TextTooltip::new(tooltip_label.clone())).into()
+                            })
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.active_shell_drawer
+                                    .toggle(ActiveShellDrawer::Notifications);
+                                cx.notify();
+                            }))
+                            .when(is_open, |el| {
+                                el.child(
+                                    div()
+                                        .absolute()
+                                        .left(px(-8.0))
+                                        .top(px(6.0))
+                                        .bottom(px(6.0))
+                                        .w(px(2.0))
+                                        .rounded_full()
+                                        .bg(nav.indicator),
+                                )
+                            })
+                            .child(render_icon(
+                                Icon::Bell,
+                                px(18.0),
+                                if is_open {
+                                    nav.active_fg
+                                } else {
+                                    theme.text.secondary
+                                },
+                            ))
+                            .when(unread > 0, |el| {
+                                el.child(
+                                    div()
+                                        .absolute()
+                                        .top(px(6.0))
+                                        .right(px(8.0))
+                                        .w(px(7.0))
+                                        .h(px(7.0))
+                                        .rounded_full()
+                                        .bg(theme.semantic.danger.solid),
+                                )
+                            })
+                    })
+                    .child({
+                        let is_open = self.active_shell_drawer == ActiveShellDrawer::UserProfile;
+                        div()
+                            .id("activity-profile-btn")
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(40.0))
+                            .h(px(34.0))
+                            .rounded(theme.style.radius_control)
+                            .cursor_pointer()
+                            .when(is_open, |el| el.bg(nav.active_bg))
+                            .hover(move |style| style.bg(hover_bg))
+                            .tooltip(|_, cx| cx.new(|_| TextTooltip::new("User Profile")).into())
+                            .on_click(cx.listener(|this, _event, _window, cx| {
+                                this.active_shell_drawer
+                                    .toggle(ActiveShellDrawer::UserProfile);
+                                cx.notify();
+                            }))
+                            .when(is_open, |el| {
+                                el.child(
+                                    div()
+                                        .absolute()
+                                        .left(px(-8.0))
+                                        .top(px(6.0))
+                                        .bottom(px(6.0))
+                                        .w(px(2.0))
+                                        .rounded_full()
+                                        .bg(nav.indicator),
+                                )
+                            })
+                            .child(render_icon(
+                                Icon::User,
+                                px(18.0),
+                                if is_open {
+                                    nav.active_fg
+                                } else {
+                                    theme.text.secondary
+                                },
+                            ))
+                    })
+                    .child(
+                        div()
+                            .id("activity-github-btn")
+                            .relative()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(40.0))
+                            .h(px(34.0))
+                            .rounded(theme.style.radius_control)
+                            .cursor_pointer()
+                            .hover(move |style| style.bg(hover_bg))
+                            .tooltip(|_, cx| {
+                                cx.new(|_| TextTooltip::new("GitHub Repository")).into()
+                            })
+                            .on_click(|_event, _window, cx| {
+                                cx.open_url(ORBIT_GITHUB_REPO_URL);
+                            })
+                            .child(render_icon(Icon::GitBranch, px(18.0), theme.text.secondary)),
+                    ),
             )
             .into_any_element()
     }
@@ -7311,13 +7557,7 @@ impl OrbitShell {
                     let name = ev.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Event",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal("Event", Some(&ns), &name, window, cx);
                         });
                     }
                 };
@@ -7511,7 +7751,13 @@ impl OrbitShell {
                         let name = dep_name.clone();
                         let ports = dep_ports.clone();
                         pf_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_target_modal(&ns, "Deployment", &name, ports, cx);
+                            shell.open_port_forward_target_modal(
+                                &ns,
+                                "Deployment",
+                                &name,
+                                ports,
+                                cx,
+                            );
                         });
                     };
                     let entries = views::deployments::build_deployment_context_menu_entries(
@@ -7725,7 +7971,13 @@ impl OrbitShell {
                         let name = ss_name.clone();
                         let ports = ss_ports.clone();
                         pf_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_target_modal(&ns, "StatefulSet", &name, ports, cx);
+                            shell.open_port_forward_target_modal(
+                                &ns,
+                                "StatefulSet",
+                                &name,
+                                ports,
+                                cx,
+                            );
                         });
                     };
                     let entries = views::statefulsets::build_statefulset_context_menu_entries(
@@ -7921,7 +8173,13 @@ impl OrbitShell {
                         let name = rs_name.clone();
                         let ports = rs_ports.clone();
                         pf_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_target_modal(&ns, "ReplicaSet", &name, ports, cx);
+                            shell.open_port_forward_target_modal(
+                                &ns,
+                                "ReplicaSet",
+                                &name,
+                                ports,
+                                cx,
+                            );
                         });
                     };
                     let entries = views::replicasets::build_replicaset_context_menu_entries(
@@ -8249,13 +8507,7 @@ impl OrbitShell {
                     let name = job.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Job",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal("Job", Some(&ns), &name, window, cx);
                         });
                     }
                 };
@@ -8907,14 +9159,13 @@ impl OrbitShell {
             );
 
             let select_entity = cx.entity().clone();
-            let on_toggle_select = std::rc::Rc::new(
-                move |id: String, _window: &mut Window, cx: &mut App| {
+            let on_toggle_select =
+                std::rc::Rc::new(move |id: String, _window: &mut Window, cx: &mut App| {
                     select_entity.update(cx, |shell, cx| {
                         shell.port_forwards.toggle_select(&id);
                         cx.notify();
                     });
-                },
-            );
+                });
 
             let select_all_entity = cx.entity().clone();
             let on_toggle_select_all = std::rc::Rc::new(
@@ -8937,14 +9188,13 @@ impl OrbitShell {
             );
 
             let focus_entity = cx.entity().clone();
-            let on_focus_search = std::rc::Rc::new(
-                move |focused: bool, _window: &mut Window, cx: &mut App| {
+            let on_focus_search =
+                std::rc::Rc::new(move |focused: bool, _window: &mut Window, cx: &mut App| {
                     focus_entity.update(cx, |shell, cx| {
                         shell.port_forwards.search_focused = focused;
                         cx.notify();
                     });
-                },
-            );
+                });
 
             let clear_entity = cx.entity().clone();
             let on_clear_search = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
@@ -8987,12 +9237,11 @@ impl OrbitShell {
                 });
 
             let stop_sel_entity = cx.entity().clone();
-            let on_stop_selected =
-                std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
-                    stop_sel_entity.update(cx, |shell, cx| {
-                        shell.stop_selected_port_forwards(cx);
-                    });
+            let on_stop_selected = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                stop_sel_entity.update(cx, |shell, cx| {
+                    shell.stop_selected_port_forwards(cx);
                 });
+            });
 
             let stop_all_entity = cx.entity().clone();
             let on_stop_all = std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
@@ -9007,12 +9256,9 @@ impl OrbitShell {
                     if let ClusterConnectionState::Connected { cluster_id, .. } =
                         &shell.state.connection_state
                     {
-                        let cmd = shell
-                            .port_forwards
-                            .begin_refresh()
-                            .unwrap_or_else(|| {
-                                shell.port_forwards.begin_load_for_cluster(cluster_id)
-                            });
+                        let cmd = shell.port_forwards.begin_refresh().unwrap_or_else(|| {
+                            shell.port_forwards.begin_load_for_cluster(cluster_id)
+                        });
                         shell.dispatch_command(cmd);
                         cx.notify();
                     }
@@ -9290,13 +9536,7 @@ impl OrbitShell {
                     let name = sec.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Secret",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal("Secret", Some(&ns), &name, window, cx);
                         });
                     }
                 };
@@ -9469,13 +9709,7 @@ impl OrbitShell {
                     let name = pod.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Pod",
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal("Pod", Some(&ns), &name, window, cx);
                         });
                     }
                 };
@@ -9639,13 +9873,7 @@ impl OrbitShell {
                     let name = ns.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Namespace",
-                                None,
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal("Namespace", None, &name, window, cx);
                         });
                     }
                 };
@@ -10213,13 +10441,7 @@ impl OrbitShell {
                     let name = node.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                "Node",
-                                None,
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal("Node", None, &name, window, cx);
                         });
                     }
                 };
@@ -10566,13 +10788,7 @@ impl OrbitShell {
                     let name = policy.name.clone();
                     move |window: &mut Window, cx: &mut App| {
                         e.update(cx, |shell, cx| {
-                            shell.open_delete_confirm_modal(
-                                &kind,
-                                Some(&ns),
-                                &name,
-                                window,
-                                cx,
-                            );
+                            shell.open_delete_confirm_modal(&kind, Some(&ns), &name, window, cx);
                         });
                     }
                 };
@@ -11264,11 +11480,143 @@ impl OrbitShell {
         )
     }
 
+    fn record_notification(
+        &mut self,
+        severity: NotificationSeverity,
+        title: impl Into<String>,
+        message: impl Into<String>,
+    ) {
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        self.notifications.push(severity, title, message, now_secs);
+    }
+
+    fn render_shell_drawer_overlay(
+        &self,
+        window_width: f32,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let theme = OrbitTheme::get(cx).clone();
+        match self.active_shell_drawer {
+            ActiveShellDrawer::None => None,
+            ActiveShellDrawer::Notifications => {
+                let close_e = cx.entity().clone();
+                let filter_e = cx.entity().clone();
+                let mark_e = cx.entity().clone();
+                let mark_all_e = cx.entity().clone();
+                let remove_e = cx.entity().clone();
+                let clear_e = cx.entity().clone();
+                Some(render_notification_drawer(
+                    &self.notifications,
+                    window_width,
+                    &theme,
+                    NotificationDrawerCallbacks {
+                        on_close: std::rc::Rc::new(move |_w, cx| {
+                            close_e.update(cx, |shell, cx| {
+                                if shell.active_shell_drawer.close() {
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_select_filter: std::rc::Rc::new(move |tab, _w, cx| {
+                            filter_e.update(cx, |shell, cx| {
+                                if shell.notifications.filter != tab {
+                                    shell.notifications.filter = tab;
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_mark_read: std::rc::Rc::new(move |id, _w, cx| {
+                            mark_e.update(cx, |shell, cx| {
+                                if shell.notifications.mark_read(id) {
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_mark_all_read: std::rc::Rc::new(move |_w, cx| {
+                            mark_all_e.update(cx, |shell, cx| {
+                                if shell.notifications.mark_all_read() {
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_remove: std::rc::Rc::new(move |id, _w, cx| {
+                            remove_e.update(cx, |shell, cx| {
+                                if shell.notifications.remove(id) {
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_clear_all: std::rc::Rc::new(move |_w, cx| {
+                            clear_e.update(cx, |shell, cx| {
+                                if shell.notifications.clear_all() {
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_copy: std::rc::Rc::new(move |text, _w, cx| {
+                            cx.write_to_clipboard(ClipboardItem::new_string(text));
+                        }),
+                    },
+                ))
+            }
+            ActiveShellDrawer::UserProfile => {
+                let close_e = cx.entity().clone();
+                let switch_e = cx.entity().clone();
+                let add_e = cx.entity().clone();
+                let refresh_e = cx.entity().clone();
+                let settings_e = cx.entity().clone();
+                Some(render_profile_drawer(
+                    self.state.active_profile.as_ref(),
+                    &self.state.clusters,
+                    self.state.active_cluster_id.as_deref(),
+                    window_width,
+                    &theme,
+                    ProfileDrawerCallbacks {
+                        on_close: std::rc::Rc::new(move |_w, cx| {
+                            close_e.update(cx, |shell, cx| {
+                                if shell.active_shell_drawer.close() {
+                                    cx.notify();
+                                }
+                            });
+                        }),
+                        on_switch_cluster: std::rc::Rc::new(move |cluster_id, _w, cx| {
+                            switch_e.update(cx, |shell, cx| {
+                                shell.active_shell_drawer.close();
+                                shell.select_cluster(&cluster_id, cx);
+                            });
+                        }),
+                        on_add_cluster: std::rc::Rc::new(move |window, cx| {
+                            add_e.update(cx, |shell, cx| {
+                                shell.active_shell_drawer.close();
+                                shell.open_add_cluster_modal(window, cx);
+                            });
+                        }),
+                        on_refresh: std::rc::Rc::new(move |_w, cx| {
+                            refresh_e.update(cx, |shell, cx| {
+                                shell.refresh_workspace(cx);
+                            });
+                        }),
+                        on_open_settings: std::rc::Rc::new(move |_w, cx| {
+                            settings_e.update(cx, |shell, cx| {
+                                shell.active_shell_drawer.close();
+                                shell.select_workspace_view(WorkspaceView::Settings, cx);
+                            });
+                        }),
+                    },
+                ))
+            }
+        }
+    }
+
     fn dismiss_overlays(&mut self) {
         self.dismiss_context_menu();
         self.tabs.close_picker();
         self.state.dropdown_open = false;
         self.namespaces.close_dropdown();
+        self.active_shell_drawer.close();
     }
 
     fn apply_focus_target(&self, target: ShellFocusTarget, window: &mut Window) {
@@ -11806,6 +12154,12 @@ impl Render for OrbitShell {
                     cx.notify();
                     return;
                 }
+                if event.keystroke.key.eq_ignore_ascii_case("escape")
+                    && this.active_shell_drawer.close()
+                {
+                    cx.notify();
+                    return;
+                }
                 if event.keystroke.key.eq_ignore_ascii_case("escape") && this.drawer.is_open {
                     this.dismiss_resource_drawer(cx);
                     return;
@@ -12010,6 +12364,10 @@ impl Render for OrbitShell {
                     ),
             )
             .child(self.render_footer(cx))
+            .when_some(
+                self.render_shell_drawer_overlay(f32::from(viewport.width), cx),
+                |el, overlay| el.child(overlay),
+            )
             .when_some(self.render_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
             })
@@ -12023,10 +12381,9 @@ impl Render for OrbitShell {
                 self.render_workload_action_modal_overlay(cx),
                 |el, overlay| el.child(overlay),
             )
-            .when_some(
-                self.render_port_forward_modal_overlay(cx),
-                |el, overlay| el.child(overlay),
-            )
+            .when_some(self.render_port_forward_modal_overlay(cx), |el, overlay| {
+                el.child(overlay)
+            })
             .when_some(self.render_action_toast_overlay_view(cx), |el, overlay| {
                 el.child(overlay)
             })
@@ -20840,7 +21197,13 @@ mod tests {
     #[test]
     fn test_apply_delete_failed_sets_modal_error_without_stale_loading() {
         let mut modal = WorkloadActionModalState::default();
-        modal.open_confirm("prod", WorkloadActionKind::Delete, "Pod", "default", "web-0");
+        modal.open_confirm(
+            "prod",
+            WorkloadActionKind::Delete,
+            "Pod",
+            "default",
+            "web-0",
+        );
         modal.set_submitting(true);
         let mut toast = ActionToastState::default();
         let mut targets = TestWorkloadActionTargets::with_cluster("prod-ctx");
@@ -21147,5 +21510,73 @@ mod tests {
             },
         );
         assert!(pf_state.port_forwards.is_empty());
+    }
+
+    #[test]
+    fn test_sidebar_utility_theme_cycle_persists_next_mode() {
+        assert_eq!(ThemeMode::Dark.next(), ThemeMode::Light);
+        assert_eq!(ThemeMode::Light.next(), ThemeMode::System);
+        assert_eq!(ThemeMode::System.next(), ThemeMode::Dark);
+
+        assert_eq!(theme_mode_tooltip(ThemeMode::Dark, true), "Theme: Dark");
+        assert_eq!(theme_mode_tooltip(ThemeMode::Light, false), "Theme: Light");
+        assert_eq!(
+            theme_mode_tooltip(ThemeMode::System, true),
+            "Theme: System (Dark)"
+        );
+    }
+
+    #[test]
+    fn test_orbit_github_repo_url_is_valid_https() {
+        assert_eq!(
+            ORBIT_GITHUB_REPO_URL,
+            "https://github.com/vantoan1511/orbit"
+        );
+    }
+
+    #[test]
+    fn test_shell_drawer_escape_dismissal_closes_notifications_and_profile() {
+        let mut drawer = ActiveShellDrawer::Notifications;
+        assert!(drawer.close());
+        assert_eq!(drawer, ActiveShellDrawer::None);
+        assert!(!drawer.close());
+
+        drawer.toggle(ActiveShellDrawer::UserProfile);
+        assert_eq!(drawer, ActiveShellDrawer::UserProfile);
+        assert!(drawer.close());
+        assert_eq!(drawer, ActiveShellDrawer::None);
+    }
+
+    #[test]
+    fn test_notification_recorded_from_bridge_events() {
+        let ok_event = ClusterBridgeEvent::WorkloadActionSucceeded {
+            cluster_id: "prod".to_string(),
+            action: WorkloadActionKind::Restart,
+            kind: "Deployment".to_string(),
+            namespace: "default".to_string(),
+            name: "api".to_string(),
+            message: "Restarted api".to_string(),
+        };
+        let (sev, title, msg) = notification_from_bridge_event(&ok_event).expect("should map");
+        assert_eq!(sev, NotificationSeverity::Success);
+        assert_eq!(title, "Deployment api");
+        assert_eq!(msg, "Restarted api");
+
+        let err_event = ClusterBridgeEvent::PortForwardFailed {
+            cluster_id: "prod".to_string(),
+            id: None,
+            message: "Port in use".to_string(),
+        };
+        let (sev, title, msg) = notification_from_bridge_event(&err_event).expect("should map");
+        assert_eq!(sev, NotificationSeverity::Error);
+        assert_eq!(title, "Port Forward Failed");
+        assert_eq!(msg, "Port in use");
+
+        let noisy_event = ClusterBridgeEvent::PodsLoaded {
+            cluster_id: "prod".to_string(),
+            generation: 1,
+            pods: Vec::new(),
+        };
+        assert!(notification_from_bridge_event(&noisy_event).is_none());
     }
 }

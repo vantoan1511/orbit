@@ -32,6 +32,17 @@ pub const fn theme_mode_icon(mode: ThemeMode) -> Icon {
     }
 }
 
+pub fn theme_mode_tooltip(mode: ThemeMode, is_dark: bool) -> String {
+    match mode {
+        ThemeMode::Dark => "Theme: Dark".to_string(),
+        ThemeMode::Light => "Theme: Light".to_string(),
+        ThemeMode::System => {
+            let resolved = if is_dark { "Dark" } else { "Light" };
+            format!("Theme: System ({resolved})")
+        }
+    }
+}
+
 pub fn register_lucide_font(cx: &App) -> gpui::Result<()> {
     cx.text_system()
         .add_fonts(vec![Cow::Borrowed(LUCIDE_FONT_BYTES)])
@@ -80,6 +91,20 @@ mod tests {
         assert_eq!(
             icon_char(theme_mode_icon(ThemeMode::System)),
             icon_char(Icon::Laptop)
+        );
+    }
+
+    #[test]
+    fn test_theme_mode_tooltip_formats_all_modes() {
+        assert_eq!(theme_mode_tooltip(ThemeMode::Dark, true), "Theme: Dark");
+        assert_eq!(theme_mode_tooltip(ThemeMode::Light, false), "Theme: Light");
+        assert_eq!(
+            theme_mode_tooltip(ThemeMode::System, true),
+            "Theme: System (Dark)"
+        );
+        assert_eq!(
+            theme_mode_tooltip(ThemeMode::System, false),
+            "Theme: System (Light)"
         );
     }
 }
