@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -8,6 +9,10 @@ use gpui::{
     UniformListScrollHandle, Window, div, prelude::*, px, uniform_list,
 };
 use lucide_icons::Icon;
+use orbit_core::config::{
+    ALLOWED_TABLE_PAGE_SIZES, DEFAULT_TABLE_PAGE_SIZE, PersistedClusterTableFilters,
+    PersistedSortDirection, PersistedTableConfig, PersistedTablePreferences,
+};
 
 use crate::components::tooltip::TextTooltip;
 use crate::icons::render_icon;
@@ -15,6 +20,11 @@ use crate::theme::{OrbitTheme, apply_text_step};
 
 pub const TABLE_HEADER_HEIGHT: f32 = 32.0;
 pub const TABLE_ROW_HEIGHT: f32 = 36.0;
+pub const TABLE_PAGINATOR_HEIGHT: f32 = 32.0;
+pub const TOOLBAR_CONTROL_HEIGHT: f32 = 28.0;
+pub const TOOLBAR_SEARCH_WIDTH: f32 = 220.0;
+pub const COLUMN_POPOVER_WIDTH: f32 = 240.0;
+pub const COLUMN_POPOVER_MAX_HEIGHT: f32 = 260.0;
 pub const DEFAULT_SKELETON_ROWS: usize = 6;
 pub const DEFAULT_EMPTY_MESSAGE: &str = "No resources found.";
 
@@ -61,6 +71,8 @@ pub struct TableColumn {
     pub align: ColumnAlign,
     pub sortable: bool,
     pub monospace: bool,
+    pub default_visible: bool,
+    pub locked: bool,
 }
 
 impl TableColumn {
@@ -72,6 +84,8 @@ impl TableColumn {
             align: ColumnAlign::Left,
             sortable: true,
             monospace: false,
+            default_visible: true,
+            locked: false,
         }
     }
 
@@ -105,6 +119,105 @@ impl TableColumn {
         self.monospace = monospace;
         self
     }
+
+    pub fn default_visible(mut self, default_visible: bool) -> Self {
+        self.default_visible = if self.locked { true } else { default_visible };
+        self
+    }
+
+    pub fn locked(mut self, locked: bool) -> Self {
+        self.locked = locked;
+        if locked {
+            self.default_visible = true;
+        }
+        self
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PaginationMode {
+    /// Slices `0..row_count` locally using `first` and `page_size`.
+    Client,
+    /// Rows passed in are already the current page; `total_records` drives paginator bounds.
+    Lazy { total_records: usize },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PageSlice {
+    pub range: Range<usize>,
+    pub clamped_first: usize,
+    pub page: usize,
+    pub total_pages: usize,
+    pub total_records: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TablePaginationState {
+    pub enabled: bool,
+    pub first: usize,
+    pub page_size: usize,
+    pub mode: PaginationMode,
+}
+
+impl Default for TablePaginationState {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            first: 0,
+            page_size: DEFAULT_TABLE_PAGE_SIZE,
+            mode: PaginationMode::Client,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct TableFilterState {
+    pub search_query: String,
+    pub search_focused: bool,
+    pub extra_filters: HashMap<String, String>,
+}
+
+pub fn paginate_rows_range(
+    row_count: usize,
+    first: usize,
+    page_size: usize,
+    mode: PaginationMode,
+) -> PageSlice {
+    let effective_size = page_size.max(1);
+    let total_records = match mode {
+        PaginationMode::Client => row_count,
+        PaginationMode::Lazy { total_records } => total_records,
+    };
+
+    if total_records == 0 {
+        return PageSlice {
+            range: 0..0,
+            clamped_first: 0,
+            page: 0,
+            total_pages: 1,
+            total_records: 0,
+        };
+    }
+
+    let total_pages = total_records.div_ceil(effective_size);
+    let clamped_page = (first / effective_size).min(total_pages - 1);
+    let clamped_first = clamped_page * effective_size;
+
+    let range = match mode {
+        PaginationMode::Client => {
+            let end = (clamped_first + effective_size).min(row_count);
+            clamped_first.min(end)..end
+        }
+        PaginationMode::Lazy { .. } => 0..row_count.min(effective_size),
+    };
+
+    PageSlice {
+        range,
+        clamped_first,
+        page: clamped_page,
+        total_pages,
+        total_records,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,6 +234,10 @@ pub struct DataTableState {
     pub scroll_handle: UniformListScrollHandle,
     pub loading: bool,
     pub empty_message: SharedString,
+    pub pagination: TablePaginationState,
+    pub filters: TableFilterState,
+    pub hidden_columns: HashSet<String>,
+    pub config_popover_open: bool,
 }
 
 impl Default for DataTableState {
@@ -137,12 +254,214 @@ impl DataTableState {
             scroll_handle: UniformListScrollHandle::new(),
             loading: false,
             empty_message: SharedString::from(DEFAULT_EMPTY_MESSAGE),
+            pagination: TablePaginationState::default(),
+            filters: TableFilterState::default(),
+            hidden_columns: HashSet::new(),
+            config_popover_open: false,
         }
     }
 
     pub fn with_empty_message(mut self, message: impl Into<SharedString>) -> Self {
         self.empty_message = message.into();
         self
+    }
+
+    pub fn with_pagination(mut self) -> Self {
+        self.pagination.enabled = true;
+        self.pagination.mode = PaginationMode::Client;
+        self
+    }
+
+    pub fn with_lazy_pagination(mut self, total_records: usize) -> Self {
+        self.pagination.enabled = true;
+        self.pagination.mode = PaginationMode::Lazy { total_records };
+        self
+    }
+
+    pub fn reset_page(&mut self) {
+        self.pagination.first = 0;
+        self.scroll_handle.scroll_to_item(0, gpui::ScrollStrategy::Top);
+    }
+
+    pub fn set_search_query(&mut self, query: impl Into<String>) {
+        self.filters.search_query = query.into();
+        self.reset_page();
+    }
+
+    pub fn set_extra_filter(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        let key = key.into();
+        let value = value.into();
+        if value.trim().is_empty() {
+            self.filters.extra_filters.remove(&key);
+        } else {
+            self.filters.extra_filters.insert(key, value);
+        }
+        self.reset_page();
+    }
+
+    pub fn clear_filters(&mut self) {
+        self.filters.search_query.clear();
+        self.filters.extra_filters.clear();
+        self.reset_page();
+    }
+
+    pub fn has_active_filters(&self, defaults: &[(&str, &str)]) -> bool {
+        if !self.filters.search_query.trim().is_empty() {
+            return true;
+        }
+        for (key, value) in &self.filters.extra_filters {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let is_default = defaults
+                .iter()
+                .any(|(def_k, def_v)| *def_k == key.as_str() && def_v.eq_ignore_ascii_case(trimmed));
+            if !is_default {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn visible_columns(&self, all_columns: &[TableColumn]) -> Vec<TableColumn> {
+        all_columns
+            .iter()
+            .filter(|col| col.locked || !self.hidden_columns.contains(col.id.as_ref()))
+            .cloned()
+            .collect()
+    }
+
+    pub fn toggle_column(&mut self, col_id: &str, locked: bool) -> bool {
+        if locked {
+            return false;
+        }
+        if !self.hidden_columns.remove(col_id) {
+            self.hidden_columns.insert(col_id.to_string());
+        }
+        true
+    }
+
+    pub fn set_all_columns_visible(&mut self, all_columns: &[TableColumn], visible: bool) {
+        if visible {
+            self.hidden_columns.clear();
+        } else {
+            self.hidden_columns = all_columns
+                .iter()
+                .filter(|col| !col.locked)
+                .map(|col| col.id.to_string())
+                .collect();
+        }
+    }
+
+    pub fn reset_columns(&mut self, all_columns: &[TableColumn]) {
+        self.hidden_columns = all_columns
+            .iter()
+            .filter(|col| !col.locked && !col.default_visible)
+            .map(|col| col.id.to_string())
+            .collect();
+    }
+
+    pub fn has_custom_columns(&self, all_columns: &[TableColumn]) -> bool {
+        let default_hidden: HashSet<&str> = all_columns
+            .iter()
+            .filter(|col| !col.locked && !col.default_visible)
+            .map(|col| col.id.as_ref())
+            .collect();
+        let current_hidden: HashSet<&str> = all_columns
+            .iter()
+            .filter(|col| !col.locked && self.hidden_columns.contains(col.id.as_ref()))
+            .map(|col| col.id.as_ref())
+            .collect();
+        current_hidden != default_hidden
+    }
+
+    pub fn hydrate_from_preferences(
+        &mut self,
+        table_id: &str,
+        cluster_id: Option<&str>,
+        prefs: &PersistedTablePreferences,
+        columns: &[TableColumn],
+    ) {
+        if let Some(table_cfg) = prefs.tables.get(table_id) {
+            self.pagination.page_size = table_cfg
+                .page_size
+                .filter(|sz| ALLOWED_TABLE_PAGE_SIZES.contains(sz))
+                .unwrap_or(DEFAULT_TABLE_PAGE_SIZE);
+
+            let locked_ids: HashSet<&str> = columns
+                .iter()
+                .filter(|c| c.locked)
+                .map(|c| c.id.as_ref())
+                .collect();
+            let valid_ids: HashSet<&str> = columns.iter().map(|c| c.id.as_ref()).collect();
+
+            self.hidden_columns = table_cfg
+                .hidden_columns
+                .iter()
+                .filter(|id| {
+                    let s = id.as_str();
+                    !locked_ids.contains(s) && (valid_ids.is_empty() || valid_ids.contains(s))
+                })
+                .cloned()
+                .collect();
+
+            self.sort = match (&table_cfg.sort_column, table_cfg.sort_direction) {
+                (Some(col), Some(dir)) if valid_ids.is_empty() || valid_ids.contains(col.as_str()) => {
+                    Some(SortState {
+                        column_id: col.clone(),
+                        direction: match dir {
+                            PersistedSortDirection::Asc => SortDirection::Asc,
+                            PersistedSortDirection::Desc => SortDirection::Desc,
+                        },
+                    })
+                }
+                _ => None,
+            };
+        } else {
+            self.pagination.page_size = DEFAULT_TABLE_PAGE_SIZE;
+            self.reset_columns(columns);
+            self.sort = None;
+        }
+
+        if let Some(cluster_filters) = cluster_id
+            .and_then(|cid| prefs.clusters.get(cid))
+            .and_then(|tables| tables.get(table_id))
+        {
+            self.filters.search_query = cluster_filters.search_query.clone();
+            self.filters.extra_filters = cluster_filters.extra_filters.clone();
+        } else {
+            self.filters.search_query.clear();
+            self.filters.extra_filters.clear();
+        }
+
+        self.reset_page();
+    }
+
+    pub fn to_persisted_config(&self) -> PersistedTableConfig {
+        let mut hidden_columns: Vec<String> = self.hidden_columns.iter().cloned().collect();
+        hidden_columns.sort();
+
+        PersistedTableConfig {
+            page_size: if self.pagination.enabled {
+                Some(self.pagination.page_size)
+            } else {
+                None
+            },
+            hidden_columns,
+            sort_column: self.sort.as_ref().map(|s| s.column_id.clone()),
+            sort_direction: self.sort.as_ref().map(|s| match s.direction {
+                SortDirection::Asc => PersistedSortDirection::Asc,
+                SortDirection::Desc => PersistedSortDirection::Desc,
+            }),
+        }
+    }
+
+    pub fn to_persisted_filters(&self) -> PersistedClusterTableFilters {
+        PersistedClusterTableFilters {
+            search_query: self.filters.search_query.trim().to_string(),
+            extra_filters: self.filters.extra_filters.clone(),
+        }
     }
 
     pub fn toggle_sort(&mut self, column_id: &str) {
@@ -328,6 +647,7 @@ pub type SortCallback = Rc<dyn Fn(SharedString, &ClickEvent, &mut Window, &mut A
 pub type RowClickCallback = Rc<dyn Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App)>;
 pub type RowContextMenuCallback =
     Rc<dyn Fn(usize, SharedString, &MouseDownEvent, &mut Window, &mut App)>;
+pub type PageChangeCallback = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
 
 pub struct DataTableCallbacks<K, C>
 where
@@ -340,6 +660,7 @@ where
     pub on_row_click: Option<RowClickCallback>,
     pub on_row_context_menu: Option<RowContextMenuCallback>,
     pub on_row_quick_yaml: Option<RowClickCallback>,
+    pub on_page_change: Option<PageChangeCallback>,
 }
 
 impl<K, C> DataTableCallbacks<K, C>
@@ -355,6 +676,7 @@ where
             on_row_click: None,
             on_row_context_menu: None,
             on_row_quick_yaml: None,
+            on_page_change: None,
         }
     }
 
@@ -387,6 +709,14 @@ where
         callback: impl 'static + Fn(usize, SharedString, &ClickEvent, &mut Window, &mut App),
     ) -> Self {
         self.on_row_quick_yaml = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_page_change(
+        mut self,
+        callback: impl 'static + Fn(usize, usize, &mut Window, &mut App),
+    ) -> Self {
+        self.on_page_change = Some(Rc::new(callback));
         self
     }
 }
@@ -570,6 +900,799 @@ pub fn render_empty_state(
         .into_any_element()
 }
 
+pub fn format_paginator_report(slice: &PageSlice) -> String {
+    if slice.total_records == 0 {
+        return "Showing 0 of 0".to_string();
+    }
+    let start = slice.clamped_first + 1;
+    let end = (slice.clamped_first + slice.range.len()).min(slice.total_records);
+    format!("Showing {start}\u{2013}{end} of {}", slice.total_records)
+}
+
+#[derive(Debug, Clone)]
+pub struct TableFilterChipOption {
+    pub value: &'static str,
+    pub label: &'static str,
+}
+
+#[derive(Debug, Clone)]
+pub struct TableFilterChipGroup {
+    pub key: &'static str,
+    pub default_value: &'static str,
+    pub options: Vec<TableFilterChipOption>,
+}
+
+pub type TableActionCallback = Rc<dyn Fn(&mut Window, &mut App)>;
+pub type TableBoolCallback = Rc<dyn Fn(bool, &mut Window, &mut App)>;
+pub type TableExtraFilterCallback = Rc<dyn Fn(String, String, &mut Window, &mut App)>;
+pub type TableColumnToggleCallback = Rc<dyn Fn(String, bool, &mut Window, &mut App)>;
+
+pub struct TableToolbarCallbacks {
+    pub on_focus_search: TableBoolCallback,
+    pub on_clear_search: TableActionCallback,
+    pub on_extra_filter: TableExtraFilterCallback,
+    pub on_clear_filters: TableActionCallback,
+    pub on_toggle_columns_popover: TableActionCallback,
+}
+
+pub struct ColumnConfigCallbacks {
+    pub on_close: TableActionCallback,
+    pub on_toggle_column: TableColumnToggleCallback,
+    pub on_toggle_all: TableBoolCallback,
+    pub on_reset_defaults: TableActionCallback,
+}
+
+pub struct DataTableEnhancementCallbacks {
+    pub on_page_change: PageChangeCallback,
+    pub toolbar: TableToolbarCallbacks,
+    pub column_config: ColumnConfigCallbacks,
+}
+
+pub fn render_table_toolbar(
+    table_id: &str,
+    search_placeholder: &str,
+    filter_groups: &[TableFilterChipGroup],
+    state: &DataTableState,
+    theme: &OrbitTheme,
+    callbacks: TableToolbarCallbacks,
+) -> AnyElement {
+    let defaults: Vec<(&str, &str)> = filter_groups
+        .iter()
+        .map(|g| (g.key, g.default_value))
+        .collect();
+    let has_active_filters = state.has_active_filters(&defaults);
+
+    let search_box = render_toolbar_search_box(
+        table_id,
+        search_placeholder,
+        state,
+        theme,
+        callbacks.on_focus_search.clone(),
+        callbacks.on_clear_search.clone(),
+    );
+
+    let mut left_group = div()
+        .flex()
+        .items_center()
+        .flex_wrap()
+        .gap_2()
+        .child(search_box);
+
+    for group in filter_groups {
+        left_group = left_group.child(render_toolbar_filter_group(
+            table_id,
+            group,
+            state,
+            theme,
+            callbacks.on_extra_filter.clone(),
+        ));
+    }
+
+    if has_active_filters {
+        let on_clear_filters = callbacks.on_clear_filters.clone();
+        let hover_bg = theme.surface.control_hover;
+        left_group = left_group.child(
+            div()
+                .id(SharedString::from(format!("{table_id}-clear-filters")))
+                .h(px(TOOLBAR_CONTROL_HEIGHT))
+                .px_2p5()
+                .rounded(theme.style.radius_control)
+                .border_1()
+                .border_color(theme.border.default)
+                .bg(theme.surface.bg_panel)
+                .flex()
+                .items_center()
+                .gap_1()
+                .cursor_pointer()
+                .hover(move |s| s.bg(hover_bg))
+                .on_click(move |_, window, cx| on_clear_filters(window, cx))
+                .child(render_icon(Icon::FilterX, px(12.0), theme.text.secondary))
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.text.secondary)
+                        .child("Clear Filters"),
+                ),
+        );
+    }
+
+    let cols_btn = render_toolbar_columns_button(
+        table_id,
+        state.config_popover_open,
+        theme,
+        callbacks.on_toggle_columns_popover,
+    );
+
+    div()
+        .id(SharedString::from(format!("{table_id}-toolbar")))
+        .px_4()
+        .py_2()
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_2()
+        .flex_wrap()
+        .child(left_group)
+        .child(cols_btn)
+        .into_any_element()
+}
+
+fn render_toolbar_search_box(
+    table_id: &str,
+    search_placeholder: &str,
+    state: &DataTableState,
+    theme: &OrbitTheme,
+    on_focus_search: TableBoolCallback,
+    on_clear_search: TableActionCallback,
+) -> AnyElement {
+    div()
+        .id(SharedString::from(format!("{table_id}-search-input")))
+        .h(px(TOOLBAR_CONTROL_HEIGHT))
+        .w(px(TOOLBAR_SEARCH_WIDTH))
+        .px_2()
+        .rounded(theme.style.radius_control)
+        .bg(theme.surface.input_bg)
+        .border_1()
+        .border_color(if state.filters.search_focused {
+            theme.accent.accent
+        } else {
+            theme.border.input
+        })
+        .flex()
+        .items_center()
+        .gap_1p5()
+        .cursor_pointer()
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            window.prevent_default();
+            cx.stop_propagation();
+            on_focus_search(true, window, cx);
+        })
+        .child(render_icon(Icon::Search, px(12.0), theme.text.muted))
+        .child(
+            apply_text_step(div(), theme.typography.size_xs)
+                .flex_1()
+                .min_w(px(0.0))
+                .truncate()
+                .text_color(if state.filters.search_query.is_empty() {
+                    theme.text.muted
+                } else {
+                    theme.text.primary
+                })
+                .child(if state.filters.search_query.is_empty() {
+                    SharedString::from(search_placeholder.to_string())
+                } else {
+                    SharedString::from(state.filters.search_query.clone())
+                }),
+        )
+        .when(!state.filters.search_query.is_empty(), |el| {
+            let hover_bg = theme.surface.bg_hover;
+            el.child(
+                div()
+                    .id(SharedString::from(format!("{table_id}-search-clear")))
+                    .w(px(16.0))
+                    .h(px(16.0))
+                    .rounded(theme.style.radius_control)
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .hover(move |s| s.bg(hover_bg))
+                    .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                        window.prevent_default();
+                        cx.stop_propagation();
+                        on_clear_search(window, cx);
+                    })
+                    .child(render_icon(Icon::X, px(11.0), theme.text.muted)),
+            )
+        })
+        .into_any_element()
+}
+
+fn render_toolbar_filter_group(
+    table_id: &str,
+    group: &TableFilterChipGroup,
+    state: &DataTableState,
+    theme: &OrbitTheme,
+    on_extra_filter: TableExtraFilterCallback,
+) -> AnyElement {
+    let active_val = state
+        .filters
+        .extra_filters
+        .get(group.key)
+        .map(String::as_str)
+        .unwrap_or(group.default_value);
+    let group_key = group.key;
+
+    div()
+        .flex()
+        .items_center()
+        .gap_1()
+        .p_0p5()
+        .rounded(theme.style.radius_control)
+        .border_1()
+        .border_color(theme.border.default)
+        .bg(theme.surface.bg_panel)
+        .children(group.options.iter().map(|opt| {
+            let is_active = active_val.eq_ignore_ascii_case(opt.value);
+            let opt_val = opt.value.to_string();
+            let on_extra = on_extra_filter.clone();
+            let hover_bg = theme.surface.control_hover;
+            div()
+                .id(SharedString::from(format!(
+                    "{table_id}-filter-{group_key}-{}",
+                    opt.value
+                )))
+                .h(px(24.0))
+                .px_2p5()
+                .rounded(theme.style.radius_control)
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .when(is_active, |el| {
+                    el.bg(theme.accent.soft).text_color(theme.accent.accent)
+                })
+                .when(!is_active, |el| {
+                    el.text_color(theme.text.secondary)
+                        .hover(move |style| style.bg(hover_bg))
+                })
+                .on_click(move |_, window, cx| {
+                    on_extra(group_key.to_string(), opt_val.clone(), window, cx);
+                })
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font_weight(if is_active {
+                            FontWeight::SEMIBOLD
+                        } else {
+                            FontWeight::MEDIUM
+                        })
+                        .child(opt.label),
+                )
+        }))
+        .into_any_element()
+}
+
+fn render_toolbar_columns_button(
+    table_id: &str,
+    cols_open: bool,
+    theme: &OrbitTheme,
+    on_toggle_cols: TableActionCallback,
+) -> AnyElement {
+    let cols_hover = theme.surface.control_hover;
+    div()
+        .id(SharedString::from(format!("{table_id}-columns-btn")))
+        .h(px(TOOLBAR_CONTROL_HEIGHT))
+        .px_2p5()
+        .rounded(theme.style.radius_control)
+        .border_1()
+        .border_color(if cols_open {
+            theme.accent.accent
+        } else {
+            theme.border.default
+        })
+        .bg(if cols_open {
+            theme.accent.soft
+        } else {
+            theme.surface.bg_panel
+        })
+        .flex()
+        .items_center()
+        .gap_1p5()
+        .cursor_pointer()
+        .hover(move |s| s.bg(cols_hover))
+        .tooltip(|_, cx| cx.new(|_| TextTooltip::new("Configure columns")).into())
+        .on_mouse_down(MouseButton::Left, |_, _, cx| {
+            cx.stop_propagation();
+        })
+        .on_click(move |_, window, cx| on_toggle_cols(window, cx))
+        .child(render_icon(
+            Icon::SlidersHorizontal,
+            px(13.0),
+            if cols_open {
+                theme.accent.accent
+            } else {
+                theme.text.secondary
+            },
+        ))
+        .child(
+            apply_text_step(div(), theme.typography.size_xs)
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(if cols_open {
+                    theme.accent.accent
+                } else {
+                    theme.text.secondary
+                })
+                .child("Columns"),
+        )
+        .into_any_element()
+}
+
+pub fn render_column_config_popover(
+    table_id: &str,
+    columns: &[TableColumn],
+    state: &DataTableState,
+    theme: &OrbitTheme,
+    callbacks: ColumnConfigCallbacks,
+) -> AnyElement {
+    let all_unlocked_visible = columns
+        .iter()
+        .filter(|c| !c.locked)
+        .all(|c| !state.hidden_columns.contains(c.id.as_ref()));
+    let has_custom = state.has_custom_columns(columns);
+
+    let on_close = callbacks.on_close.clone();
+    let on_toggle_all = callbacks.on_toggle_all.clone();
+    let on_reset = callbacks.on_reset_defaults.clone();
+    let hover_bg = theme.surface.bg_hover;
+
+    let mut panel = div()
+        .id(SharedString::from(format!("{table_id}-col-popover")))
+        .absolute()
+        .top(px(40.0))
+        .right(px(16.0))
+        .w(px(COLUMN_POPOVER_WIDTH))
+        .rounded(theme.style.radius_card)
+        .bg(theme.surface.bg_panel)
+        .border_1()
+        .border_color(theme.border.strong)
+        .shadow_lg()
+        .p_2()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| {
+            cx.stop_propagation();
+        });
+
+    // All Columns toggle row
+    panel = panel.child(
+        div()
+            .id(SharedString::from(format!("{table_id}-col-all")))
+            .h(px(28.0))
+            .px_2()
+            .rounded(theme.style.radius_control)
+            .flex()
+            .items_center()
+            .justify_between()
+            .cursor_pointer()
+            .hover(move |s| s.bg(hover_bg))
+            .on_click(move |_, window, cx| {
+                on_toggle_all(!all_unlocked_visible, window, cx);
+            })
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .child(render_checkbox_box(all_unlocked_visible, false, theme))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_color(theme.text.primary)
+                            .child("All Columns"),
+                    ),
+            )
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .text_color(theme.text.muted)
+                    .child(format!(
+                        "{}/{}",
+                        state.visible_columns(columns).len(),
+                        columns.len()
+                    )),
+            ),
+    );
+
+    let mut list = div()
+        .id(SharedString::from(format!("{table_id}-col-list")))
+        .max_h(px(COLUMN_POPOVER_MAX_HEIGHT))
+        .overflow_y_scroll()
+        .flex()
+        .flex_col()
+        .gap_0p5()
+        .py_1()
+        .border_t_1()
+        .border_b_1()
+        .border_color(theme.border.subtle);
+
+    for (idx, col) in columns.iter().enumerate() {
+        let is_visible = col.locked || !state.hidden_columns.contains(col.id.as_ref());
+        let col_id = col.id.to_string();
+        let locked = col.locked;
+        let on_toggle_col = callbacks.on_toggle_column.clone();
+        let row_hover = theme.surface.bg_hover;
+
+        list = list.child(
+            div()
+                .id(ElementId::NamedInteger(
+                    SharedString::from(format!("{table_id}-col-opt")),
+                    idx as u64,
+                ))
+                .h(px(26.0))
+                .px_2()
+                .rounded(theme.style.radius_control)
+                .flex()
+                .items_center()
+                .justify_between()
+                .when(!locked, |el| {
+                    el.cursor_pointer().hover(move |s| s.bg(row_hover))
+                })
+                .when(!locked, |el| {
+                    el.on_click(move |_, window, cx| {
+                        on_toggle_col(col_id.clone(), locked, window, cx);
+                    })
+                })
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(render_checkbox_box(is_visible, locked, theme))
+                        .child(
+                            apply_text_step(div(), theme.typography.size_xs)
+                                .text_color(if locked {
+                                    theme.text.muted
+                                } else {
+                                    theme.text.primary
+                                })
+                                .child(col.header.clone()),
+                        ),
+                )
+                .when(locked, |el| {
+                    el.child(render_icon(Icon::Lock, px(11.0), theme.text.muted))
+                }),
+        );
+    }
+
+    panel = panel.child(list);
+
+    let reset_hover = theme.surface.control_hover;
+    panel = panel.child(
+        div()
+            .id(SharedString::from(format!("{table_id}-col-reset")))
+            .h(px(26.0))
+            .px_2()
+            .rounded(theme.style.radius_control)
+            .flex()
+            .items_center()
+            .justify_center()
+            .gap_1p5()
+            .when(has_custom, |el| {
+                el.cursor_pointer()
+                    .hover(move |s| s.bg(reset_hover))
+                    .on_click(move |_, window, cx| on_reset(window, cx))
+            })
+            .child(render_icon(
+                Icon::RotateCcw,
+                px(12.0),
+                if has_custom {
+                    theme.text.secondary
+                } else {
+                    theme.text.disabled
+                },
+            ))
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(if has_custom {
+                        theme.text.secondary
+                    } else {
+                        theme.text.disabled
+                    })
+                    .child("Reset to Defaults"),
+            ),
+    );
+
+    div()
+        .id(SharedString::from(format!("{table_id}-col-popover-backdrop")))
+        .absolute()
+        .inset_0()
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            cx.stop_propagation();
+            on_close(window, cx);
+        })
+        .child(panel)
+        .into_any_element()
+}
+
+fn render_checkbox_box(checked: bool, disabled: bool, theme: &OrbitTheme) -> AnyElement {
+    let bg = if checked {
+        if disabled {
+            theme.surface.bg_hover
+        } else {
+            theme.accent.accent
+        }
+    } else {
+        theme.surface.input_bg
+    };
+    let border = if checked && !disabled {
+        theme.accent.accent
+    } else {
+        theme.border.default
+    };
+
+    div()
+        .w(px(14.0))
+        .h(px(14.0))
+        .rounded(theme.style.radius_control)
+        .bg(bg)
+        .border_1()
+        .border_color(border)
+        .flex()
+        .items_center()
+        .justify_center()
+        .when(checked, |el| {
+            el.child(render_icon(
+                Icon::Check,
+                px(10.0),
+                if disabled {
+                    theme.text.muted
+                } else {
+                    theme.text.on_accent
+                },
+            ))
+        })
+        .into_any_element()
+}
+
+pub fn render_table_paginator(
+    table_id: &str,
+    slice: &PageSlice,
+    page_size: usize,
+    theme: &OrbitTheme,
+    on_page_change: Option<PageChangeCallback>,
+) -> AnyElement {
+    let report = apply_text_step(div(), theme.typography.size_xs)
+        .font(theme.typography.mono_font(FontWeight::NORMAL))
+        .text_color(theme.text.secondary)
+        .child(format_paginator_report(slice));
+
+    let size_pills = render_paginator_size_pills(table_id, page_size, theme, on_page_change.clone());
+    let nav_controls = render_paginator_nav_controls(table_id, slice, page_size, theme, on_page_change);
+
+    div()
+        .id(SharedString::from(format!("{table_id}-paginator")))
+        .h(px(TABLE_PAGINATOR_HEIGHT))
+        .px_4()
+        .flex_shrink_0()
+        .w_full()
+        .bg(theme.surface.bg_panel)
+        .border_t_1()
+        .border_color(theme.border.default)
+        .flex()
+        .items_center()
+        .justify_between()
+        .child(report)
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_4()
+                .child(size_pills)
+                .child(nav_controls),
+        )
+        .into_any_element()
+}
+
+fn render_paginator_size_pills(
+    table_id: &str,
+    page_size: usize,
+    theme: &OrbitTheme,
+    on_page_change: Option<PageChangeCallback>,
+) -> AnyElement {
+    let effective_size = page_size.max(1);
+    div()
+        .flex()
+        .items_center()
+        .gap_1()
+        .child(
+            apply_text_step(div(), theme.typography.size_xs)
+                .text_color(theme.text.muted)
+                .mr_1()
+                .child("Rows:"),
+        )
+        .children(ALLOWED_TABLE_PAGE_SIZES.iter().map(|&sz| {
+            let active = sz == effective_size;
+            let cb = on_page_change.clone();
+            let hover_bg = theme.surface.control_hover;
+            div()
+                .id(SharedString::from(format!("{table_id}-pg-size-{sz}")))
+                .h(px(22.0))
+                .px_1p5()
+                .rounded(theme.style.radius_control)
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .when(active, |el| {
+                    el.bg(theme.accent.soft).text_color(theme.accent.accent)
+                })
+                .when(!active, |el| {
+                    el.text_color(theme.text.secondary)
+                        .hover(move |s| s.bg(hover_bg))
+                })
+                .when_some(cb, |el, cb| {
+                    el.on_click(move |_, window, cx| cb(0, sz, window, cx))
+                })
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font(theme.typography.mono_font(if active {
+                            FontWeight::SEMIBOLD
+                        } else {
+                            FontWeight::NORMAL
+                        }))
+                        .child(sz.to_string()),
+                )
+        }))
+        .into_any_element()
+}
+
+fn render_paginator_nav_controls(
+    table_id: &str,
+    slice: &PageSlice,
+    page_size: usize,
+    theme: &OrbitTheme,
+    on_page_change: Option<PageChangeCallback>,
+) -> AnyElement {
+    let at_first = slice.page == 0;
+    let at_last = slice.total_records == 0 || slice.page + 1 >= slice.total_pages;
+    let effective_size = page_size.max(1);
+    let last_first = slice.total_pages.saturating_sub(1) * effective_size;
+
+    let nav_btn = |id_suffix: &str,
+                   icon: Icon,
+                   tooltip_label: &'static str,
+                   disabled: bool,
+                   target_first: usize| {
+        let cb = on_page_change.clone();
+        let hover_bg = theme.surface.control_hover;
+        div()
+            .id(SharedString::from(format!("{table_id}-pg-{id_suffix}")))
+            .w(px(24.0))
+            .h(px(24.0))
+            .rounded(theme.style.radius_control)
+            .flex()
+            .items_center()
+            .justify_center()
+            .tooltip(move |_, cx| cx.new(|_| TextTooltip::new(tooltip_label)).into())
+            .when(!disabled, |el| {
+                el.cursor_pointer().hover(move |s| s.bg(hover_bg))
+            })
+            .when(!disabled, |el| {
+                el.when_some(cb, |el, cb| {
+                    el.on_click(move |_, window, cx| cb(target_first, effective_size, window, cx))
+                })
+            })
+            .child(render_icon(
+                icon,
+                px(13.0),
+                if disabled {
+                    theme.text.disabled
+                } else {
+                    theme.text.secondary
+                },
+            ))
+    };
+
+    div()
+        .flex()
+        .items_center()
+        .gap_1()
+        .child(nav_btn("first", Icon::ChevronsLeft, "First page", at_first, 0))
+        .child(nav_btn(
+            "prev",
+            Icon::ChevronLeft,
+            "Previous page",
+            at_first,
+            slice.clamped_first.saturating_sub(effective_size),
+        ))
+        .child(
+            apply_text_step(div(), theme.typography.size_xs)
+                .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                .text_color(theme.text.primary)
+                .px_2()
+                .child(format!("{} / {}", slice.page + 1, slice.total_pages)),
+        )
+        .child(nav_btn(
+            "next",
+            Icon::ChevronRight,
+            "Next page",
+            at_last,
+            (slice.clamped_first + effective_size).min(last_first),
+        ))
+        .child(nav_btn(
+            "last",
+            Icon::ChevronsRight,
+            "Last page",
+            at_last,
+            last_first,
+        ))
+        .into_any_element()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn render_enhanced_data_table<K, C>(
+    table_id: impl Into<SharedString>,
+    search_placeholder: &str,
+    filter_groups: &[TableFilterChipGroup],
+    columns: &[TableColumn],
+    row_count: usize,
+    state: &DataTableState,
+    theme: &OrbitTheme,
+    mut callbacks: DataTableCallbacks<K, C>,
+    enhancements: Option<DataTableEnhancementCallbacks>,
+) -> AnyElement
+where
+    K: 'static + Fn(usize) -> String,
+    C: 'static + Fn(usize, &TableColumn, &OrbitTheme) -> AnyElement,
+{
+    let table_id = table_id.into();
+    let Some(enh) = enhancements else {
+        return render_data_table(table_id, columns, row_count, state, theme, callbacks);
+    };
+
+    callbacks = callbacks.on_page_change(move |first, size, window, cx| {
+        (enh.on_page_change)(first, size, window, cx);
+    });
+    let toolbar = render_table_toolbar(
+        table_id.as_ref(),
+        search_placeholder,
+        filter_groups,
+        state,
+        theme,
+        enh.toolbar,
+    );
+    let table = render_data_table(
+        table_id.clone(),
+        columns,
+        row_count,
+        state,
+        theme,
+        callbacks,
+    );
+    let popover = if state.config_popover_open {
+        Some(render_column_config_popover(
+            table_id.as_ref(),
+            columns,
+            state,
+            theme,
+            enh.column_config,
+        ))
+    } else {
+        None
+    };
+
+    div()
+        .relative()
+        .flex_1()
+        .min_h(px(0.0))
+        .flex()
+        .flex_col()
+        .child(toolbar)
+        .child(table)
+        .when_some(popover, |el, pop| el.child(pop))
+        .into_any_element()
+}
+
 pub fn render_data_table<K, C>(
     table_id: impl Into<SharedString>,
     columns: &[TableColumn],
@@ -583,18 +1706,41 @@ where
     C: 'static + Fn(usize, &TableColumn, &OrbitTheme) -> AnyElement,
 {
     let table_id_str = table_id.into();
+    let visible_cols = state.visible_columns(columns);
     let header = render_table_header(
         table_id_str.as_ref(),
-        columns,
+        &visible_cols,
         state,
         theme,
         callbacks.on_sort.clone(),
     );
 
-    let body = match state.body_mode(row_count) {
+    let page_slice = if state.pagination.enabled {
+        Some(paginate_rows_range(
+            row_count,
+            state.pagination.first,
+            state.pagination.page_size,
+            state.pagination.mode,
+        ))
+    } else {
+        None
+    };
+
+    let (render_count, row_offset) = match &page_slice {
+        Some(slice) => {
+            let offset = match state.pagination.mode {
+                PaginationMode::Client => slice.range.start,
+                PaginationMode::Lazy { .. } => 0,
+            };
+            (slice.range.len(), offset)
+        }
+        None => (row_count, 0),
+    };
+
+    let body = match state.body_mode(render_count) {
         TableBodyMode::LoadingSkeleton => render_loading_skeleton(
             table_id_str.as_ref(),
-            columns,
+            &visible_cols,
             DEFAULT_SKELETON_ROWS,
             theme,
         ),
@@ -604,7 +1750,7 @@ where
             theme,
         ),
         TableBodyMode::Rows => {
-            let cols: Rc<[TableColumn]> = Rc::from(columns.to_vec());
+            let cols: Rc<[TableColumn]> = Rc::from(visible_cols);
             let row_key_fn = Rc::new(callbacks.row_key);
             let render_cell_fn = Rc::new(callbacks.render_cell);
             let on_row_click = callbacks.on_row_click.clone();
@@ -624,7 +1770,7 @@ where
 
             uniform_list(
                 ElementId::Name(list_id),
-                row_count,
+                render_count,
                 move |range: Range<usize>, _window: &mut Window, _cx: &mut App| {
                     let mut items = Vec::with_capacity(range.len());
                     let surface = resolve_data_table_surface_style(&theme_snapshot);
@@ -633,7 +1779,8 @@ where
                     let border_subtle = surface.row_separator;
                     let accent_bar = theme_snapshot.accent.accent;
 
-                    for row_idx in range {
+                    for local_idx in range {
+                        let row_idx = row_offset + local_idx;
                         let key = (row_key_fn)(row_idx);
                         let is_selected = selected_key.as_deref() == Some(key.as_str());
                         let key_shared = SharedString::from(key);
@@ -811,6 +1958,16 @@ where
     };
 
     let surface = resolve_data_table_surface_style(theme);
+    let paginator = page_slice.as_ref().map(|slice| {
+        render_table_paginator(
+            table_id_str.as_ref(),
+            slice,
+            state.pagination.page_size,
+            theme,
+            callbacks.on_page_change.clone(),
+        )
+    });
+
     div()
         .id(table_id_str)
         .bg(surface.background)
@@ -824,6 +1981,7 @@ where
         .overflow_hidden()
         .child(header)
         .child(body)
+        .when_some(paginator, |el, paginator| el.child(paginator))
         .into_any_element()
 }
 
@@ -1153,5 +2311,229 @@ mod tests {
         )
         .on_row_quick_yaml(|_, _, _, _, _| {});
         assert!(callbacks.on_row_quick_yaml.is_some());
+    }
+
+    #[test]
+    fn test_paginate_rows_range_client_slicing_and_clamping() {
+        let first_page = paginate_rows_range(95, 0, 25, PaginationMode::Client);
+        assert_eq!(first_page.range, 0..25);
+        assert_eq!(first_page.clamped_first, 0);
+        assert_eq!(first_page.page, 0);
+        assert_eq!(first_page.total_pages, 4);
+        assert_eq!(first_page.total_records, 95);
+
+        let last_page = paginate_rows_range(95, 75, 25, PaginationMode::Client);
+        assert_eq!(last_page.range, 75..95);
+        assert_eq!(last_page.clamped_first, 75);
+        assert_eq!(last_page.page, 3);
+        assert_eq!(last_page.total_pages, 4);
+
+        let clamped = paginate_rows_range(95, 150, 25, PaginationMode::Client);
+        assert_eq!(clamped.range, 75..95);
+        assert_eq!(clamped.clamped_first, 75);
+        assert_eq!(clamped.page, 3);
+        assert_eq!(clamped.total_pages, 4);
+
+        let empty = paginate_rows_range(0, 50, 25, PaginationMode::Client);
+        assert_eq!(empty.range, 0..0);
+        assert_eq!(empty.clamped_first, 0);
+        assert_eq!(empty.page, 0);
+        assert_eq!(empty.total_pages, 1);
+        assert_eq!(empty.total_records, 0);
+    }
+
+    #[test]
+    fn test_paginate_rows_range_lazy_mode_uses_total_records_without_reslicing() {
+        let lazy = paginate_rows_range(
+            25,
+            50,
+            25,
+            PaginationMode::Lazy { total_records: 250 },
+        );
+        assert_eq!(lazy.range, 0..25);
+        assert_eq!(lazy.clamped_first, 50);
+        assert_eq!(lazy.page, 2);
+        assert_eq!(lazy.total_pages, 10);
+        assert_eq!(lazy.total_records, 250);
+    }
+
+    #[test]
+    fn test_column_visibility_respects_locked_columns_and_reset_defaults() {
+        let columns = vec![
+            TableColumn::new("name", "Name").locked(true),
+            TableColumn::new("status", "Status"),
+            TableColumn::new("node", "Node").default_visible(false),
+        ];
+
+        let mut state = DataTableState::new();
+        state.reset_columns(&columns);
+        assert!(!state.has_custom_columns(&columns));
+        assert_eq!(
+            state
+                .visible_columns(&columns)
+                .iter()
+                .map(|c| c.id.as_ref())
+                .collect::<Vec<_>>(),
+            vec!["name", "status"]
+        );
+
+        // Showing all columns when one has default_visible(false) is a custom state
+        state.set_all_columns_visible(&columns, true);
+        assert!(state.has_custom_columns(&columns));
+        state.reset_columns(&columns);
+        assert!(!state.has_custom_columns(&columns));
+
+        // Locked column ignores toggle_column
+        assert!(!state.toggle_column("name", true));
+        assert!(!state.hidden_columns.contains("name"));
+
+        // Non-locked column toggles
+        assert!(state.toggle_column("status", false));
+        assert!(state.hidden_columns.contains("status"));
+        assert!(state.has_custom_columns(&columns));
+
+        // set_all_columns_visible(false) keeps locked column visible
+        state.set_all_columns_visible(&columns, false);
+        assert!(!state.hidden_columns.contains("name"));
+        assert!(state.hidden_columns.contains("status"));
+        assert!(state.hidden_columns.contains("node"));
+
+        // reset_columns restores default_visible
+        state.reset_columns(&columns);
+        assert!(!state.has_custom_columns(&columns));
+        assert!(!state.hidden_columns.contains("status"));
+        assert!(state.hidden_columns.contains("node"));
+    }
+
+    #[test]
+    fn test_table_filter_state_active_detection_clear_and_page_reset() {
+        let mut state = DataTableState::new().with_pagination();
+        state.pagination.first = 50;
+
+        assert!(!state.has_active_filters(&[("status", "All")]));
+
+        state.set_search_query("nginx");
+        assert_eq!(state.pagination.first, 0);
+        assert!(state.has_active_filters(&[("status", "All")]));
+
+        state.pagination.first = 25;
+        state.set_extra_filter("status", "Running");
+        assert_eq!(state.pagination.first, 0);
+        assert!(state.has_active_filters(&[("status", "All")]));
+
+        state.pagination.first = 75;
+        state.clear_filters();
+        assert_eq!(state.pagination.first, 0);
+        assert!(state.filters.search_query.is_empty());
+        assert!(state.filters.extra_filters.is_empty());
+        assert!(!state.has_active_filters(&[("status", "All")]));
+    }
+
+    #[test]
+    fn test_data_table_state_hydrates_and_serializes_persisted_preferences() {
+        use orbit_core::config::{
+            PersistedClusterTableFilters, PersistedSortDirection, PersistedTableConfig,
+            PersistedTablePreferences,
+        };
+        use std::collections::HashMap;
+
+        let mut prefs = PersistedTablePreferences::default();
+        prefs.tables.insert(
+            "pods".to_string(),
+            PersistedTableConfig {
+                page_size: Some(100),
+                hidden_columns: vec!["node".to_string()],
+                sort_column: Some("name".to_string()),
+                sort_direction: Some(PersistedSortDirection::Desc),
+            },
+        );
+        let mut extra = HashMap::new();
+        extra.insert("status".to_string(), "Running".to_string());
+        let mut cluster_map = HashMap::new();
+        cluster_map.insert(
+            "pods".to_string(),
+            PersistedClusterTableFilters {
+                search_query: "api".to_string(),
+                extra_filters: extra,
+            },
+        );
+        prefs.clusters.insert("prod-ctx".to_string(), cluster_map);
+
+        let columns = vec![
+            TableColumn::new("name", "Name").locked(true),
+            TableColumn::new("node", "Node"),
+        ];
+
+        let mut state = DataTableState::new().with_pagination();
+        state.hydrate_from_preferences("pods", Some("prod-ctx"), &prefs, &columns);
+
+        assert_eq!(state.pagination.page_size, 100);
+        assert!(state.hidden_columns.contains("node"));
+        assert_eq!(
+            state.sort,
+            Some(SortState {
+                column_id: "name".to_string(),
+                direction: SortDirection::Desc,
+            })
+        );
+        assert_eq!(state.filters.search_query, "api");
+        assert_eq!(
+            state.filters.extra_filters.get("status").map(String::as_str),
+            Some("Running")
+        );
+
+        let config_out = state.to_persisted_config();
+        assert_eq!(config_out.page_size, Some(100));
+        assert_eq!(config_out.hidden_columns, vec!["node".to_string()]);
+        assert_eq!(config_out.sort_column.as_deref(), Some("name"));
+        assert_eq!(config_out.sort_direction, Some(PersistedSortDirection::Desc));
+
+        let filters_out = state.to_persisted_filters();
+        assert_eq!(filters_out.search_query, "api");
+        assert_eq!(
+            filters_out.extra_filters.get("status").map(String::as_str),
+            Some("Running")
+        );
+    }
+
+    #[test]
+    fn test_paginator_report_label_formats_populated_and_empty_ranges() {
+        let populated = paginate_rows_range(95, 0, 25, PaginationMode::Client);
+        assert_eq!(format_paginator_report(&populated), "Showing 1–25 of 95");
+
+        let partial = paginate_rows_range(95, 75, 25, PaginationMode::Client);
+        assert_eq!(format_paginator_report(&partial), "Showing 76–95 of 95");
+
+        let empty = paginate_rows_range(0, 0, 25, PaginationMode::Client);
+        assert_eq!(format_paginator_report(&empty), "Showing 0 of 0");
+    }
+
+    #[test]
+    fn test_data_table_callbacks_accept_optional_page_change_handler() {
+        let callbacks = DataTableCallbacks::new(
+            |idx| format!("row-{idx}"),
+            |_, _, _| div().into_any_element(),
+        )
+        .on_page_change(|_, _, _, _| {});
+        assert!(callbacks.on_page_change.is_some());
+    }
+
+    #[test]
+    fn test_visible_columns_filters_out_hidden_but_retains_locked_columns_for_render() {
+        let cols = vec![
+            TableColumn::new("name", "Name").locked(true),
+            TableColumn::new("namespace", "Namespace"),
+            TableColumn::new("status", "Status"),
+            TableColumn::new("age", "Age"),
+        ];
+        let mut state = DataTableState::new();
+        state.hidden_columns.insert("name".to_string()); // should be retained due to locked
+        state.hidden_columns.insert("status".to_string());
+
+        let visible = state.visible_columns(&cols);
+        assert_eq!(
+            visible.iter().map(|c| c.id.as_ref()).collect::<Vec<_>>(),
+            vec!["name", "namespace", "age"]
+        );
     }
 }

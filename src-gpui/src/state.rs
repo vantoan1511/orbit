@@ -174,6 +174,15 @@ pub enum ClusterBridgeCommand {
         open_tabs: Vec<String>,
         active_tab: Option<String>,
     },
+    SaveTableConfig {
+        table_id: String,
+        config: orbit_core::config::PersistedTableConfig,
+    },
+    SaveClusterTableFilters {
+        cluster_id: String,
+        table_id: String,
+        filters: orbit_core::config::PersistedClusterTableFilters,
+    },
     SaveThemeMode {
         mode: String,
     },
@@ -1057,7 +1066,7 @@ pub enum DeploymentsLoadStatus {
     Error,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct DeploymentsState {
     pub cluster_id: Option<String>,
     pub generation: u64,
@@ -1067,7 +1076,33 @@ pub struct DeploymentsState {
     pub table: DataTableState,
 }
 
+impl Default for DeploymentsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DeploymentsState {
+    pub fn new() -> Self {
+        Self {
+            cluster_id: None,
+            generation: 0,
+            status: DeploymentsLoadStatus::Idle,
+            deployments: Vec::new(),
+            error_message: None,
+            table: DataTableState::new().with_pagination(),
+        }
+    }
+
+    pub fn hydrate_table_preferences(
+        &mut self,
+        cluster_id: Option<&str>,
+        prefs: &orbit_core::config::PersistedTablePreferences,
+        columns: &[crate::components::TableColumn],
+    ) {
+        self.table
+            .hydrate_from_preferences("deployments", cluster_id, prefs, columns);
+    }
     pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
         let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
         self.generation += 1;
@@ -1665,7 +1700,7 @@ pub enum PodsLoadStatus {
     Error,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct PodsState {
     pub cluster_id: Option<String>,
     pub generation: u64,
@@ -1675,7 +1710,33 @@ pub struct PodsState {
     pub table: DataTableState,
 }
 
+impl Default for PodsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PodsState {
+    pub fn new() -> Self {
+        Self {
+            cluster_id: None,
+            generation: 0,
+            status: PodsLoadStatus::Idle,
+            pods: Vec::new(),
+            error_message: None,
+            table: DataTableState::new().with_pagination(),
+        }
+    }
+
+    pub fn hydrate_table_preferences(
+        &mut self,
+        cluster_id: Option<&str>,
+        prefs: &orbit_core::config::PersistedTablePreferences,
+        columns: &[crate::components::TableColumn],
+    ) {
+        self.table
+            .hydrate_from_preferences("pods", cluster_id, prefs, columns);
+    }
     pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
         let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
         self.generation += 1;
@@ -1804,7 +1865,7 @@ impl ServiceTypeFilter {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ServicesState {
     pub cluster_id: Option<String>,
     pub generation: u64,
@@ -1815,7 +1876,34 @@ pub struct ServicesState {
     pub table: DataTableState,
 }
 
+impl Default for ServicesState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServicesState {
+    pub fn new() -> Self {
+        Self {
+            cluster_id: None,
+            generation: 0,
+            status: ServicesLoadStatus::Idle,
+            services: Vec::new(),
+            type_filter: ServiceTypeFilter::All,
+            error_message: None,
+            table: DataTableState::new().with_pagination(),
+        }
+    }
+
+    pub fn hydrate_table_preferences(
+        &mut self,
+        cluster_id: Option<&str>,
+        prefs: &orbit_core::config::PersistedTablePreferences,
+        columns: &[crate::components::TableColumn],
+    ) {
+        self.table
+            .hydrate_from_preferences("services", cluster_id, prefs, columns);
+    }
     pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
         let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
         self.generation += 1;
@@ -3274,7 +3362,7 @@ impl EventTypeFilter {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct EventsState {
     pub cluster_id: Option<String>,
     pub generation: u64,
@@ -3285,7 +3373,34 @@ pub struct EventsState {
     pub table: DataTableState,
 }
 
+impl Default for EventsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventsState {
+    pub fn new() -> Self {
+        Self {
+            cluster_id: None,
+            generation: 0,
+            status: EventsLoadStatus::Idle,
+            events: Vec::new(),
+            type_filter: EventTypeFilter::All,
+            error_message: None,
+            table: DataTableState::new().with_pagination(),
+        }
+    }
+
+    pub fn hydrate_table_preferences(
+        &mut self,
+        cluster_id: Option<&str>,
+        prefs: &orbit_core::config::PersistedTablePreferences,
+        columns: &[crate::components::TableColumn],
+    ) {
+        self.table
+            .hydrate_from_preferences("events", cluster_id, prefs, columns);
+    }
     pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
         let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
         self.generation += 1;
@@ -7406,5 +7521,65 @@ mod tests {
         assert_eq!(state.selected_ids.len(), 2);
         state.toggle_select_all_visible(&visible);
         assert!(state.selected_ids.is_empty());
+    }
+
+    #[test]
+    fn test_exemplar_states_hydrate_table_preferences_and_switch_cluster_filters() {
+        use orbit_core::config::{
+            PersistedClusterTableFilters, PersistedSortDirection, PersistedTableConfig,
+            PersistedTablePreferences,
+        };
+        use std::collections::HashMap;
+
+        let mut prefs = PersistedTablePreferences::default();
+        prefs.tables.insert(
+            "pods".to_string(),
+            PersistedTableConfig {
+                page_size: Some(50),
+                hidden_columns: vec!["node".to_string()],
+                sort_column: Some("name".to_string()),
+                sort_direction: Some(PersistedSortDirection::Asc),
+            },
+        );
+        let mut extra_a = HashMap::new();
+        extra_a.insert("status".to_string(), "Running".to_string());
+        let mut cluster_a = HashMap::new();
+        cluster_a.insert(
+            "pods".to_string(),
+            PersistedClusterTableFilters {
+                search_query: "api".to_string(),
+                extra_filters: extra_a,
+            },
+        );
+        prefs.clusters.insert("ctx-a".to_string(), cluster_a);
+
+        let mut cluster_b = HashMap::new();
+        cluster_b.insert(
+            "pods".to_string(),
+            PersistedClusterTableFilters {
+                search_query: "worker".to_string(),
+                extra_filters: HashMap::new(),
+            },
+        );
+        prefs.clusters.insert("ctx-b".to_string(), cluster_b);
+
+        let mut pods = PodsState::new();
+        assert!(pods.table.pagination.enabled);
+        let deps = DeploymentsState::new();
+        assert!(deps.table.pagination.enabled);
+        let svcs = ServicesState::new();
+        assert!(svcs.table.pagination.enabled);
+        let evs = EventsState::new();
+        assert!(evs.table.pagination.enabled);
+
+        pods.hydrate_table_preferences(Some("ctx-a"), &prefs, &[]);
+        assert_eq!(pods.table.pagination.page_size, 50);
+        assert_eq!(pods.table.filters.search_query, "api");
+
+        // Switching cluster swaps per-cluster filters while preserving table config
+        pods.hydrate_table_preferences(Some("ctx-b"), &prefs, &[]);
+        assert_eq!(pods.table.pagination.page_size, 50);
+        assert_eq!(pods.table.filters.search_query, "worker");
+        assert!(pods.table.filters.extra_filters.is_empty());
     }
 }

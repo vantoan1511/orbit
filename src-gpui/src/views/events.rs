@@ -9,7 +9,9 @@ use lucide_icons::Icon;
 use orbit_core::kubernetes::models::EventInfo;
 
 use crate::components::data_table::{
-    DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
+    DataTableCallbacks, DataTableEnhancementCallbacks, SortState, TableColumn,
+    TableFilterChipGroup, TableFilterChipOption, TableFilterState, render_enhanced_data_table,
+    sort_rows_stable,
 };
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, TextTooltip,
@@ -48,8 +50,12 @@ pub struct EventMetricCard {
 
 pub fn event_columns() -> Vec<TableColumn> {
     vec![
-        TableColumn::new("type", "Type").fixed_width(px(110.0)),
-        TableColumn::new("reason", "Reason").flex_width(1.1, px(120.0)),
+        TableColumn::new("type", "Type")
+            .fixed_width(px(110.0))
+            .locked(true),
+        TableColumn::new("reason", "Reason")
+            .flex_width(1.1, px(120.0))
+            .locked(true),
         TableColumn::new("object", "Object").flex_width(1.8, px(180.0)),
         TableColumn::new("namespace", "Namespace").flex_width(1.0, px(105.0)),
         TableColumn::new("message", "Message").flex_width(2.6, px(220.0)),
@@ -128,10 +134,48 @@ pub fn filter_and_sort_events<'a>(
     type_filter: EventTypeFilter,
     sort: Option<&SortState>,
 ) -> Vec<&'a EventInfo> {
+    filter_and_sort_events_with_filters(
+        events,
+        namespaces,
+        type_filter,
+        &TableFilterState::default(),
+        sort,
+    )
+}
+
+pub fn filter_and_sort_events_with_filters<'a>(
+    events: &'a [EventInfo],
+    namespaces: &NamespaceFilterState,
+    type_filter: EventTypeFilter,
+    filters: &TableFilterState,
+    sort: Option<&SortState>,
+) -> Vec<&'a EventInfo> {
+    let query = filters.search_query.trim().to_ascii_lowercase();
+    let extra_type = filters
+        .extra_filters
+        .get("type")
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty() && s != "all");
+
     let mut rows: Vec<&'a EventInfo> = events
         .iter()
         .filter(|ev| namespaces.matches_resource_namespace(Some(&ev.namespace)))
-        .filter(|ev| type_filter.matches(&ev.r#type))
+        .filter(|ev| {
+            type_filter.matches(&ev.r#type)
+                && extra_type
+                    .as_deref()
+                    .is_none_or(|t| ev.r#type.to_ascii_lowercase() == t)
+        })
+        .filter(|ev| {
+            if query.is_empty() {
+                return true;
+            }
+            ev.reason.to_ascii_lowercase().contains(&query)
+                || ev.object_kind.to_ascii_lowercase().contains(&query)
+                || ev.object_name.to_ascii_lowercase().contains(&query)
+                || ev.namespace.to_ascii_lowercase().contains(&query)
+                || ev.message.to_ascii_lowercase().contains(&query)
+        })
         .collect();
 
     if sort.is_some() {
@@ -505,6 +549,7 @@ pub fn render_events_view(
         + Fn(SharedString, &EventInfo, &MouseDownEvent, &mut Window, &mut App),
     on_type_filter: impl 'static + Fn(EventTypeFilter, &mut Window, &mut App),
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
+    enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = event_columns();
     let ns_filtered: Vec<&EventInfo> = state
@@ -515,10 +560,11 @@ pub fn render_events_view(
     let total_ns_count = ns_filtered.len();
 
     let filtered_rows: Rc<Vec<EventInfo>> = Rc::new(
-        filter_and_sort_events(
+        filter_and_sort_events_with_filters(
             &state.events,
             namespaces,
             state.type_filter,
+            &state.table.filters,
             state.table.sort.as_ref(),
         )
         .into_iter()
@@ -541,13 +587,27 @@ pub fn render_events_view(
         WorkspaceView::Events.description(),
         count_label,
         Some(namespaces),
-        Some(render_type_filter_pills(
-            state.type_filter,
-            theme,
-            on_type_filter_rc,
-        )),
+        if enhancements.is_some() {
+            None
+        } else {
+            Some(render_type_filter_pills(
+                state.type_filter,
+                theme,
+                on_type_filter_rc,
+            ))
+        },
         theme,
     );
+
+    let filter_groups = [TableFilterChipGroup {
+        key: "type",
+        default_value: "All",
+        options: vec![
+            TableFilterChipOption { value: "All", label: "All" },
+            TableFilterChipOption { value: "Normal", label: "Normal" },
+            TableFilterChipOption { value: "Warning", label: "Warning" },
+        ],
+    }];
 
     let summary_row = div()
         .w_full()
@@ -590,39 +650,38 @@ pub fn render_events_view(
             let cell_rows = filtered_rows.clone();
             let ctx_rows = filtered_rows.clone();
 
-            div()
-                .flex_1()
-                .min_h(px(0.0))
-                .flex()
-                .flex_col()
-                .child(render_data_table(
-                    "events-table",
-                    &columns,
-                    filtered_rows.len(),
-                    &table_state,
-                    theme,
-                    DataTableCallbacks::new(
-                        move |idx| {
-                            let ev = &key_rows[idx];
-                            if !ev.uid.is_empty() {
-                                ev.uid.clone()
-                            } else {
-                                format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
-                            }
-                        },
-                        move |row_idx, col, theme| {
-                            render_event_cell(row_idx, &cell_rows[row_idx], col, theme)
-                        },
-                    )
-                    .on_sort(on_sort)
-                    .on_row_click(on_row_click)
-                    .on_row_context_menu(move |idx, row_key, event, window, cx| {
-                        if let Some(ev) = ctx_rows.get(idx) {
-                            on_row_context_menu(row_key, ev, event, window, cx);
-                        }
-                    }),
-                ))
-                .into_any_element()
+            let callbacks = DataTableCallbacks::new(
+                move |idx| {
+                    let ev = &key_rows[idx];
+                    if !ev.uid.is_empty() {
+                        ev.uid.clone()
+                    } else {
+                        format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
+                    }
+                },
+                move |row_idx, col, theme| {
+                    render_event_cell(row_idx, &cell_rows[row_idx], col, theme)
+                },
+            )
+            .on_sort(on_sort)
+            .on_row_click(on_row_click)
+            .on_row_context_menu(move |idx, row_key, event, window, cx| {
+                if let Some(ev) = ctx_rows.get(idx) {
+                    on_row_context_menu(row_key, ev, event, window, cx);
+                }
+            });
+
+            render_enhanced_data_table(
+                "events-table",
+                "Filter events...",
+                &filter_groups,
+                &columns,
+                filtered_rows.len(),
+                &table_state,
+                theme,
+                callbacks,
+                enhancements,
+            )
         }
     };
 
@@ -959,5 +1018,36 @@ mod tests {
         assert!(delete_item.danger);
         assert!(!delete_item.disabled);
         assert!(delete_item.on_select.is_some());
+    }
+
+    #[test]
+    fn test_filter_and_sort_events_applies_search_query_and_type_extra_filter() {
+        let cols = event_columns();
+        let type_col = cols.iter().find(|c| c.id.as_ref() == "type").expect("type col");
+        assert!(type_col.locked);
+
+        let events = vec![
+            sample_event("1", "Normal", "Scheduled", "Pod", "api-0", "default", 1, "1m"),
+            sample_event("2", "Warning", "BackOff", "Pod", "api-0", "default", 3, "2m"),
+            sample_event("3", "Warning", "FailedMount", "Pod", "db-0", "default", 2, "3m"),
+        ];
+        let ns = NamespaceFilterState::default();
+        let mut filters = crate::components::TableFilterState {
+            search_query: "api".to_string(),
+            ..Default::default()
+        };
+        filters
+            .extra_filters
+            .insert("type".to_string(), "Warning".to_string());
+
+        let matched = filter_and_sort_events_with_filters(
+            &events,
+            &ns,
+            EventTypeFilter::All,
+            &filters,
+            None,
+        );
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].uid, "2");
     }
 }
