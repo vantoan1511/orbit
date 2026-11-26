@@ -3348,8 +3348,32 @@ impl OrbitShell {
                 });
             });
 
+        let resize_entity = cx.entity().clone();
+        let on_column_resize_start: crate::components::ColumnResizeStartCallback =
+            Rc::new(move |col_id, pointer_x, window, cx| {
+                resize_entity.update(cx, |shell, cx| {
+                    let container_width = table_container_width(
+                        f32::from(window.viewport_size().width),
+                        &shell.sidebar,
+                    );
+                    if let Some((_, table, cols)) = shell.exemplar_table_mut(view) {
+                        let visible_cols = table.resolved_visible_columns(&cols);
+                        if table.start_column_resize(
+                            col_id.as_ref(),
+                            pointer_x,
+                            &visible_cols,
+                            container_width,
+                        ) {
+                            table.config_popover_open = false;
+                            cx.notify();
+                        }
+                    }
+                });
+            });
+
         crate::components::DataTableEnhancementCallbacks {
             on_page_change,
+            on_column_resize_start,
             toolbar: crate::components::TableToolbarCallbacks {
                 on_focus_search,
                 on_clear_search: self.table_action_cb(view, cx, |shell, table_id, table, _| {
@@ -3382,6 +3406,40 @@ impl OrbitShell {
                 ),
             },
         }
+    }
+
+    fn update_active_table_column_resize(&mut self, pointer_x: f32) -> bool {
+        let mut updated = false;
+        for table in [
+            &mut self.pods.table,
+            &mut self.deployments.table,
+            &mut self.services.table,
+            &mut self.events.table,
+        ] {
+            if table.update_column_resize(pointer_x) {
+                updated = true;
+            }
+        }
+        updated
+    }
+
+    fn finish_active_table_column_resize(&mut self) -> bool {
+        let mut finished = Vec::new();
+        for (table_id, table) in [
+            ("pods", &mut self.pods.table),
+            ("deployments", &mut self.deployments.table),
+            ("services", &mut self.services.table),
+            ("events", &mut self.events.table),
+        ] {
+            if let Some(item) = finish_table_column_resize(table_id, table) {
+                finished.push(item);
+            }
+        }
+        let any_finished = !finished.is_empty();
+        for (table_id, cfg) in finished {
+            self.persist_table_config(table_id, cfg);
+        }
+        any_finished
     }
 
     fn dispatch_command(&self, cmd: ClusterBridgeCommand) {
@@ -12295,6 +12353,9 @@ impl Render for OrbitShell {
                     );
                     cx.notify();
                 }
+                if this.update_active_table_column_resize(f32::from(event.position.x)) {
+                    cx.notify();
+                }
             }))
             .on_mouse_up(
                 MouseButton::Left,
@@ -12312,6 +12373,9 @@ impl Render for OrbitShell {
                     }
                     if this.drawer.is_resizing {
                         this.drawer.stop_resize();
+                        changed = true;
+                    }
+                    if this.finish_active_table_column_resize() {
                         changed = true;
                     }
                     if this.tabs.dragging_index.is_some() || this.tabs.drop_target.is_some() {
@@ -12570,6 +12634,26 @@ fn main() -> std::process::ExitCode {
 
 pub const fn workspace_drawer_stacks_as_overlay() -> bool {
     true
+}
+
+fn table_container_width(viewport_width: f32, sidebar: &SidebarLayoutState) -> f32 {
+    let sidebar_width = if sidebar.is_collapsed {
+        ACTIVITY_BAR_WIDTH
+    } else {
+        ACTIVITY_BAR_WIDTH + sidebar.panel_width
+    };
+    (viewport_width - sidebar_width).max(320.0)
+}
+
+fn finish_table_column_resize(
+    table_id: &'static str,
+    table: &mut crate::components::DataTableState,
+) -> Option<(&'static str, orbit_core::config::PersistedTableConfig)> {
+    if table.end_column_resize() {
+        Some((table_id, table.to_persisted_config()))
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
@@ -21578,5 +21662,37 @@ mod tests {
             pods: Vec::new(),
         };
         assert!(notification_from_bridge_event(&noisy_event).is_none());
+    }
+
+    #[test]
+    fn test_table_container_width_accounts_for_sidebar_state() {
+        let mut sidebar = SidebarLayoutState::new();
+        sidebar.is_collapsed = false;
+        sidebar.panel_width = 240.0;
+        assert_eq!(
+            table_container_width(1280.0, &sidebar),
+            (1280.0 - ACTIVITY_BAR_WIDTH - 240.0).max(320.0)
+        );
+
+        sidebar.is_collapsed = true;
+        assert_eq!(
+            table_container_width(1280.0, &sidebar),
+            (1280.0 - ACTIVITY_BAR_WIDTH).max(320.0)
+        );
+        assert_eq!(table_container_width(200.0, &sidebar), 320.0);
+
+        let cols = vec![
+            crate::components::TableColumn::new("name", "Name").flex_width(2.0, px(140.0)),
+            crate::components::TableColumn::new("age", "Age").fixed_width(px(80.0)),
+        ];
+        let mut table = crate::components::DataTableState::new();
+        assert!(finish_table_column_resize("pods", &mut table).is_none());
+
+        assert!(table.start_column_resize("name", 300.0, &cols, 680.0));
+        assert!(table.update_column_resize(340.0));
+        let (id, cfg) = finish_table_column_resize("pods", &mut table).expect("should finish");
+        assert_eq!(id, "pods");
+        assert!(table.active_resize.is_none());
+        assert_eq!(cfg.column_widths.get("name").copied(), Some(640));
     }
 }

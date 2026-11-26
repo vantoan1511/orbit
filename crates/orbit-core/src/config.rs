@@ -321,6 +321,9 @@ pub enum PersistedSortDirection {
     Desc,
 }
 
+pub const MIN_TABLE_COLUMN_WIDTH: u32 = 48;
+pub const MAX_TABLE_COLUMN_WIDTH: u32 = 1200;
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedTableConfig {
@@ -332,6 +335,8 @@ pub struct PersistedTableConfig {
     pub sort_column: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sort_direction: Option<PersistedSortDirection>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub column_widths: HashMap<String, u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
@@ -878,11 +883,28 @@ impl OrbitConfig {
             None
         };
 
+        let column_widths: HashMap<String, u32> = config
+            .column_widths
+            .into_iter()
+            .filter_map(|(col, width)| {
+                let key = col.trim().to_string();
+                if key.is_empty() || width == 0 {
+                    None
+                } else {
+                    Some((
+                        key,
+                        width.clamp(MIN_TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMN_WIDTH),
+                    ))
+                }
+            })
+            .collect();
+
         let normalized = PersistedTableConfig {
             page_size,
             hidden_columns,
             sort_column,
             sort_direction,
+            column_widths,
         };
 
         if normalized == PersistedTableConfig::default() {
@@ -1778,6 +1800,7 @@ mod tests {
                 ],
                 sort_column: Some("name".to_string()),
                 sort_direction: Some(PersistedSortDirection::Asc),
+                ..Default::default()
             },
         );
         config.save().expect("save should succeed");
@@ -1791,6 +1814,7 @@ mod tests {
                 hidden_columns: vec!["node".to_string(), "restarts".to_string()],
                 sort_column: Some("name".to_string()),
                 sort_direction: Some(PersistedSortDirection::Asc),
+                ..Default::default()
             })
         );
 
@@ -1803,6 +1827,7 @@ mod tests {
                 hidden_columns: vec![],
                 sort_column: Some("age".to_string()),
                 sort_direction: Some(PersistedSortDirection::Desc),
+                ..Default::default()
             },
         );
         assert_eq!(
@@ -1812,6 +1837,7 @@ mod tests {
                 hidden_columns: vec![],
                 sort_column: Some("age".to_string()),
                 sort_direction: Some(PersistedSortDirection::Desc),
+                ..Default::default()
             })
         );
 
@@ -1819,6 +1845,59 @@ mod tests {
         next.update_table_config("pods", PersistedTableConfig::default());
         assert!(!next.table_preferences().tables.contains_key("pods"));
         assert!(!next.values.contains_key("tablePreferences"));
+    }
+
+    #[test]
+    fn test_orbit_config_table_config_column_widths_roundtrip_and_clamping() {
+        let _guard = TestConfigDirGuard::new("table_column_widths");
+        let mut config = OrbitConfig::default();
+
+        let mut column_widths = HashMap::new();
+        column_widths.insert("name".to_string(), 280);
+        column_widths.insert("status".to_string(), 12);
+        column_widths.insert("huge".to_string(), 5000);
+        column_widths.insert("zero".to_string(), 0);
+        column_widths.insert("  ".to_string(), 120);
+
+        config.update_table_config(
+            "pods",
+            PersistedTableConfig {
+                column_widths,
+                ..Default::default()
+            },
+        );
+        config.save().expect("save should succeed");
+
+        let reloaded = OrbitConfig::load();
+        let saved = reloaded
+            .table_preferences()
+            .tables
+            .get("pods")
+            .cloned()
+            .expect("pods table config should exist");
+        assert_eq!(saved.column_widths.get("name"), Some(&280));
+        assert_eq!(
+            saved.column_widths.get("status"),
+            Some(&MIN_TABLE_COLUMN_WIDTH)
+        );
+        assert_eq!(
+            saved.column_widths.get("huge"),
+            Some(&MAX_TABLE_COLUMN_WIDTH)
+        );
+        assert!(!saved.column_widths.contains_key("zero"));
+        assert!(!saved.column_widths.contains_key("  "));
+        assert!(!saved.column_widths.contains_key(""));
+
+        // Legacy JSON without columnWidths deserializes with empty map
+        let legacy: PersistedTableConfig =
+            serde_json::from_str(r#"{"pageSize":25}"#).expect("legacy json should deserialize");
+        assert!(legacy.column_widths.is_empty());
+
+        // Clearing column_widths with all other fields default prunes tablePreferences
+        let mut cleared = reloaded;
+        cleared.update_table_config("pods", PersistedTableConfig::default());
+        assert!(!cleared.table_preferences().tables.contains_key("pods"));
+        assert!(!cleared.values.contains_key("tablePreferences"));
     }
 
     #[test]

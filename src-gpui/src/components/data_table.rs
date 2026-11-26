@@ -4,14 +4,16 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, Div, ElementId, Font, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, MouseDownEvent, Pixels, Rgba, SharedString, StatefulInteractiveElement, Styled,
-    UniformListScrollHandle, Window, div, prelude::*, px, uniform_list,
+    AnyElement, App, ClickEvent, CursorStyle, Div, ElementId, Font, FontWeight,
+    InteractiveElement, IntoElement, MouseButton, MouseDownEvent, Pixels, Rgba, SharedString,
+    StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div, prelude::*, px,
+    uniform_list,
 };
 use lucide_icons::Icon;
 use orbit_core::config::{
-    ALLOWED_TABLE_PAGE_SIZES, DEFAULT_TABLE_PAGE_SIZE, PersistedClusterTableFilters,
-    PersistedSortDirection, PersistedTableConfig, PersistedTablePreferences,
+    ALLOWED_TABLE_PAGE_SIZES, DEFAULT_TABLE_PAGE_SIZE, MAX_TABLE_COLUMN_WIDTH,
+    MIN_TABLE_COLUMN_WIDTH, PersistedClusterTableFilters, PersistedSortDirection,
+    PersistedTableConfig, PersistedTablePreferences,
 };
 
 use crate::components::tooltip::TextTooltip;
@@ -27,6 +29,29 @@ pub const COLUMN_POPOVER_WIDTH: f32 = 240.0;
 pub const COLUMN_POPOVER_MAX_HEIGHT: f32 = 260.0;
 pub const DEFAULT_SKELETON_ROWS: usize = 6;
 pub const DEFAULT_EMPTY_MESSAGE: &str = "No resources found.";
+pub const DEFAULT_MIN_COLUMN_WIDTH: f32 = MIN_TABLE_COLUMN_WIDTH as f32;
+pub const MAX_COLUMN_WIDTH: f32 = MAX_TABLE_COLUMN_WIDTH as f32;
+pub const COLUMN_RESIZE_HANDLE_WIDTH: f32 = 6.0;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ActiveColumnResize {
+    pub column_id: String,
+    pub start_pointer_x: f32,
+    pub start_width: f32,
+    pub min_width: f32,
+}
+
+pub fn clamp_column_width(width: f32, min_width: f32) -> f32 {
+    let floor = if min_width.is_finite() {
+        min_width.clamp(DEFAULT_MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH)
+    } else {
+        DEFAULT_MIN_COLUMN_WIDTH
+    };
+    if !width.is_finite() {
+        return floor;
+    }
+    width.clamp(floor, MAX_COLUMN_WIDTH)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ColumnAlign {
@@ -131,6 +156,10 @@ impl TableColumn {
             self.default_visible = true;
         }
         self
+    }
+
+    pub fn min_resize_width(&self) -> f32 {
+        DEFAULT_MIN_COLUMN_WIDTH
     }
 }
 
@@ -238,6 +267,8 @@ pub struct DataTableState {
     pub filters: TableFilterState,
     pub hidden_columns: HashSet<String>,
     pub config_popover_open: bool,
+    pub column_widths: HashMap<String, f32>,
+    pub active_resize: Option<ActiveColumnResize>,
 }
 
 impl Default for DataTableState {
@@ -258,6 +289,8 @@ impl DataTableState {
             filters: TableFilterState::default(),
             hidden_columns: HashSet::new(),
             config_popover_open: false,
+            column_widths: HashMap::new(),
+            active_resize: None,
         }
     }
 
@@ -332,6 +365,16 @@ impl DataTableState {
             .collect()
     }
 
+    pub fn resolved_visible_columns(&self, all_columns: &[TableColumn]) -> Vec<TableColumn> {
+        self.visible_columns(all_columns)
+            .into_iter()
+            .map(|mut col| {
+                col.width = self.resolve_column_width(&col);
+                col
+            })
+            .collect()
+    }
+
     pub fn toggle_column(&mut self, col_id: &str, locked: bool) -> bool {
         if locked {
             return false;
@@ -360,6 +403,7 @@ impl DataTableState {
             .filter(|col| !col.locked && !col.default_visible)
             .map(|col| col.id.to_string())
             .collect();
+        self.reset_column_widths();
     }
 
     pub fn has_custom_columns(&self, all_columns: &[TableColumn]) -> bool {
@@ -373,7 +417,99 @@ impl DataTableState {
             .filter(|col| !col.locked && self.hidden_columns.contains(col.id.as_ref()))
             .map(|col| col.id.as_ref())
             .collect();
-        current_hidden != default_hidden
+        current_hidden != default_hidden || !self.column_widths.is_empty()
+    }
+
+    pub fn resolve_column_width(&self, col: &TableColumn) -> ColumnWidth {
+        if let Some(&width) = self.column_widths.get(col.id.as_ref()) {
+            ColumnWidth::Fixed(px(clamp_column_width(width, col.min_resize_width())))
+        } else {
+            col.width
+        }
+    }
+
+    pub fn estimate_rendered_column_width(
+        &self,
+        col_id: &str,
+        visible_columns: &[TableColumn],
+        container_width: f32,
+    ) -> f32 {
+        let mut fixed_total = 0.0_f32;
+        let mut total_flex_weight = 0.0_f32;
+        let mut target_col: Option<&TableColumn> = None;
+
+        for col in visible_columns {
+            if col.id.as_ref() == col_id {
+                target_col = Some(col);
+            }
+            match self.resolve_column_width(col) {
+                ColumnWidth::Fixed(w) => fixed_total += f32::from(w),
+                ColumnWidth::Flex { weight, .. } => total_flex_weight += weight.max(0.0),
+            }
+        }
+
+        let Some(col) = target_col else {
+            return DEFAULT_MIN_COLUMN_WIDTH;
+        };
+
+        match self.resolve_column_width(col) {
+            ColumnWidth::Fixed(w) => clamp_column_width(f32::from(w), col.min_resize_width()),
+            ColumnWidth::Flex { weight, min_width } => {
+                let remaining = (container_width - fixed_total).max(0.0);
+                let share = if total_flex_weight > 0.0 {
+                    remaining * (weight.max(0.0) / total_flex_weight)
+                } else {
+                    f32::from(min_width)
+                };
+                clamp_column_width(share.max(f32::from(min_width)), col.min_resize_width())
+            }
+        }
+    }
+
+    pub fn start_column_resize(
+        &mut self,
+        col_id: &str,
+        pointer_x: f32,
+        visible_columns: &[TableColumn],
+        container_width: f32,
+    ) -> bool {
+        let Some(col) = visible_columns.iter().find(|c| c.id.as_ref() == col_id) else {
+            return false;
+        };
+        let start_width =
+            self.estimate_rendered_column_width(col_id, visible_columns, container_width);
+        let min_width = col.min_resize_width();
+        self.column_widths.insert(col_id.to_string(), start_width);
+        self.active_resize = Some(ActiveColumnResize {
+            column_id: col_id.to_string(),
+            start_pointer_x: pointer_x,
+            start_width,
+            min_width,
+        });
+        true
+    }
+
+    pub fn update_column_resize(&mut self, pointer_x: f32) -> bool {
+        let Some(active) = &self.active_resize else {
+            return false;
+        };
+        let next_width =
+            clamp_column_width(active.start_width + (pointer_x - active.start_pointer_x), active.min_width);
+        let prev = self.column_widths.insert(active.column_id.clone(), next_width);
+        prev != Some(next_width)
+    }
+
+    pub fn end_column_resize(&mut self) -> bool {
+        self.active_resize.take().is_some()
+    }
+
+    pub fn reset_column_width(&mut self, col_id: &str) -> bool {
+        self.column_widths.remove(col_id).is_some()
+    }
+
+    pub fn reset_column_widths(&mut self) {
+        self.column_widths.clear();
+        self.active_resize = None;
     }
 
     pub fn hydrate_from_preferences(
@@ -418,6 +554,27 @@ impl DataTableState {
                 }
                 _ => None,
             };
+
+            self.column_widths = table_cfg
+                .column_widths
+                .iter()
+                .filter_map(|(col_id, &width)| {
+                    let trimmed = col_id.trim();
+                    if trimmed.is_empty() || width == 0 {
+                        return None;
+                    }
+                    if !valid_ids.is_empty() && !valid_ids.contains(trimmed) {
+                        return None;
+                    }
+                    let min_width = columns
+                        .iter()
+                        .find(|c| c.id.as_ref() == trimmed)
+                        .map(|c| c.min_resize_width())
+                        .unwrap_or(DEFAULT_MIN_COLUMN_WIDTH);
+                    Some((trimmed.to_string(), clamp_column_width(width as f32, min_width)))
+                })
+                .collect();
+            self.active_resize = None;
         } else {
             self.pagination.page_size = DEFAULT_TABLE_PAGE_SIZE;
             self.reset_columns(columns);
@@ -442,6 +599,21 @@ impl DataTableState {
         let mut hidden_columns: Vec<String> = self.hidden_columns.iter().cloned().collect();
         hidden_columns.sort();
 
+        let column_widths: HashMap<String, u32> = self
+            .column_widths
+            .iter()
+            .filter_map(|(col_id, &width)| {
+                let trimmed = col_id.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    let clamped =
+                        clamp_column_width(width, DEFAULT_MIN_COLUMN_WIDTH).round() as u32;
+                    Some((trimmed.to_string(), clamped))
+                }
+            })
+            .collect();
+
         PersistedTableConfig {
             page_size: if self.pagination.enabled {
                 Some(self.pagination.page_size)
@@ -454,6 +626,7 @@ impl DataTableState {
                 SortDirection::Asc => PersistedSortDirection::Asc,
                 SortDirection::Desc => PersistedSortDirection::Desc,
             }),
+            column_widths,
         }
     }
 
@@ -648,6 +821,7 @@ pub type RowClickCallback = Rc<dyn Fn(usize, SharedString, &ClickEvent, &mut Win
 pub type RowContextMenuCallback =
     Rc<dyn Fn(usize, SharedString, &MouseDownEvent, &mut Window, &mut App)>;
 pub type PageChangeCallback = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
+pub type ColumnResizeStartCallback = Rc<dyn Fn(SharedString, f32, &mut Window, &mut App)>;
 
 pub struct DataTableCallbacks<K, C>
 where
@@ -661,6 +835,7 @@ where
     pub on_row_context_menu: Option<RowContextMenuCallback>,
     pub on_row_quick_yaml: Option<RowClickCallback>,
     pub on_page_change: Option<PageChangeCallback>,
+    pub on_column_resize_start: Option<ColumnResizeStartCallback>,
 }
 
 impl<K, C> DataTableCallbacks<K, C>
@@ -677,6 +852,7 @@ where
             on_row_context_menu: None,
             on_row_quick_yaml: None,
             on_page_change: None,
+            on_column_resize_start: None,
         }
     }
 
@@ -719,6 +895,14 @@ where
         self.on_page_change = Some(Rc::new(callback));
         self
     }
+
+    pub fn on_column_resize_start(
+        mut self,
+        callback: impl 'static + Fn(SharedString, f32, &mut Window, &mut App),
+    ) -> Self {
+        self.on_column_resize_start = Some(Rc::new(callback));
+        self
+    }
 }
 
 pub fn render_table_header(
@@ -727,6 +911,7 @@ pub fn render_table_header(
     state: &DataTableState,
     theme: &OrbitTheme,
     on_sort: Option<SortCallback>,
+    on_column_resize_start: Option<ColumnResizeStartCallback>,
 ) -> AnyElement {
     let surface = resolve_data_table_surface_style(theme);
     let hover_bg = theme.surface.bg_hover;
@@ -761,6 +946,7 @@ pub fn render_table_header(
             ),
             col.align,
         )
+        .relative()
         .h_full()
         .px_3()
         .flex()
@@ -795,6 +981,53 @@ pub fn render_table_header(
             if let Some(icon_el) = icon_el {
                 cell = cell.child(icon_el);
             }
+        }
+
+        if col_idx + 1 < columns.len()
+            && let Some(resize_cb) = on_column_resize_start.clone()
+        {
+            let resize_col_id = col.id.clone();
+            let is_active_resize = state
+                .active_resize
+                .as_ref()
+                .is_some_and(|r| r.column_id == col.id.as_ref());
+            let divider_color = if is_active_resize {
+                theme.accent.accent
+            } else {
+                theme.border.subtle
+            };
+            let handle_hover = theme.accent.soft;
+
+            cell = cell.child(
+                div()
+                    .id(ElementId::NamedInteger(
+                        SharedString::from(format!("{table_id}-hdr-resize")),
+                        col_idx as u64,
+                    ))
+                    .absolute()
+                    .top_0()
+                    .bottom_0()
+                    .right(px(-(COLUMN_RESIZE_HANDLE_WIDTH / 2.0)))
+                    .w(px(COLUMN_RESIZE_HANDLE_WIDTH))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor(CursorStyle::ResizeLeftRight)
+                    .hover(move |s| s.bg(handle_hover))
+                    .on_mouse_down(MouseButton::Left, move |event, window, cx| {
+                        cx.stop_propagation();
+                        resize_cb(
+                            resize_col_id.clone(),
+                            f32::from(event.position.x),
+                            window,
+                            cx,
+                        );
+                    })
+                    .on_click(|_, _, cx| {
+                        cx.stop_propagation();
+                    })
+                    .child(div().w(px(1.0)).h_full().bg(divider_color)),
+            );
         }
 
         header_row = header_row.child(cell);
@@ -944,6 +1177,7 @@ pub struct ColumnConfigCallbacks {
 
 pub struct DataTableEnhancementCallbacks {
     pub on_page_change: PageChangeCallback,
+    pub on_column_resize_start: ColumnResizeStartCallback,
     pub toolbar: TableToolbarCallbacks,
     pub column_config: ColumnConfigCallbacks,
 }
@@ -1650,9 +1884,13 @@ where
         return render_data_table(table_id, columns, row_count, state, theme, callbacks);
     };
 
-    callbacks = callbacks.on_page_change(move |first, size, window, cx| {
-        (enh.on_page_change)(first, size, window, cx);
-    });
+    callbacks = callbacks
+        .on_page_change(move |first, size, window, cx| {
+            (enh.on_page_change)(first, size, window, cx);
+        })
+        .on_column_resize_start(move |col_id, pointer_x, window, cx| {
+            (enh.on_column_resize_start)(col_id, pointer_x, window, cx);
+        });
     let toolbar = render_table_toolbar(
         table_id.as_ref(),
         search_placeholder,
@@ -1706,13 +1944,14 @@ where
     C: 'static + Fn(usize, &TableColumn, &OrbitTheme) -> AnyElement,
 {
     let table_id_str = table_id.into();
-    let visible_cols = state.visible_columns(columns);
+    let visible_cols = state.resolved_visible_columns(columns);
     let header = render_table_header(
         table_id_str.as_ref(),
         &visible_cols,
         state,
         theme,
         callbacks.on_sort.clone(),
+        callbacks.on_column_resize_start.clone(),
     );
 
     let page_slice = if state.pagination.enabled {
@@ -2445,6 +2684,7 @@ mod tests {
                 hidden_columns: vec!["node".to_string()],
                 sort_column: Some("name".to_string()),
                 sort_direction: Some(PersistedSortDirection::Desc),
+                ..Default::default()
             },
         );
         let mut extra = HashMap::new();
@@ -2535,5 +2775,142 @@ mod tests {
             visible.iter().map(|c| c.id.as_ref()).collect::<Vec<_>>(),
             vec!["name", "namespace", "age"]
         );
+    }
+
+    #[test]
+    fn test_column_width_clamping_and_layout_resolution() {
+        assert_eq!(clamp_column_width(10.0, DEFAULT_MIN_COLUMN_WIDTH), DEFAULT_MIN_COLUMN_WIDTH);
+        assert_eq!(clamp_column_width(2500.0, DEFAULT_MIN_COLUMN_WIDTH), MAX_COLUMN_WIDTH);
+        assert_eq!(clamp_column_width(f32::NAN, DEFAULT_MIN_COLUMN_WIDTH), DEFAULT_MIN_COLUMN_WIDTH);
+        assert_eq!(
+            clamp_column_width(f32::INFINITY, DEFAULT_MIN_COLUMN_WIDTH),
+            DEFAULT_MIN_COLUMN_WIDTH
+        );
+        assert_eq!(clamp_column_width(240.0, DEFAULT_MIN_COLUMN_WIDTH), 240.0);
+
+        let col_flex = TableColumn::new("name", "Name").flex_width(2.0, px(160.0));
+        let col_fixed = TableColumn::new("age", "Age").fixed_width(px(80.0));
+
+        let mut state = DataTableState::new();
+        assert_eq!(state.resolve_column_width(&col_flex), col_flex.width);
+        assert_eq!(state.resolve_column_width(&col_fixed), col_fixed.width);
+
+        state.column_widths.insert("name".to_string(), 320.0);
+        state.column_widths.insert("age".to_string(), 12.0);
+        assert_eq!(
+            state.resolve_column_width(&col_flex),
+            ColumnWidth::Fixed(px(320.0))
+        );
+        assert_eq!(
+            state.resolve_column_width(&col_fixed),
+            ColumnWidth::Fixed(px(DEFAULT_MIN_COLUMN_WIDTH))
+        );
+    }
+
+    #[test]
+    fn test_column_resize_drag_lifecycle_and_flex_estimation() {
+        let cols = vec![
+            TableColumn::new("name", "Name").flex_width(2.0, px(140.0)),
+            TableColumn::new("status", "Status").flex_width(1.0, px(100.0)),
+            TableColumn::new("age", "Age").fixed_width(px(80.0)),
+        ];
+        let mut state = DataTableState::new();
+        // container_width = 680.0 => fixed = 80.0 => remaining = 600.0 => name = 400.0, status = 200.0
+        let est_name = state.estimate_rendered_column_width("name", &cols, 680.0);
+        let est_status = state.estimate_rendered_column_width("status", &cols, 680.0);
+        let est_age = state.estimate_rendered_column_width("age", &cols, 680.0);
+        assert!((est_name - 400.0).abs() < 0.01);
+        assert!((est_status - 200.0).abs() < 0.01);
+        assert!((est_age - 80.0).abs() < 0.01);
+
+        assert!(state.start_column_resize("name", 500.0, &cols, 680.0));
+        assert!(state.active_resize.is_some());
+        assert_eq!(state.column_widths.get("name").copied(), Some(400.0));
+
+        assert!(state.update_column_resize(560.0));
+        assert_eq!(state.column_widths.get("name").copied(), Some(460.0));
+
+        // Negative delta clamped at floor
+        assert!(state.update_column_resize(50.0));
+        assert_eq!(
+            state.column_widths.get("name").copied(),
+            Some(DEFAULT_MIN_COLUMN_WIDTH)
+        );
+
+        assert!(state.end_column_resize());
+        assert!(!state.end_column_resize());
+        assert!(state.active_resize.is_none());
+    }
+
+    #[test]
+    fn test_column_widths_hydration_serialization_and_reset_defaults() {
+        use orbit_core::config::{PersistedTableConfig, PersistedTablePreferences};
+        use std::collections::HashMap;
+
+        let cols = vec![
+            TableColumn::new("name", "Name").locked(true),
+            TableColumn::new("status", "Status"),
+        ];
+        let mut widths = HashMap::new();
+        widths.insert("name".to_string(), 310);
+        widths.insert("status".to_string(), 10);
+        widths.insert("unknown".to_string(), 200);
+
+        let mut prefs = PersistedTablePreferences::default();
+        prefs.tables.insert(
+            "pods".to_string(),
+            PersistedTableConfig {
+                column_widths: widths,
+                ..Default::default()
+            },
+        );
+
+        let mut state = DataTableState::new();
+        state.hydrate_from_preferences("pods", None, &prefs, &cols);
+        assert_eq!(state.column_widths.get("name").copied(), Some(310.0));
+        assert_eq!(
+            state.column_widths.get("status").copied(),
+            Some(DEFAULT_MIN_COLUMN_WIDTH)
+        );
+        assert!(!state.column_widths.contains_key("unknown"));
+        assert!(state.has_custom_columns(&cols));
+
+        let persisted = state.to_persisted_config();
+        assert_eq!(persisted.column_widths.get("name").copied(), Some(310));
+        assert_eq!(
+            persisted.column_widths.get("status").copied(),
+            Some(DEFAULT_MIN_COLUMN_WIDTH as u32)
+        );
+
+        state.reset_columns(&cols);
+        assert!(state.column_widths.is_empty());
+        assert!(state.active_resize.is_none());
+        assert!(!state.has_custom_columns(&cols));
+        assert!(state.to_persisted_config().column_widths.is_empty());
+    }
+
+    #[test]
+    fn test_data_table_callbacks_accept_optional_column_resize_start_handler() {
+        let default_callbacks =
+            DataTableCallbacks::new(|idx| format!("row-{idx}"), |_, _, _| div().into_any_element());
+        assert!(default_callbacks.on_column_resize_start.is_none());
+
+        let with_resize = DataTableCallbacks::new(
+            |idx| format!("row-{idx}"),
+            |_, _, _| div().into_any_element(),
+        )
+        .on_column_resize_start(|_, _, _, _| {});
+        assert!(with_resize.on_column_resize_start.is_some());
+
+        let cols = vec![
+            TableColumn::new("name", "Name").flex_width(2.0, px(140.0)),
+            TableColumn::new("age", "Age").fixed_width(px(80.0)),
+        ];
+        let mut state = DataTableState::new();
+        state.column_widths.insert("name".to_string(), 260.0);
+        let resolved = state.resolved_visible_columns(&cols);
+        assert_eq!(resolved.len(), 2);
+        assert_eq!(resolved[0].width, ColumnWidth::Fixed(px(260.0)));
+        assert_eq!(resolved[1].width, ColumnWidth::Fixed(px(80.0)));
     }
 }
