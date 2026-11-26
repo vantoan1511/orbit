@@ -17,6 +17,7 @@ pub mod persistent_volume_claims;
 pub mod persistent_volumes;
 pub mod pod_security;
 pub mod pods;
+pub mod port_forward;
 pub mod replicasets;
 pub mod resource_quotas;
 pub mod secrets;
@@ -811,9 +812,11 @@ mod tests {
             "desired",
             "last_updated",
             "age",
+            "local_port",
+            "remote_port",
         ];
 
-        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 23] = [
+        let all_views: [(&str, Vec<crate::components::data_table::TableColumn>); 24] = [
             (
                 "admission_webhooks",
                 admission_webhooks::admission_webhook_columns(),
@@ -842,6 +845,7 @@ mod tests {
             ),
             ("pod_security", pod_security::pod_security_columns()),
             ("pods", pods::pod_columns()),
+            ("port_forward", port_forward::port_forward_columns()),
             ("replicasets", replicasets::replicaset_columns()),
             ("resource_quotas", resource_quotas::resource_quota_columns()),
             ("secrets", secrets::secret_columns()),

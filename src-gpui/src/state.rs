@@ -12,6 +12,7 @@ use orbit_core::kubernetes::models::{
     StorageClassInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
+use orbit_core::kubernetes::port_forward::PersistedPortForward;
 use orbit_core::kubernetes::storage_overview::StorageOverviewSnapshot;
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
 
@@ -229,6 +230,29 @@ pub enum ClusterBridgeCommand {
     },
     StopLogStream {
         stream_id: u64,
+    },
+    LoadPortForwards {
+        cluster_id: String,
+        generation: u64,
+    },
+    StartPortForward {
+        cluster_id: String,
+        namespace: String,
+        kind: String,
+        name: String,
+        local_port: u16,
+        remote_port: u16,
+    },
+    StopPortForward {
+        cluster_id: String,
+        id: String,
+    },
+    StopSelectedPortForwards {
+        cluster_id: String,
+        ids: Vec<String>,
+    },
+    StopAllPortForwards {
+        cluster_id: String,
     },
 }
 
@@ -593,6 +617,27 @@ pub enum ClusterBridgeEvent {
     LogStreamEnded {
         cluster_id: String,
         stream_id: u64,
+    },
+    PortForwardsLoaded {
+        cluster_id: String,
+        generation: u64,
+        port_forwards: Vec<PersistedPortForward>,
+    },
+    PortForwardStarted {
+        cluster_id: String,
+        port_forward: PersistedPortForward,
+    },
+    PortForwardStopped {
+        cluster_id: String,
+        id: String,
+    },
+    PortForwardsCleared {
+        cluster_id: String,
+    },
+    PortForwardFailed {
+        cluster_id: String,
+        id: Option<String>,
+        message: String,
     },
 }
 
@@ -3330,6 +3375,293 @@ impl EventsState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PortForwardsLoadStatus {
+    #[default]
+    Idle,
+    Loading,
+    Loaded,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PortForwardKindFilter {
+    #[default]
+    All,
+    Service,
+    Pod,
+    Deployment,
+    StatefulSet,
+    ReplicaSet,
+}
+
+impl PortForwardKindFilter {
+    pub fn all() -> &'static [Self] {
+        &[
+            Self::All,
+            Self::Service,
+            Self::Pod,
+            Self::Deployment,
+            Self::StatefulSet,
+            Self::ReplicaSet,
+        ]
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::All => "All Kinds",
+            Self::Service => "Service",
+            Self::Pod => "Pod",
+            Self::Deployment => "Deployment",
+            Self::StatefulSet => "StatefulSet",
+            Self::ReplicaSet => "ReplicaSet",
+        }
+    }
+
+    pub fn matches_kind(&self, kind: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Service => kind.eq_ignore_ascii_case("Service"),
+            Self::Pod => kind.eq_ignore_ascii_case("Pod"),
+            Self::Deployment => kind.eq_ignore_ascii_case("Deployment"),
+            Self::StatefulSet => kind.eq_ignore_ascii_case("StatefulSet"),
+            Self::ReplicaSet => kind.eq_ignore_ascii_case("ReplicaSet"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PortForwardsState {
+    pub cluster_id: Option<String>,
+    pub generation: u64,
+    pub status: PortForwardsLoadStatus,
+    pub port_forwards: Vec<PersistedPortForward>,
+    pub stopping_ids: HashSet<String>,
+    pub selected_ids: HashSet<String>,
+    pub kind_filter: PortForwardKindFilter,
+    pub search_query: String,
+    pub search_focused: bool,
+    pub table: DataTableState,
+    pub error_message: Option<String>,
+}
+
+impl PortForwardsState {
+    pub fn needs_load_for_cluster(&self, cluster_id: &str) -> bool {
+        self.cluster_id.as_deref() != Some(cluster_id)
+            || self.status == PortForwardsLoadStatus::Idle
+    }
+
+    pub fn begin_load_for_cluster(&mut self, cluster_id: &str) -> ClusterBridgeCommand {
+        let switching_cluster = self.cluster_id.as_deref() != Some(cluster_id);
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PortForwardsLoadStatus::Loading;
+        self.error_message = None;
+        if switching_cluster {
+            self.port_forwards.clear();
+            self.stopping_ids.clear();
+            self.selected_ids.clear();
+            self.kind_filter = PortForwardKindFilter::All;
+            self.search_query.clear();
+            self.search_focused = false;
+            self.table.selected_row_key = None;
+        }
+        self.table.loading = self.port_forwards.is_empty();
+        ClusterBridgeCommand::LoadPortForwards {
+            cluster_id: cluster_id.to_string(),
+            generation: self.generation,
+        }
+    }
+
+    pub fn begin_refresh(&mut self) -> Option<ClusterBridgeCommand> {
+        let cluster_id = self.cluster_id.clone()?;
+        self.generation += 1;
+        self.status = PortForwardsLoadStatus::Loading;
+        self.error_message = None;
+        self.table.loading = self.port_forwards.is_empty();
+        Some(ClusterBridgeCommand::LoadPortForwards {
+            cluster_id,
+            generation: self.generation,
+        })
+    }
+
+    pub fn reset_for_cluster(&mut self, cluster_id: &str) {
+        self.generation += 1;
+        self.cluster_id = Some(cluster_id.to_string());
+        self.status = PortForwardsLoadStatus::Idle;
+        self.port_forwards.clear();
+        self.stopping_ids.clear();
+        self.selected_ids.clear();
+        self.kind_filter = PortForwardKindFilter::All;
+        self.search_query.clear();
+        self.search_focused = false;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn reset_for_disconnected(&mut self) {
+        self.generation += 1;
+        self.cluster_id = None;
+        self.status = PortForwardsLoadStatus::Idle;
+        self.port_forwards.clear();
+        self.stopping_ids.clear();
+        self.selected_ids.clear();
+        self.kind_filter = PortForwardKindFilter::All;
+        self.search_query.clear();
+        self.search_focused = false;
+        self.error_message = None;
+        self.table.selected_row_key = None;
+        self.table.loading = false;
+    }
+
+    pub fn apply_loaded(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        port_forwards: Vec<PersistedPortForward>,
+    ) -> bool {
+        if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            self.status = PortForwardsLoadStatus::Loaded;
+            self.port_forwards = port_forwards;
+            let active_ids: HashSet<&str> = self
+                .port_forwards
+                .iter()
+                .map(|pf| pf.id.as_str())
+                .collect();
+            self.stopping_ids
+                .retain(|id| active_ids.contains(id.as_str()));
+            self.selected_ids
+                .retain(|id| active_ids.contains(id.as_str()));
+            self.error_message = None;
+            self.table.loading = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn apply_started(&mut self, cluster_id: &str, port_forward: PersistedPortForward) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id) {
+            return false;
+        }
+        self.stopping_ids.remove(&port_forward.id);
+        self.port_forwards.retain(|pf| pf.id != port_forward.id);
+        self.port_forwards.push(port_forward);
+        self.status = PortForwardsLoadStatus::Loaded;
+        self.error_message = None;
+        self.table.loading = false;
+        true
+    }
+
+    pub fn apply_stopped(&mut self, cluster_id: &str, id: &str) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id) {
+            return false;
+        }
+        self.stopping_ids.remove(id);
+        self.selected_ids.remove(id);
+        self.port_forwards.retain(|pf| pf.id != id);
+        if self.table.selected_row_key.as_deref() == Some(id) {
+            self.table.selected_row_key = None;
+        }
+        true
+    }
+
+    pub fn apply_cleared(&mut self, cluster_id: &str) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id) {
+            return false;
+        }
+        self.stopping_ids.clear();
+        self.selected_ids.clear();
+        self.port_forwards.clear();
+        self.table.selected_row_key = None;
+        self.status = PortForwardsLoadStatus::Loaded;
+        self.error_message = None;
+        self.table.loading = false;
+        true
+    }
+
+    pub fn apply_failed(&mut self, cluster_id: &str, id: Option<&str>, message: String) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id) {
+            return false;
+        }
+        if let Some(forward_id) = id {
+            self.stopping_ids.remove(forward_id);
+        }
+        self.error_message = Some(message);
+        self.table.loading = false;
+        true
+    }
+
+    pub fn mark_stopping(&mut self, id: &str) {
+        self.stopping_ids.insert(id.to_string());
+    }
+
+    pub fn toggle_select(&mut self, id: &str) {
+        if !self.selected_ids.remove(id) {
+            self.selected_ids.insert(id.to_string());
+        }
+    }
+
+    pub fn toggle_select_all_visible(&mut self, visible_ids: &[String]) {
+        if visible_ids.is_empty() {
+            return;
+        }
+        let all_selected = visible_ids.iter().all(|id| self.selected_ids.contains(id));
+        if all_selected {
+            for id in visible_ids {
+                self.selected_ids.remove(id);
+            }
+        } else {
+            for id in visible_ids {
+                self.selected_ids.insert(id.clone());
+            }
+        }
+    }
+
+    pub fn clear_selection(&mut self) {
+        self.selected_ids.clear();
+    }
+
+    pub fn set_kind_filter(&mut self, filter: PortForwardKindFilter) {
+        self.kind_filter = filter;
+    }
+
+    pub fn handle_search_key(&mut self, key: &str, key_char: Option<&str>) -> bool {
+        if !self.search_focused {
+            return false;
+        }
+        if key == "escape" {
+            if self.search_query.is_empty() {
+                self.search_focused = false;
+            } else {
+                self.search_query.clear();
+            }
+            return true;
+        }
+        if key == "backspace" {
+            self.search_query.pop();
+            return true;
+        }
+        if let Some(ch_str) = key_char {
+            let mut chars = ch_str.chars();
+            if let (Some(ch), None) = (chars.next(), chars.next())
+                && !ch.is_control()
+            {
+                self.search_query.push(ch);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn has_local_port(&self, local_port: u16) -> bool {
+        self.port_forwards
+            .iter()
+            .any(|pf| pf.local_port == local_port)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ClusterSwitcherState {
     pub clusters: Vec<ClusterInfo>,
@@ -3618,7 +3950,12 @@ impl ClusterSwitcherState {
                 self.dropdown_open = false;
             }
             ClusterBridgeEvent::AddClusterFailed { .. }
-            | ClusterBridgeEvent::SettingsSaveFailed { .. } => {}
+            | ClusterBridgeEvent::SettingsSaveFailed { .. }
+            | ClusterBridgeEvent::PortForwardsLoaded { .. }
+            | ClusterBridgeEvent::PortForwardStarted { .. }
+            | ClusterBridgeEvent::PortForwardStopped { .. }
+            | ClusterBridgeEvent::PortForwardsCleared { .. }
+            | ClusterBridgeEvent::PortForwardFailed { .. } => {}
         }
     }
 
@@ -6973,5 +7310,101 @@ mod tests {
         state.reset_for_disconnected();
         assert!(state.cluster_id.is_none());
         assert!(state.snapshot.is_none());
+    }
+
+    #[test]
+    fn test_port_forwards_state_load_start_stop_and_clear_lifecycle() {
+        let mut state = PortForwardsState::default();
+        assert!(state.needs_load_for_cluster("ctx-a"));
+
+        let cmd = state.begin_load_for_cluster("ctx-a");
+        assert_eq!(
+            cmd,
+            ClusterBridgeCommand::LoadPortForwards {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+            }
+        );
+
+        let pf1 = PersistedPortForward {
+            id: "default/Service/api:8080:80".to_string(),
+            cluster_id: "ctx-a".to_string(),
+            namespace: "default".to_string(),
+            kind: "Service".to_string(),
+            name: "api".to_string(),
+            local_port: 8080,
+            remote_port: 80,
+        };
+        let pf2 = PersistedPortForward {
+            id: "default/Pod/web:3000:3000".to_string(),
+            cluster_id: "ctx-a".to_string(),
+            namespace: "default".to_string(),
+            kind: "Pod".to_string(),
+            name: "web".to_string(),
+            local_port: 3000,
+            remote_port: 3000,
+        };
+
+        // Stale generation is ignored
+        assert!(!state.apply_loaded("ctx-a", 99, vec![pf1.clone()]));
+        assert!(state.apply_loaded("ctx-a", 1, vec![pf1.clone()]));
+        assert_eq!(state.status, PortForwardsLoadStatus::Loaded);
+        assert_eq!(state.port_forwards.len(), 1);
+        assert!(!state.needs_load_for_cluster("ctx-a"));
+
+        // apply_started deduplicates existing entry and adds new one
+        assert!(state.apply_started("ctx-a", pf1.clone()));
+        assert!(state.apply_started("ctx-a", pf2.clone()));
+        assert_eq!(state.port_forwards.len(), 2);
+
+        // apply_stopped cleans stopping_ids, selected_ids, and entry
+        state.mark_stopping(&pf1.id);
+        state.toggle_select(&pf1.id);
+        assert!(state.apply_stopped("ctx-a", &pf1.id));
+        assert!(!state.stopping_ids.contains(&pf1.id));
+        assert!(!state.selected_ids.contains(&pf1.id));
+        assert_eq!(state.port_forwards, vec![pf2]);
+
+        // apply_cleared empties everything
+        assert!(state.apply_cleared("ctx-a"));
+        assert!(state.port_forwards.is_empty());
+        assert!(state.selected_ids.is_empty());
+    }
+
+    #[test]
+    fn test_port_forwards_state_selection_and_local_port_collision() {
+        let mut state = PortForwardsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        let pf1 = PersistedPortForward {
+            id: "default/Service/api:8080:80".to_string(),
+            cluster_id: "ctx-a".to_string(),
+            namespace: "default".to_string(),
+            kind: "Service".to_string(),
+            name: "api".to_string(),
+            local_port: 8080,
+            remote_port: 80,
+        };
+        let pf2 = PersistedPortForward {
+            id: "default/Pod/web:9090:90".to_string(),
+            cluster_id: "ctx-a".to_string(),
+            namespace: "default".to_string(),
+            kind: "Pod".to_string(),
+            name: "web".to_string(),
+            local_port: 9090,
+            remote_port: 90,
+        };
+        assert!(state.apply_loaded("ctx-a", 1, vec![pf1.clone(), pf2.clone()]));
+        assert!(state.has_local_port(8080));
+        assert!(!state.has_local_port(7777));
+
+        let visible = vec![pf1.id.clone(), pf2.id.clone()];
+        state.toggle_select_all_visible(&visible);
+        assert_eq!(state.selected_ids.len(), 2);
+        state.toggle_select(&pf1.id);
+        assert_eq!(state.selected_ids.len(), 1);
+        state.toggle_select_all_visible(&visible);
+        assert_eq!(state.selected_ids.len(), 2);
+        state.toggle_select_all_visible(&visible);
+        assert!(state.selected_ids.is_empty());
     }
 }
