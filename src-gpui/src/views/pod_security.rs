@@ -333,6 +333,7 @@ pub fn render_pod_security_view(
         PodSecurityPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.policies.is_empty();
+            table_state.refreshing = is_loading && !state.policies.is_empty();
             table_state.empty_message = SharedString::from(pod_security_empty_message(state));
 
             let key_rows = filtered_rows.clone();

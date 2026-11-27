@@ -472,6 +472,7 @@ pub fn render_secrets_view(
         SecretsPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.secrets.is_empty();
+            table_state.refreshing = is_loading && !state.secrets.is_empty();
             table_state.empty_message = SharedString::from(secrets_empty_message(state));
 
             let key_rows = filtered_rows.clone();

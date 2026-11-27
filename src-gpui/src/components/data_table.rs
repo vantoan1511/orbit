@@ -254,6 +254,7 @@ pub enum TableBodyMode {
     LoadingSkeleton,
     Empty,
     Rows,
+    RefreshingRows,
 }
 
 #[derive(Debug, Clone)]
@@ -262,6 +263,7 @@ pub struct DataTableState {
     pub selected_row_key: Option<String>,
     pub scroll_handle: UniformListScrollHandle,
     pub loading: bool,
+    pub refreshing: bool,
     pub empty_message: SharedString,
     pub pagination: TablePaginationState,
     pub filters: TableFilterState,
@@ -284,6 +286,7 @@ impl DataTableState {
             selected_row_key: None,
             scroll_handle: UniformListScrollHandle::new(),
             loading: false,
+            refreshing: false,
             empty_message: SharedString::from(DEFAULT_EMPTY_MESSAGE),
             pagination: TablePaginationState::default(),
             filters: TableFilterState::default(),
@@ -665,11 +668,46 @@ impl DataTableState {
         self.selected_row_key.as_deref() == Some(row_key)
     }
 
+    pub fn move_selection_by_delta(
+        &mut self,
+        delta: isize,
+        visible_row_keys: &[String],
+    ) -> Option<usize> {
+        if visible_row_keys.is_empty() {
+            return None;
+        }
+        let current = self
+            .selected_row_key
+            .as_deref()
+            .and_then(|key| visible_row_keys.iter().position(|k| k == key));
+        let next_idx = match current {
+            Some(idx) if delta >= 0 => (idx + delta as usize).min(visible_row_keys.len() - 1),
+            Some(idx) => idx.saturating_sub(delta.unsigned_abs()),
+            None if delta >= 0 => 0,
+            None => visible_row_keys.len() - 1,
+        };
+        self.selected_row_key = visible_row_keys.get(next_idx).cloned();
+        if self.pagination.enabled {
+            let page_size = self.pagination.page_size.max(1);
+            let target_first = (next_idx / page_size) * page_size;
+            self.pagination.first = target_first;
+            let local_idx = next_idx - target_first;
+            self.scroll_handle
+                .scroll_to_item(local_idx, gpui::ScrollStrategy::Center);
+        } else {
+            self.scroll_handle
+                .scroll_to_item(next_idx, gpui::ScrollStrategy::Center);
+        }
+        Some(next_idx)
+    }
+
     pub fn body_mode(&self, row_count: usize) -> TableBodyMode {
         if self.loading && row_count == 0 {
             TableBodyMode::LoadingSkeleton
         } else if row_count == 0 {
             TableBodyMode::Empty
+        } else if self.refreshing {
+            TableBodyMode::RefreshingRows
         } else {
             TableBodyMode::Rows
         }
@@ -823,6 +861,13 @@ pub type RowContextMenuCallback =
 pub type PageChangeCallback = Rc<dyn Fn(usize, usize, &mut Window, &mut App)>;
 pub type ColumnResizeStartCallback = Rc<dyn Fn(SharedString, f32, &mut Window, &mut App)>;
 
+#[derive(Clone)]
+pub struct EmptyStateAction {
+    pub label: SharedString,
+    pub icon: Icon,
+    pub on_click: TableActionCallback,
+}
+
 pub struct DataTableCallbacks<K, C>
 where
     K: 'static + Fn(usize) -> String,
@@ -836,6 +881,7 @@ where
     pub on_row_quick_yaml: Option<RowClickCallback>,
     pub on_page_change: Option<PageChangeCallback>,
     pub on_column_resize_start: Option<ColumnResizeStartCallback>,
+    pub on_empty_action: Option<EmptyStateAction>,
 }
 
 impl<K, C> DataTableCallbacks<K, C>
@@ -853,6 +899,7 @@ where
             on_row_quick_yaml: None,
             on_page_change: None,
             on_column_resize_start: None,
+            on_empty_action: None,
         }
     }
 
@@ -901,6 +948,11 @@ where
         callback: impl 'static + Fn(SharedString, f32, &mut Window, &mut App),
     ) -> Self {
         self.on_column_resize_start = Some(Rc::new(callback));
+        self
+    }
+
+    pub fn on_empty_action(mut self, action: EmptyStateAction) -> Self {
+        self.on_empty_action = Some(action);
         self
     }
 }
@@ -1112,6 +1164,16 @@ pub fn render_empty_state(
     empty_message: SharedString,
     theme: &OrbitTheme,
 ) -> AnyElement {
+    render_empty_state_with_action(table_id, empty_message, None, theme)
+}
+
+pub fn render_empty_state_with_action(
+    table_id: &str,
+    empty_message: SharedString,
+    action: Option<&EmptyStateAction>,
+    theme: &OrbitTheme,
+) -> AnyElement {
+    let hover_bg = theme.surface.control_hover;
     div()
         .id(SharedString::from(format!("{table_id}-empty")))
         .flex_1()
@@ -1121,7 +1183,7 @@ pub fn render_empty_state(
         .flex_col()
         .items_center()
         .justify_center()
-        .gap_2()
+        .gap_2p5()
         .p_6()
         .child(render_icon(Icon::Info, px(20.0), theme.text.muted))
         .child(
@@ -1130,6 +1192,32 @@ pub fn render_empty_state(
                 .text_color(theme.text.muted)
                 .child(empty_message),
         )
+        .when_some(action, |el, act| {
+            let on_click = act.on_click.clone();
+            el.child(
+                div()
+                    .id(SharedString::from(format!("{table_id}-empty-action")))
+                    .h(px(28.0))
+                    .px_3()
+                    .rounded(theme.style.radius_control)
+                    .border_1()
+                    .border_color(theme.border.default)
+                    .bg(theme.surface.bg_card)
+                    .flex()
+                    .items_center()
+                    .gap_1p5()
+                    .cursor_pointer()
+                    .hover(move |s| s.bg(hover_bg))
+                    .on_click(move |_, window, cx| on_click(window, cx))
+                    .child(render_icon(act.icon, px(13.0), theme.text.secondary))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(theme.text.primary)
+                            .child(act.label.clone()),
+                    ),
+            )
+        })
         .into_any_element()
 }
 
@@ -1318,6 +1406,22 @@ fn render_toolbar_search_box(
                 } else {
                     SharedString::from(state.filters.search_query.clone())
                 }),
+        )
+        .when(
+            !state.filters.search_focused && state.filters.search_query.is_empty(),
+            |el| {
+                el.child(
+                    apply_text_step(div(), theme.typography.size_3xs)
+                        .px_1()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.control_bg)
+                        .border_1()
+                        .border_color(theme.border.default)
+                        .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                        .text_color(theme.text.muted)
+                        .child("/"),
+                )
+            },
         )
         .when(!state.filters.search_query.is_empty(), |el| {
             let hover_bg = theme.surface.bg_hover;
@@ -1976,19 +2080,21 @@ where
         None => (row_count, 0),
     };
 
-    let body = match state.body_mode(render_count) {
+    let body_mode = state.body_mode(render_count);
+    let body = match body_mode {
         TableBodyMode::LoadingSkeleton => render_loading_skeleton(
             table_id_str.as_ref(),
             &visible_cols,
             DEFAULT_SKELETON_ROWS,
             theme,
         ),
-        TableBodyMode::Empty => render_empty_state(
+        TableBodyMode::Empty => render_empty_state_with_action(
             table_id_str.as_ref(),
             state.empty_message.clone(),
+            callbacks.on_empty_action.as_ref(),
             theme,
         ),
-        TableBodyMode::Rows => {
+        TableBodyMode::Rows | TableBodyMode::RefreshingRows => {
             let cols: Rc<[TableColumn]> = Rc::from(visible_cols);
             let row_key_fn = Rc::new(callbacks.row_key);
             let render_cell_fn = Rc::new(callbacks.render_cell);
@@ -2207,8 +2313,10 @@ where
         )
     });
 
+    let refreshing_bar_id = SharedString::from(format!("{table_id_str}-refreshing-bar"));
     div()
         .id(table_id_str)
+        .relative()
         .bg(surface.background)
         .border_t_1()
         .border_color(surface.top_hairline)
@@ -2218,6 +2326,18 @@ where
         .w_full()
         .min_h(px(0.0))
         .overflow_hidden()
+        .when(body_mode == TableBodyMode::RefreshingRows, |el| {
+            el.child(
+                div()
+                    .id(refreshing_bar_id)
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .right_0()
+                    .h(px(2.0))
+                    .bg(theme.accent.accent),
+            )
+        })
         .child(header)
         .child(body)
         .when_some(paginator, |el, paginator| el.child(paginator))
@@ -2351,6 +2471,79 @@ mod tests {
         state.loading = false;
         assert_eq!(state.body_mode(0), TableBodyMode::Empty);
         assert_eq!(state.body_mode(5), TableBodyMode::Rows);
+    }
+
+    #[test]
+    fn test_data_table_body_mode_distinguishes_cold_load_empty_rows_and_warm_refresh() {
+        let mut state = DataTableState::new();
+
+        state.loading = true;
+        state.refreshing = false;
+        assert_eq!(state.body_mode(0), TableBodyMode::LoadingSkeleton);
+
+        state.loading = false;
+        state.refreshing = false;
+        assert_eq!(state.body_mode(0), TableBodyMode::Empty);
+        assert_eq!(state.body_mode(5), TableBodyMode::Rows);
+
+        state.loading = false;
+        state.refreshing = true;
+        assert_eq!(state.body_mode(5), TableBodyMode::RefreshingRows);
+
+        // Populated table must NEVER revert to loading skeleton during refresh
+        state.loading = true;
+        state.refreshing = true;
+        assert_eq!(state.body_mode(5), TableBodyMode::RefreshingRows);
+    }
+
+    #[test]
+    fn test_data_table_keyboard_row_selection_navigation_and_pagination_sync() {
+        let keys: Vec<String> = ["r0", "r1", "r2", "r3", "r4"]
+            .into_iter()
+            .map(String::from)
+            .collect();
+        let mut state = DataTableState::new().with_pagination();
+        state.pagination.page_size = 2;
+
+        // Empty list returns None and leaves selection untouched
+        assert_eq!(state.move_selection_by_delta(1, &[]), None);
+        assert_eq!(state.selected_row_key, None);
+
+        // Down from unselected -> selects first row
+        assert_eq!(state.move_selection_by_delta(1, &keys), Some(0));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r0"));
+        assert_eq!(state.pagination.first, 0);
+
+        // Down -> r1 (same page)
+        assert_eq!(state.move_selection_by_delta(1, &keys), Some(1));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r1"));
+        assert_eq!(state.pagination.first, 0);
+
+        // Down -> r2 (advances to page 2)
+        assert_eq!(state.move_selection_by_delta(1, &keys), Some(2));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r2"));
+        assert_eq!(state.pagination.first, 2);
+
+        // Up -> r1 (returns to page 1)
+        assert_eq!(state.move_selection_by_delta(-1, &keys), Some(1));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r1"));
+        assert_eq!(state.pagination.first, 0);
+
+        // Clamp at top
+        assert_eq!(state.move_selection_by_delta(-1, &keys), Some(0));
+        assert_eq!(state.move_selection_by_delta(-1, &keys), Some(0));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r0"));
+
+        // Clamp at bottom
+        state.selected_row_key = Some("r4".to_string());
+        assert_eq!(state.move_selection_by_delta(1, &keys), Some(4));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r4"));
+        assert_eq!(state.pagination.first, 4);
+
+        // Up from unselected -> selects last row
+        state.clear_selection();
+        assert_eq!(state.move_selection_by_delta(-1, &keys), Some(4));
+        assert_eq!(state.selected_row_key.as_deref(), Some("r4"));
     }
 
     #[test]

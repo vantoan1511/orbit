@@ -301,6 +301,50 @@ pub fn render_resource_error_banner(
         .into_any_element()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EmptyStateRecoveryKind {
+    ClearFilters,
+    ClearNamespaceFilter,
+    Refresh,
+}
+
+pub fn resolve_empty_state_recovery_kind(
+    has_table_filters: bool,
+    has_namespace_filter: bool,
+) -> EmptyStateRecoveryKind {
+    if has_table_filters {
+        EmptyStateRecoveryKind::ClearFilters
+    } else if has_namespace_filter {
+        EmptyStateRecoveryKind::ClearNamespaceFilter
+    } else {
+        EmptyStateRecoveryKind::Refresh
+    }
+}
+
+pub fn build_empty_state_action(
+    has_table_filters: bool,
+    on_clear_filters: Option<ActionCallback>,
+    on_refresh: ActionCallback,
+) -> crate::components::data_table::EmptyStateAction {
+    match resolve_empty_state_recovery_kind(has_table_filters, false) {
+        EmptyStateRecoveryKind::ClearFilters => {
+            if let Some(clear_cb) = on_clear_filters {
+                return crate::components::data_table::EmptyStateAction {
+                    label: SharedString::from("Clear Filters"),
+                    icon: Icon::RotateCcw,
+                    on_click: clear_cb,
+                };
+            }
+        }
+        EmptyStateRecoveryKind::ClearNamespaceFilter | EmptyStateRecoveryKind::Refresh => {}
+    }
+    crate::components::data_table::EmptyStateAction {
+        label: SharedString::from("Refresh"),
+        icon: Icon::RefreshCw,
+        on_click: on_refresh,
+    }
+}
+
 pub fn render_resource_error_state(
     retry_btn_id: &'static str,
     title: impl Into<SharedString>,
@@ -923,6 +967,26 @@ mod tests {
         assert_eq!(
             format_images_tooltip(&["nginx:1.25".to_string(), "envoy:1.30".to_string()]),
             Some("nginx:1.25\nenvoy:1.30".to_string())
+        );
+    }
+
+    #[test]
+    fn test_resolve_empty_state_recovery_kind() {
+        assert_eq!(
+            resolve_empty_state_recovery_kind(true, true),
+            EmptyStateRecoveryKind::ClearFilters
+        );
+        assert_eq!(
+            resolve_empty_state_recovery_kind(true, false),
+            EmptyStateRecoveryKind::ClearFilters
+        );
+        assert_eq!(
+            resolve_empty_state_recovery_kind(false, true),
+            EmptyStateRecoveryKind::ClearNamespaceFilter
+        );
+        assert_eq!(
+            resolve_empty_state_recovery_kind(false, false),
+            EmptyStateRecoveryKind::Refresh
         );
     }
 }

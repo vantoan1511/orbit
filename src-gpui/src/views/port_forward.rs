@@ -236,6 +236,7 @@ pub fn render_port_forward_view(
 
     let mut table_state = state.table.clone();
     table_state.loading = is_loading && state.port_forwards.is_empty();
+    table_state.refreshing = is_loading && !state.port_forwards.is_empty();
     table_state.empty_message = SharedString::from(if state.port_forwards.is_empty() {
         "No active port forwards. Click '+ Forward Port' or right-click a Pod, Service, or Workload."
     } else {

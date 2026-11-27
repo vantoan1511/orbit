@@ -879,11 +879,13 @@ impl NamespacesViewState {
     pub fn reset_for_cluster(&mut self) {
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 }
 
@@ -1114,6 +1116,7 @@ impl DeploymentsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.deployments.is_empty();
+        self.table.refreshing = !self.deployments.is_empty();
         ClusterBridgeCommand::LoadDeployments {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1126,6 +1129,7 @@ impl DeploymentsState {
         self.status = DeploymentsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.deployments.is_empty();
+        self.table.refreshing = !self.deployments.is_empty();
         Some(ClusterBridgeCommand::LoadDeployments {
             cluster_id,
             generation: self.generation,
@@ -1140,6 +1144,7 @@ impl DeploymentsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1150,6 +1155,7 @@ impl DeploymentsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -1163,6 +1169,7 @@ impl DeploymentsState {
             self.deployments = deployments;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1174,6 +1181,7 @@ impl DeploymentsState {
             self.status = DeploymentsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1216,6 +1224,7 @@ impl StatefulSetsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.statefulsets.is_empty();
+        self.table.refreshing = !self.statefulsets.is_empty();
         ClusterBridgeCommand::LoadStatefulSets {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1228,6 +1237,7 @@ impl StatefulSetsState {
         self.status = StatefulSetsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.statefulsets.is_empty();
+        self.table.refreshing = !self.statefulsets.is_empty();
         Some(ClusterBridgeCommand::LoadStatefulSets {
             cluster_id,
             generation: self.generation,
@@ -1242,6 +1252,7 @@ impl StatefulSetsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1252,6 +1263,7 @@ impl StatefulSetsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -1265,6 +1277,7 @@ impl StatefulSetsState {
             self.statefulsets = statefulsets;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1276,6 +1289,7 @@ impl StatefulSetsState {
             self.status = StatefulSetsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1319,6 +1333,7 @@ impl ReplicaSetsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.replicasets.is_empty();
+        self.table.refreshing = !self.replicasets.is_empty();
         ClusterBridgeCommand::LoadReplicaSets {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1331,6 +1346,7 @@ impl ReplicaSetsState {
         self.status = ReplicaSetsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.replicasets.is_empty();
+        self.table.refreshing = !self.replicasets.is_empty();
         Some(ClusterBridgeCommand::LoadReplicaSets {
             cluster_id,
             generation: self.generation,
@@ -1345,6 +1361,7 @@ impl ReplicaSetsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1355,6 +1372,7 @@ impl ReplicaSetsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -1368,6 +1386,7 @@ impl ReplicaSetsState {
             self.replicasets = replicasets;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1379,6 +1398,7 @@ impl ReplicaSetsState {
             self.status = ReplicaSetsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1421,6 +1441,7 @@ impl DaemonSetsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.daemonsets.is_empty();
+        self.table.refreshing = !self.daemonsets.is_empty();
         ClusterBridgeCommand::LoadDaemonSets {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1433,6 +1454,7 @@ impl DaemonSetsState {
         self.status = DaemonSetsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.daemonsets.is_empty();
+        self.table.refreshing = !self.daemonsets.is_empty();
         Some(ClusterBridgeCommand::LoadDaemonSets {
             cluster_id,
             generation: self.generation,
@@ -1447,6 +1469,7 @@ impl DaemonSetsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1457,6 +1480,7 @@ impl DaemonSetsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -1470,6 +1494,7 @@ impl DaemonSetsState {
             self.daemonsets = daemonsets;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1481,6 +1506,7 @@ impl DaemonSetsState {
             self.status = DaemonSetsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1523,6 +1549,7 @@ impl JobsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.jobs.is_empty();
+        self.table.refreshing = !self.jobs.is_empty();
         ClusterBridgeCommand::LoadJobs {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1535,6 +1562,7 @@ impl JobsState {
         self.status = JobsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.jobs.is_empty();
+        self.table.refreshing = !self.jobs.is_empty();
         Some(ClusterBridgeCommand::LoadJobs {
             cluster_id,
             generation: self.generation,
@@ -1549,6 +1577,7 @@ impl JobsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1559,6 +1588,7 @@ impl JobsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(&mut self, cluster_id: &str, generation: u64, jobs: Vec<JobInfo>) -> bool {
@@ -1567,6 +1597,7 @@ impl JobsState {
             self.jobs = jobs;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1578,6 +1609,7 @@ impl JobsState {
             self.status = JobsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1620,6 +1652,7 @@ impl CronJobsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.cronjobs.is_empty();
+        self.table.refreshing = !self.cronjobs.is_empty();
         ClusterBridgeCommand::LoadCronJobs {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1632,6 +1665,7 @@ impl CronJobsState {
         self.status = CronJobsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.cronjobs.is_empty();
+        self.table.refreshing = !self.cronjobs.is_empty();
         Some(ClusterBridgeCommand::LoadCronJobs {
             cluster_id,
             generation: self.generation,
@@ -1646,6 +1680,7 @@ impl CronJobsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1656,6 +1691,7 @@ impl CronJobsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -1669,6 +1705,7 @@ impl CronJobsState {
             self.cronjobs = cronjobs;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1680,6 +1717,7 @@ impl CronJobsState {
             self.status = CronJobsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1748,6 +1786,7 @@ impl PodsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.pods.is_empty();
+        self.table.refreshing = !self.pods.is_empty();
         ClusterBridgeCommand::LoadPods {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1760,6 +1799,7 @@ impl PodsState {
         self.status = PodsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.pods.is_empty();
+        self.table.refreshing = !self.pods.is_empty();
         Some(ClusterBridgeCommand::LoadPods {
             cluster_id,
             generation: self.generation,
@@ -1774,6 +1814,7 @@ impl PodsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1784,6 +1825,7 @@ impl PodsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(&mut self, cluster_id: &str, generation: u64, pods: Vec<PodInfo>) -> bool {
@@ -1792,6 +1834,7 @@ impl PodsState {
             self.pods = pods;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1803,6 +1846,7 @@ impl PodsState {
             self.status = PodsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1916,6 +1960,7 @@ impl ServicesState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.services.is_empty();
+        self.table.refreshing = !self.services.is_empty();
         ClusterBridgeCommand::LoadServices {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -1928,6 +1973,7 @@ impl ServicesState {
         self.status = ServicesLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.services.is_empty();
+        self.table.refreshing = !self.services.is_empty();
         Some(ClusterBridgeCommand::LoadServices {
             cluster_id,
             generation: self.generation,
@@ -1943,6 +1989,7 @@ impl ServicesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -1954,6 +2001,7 @@ impl ServicesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -1967,6 +2015,7 @@ impl ServicesState {
             self.services = services;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -1978,6 +2027,7 @@ impl ServicesState {
             self.status = ServicesLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2020,6 +2070,7 @@ impl IngressesState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.ingresses.is_empty();
+        self.table.refreshing = !self.ingresses.is_empty();
         ClusterBridgeCommand::LoadIngresses {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2032,6 +2083,7 @@ impl IngressesState {
         self.status = IngressesLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.ingresses.is_empty();
+        self.table.refreshing = !self.ingresses.is_empty();
         Some(ClusterBridgeCommand::LoadIngresses {
             cluster_id,
             generation: self.generation,
@@ -2046,6 +2098,7 @@ impl IngressesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2056,6 +2109,7 @@ impl IngressesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2069,6 +2123,7 @@ impl IngressesState {
             self.ingresses = ingresses;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2080,6 +2135,7 @@ impl IngressesState {
             self.status = IngressesLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2122,6 +2178,7 @@ impl ConfigMapsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.configmaps.is_empty();
+        self.table.refreshing = !self.configmaps.is_empty();
         ClusterBridgeCommand::LoadConfigMaps {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2134,6 +2191,7 @@ impl ConfigMapsState {
         self.status = ConfigMapsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.configmaps.is_empty();
+        self.table.refreshing = !self.configmaps.is_empty();
         Some(ClusterBridgeCommand::LoadConfigMaps {
             cluster_id,
             generation: self.generation,
@@ -2148,6 +2206,7 @@ impl ConfigMapsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2158,6 +2217,7 @@ impl ConfigMapsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2171,6 +2231,7 @@ impl ConfigMapsState {
             self.configmaps = configmaps;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2182,6 +2243,7 @@ impl ConfigMapsState {
             self.status = ConfigMapsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2224,6 +2286,7 @@ impl SecretsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.secrets.is_empty();
+        self.table.refreshing = !self.secrets.is_empty();
         ClusterBridgeCommand::LoadSecrets {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2236,6 +2299,7 @@ impl SecretsState {
         self.status = SecretsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.secrets.is_empty();
+        self.table.refreshing = !self.secrets.is_empty();
         Some(ClusterBridgeCommand::LoadSecrets {
             cluster_id,
             generation: self.generation,
@@ -2250,6 +2314,7 @@ impl SecretsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2260,6 +2325,7 @@ impl SecretsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2273,6 +2339,7 @@ impl SecretsState {
             self.secrets = secrets;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2284,6 +2351,7 @@ impl SecretsState {
             self.status = SecretsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2326,6 +2394,7 @@ impl PersistentVolumesState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.persistent_volumes.is_empty();
+        self.table.refreshing = !self.persistent_volumes.is_empty();
         ClusterBridgeCommand::LoadPersistentVolumes {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2338,6 +2407,7 @@ impl PersistentVolumesState {
         self.status = PersistentVolumesLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.persistent_volumes.is_empty();
+        self.table.refreshing = !self.persistent_volumes.is_empty();
         Some(ClusterBridgeCommand::LoadPersistentVolumes {
             cluster_id,
             generation: self.generation,
@@ -2352,6 +2422,7 @@ impl PersistentVolumesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2362,6 +2433,7 @@ impl PersistentVolumesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2375,6 +2447,7 @@ impl PersistentVolumesState {
             self.persistent_volumes = persistent_volumes;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2386,6 +2459,7 @@ impl PersistentVolumesState {
             self.status = PersistentVolumesLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2429,6 +2503,7 @@ impl PersistentVolumeClaimsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.persistent_volume_claims.is_empty();
+        self.table.refreshing = !self.persistent_volume_claims.is_empty();
         ClusterBridgeCommand::LoadPersistentVolumeClaims {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2441,6 +2516,7 @@ impl PersistentVolumeClaimsState {
         self.status = PersistentVolumeClaimsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.persistent_volume_claims.is_empty();
+        self.table.refreshing = !self.persistent_volume_claims.is_empty();
         Some(ClusterBridgeCommand::LoadPersistentVolumeClaims {
             cluster_id,
             generation: self.generation,
@@ -2455,6 +2531,7 @@ impl PersistentVolumeClaimsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2465,6 +2542,7 @@ impl PersistentVolumeClaimsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2478,6 +2556,7 @@ impl PersistentVolumeClaimsState {
             self.persistent_volume_claims = persistent_volume_claims;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2489,6 +2568,7 @@ impl PersistentVolumeClaimsState {
             self.status = PersistentVolumeClaimsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2532,6 +2612,7 @@ impl NetworkPoliciesState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.network_policies.is_empty();
+        self.table.refreshing = !self.network_policies.is_empty();
         ClusterBridgeCommand::LoadNetworkPolicies {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2544,6 +2625,7 @@ impl NetworkPoliciesState {
         self.status = NetworkPoliciesLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.network_policies.is_empty();
+        self.table.refreshing = !self.network_policies.is_empty();
         Some(ClusterBridgeCommand::LoadNetworkPolicies {
             cluster_id,
             generation: self.generation,
@@ -2558,6 +2640,7 @@ impl NetworkPoliciesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2568,6 +2651,7 @@ impl NetworkPoliciesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2581,6 +2665,7 @@ impl NetworkPoliciesState {
             self.network_policies = network_policies;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2592,6 +2677,7 @@ impl NetworkPoliciesState {
             self.status = NetworkPoliciesLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2635,6 +2721,7 @@ impl PodSecurityState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.policies.is_empty();
+        self.table.refreshing = !self.policies.is_empty();
         ClusterBridgeCommand::LoadPodSecurity {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -2647,6 +2734,7 @@ impl PodSecurityState {
         self.status = PodSecurityLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.policies.is_empty();
+        self.table.refreshing = !self.policies.is_empty();
         Some(ClusterBridgeCommand::LoadPodSecurity {
             cluster_id,
             generation: self.generation,
@@ -2661,6 +2749,7 @@ impl PodSecurityState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -2671,6 +2760,7 @@ impl PodSecurityState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -2684,6 +2774,7 @@ impl PodSecurityState {
             self.policies = policies;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2695,6 +2786,7 @@ impl PodSecurityState {
             self.status = PodSecurityLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -2741,6 +2833,7 @@ macro_rules! cluster_list_state {
                     self.table.selected_row_key = None;
                 }
                 self.table.loading = self.$field.is_empty();
+                self.table.refreshing = !self.$field.is_empty();
                 ClusterBridgeCommand::$cmd {
                     cluster_id: cluster_id.to_string(),
                     generation: self.generation,
@@ -2753,6 +2846,7 @@ macro_rules! cluster_list_state {
                 self.status = $status::Loading;
                 self.error_message = None;
                 self.table.loading = self.$field.is_empty();
+                self.table.refreshing = !self.$field.is_empty();
                 Some(ClusterBridgeCommand::$cmd {
                     cluster_id,
                     generation: self.generation,
@@ -2777,6 +2871,7 @@ macro_rules! cluster_list_state {
                 self.error_message = None;
                 self.table.selected_row_key = None;
                 self.table.loading = false;
+                self.table.refreshing = false;
             }
 
             pub fn apply_loaded(
@@ -2790,6 +2885,7 @@ macro_rules! cluster_list_state {
                     self.$field = items;
                     self.error_message = None;
                     self.table.loading = false;
+                    self.table.refreshing = false;
                     true
                 } else {
                     false
@@ -2806,6 +2902,7 @@ macro_rules! cluster_list_state {
                     self.status = $status::Error;
                     self.error_message = Some(message);
                     self.table.loading = false;
+                    self.table.refreshing = false;
                     true
                 } else {
                     false
@@ -3066,6 +3163,7 @@ impl ResourceQuotasState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.policies.is_empty();
+        self.table.refreshing = !self.policies.is_empty();
         ClusterBridgeCommand::LoadResourceQuotas {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -3078,6 +3176,7 @@ impl ResourceQuotasState {
         self.status = ResourceQuotasLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.policies.is_empty();
+        self.table.refreshing = !self.policies.is_empty();
         Some(ClusterBridgeCommand::LoadResourceQuotas {
             cluster_id,
             generation: self.generation,
@@ -3093,6 +3192,7 @@ impl ResourceQuotasState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -3104,6 +3204,7 @@ impl ResourceQuotasState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -3117,6 +3218,7 @@ impl ResourceQuotasState {
             self.policies = policies;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3128,6 +3230,7 @@ impl ResourceQuotasState {
             self.status = ResourceQuotasLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3264,6 +3367,7 @@ impl NodesState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.nodes.is_empty();
+        self.table.refreshing = !self.nodes.is_empty();
         ClusterBridgeCommand::LoadNodes {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -3276,6 +3380,7 @@ impl NodesState {
         self.status = NodesLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.nodes.is_empty();
+        self.table.refreshing = !self.nodes.is_empty();
         Some(ClusterBridgeCommand::LoadNodes {
             cluster_id,
             generation: self.generation,
@@ -3290,6 +3395,7 @@ impl NodesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -3300,6 +3406,7 @@ impl NodesState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -3313,6 +3420,7 @@ impl NodesState {
             self.nodes = nodes;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3324,6 +3432,7 @@ impl NodesState {
             self.status = NodesLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3413,6 +3522,7 @@ impl EventsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.events.is_empty();
+        self.table.refreshing = !self.events.is_empty();
         ClusterBridgeCommand::LoadEvents {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -3425,6 +3535,7 @@ impl EventsState {
         self.status = EventsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.events.is_empty();
+        self.table.refreshing = !self.events.is_empty();
         Some(ClusterBridgeCommand::LoadEvents {
             cluster_id,
             generation: self.generation,
@@ -3440,6 +3551,7 @@ impl EventsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -3451,6 +3563,7 @@ impl EventsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -3464,6 +3577,7 @@ impl EventsState {
             self.events = events;
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3475,6 +3589,7 @@ impl EventsState {
             self.status = EventsLoadStatus::Error;
             self.error_message = Some(message);
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3582,6 +3697,7 @@ impl PortForwardsState {
             self.table.selected_row_key = None;
         }
         self.table.loading = self.port_forwards.is_empty();
+        self.table.refreshing = !self.port_forwards.is_empty();
         ClusterBridgeCommand::LoadPortForwards {
             cluster_id: cluster_id.to_string(),
             generation: self.generation,
@@ -3594,6 +3710,7 @@ impl PortForwardsState {
         self.status = PortForwardsLoadStatus::Loading;
         self.error_message = None;
         self.table.loading = self.port_forwards.is_empty();
+        self.table.refreshing = !self.port_forwards.is_empty();
         Some(ClusterBridgeCommand::LoadPortForwards {
             cluster_id,
             generation: self.generation,
@@ -3613,6 +3730,7 @@ impl PortForwardsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn reset_for_disconnected(&mut self) {
@@ -3628,6 +3746,7 @@ impl PortForwardsState {
         self.error_message = None;
         self.table.selected_row_key = None;
         self.table.loading = false;
+        self.table.refreshing = false;
     }
 
     pub fn apply_loaded(
@@ -3650,6 +3769,7 @@ impl PortForwardsState {
                 .retain(|id| active_ids.contains(id.as_str()));
             self.error_message = None;
             self.table.loading = false;
+            self.table.refreshing = false;
             true
         } else {
             false
@@ -3666,6 +3786,7 @@ impl PortForwardsState {
         self.status = PortForwardsLoadStatus::Loaded;
         self.error_message = None;
         self.table.loading = false;
+        self.table.refreshing = false;
         true
     }
 
@@ -3693,6 +3814,7 @@ impl PortForwardsState {
         self.status = PortForwardsLoadStatus::Loaded;
         self.error_message = None;
         self.table.loading = false;
+        self.table.refreshing = false;
         true
     }
 
@@ -3705,6 +3827,7 @@ impl PortForwardsState {
         }
         self.error_message = Some(message);
         self.table.loading = false;
+        self.table.refreshing = false;
         true
     }
 
@@ -4122,6 +4245,22 @@ pub fn calculate_tab_drop_index(
     }
 }
 
+pub fn resolve_tab_drop_target(
+    from_index: usize,
+    hover_index: usize,
+    position: TabDropPosition,
+    tab_count: usize,
+) -> Option<(usize, TabDropPosition)> {
+    if from_index >= tab_count || hover_index >= tab_count {
+        return None;
+    }
+    let to_index = calculate_tab_drop_index(from_index, hover_index, position);
+    if to_index == from_index || to_index >= tab_count {
+        return None;
+    }
+    Some((hover_index, position))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ClusterTabsState {
     pub open_tabs: Vec<WorkspaceTab>,
@@ -4456,6 +4595,50 @@ impl WorkspaceTabsState {
         }
         let moved = cluster.open_tabs.remove(from_index);
         cluster.open_tabs.insert(to_index, moved);
+    }
+
+    pub fn update_drop_target(&mut self, hover_index: usize, position: TabDropPosition) -> bool {
+        let tab_count = self.open_tabs().len();
+        let next = self
+            .dragging_index
+            .and_then(|from| resolve_tab_drop_target(from, hover_index, position, tab_count));
+        if self.drop_target != next {
+            self.drop_target = next;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn clear_drop_target(&mut self) -> bool {
+        self.drop_target.take().is_some()
+    }
+
+    pub fn clear_drag_state(&mut self) -> bool {
+        let had_drag = self.dragging_index.take().is_some();
+        let had_drop = self.drop_target.take().is_some();
+        had_drag || had_drop
+    }
+
+    pub fn apply_drop(
+        &mut self,
+        from_index: usize,
+        fallback_hover_index: usize,
+        fallback_position: TabDropPosition,
+    ) -> bool {
+        let (hover_idx, pos) = self
+            .drop_target
+            .unwrap_or((fallback_hover_index, fallback_position));
+        self.clear_drag_state();
+        let tab_count = self.open_tabs().len();
+        let Some((resolved_hover, resolved_pos)) =
+            resolve_tab_drop_target(from_index, hover_idx, pos, tab_count)
+        else {
+            return false;
+        };
+        let to_index = calculate_tab_drop_index(from_index, resolved_hover, resolved_pos);
+        self.reorder_tab(from_index, to_index);
+        true
     }
 
     pub fn move_tab_left(&mut self, tab: impl Into<WorkspaceTab>) {
@@ -5993,6 +6176,107 @@ mod tests {
         tabs.close_all_tabs();
         assert!(tabs.open_tabs().is_empty());
         assert_eq!(tabs.active_tab(), None);
+    }
+
+    #[test]
+    fn test_resolve_tab_drop_target_suppresses_noop_and_out_of_bounds_positions() {
+        // Self drops
+        assert_eq!(
+            resolve_tab_drop_target(1, 1, TabDropPosition::Before, 4),
+            None
+        );
+        assert_eq!(
+            resolve_tab_drop_target(1, 1, TabDropPosition::After, 4),
+            None
+        );
+        // Adjacent no-ops
+        assert_eq!(
+            resolve_tab_drop_target(1, 2, TabDropPosition::Before, 4),
+            None
+        );
+        assert_eq!(
+            resolve_tab_drop_target(1, 0, TabDropPosition::After, 4),
+            None
+        );
+        // Valid moves
+        assert_eq!(
+            resolve_tab_drop_target(0, 2, TabDropPosition::Before, 4),
+            Some((2, TabDropPosition::Before))
+        );
+        assert_eq!(calculate_tab_drop_index(0, 2, TabDropPosition::Before), 1);
+
+        assert_eq!(
+            resolve_tab_drop_target(0, 3, TabDropPosition::After, 4),
+            Some((3, TabDropPosition::After))
+        );
+        assert_eq!(calculate_tab_drop_index(0, 3, TabDropPosition::After), 3);
+
+        assert_eq!(
+            resolve_tab_drop_target(3, 0, TabDropPosition::Before, 4),
+            Some((0, TabDropPosition::Before))
+        );
+        assert_eq!(calculate_tab_drop_index(3, 0, TabDropPosition::Before), 0);
+
+        // Out of bounds
+        assert_eq!(
+            resolve_tab_drop_target(0, 4, TabDropPosition::Before, 4),
+            None
+        );
+        assert_eq!(
+            resolve_tab_drop_target(4, 0, TabDropPosition::Before, 4),
+            None
+        );
+    }
+
+    #[test]
+    fn test_workspace_tabs_drag_drop_lifecycle_and_cancel_clears_indicator() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("cluster-a");
+        tabs.open_tab(WorkspaceView::Pods);
+        tabs.open_tab(WorkspaceView::Deployments);
+        assert_eq!(
+            tabs.open_views(),
+            vec![
+                WorkspaceView::Overview,
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+            ]
+        );
+
+        tabs.dragging_index = Some(0);
+        assert!(tabs.update_drop_target(2, TabDropPosition::Before));
+        assert_eq!(tabs.drop_target, Some((2, TabDropPosition::Before)));
+
+        assert!(tabs.clear_drop_target());
+        assert_eq!(tabs.drop_target, None);
+        assert_eq!(tabs.dragging_index, Some(0));
+
+        assert!(tabs.update_drop_target(2, TabDropPosition::After));
+        assert!(tabs.apply_drop(0, 2, TabDropPosition::Before));
+        assert_eq!(
+            tabs.open_views(),
+            vec![
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+                WorkspaceView::Overview,
+            ]
+        );
+        assert_eq!(tabs.dragging_index, None);
+        assert_eq!(tabs.drop_target, None);
+
+        tabs.dragging_index = Some(1);
+        tabs.update_drop_target(0, TabDropPosition::Before);
+        assert!(tabs.clear_drag_state());
+        assert_eq!(tabs.dragging_index, None);
+        assert_eq!(tabs.drop_target, None);
+        assert_eq!(
+            tabs.open_views(),
+            vec![
+                WorkspaceView::Pods,
+                WorkspaceView::Deployments,
+                WorkspaceView::Overview,
+            ]
+        );
     }
 
     #[test]
@@ -7582,5 +7866,108 @@ mod tests {
         assert_eq!(pods.table.pagination.page_size, 50);
         assert_eq!(pods.table.filters.search_query, "worker");
         assert!(pods.table.filters.extra_filters.is_empty());
+    }
+
+    #[test]
+    fn test_resource_state_begin_refresh_preserves_rows_and_sets_refreshing_flag() {
+        use crate::components::data_table::TableBodyMode;
+
+        // 1. PodsState: cold load -> loaded -> warm refresh -> fail (preserves rows) -> loaded
+        let mut pods = PodsState::new();
+        let cmd = pods.begin_load_for_cluster("ctx-a");
+        let ClusterBridgeCommand::LoadPods { generation, .. } = cmd else {
+            panic!("expected LoadPods");
+        };
+        assert!(pods.table.loading);
+        assert!(!pods.table.refreshing);
+        assert_eq!(pods.table.body_mode(0), TableBodyMode::LoadingSkeleton);
+
+        assert!(pods.apply_loaded("ctx-a", generation, vec![sample_pod("web-1", "default")]));
+        assert!(!pods.table.loading);
+        assert!(!pods.table.refreshing);
+        assert_eq!(pods.table.body_mode(pods.pods.len()), TableBodyMode::Rows);
+
+        let refresh_cmd = pods.begin_refresh().expect("refresh command");
+        let ClusterBridgeCommand::LoadPods { generation: g2, .. } = refresh_cmd else {
+            panic!("expected LoadPods");
+        };
+        assert_eq!(pods.pods.len(), 1);
+        assert!(!pods.table.loading);
+        assert!(pods.table.refreshing);
+        assert_eq!(
+            pods.table.body_mode(pods.pods.len()),
+            TableBodyMode::RefreshingRows
+        );
+
+        assert!(pods.apply_failed("ctx-a", g2, "timeout".to_string()));
+        assert_eq!(pods.pods.len(), 1, "warm refresh failure must preserve live rows");
+        assert!(!pods.table.loading);
+        assert!(!pods.table.refreshing);
+        assert!(pods.error_message.is_some());
+
+        // 2. DeploymentsState
+        let mut deps = DeploymentsState::new();
+        let ClusterBridgeCommand::LoadDeployments { generation: dg1, .. } =
+            deps.begin_load_for_cluster("ctx-a")
+        else {
+            panic!("expected LoadDeployments");
+        };
+        assert!(deps.apply_loaded(
+            "ctx-a",
+            dg1,
+            vec![sample_deployment("api", "default")]
+        ));
+        let ClusterBridgeCommand::LoadDeployments { generation: dg2, .. } =
+            deps.begin_refresh().expect("deployments refresh")
+        else {
+            panic!("expected LoadDeployments");
+        };
+        assert_eq!(deps.deployments.len(), 1);
+        assert!(!deps.table.loading);
+        assert!(deps.table.refreshing);
+        assert_eq!(
+            deps.table.body_mode(deps.deployments.len()),
+            TableBodyMode::RefreshingRows
+        );
+        assert!(deps.apply_loaded(
+            "ctx-a",
+            dg2,
+            vec![
+                sample_deployment("api", "default"),
+                sample_deployment("worker", "default"),
+            ]
+        ));
+        assert_eq!(deps.deployments.len(), 2);
+        assert!(!deps.table.loading);
+        assert!(!deps.table.refreshing);
+        assert!(deps.error_message.is_none());
+
+        // 3. Macro-generated cluster_list_state! (HpasState)
+        let mut hpas = HpasState::default();
+        let ClusterBridgeCommand::LoadHpas { generation: hg1, .. } =
+            hpas.begin_load_for_cluster("ctx-a")
+        else {
+            panic!("expected LoadHpas");
+        };
+        assert!(hpas.table.loading);
+        assert!(!hpas.table.refreshing);
+        assert!(hpas.apply_loaded("ctx-a", hg1, vec![sample_hpa("api-hpa", "default")]));
+        let ClusterBridgeCommand::LoadHpas { generation: hg2, .. } =
+            hpas.begin_refresh().expect("hpas refresh")
+        else {
+            panic!("expected LoadHpas");
+        };
+        assert_eq!(hpas.hpas.len(), 1);
+        assert!(!hpas.table.loading);
+        assert!(hpas.table.refreshing);
+        assert_eq!(
+            hpas.table.body_mode(hpas.hpas.len()),
+            TableBodyMode::RefreshingRows
+        );
+        assert!(hpas.apply_failed("ctx-a", hg2, "rbac denied".to_string()));
+        assert_eq!(hpas.hpas.len(), 1);
+        assert!(!hpas.table.loading);
+        assert!(!hpas.table.refreshing);
+        assert!(hpas.error_message.is_some());
     }
 }

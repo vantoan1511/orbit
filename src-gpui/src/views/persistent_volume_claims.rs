@@ -394,6 +394,7 @@ pub fn render_persistent_volume_claims_view(
         PersistentVolumeClaimsPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.persistent_volume_claims.is_empty();
+            table_state.refreshing = is_loading && !state.persistent_volume_claims.is_empty();
             table_state.empty_message =
                 SharedString::from(persistent_volume_claims_empty_message(state));
 

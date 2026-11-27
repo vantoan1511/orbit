@@ -444,6 +444,7 @@ pub fn render_namespaces_view(
         NamespacesPresentationMode::Table => {
             let mut table_state = view_state.table.clone();
             table_state.loading = is_loading && state.namespaces.is_empty();
+            table_state.refreshing = is_loading && !state.namespaces.is_empty();
             table_state.empty_message = SharedString::from(namespaces_empty_message(state));
 
             let key_rows = sorted_rows.clone();

@@ -644,12 +644,21 @@ pub fn render_events_view(
         EventsPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.events.is_empty();
+            table_state.refreshing = is_loading && !state.events.is_empty();
             table_state.empty_message = SharedString::from(events_empty_message(state, namespaces));
 
             let key_rows = filtered_rows.clone();
             let cell_rows = filtered_rows.clone();
             let ctx_rows = filtered_rows.clone();
 
+            let has_table_filters = table_state.has_active_filters(&[("type", "All")]);
+            let empty_action = crate::views::build_empty_state_action(
+                has_table_filters,
+                enhancements
+                    .as_ref()
+                    .map(|e| e.toolbar.on_clear_filters.clone()),
+                on_refresh_rc,
+            );
             let callbacks = DataTableCallbacks::new(
                 move |idx| {
                     let ev = &key_rows[idx];
@@ -665,6 +674,7 @@ pub fn render_events_view(
             )
             .on_sort(on_sort)
             .on_row_click(on_row_click)
+            .on_empty_action(empty_action)
             .on_row_context_menu(move |idx, row_key, event, window, cx| {
                 if let Some(ev) = ctx_rows.get(idx) {
                     on_row_context_menu(row_key, ev, event, window, cx);

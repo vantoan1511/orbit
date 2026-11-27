@@ -1,5 +1,7 @@
 pub mod action_toast;
 pub mod add_cluster_modal;
+pub mod command_palette;
+pub mod confirm_dialog;
 pub mod context_menu;
 pub mod data_table;
 pub mod port_forward_modal;
@@ -17,6 +19,15 @@ pub use action_toast::{
     ActionToast, ActionToastKind, ActionToastState, render_action_toast_overlay,
 };
 pub use add_cluster_modal::{AddClusterModalCallbacks, parse_hex_color, render_add_cluster_modal};
+pub use command_palette::{
+    CommandPaletteAction, CommandPaletteCallbacks, CommandPaletteCategory, CommandPaletteItem,
+    CommandPaletteKeyResult, CommandPaletteState, build_command_palette_items, fuzzy_match_score,
+    render_command_palette_overlay,
+};
+pub use confirm_dialog::{
+    ConfirmDialogCallback, ConfirmDialogCallbacks, ConfirmDialogKeyResult, ConfirmDialogSpec,
+    ConfirmDialogState, format_dialog_target, render_confirm_dialog,
+};
 pub use context_menu::{
     CONTEXT_MENU_ITEM_HEIGHT, CONTEXT_MENU_PADDING_Y, CONTEXT_MENU_SEPARATOR_HEIGHT,
     CONTEXT_MENU_VIEWPORT_MARGIN, CONTEXT_MENU_WIDTH, ContextMenuCallback, ContextMenuEntry,
@@ -27,7 +38,8 @@ pub use context_menu::{
 pub use data_table::{
     ActiveColumnResize, COLUMN_RESIZE_HANDLE_WIDTH, ColumnAlign, ColumnConfigCallbacks,
     ColumnResizeStartCallback, ColumnWidth, DEFAULT_MIN_COLUMN_WIDTH, DataTableCallbacks,
-    DataTableEnhancementCallbacks, DataTableState, DataTableSurfaceStyle, MAX_COLUMN_WIDTH,
+    DataTableEnhancementCallbacks, DataTableState, DataTableSurfaceStyle, EmptyStateAction,
+    MAX_COLUMN_WIDTH,
     PageChangeCallback, PageSlice, PaginationMode, RowClickCallback, RowContextMenuCallback,
     RowHoverActionSpec, SortCallback, SortDirection, SortState, TableActionCallback,
     TableBodyMode, TableBoolCallback, TableColumn, TableColumnToggleCallback,

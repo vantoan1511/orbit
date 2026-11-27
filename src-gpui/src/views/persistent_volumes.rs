@@ -336,6 +336,7 @@ pub fn render_persistent_volumes_view(
         PersistentVolumesPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.persistent_volumes.is_empty();
+            table_state.refreshing = is_loading && !state.persistent_volumes.is_empty();
             table_state.empty_message = SharedString::from(persistent_volumes_empty_message(state));
 
             let key_rows = sorted_rows.clone();
