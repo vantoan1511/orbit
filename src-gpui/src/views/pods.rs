@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, PodInfo};
@@ -16,9 +16,8 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, PodsLoadStatus, PodsState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
     nonzero_metric_text_color, numeric_metric_text_color, parse_age_seconds, render_action_button,
     render_ratio_metric_cell, render_resource_error_banner, render_resource_error_state,
@@ -29,24 +28,6 @@ pub use crate::views::{
 pub enum PodsPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct PodSummary {
-    pub total: usize,
-    pub running: usize,
-    pub pending: usize,
-    pub failed: usize,
-    pub succeeded: usize,
-    pub other: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct PodMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 pub fn pod_columns() -> Vec<TableColumn> {
@@ -228,83 +209,6 @@ pub fn filter_and_sort_pods_with_filters<'a>(
     rows
 }
 
-pub fn compute_pod_summary(pods: &[&PodInfo]) -> PodSummary {
-    let mut summary = PodSummary {
-        total: pods.len(),
-        ..Default::default()
-    };
-
-    for pod in pods {
-        match pod.status.to_ascii_lowercase().as_str() {
-            "running" => summary.running += 1,
-            "pending" => summary.pending += 1,
-            "failed" | "error" | "crashloopbackoff" | "imagepullbackoff" | "errimagepull" => {
-                summary.failed += 1
-            }
-            "succeeded" | "completed" => summary.succeeded += 1,
-            _ => summary.other += 1,
-        }
-    }
-
-    summary
-}
-
-pub fn pod_summary_cards(
-    pods: &[&PodInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> Vec<PodMetricCard> {
-    let summary = compute_pod_summary(pods);
-    let pct = |count: usize, total: usize| -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 / total as f64) * 100.0
-        }
-    };
-
-    let total_subtitle = if !namespaces.is_all_namespaces() {
-        format!("Scope: {}", namespaces.summary_label())
-    } else if summary.succeeded > 0 || summary.other > 0 {
-        format!("{} succeeded · {} other", summary.succeeded, summary.other)
-    } else {
-        "All namespaces".to_string()
-    };
-
-    let failed_subtitle = if summary.failed > 0 {
-        "Requires attention".to_string()
-    } else {
-        format!("{:.0}% of pods", pct(summary.failed, summary.total))
-    };
-
-    vec![
-        PodMetricCard {
-            title: "Total Pods",
-            primary_value: summary.total.to_string(),
-            subtitle: total_subtitle,
-            accent_color: theme.k8s_color(K8sResourceKind::Pod),
-        },
-        PodMetricCard {
-            title: "Running",
-            primary_value: summary.running.to_string(),
-            subtitle: format!("{:.0}% of pods", pct(summary.running, summary.total)),
-            accent_color: theme.semantic.success.solid,
-        },
-        PodMetricCard {
-            title: "Pending",
-            primary_value: summary.pending.to_string(),
-            subtitle: format!("{:.0}% of pods", pct(summary.pending, summary.total)),
-            accent_color: theme.semantic.warning.solid,
-        },
-        PodMetricCard {
-            title: "Failed",
-            primary_value: summary.failed.to_string(),
-            subtitle: failed_subtitle,
-            accent_color: theme.semantic.danger.solid,
-        },
-    ]
-}
-
 pub fn pods_empty_message(state: &PodsState) -> &'static str {
     if state.pods.is_empty() {
         "No pods found in this cluster."
@@ -417,59 +321,6 @@ fn render_pod_cell(
     }
 }
 
-fn render_summary_cards_row(
-    pods: &[&PodInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> AnyElement {
-    let cards = pod_summary_cards(pods, namespaces, theme);
-    div()
-        .grid()
-        .grid_cols(4)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(
-                            div()
-                                .w(px(6.0))
-                                .h(px(6.0))
-                                .rounded_full()
-                                .bg(card.accent_color),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn build_pod_context_menu_entries(
     pod: &PodInfo,
@@ -559,12 +410,6 @@ pub fn render_pods_view(
         &state.table.filters,
         state.table.sort.as_ref(),
     );
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&filtered_refs, namespaces, theme));
     let filtered_rows: Rc<Vec<PodInfo>> = Rc::new(filtered_refs.into_iter().cloned().collect());
     let total_count = state.pods.len();
     let visible_count = filtered_rows.len();
@@ -577,14 +422,7 @@ pub fn render_pods_view(
         format!("{visible_count} of {total_count} pods")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::Pods.label(),
-        WorkspaceView::Pods.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -686,7 +524,6 @@ pub fn render_pods_view(
         .min_h(px(0.0))
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(mode == PodsPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })
@@ -885,8 +722,6 @@ pub fn render_pod_drawer_events(
 mod tests {
     use super::*;
     use crate::components::data_table::{ColumnAlign, SortDirection};
-    use gpui::WindowAppearance;
-    use orbit_core::config::OrbitConfig;
     use orbit_core::kubernetes::models::{NamespaceInfo, PodContainer};
 
     fn make_ns(name: &str) -> NamespaceInfo {
@@ -1121,39 +956,6 @@ mod tests {
             }),
         );
         assert_eq!(by_status_asc[0].name, "api-a");
-    }
-
-    #[test]
-    fn test_pod_summary_cards_scoped_by_namespace() {
-        let pods = vec![
-            make_pod("p1", "prod", "Running", 1, 1, 0, None, None, "5m"),
-            make_pod("p2", "prod", "Pending", 0, 1, 0, None, None, "2m"),
-            make_pod("p3", "staging", "Failed", 0, 1, 3, None, None, "1h"),
-        ];
-
-        let mut ns_filter = NamespaceFilterState::default();
-        ns_filter.begin_load_for_cluster("ctx-a");
-        ns_filter.apply_loaded("ctx-a", 1, vec![make_ns("prod"), make_ns("staging")]);
-        ns_filter.toggle_namespace("prod");
-
-        let filtered = filter_and_sort_pods(&pods, &ns_filter, None);
-        let theme = OrbitTheme::from_config(&OrbitConfig::default(), WindowAppearance::Dark);
-        let cards = pod_summary_cards(&filtered, &ns_filter, &theme);
-
-        assert_eq!(cards.len(), 4);
-        assert_eq!(cards[0].title, "Total Pods");
-        assert_eq!(cards[0].primary_value, "2");
-        assert_eq!(cards[0].accent_color, theme.k8s_color(K8sResourceKind::Pod));
-        assert_eq!(cards[1].title, "Running");
-        assert_eq!(cards[1].primary_value, "1");
-        assert_eq!(cards[1].subtitle, "50% of pods");
-        assert_eq!(cards[1].accent_color, theme.semantic.success.solid);
-        assert_eq!(cards[2].title, "Pending");
-        assert_eq!(cards[2].primary_value, "1");
-        assert_eq!(cards[2].accent_color, theme.semantic.warning.solid);
-        assert_eq!(cards[3].title, "Failed");
-        assert_eq!(cards[3].primary_value, "0");
-        assert_eq!(cards[3].accent_color, theme.semantic.danger.solid);
     }
 
     #[test]

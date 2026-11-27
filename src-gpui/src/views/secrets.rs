@@ -3,8 +3,8 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseButton, MouseDownEvent, Rgba,
-    SharedString, Window, div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseButton, MouseDownEvent, SharedString,
+    Window, div, prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::configmaps::{format_size, parse_size_bytes};
@@ -19,9 +19,8 @@ use crate::components::{
     render_status_badge_from_str,
 };
 use crate::icons::render_icon;
-use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, SecretsLoadStatus, SecretsState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
     nonzero_metric_text_color, parse_age_seconds, render_action_button,
     render_resource_error_banner, render_resource_error_state, render_resource_view_header,
@@ -34,22 +33,6 @@ pub const MASKED_SECRET_PLACEHOLDER: &str = "••••••••";
 pub enum SecretsPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct SecretSummary {
-    pub total: usize,
-    pub total_bytes: u64,
-    pub mounted: usize,
-    pub orphaned: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct SecretMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 pub fn secret_columns() -> Vec<TableColumn> {
@@ -127,72 +110,6 @@ pub fn filter_and_sort_secrets<'a>(
         compare_secrets_by_col(a, b, col_id)
     });
     rows
-}
-
-pub fn compute_secret_summary(secrets: &[&SecretInfo]) -> SecretSummary {
-    let mut summary = SecretSummary {
-        total: secrets.len(),
-        ..Default::default()
-    };
-
-    for sec in secrets {
-        summary.total_bytes = summary.total_bytes.saturating_add(parse_size_bytes(&sec.size));
-        if sec.mounted_pods > 0 {
-            summary.mounted += 1;
-        } else {
-            summary.orphaned += 1;
-        }
-    }
-
-    summary
-}
-
-pub fn secret_summary_cards(
-    secrets: &[&SecretInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> Vec<SecretMetricCard> {
-    let summary = compute_secret_summary(secrets);
-    let pct = |count: usize, total: usize| -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 / total as f64) * 100.0
-        }
-    };
-
-    let total_subtitle = if !namespaces.is_all_namespaces() {
-        format!("Scope: {}", namespaces.summary_label())
-    } else {
-        "All namespaces".to_string()
-    };
-
-    vec![
-        SecretMetricCard {
-            title: "Total Secrets",
-            primary_value: summary.total.to_string(),
-            subtitle: total_subtitle,
-            accent_color: theme.k8s_color(K8sResourceKind::Secret),
-        },
-        SecretMetricCard {
-            title: "Total Size",
-            primary_value: format_size(summary.total_bytes as usize),
-            subtitle: "Total data footprint".to_string(),
-            accent_color: theme.semantic.info.solid,
-        },
-        SecretMetricCard {
-            title: "Mounted in Pods",
-            primary_value: summary.mounted.to_string(),
-            subtitle: format!("{:.0}% of secrets", pct(summary.mounted, summary.total)),
-            accent_color: theme.semantic.success.solid,
-        },
-        SecretMetricCard {
-            title: "Orphaned",
-            primary_value: summary.orphaned.to_string(),
-            subtitle: "Not referenced".to_string(),
-            accent_color: theme.semantic.warning.solid,
-        },
-    ]
 }
 
 pub fn secrets_empty_message(state: &SecretsState) -> &'static str {
@@ -306,53 +223,6 @@ fn render_secret_cell(
     }
 }
 
-fn render_summary_cards_row(
-    secrets: &[&SecretInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> AnyElement {
-    let cards = secret_summary_cards(secrets, namespaces, theme);
-    div()
-        .grid()
-        .grid_cols(4)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
-}
-
 pub fn build_secret_context_menu_entries(
     secret: &SecretInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -416,12 +286,6 @@ pub fn render_secrets_view(
     let columns = secret_columns();
     let filtered_refs =
         filter_and_sort_secrets(&state.secrets, namespaces, state.table.sort.as_ref());
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&filtered_refs, namespaces, theme));
     let filtered_rows: Rc<Vec<SecretInfo>> = Rc::new(filtered_refs.into_iter().cloned().collect());
     let total_count = state.secrets.len();
     let visible_count = filtered_rows.len();
@@ -434,14 +298,7 @@ pub fn render_secrets_view(
         format!("{visible_count} of {total_count} secrets")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::Secrets.label(),
-        WorkspaceView::Secrets.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -519,7 +376,6 @@ pub fn render_secrets_view(
         .min_h(px(0.0))
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(mode == SecretsPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })
@@ -992,35 +848,6 @@ mod tests {
         let by_age = filter_and_sort_secrets(&secrets, &all_ns, Some(&sort_age));
         assert_eq!(by_age[0].name, "db-pass");
         assert_eq!(by_age[2].name, "tls-cert");
-    }
-
-    #[test]
-    fn test_secret_summary_cards_scope_to_filtered_namespace() {
-        let theme = OrbitTheme::from_config(
-            &orbit_core::config::OrbitConfig::default(),
-            gpui::WindowAppearance::Dark,
-        );
-        let secrets = vec![
-            sample_secret("s1", "prod", "Opaque", 1, "1.0 KiB", 2, false, "1h"),
-            sample_secret("s2", "prod", "Opaque", 2, "512 B", 0, true, "2h"),
-            sample_secret("s3", "dev", "Opaque", 1, "256 B", 1, false, "3h"),
-        ];
-
-        let ns = make_namespace_filter_prod();
-        let scoped = filter_and_sort_secrets(&secrets, &ns, None);
-        let cards = secret_summary_cards(&scoped, &ns, &theme);
-
-        assert_eq!(cards.len(), 4);
-        assert_eq!(cards[0].title, "Total Secrets");
-        assert_eq!(cards[0].primary_value, "2");
-        assert_eq!(cards[0].subtitle, "Scope: prod");
-        assert_eq!(cards[1].title, "Total Size");
-        assert_eq!(cards[1].primary_value, "1.5 KiB");
-        assert_eq!(cards[2].title, "Mounted in Pods");
-        assert_eq!(cards[2].primary_value, "1");
-        assert_eq!(cards[2].subtitle, "50% of secrets");
-        assert_eq!(cards[3].title, "Orphaned");
-        assert_eq!(cards[3].primary_value, "1");
     }
 
     #[test]

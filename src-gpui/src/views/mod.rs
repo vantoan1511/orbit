@@ -180,8 +180,6 @@ pub fn render_images_cell(id: ElementId, images: &[String], theme: &OrbitTheme) 
 }
 
 pub fn render_resource_view_header(
-    title: impl Into<SharedString>,
-    subtitle: impl Into<SharedString>,
     count_label: impl Into<SharedString>,
     namespaces: Option<&NamespaceFilterState>,
     extra_controls: Option<AnyElement>,
@@ -201,33 +199,12 @@ pub fn render_resource_view_header(
     div()
         .w_full()
         .px_4()
-        .py_3()
+        .py_1p5()
         .flex_shrink_0()
         .flex()
         .items_center()
         .justify_between()
         .gap_3()
-        .child(
-            div()
-                .min_w(px(0.0))
-                .flex_1()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font_weight(FontWeight::BOLD)
-                        .text_color(theme.text.primary)
-                        .truncate()
-                        .child(title.into()),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(subtitle.into()),
-                ),
-        )
         .child(
             div()
                 .flex_shrink_0()
@@ -240,9 +217,9 @@ pub fn render_resource_view_header(
                         .text_color(theme.text.muted)
                         .child(count_label.into()),
                 )
-                .when_some(namespace_chip, |el, chip| el.child(chip))
-                .when_some(extra_controls, |el, controls| el.child(controls)),
+                .when_some(namespace_chip, |el, chip| el.child(chip)),
         )
+        .when_some(extra_controls, |el, controls| el.child(controls))
         .into_any_element()
 }
 
@@ -988,5 +965,111 @@ mod tests {
             resolve_empty_state_recovery_kind(false, false),
             EmptyStateRecoveryKind::Refresh
         );
+    }
+
+    #[test]
+    fn test_only_cluster_overview_renders_top_metric_cards_in_resource_views() {
+        let data_table_views: [(&str, &str); 8] = [
+            ("pods.rs", include_str!("pods.rs")),
+            ("nodes.rs", include_str!("nodes.rs")),
+            ("namespaces.rs", include_str!("namespaces.rs")),
+            ("events.rs", include_str!("events.rs")),
+            ("services.rs", include_str!("services.rs")),
+            ("configmaps.rs", include_str!("configmaps.rs")),
+            ("secrets.rs", include_str!("secrets.rs")),
+            ("security_overview.rs", include_str!("security_overview.rs")),
+        ];
+
+        for (file, src) in data_table_views {
+            assert!(
+                !src.contains("render_summary_cards_row"),
+                "{file} must not render top summary metric cards"
+            );
+            assert!(
+                !src.contains("render_security_metrics_row"),
+                "{file} must not render top security metric cards"
+            );
+        }
+
+        let storage_overview_src = include_str!("storage_overview.rs");
+        assert!(
+            !storage_overview_src.contains("kpi_strip"),
+            "storage_overview.rs must not render the 5-tile KPI strip"
+        );
+        assert!(
+            !storage_overview_src.contains("StorageMetricTile"),
+            "storage_overview.rs must remove dead StorageMetricTile struct"
+        );
+
+        let overview_src = include_str!("overview.rs");
+        assert!(
+            overview_src.contains("render_metric_cards"),
+            "overview.rs must retain its top cluster metric cards"
+        );
+    }
+
+    #[test]
+    fn test_resource_view_header_omits_duplicated_title_and_subtitle() {
+        let mod_src = include_str!("mod.rs");
+        let header_fn_start = mod_src
+            .find("pub fn render_resource_view_header(")
+            .expect("render_resource_view_header must exist");
+        let header_fn_end = mod_src[header_fn_start..]
+            .find("pub fn render_resource_error_banner(")
+            .expect("render_resource_error_banner must follow render_resource_view_header");
+        let header_fn = &mod_src[header_fn_start..header_fn_start + header_fn_end];
+
+        assert!(
+            !header_fn.contains("title:") && !header_fn.contains("subtitle:"),
+            "render_resource_view_header must not accept title or subtitle parameters"
+        );
+        assert!(
+            header_fn.contains("py_1p5()"),
+            "render_resource_view_header must use compact vertical padding (py_1p5)"
+        );
+
+        let resource_views: [(&str, &str); 24] = [
+            ("admission_webhooks.rs", include_str!("admission_webhooks.rs")),
+            ("configmaps.rs", include_str!("configmaps.rs")),
+            ("cronjobs.rs", include_str!("cronjobs.rs")),
+            ("daemonsets.rs", include_str!("daemonsets.rs")),
+            ("deployments.rs", include_str!("deployments.rs")),
+            ("events.rs", include_str!("events.rs")),
+            ("hpas.rs", include_str!("hpas.rs")),
+            ("ingresses.rs", include_str!("ingresses.rs")),
+            ("jobs.rs", include_str!("jobs.rs")),
+            ("namespaces.rs", include_str!("namespaces.rs")),
+            ("network_policies.rs", include_str!("network_policies.rs")),
+            ("nodes.rs", include_str!("nodes.rs")),
+            (
+                "persistent_volume_claims.rs",
+                include_str!("persistent_volume_claims.rs"),
+            ),
+            ("persistent_volumes.rs", include_str!("persistent_volumes.rs")),
+            ("pod_security.rs", include_str!("pod_security.rs")),
+            ("pods.rs", include_str!("pods.rs")),
+            ("port_forward.rs", include_str!("port_forward.rs")),
+            ("replicasets.rs", include_str!("replicasets.rs")),
+            ("resource_quotas.rs", include_str!("resource_quotas.rs")),
+            ("secrets.rs", include_str!("secrets.rs")),
+            ("security_overview.rs", include_str!("security_overview.rs")),
+            ("services.rs", include_str!("services.rs")),
+            ("statefulsets.rs", include_str!("statefulsets.rs")),
+            ("storage_classes.rs", include_str!("storage_classes.rs")),
+        ];
+
+        for (file, src) in resource_views {
+            if let Some(call_idx) = src.find("render_resource_view_header(") {
+                let call_end = src[call_idx..]
+                    .find(");")
+                    .map(|offset| call_idx + offset)
+                    .unwrap_or(src.len());
+                let call_snippet = &src[call_idx..call_end];
+                assert!(
+                    !call_snippet.contains(".label()") && !call_snippet.contains(".description()"),
+                    "{file} must not pass duplicated .label() or .description() to render_resource_view_header"
+                );
+            }
+        }
     }
 }

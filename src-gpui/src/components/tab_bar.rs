@@ -798,7 +798,6 @@ mod tests {
                 WorkspaceView::Deployments,
                 WorkspaceView::Pods,
                 WorkspaceView::Overview,
-                WorkspaceView::Logs,
             ] {
                 assert_eq!(tab_icon_color(view, true, &theme), theme.text.primary);
                 assert_eq!(tab_icon_color(view, false, &theme), theme.text.muted);

@@ -16,7 +16,6 @@ use crate::components::{
     render_status_badge_from_str,
 };
 use crate::icons::render_icon;
-use crate::navigation::WorkspaceView;
 use crate::state::{
     NamespaceFilterState, PersistentVolumeClaimsLoadStatus, PersistentVolumeClaimsState,
 };
@@ -353,14 +352,7 @@ pub fn render_persistent_volume_claims_view(
         format!("{visible_count} of {total_count} claims")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::PersistentVolumeClaims.label(),
-        WorkspaceView::PersistentVolumeClaims.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = if presentation_mode == PersistentVolumeClaimsPresentationMode::Table {
         state.error_message.as_ref().map(|message| {

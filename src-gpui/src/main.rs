@@ -14391,7 +14391,6 @@ mod tests {
                     WorkspaceView::Pods,
                     WorkspaceView::Services,
                     WorkspaceView::Overview,
-                    WorkspaceView::Logs,
                 ] {
                     assert_eq!(nav_item_icon_color(view, false, &theme), theme.text.muted);
                     assert_eq!(nav_item_icon_color(view, true, &theme), theme.text.primary);
@@ -21707,7 +21706,6 @@ mod tests {
             WorkspaceView::WorkloadsOverview,
             WorkspaceView::StorageOverview,
             WorkspaceView::Settings,
-            WorkspaceView::Logs,
         ] {
             assert!(
                 !is_full_bleed_table_view(non_table_view),

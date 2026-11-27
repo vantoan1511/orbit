@@ -17,11 +17,10 @@ pub enum SidebarCategory {
     Storage,
     Config,
     Security,
-    Logs,
 }
 
 impl SidebarCategory {
-    pub const ALL: [SidebarCategory; 8] = [
+    pub const ALL: [SidebarCategory; 7] = [
         SidebarCategory::Clusters,
         SidebarCategory::Core,
         SidebarCategory::Workloads,
@@ -29,7 +28,6 @@ impl SidebarCategory {
         SidebarCategory::Storage,
         SidebarCategory::Config,
         SidebarCategory::Security,
-        SidebarCategory::Logs,
     ];
 
     pub const fn id(self) -> &'static str {
@@ -41,7 +39,6 @@ impl SidebarCategory {
             Self::Storage => "storage",
             Self::Config => "config",
             Self::Security => "security",
-            Self::Logs => "logs",
         }
     }
 
@@ -54,7 +51,6 @@ impl SidebarCategory {
             Self::Storage => "Storage",
             Self::Config => "Config & Secrets",
             Self::Security => "Security",
-            Self::Logs => "Logs",
         }
     }
 
@@ -67,7 +63,6 @@ impl SidebarCategory {
             Self::Storage => Icon::HardDrive,
             Self::Config => Icon::Settings2,
             Self::Security => Icon::ShieldCheck,
-            Self::Logs => Icon::FileText,
         }
     }
 
@@ -80,7 +75,6 @@ impl SidebarCategory {
             Self::Storage => Some(WorkspaceView::StorageOverview),
             Self::Config => Some(WorkspaceView::ConfigMaps),
             Self::Security => Some(WorkspaceView::SecurityOverview),
-            Self::Logs => Some(WorkspaceView::Logs),
         }
     }
 
@@ -123,7 +117,6 @@ impl SidebarCategory {
                 WorkspaceView::ResourceQuotas,
                 WorkspaceView::AdmissionWebhooks,
             ],
-            Self::Logs => &[WorkspaceView::Logs],
         }
     }
 }
@@ -157,7 +150,6 @@ pub enum WorkspaceView {
     PodSecurity,
     ResourceQuotas,
     AdmissionWebhooks,
-    Logs,
     Settings,
 }
 
@@ -228,7 +220,7 @@ impl From<WorkspaceView> for WorkspaceTab {
 }
 
 impl WorkspaceView {
-    pub const ALL: [WorkspaceView; 29] = [
+    pub const ALL: [WorkspaceView; 28] = [
         Self::Overview,
         Self::Nodes,
         Self::Namespaces,
@@ -256,7 +248,6 @@ impl WorkspaceView {
         Self::PodSecurity,
         Self::ResourceQuotas,
         Self::AdmissionWebhooks,
-        Self::Logs,
         Self::Settings,
     ];
 
@@ -293,7 +284,6 @@ impl WorkspaceView {
             Self::PodSecurity => "security-pod-security",
             Self::ResourceQuotas => "security-resource",
             Self::AdmissionWebhooks => "security-admission",
-            Self::Logs => "logs-main",
             Self::Settings => "settings",
         }
     }
@@ -326,7 +316,6 @@ impl WorkspaceView {
             Self::PodSecurity => "Pod Security",
             Self::ResourceQuotas => "Resource Quotas & Limits",
             Self::AdmissionWebhooks => "Admission Webhooks",
-            Self::Logs => "Logs",
             Self::Settings => "Settings",
         }
     }
@@ -360,7 +349,6 @@ impl WorkspaceView {
             Self::PodSecurity => "Pod security standards and admission enforcement.",
             Self::ResourceQuotas => "Namespace CPU, memory, and object count limits.",
             Self::AdmissionWebhooks => "Mutating and validating admission webhook configurations.",
-            Self::Logs => "Live container log streaming and filtering.",
             Self::Settings => "Orbit preferences, appearance styles, and cluster settings.",
         }
     }
@@ -392,7 +380,6 @@ impl WorkspaceView {
             | Self::PodSecurity
             | Self::ResourceQuotas
             | Self::AdmissionWebhooks => Some(SidebarCategory::Security),
-            Self::Logs => Some(SidebarCategory::Logs),
             Self::Settings => None,
         }
     }
@@ -426,7 +413,6 @@ impl WorkspaceView {
             Self::PodSecurity => Icon::ShieldAlert,
             Self::ResourceQuotas => Icon::Sliders,
             Self::AdmissionWebhooks => Icon::Webhook,
-            Self::Logs => Icon::FileText,
             Self::Settings => Icon::Settings,
         }
     }
@@ -485,7 +471,6 @@ impl WorkspaceView {
             Self::PodSecurity => &["pss", "psa", "podsecurity"],
             Self::ResourceQuotas => &["quota", "limits", "limitrange"],
             Self::AdmissionWebhooks => &["webhook", "admission", "mutating", "validating"],
-            Self::Logs => &["log", "stream", "tail"],
             Self::Settings => &["preferences", "theme", "appearance", "config"],
         }
     }
@@ -619,10 +604,16 @@ mod tests {
                 SidebarCategory::Storage,
                 SidebarCategory::Config,
                 SidebarCategory::Security,
-                SidebarCategory::Logs,
             ]
         );
-        assert_eq!(SidebarCategory::ALL.len(), 8);
+        assert_eq!(SidebarCategory::ALL.len(), 7);
+        assert_eq!(WorkspaceView::ALL.len(), 28);
+        assert_eq!(WorkspaceView::from_id("logs-main"), None);
+        assert!(
+            SidebarCategory::ALL
+                .iter()
+                .all(|category| category.id() != "logs")
+        );
 
         assert!(SidebarCategory::Clusters.nav_items().is_empty());
         assert_eq!(SidebarCategory::Clusters.default_view(), None);
@@ -718,10 +709,6 @@ mod tests {
         assert_eq!(
             char::from(SidebarCategory::Security.icon()),
             char::from(Icon::ShieldCheck)
-        );
-        assert_eq!(
-            char::from(SidebarCategory::Logs.icon()),
-            char::from(Icon::FileText)
         );
 
         for category in SidebarCategory::ALL {
@@ -832,7 +819,7 @@ mod tests {
 
     #[test]
     fn test_workspace_view_id_roundtrip_and_sidebar_sync_for_view() {
-        assert_eq!(WorkspaceView::ALL.len(), 29);
+        assert_eq!(WorkspaceView::ALL.len(), 28);
         for view in WorkspaceView::ALL {
             assert_eq!(
                 WorkspaceView::from_id(view.id()),

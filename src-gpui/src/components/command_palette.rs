@@ -882,4 +882,44 @@ mod tests {
         assert!(!state.is_open);
         assert!(state.query.is_empty());
     }
+
+    #[test]
+    fn test_picker_and_command_palette_exclude_standalone_logs() {
+        use crate::navigation::{LogsTabTarget, WorkspaceTab};
+        use crate::state::WorkspaceTabsState;
+
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("prod-ctx");
+        tabs.open_picker();
+        tabs.picker_query = "logs".to_string();
+        assert!(
+            tabs.filtered_picker_views().is_empty(),
+            "Tab picker must not return standalone Logs view entries"
+        );
+
+        let catalog = build_command_palette_items(&[], None, &NamespaceFilterState::default());
+        let mut palette = CommandPaletteState::default();
+        palette.open();
+        palette.query = "logs".to_string();
+        let filtered_views: Vec<_> = palette
+            .filter_items(&catalog)
+            .into_iter()
+            .filter(|item| item.category == CommandPaletteCategory::View)
+            .collect();
+        assert!(
+            filtered_views.is_empty(),
+            "Command palette must not return standalone Logs view entries"
+        );
+
+        let target = LogsTabTarget {
+            kind: "Pod".to_string(),
+            namespace: "default".to_string(),
+            name: "api-0".to_string(),
+        };
+        tabs.open_logs_tab(target.clone());
+        let count_after_first = tabs.open_tabs().len();
+        tabs.open_logs_tab(target.clone());
+        assert_eq!(tabs.open_tabs().len(), count_after_first);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceTab::Logs(target)));
+    }
 }

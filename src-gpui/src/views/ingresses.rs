@@ -13,7 +13,6 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{ContextMenuEntry, ContextMenuItem, TextTooltip};
-use crate::navigation::WorkspaceView;
 use crate::state::{IngressesLoadStatus, IngressesState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
@@ -352,14 +351,7 @@ pub fn render_ingresses_view(
         format!("{visible_count} of {total_count} ingresses")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::Ingresses.label(),
-        WorkspaceView::Ingresses.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(

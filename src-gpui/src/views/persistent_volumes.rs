@@ -17,7 +17,6 @@ use crate::components::{
     render_status_badge_from_str,
 };
 use crate::icons::render_icon;
-use crate::navigation::WorkspaceView;
 use crate::state::{PersistentVolumesLoadStatus, PersistentVolumesState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -295,14 +294,7 @@ pub fn render_persistent_volumes_view(
     let presentation_mode = persistent_volumes_presentation_mode(state);
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let header = render_resource_view_header(
-        WorkspaceView::PersistentVolumes.label(),
-        WorkspaceView::PersistentVolumes.description(),
-        format!("{total_count} volumes"),
-        None,
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(format!("{total_count} volumes"), None, None, theme);
 
     let error_banner = if presentation_mode == PersistentVolumesPresentationMode::Table {
         state.error_message.as_ref().map(|message| {

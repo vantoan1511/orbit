@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, PolicyInfo};
@@ -14,7 +14,6 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, SecurityOverviewLoadStatus, SecurityOverviewState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -27,37 +26,6 @@ use crate::views::{
 pub enum SecurityOverviewPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct SecurityMetrics {
-    pub total: usize,
-    pub enforced: usize,
-    pub audit: usize,
-    pub disabled: usize,
-    pub violations: i64,
-}
-
-pub fn compute_security_metrics(policies: &[PolicyInfo]) -> SecurityMetrics {
-    compute_security_metrics_iter(policies.iter())
-}
-
-pub fn compute_security_metrics_iter<'a>(
-    policies: impl IntoIterator<Item = &'a PolicyInfo>,
-) -> SecurityMetrics {
-    let mut metrics = SecurityMetrics::default();
-    for policy in policies {
-        metrics.total += 1;
-        if policy.status.eq_ignore_ascii_case("Enforced") {
-            metrics.enforced += 1;
-        } else if policy.status.eq_ignore_ascii_case("Audit") {
-            metrics.audit += 1;
-        } else if policy.status.eq_ignore_ascii_case("Disabled") {
-            metrics.disabled += 1;
-        }
-        metrics.violations += i64::from(policy.violations.max(0));
-    }
-    metrics
 }
 
 pub fn security_policy_columns() -> Vec<TableColumn> {
@@ -164,85 +132,6 @@ pub fn security_overview_presentation_mode(
     } else {
         SecurityOverviewPresentationMode::Table
     }
-}
-
-fn render_metric_card(
-    label: &'static str,
-    value: String,
-    accent: Rgba,
-    theme: &OrbitTheme,
-) -> AnyElement {
-    theme
-        .style_card(div())
-        .flex_1()
-        .min_w(px(120.0))
-        .px_3p5()
-        .py_3()
-        .bg(theme.surface.bg_panel)
-        .flex()
-        .flex_col()
-        .gap_1()
-        .child(
-            apply_text_step(div(), theme.typography.size_xs)
-                .text_color(theme.text.muted)
-                .font_weight(FontWeight::MEDIUM)
-                .child(label),
-        )
-        .child(
-            apply_text_step(div(), theme.typography.size_xl)
-                .font(theme.typography.tabular_ui_font(FontWeight::BOLD))
-                .text_color(accent)
-                .child(value),
-        )
-        .into_any_element()
-}
-
-fn render_security_metrics_row(metrics: SecurityMetrics, theme: &OrbitTheme) -> AnyElement {
-    let violations_color = if metrics.violations > 0 {
-        theme.semantic.danger.solid
-    } else {
-        theme.text.primary
-    };
-
-    div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .flex()
-        .flex_wrap()
-        .gap_3()
-        .child(render_metric_card(
-            "Total",
-            metrics.total.to_string(),
-            theme.text.primary,
-            theme,
-        ))
-        .child(render_metric_card(
-            "Enforced",
-            metrics.enforced.to_string(),
-            theme.semantic.success.solid,
-            theme,
-        ))
-        .child(render_metric_card(
-            "Audit",
-            metrics.audit.to_string(),
-            theme.semantic.warning.solid,
-            theme,
-        ))
-        .child(render_metric_card(
-            "Disabled",
-            metrics.disabled.to_string(),
-            theme.text.muted,
-            theme,
-        ))
-        .child(render_metric_card(
-            "Violations",
-            metrics.violations.to_string(),
-            violations_color,
-            theme,
-        ))
-        .into_any_element()
 }
 
 fn render_security_policy_cell(
@@ -389,7 +278,6 @@ pub fn render_security_overview_view(
             .cloned()
             .collect(),
     );
-    let metrics = compute_security_metrics(&filtered_rows);
     let total_count = state.policies.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == SecurityOverviewLoadStatus::Loading;
@@ -402,14 +290,7 @@ pub fn render_security_overview_view(
         format!("{visible_count} of {total_count} policies")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::SecurityOverview.label(),
-        WorkspaceView::SecurityOverview.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = if presentation_mode == SecurityOverviewPresentationMode::Table {
         state.error_message.as_ref().map(|message| {
@@ -474,22 +355,14 @@ pub fn render_security_overview_view(
                 }
             });
 
-            div()
-                .flex()
-                .flex_col()
-                .flex_1()
-                .min_h(px(0.0))
-                .gap_0()
-                .child(render_security_metrics_row(metrics, theme))
-                .child(render_data_table(
-                    "security-overview-table",
-                    &columns,
-                    visible_count,
-                    &table_state,
-                    theme,
-                    callbacks,
-                ))
-                .into_any_element()
+            render_data_table(
+                "security-overview-table",
+                &columns,
+                visible_count,
+                &table_state,
+                theme,
+                callbacks,
+            )
         }
     };
 
@@ -636,74 +509,6 @@ mod tests {
             rules: String::new(),
             kind: kind.to_string(),
         }
-    }
-
-    #[test]
-    fn test_compute_security_metrics_counts_statuses_and_sums_violations() {
-        let policies = vec![
-            sample_policy(
-                "p1",
-                "Network Policy",
-                "NetworkPolicy",
-                "prod",
-                "Enforced",
-                3,
-                "1d",
-            ),
-            sample_policy(
-                "p2",
-                "Resource Quota",
-                "ResourceQuota",
-                "prod",
-                "Enforced",
-                2,
-                "2d",
-            ),
-            sample_policy(
-                "p3",
-                "Admission Policy",
-                "ValidatingWebhookConfiguration",
-                "-",
-                "Audit",
-                0,
-                "3d",
-            ),
-            sample_policy(
-                "p4",
-                "Limit Range",
-                "LimitRange",
-                "dev",
-                "Disabled",
-                0,
-                "4d",
-            ),
-        ];
-
-        let metrics = compute_security_metrics(&policies);
-        assert_eq!(
-            metrics,
-            SecurityMetrics {
-                total: 4,
-                enforced: 2,
-                audit: 1,
-                disabled: 1,
-                violations: 5,
-            }
-        );
-    }
-
-    #[test]
-    fn test_compute_security_metrics_empty_is_zero() {
-        assert_eq!(
-            compute_security_metrics(&[]),
-            SecurityMetrics {
-                total: 0,
-                enforced: 0,
-                audit: 0,
-                disabled: 0,
-                violations: 0,
-            }
-        );
     }
 
     #[test]
