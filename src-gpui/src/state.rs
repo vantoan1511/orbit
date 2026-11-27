@@ -4258,7 +4258,13 @@ pub fn resolve_tab_drop_target(
     if to_index == from_index || to_index >= tab_count {
         return None;
     }
-    Some((hover_index, position))
+    let (canonical_hover, canonical_pos) = match position {
+        TabDropPosition::After if hover_index + 1 < tab_count => {
+            (hover_index + 1, TabDropPosition::Before)
+        }
+        _ => (hover_index, position),
+    };
+    Some((canonical_hover, canonical_pos))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -6216,6 +6222,20 @@ mod tests {
             Some((0, TabDropPosition::Before))
         );
         assert_eq!(calculate_tab_drop_index(3, 0, TabDropPosition::Before), 0);
+
+        // Interior After canonicalizes to next tab's Before so a single seam never has 2 indicators
+        assert_eq!(
+            resolve_tab_drop_target(3, 0, TabDropPosition::After, 4),
+            Some((1, TabDropPosition::Before))
+        );
+        assert_eq!(
+            resolve_tab_drop_target(3, 1, TabDropPosition::Before, 4),
+            Some((1, TabDropPosition::Before))
+        );
+        assert_eq!(
+            resolve_tab_drop_target(0, 2, TabDropPosition::After, 4),
+            Some((3, TabDropPosition::Before))
+        );
 
         // Out of bounds
         assert_eq!(

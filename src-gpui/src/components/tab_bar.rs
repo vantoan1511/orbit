@@ -481,8 +481,9 @@ fn render_tab_item(
             .w(px(2.0))
             .bg(theme.accent.accent);
         tab_el = tab_el.child(match pos {
+            TabDropPosition::Before if index > 0 => indicator.left(px(-1.0)),
             TabDropPosition::Before => indicator.left_0(),
-            TabDropPosition::After => indicator.right_0(),
+            TabDropPosition::After => indicator.right(px(-1.0)),
         });
     }
 
