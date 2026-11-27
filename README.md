@@ -61,7 +61,7 @@ Desktop Kubernetes management shouldn't require running a dedicated Chromium ins
 
 ### 📝 Integrated Monaco YAML Editor & Direct Apply
 
-- **Live Manifest Editor**: Locally bundled Monaco Editor with YAML syntax highlighting and isolated draft lifecycles per tab.
+- **Live Manifest Editor**: Locally bundled Monaco Editor (`monaco-editor`) with YAML syntax highlighting and isolated draft lifecycles per tab.
 - **Diff & In-App Apply**: Review changes and apply updates directly to the cluster with structured validation feedback and automatic conflict retry handling.
 
 ### 📊 Real-Time Logs & Cluster Events
