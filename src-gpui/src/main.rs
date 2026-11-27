@@ -14,10 +14,10 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui::{
-    AnyElement, App, Application, Bounds, ClipboardItem, Context, CursorStyle, FocusHandle,
+    AnyElement, App, Application, Bounds, ClipboardItem, Context, Corner, CursorStyle, FocusHandle,
     FontWeight, KeyDownEvent, MouseButton, MouseDownEvent, MouseMoveEvent, PathPromptOptions,
     Pixels, Point, Rgba, SharedString, Window, WindowAppearance, WindowBounds, WindowDecorations,
-    WindowOptions, div, prelude::*, px, size,
+    WindowOptions, anchored, deferred, div, point, prelude::*, px, size,
 };
 use lucide_icons::Icon;
 use orbit_core::config::OrbitConfig;
@@ -29,11 +29,12 @@ use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ActionToastKind, ActionToastState, ActiveShellDrawer, AddClusterModalCallbacks,
     CommandPaletteAction, CommandPaletteCallbacks, CommandPaletteState, ContextMenuEntry,
-    ContextMenuKeyAction, ContextMenuState, NotificationCenterState, NotificationDrawerCallbacks,
-    NotificationSeverity, PortForwardModalCallbacks, PortForwardModalKeyResult,
-    PortForwardModalState, PortForwardResourceOption, ProfileDrawerCallbacks, ResourceDrawerProps,
-    ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
-    TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks, TextTooltip,
+    ContextMenuKeyAction, ContextMenuState, MACOS_TRAFFIC_LIGHT_Y, NotificationCenterState,
+    NotificationDrawerCallbacks, NotificationSeverity, PortForwardModalCallbacks,
+    PortForwardModalKeyResult, PortForwardModalState, PortForwardResourceOption,
+    ProfileDrawerCallbacks, ResourceDrawerProps, ResourceDrawerState, ResourceDrawerTabDef,
+    ResourceDrawerTabId, ResourceDrawerTarget, TITLEBAR_CONTROL_HEIGHT, TabBarCallbacks,
+    TabContextMenuCallbacks, TabPickerCallbacks, TextTooltip, TitlebarSlots,
     WorkloadActionDialogState, WorkloadActionModalCallbacks, WorkloadActionModalKeyResult,
     WorkloadActionModalState, YamlLoadStatus, YamlViewerProps, build_command_palette_items,
     build_tab_context_menu_entries, extract_ports_from_deployment, extract_ports_from_pod,
@@ -394,6 +395,18 @@ pub fn namespace_trigger_presentation(
         is_filtered,
         indicator_color,
     }
+}
+
+pub fn should_show_namespace_trigger(connection_state: &ClusterConnectionState) -> bool {
+    matches!(connection_state, ClusterConnectionState::Connected { .. })
+}
+
+pub fn dismiss_cluster_dropdown_on_escape(key: &str, state: &mut ClusterSwitcherState) -> bool {
+    if key.eq_ignore_ascii_case("escape") && state.dropdown_open {
+        state.close_dropdown();
+        return true;
+    }
+    false
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2127,15 +2140,14 @@ impl OrbitShell {
     pub const DEFAULT_WIDTH: f32 = 1200.0;
     pub const DEFAULT_HEIGHT: f32 = 800.0;
     pub const TITLEBAR_HEIGHT: f32 = crate::components::TITLEBAR_HEIGHT;
-    pub const HEADER_HEIGHT: f32 = 48.0;
     pub const FOOTER_HEIGHT: f32 = 26.0;
 
     pub const fn header_dropdown_top_offset() -> f32 {
-        Self::TITLEBAR_HEIGHT + Self::HEADER_HEIGHT + 4.0
+        Self::TITLEBAR_HEIGHT + 4.0
     }
 
     pub const fn tab_picker_top_offset() -> f32 {
-        Self::TITLEBAR_HEIGHT + Self::HEADER_HEIGHT + crate::components::TAB_BAR_HEIGHT + 4.0
+        Self::TITLEBAR_HEIGHT + crate::components::TAB_BAR_HEIGHT + 4.0
     }
 
     pub fn new(config: &OrbitConfig, window: &mut Window, cx: &mut Context<Self>) -> Self {
@@ -5982,7 +5994,7 @@ impl OrbitShell {
             titlebar: Some(gpui::TitlebarOptions {
                 title: Some(SharedString::from(Self::WINDOW_TITLE)),
                 appears_transparent: true,
-                traffic_light_position: Some(gpui::point(px(12.0), px(10.0))),
+                traffic_light_position: Some(gpui::point(px(12.0), px(MACOS_TRAFFIC_LIGHT_Y))),
             }),
             window_decorations: Some(WindowDecorations::Client),
             is_movable: true,
@@ -6522,7 +6534,7 @@ impl OrbitShell {
                 .border_color(theme.border.default)
                 .child(
                     div()
-                        .h(px(Self::HEADER_HEIGHT))
+                        .h(px(crate::components::TAB_BAR_HEIGHT))
                         .flex_shrink_0()
                         .px_3()
                         .border_b_1()
@@ -6565,238 +6577,318 @@ impl OrbitShell {
         )
     }
 
-    fn render_header(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn render_anchored_dropdown(menu: AnyElement) -> AnyElement {
+        deferred(
+            anchored()
+                .anchor(Corner::TopLeft)
+                .offset(point(px(0.0), px(4.0)))
+                .snap_to_window_with_margin(px(8.0))
+                .child(menu),
+        )
+        .with_priority(2)
+        .into_any_element()
+    }
+
+    fn render_dropdown_backdrop(
+        &self,
+        id: &'static str,
+        on_close: impl Fn(&mut Self) + Copy + 'static,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        div()
+            .id(id)
+            .absolute()
+            .inset_0()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _event, _window, cx| {
+                    cx.stop_propagation();
+                    on_close(this);
+                    cx.notify();
+                }),
+            )
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |this, _event, _window, cx| {
+                    cx.stop_propagation();
+                    on_close(this);
+                    cx.notify();
+                }),
+            )
+            .into_any_element()
+    }
+
+    fn render_namespace_trigger_control(
+        &self,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let control_hover = theme.surface.control_hover;
+        let ns_pres = namespace_trigger_presentation(&self.namespaces, theme);
+        let ns_chevron = dropdown_chevron_icon(self.namespaces.dropdown_open);
+        let ns_trigger = theme
+            .style_control(div().id("namespace-selector-btn"))
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .h(px(TITLEBAR_CONTROL_HEIGHT))
+            .px(theme.typography.control_padding_x_sm)
+            .hover(move |style| style.bg(control_hover))
+            .when(self.namespaces.dropdown_open, |el| {
+                el.border_color(theme.accent.accent)
+            })
+            .cursor_pointer()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _event, window, cx| {
+                    cx.stop_propagation();
+                    this.dismiss_context_menu();
+                    this.state.close_dropdown();
+                    this.settings_dropdown.close();
+                    this.namespaces.toggle_dropdown();
+                    if this.namespaces.dropdown_open {
+                        this.namespace_search_focus.focus(window);
+                    }
+                    cx.notify();
+                }),
+            )
+            .child(render_icon(Icon::Layers, px(13.0), ns_pres.indicator_color))
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .font_weight(FontWeight::MEDIUM)
+                    .max_w(px(180.0))
+                    .truncate()
+                    .text_color(if ns_pres.is_filtered {
+                        theme.text.primary
+                    } else {
+                        theme.text.secondary
+                    })
+                    .child(ns_pres.label),
+            )
+            .when(ns_pres.is_loading, |el| {
+                el.child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .text_color(theme.text.muted)
+                        .child("…"),
+                )
+            })
+            .when(ns_pres.is_error, |el| {
+                el.child(render_icon(
+                    Icon::TriangleAlert,
+                    px(12.0),
+                    theme.semantic.danger.solid,
+                ))
+            })
+            .child(render_icon(ns_chevron, px(13.0), theme.text.secondary));
+
+        div()
+            .flex()
+            .flex_col()
+            .child(ns_trigger)
+            .when(self.namespaces.dropdown_open, |el| {
+                el.child(Self::render_anchored_dropdown(
+                    self.render_namespace_dropdown_menu(theme, cx),
+                ))
+            })
+            .into_any_element()
+    }
+
+    fn render_titlebar_left_controls(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
         let presentation = format_cluster_status(&self.state, &theme);
         let cluster_chevron = dropdown_chevron_icon(self.state.dropdown_open);
         let control_hover = theme.surface.control_hover;
-        let is_refreshing = self.is_active_view_loading();
 
-        div()
-            .id("orbit-header-toolbar")
-            .h(px(Self::HEADER_HEIGHT))
-            .flex_shrink_0()
-            .px_4()
-            .border_b_1()
-            .border_color(theme.border.default)
-            .bg(theme.surface.bg_panel)
+        let cluster_trigger = theme
+            .style_control(div().id("cluster-switcher-btn"))
             .flex()
             .items_center()
-            .justify_between()
-            .gap_4()
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_3()
-                    .child(
-                        theme
-                            .style_control(div().id("cluster-switcher-btn"))
-                            .flex()
-                            .items_center()
-                            .gap_2p5()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_md)
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                this.dismiss_context_menu();
-                                this.namespaces.close_dropdown();
-                                this.settings_dropdown.close();
-                                this.state.toggle_dropdown();
-                                cx.notify();
-                            }))
-                            .child(
-                                div()
-                                    .w(px(8.0))
-                                    .h(px(8.0))
-                                    .rounded_full()
-                                    .bg(presentation.color),
-                            )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_sm)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child(presentation.pill_label),
-                            )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.muted)
-                                    .child(presentation.status_label),
-                            )
-                            .child(render_icon(cluster_chevron, px(13.0), theme.text.secondary)),
-                    )
-                    .when(
-                        matches!(
-                            self.state.connection_state,
-                            ClusterConnectionState::Connected { .. }
-                        ),
-                        |el| {
-                            let ns_pres = namespace_trigger_presentation(&self.namespaces, &theme);
-                            let ns_chevron = dropdown_chevron_icon(self.namespaces.dropdown_open);
-                            el.child(
-                                theme
-                                    .style_control(div().id("namespace-selector-btn"))
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .h(theme.typography.control_height_sm)
-                                    .px(theme.typography.control_padding_x_md)
-                                    .hover(move |style| style.bg(control_hover))
-                                    .cursor_pointer()
-                                    .on_click(cx.listener(|this, _event, window, cx| {
-                                        this.dismiss_context_menu();
-                                        this.state.close_dropdown();
-                                        this.settings_dropdown.close();
-                                        this.namespaces.toggle_dropdown();
-                                        if this.namespaces.dropdown_open {
-                                            this.namespace_search_focus.focus(window);
-                                        }
-                                        cx.notify();
-                                    }))
-                                    .child(render_icon(
-                                        Icon::Layers,
-                                        px(13.0),
-                                        ns_pres.indicator_color,
-                                    ))
-                                    .child(
-                                        apply_text_step(div(), theme.typography.size_sm)
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .text_color(if ns_pres.is_filtered {
-                                                theme.text.primary
-                                            } else {
-                                                theme.text.secondary
-                                            })
-                                            .child(ns_pres.label),
-                                    )
-                                    .when(ns_pres.is_loading, |el| {
-                                        el.child(
-                                            apply_text_step(div(), theme.typography.size_xs)
-                                                .text_color(theme.text.muted)
-                                                .child("…"),
-                                        )
-                                    })
-                                    .when(ns_pres.is_error, |el| {
-                                        el.child(render_icon(
-                                            Icon::TriangleAlert,
-                                            px(12.0),
-                                            theme.semantic.danger.solid,
-                                        ))
-                                    })
-                                    .child(render_icon(ns_chevron, px(13.0), theme.text.secondary)),
-                            )
-                        },
-                    ),
+            .gap_2()
+            .h(px(TITLEBAR_CONTROL_HEIGHT))
+            .px(theme.typography.control_padding_x_sm)
+            .hover(move |style| style.bg(control_hover))
+            .when(self.state.dropdown_open, |el| {
+                el.border_color(theme.accent.accent)
+            })
+            .cursor_pointer()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _event, _window, cx| {
+                    cx.stop_propagation();
+                    this.dismiss_context_menu();
+                    this.namespaces.close_dropdown();
+                    this.settings_dropdown.close();
+                    this.state.toggle_dropdown();
+                    cx.notify();
+                }),
             )
             .child(
                 div()
+                    .w(px(8.0))
+                    .h(px(8.0))
+                    .rounded_full()
+                    .flex_shrink_0()
+                    .bg(presentation.color),
+            )
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .font_weight(FontWeight::MEDIUM)
+                    .max_w(px(220.0))
+                    .truncate()
+                    .child(presentation.pill_label),
+            )
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .text_color(theme.text.muted)
+                    .flex_shrink_0()
+                    .child(presentation.status_label),
+            )
+            .child(render_icon(cluster_chevron, px(13.0), theme.text.secondary));
+
+        let cluster_control = div()
+            .flex()
+            .flex_col()
+            .child(cluster_trigger)
+            .when(self.state.dropdown_open, |el| {
+                el.child(Self::render_anchored_dropdown(
+                    self.render_cluster_dropdown_menu(&theme, cx),
+                ))
+            });
+
+        div()
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .child(cluster_control)
+            .when(
+                should_show_namespace_trigger(&self.state.connection_state),
+                |el| el.child(self.render_namespace_trigger_control(&theme, cx)),
+            )
+            .into_any_element()
+    }
+
+    fn render_titlebar_right_controls(&self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = OrbitTheme::get(cx).clone();
+        let control_hover = theme.surface.control_hover;
+        let is_refreshing = self.is_active_view_loading();
+
+        div()
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .child(
+                theme
+                    .style_control(div().id("command-palette-trigger-btn"))
                     .flex()
                     .items_center()
-                    .gap_2()
-                    .child(
-                        theme
-                            .style_control(div().id("command-palette-trigger-btn"))
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_md)
-                            .hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                            .tooltip(|_window, cx| {
-                                cx.new(|_| {
-                                    TextTooltip::new(format!(
-                                        "Command Palette ({})",
-                                        primary_shortcut_label("K")
-                                    ))
-                                })
-                                .into()
-                            })
-                            .on_click(cx.listener(|this, _event, window, cx| {
-                                this.toggle_command_palette(window, cx);
-                            }))
-                            .child(render_icon(Icon::Search, px(13.0), theme.text.muted))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_xs)
-                                    .text_color(theme.text.muted)
-                                    .child("Search..."),
-                            )
-                            .child(
-                                apply_text_step(div(), theme.typography.size_3xs)
-                                    .px_1p5()
-                                    .py(px(1.0))
-                                    .rounded(theme.style.radius_control)
-                                    .bg(theme.surface.bg_panel)
-                                    .border_1()
-                                    .border_color(theme.border.default)
-                                    .font(theme.typography.mono_font(FontWeight::MEDIUM))
-                                    .text_color(theme.text.muted)
-                                    .child(primary_shortcut_label("K")),
-                            ),
-                    )
-                    .child(
-                        theme
-                            .style_control(div().id("refresh-clusters-btn"))
-                            .flex()
-                            .items_center()
-                            .gap_1p5()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_md)
-                            .when(is_refreshing, |el| el.opacity(0.6))
-                            .when(!is_refreshing, |el| {
-                                el.hover(move |style| style.bg(control_hover))
-                                    .cursor_pointer()
-                            })
-                            .tooltip(|_window, cx| {
-                                cx.new(|_| TextTooltip::new("Refresh workspace (R)")).into()
-                            })
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                if !this.is_active_view_loading() {
-                                    this.refresh_workspace(cx);
-                                }
-                            }))
-                            .child(render_icon(
-                                Icon::RefreshCw,
-                                px(13.0),
-                                if is_refreshing {
-                                    theme.text.muted
-                                } else {
-                                    theme.text.secondary
-                                },
+                    .gap_1p5()
+                    .h(px(TITLEBAR_CONTROL_HEIGHT))
+                    .px(theme.typography.control_padding_x_sm)
+                    .hover(move |style| style.bg(control_hover))
+                    .cursor_pointer()
+                    .tooltip(|_window, cx| {
+                        cx.new(|_| {
+                            TextTooltip::new(format!(
+                                "Command Palette ({})",
+                                primary_shortcut_label("K")
                             ))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_sm)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(if is_refreshing {
-                                        theme.text.muted
-                                    } else {
-                                        theme.text.primary
-                                    })
-                                    .child(if is_refreshing {
-                                        "Refreshing..."
-                                    } else {
-                                        "Refresh"
-                                    }),
-                            ),
+                        })
+                        .into()
+                    })
+                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+                        cx.stop_propagation();
+                    })
+                    .on_click(cx.listener(|this, _event, window, cx| {
+                        this.toggle_command_palette(window, cx);
+                    }))
+                    .child(render_icon(Icon::Search, px(13.0), theme.text.muted))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .text_color(theme.text.muted)
+                            .child("Search..."),
                     )
                     .child(
-                        theme
-                            .style_control(div().id("switch-to-old-ui"))
-                            .flex()
-                            .items_center()
-                            .gap_1p5()
-                            .h(theme.typography.control_height_sm)
-                            .px(theme.typography.control_padding_x_md)
-                            .hover(move |style| style.bg(control_hover))
+                        apply_text_step(div(), theme.typography.size_3xs)
+                            .px_1p5()
+                            .py(px(1.0))
+                            .rounded(theme.style.radius_control)
+                            .bg(theme.surface.bg_panel)
+                            .border_1()
+                            .border_color(theme.border.default)
+                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                            .text_color(theme.text.muted)
+                            .child(primary_shortcut_label("K")),
+                    ),
+            )
+            .child(
+                theme
+                    .style_control(div().id("refresh-clusters-btn"))
+                    .flex()
+                    .items_center()
+                    .gap_1p5()
+                    .h(px(TITLEBAR_CONTROL_HEIGHT))
+                    .px(theme.typography.control_padding_x_sm)
+                    .when(is_refreshing, |el| el.opacity(0.6))
+                    .when(!is_refreshing, |el| {
+                        el.hover(move |style| style.bg(control_hover))
                             .cursor_pointer()
-                            .on_click(cx.listener(|_this, _event, _window, cx| {
-                                cx.quit();
-                            }))
-                            .child(render_icon(Icon::LogOut, px(13.0), theme.text.secondary))
-                            .child(
-                                apply_text_step(div(), theme.typography.size_sm)
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .child("Switch to Old UI"),
-                            ),
+                    })
+                    .tooltip(|_window, cx| {
+                        cx.new(|_| TextTooltip::new("Refresh workspace (R)")).into()
+                    })
+                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+                        cx.stop_propagation();
+                    })
+                    .on_click(cx.listener(|this, _event, _window, cx| {
+                        if !this.is_active_view_loading() {
+                            this.refresh_workspace(cx);
+                        }
+                    }))
+                    .child(render_icon(
+                        Icon::RefreshCw,
+                        px(13.0),
+                        if is_refreshing {
+                            theme.text.muted
+                        } else {
+                            theme.text.secondary
+                        },
+                    ))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(if is_refreshing {
+                                theme.text.muted
+                            } else {
+                                theme.text.primary
+                            })
+                            .child(if is_refreshing {
+                                "Refreshing..."
+                            } else {
+                                "Refresh"
+                            }),
+                    ),
+            )
+            .child(
+                theme
+                    .style_control(div().id("switch-to-old-ui"))
+                    .flex()
+                    .items_center()
+                    .gap_1p5()
+                    .h(px(TITLEBAR_CONTROL_HEIGHT))
+                    .px(theme.typography.control_padding_x_sm)
+                    .hover(move |style| style.bg(control_hover))
+                    .cursor_pointer()
+                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+                        cx.stop_propagation();
+                    })
+                    .on_click(cx.listener(|_this, _event, _window, cx| {
+                        cx.quit();
+                    }))
+                    .child(render_icon(Icon::LogOut, px(13.0), theme.text.secondary))
+                    .child(
+                        apply_text_step(div(), theme.typography.size_xs)
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("Switch to Old UI"),
                     ),
             )
             .into_any_element()
@@ -6873,12 +6965,11 @@ impl OrbitShell {
         )
     }
 
-    fn render_dropdown_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !self.state.dropdown_open {
-            return None;
-        }
-
-        let theme = OrbitTheme::get(cx).clone();
+    fn render_cluster_dropdown_menu(
+        &self,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let control_hover = theme.surface.control_hover;
         let mono_font = theme.typography.mono_font(FontWeight::NORMAL);
         let mut list = div().flex().flex_col().gap_1().p_1p5();
@@ -6898,7 +6989,7 @@ impl OrbitShell {
                     self.state.active_cluster_id.as_deref() == Some(cluster_id.as_str());
                 let display = cluster_display_label(cluster);
                 let show_raw = display != cluster.name;
-                let dot_color = cluster_dot_color(cluster, &theme);
+                let dot_color = cluster_dot_color(cluster, theme);
 
                 list = list.child(
                     div()
@@ -6981,111 +7072,84 @@ impl OrbitShell {
             }
         }
 
-        let dropdown_left = if self.sidebar.is_collapsed {
-            ACTIVITY_BAR_WIDTH + 60.0
-        } else {
-            ACTIVITY_BAR_WIDTH + self.sidebar.panel_width + 60.0
-        };
-
-        Some(
-            div()
-                .absolute()
-                .inset_0()
-                .child(
-                    div()
-                        .id("cluster-dropdown-backdrop")
-                        .absolute()
-                        .inset_0()
-                        .on_click(cx.listener(|this, _event, _window, cx| {
-                            this.state.close_dropdown();
-                            cx.notify();
-                        })),
-                )
-                .child(
-                    theme
-                        .style_overlay(div().id("cluster-dropdown-menu"))
-                        .absolute()
-                        .top(px(Self::header_dropdown_top_offset()))
-                        .left(px(dropdown_left))
-                        .w(px(400.0))
-                        .max_h(px(420.0))
-                        .overflow_y_scroll()
-                        .on_click(|_event, _window, cx| {
-                            cx.stop_propagation();
-                        })
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
+        theme
+            .style_overlay(div().id("cluster-dropdown-menu"))
+            .w(px(400.0))
+            .max_h(px(420.0))
+            .overflow_y_scroll()
+            .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+                cx.stop_propagation();
+            })
+            .on_mouse_down(MouseButton::Right, |_event, _window, cx| {
+                cx.stop_propagation();
+            })
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .px_3()
+                    .py_2()
+                    .border_b_1()
+                    .border_color(theme.border.default)
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(theme.text.muted)
+                    .child(format!(
+                        "KUBECONFIG CONTEXTS ({})",
+                        self.state.clusters.len()
+                    )),
+            )
+            .child(list)
+            .child(
+                div()
+                    .border_t_1()
+                    .border_color(theme.border.default)
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .child(
+                        div()
+                            .id("dropdown-add-cluster-btn")
+                            .px_3()
+                            .py_2()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .cursor_pointer()
+                            .text_xs()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(theme.accent.accent)
+                            .hover(move |s| s.bg(control_hover))
+                            .on_click(cx.listener(|this, _event, window, cx| {
+                                this.open_add_cluster_modal(window, cx);
+                            }))
+                            .child(render_icon(Icon::Plus, px(12.0), theme.accent.accent))
+                            .child("Add Cluster"),
+                    )
+                    .when(dropdown_can_disconnect(&self.state), |el| {
+                        el.child(
+                            div()
+                                .id("dropdown-disconnect-cluster-btn")
                                 .px_3()
                                 .py_2()
-                                .border_b_1()
-                                .border_color(theme.border.default)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.muted)
-                                .child(format!(
-                                    "KUBECONFIG CONTEXTS ({})",
-                                    self.state.clusters.len()
-                                )),
-                        )
-                        .child(list)
-                        .child(
-                            div()
-                                .border_t_1()
-                                .border_color(theme.border.default)
                                 .flex()
                                 .items_center()
-                                .justify_between()
-                                .child(
-                                    div()
-                                        .id("dropdown-add-cluster-btn")
-                                        .px_3()
-                                        .py_2()
-                                        .flex()
-                                        .items_center()
-                                        .gap_2()
-                                        .cursor_pointer()
-                                        .text_xs()
-                                        .font_weight(FontWeight::MEDIUM)
-                                        .text_color(theme.accent.accent)
-                                        .hover(move |s| s.bg(control_hover))
-                                        .on_click(cx.listener(|this, _event, window, cx| {
-                                            this.open_add_cluster_modal(window, cx);
-                                        }))
-                                        .child(render_icon(
-                                            Icon::Plus,
-                                            px(12.0),
-                                            theme.accent.accent,
-                                        ))
-                                        .child("Add Cluster"),
-                                )
-                                .when(dropdown_can_disconnect(&self.state), |el| {
-                                    el.child(
-                                        div()
-                                            .id("dropdown-disconnect-cluster-btn")
-                                            .px_3()
-                                            .py_2()
-                                            .flex()
-                                            .items_center()
-                                            .gap_1p5()
-                                            .cursor_pointer()
-                                            .text_xs()
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .text_color(theme.semantic.danger.solid)
-                                            .hover(move |s| s.bg(control_hover))
-                                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                                this.disconnect_cluster(cx);
-                                            }))
-                                            .child(render_icon(
-                                                Icon::Unplug,
-                                                px(12.0),
-                                                theme.semantic.danger.solid,
-                                            ))
-                                            .child("Disconnect"),
-                                    )
-                                }),
-                        ),
-                )
-                .into_any_element(),
-        )
+                                .gap_1p5()
+                                .cursor_pointer()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(theme.semantic.danger.solid)
+                                .hover(move |s| s.bg(control_hover))
+                                .on_click(cx.listener(|this, _event, _window, cx| {
+                                    this.disconnect_cluster(cx);
+                                }))
+                                .child(render_icon(
+                                    Icon::Unplug,
+                                    px(12.0),
+                                    theme.semantic.danger.solid,
+                                ))
+                                .child("Disconnect"),
+                        )
+                    }),
+            )
+            .into_any_element()
     }
 
     fn render_namespace_search_input(
@@ -7415,47 +7479,23 @@ impl OrbitShell {
         list.into_any_element()
     }
 
-    fn render_namespace_dropdown_overlay(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !self.namespaces.dropdown_open {
-            return None;
-        }
-
-        let theme = OrbitTheme::get(cx).clone();
-        let dropdown_left = if self.sidebar.is_collapsed {
-            ACTIVITY_BAR_WIDTH + 240.0
-        } else {
-            ACTIVITY_BAR_WIDTH + self.sidebar.panel_width + 240.0
-        };
-
-        Some(
-            div()
-                .absolute()
-                .inset_0()
-                .child(
-                    div()
-                        .id("namespace-dropdown-backdrop")
-                        .absolute()
-                        .inset_0()
-                        .on_click(cx.listener(|this, _event, _window, cx| {
-                            this.namespaces.close_dropdown();
-                            cx.notify();
-                        })),
-                )
-                .child(
-                    theme
-                        .style_overlay(div().id("namespace-dropdown-menu"))
-                        .absolute()
-                        .top(px(Self::header_dropdown_top_offset()))
-                        .left(px(dropdown_left))
-                        .w(px(320.0))
-                        .on_click(|_event, _window, cx| {
-                            cx.stop_propagation();
-                        })
-                        .child(self.render_namespace_search_input(&theme, cx))
-                        .child(self.render_namespace_list_body(&theme, cx)),
-                )
-                .into_any_element(),
-        )
+    fn render_namespace_dropdown_menu(
+        &self,
+        theme: &OrbitTheme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        theme
+            .style_overlay(div().id("namespace-dropdown-menu"))
+            .w(px(320.0))
+            .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
+                cx.stop_propagation();
+            })
+            .on_mouse_down(MouseButton::Right, |_event, _window, cx| {
+                cx.stop_propagation();
+            })
+            .child(self.render_namespace_search_input(theme, cx))
+            .child(self.render_namespace_list_body(theme, cx))
+            .into_any_element()
     }
 
     fn render_workspace_view_header(&self, theme: &OrbitTheme) -> AnyElement {
@@ -13317,6 +13357,10 @@ impl Render for OrbitShell {
                     cx.notify();
                     return;
                 }
+                if dismiss_cluster_dropdown_on_escape(&event.keystroke.key, &mut this.state) {
+                    cx.notify();
+                    return;
+                }
                 if event.keystroke.key.eq_ignore_ascii_case("escape")
                     && this.active_shell_drawer.close()
                 {
@@ -13544,7 +13588,10 @@ impl Render for OrbitShell {
                 el.border_1().border_color(c)
             })
             .child(render_custom_titlebar(
-                Self::WINDOW_TITLE,
+                TitlebarSlots {
+                    left_controls: Some(self.render_titlebar_left_controls(cx)),
+                    right_controls: Some(self.render_titlebar_right_controls(cx)),
+                },
                 is_window_active,
                 is_maximized,
                 decorations,
@@ -13566,7 +13613,6 @@ impl Render for OrbitShell {
                             .flex_1()
                             .min_w(px(0.0))
                             .overflow_hidden()
-                            .child(self.render_header(cx))
                             .when_some(self.render_error_banner(cx), |el, banner| el.child(banner))
                             .when_some(self.render_tab_bar(cx), |el, tab_bar| el.child(tab_bar))
                             .child(self.render_workspace(f32::from(viewport.width), cx)),
@@ -13577,35 +13623,26 @@ impl Render for OrbitShell {
                 self.render_shell_drawer_overlay(f32::from(viewport.width), cx),
                 |el, overlay| el.child(overlay),
             )
-            .when_some(self.render_dropdown_overlay(cx), |el, overlay| {
-                el.child(overlay)
+            .when(self.state.dropdown_open, |el| {
+                el.child(self.render_dropdown_backdrop(
+                    "cluster-dropdown-backdrop",
+                    |this| this.state.close_dropdown(),
+                    cx,
+                ))
             })
-            .when_some(self.render_namespace_dropdown_overlay(cx), |el, overlay| {
-                el.child(overlay)
+            .when(self.namespaces.dropdown_open, |el| {
+                el.child(self.render_dropdown_backdrop(
+                    "namespace-dropdown-backdrop",
+                    |this| this.namespaces.close_dropdown(),
+                    cx,
+                ))
             })
             .when(self.is_settings_dropdown_visible(), |el| {
-                el.child(
-                    div()
-                        .id("settings-dropdown-backdrop")
-                        .absolute()
-                        .inset_0()
-                        .on_mouse_down(
-                            MouseButton::Left,
-                            cx.listener(|this, _event, _window, cx| {
-                                cx.stop_propagation();
-                                this.settings_dropdown.close();
-                                cx.notify();
-                            }),
-                        )
-                        .on_mouse_down(
-                            MouseButton::Right,
-                            cx.listener(|this, _event, _window, cx| {
-                                cx.stop_propagation();
-                                this.settings_dropdown.close();
-                                cx.notify();
-                            }),
-                        ),
-                )
+                el.child(self.render_dropdown_backdrop(
+                    "settings-dropdown-backdrop",
+                    |this| this.settings_dropdown.close(),
+                    cx,
+                ))
             })
             .when_some(self.render_add_cluster_modal_overlay(cx), |el, overlay| {
                 el.child(overlay)
@@ -14050,11 +14087,14 @@ mod tests {
             opts.titlebar.as_ref().map(|t| t.appears_transparent),
             Some(true)
         );
-        assert!(
+        assert_eq!(
             opts.titlebar
                 .as_ref()
-                .and_then(|t| t.traffic_light_position)
-                .is_some()
+                .and_then(|t| t.traffic_light_position),
+            Some(gpui::point(
+                px(12.0),
+                px(crate::components::MACOS_TRAFFIC_LIGHT_Y),
+            ))
         );
         assert!(opts.is_resizable);
         assert!(opts.is_movable);
@@ -14075,19 +14115,126 @@ mod tests {
 
     #[test]
     fn test_shell_overlay_top_offsets_account_for_titlebar() {
+        assert_eq!(OrbitShell::TITLEBAR_HEIGHT, 38.0);
         assert_eq!(
             OrbitShell::header_dropdown_top_offset(),
-            OrbitShell::TITLEBAR_HEIGHT + OrbitShell::HEADER_HEIGHT + 4.0
+            OrbitShell::TITLEBAR_HEIGHT + 4.0
         );
-        assert_eq!(OrbitShell::header_dropdown_top_offset(), 84.0);
+        assert_eq!(OrbitShell::header_dropdown_top_offset(), 42.0);
         assert_eq!(
             OrbitShell::tab_picker_top_offset(),
-            OrbitShell::TITLEBAR_HEIGHT
-                + OrbitShell::HEADER_HEIGHT
-                + crate::components::TAB_BAR_HEIGHT
-                + 4.0
+            OrbitShell::TITLEBAR_HEIGHT + crate::components::TAB_BAR_HEIGHT + 4.0
         );
-        assert_eq!(OrbitShell::tab_picker_top_offset(), 116.0);
+        assert_eq!(OrbitShell::tab_picker_top_offset(), 74.0);
+    }
+
+    #[test]
+    fn test_cluster_and_namespace_dropdown_escape_dismissal() {
+        let mut cluster_state = ClusterSwitcherState::new();
+        cluster_state.dropdown_open = true;
+        assert!(!dismiss_cluster_dropdown_on_escape("a", &mut cluster_state));
+        assert!(cluster_state.dropdown_open);
+        assert!(dismiss_cluster_dropdown_on_escape(
+            "Escape",
+            &mut cluster_state
+        ));
+        assert!(!cluster_state.dropdown_open);
+        assert!(!dismiss_cluster_dropdown_on_escape(
+            "escape",
+            &mut cluster_state
+        ));
+
+        let mut ns_state = NamespaceFilterState {
+            dropdown_open: true,
+            search_query: "kube".to_string(),
+            ..Default::default()
+        };
+        assert!(ns_state.handle_search_key("escape", None));
+        assert!(!ns_state.dropdown_open);
+        assert!(ns_state.search_query.is_empty());
+    }
+
+    #[test]
+    fn test_namespace_trigger_visibility_and_indicators_preserved() {
+        use orbit_core::kubernetes::models::NamespaceInfo;
+
+        assert!(!should_show_namespace_trigger(
+            &ClusterConnectionState::Disconnected
+        ));
+        assert!(!should_show_namespace_trigger(
+            &ClusterConnectionState::Connecting {
+                cluster_id: "prod".to_string(),
+                display_name: "Prod".to_string(),
+            }
+        ));
+        assert!(!should_show_namespace_trigger(
+            &ClusterConnectionState::Unreachable {
+                cluster_id: "prod".to_string(),
+                display_name: "Prod".to_string(),
+                server_url: None,
+                error_message: "timeout".to_string(),
+            }
+        ));
+        assert!(!should_show_namespace_trigger(
+            &ClusterConnectionState::Error {
+                cluster_id: Some("prod".to_string()),
+                display_name: Some("Prod".to_string()),
+                error_message: "auth failed".to_string(),
+            }
+        ));
+        assert!(should_show_namespace_trigger(
+            &ClusterConnectionState::Connected {
+                cluster_id: "prod".to_string(),
+                display_name: "Prod".to_string(),
+                k8s_version: Some("v1.31.1".to_string()),
+            }
+        ));
+
+        let theme = OrbitTheme::from_config(&OrbitConfig::default(), WindowAppearance::Dark);
+        let mut ns_state = NamespaceFilterState::default();
+
+        let idle = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(!idle.is_loading);
+        assert!(!idle.is_error);
+        assert!(!idle.is_filtered);
+        assert_eq!(idle.indicator_color, theme.text.secondary);
+
+        ns_state.begin_load_for_cluster("prod");
+        let loading = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(loading.is_loading);
+        assert!(!loading.is_error);
+        assert_eq!(loading.indicator_color, theme.semantic.warning.solid);
+
+        ns_state.apply_failed("prod", 1, "denied".to_string());
+        let err = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(!err.is_loading);
+        assert!(err.is_error);
+        assert_eq!(err.indicator_color, theme.semantic.danger.solid);
+
+        ns_state.apply_loaded(
+            "prod",
+            1,
+            vec![NamespaceInfo {
+                name: "default".to_string(),
+                status: "Active".to_string(),
+                is_system: false,
+                age: "1d".to_string(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                uid: "uid-default".to_string(),
+                created: "2026-01-01T00:00:00Z".to_string(),
+            }],
+        );
+        let loaded_all = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(!loaded_all.is_loading);
+        assert!(!loaded_all.is_error);
+        assert!(!loaded_all.is_filtered);
+        assert_eq!(loaded_all.indicator_color, theme.text.secondary);
+
+        ns_state.toggle_namespace("default");
+        let loaded_filtered = namespace_trigger_presentation(&ns_state, &theme);
+        assert!(loaded_filtered.is_filtered);
+        assert_eq!(loaded_filtered.indicator_color, theme.accent.accent);
     }
 
     #[test]
