@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{EventInfo, ServiceInfo};
@@ -17,9 +17,8 @@ use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, TextTooltip,
     render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, ServiceTypeFilter, ServicesLoadStatus, ServicesState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
     parse_age_seconds, render_action_button, render_resource_error_banner,
     render_resource_error_state, render_resource_view_header, render_truncated_cell,
@@ -30,23 +29,6 @@ pub use crate::views::{
 pub enum ServicesPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ServiceSummary {
-    pub total: usize,
-    pub cluster_ip: usize,
-    pub node_port: usize,
-    pub load_balancer: usize,
-    pub external_name: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct ServiceMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 pub fn service_columns() -> Vec<TableColumn> {
@@ -196,79 +178,6 @@ pub fn filter_and_sort_services_with_filters<'a>(
         compare_services_by_col(a, b, col_id)
     });
     rows
-}
-
-pub fn compute_service_summary(services: &[&ServiceInfo]) -> ServiceSummary {
-    let mut summary = ServiceSummary {
-        total: services.len(),
-        ..Default::default()
-    };
-
-    for svc in services {
-        match svc.r#type.as_str() {
-            "ClusterIP" => summary.cluster_ip += 1,
-            "NodePort" => summary.node_port += 1,
-            "LoadBalancer" => summary.load_balancer += 1,
-            "ExternalName" => summary.external_name += 1,
-            _ => {}
-        }
-    }
-
-    summary
-}
-
-pub fn service_summary_cards(
-    services: &[&ServiceInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> Vec<ServiceMetricCard> {
-    let summary = compute_service_summary(services);
-    let pct = |count: usize, total: usize| -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 / total as f64) * 100.0
-        }
-    };
-
-    let total_subtitle = if !namespaces.is_all_namespaces() {
-        format!("Scope: {}", namespaces.summary_label())
-    } else {
-        "All namespaces".to_string()
-    };
-
-    vec![
-        ServiceMetricCard {
-            title: "Total Services",
-            primary_value: summary.total.to_string(),
-            subtitle: total_subtitle,
-            accent_color: theme.k8s_color(K8sResourceKind::Service),
-        },
-        ServiceMetricCard {
-            title: "ClusterIP",
-            primary_value: summary.cluster_ip.to_string(),
-            subtitle: format!("{:.0}% of services", pct(summary.cluster_ip, summary.total)),
-            accent_color: theme.semantic.info.solid,
-        },
-        ServiceMetricCard {
-            title: "LoadBalancer",
-            primary_value: summary.load_balancer.to_string(),
-            subtitle: format!(
-                "{:.0}% of services",
-                pct(summary.load_balancer, summary.total)
-            ),
-            accent_color: theme.semantic.success.solid,
-        },
-        ServiceMetricCard {
-            title: "NodePort / Ext",
-            primary_value: (summary.node_port + summary.external_name).to_string(),
-            subtitle: format!(
-                "{} NodePort · {} ExternalName",
-                summary.node_port, summary.external_name
-            ),
-            accent_color: theme.semantic.warning.solid,
-        },
-    ]
 }
 
 pub fn services_empty_message(state: &ServicesState) -> &'static str {
@@ -423,53 +332,6 @@ fn render_service_cell(
     }
 }
 
-fn render_summary_cards_row(
-    services: &[&ServiceInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> AnyElement {
-    let cards = service_summary_cards(services, namespaces, theme);
-    div()
-        .grid()
-        .grid_cols(4)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn build_service_context_menu_entries(
     svc: &ServiceInfo,
@@ -547,12 +409,6 @@ pub fn render_services_view(
         &state.table.filters,
         state.table.sort.as_ref(),
     );
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&filtered_refs, namespaces, theme));
     let filtered_rows: Rc<Vec<ServiceInfo>> =
         Rc::new(filtered_refs.into_iter().cloned().collect());
     let total_count = state.services.len();
@@ -610,8 +466,6 @@ pub fn render_services_view(
         }));
 
     let header = render_resource_view_header(
-        WorkspaceView::Services.label(),
-        WorkspaceView::Services.description(),
         count_label,
         Some(namespaces),
         if enhancements.is_some() {
@@ -722,7 +576,6 @@ pub fn render_services_view(
         .min_h(px(0.0))
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(mode == ServicesPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })

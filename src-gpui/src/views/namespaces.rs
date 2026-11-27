@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::NamespaceInfo;
@@ -16,7 +16,6 @@ use crate::components::{
     ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
     render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, NamespaceLoadStatus, NamespacesViewState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -30,23 +29,6 @@ pub const MAX_VISIBLE_LABELS: usize = 2;
 pub enum NamespacesPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NamespaceSummary {
-    pub total: usize,
-    pub active: usize,
-    pub terminating: usize,
-    pub system: usize,
-    pub user: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct NamespaceMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,80 +96,6 @@ pub fn sort_namespaces<'a>(
         rows.sort_by_key(|a| a.name.to_ascii_lowercase());
     }
     rows
-}
-
-pub fn compute_namespace_summary(namespaces: &[NamespaceInfo]) -> NamespaceSummary {
-    let total = namespaces.len();
-    let mut active = 0_usize;
-    let mut terminating = 0_usize;
-    let mut system = 0_usize;
-
-    for ns in namespaces {
-        if ns.status.eq_ignore_ascii_case("active") {
-            active += 1;
-        } else if ns.status.eq_ignore_ascii_case("terminating") {
-            terminating += 1;
-        }
-        if ns.is_system {
-            system += 1;
-        }
-    }
-
-    let user = total.saturating_sub(system);
-
-    NamespaceSummary {
-        total,
-        active,
-        terminating,
-        system,
-        user,
-    }
-}
-
-pub fn namespace_summary_cards(
-    namespaces: &[NamespaceInfo],
-    theme: &OrbitTheme,
-) -> [NamespaceMetricCard; 3] {
-    let summary = compute_namespace_summary(namespaces);
-    let active_pct = (summary.active.min(summary.total) * 100)
-        .checked_div(summary.total)
-        .unwrap_or(0);
-    let system_pct = (summary.system.min(summary.total) * 100)
-        .checked_div(summary.total)
-        .unwrap_or(0);
-
-    let total_subtitle = if summary.terminating > 0 {
-        format!("{} user • {} terminating", summary.user, summary.terminating)
-    } else {
-        format!("{} user namespaces", summary.user)
-    };
-
-    let active_subtitle = if summary.terminating > 0 {
-        format!("{active_pct}% active • {} terminating", summary.terminating)
-    } else {
-        format!("{active_pct}% active")
-    };
-
-    [
-        NamespaceMetricCard {
-            title: "Total Namespaces",
-            primary_value: summary.total.to_string(),
-            subtitle: total_subtitle,
-            accent_color: theme.accent.accent,
-        },
-        NamespaceMetricCard {
-            title: "Active",
-            primary_value: summary.active.to_string(),
-            subtitle: active_subtitle,
-            accent_color: theme.semantic.success.solid,
-        },
-        NamespaceMetricCard {
-            title: "System",
-            primary_value: summary.system.to_string(),
-            subtitle: format!("{system_pct}% system • {} user", summary.user),
-            accent_color: theme.semantic.info.solid,
-        },
-    ]
 }
 
 pub fn namespaces_empty_message(_state: &NamespaceFilterState) -> &'static str {
@@ -288,49 +196,6 @@ fn render_namespace_cell(
     }
 }
 
-fn render_summary_cards_row(namespaces: &[NamespaceInfo], theme: &OrbitTheme) -> AnyElement {
-    let cards = namespace_summary_cards(namespaces, theme);
-    div()
-        .grid()
-        .grid_cols(3)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
-}
-
 pub fn build_namespace_context_menu_entries(
     _ns: &NamespaceInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -400,21 +265,7 @@ pub fn render_namespaces_view(
     let is_loading = state.status == NamespaceLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let header = render_resource_view_header(
-        WorkspaceView::Namespaces.label(),
-        WorkspaceView::Namespaces.description(),
-        format!("{total_count} namespaces"),
-        None,
-        None,
-        theme,
-    );
-
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&state.namespaces, theme));
+    let header = render_resource_view_header(format!("{total_count} namespaces"), None, None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -491,7 +342,6 @@ pub fn render_namespaces_view(
         .min_h(px(0.0))
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(
             namespaces_presentation_mode(state) == NamespacesPresentationMode::Table,
             |el| el.when_some(error_banner, |inner, banner| inner.child(banner)),
@@ -562,14 +412,11 @@ pub fn render_namespace_drawer_overview(ns: &NamespaceInfo, theme: &OrbitTheme) 
 mod tests {
     use std::collections::BTreeMap;
 
-    use gpui::WindowAppearance;
-    use orbit_core::config::OrbitConfig;
     use orbit_core::kubernetes::models::NamespaceInfo;
 
     use super::*;
     use crate::components::data_table::{ColumnAlign, SortDirection, SortState};
     use crate::state::{NamespaceFilterState, NamespaceLoadStatus};
-    use crate::theme::OrbitTheme;
 
     fn sample_ns(
         name: &str,
@@ -704,42 +551,6 @@ mod tests {
         let summary_four = format_labels_summary(&four);
         assert_eq!(summary_four.visible, vec!["a=1", "b=2"]);
         assert_eq!(summary_four.extra, 2);
-    }
-
-    #[test]
-    fn test_compute_namespace_summary_and_cards_cover_total_active_and_system() {
-        let namespaces = vec![
-            sample_ns("default", "Active", true, "10d", &[]),
-            sample_ns("kube-system", "Active", true, "10d", &[]),
-            sample_ns("payments", "Active", false, "5d", &[]),
-            sample_ns("old-ns", "Terminating", false, "1h", &[]),
-        ];
-
-        let summary = compute_namespace_summary(&namespaces);
-        assert_eq!(summary.total, 4);
-        assert_eq!(summary.active, 3);
-        assert_eq!(summary.terminating, 1);
-        assert_eq!(summary.system, 2);
-        assert_eq!(summary.user, 2);
-
-        for appearance in [WindowAppearance::Dark, WindowAppearance::Light] {
-            let theme = OrbitTheme::from_config(&OrbitConfig::default(), appearance);
-            let cards = namespace_summary_cards(&namespaces, &theme);
-            assert_eq!(cards[0].title, "Total Namespaces");
-            assert_eq!(cards[0].primary_value, "4");
-            assert_eq!(cards[0].subtitle, "2 user • 1 terminating");
-            assert_eq!(cards[0].accent_color, theme.accent.accent);
-
-            assert_eq!(cards[1].title, "Active");
-            assert_eq!(cards[1].primary_value, "3");
-            assert_eq!(cards[1].subtitle, "75% active • 1 terminating");
-            assert_eq!(cards[1].accent_color, theme.semantic.success.solid);
-
-            assert_eq!(cards[2].title, "System");
-            assert_eq!(cards[2].primary_value, "2");
-            assert_eq!(cards[2].subtitle, "50% system • 2 user");
-            assert_eq!(cards[2].accent_color, theme.semantic.info.solid);
-        }
     }
 
     #[test]

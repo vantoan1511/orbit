@@ -2,12 +2,11 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::NodeInfo;
-use orbit_core::kubernetes::nodes::format_decimal;
 
 use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
@@ -16,9 +15,8 @@ use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge,
     render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{NodesLoadStatus, NodesState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
     parse_age_seconds, render_resource_error_banner, render_resource_error_state,
     render_resource_view_header, render_truncated_cell,
@@ -28,30 +26,6 @@ use crate::views::{
 pub enum NodesPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct NodeSummary {
-    pub total: usize,
-    pub ready: usize,
-    pub not_ready: usize,
-    pub cordoned: usize,
-    pub control_plane: usize,
-    pub workers: usize,
-    pub cpu_used_cores: f64,
-    pub cpu_total_cores: f64,
-    pub cpu_pct: f64,
-    pub mem_used_gib: f64,
-    pub mem_total_gib: f64,
-    pub mem_pct: f64,
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 pub fn node_columns() -> Vec<TableColumn> {
@@ -128,121 +102,6 @@ pub fn sort_nodes<'a>(nodes: &'a [NodeInfo], sort: Option<&SortState>) -> Vec<&'
         rows.sort_by_key(|a| a.name.to_ascii_lowercase());
     }
     rows
-}
-
-pub fn compute_node_summary(nodes: &[NodeInfo]) -> NodeSummary {
-    let total = nodes.len();
-    let mut ready = 0_usize;
-    let mut not_ready = 0_usize;
-    let mut cordoned = 0_usize;
-    let mut control_plane = 0_usize;
-    let mut workers = 0_usize;
-    let mut cpu_used_cores = 0.0_f64;
-    let mut cpu_total_cores = 0.0_f64;
-    let mut mem_used_gib = 0.0_f64;
-    let mut mem_total_gib = 0.0_f64;
-
-    for node in nodes {
-        if node.status.eq_ignore_ascii_case("ready") {
-            ready += 1;
-        } else {
-            not_ready += 1;
-        }
-        if node.is_cordoned {
-            cordoned += 1;
-        }
-        if node.role.eq_ignore_ascii_case("control-plane") {
-            control_plane += 1;
-        } else {
-            workers += 1;
-        }
-
-        cpu_used_cores += node.cpu_used.trim().parse::<f64>().unwrap_or(0.0);
-        cpu_total_cores += node.cpu_total.trim().parse::<f64>().unwrap_or(0.0);
-        mem_used_gib += node.mem_used.trim().parse::<f64>().unwrap_or(0.0);
-        mem_total_gib += node.mem_total.trim().parse::<f64>().unwrap_or(0.0);
-    }
-
-    let cpu_pct = if cpu_total_cores > 0.0 {
-        ((cpu_used_cores / cpu_total_cores) * 1000.0).round() / 10.0
-    } else {
-        0.0
-    };
-    let mem_pct = if mem_total_gib > 0.0 {
-        ((mem_used_gib / mem_total_gib) * 1000.0).round() / 10.0
-    } else {
-        0.0
-    };
-
-    NodeSummary {
-        total,
-        ready,
-        not_ready,
-        cordoned,
-        control_plane,
-        workers,
-        cpu_used_cores,
-        cpu_total_cores,
-        cpu_pct,
-        mem_used_gib,
-        mem_total_gib,
-        mem_pct,
-    }
-}
-
-pub fn node_summary_cards(nodes: &[NodeInfo], theme: &OrbitTheme) -> [NodeMetricCard; 4] {
-    let summary = compute_node_summary(nodes);
-    let ready_pct = (summary.ready.min(summary.total) * 100)
-        .checked_div(summary.total)
-        .unwrap_or(0);
-
-    let attention_count = summary.cordoned + summary.not_ready;
-    let attention_color = if summary.not_ready > 0 {
-        theme.semantic.danger.solid
-    } else if summary.cordoned > 0 {
-        theme.semantic.warning.solid
-    } else {
-        theme.text.muted
-    };
-
-    [
-        NodeMetricCard {
-            title: "Total Nodes",
-            primary_value: summary.total.to_string(),
-            subtitle: format!(
-                "{} control-plane • {} worker",
-                summary.control_plane, summary.workers
-            ),
-            accent_color: theme.k8s_color(K8sResourceKind::Node),
-        },
-        NodeMetricCard {
-            title: "Ready Nodes",
-            primary_value: summary.ready.to_string(),
-            subtitle: format!("{ready_pct}% online"),
-            accent_color: theme.semantic.success.solid,
-        },
-        NodeMetricCard {
-            title: "Cordoned / NotReady",
-            primary_value: attention_count.to_string(),
-            subtitle: format!(
-                "{} cordoned • {} not ready",
-                summary.cordoned, summary.not_ready
-            ),
-            accent_color: attention_color,
-        },
-        NodeMetricCard {
-            title: "Resource Allocation",
-            primary_value: format!("{:.1}% / {:.1}%", summary.cpu_pct, summary.mem_pct),
-            subtitle: format!(
-                "{} / {}C • {} / {}G",
-                format_decimal(summary.cpu_used_cores, 2),
-                format_decimal(summary.cpu_total_cores, 0),
-                format_decimal(summary.mem_used_gib, 2),
-                format_decimal(summary.mem_total_gib, 0),
-            ),
-            accent_color: theme.accent.accent,
-        },
-    ]
 }
 
 pub fn nodes_empty_message(_state: &NodesState) -> &'static str {
@@ -342,49 +201,6 @@ fn render_node_cell(
     }
 }
 
-fn render_summary_cards_row(nodes: &[NodeInfo], theme: &OrbitTheme) -> AnyElement {
-    let cards = node_summary_cards(nodes, theme);
-    div()
-        .grid()
-        .grid_cols(4)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
-}
-
 pub fn build_node_context_menu_entries(
     _node: &NodeInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -447,21 +263,7 @@ pub fn render_nodes_view(
     let is_loading = state.status == NodesLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
-    let header = render_resource_view_header(
-        WorkspaceView::Nodes.label(),
-        WorkspaceView::Nodes.description(),
-        format!("{total_count} nodes"),
-        None,
-        None,
-        theme,
-    );
-
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&state.nodes, theme));
+    let header = render_resource_view_header(format!("{total_count} nodes"), None, None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -538,7 +340,6 @@ pub fn render_nodes_view(
         .min_h(px(0.0))
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(
             nodes_presentation_mode(state) == NodesPresentationMode::Table,
             |el| el.when_some(error_banner, |inner, banner| inner.child(banner)),
@@ -857,10 +658,8 @@ pub fn render_node_drawer_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::WindowAppearance;
 
     use crate::components::data_table::{ColumnAlign, SortDirection};
-    use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
 
     #[allow(clippy::too_many_arguments)]
     fn make_node(
@@ -1050,107 +849,6 @@ mod tests {
             by_role_asc.iter().map(|n| n.name.as_str()).collect::<Vec<_>>(),
             vec!["node-a", "node-b", "node-c"]
         );
-    }
-
-    #[test]
-    fn test_compute_node_summary_and_cards_cover_total_ready_cordoned_and_not_ready() {
-        let nodes = vec![
-            make_node(
-                "node-1",
-                "Ready",
-                "control-plane",
-                "v1.30.2",
-                false,
-                25.0,
-                "2",
-                "8",
-                50.0,
-                "16",
-                "32",
-                20,
-                110,
-                "5d",
-            ),
-            make_node(
-                "node-2",
-                "Ready",
-                "worker",
-                "v1.30.2",
-                true,
-                50.0,
-                "4",
-                "8",
-                25.0,
-                "8",
-                "32",
-                30,
-                110,
-                "3d",
-            ),
-            make_node(
-                "node-3",
-                "NotReady",
-                "worker",
-                "v1.30.2",
-                false,
-                0.0,
-                "0",
-                "4",
-                0.0,
-                "0",
-                "16",
-                0,
-                110,
-                "1d",
-            ),
-        ];
-
-        let summary = compute_node_summary(&nodes);
-        assert_eq!(summary.total, 3);
-        assert_eq!(summary.ready, 2);
-        assert_eq!(summary.not_ready, 1);
-        assert_eq!(summary.cordoned, 1);
-        assert_eq!(summary.control_plane, 1);
-        assert_eq!(summary.workers, 2);
-        assert_eq!(summary.cpu_used_cores, 6.0);
-        assert_eq!(summary.cpu_total_cores, 20.0);
-        assert_eq!(summary.cpu_pct, 30.0);
-        assert_eq!(summary.mem_used_gib, 24.0);
-        assert_eq!(summary.mem_total_gib, 80.0);
-        assert_eq!(summary.mem_pct, 30.0);
-
-        for (mode, appearance) in [
-            (ThemeMode::Dark, WindowAppearance::Dark),
-            (ThemeMode::Light, WindowAppearance::Light),
-        ] {
-            let theme = OrbitTheme::resolve(
-                mode,
-                UiStyle::Flat,
-                AccentColor::Blue,
-                SemanticColorsPreference::default(),
-                appearance,
-            );
-            let cards = node_summary_cards(&nodes, &theme);
-            assert_eq!(cards[0].title, "Total Nodes");
-            assert_eq!(cards[0].primary_value, "3");
-            assert_eq!(cards[0].subtitle, "1 control-plane • 2 worker");
-            assert_eq!(cards[0].accent_color, theme.k8s_color(K8sResourceKind::Node));
-
-            assert_eq!(cards[1].title, "Ready Nodes");
-            assert_eq!(cards[1].primary_value, "2");
-            assert_eq!(cards[1].subtitle, "66% online");
-            assert_eq!(cards[1].accent_color, theme.semantic.success.solid);
-
-            assert_eq!(cards[2].title, "Cordoned / NotReady");
-            assert_eq!(cards[2].primary_value, "2");
-            assert_eq!(cards[2].subtitle, "1 cordoned • 1 not ready");
-            assert_eq!(cards[2].accent_color, theme.semantic.danger.solid);
-
-            assert_eq!(cards[3].title, "Resource Allocation");
-            assert_eq!(cards[3].primary_value, "30.0% / 30.0%");
-            assert_eq!(cards[3].subtitle, "6 / 20C • 24 / 80G");
-            assert_eq!(cards[3].accent_color, theme.accent.accent);
-        }
     }
 
     #[test]

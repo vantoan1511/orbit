@@ -14,7 +14,6 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{
     NamespaceFilterState, ResourceQuotaKindFilter, ResourceQuotasLoadStatus, ResourceQuotasState,
 };
@@ -391,8 +390,6 @@ pub fn render_resource_quotas_view(
     );
 
     let header = render_resource_view_header(
-        WorkspaceView::ResourceQuotas.label(),
-        WorkspaceView::ResourceQuotas.description(),
         count_label,
         Some(namespaces),
         Some(kind_chips.into_any_element()),

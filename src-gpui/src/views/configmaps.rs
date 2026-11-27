@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::configmaps::{format_size, parse_size_bytes};
@@ -16,9 +16,8 @@ use crate::components::{
     ContextMenuEntry, ContextMenuItem, SemanticStatus, StatusBadgeVariant, render_status_badge,
     render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{ConfigMapsLoadStatus, ConfigMapsState, NamespaceFilterState};
-use crate::theme::{K8sResourceKind, OrbitTheme, apply_text_step};
+use crate::theme::{OrbitTheme, apply_text_step};
 pub use crate::views::{
     nonzero_metric_text_color, parse_age_seconds, render_action_button,
     render_resource_error_banner, render_resource_error_state, render_resource_view_header,
@@ -29,22 +28,6 @@ pub use crate::views::{
 pub enum ConfigMapsPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct ConfigMapSummary {
-    pub total: usize,
-    pub total_bytes: u64,
-    pub mounted: usize,
-    pub orphaned: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct ConfigMapMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 pub fn configmap_columns() -> Vec<TableColumn> {
@@ -116,72 +99,6 @@ pub fn filter_and_sort_configmaps<'a>(
         compare_configmaps_by_col(a, b, col_id)
     });
     rows
-}
-
-pub fn compute_configmap_summary(configmaps: &[&ConfigMapInfo]) -> ConfigMapSummary {
-    let mut summary = ConfigMapSummary {
-        total: configmaps.len(),
-        ..Default::default()
-    };
-
-    for cm in configmaps {
-        summary.total_bytes = summary.total_bytes.saturating_add(parse_size_bytes(&cm.size));
-        if cm.mounted_pods > 0 {
-            summary.mounted += 1;
-        } else {
-            summary.orphaned += 1;
-        }
-    }
-
-    summary
-}
-
-pub fn configmap_summary_cards(
-    configmaps: &[&ConfigMapInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> Vec<ConfigMapMetricCard> {
-    let summary = compute_configmap_summary(configmaps);
-    let pct = |count: usize, total: usize| -> f64 {
-        if total == 0 {
-            0.0
-        } else {
-            (count as f64 / total as f64) * 100.0
-        }
-    };
-
-    let total_subtitle = if !namespaces.is_all_namespaces() {
-        format!("Scope: {}", namespaces.summary_label())
-    } else {
-        "All namespaces".to_string()
-    };
-
-    vec![
-        ConfigMapMetricCard {
-            title: "Total ConfigMaps",
-            primary_value: summary.total.to_string(),
-            subtitle: total_subtitle,
-            accent_color: theme.k8s_color(K8sResourceKind::ConfigMap),
-        },
-        ConfigMapMetricCard {
-            title: "Total Size",
-            primary_value: format_size(summary.total_bytes as usize),
-            subtitle: "Total data footprint".to_string(),
-            accent_color: theme.semantic.info.solid,
-        },
-        ConfigMapMetricCard {
-            title: "Mounted in Pods",
-            primary_value: summary.mounted.to_string(),
-            subtitle: format!("{:.0}% of configmaps", pct(summary.mounted, summary.total)),
-            accent_color: theme.semantic.success.solid,
-        },
-        ConfigMapMetricCard {
-            title: "Orphaned",
-            primary_value: summary.orphaned.to_string(),
-            subtitle: "Not referenced".to_string(),
-            accent_color: theme.semantic.warning.solid,
-        },
-    ]
 }
 
 pub fn configmaps_empty_message(state: &ConfigMapsState) -> &'static str {
@@ -275,53 +192,6 @@ fn render_configmap_cell(
     }
 }
 
-fn render_summary_cards_row(
-    configmaps: &[&ConfigMapInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> AnyElement {
-    let cards = configmap_summary_cards(configmaps, namespaces, theme);
-    div()
-        .grid()
-        .grid_cols(4)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
-}
-
 pub fn build_configmap_context_menu_entries(
     cm: &ConfigMapInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -388,12 +258,6 @@ pub fn render_configmaps_view(
         namespaces,
         state.table.sort.as_ref(),
     );
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&filtered_refs, namespaces, theme));
     let filtered_rows: Rc<Vec<ConfigMapInfo>> =
         Rc::new(filtered_refs.into_iter().cloned().collect());
     let total_count = state.configmaps.len();
@@ -407,14 +271,7 @@ pub fn render_configmaps_view(
         format!("{visible_count} of {total_count} configmaps")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::ConfigMaps.label(),
-        WorkspaceView::ConfigMaps.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -492,7 +349,6 @@ pub fn render_configmaps_view(
         .min_h(px(0.0))
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(mode == ConfigMapsPresentationMode::Table, |el| {
             el.when_some(error_banner, |el, banner| el.child(banner))
         })
@@ -875,67 +731,6 @@ mod tests {
             by_age.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
             vec!["small-cm", "mid-cm", "large-cm"]
         );
-    }
-
-    #[test]
-    fn test_configmap_summary_cards_scope_to_filtered_namespace() {
-        let cms = vec![
-            make_configmap("cm-1", "prod", 2, "512 B", 2, false, "1h"),
-            make_configmap("cm-2", "prod", 3, "1.5 KiB", 0, true, "2h"),
-            make_configmap("cm-3", "dev", 1, "4.0 MiB", 1, false, "3h"),
-        ];
-        let mut ns = NamespaceFilterState::default();
-        ns.begin_load_for_cluster("ctx-a");
-        ns.apply_loaded(
-            "ctx-a",
-            1,
-            vec![
-                orbit_core::kubernetes::models::NamespaceInfo {
-                    name: "prod".to_string(),
-                    status: "Active".to_string(),
-                    age: "1d".to_string(),
-                    is_system: false,
-                    labels: BTreeMap::new(),
-                    annotations: BTreeMap::new(),
-                    uid: "ns-prod".to_string(),
-                    created: String::new(),
-                },
-                orbit_core::kubernetes::models::NamespaceInfo {
-                    name: "dev".to_string(),
-                    status: "Active".to_string(),
-                    age: "1d".to_string(),
-                    is_system: false,
-                    labels: BTreeMap::new(),
-                    annotations: BTreeMap::new(),
-                    uid: "ns-dev".to_string(),
-                    created: String::new(),
-                },
-            ],
-        );
-        ns.toggle_namespace("prod");
-
-        let filtered = filter_and_sort_configmaps(&cms, &ns, None);
-        let theme = OrbitTheme::from_config(
-            &orbit_core::config::OrbitConfig::default(),
-            gpui::WindowAppearance::Dark,
-        );
-        let cards = configmap_summary_cards(&filtered, &ns, &theme);
-
-        assert_eq!(cards.len(), 4);
-        assert_eq!(cards[0].title, "Total ConfigMaps");
-        assert_eq!(cards[0].primary_value, "2");
-        assert_eq!(cards[0].subtitle, "Scope: prod");
-
-        assert_eq!(cards[1].title, "Total Size");
-        assert_eq!(cards[1].primary_value, "2.0 KiB");
-
-        assert_eq!(cards[2].title, "Mounted in Pods");
-        assert_eq!(cards[2].primary_value, "1");
-        assert_eq!(cards[2].subtitle, "50% of configmaps");
-
-        assert_eq!(cards[3].title, "Orphaned");
-        assert_eq!(cards[3].primary_value, "1");
-        assert_eq!(cards[3].subtitle, "Not referenced");
     }
 
     #[test]

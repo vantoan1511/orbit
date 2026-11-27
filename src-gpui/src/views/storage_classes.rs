@@ -12,7 +12,6 @@ use crate::components::data_table::{
     DataTableCallbacks, SortState, TableColumn, render_data_table, sort_rows_stable,
 };
 use crate::components::{ContextMenuEntry, ContextMenuItem};
-use crate::navigation::WorkspaceView;
 use crate::state::{StorageClassesLoadStatus, StorageClassesState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -266,14 +265,7 @@ pub fn render_storage_classes_view(
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = format!("{total_count} storage classes");
-    let header = render_resource_view_header(
-        WorkspaceView::StorageClasses.label(),
-        WorkspaceView::StorageClasses.description(),
-        count_label,
-        None,
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, None, None, theme);
 
     let error_banner = if presentation_mode == StorageClassesPresentationMode::Table {
         state.error_message.as_ref().map(|message| {

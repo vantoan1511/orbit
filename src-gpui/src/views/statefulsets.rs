@@ -14,7 +14,6 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{NamespaceFilterState, StatefulSetsLoadStatus, StatefulSetsState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -280,14 +279,7 @@ pub fn render_statefulsets_view(
         format!("{visible_count} of {total_count} statefulsets")
     };
 
-    let header = render_resource_view_header(
-        WorkspaceView::StatefulSets.label(),
-        WorkspaceView::StatefulSets.description(),
-        count_label,
-        Some(namespaces),
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), None, theme);
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(

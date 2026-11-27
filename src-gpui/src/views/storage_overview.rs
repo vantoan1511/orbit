@@ -24,14 +24,6 @@ pub enum StorageOverviewPresentationMode {
     Summary,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct StorageMetricTile {
-    pub label: &'static str,
-    pub value: String,
-    pub subtitle: String,
-    pub accent_color: Option<Rgba>,
-}
-
 #[derive(Debug, Clone)]
 pub struct StorageResourceCard {
     pub title: &'static str,
@@ -98,57 +90,6 @@ pub fn aggregate_storage_status(
     } else {
         ("No Storage", SemanticStatus::Neutral)
     }
-}
-
-pub fn storage_metric_tiles(
-    snapshot: &StorageOverviewSnapshot,
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> [StorageMetricTile; 5] {
-    let pv = snapshot.pv_status_counts();
-    let pvc = snapshot.pvc_status_counts_for_namespaces(namespaces.active_selection());
-    let cap = snapshot.capacity_summary();
-    let sc_total = snapshot.storage_classes.items.len();
-    let sc_expandable = snapshot.storage_classes_expandable_count();
-
-    [
-        StorageMetricTile {
-            label: "Total Capacity",
-            value: format_storage_gib(cap.total_gib),
-            subtitle: format!("{} Total Volumes", pv.total),
-            accent_color: None,
-        },
-        StorageMetricTile {
-            label: "Bound Capacity",
-            value: format_storage_gib(cap.bound_gib),
-            subtitle: format!("{}% of cluster total", cap.bound_pct),
-            accent_color: Some(theme.semantic.success.solid),
-        },
-        StorageMetricTile {
-            label: "Available Capacity",
-            value: format_storage_gib(cap.available_gib),
-            subtitle: format!("{}% remaining", cap.available_pct),
-            accent_color: Some(theme.accent.accent),
-        },
-        StorageMetricTile {
-            label: "Volume Claims",
-            value: pvc.total.to_string(),
-            subtitle: format!("{} Bound · {} Pending", pvc.bound, pvc.pending),
-            accent_color: if pvc.lost > 0 {
-                Some(theme.semantic.danger.solid)
-            } else if pvc.pending > 0 {
-                Some(theme.semantic.warning.solid)
-            } else {
-                None
-            },
-        },
-        StorageMetricTile {
-            label: "Storage Classes",
-            value: sc_total.to_string(),
-            subtitle: format!("{sc_expandable} expandable"),
-            accent_color: None,
-        },
-    ]
 }
 
 pub fn storage_resource_cards(
@@ -459,41 +400,8 @@ fn render_summary_body(
     theme: &OrbitTheme,
     on_navigate: NavigateCallback,
 ) -> AnyElement {
-    let tiles = storage_metric_tiles(snapshot, namespaces, theme);
     let cards = storage_resource_cards(snapshot, namespaces);
     let breakdown = snapshot.storage_class_capacity_breakdown();
-
-    let kpi_strip = div()
-        .w_full()
-        .grid()
-        .grid_cols(5)
-        .gap_3()
-        .children(tiles.into_iter().map(|tile| {
-            theme
-                .style_card(div())
-                .p_3()
-                .bg(theme.surface.bg_card)
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.muted)
-                        .child(tile.label),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::BOLD))
-                        .text_color(tile.accent_color.unwrap_or(theme.text.primary))
-                        .child(tile.value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_2xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(tile.subtitle),
-                )
-        }));
 
     let resource_cards_grid = div()
         .w_full()
@@ -511,7 +419,6 @@ fn render_summary_body(
         .flex()
         .flex_col()
         .gap_4()
-        .child(kpi_strip)
         .child(resource_cards_grid)
         .child(breakdown_panel)
         .into_any_element()
@@ -932,7 +839,6 @@ fn render_error_state(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::{AccentColor, SemanticColorsPreference, ThemeMode, UiStyle};
     use orbit_core::kubernetes::models::{
         PersistentVolumeClaimInfo, PersistentVolumeInfo, StorageClassInfo,
     };
@@ -1086,38 +992,5 @@ mod tests {
         assert_eq!(cards[0].total, 2, "PVs remain cluster-scoped");
         assert_eq!(cards[1].total, 1, "PVCs filtered to prod");
         assert_eq!(cards[2].total, 1, "StorageClasses remain cluster-scoped");
-    }
-
-    #[test]
-    fn test_storage_metrics_strip_and_class_breakdown_values() {
-        let theme = OrbitTheme::resolve(
-            ThemeMode::Dark,
-            UiStyle::Flat,
-            AccentColor::Blue,
-            SemanticColorsPreference::default(),
-            gpui::WindowAppearance::Dark,
-        );
-        let ns = NamespaceFilterState::default();
-        let snap = build_storage_overview_snapshot(
-            Ok(vec![
-                sample_pv("pv-1", "10Gi", "Bound", "gp3"),
-                sample_pv("pv-2", "30Gi", "Available", "standard"),
-            ]),
-            Ok(vec![sample_pvc("pvc-1", "prod", "Bound")]),
-            Ok(vec![
-                sample_sc("gp3", "ebs.csi.aws.com", true),
-                sample_sc("standard", "kubernetes.io/aws-ebs", false),
-            ]),
-        );
-
-        let tiles = storage_metric_tiles(&snap, &ns, &theme);
-        assert_eq!(tiles[0].value, "40.0 GiB");
-        assert_eq!(tiles[1].value, "10.0 GiB");
-        assert_eq!(tiles[1].subtitle, "25% of cluster total");
-        assert_eq!(tiles[2].value, "30.0 GiB");
-        assert_eq!(tiles[2].subtitle, "75% remaining");
-        assert_eq!(tiles[3].value, "1");
-        assert_eq!(tiles[4].value, "2");
-        assert_eq!(tiles[4].subtitle, "1 expandable");
     }
 }

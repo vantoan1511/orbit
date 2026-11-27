@@ -16,7 +16,6 @@ use crate::components::{
     parse_k8s_resource_kind, render_status_badge,
 };
 use crate::icons::render_icon;
-use crate::navigation::WorkspaceView;
 use crate::state::{
     NamespaceFilterState, PortForwardKindFilter, PortForwardsLoadStatus, PortForwardsState,
 };
@@ -214,14 +213,7 @@ pub fn render_port_forward_view(
         &callbacks,
     );
 
-    let header = render_resource_view_header(
-        WorkspaceView::PortForward.label(),
-        WorkspaceView::PortForward.description(),
-        count_label,
-        Some(namespaces),
-        Some(toolbar),
-        theme,
-    );
+    let header = render_resource_view_header(count_label, Some(namespaces), Some(toolbar), theme);
 
     let on_refresh_rc = callbacks.on_refresh.clone();
     let error_banner = state.error_message.as_ref().map(|message| {

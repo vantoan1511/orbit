@@ -14,7 +14,6 @@ use crate::components::data_table::{
 use crate::components::{
     ContextMenuEntry, ContextMenuItem, StatusBadgeVariant, render_status_badge_from_str,
 };
-use crate::navigation::WorkspaceView;
 use crate::state::{AdmissionWebhooksLoadStatus, AdmissionWebhooksState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -266,14 +265,7 @@ pub fn render_admission_webhooks_view(
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);
 
     let count_label = format!("{total_count} admission webhooks");
-    let header = render_resource_view_header(
-        WorkspaceView::AdmissionWebhooks.label(),
-        WorkspaceView::AdmissionWebhooks.description(),
-        count_label,
-        None,
-        None,
-        theme,
-    );
+    let header = render_resource_view_header(count_label, None, None, theme);
 
     let error_banner = if presentation_mode == AdmissionWebhooksPresentationMode::Table {
         state.error_message.as_ref().map(|message| {

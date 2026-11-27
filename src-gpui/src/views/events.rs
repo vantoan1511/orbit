@@ -2,8 +2,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, Rgba, SharedString, Window,
-    div, prelude::*, px,
+    AnyElement, App, ClickEvent, ElementId, FontWeight, MouseDownEvent, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::EventInfo;
@@ -18,7 +18,6 @@ use crate::components::{
     render_status_badge_from_str, resource_kind_meta_from_str,
 };
 use crate::icons::render_icon;
-use crate::navigation::WorkspaceView;
 use crate::state::{EventTypeFilter, EventsLoadStatus, EventsState, NamespaceFilterState};
 use crate::theme::{OrbitTheme, apply_text_step};
 use crate::views::{
@@ -30,22 +29,6 @@ use crate::views::{
 pub enum EventsPresentationMode {
     Table,
     ErrorCard,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EventSummary {
-    pub total: usize,
-    pub normal: usize,
-    pub warning: usize,
-    pub other: usize,
-}
-
-#[derive(Debug, Clone)]
-pub struct EventMetricCard {
-    pub title: &'static str,
-    pub primary_value: String,
-    pub subtitle: String,
-    pub accent_color: Rgba,
 }
 
 pub fn event_columns() -> Vec<TableColumn> {
@@ -193,72 +176,6 @@ pub fn filter_and_sort_events_with_filters<'a>(
     rows
 }
 
-pub fn compute_event_summary(events: &[&EventInfo]) -> EventSummary {
-    let total = events.len();
-    let mut normal = 0_usize;
-    let mut warning = 0_usize;
-
-    for ev in events {
-        if ev.r#type.eq_ignore_ascii_case("normal") {
-            normal += 1;
-        } else if ev.r#type.eq_ignore_ascii_case("warning") {
-            warning += 1;
-        }
-    }
-
-    let other = total.saturating_sub(normal + warning);
-
-    EventSummary {
-        total,
-        normal,
-        warning,
-        other,
-    }
-}
-
-pub fn event_summary_cards(
-    events: &[&EventInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> [EventMetricCard; 3] {
-    let summary = compute_event_summary(events);
-    let normal_pct = (summary.normal.min(summary.total) * 100)
-        .checked_div(summary.total)
-        .unwrap_or(0);
-    let warning_pct = (summary.warning.min(summary.total) * 100)
-        .checked_div(summary.total)
-        .unwrap_or(0);
-
-    let total_subtitle = if summary.other > 0 {
-        format!("{} other type", summary.other)
-    } else if namespaces.is_all_namespaces() {
-        "All namespaces".to_string()
-    } else {
-        format!("Namespace: {}", namespaces.summary_label())
-    };
-
-    [
-        EventMetricCard {
-            title: "Total Events",
-            primary_value: summary.total.to_string(),
-            subtitle: total_subtitle,
-            accent_color: theme.accent.accent,
-        },
-        EventMetricCard {
-            title: "Normal",
-            primary_value: summary.normal.to_string(),
-            subtitle: format!("{normal_pct}% of events"),
-            accent_color: theme.semantic.success.solid,
-        },
-        EventMetricCard {
-            title: "Warning",
-            primary_value: summary.warning.to_string(),
-            subtitle: format!("{warning_pct}% of events"),
-            accent_color: theme.semantic.warning.solid,
-        },
-    ]
-}
-
 pub fn events_empty_message(state: &EventsState, _namespaces: &NamespaceFilterState) -> &'static str {
     if state.events.is_empty() {
         "No events found in this cluster."
@@ -383,53 +300,6 @@ fn render_event_cell(
             .into_any_element(),
         _ => div().into_any_element(),
     }
-}
-
-fn render_summary_cards_row(
-    events: &[&EventInfo],
-    namespaces: &NamespaceFilterState,
-    theme: &OrbitTheme,
-) -> AnyElement {
-    let cards = event_summary_cards(events, namespaces, theme);
-    div()
-        .grid()
-        .grid_cols(3)
-        .gap_3()
-        .flex_shrink_0()
-        .children(cards.into_iter().map(|card| {
-            theme
-                .style_card(div())
-                .p_3()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.text.muted)
-                                .child(card.title),
-                        )
-                        .child(div().w(px(6.0)).h(px(6.0)).rounded_full().bg(card.accent_color)),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_lg)
-                        .font(theme.typography.tabular_ui_font(FontWeight::SEMIBOLD))
-                        .text_color(theme.text.primary)
-                        .child(card.primary_value),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .truncate()
-                        .child(card.subtitle),
-                )
-        }))
-        .into_any_element()
 }
 
 fn render_type_filter_pills(
@@ -583,8 +453,6 @@ pub fn render_events_view(
     };
 
     let header = render_resource_view_header(
-        WorkspaceView::Events.label(),
-        WorkspaceView::Events.description(),
         count_label,
         Some(namespaces),
         if enhancements.is_some() {
@@ -608,13 +476,6 @@ pub fn render_events_view(
             TableFilterChipOption { value: "Warning", label: "Warning" },
         ],
     }];
-
-    let summary_row = div()
-        .w_full()
-        .px_4()
-        .pb_3()
-        .flex_shrink_0()
-        .child(render_summary_cards_row(&ns_filtered, namespaces, theme));
 
     let error_banner = state.error_message.as_ref().map(|message| {
         render_resource_error_banner(
@@ -702,7 +563,6 @@ pub fn render_events_view(
         .flex_col()
         .gap_0()
         .child(header)
-        .child(summary_row)
         .when(
             events_presentation_mode(state) == EventsPresentationMode::Table,
             |el| el.when_some(error_banner, |el, banner| el.child(banner)),
@@ -787,8 +647,6 @@ pub fn render_event_drawer_overview(event: &EventInfo, theme: &OrbitTheme) -> An
 mod tests {
     use super::*;
     use crate::components::data_table::{ColumnAlign, SortDirection};
-    use gpui::WindowAppearance;
-    use orbit_core::config::OrbitConfig;
 
     #[allow(clippy::too_many_arguments)]
     fn sample_event(
@@ -918,39 +776,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["BackOff", "Pulled", "Scheduled"]
         );
-    }
-
-    #[test]
-    fn test_compute_event_summary_counts_normal_warning_and_other() {
-        let events = [
-            sample_event("1", "Normal", "Scheduled", "Pod", "web-1", "default", 1, "1m"),
-            sample_event("2", "Normal", "Pulled", "Pod", "web-2", "default", 1, "2m"),
-            sample_event("3", "Warning", "BackOff", "Pod", "api-1", "default", 4, "3m"),
-            sample_event("4", "Custom", "Info", "Node", "node-1", "default", 1, "4m"),
-        ];
-        let refs: Vec<&EventInfo> = events.iter().collect();
-
-        let summary = compute_event_summary(&refs);
-        assert_eq!(
-            summary,
-            EventSummary {
-                total: 4,
-                normal: 2,
-                warning: 1,
-                other: 1,
-            }
-        );
-
-        let theme = OrbitTheme::from_config(&OrbitConfig::default(), WindowAppearance::Dark);
-        let cards = event_summary_cards(&refs, &NamespaceFilterState::default(), &theme);
-        assert_eq!(cards[0].title, "Total Events");
-        assert_eq!(cards[0].primary_value, "4");
-        assert_eq!(cards[1].title, "Normal");
-        assert_eq!(cards[1].primary_value, "2");
-        assert_eq!(cards[1].subtitle, "50% of events");
-        assert_eq!(cards[2].title, "Warning");
-        assert_eq!(cards[2].primary_value, "1");
-        assert_eq!(cards[2].subtitle, "25% of events");
     }
 
     #[test]
