@@ -1,13 +1,167 @@
 use std::rc::Rc;
 
-use gpui::{AnyElement, App, FontWeight, Window, WindowAppearance, div, prelude::*, px};
+use gpui::{
+    AnyElement, App, Corner, FontWeight, MouseButton, Window, WindowAppearance, anchored, deferred,
+    div, point, prelude::*, px,
+};
 use lucide_icons::Icon;
 
+use crate::components::TextTooltip;
+use crate::dropdown_chevron_icon;
 use crate::icons::render_icon;
 use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, palettes::resolve_accent_tokens,
 };
-use crate::views::{render_action_button, render_detail_row};
+use crate::views::render_action_button;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsDropdownKind {
+    ThemeMode,
+    UiStyle,
+}
+
+impl SettingsDropdownKind {
+    const fn option_count(self) -> usize {
+        match self {
+            Self::ThemeMode => ThemeMode::ALL.len(),
+            Self::UiStyle => UiStyle::ALL.len(),
+        }
+    }
+
+    const fn trigger_id(self) -> &'static str {
+        match self {
+            Self::ThemeMode => "settings-theme-mode-trigger",
+            Self::UiStyle => "settings-ui-style-trigger",
+        }
+    }
+
+    const fn menu_id(self) -> &'static str {
+        match self {
+            Self::ThemeMode => "settings-theme-mode-menu",
+            Self::UiStyle => "settings-ui-style-menu",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsDropdownKeyAction {
+    Ignored,
+    Navigated,
+    Closed,
+    SelectThemeMode(ThemeMode),
+    SelectUiStyle(UiStyle),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct SettingsDropdownState {
+    pub open: Option<SettingsDropdownKind>,
+    pub highlighted_index: usize,
+}
+
+impl SettingsDropdownState {
+    pub fn is_open(&self, kind: SettingsDropdownKind) -> bool {
+        self.open == Some(kind)
+    }
+
+    pub fn is_any_open(&self) -> bool {
+        self.open.is_some()
+    }
+
+    pub fn toggle(&mut self, kind: SettingsDropdownKind, current_index: usize) {
+        if self.open == Some(kind) {
+            self.close();
+        } else {
+            let max_idx = kind.option_count().saturating_sub(1);
+            self.open = Some(kind);
+            self.highlighted_index = current_index.min(max_idx);
+        }
+    }
+
+    pub fn close(&mut self) {
+        self.open = None;
+    }
+
+    pub fn set_highlight(&mut self, index: usize) {
+        if let Some(kind) = self.open
+            && index < kind.option_count()
+        {
+            self.highlighted_index = index;
+        }
+    }
+
+    pub fn move_highlight(&mut self, delta: isize) {
+        let Some(kind) = self.open else {
+            return;
+        };
+        let len = kind.option_count() as isize;
+        if len <= 0 {
+            return;
+        }
+        let next = (self.highlighted_index as isize + delta).rem_euclid(len);
+        self.highlighted_index = next as usize;
+    }
+
+    pub fn handle_key(&mut self, key: &str) -> SettingsDropdownKeyAction {
+        let Some(kind) = self.open else {
+            return SettingsDropdownKeyAction::Ignored;
+        };
+        match key {
+            "escape" => {
+                self.close();
+                SettingsDropdownKeyAction::Closed
+            }
+            "down" | "arrowdown" => {
+                self.move_highlight(1);
+                SettingsDropdownKeyAction::Navigated
+            }
+            "up" | "arrowup" => {
+                self.move_highlight(-1);
+                SettingsDropdownKeyAction::Navigated
+            }
+            "enter" | "return" => {
+                let idx = self.highlighted_index;
+                self.close();
+                match kind {
+                    SettingsDropdownKind::ThemeMode => ThemeMode::ALL
+                        .get(idx)
+                        .copied()
+                        .map(SettingsDropdownKeyAction::SelectThemeMode)
+                        .unwrap_or(SettingsDropdownKeyAction::Closed),
+                    SettingsDropdownKind::UiStyle => UiStyle::ALL
+                        .get(idx)
+                        .copied()
+                        .map(SettingsDropdownKeyAction::SelectUiStyle)
+                        .unwrap_or(SettingsDropdownKeyAction::Closed),
+                }
+            }
+            _ => SettingsDropdownKeyAction::Ignored,
+        }
+    }
+}
+
+pub fn theme_mode_dropdown_label(mode: ThemeMode, resolved_system_is_dark: bool) -> String {
+    match mode {
+        ThemeMode::System => {
+            let resolved = if resolved_system_is_dark { "Dark" } else { "Light" };
+            format!("{} ({resolved})", mode.label())
+        }
+        _ => mode.label().to_string(),
+    }
+}
+
+pub fn theme_mode_index(mode: ThemeMode) -> usize {
+    ThemeMode::ALL
+        .iter()
+        .position(|&candidate| candidate == mode)
+        .unwrap_or(0)
+}
+
+pub fn ui_style_index(style: UiStyle) -> usize {
+    UiStyle::ALL
+        .iter()
+        .position(|&candidate| candidate == style)
+        .unwrap_or(0)
+}
 
 pub struct SettingsViewModel<'a> {
     pub theme: &'a OrbitTheme,
@@ -16,6 +170,7 @@ pub struct SettingsViewModel<'a> {
     pub config_file_path: Option<String>,
     pub sidebar_status: String,
     pub save_error: Option<&'a str>,
+    pub dropdown: &'a SettingsDropdownState,
 }
 
 pub type SettingsActionCallback = Rc<dyn Fn(&mut Window, &mut App)>;
@@ -27,6 +182,8 @@ pub struct SettingsCallbacks {
     pub on_select_accent_color: SettingsValueCallback<AccentColor>,
     pub on_toggle_experience_features: SettingsValueCallback<bool>,
     pub on_reset_appearance: SettingsActionCallback,
+    pub on_toggle_dropdown: SettingsValueCallback<SettingsDropdownKind>,
+    pub on_hover_dropdown_option: SettingsValueCallback<usize>,
 }
 
 pub fn is_appearance_modified(theme: &OrbitTheme) -> bool {
@@ -53,68 +210,97 @@ pub fn render_settings_view(
 ) -> AnyElement {
     let theme = model.theme;
     let modified = is_appearance_modified(theme);
+    let config_path = model
+        .config_file_path
+        .clone()
+        .unwrap_or_else(|| "~/.orbit/config.json".to_string());
 
     div()
-        .id("settings-scroll-container")
-        .flex_1()
+        .id("settings-view-root")
         .w_full()
-        .overflow_y_scroll()
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .gap_8()
-                .w_full()
-                .max_w(px(960.0))
-                .pb_8()
-                .child(render_settings_header(theme, modified, &callbacks.on_reset_appearance))
-                .when_some(model.save_error, |el, error_msg| {
-                    el.child(render_save_error_banner(theme, error_msg))
-                })
-                .child(render_two_column_section(
+        .flex()
+        .flex_col()
+        .gap_8()
+        .max_w(px(880.0))
+        .pb_8()
+        .child(render_settings_header(
+            theme,
+            modified,
+            &callbacks.on_reset_appearance,
+        ))
+        .when_some(model.save_error, |el, error_msg| {
+            el.child(render_save_error_banner(theme, error_msg))
+        })
+        .child(render_settings_section(
+            theme,
+            "APPEARANCE",
+            vec![
+                render_setting_row(
                     theme,
-                    "THEME MODE",
-                    "Color Appearance",
+                    "Theme Mode",
+                    None,
                     "Switch between dark noir, daylight, or follow your OS preference.",
-                    render_theme_mode_cards(
+                    render_theme_mode_dropdown(
                         theme,
                         model.resolved_system_is_dark,
-                        &callbacks.on_select_theme_mode,
+                        model.dropdown,
+                        callbacks,
                     ),
-                ))
-                .child(render_two_column_section(
+                ),
+                render_setting_row(
                     theme,
-                    "UI STYLE & AESTHETIC",
-                    "Surface Material",
+                    "UI Style",
+                    None,
                     "Select how panels, cards, and overlays render across the workspace.",
-                    render_ui_style_cards(theme, &callbacks.on_select_ui_style),
-                ))
-                .child(render_two_column_section(
+                    render_ui_style_dropdown(theme, model.dropdown, callbacks),
+                ),
+                render_setting_row(
                     theme,
-                    "ACCENT COLOR",
-                    "Interactive Focus",
+                    "Accent Color",
+                    None,
                     "Primary accent applied to active controls, selections, and focus rings.",
-                    render_accent_section(theme, &callbacks.on_select_accent_color),
-                ))
-                .child(render_two_column_section(
+                    render_accent_swatches(theme, &callbacks.on_select_accent_color),
+                ),
+            ],
+        ))
+        .child(render_settings_section(
+            theme,
+            "EXPERIENCE FEATURES",
+            vec![render_setting_row(
+                theme,
+                "Native GPUI Preview Shell",
+                Some(render_experience_status_badge(
                     theme,
-                    "EXPERIENCE FEATURES",
-                    "Preview Shell",
-                    "Enable experimental experience features such as the native GPUI preview shell.",
-                    render_experience_section(
-                        theme,
-                        model.enable_experience_features,
-                        &callbacks.on_toggle_experience_features,
-                    ),
-                ))
-                .child(render_two_column_section(
-                    theme,
-                    "SHELL & STORAGE",
-                    "Runtime Diagnostics",
-                    "Shared configuration file location and current workspace shell layout.",
-                    render_storage_well(model),
+                    model.enable_experience_features,
                 )),
-        )
+                "Sets enableExperienceFeatures in config.json for desktop shell previews.",
+                render_experience_toggle(
+                    theme,
+                    model.enable_experience_features,
+                    &callbacks.on_toggle_experience_features,
+                ),
+            )],
+        ))
+        .child(render_settings_section(
+            theme,
+            "SHELL & STORAGE",
+            vec![
+                render_setting_row(
+                    theme,
+                    "Config File",
+                    None,
+                    "Shared configuration file location for appearance and shell preferences.",
+                    render_mono_value(theme, config_path),
+                ),
+                render_setting_row(
+                    theme,
+                    "Sidebar Layout",
+                    None,
+                    "Current workspace sidebar collapse state and width.",
+                    render_mono_value(theme, model.sidebar_status.clone()),
+                ),
+            ],
+        ))
         .into_any_element()
 }
 
@@ -181,37 +367,73 @@ fn render_save_error_banner(theme: &OrbitTheme, message: &str) -> AnyElement {
         .into_any_element()
 }
 
-fn render_two_column_section(
+fn render_settings_section(
     theme: &OrbitTheme,
     eyebrow: &'static str,
-    title: &'static str,
-    description: &'static str,
-    content: AnyElement,
+    rows: Vec<AnyElement>,
 ) -> AnyElement {
     div()
         .flex()
-        .flex_row()
-        .items_start()
-        .gap_8()
+        .flex_col()
+        .gap_2()
         .w_full()
         .child(
+            apply_text_step(div(), theme.typography.size_2xs)
+                .font_weight(FontWeight::SEMIBOLD)
+                .text_color(theme.text.muted)
+                .px_1()
+                .child(eyebrow),
+        )
+        .child(
             div()
-                .w(px(230.0))
-                .flex_shrink_0()
+                .w_full()
+                .p_1p5()
+                .rounded(theme.style.radius_card)
+                .bg(theme.surface.bg_panel)
                 .flex()
                 .flex_col()
-                .gap_1p5()
+                .gap_0p5()
+                .children(rows),
+        )
+        .into_any_element()
+}
+
+fn render_setting_row(
+    theme: &OrbitTheme,
+    title: &'static str,
+    badge: Option<AnyElement>,
+    description: &'static str,
+    control: AnyElement,
+) -> AnyElement {
+    div()
+        .w_full()
+        .px_3()
+        .py_2p5()
+        .rounded(theme.style.radius_control)
+        .flex()
+        .flex_row()
+        .items_center()
+        .justify_between()
+        .gap_6()
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .flex()
+                .flex_col()
+                .gap_0p5()
                 .child(
-                    apply_text_step(div(), theme.typography.size_2xs)
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(theme.text.muted)
-                        .child(eyebrow),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_sm)
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(theme.text.primary)
-                        .child(title),
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .child(
+                            apply_text_step(div(), theme.typography.size_sm)
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(theme.text.primary)
+                                .child(title),
+                        )
+                        .when_some(badge, |el, b| el.child(b)),
                 )
                 .child(
                     apply_text_step(div(), theme.typography.size_xs)
@@ -219,357 +441,369 @@ fn render_two_column_section(
                         .child(description),
                 ),
         )
-        .child(div().flex_1().min_w_0().child(content))
+        .child(
+            div()
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .justify_end()
+                .child(control),
+        )
         .into_any_element()
 }
 
-fn render_theme_mode_cards(
+const fn theme_mode_icon(mode: ThemeMode) -> Icon {
+    match mode {
+        ThemeMode::Dark => Icon::Moon,
+        ThemeMode::Light => Icon::Sun,
+        ThemeMode::System => Icon::Monitor,
+    }
+}
+
+fn render_dropdown_control(
     theme: &OrbitTheme,
-    resolved_system_is_dark: bool,
-    on_select: &SettingsValueCallback<ThemeMode>,
+    kind: SettingsDropdownKind,
+    is_open: bool,
+    leading_icon: Option<Icon>,
+    label: String,
+    on_toggle: &SettingsValueCallback<SettingsDropdownKind>,
+    options: Vec<AnyElement>,
 ) -> AnyElement {
-    let mut row = div().flex().flex_row().gap_3().w_full();
+    let control_hover = theme.surface.control_hover;
+    let toggle_cb = Rc::clone(on_toggle);
 
-    for mode in ThemeMode::ALL {
-        let is_selected = theme.mode == mode;
-        let icon = match mode {
-            ThemeMode::Dark => Icon::Moon,
-            ThemeMode::Light => Icon::Sun,
-            ThemeMode::System => Icon::Monitor,
-        };
-        let subtitle = match mode {
-            ThemeMode::System => {
-                let resolved = if resolved_system_is_dark { "Dark" } else { "Light" };
-                format!("{} (Currently {resolved})", mode.description())
-            }
-            _ => mode.description().to_string(),
-        };
-
-        let border_color = if is_selected {
-            theme.accent.accent
-        } else {
-            theme.border.card
-        };
-        let bg_color = if is_selected {
-            theme.accent.soft
-        } else {
-            theme.surface.bg_card
-        };
-        let hover_bg = if is_selected {
-            theme.accent.soft
-        } else {
-            theme.surface.bg_hover
-        };
-        let callback = Rc::clone(on_select);
-
-        row = row.child(
+    let trigger = theme
+        .style_control(div().id(kind.trigger_id()))
+        .w(px(210.0))
+        .h(theme.typography.control_height_sm)
+        .px(theme.typography.control_padding_x_sm)
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_2()
+        .cursor_pointer()
+        .hover(move |s| s.bg(control_hover))
+        .when(is_open, |el| el.border_color(theme.accent.accent))
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            cx.stop_propagation();
+            toggle_cb(kind, window, cx);
+        })
+        .child(
             div()
-                .id(("settings-theme-mode", mode as u32))
-                .flex_1()
-                .min_w_0()
-                .p_3()
-                .rounded(theme.style.radius_card)
-                .border_1()
-                .border_color(border_color)
-                .bg(bg_color)
-                .cursor_pointer()
-                .hover(move |s| s.bg(hover_bg))
-                .on_click(move |_, window, cx| callback(mode, window, cx))
                 .flex()
-                .flex_col()
+                .items_center()
                 .gap_2()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .child(
-                                    div()
-                                        .w(px(26.0))
-                                        .h(px(26.0))
-                                        .rounded(theme.style.radius_control)
-                                        .bg(theme.surface.bg_panel)
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .child(render_icon(
-                                            icon,
-                                            px(14.0),
-                                            if is_selected {
-                                                theme.accent.accent
-                                            } else {
-                                                theme.text.secondary
-                                            },
-                                        )),
-                                )
-                                .child(
-                                    apply_text_step(div(), theme.typography.size_sm)
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(theme.text.primary)
-                                        .child(mode.label()),
-                                ),
-                        )
-                        .when(is_selected, |el| {
-                            el.child(render_icon(Icon::Check, px(14.0), theme.accent.accent))
-                        }),
-                )
+                .min_w_0()
+                .flex_1()
+                .when_some(leading_icon, |el, icon| {
+                    el.child(render_icon(icon, px(13.0), theme.text.secondary))
+                })
                 .child(
                     apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child(subtitle),
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.text.primary)
+                        .truncate()
+                        .child(label),
                 ),
-        );
-    }
+        )
+        .child(render_icon(
+            dropdown_chevron_icon(is_open),
+            px(13.0),
+            theme.text.secondary,
+        ));
 
-    row.into_any_element()
+    div()
+        .flex()
+        .flex_col()
+        .child(trigger)
+        .when(is_open, |el| {
+            let menu = theme
+                .style_overlay(div().id(kind.menu_id()))
+                .w(px(230.0))
+                .p_1()
+                .flex()
+                .flex_col()
+                .gap_0p5()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .children(options);
+
+            el.child(
+                deferred(
+                    anchored()
+                        .anchor(Corner::TopLeft)
+                        .offset(point(px(0.0), px(4.0)))
+                        .snap_to_window_with_margin(px(8.0))
+                        .child(menu),
+                )
+                .with_priority(2),
+            )
+        })
+        .into_any_element()
 }
 
-fn render_ui_style_cards(
+struct DropdownOptionProps {
+    id_prefix: &'static str,
+    idx: usize,
+    is_selected: bool,
+    is_highlighted: bool,
+    leading_icon: Option<Icon>,
+    label: &'static str,
+    trailing_meta: Option<AnyElement>,
+}
+
+fn render_dropdown_option(
     theme: &OrbitTheme,
-    on_select: &SettingsValueCallback<UiStyle>,
+    props: DropdownOptionProps,
+    on_hover: SettingsValueCallback<usize>,
+    on_select: SettingsActionCallback,
 ) -> AnyElement {
-    let mut col = div().flex().flex_col().gap_3().w_full();
+    let idx = props.idx;
+    let row_bg = if props.is_selected {
+        Some(theme.accent.soft)
+    } else if props.is_highlighted {
+        Some(theme.surface.bg_hover)
+    } else {
+        None
+    };
 
-    for chunk in UiStyle::ALL.chunks(2) {
-        let mut row = div().flex().flex_row().gap_3().w_full();
-        for &style in chunk {
-            let is_selected = theme.style.ui_style == style;
-            let border_color = if is_selected {
-                theme.accent.accent
-            } else {
-                theme.border.card
-            };
-            let bg_color = if is_selected {
-                theme.accent.soft
-            } else {
-                theme.surface.bg_card
-            };
-            let hover_bg = if is_selected {
-                theme.accent.soft
-            } else {
-                theme.surface.bg_hover
-            };
-            let callback = Rc::clone(on_select);
-
-            row = row.child(
-                div()
-                    .id(("settings-ui-style", style as u32))
-                    .flex_1()
-                    .min_w_0()
-                    .p_3()
-                    .rounded(theme.style.radius_card)
-                    .border_1()
-                    .border_color(border_color)
-                    .bg(bg_color)
-                    .cursor_pointer()
-                    .hover(move |s| s.bg(hover_bg))
-                    .on_click(move |_, window, cx| callback(style, window, cx))
-                    .flex()
-                    .flex_col()
-                    .gap_1p5()
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .gap_2()
-                            .child(
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(
-                                        apply_text_step(div(), theme.typography.size_sm)
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .text_color(theme.text.primary)
-                                            .child(style.label()),
-                                    )
-                                    .when_some(style.badge(), |el, badge| {
-                                        el.child(
-                                            apply_text_step(div(), theme.typography.size_2xs)
-                                                .px_1p5()
-                                                .py_0p5()
-                                                .rounded(theme.style.radius_control)
-                                                .bg(theme.surface.bg_panel)
-                                                .text_color(theme.text.secondary)
-                                                .font_weight(FontWeight::MEDIUM)
-                                                .child(badge),
-                                        )
-                                    }),
-                            )
-                            .when(is_selected, |el| {
-                                el.child(render_icon(Icon::Check, px(14.0), theme.accent.accent))
-                            }),
-                    )
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.secondary)
-                            .child(style.description()),
-                    ),
-            );
-        }
-        col = col.child(row);
-    }
-
-    col.into_any_element()
+    div()
+        .id((props.id_prefix, idx))
+        .px_2p5()
+        .py_1p5()
+        .rounded(theme.style.radius_control)
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap_2()
+        .cursor_pointer()
+        .when_some(row_bg, |el, bg| el.bg(bg))
+        .on_hover(move |hovered, window, cx| {
+            if *hovered {
+                on_hover(idx, window, cx);
+            }
+        })
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+            cx.stop_propagation();
+            on_select(window, cx);
+        })
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .min_w_0()
+                .when_some(props.leading_icon, |el, icon| {
+                    let color = if props.is_selected {
+                        theme.accent.accent
+                    } else {
+                        theme.text.secondary
+                    };
+                    el.child(render_icon(icon, px(13.0), color))
+                })
+                .child(
+                    apply_text_step(div(), theme.typography.size_xs)
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(theme.text.primary)
+                        .child(props.label),
+                )
+                .when_some(props.trailing_meta, |el, meta| el.child(meta)),
+        )
+        .when(props.is_selected, |el| {
+            el.child(render_icon(Icon::Check, px(13.0), theme.accent.accent))
+        })
+        .into_any_element()
 }
 
-fn render_accent_section(
+fn render_theme_mode_dropdown(
+    theme: &OrbitTheme,
+    resolved_system_is_dark: bool,
+    dropdown: &SettingsDropdownState,
+    callbacks: &SettingsCallbacks,
+) -> AnyElement {
+    let is_open = dropdown.is_open(SettingsDropdownKind::ThemeMode);
+    let label = theme_mode_dropdown_label(theme.mode, resolved_system_is_dark);
+
+    let options = if is_open {
+        ThemeMode::ALL
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(idx, mode)| {
+                let on_select_mode = Rc::clone(&callbacks.on_select_theme_mode);
+                let resolved_hint = (mode == ThemeMode::System).then_some(
+                    if resolved_system_is_dark {
+                        "(Dark)"
+                    } else {
+                        "(Light)"
+                    },
+                );
+                let trailing_meta = resolved_hint.map(|hint| {
+                    apply_text_step(div(), theme.typography.size_2xs)
+                        .text_color(theme.text.muted)
+                        .child(hint)
+                        .into_any_element()
+                });
+
+                render_dropdown_option(
+                    theme,
+                    DropdownOptionProps {
+                        id_prefix: "settings-theme-mode-opt",
+                        idx,
+                        is_selected: theme.mode == mode,
+                        is_highlighted: dropdown.highlighted_index == idx,
+                        leading_icon: Some(theme_mode_icon(mode)),
+                        label: mode.label(),
+                        trailing_meta,
+                    },
+                    Rc::clone(&callbacks.on_hover_dropdown_option),
+                    Rc::new(move |window, cx| on_select_mode(mode, window, cx)),
+                )
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    render_dropdown_control(
+        theme,
+        SettingsDropdownKind::ThemeMode,
+        is_open,
+        Some(theme_mode_icon(theme.mode)),
+        label,
+        &callbacks.on_toggle_dropdown,
+        options,
+    )
+}
+
+fn render_ui_style_dropdown(
+    theme: &OrbitTheme,
+    dropdown: &SettingsDropdownState,
+    callbacks: &SettingsCallbacks,
+) -> AnyElement {
+    let is_open = dropdown.is_open(SettingsDropdownKind::UiStyle);
+    let label = theme.style.ui_style.label().to_string();
+
+    let options = if is_open {
+        UiStyle::ALL
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(idx, style)| {
+                let on_select_style = Rc::clone(&callbacks.on_select_ui_style);
+                let trailing_meta = style.badge().map(|badge| {
+                    apply_text_step(div(), theme.typography.size_2xs)
+                        .px_1p5()
+                        .py_0p5()
+                        .rounded(theme.style.radius_control)
+                        .bg(theme.surface.bg_panel)
+                        .text_color(theme.text.secondary)
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(badge)
+                        .into_any_element()
+                });
+
+                render_dropdown_option(
+                    theme,
+                    DropdownOptionProps {
+                        id_prefix: "settings-ui-style-opt",
+                        idx,
+                        is_selected: theme.style.ui_style == style,
+                        is_highlighted: dropdown.highlighted_index == idx,
+                        leading_icon: None,
+                        label: style.label(),
+                        trailing_meta,
+                    },
+                    Rc::clone(&callbacks.on_hover_dropdown_option),
+                    Rc::new(move |window, cx| on_select_style(style, window, cx)),
+                )
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
+    render_dropdown_control(
+        theme,
+        SettingsDropdownKind::UiStyle,
+        is_open,
+        None,
+        label,
+        &callbacks.on_toggle_dropdown,
+        options,
+    )
+}
+
+fn render_accent_swatches(
     theme: &OrbitTheme,
     on_select: &SettingsValueCallback<AccentColor>,
 ) -> AnyElement {
-    let mut swatch_row = div().flex().flex_row().items_center().gap_3();
+    let mut swatch_row = div().flex().flex_row().items_center().gap_2();
 
     for accent in AccentColor::ALL {
         let is_selected = theme.accent_id == accent;
         let tokens = resolve_accent_tokens(accent, theme.is_dark);
         let callback = Rc::clone(on_select);
+        let label = accent.label();
 
         swatch_row = swatch_row.child(
             div()
                 .id(("settings-accent-swatch", accent as u32))
-                .flex()
-                .flex_col()
-                .items_center()
-                .gap_1()
+                .w(px(24.0))
+                .h(px(24.0))
+                .rounded_full()
+                .border_2()
+                .border_color(if is_selected {
+                    theme.text.primary
+                } else {
+                    theme.border.default
+                })
+                .p(px(2.0))
                 .cursor_pointer()
+                .flex()
+                .items_center()
+                .justify_center()
+                .tooltip(move |_, cx| cx.new(|_| TextTooltip::new(label)).into())
                 .on_click(move |_, window, cx| callback(accent, window, cx))
                 .child(
                     div()
-                        .w(px(28.0))
-                        .h(px(28.0))
+                        .w_full()
+                        .h_full()
                         .rounded_full()
-                        .border_2()
-                        .border_color(if is_selected {
-                            theme.text.primary
-                        } else {
-                            theme.border.default
-                        })
-                        .p(px(2.0))
+                        .bg(tokens.accent)
                         .flex()
                         .items_center()
                         .justify_center()
-                        .child(
-                            div()
-                                .w_full()
-                                .h_full()
-                                .rounded_full()
-                                .bg(tokens.accent)
-                                .flex()
-                                .items_center()
-                                .justify_center()
-                                .when(is_selected, |el| {
-                                    el.child(render_icon(
-                                        Icon::Check,
-                                        px(12.0),
-                                        theme.surface.bg_app,
-                                    ))
-                                }),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_2xs)
-                        .font_weight(if is_selected {
-                            FontWeight::SEMIBOLD
-                        } else {
-                            FontWeight::NORMAL
-                        })
-                        .text_color(if is_selected {
-                            theme.text.primary
-                        } else {
-                            theme.text.muted
-                        })
-                        .child(accent.label()),
+                        .when(is_selected, |el| {
+                            el.child(render_icon(Icon::Check, px(11.0), theme.surface.bg_app))
+                        }),
                 ),
         );
     }
 
-    let preview_strip = div()
-        .p_3()
-        .rounded(theme.style.radius_card)
-        .bg(theme.surface.bg_panel)
-        .border_1()
-        .border_color(theme.border.default)
-        .flex()
-        .items_center()
-        .justify_between()
-        .gap_3()
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    div()
-                        .px_2p5()
-                        .py_1()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.accent.accent)
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.surface.bg_app)
-                                .child("Primary Action"),
-                        ),
-                )
-                .child(
-                    div()
-                        .px_2p5()
-                        .py_1()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.accent.soft)
-                        .border_1()
-                        .border_color(theme.accent.accent)
-                        .child(
-                            apply_text_step(div(), theme.typography.size_xs)
-                                .font_weight(FontWeight::MEDIUM)
-                                .text_color(theme.accent.accent)
-                                .child("Active Selection"),
-                        ),
-                ),
-        )
-        .child(
-            div()
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(render_semantic_pill("Healthy", theme.semantic.success.soft, theme.semantic.success.solid, theme))
-                .child(render_semantic_pill("Pending", theme.semantic.warning.soft, theme.semantic.warning.solid, theme))
-                .child(render_semantic_pill("Error", theme.semantic.danger.soft, theme.semantic.danger.solid, theme)),
-        );
-
-    div()
-        .flex()
-        .flex_col()
-        .gap_3()
-        .child(swatch_row)
-        .child(preview_strip)
-        .into_any_element()
+    swatch_row.into_any_element()
 }
 
-fn render_semantic_pill(
-    label: &'static str,
-    bg: gpui::Rgba,
-    fg: gpui::Rgba,
-    theme: &OrbitTheme,
-) -> AnyElement {
+fn render_experience_status_badge(theme: &OrbitTheme, enabled: bool) -> AnyElement {
     apply_text_step(div(), theme.typography.size_2xs)
-        .px_2()
+        .px_1p5()
         .py_0p5()
         .rounded(theme.style.radius_control)
-        .bg(bg)
-        .text_color(fg)
+        .bg(if enabled {
+            theme.semantic.success.soft
+        } else {
+            theme.surface.bg_hover
+        })
+        .text_color(if enabled {
+            theme.semantic.success.solid
+        } else {
+            theme.text.muted
+        })
         .font_weight(FontWeight::SEMIBOLD)
-        .child(label)
+        .child(experience_features_status_label(enabled))
         .into_any_element()
 }
 
-fn render_experience_section(
+fn render_experience_toggle(
     theme: &OrbitTheme,
     enabled: bool,
     on_toggle: &SettingsValueCallback<bool>,
@@ -579,7 +813,7 @@ fn render_experience_section(
     let track_bg = if enabled {
         theme.accent.accent
     } else {
-        theme.surface.bg_panel
+        theme.surface.control_bg
     };
     let track_border = if enabled {
         theme.accent.accent
@@ -588,108 +822,39 @@ fn render_experience_section(
     };
 
     div()
-        .p_3()
-        .rounded(theme.style.radius_card)
-        .bg(theme.surface.bg_card)
+        .id("settings-experience-toggle")
+        .w(px(38.0))
+        .h(px(22.0))
+        .rounded_full()
+        .bg(track_bg)
         .border_1()
-        .border_color(theme.border.card)
+        .border_color(track_border)
+        .p(px(2.0))
+        .cursor_pointer()
         .flex()
         .items_center()
-        .justify_between()
-        .gap_4()
+        .justify_end()
+        .when(!enabled, |el| el.justify_start())
+        .on_click(move |_, window, cx| callback(next_enabled, window, cx))
         .child(
             div()
-                .flex()
-                .flex_col()
-                .gap_1()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap_2()
-                        .child(
-                            apply_text_step(div(), theme.typography.size_sm)
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .text_color(theme.text.primary)
-                                .child("Native GPUI Preview Shell"),
-                        )
-                        .child(
-                            apply_text_step(div(), theme.typography.size_2xs)
-                                .px_1p5()
-                                .py_0p5()
-                                .rounded(theme.style.radius_control)
-                                .bg(if enabled {
-                                    theme.semantic.success.soft
-                                } else {
-                                    theme.surface.bg_panel
-                                })
-                                .text_color(if enabled {
-                                    theme.semantic.success.solid
-                                } else {
-                                    theme.text.muted
-                                })
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(experience_features_status_label(enabled)),
-                        ),
-                )
-                .child(
-                    apply_text_step(div(), theme.typography.size_xs)
-                        .text_color(theme.text.secondary)
-                        .child("Sets enableExperienceFeatures in config.json for desktop shell previews."),
-                ),
-        )
-        .child(
-            div()
-                .id("settings-experience-toggle")
-                .w(px(38.0))
-                .h(px(22.0))
+                .w(px(16.0))
+                .h(px(16.0))
                 .rounded_full()
-                .bg(track_bg)
-                .border_1()
-                .border_color(track_border)
-                .p(px(2.0))
-                .cursor_pointer()
-                .flex()
-                .items_center()
-                .justify_end()
-                .when(!enabled, |el| el.justify_start())
-                .on_click(move |_, window, cx| callback(next_enabled, window, cx))
-                .child(
-                    div()
-                        .w(px(16.0))
-                        .h(px(16.0))
-                        .rounded_full()
-                        .bg(if enabled {
-                            theme.surface.bg_app
-                        } else {
-                            theme.text.secondary
-                        }),
-                ),
+                .bg(if enabled {
+                    theme.surface.bg_app
+                } else {
+                    theme.text.secondary
+                }),
         )
         .into_any_element()
 }
 
-fn render_storage_well(model: &SettingsViewModel<'_>) -> AnyElement {
-    let theme = model.theme;
-    let config_path = model
-        .config_file_path
-        .clone()
-        .unwrap_or_else(|| "~/.orbit/config.json".to_string());
-
-    div()
-        .p_3()
-        .rounded(theme.style.radius_card)
-        .bg(theme.surface.bg_panel)
-        .flex()
-        .flex_col()
-        .gap_2()
-        .child(render_detail_row("Config File", config_path, true, theme))
-        .child(render_detail_row(
-            "Sidebar Layout",
-            model.sidebar_status.clone(),
-            true,
-            theme,
-        ))
+fn render_mono_value(theme: &OrbitTheme, value: String) -> AnyElement {
+    apply_text_step(div(), theme.typography.size_xs)
+        .font(theme.typography.mono_font(FontWeight::NORMAL))
+        .text_color(theme.text.secondary)
+        .child(value)
         .into_any_element()
 }
 
@@ -726,5 +891,107 @@ mod tests {
 
         assert_eq!(experience_features_status_label(true), "Enabled");
         assert_eq!(experience_features_status_label(false), "Disabled");
+    }
+
+    #[test]
+    fn test_settings_dropdown_toggle_switch_and_close() {
+        let mut state = SettingsDropdownState::default();
+        assert!(!state.is_any_open());
+        assert!(!state.is_open(SettingsDropdownKind::ThemeMode));
+        assert!(!state.is_open(SettingsDropdownKind::UiStyle));
+
+        state.toggle(SettingsDropdownKind::ThemeMode, 1);
+        assert!(state.is_any_open());
+        assert!(state.is_open(SettingsDropdownKind::ThemeMode));
+        assert!(!state.is_open(SettingsDropdownKind::UiStyle));
+        assert_eq!(state.highlighted_index, 1);
+
+        // Switching directly to UiStyle replaces open dropdown and updates highlight
+        state.toggle(SettingsDropdownKind::UiStyle, 3);
+        assert!(state.is_open(SettingsDropdownKind::UiStyle));
+        assert!(!state.is_open(SettingsDropdownKind::ThemeMode));
+        assert_eq!(state.highlighted_index, 3);
+
+        // Toggling the already-open dropdown closes it
+        state.toggle(SettingsDropdownKind::UiStyle, 3);
+        assert!(!state.is_any_open());
+        assert_eq!(state.open, None);
+
+        // Open again and verify explicit close()
+        state.toggle(SettingsDropdownKind::ThemeMode, 2);
+        assert!(state.is_open(SettingsDropdownKind::ThemeMode));
+        state.close();
+        assert_eq!(state.open, None);
+        assert!(!state.is_any_open());
+    }
+
+    #[test]
+    fn test_settings_dropdown_keyboard_navigation_wraps_and_activates() {
+        let mut state = SettingsDropdownState::default();
+        assert_eq!(
+            state.handle_key("arrowdown"),
+            SettingsDropdownKeyAction::Ignored
+        );
+
+        // ThemeMode: 0 = Dark, 1 = Light, 2 = System
+        state.toggle(SettingsDropdownKind::ThemeMode, 0);
+        assert_eq!(
+            state.handle_key("arrowdown"),
+            SettingsDropdownKeyAction::Navigated
+        );
+        assert_eq!(state.highlighted_index, 1);
+        assert_eq!(
+            state.handle_key("arrowup"),
+            SettingsDropdownKeyAction::Navigated
+        );
+        assert_eq!(state.highlighted_index, 0);
+        assert_eq!(
+            state.handle_key("arrowdown"),
+            SettingsDropdownKeyAction::Navigated
+        );
+        assert_eq!(
+            state.handle_key("enter"),
+            SettingsDropdownKeyAction::SelectThemeMode(ThemeMode::Light)
+        );
+        assert!(!state.is_any_open());
+
+        // UiStyle: 0 = Flat .. 5 = Paper; arrowup wraps to Paper
+        state.toggle(SettingsDropdownKind::UiStyle, 0);
+        assert_eq!(
+            state.handle_key("arrowup"),
+            SettingsDropdownKeyAction::Navigated
+        );
+        assert_eq!(state.highlighted_index, UiStyle::ALL.len() - 1);
+        assert_eq!(
+            state.handle_key("return"),
+            SettingsDropdownKeyAction::SelectUiStyle(UiStyle::Paper)
+        );
+        assert!(!state.is_any_open());
+
+        // Escape closes without selecting
+        state.toggle(SettingsDropdownKind::ThemeMode, 2);
+        assert_eq!(state.handle_key("escape"), SettingsDropdownKeyAction::Closed);
+        assert!(!state.is_any_open());
+    }
+
+    #[test]
+    fn test_settings_dropdown_labels_and_indices() {
+        assert_eq!(theme_mode_dropdown_label(ThemeMode::Dark, false), "Dark");
+        assert_eq!(theme_mode_dropdown_label(ThemeMode::Light, true), "Light");
+        assert_eq!(
+            theme_mode_dropdown_label(ThemeMode::System, true),
+            "System (Dark)"
+        );
+        assert_eq!(
+            theme_mode_dropdown_label(ThemeMode::System, false),
+            "System (Light)"
+        );
+
+        for (expected_idx, mode) in ThemeMode::ALL.iter().copied().enumerate() {
+            assert_eq!(theme_mode_index(mode), expected_idx);
+        }
+        for (expected_idx, style) in UiStyle::ALL.iter().copied().enumerate() {
+            assert_eq!(ui_style_index(style), expected_idx);
+        }
     }
 }
