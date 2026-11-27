@@ -84,9 +84,10 @@ pub use tab_bar::{
     tab_item_presentation,
 };
 pub use titlebar::{
-    MACOS_TRAFFIC_LIGHT_INSET, TITLEBAR_HEIGHT, TitlebarLayoutSpec, TitlebarPlatform,
-    WINDOW_CONTROL_WIDTH, WindowChromeStyle, maximize_control_icon, maximize_control_tooltip,
-    render_custom_titlebar, resolve_titlebar_layout_spec, resolve_window_chrome_style,
+    MACOS_TRAFFIC_LIGHT_INSET, MACOS_TRAFFIC_LIGHT_Y, TITLEBAR_CONTROL_HEIGHT, TITLEBAR_HEIGHT,
+    TitlebarLayoutSpec, TitlebarPlatform, TitlebarSlots, WINDOW_CONTROL_WIDTH, WindowChromeStyle,
+    maximize_control_icon, maximize_control_tooltip, render_custom_titlebar,
+    resolve_titlebar_layout_spec, resolve_window_chrome_style,
 };
 pub use tooltip::TextTooltip;
 pub use workload_action_modal::{

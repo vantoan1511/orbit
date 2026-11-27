@@ -1,6 +1,6 @@
 use gpui::{
-    AnyElement, Decorations, FontWeight, InteractiveElement, IntoElement, Rgba, SharedString,
-    StatefulInteractiveElement, Styled, Window, WindowControlArea, div, prelude::*, px,
+    AnyElement, Decorations, InteractiveElement, IntoElement, Rgba, StatefulInteractiveElement,
+    Styled, Window, WindowControlArea, div, prelude::*, px,
 };
 #[cfg(not(target_os = "windows"))]
 use gpui::{MouseButton, MouseDownEvent};
@@ -8,11 +8,19 @@ use lucide_icons::Icon;
 
 use crate::components::TextTooltip;
 use crate::icons::render_icon;
-use crate::theme::{OrbitTheme, apply_text_step, rgb_hex};
+use crate::theme::{OrbitTheme, rgb_hex};
 
-pub const TITLEBAR_HEIGHT: f32 = 32.0;
+pub const TITLEBAR_HEIGHT: f32 = 38.0;
+pub const TITLEBAR_CONTROL_HEIGHT: f32 = 28.0;
 pub const WINDOW_CONTROL_WIDTH: f32 = 44.0;
 pub const MACOS_TRAFFIC_LIGHT_INSET: f32 = 76.0;
+pub const MACOS_TRAFFIC_LIGHT_Y: f32 = 13.0;
+
+#[derive(Default)]
+pub struct TitlebarSlots {
+    pub left_controls: Option<AnyElement>,
+    pub right_controls: Option<AnyElement>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TitlebarPlatform {
@@ -166,34 +174,40 @@ fn render_window_control_button(
 }
 
 pub fn render_custom_titlebar(
-    title: impl Into<SharedString>,
+    slots: TitlebarSlots,
     is_window_active: bool,
     is_maximized: bool,
     decorations: Decorations,
     theme: &OrbitTheme,
     _window: &Window,
 ) -> AnyElement {
-    let title: SharedString = title.into();
     let layout = resolve_titlebar_layout_spec(TitlebarPlatform::current(), decorations);
     let chrome = resolve_window_chrome_style(theme, is_window_active, is_maximized);
+
+    let mut left_slot = div()
+        .id("orbit-titlebar-left-slot")
+        .h_full()
+        .flex()
+        .items_center()
+        .gap_2()
+        .flex_shrink_0();
+    left_slot = if layout.left_inset_px == 0.0 {
+        left_slot.pl_3()
+    } else {
+        left_slot.pl_1()
+    };
+    left_slot = left_slot.child(render_icon(Icon::Orbit, px(15.0), chrome.icon_fg));
+    if let Some(left_controls) = slots.left_controls {
+        left_slot = left_slot.child(left_controls);
+    }
 
     #[allow(unused_mut)]
     let mut drag_region = div()
         .id("orbit-titlebar-drag-region")
         .flex_1()
+        .min_w(px(32.0))
         .h_full()
-        .px_3()
-        .flex()
-        .items_center()
-        .gap_2()
-        .window_control_area(WindowControlArea::Drag)
-        .child(render_icon(Icon::Orbit, px(14.0), chrome.icon_fg))
-        .child(
-            apply_text_step(div(), theme.typography.size_xs)
-                .font_weight(FontWeight::MEDIUM)
-                .text_color(chrome.title_fg)
-                .child(title),
-        );
+        .window_control_area(WindowControlArea::Drag);
 
     #[cfg(target_os = "macos")]
     {
@@ -236,7 +250,21 @@ pub fn render_custom_titlebar(
         bar = bar.child(div().w(px(layout.left_inset_px)).h_full().flex_shrink_0());
     }
 
-    bar = bar.child(drag_region);
+    bar = bar.child(left_slot).child(drag_region);
+
+    if let Some(right_controls) = slots.right_controls {
+        bar = bar.child(
+            div()
+                .id("orbit-titlebar-right-slot")
+                .h_full()
+                .flex()
+                .items_center()
+                .gap_1p5()
+                .pr_2()
+                .flex_shrink_0()
+                .child(right_controls),
+        );
+    }
 
     if layout.show_window_controls {
         let min_btn = render_window_control_button(
@@ -336,6 +364,24 @@ mod tests {
         assert_eq!(linux_server.left_inset_px, 0.0);
         assert!(!linux_server.show_window_controls);
         assert_eq!(linux_server.height_px, TITLEBAR_HEIGHT);
+        assert_eq!(linux_server.height_px, 38.0);
+    }
+
+    #[test]
+    fn test_unified_titlebar_dimensions_and_macos_centering() {
+        assert_eq!(TITLEBAR_HEIGHT, 38.0);
+        assert_eq!(TITLEBAR_CONTROL_HEIGHT, 28.0);
+        const {
+            assert!(TITLEBAR_CONTROL_HEIGHT < TITLEBAR_HEIGHT);
+        }
+        assert_eq!(TITLEBAR_HEIGHT - TITLEBAR_CONTROL_HEIGHT, 10.0);
+        assert_eq!(MACOS_TRAFFIC_LIGHT_INSET, 76.0);
+        assert_eq!(MACOS_TRAFFIC_LIGHT_Y, 13.0);
+        assert_eq!((TITLEBAR_HEIGHT - 12.0) / 2.0, MACOS_TRAFFIC_LIGHT_Y);
+
+        let slots = TitlebarSlots::default();
+        assert!(slots.left_controls.is_none());
+        assert!(slots.right_controls.is_none());
     }
 
     #[test]
