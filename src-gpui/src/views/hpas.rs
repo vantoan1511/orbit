@@ -360,6 +360,7 @@ pub fn render_hpas_view(
         HpasPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.hpas.is_empty();
+            table_state.refreshing = is_loading && !state.hpas.is_empty();
             table_state.empty_message = SharedString::from(hpas_empty_message(state));
 
             let key_rows = filtered_rows.clone();

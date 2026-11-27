@@ -431,6 +431,7 @@ pub fn render_resource_quotas_view(
         ResourceQuotasPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.policies.is_empty();
+            table_state.refreshing = is_loading && !state.policies.is_empty();
             table_state.empty_message =
                 SharedString::from(resource_quotas_empty_message(state, namespaces));
 

@@ -317,6 +317,7 @@ pub fn render_statefulsets_view(
         StatefulSetsPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.statefulsets.is_empty();
+            table_state.refreshing = is_loading && !state.statefulsets.is_empty();
             table_state.empty_message = SharedString::from(statefulsets_empty_message(state));
 
             let key_rows = filtered_rows.clone();

@@ -455,6 +455,40 @@ impl WorkspaceView {
             None => ("Orbit", self.label()),
         }
     }
+
+    pub const fn search_keywords(self) -> &'static [&'static str] {
+        match self {
+            Self::Overview => &["home", "summary", "dashboard"],
+            Self::Nodes => &["no", "node", "hosts"],
+            Self::Namespaces => &["ns", "namespace"],
+            Self::Events => &["ev", "event", "warnings"],
+            Self::WorkloadsOverview => &["workloads", "workload"],
+            Self::Pods => &["po", "pod", "containers"],
+            Self::Deployments => &["deploy", "deployments", "dp"],
+            Self::StatefulSets => &["sts", "stateful"],
+            Self::DaemonSets => &["ds", "daemon"],
+            Self::ReplicaSets => &["rs", "replica"],
+            Self::Jobs => &["job", "batch"],
+            Self::CronJobs => &["cj", "cron", "schedule"],
+            Self::Hpas => &["hpa", "autoscale", "autoscaler"],
+            Self::Services => &["svc", "service", "endpoints"],
+            Self::Ingresses => &["ing", "ingress", "routes"],
+            Self::PortForward => &["pf", "port", "forward", "tunnel"],
+            Self::StorageOverview => &["storage"],
+            Self::PersistentVolumes => &["pv", "volumes"],
+            Self::PersistentVolumeClaims => &["pvc", "claims"],
+            Self::StorageClasses => &["sc", "storageclass"],
+            Self::ConfigMaps => &["cm", "config", "configmap"],
+            Self::Secrets => &["sec", "secret", "credentials"],
+            Self::SecurityOverview => &["security", "rbac"],
+            Self::NetworkPolicies => &["netpol", "networkpolicy", "firewall"],
+            Self::PodSecurity => &["pss", "psa", "podsecurity"],
+            Self::ResourceQuotas => &["quota", "limits", "limitrange"],
+            Self::AdmissionWebhooks => &["webhook", "admission", "mutating", "validating"],
+            Self::Logs => &["log", "stream", "tail"],
+            Self::Settings => &["preferences", "theme", "appearance", "config"],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

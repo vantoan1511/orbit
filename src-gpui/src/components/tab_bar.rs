@@ -197,6 +197,19 @@ pub fn build_tab_context_menu_entries(
     ]
 }
 
+pub fn compute_tab_drop_position(
+    pointer_x: f32,
+    bounds_left: f32,
+    bounds_width: f32,
+) -> TabDropPosition {
+    let midpoint = bounds_left + bounds_width * 0.5;
+    if pointer_x < midpoint {
+        TabDropPosition::Before
+    } else {
+        TabDropPosition::After
+    }
+}
+
 #[derive(Clone)]
 pub struct TabBarCallbacks {
     pub on_select: TabCallback,
@@ -204,6 +217,7 @@ pub struct TabBarCallbacks {
     pub on_context_menu: TabContextMenuCallback,
     pub on_drag_start: TabDragStartCallback,
     pub on_drag_move: TabDragMoveCallback,
+    pub on_drag_leave: TabActionCallback,
     pub on_drop: TabDropCallback,
     pub on_toggle_picker: TabActionCallback,
 }
@@ -214,6 +228,7 @@ pub fn render_workspace_tab_bar(
     callbacks: TabBarCallbacks,
 ) -> AnyElement {
     let open_tabs = tabs.open_tabs().to_vec();
+    let open_tabs_len = open_tabs.len();
     let active_tab = tabs.active_tab();
     let drop_target = tabs.drop_target;
     let dragging_index = tabs.dragging_index;
@@ -230,6 +245,7 @@ pub fn render_workspace_tab_bar(
 
     let scroll_handle = tabs.scroll_handle.clone();
     let wheel_scroll_handle = tabs.scroll_handle.clone();
+    let on_strip_drag_leave = callbacks.on_drag_leave.clone();
 
     let mut strip = div()
         .id("workspace-tab-strip")
@@ -247,6 +263,11 @@ pub fn render_workspace_tab_bar(
             offset.x -= delta.x + delta.y;
             wheel_scroll_handle.set_offset(offset);
             cx.stop_propagation();
+        })
+        .on_drag_move::<DraggedWorkspaceTab>(move |event, window, cx| {
+            if !event.bounds.contains(&event.event.position) {
+                on_strip_drag_leave(window, cx);
+            }
         });
 
     for (index, tab) in open_tabs.into_iter().enumerate() {
@@ -262,14 +283,27 @@ pub fn render_workspace_tab_bar(
         ));
     }
 
-    strip = strip.child(
-        div()
-            .flex_1()
-            .min_w(px(8.0))
-            .h(px(TAB_BAR_HEIGHT))
-            .border_b_1()
-            .border_color(theme.border.default),
-    );
+    let mut trailing_spacer = div()
+        .flex_1()
+        .min_w(px(8.0))
+        .h(px(TAB_BAR_HEIGHT))
+        .border_b_1()
+        .border_color(theme.border.default);
+    if let Some(last_idx) = open_tabs_len.checked_sub(1) {
+        let on_spacer_drag_move = callbacks.on_drag_move.clone();
+        let on_spacer_drop = callbacks.on_drop.clone();
+        trailing_spacer = trailing_spacer
+            .on_drag_move::<DraggedWorkspaceTab>(move |event, window, cx| {
+                if !event.bounds.contains(&event.event.position) {
+                    return;
+                }
+                on_spacer_drag_move(last_idx, TabDropPosition::After, window, cx);
+            })
+            .on_drop::<DraggedWorkspaceTab>(move |dragged, window, cx| {
+                on_spacer_drop(dragged.index, last_idx, TabDropPosition::After, window, cx);
+            });
+    }
+    strip = strip.child(trailing_spacer);
 
     let on_toggle_picker = callbacks.on_toggle_picker.clone();
     let new_tab_btn = div()
@@ -412,12 +446,14 @@ fn render_tab_item(
             cx.new(|_| dragged.clone())
         })
         .on_drag_move::<DraggedWorkspaceTab>(move |event, window, cx| {
-            let midpoint = event.bounds.left() + event.bounds.size.width * 0.5;
-            let pos = if event.event.position.x < midpoint {
-                TabDropPosition::Before
-            } else {
-                TabDropPosition::After
-            };
+            if !event.bounds.contains(&event.event.position) {
+                return;
+            }
+            let pos = compute_tab_drop_position(
+                f32::from(event.event.position.x),
+                f32::from(event.bounds.left()),
+                f32::from(event.bounds.size.width),
+            );
             on_drag_move(index, pos, window, cx);
         })
         .on_drop::<DraggedWorkspaceTab>(move |dragged, window, cx| {
@@ -445,8 +481,9 @@ fn render_tab_item(
             .w(px(2.0))
             .bg(theme.accent.accent);
         tab_el = tab_el.child(match pos {
+            TabDropPosition::Before if index > 0 => indicator.left(px(-1.0)),
             TabDropPosition::Before => indicator.left_0(),
-            TabDropPosition::After => indicator.right_0(),
+            TabDropPosition::After => indicator.right(px(-1.0)),
         });
     }
 
@@ -859,5 +896,25 @@ mod tests {
         assert_eq!(inactive.surface, theme.surface.bg_sidebar);
         assert!(inactive.has_bottom_border);
         assert_eq!(inactive.icon_color, theme.text.muted);
+    }
+
+    #[test]
+    fn test_compute_tab_drop_position_splits_at_midpoint() {
+        assert_eq!(
+            compute_tab_drop_position(110.0, 100.0, 80.0),
+            TabDropPosition::Before
+        );
+        assert_eq!(
+            compute_tab_drop_position(139.9, 100.0, 80.0),
+            TabDropPosition::Before
+        );
+        assert_eq!(
+            compute_tab_drop_position(140.0, 100.0, 80.0),
+            TabDropPosition::After
+        );
+        assert_eq!(
+            compute_tab_drop_position(179.0, 100.0, 80.0),
+            TabDropPosition::After
+        );
     }
 }

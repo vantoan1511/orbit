@@ -28,20 +28,21 @@ use tokio::sync::mpsc;
 use crate::bridge::{ClusterBridge, start_cluster_bridge};
 use crate::components::{
     ActionToastKind, ActionToastState, ActiveShellDrawer, AddClusterModalCallbacks,
-    ContextMenuEntry, ContextMenuKeyAction, ContextMenuState, NotificationCenterState,
-    NotificationDrawerCallbacks, NotificationSeverity, PortForwardModalCallbacks,
-    PortForwardModalKeyResult, PortForwardModalState, PortForwardResourceOption,
-    ProfileDrawerCallbacks, ResourceDrawerProps, ResourceDrawerState, ResourceDrawerTabDef,
-    ResourceDrawerTabId, ResourceDrawerTarget, TabBarCallbacks, TabContextMenuCallbacks,
-    TabPickerCallbacks, TextTooltip, WorkloadActionDialogState, WorkloadActionModalCallbacks,
-    WorkloadActionModalKeyResult, WorkloadActionModalState, YamlLoadStatus, YamlViewerProps,
+    CommandPaletteAction, CommandPaletteCallbacks, CommandPaletteState, ContextMenuEntry,
+    ContextMenuKeyAction, ContextMenuState, NotificationCenterState, NotificationDrawerCallbacks,
+    NotificationSeverity, PortForwardModalCallbacks, PortForwardModalKeyResult,
+    PortForwardModalState, PortForwardResourceOption, ProfileDrawerCallbacks, ResourceDrawerProps,
+    ResourceDrawerState, ResourceDrawerTabDef, ResourceDrawerTabId, ResourceDrawerTarget,
+    TabBarCallbacks, TabContextMenuCallbacks, TabPickerCallbacks, TextTooltip,
+    WorkloadActionDialogState, WorkloadActionModalCallbacks, WorkloadActionModalKeyResult,
+    WorkloadActionModalState, YamlLoadStatus, YamlViewerProps, build_command_palette_items,
     build_tab_context_menu_entries, extract_ports_from_deployment, extract_ports_from_pod,
     extract_ports_from_replicaset, extract_ports_from_service, extract_ports_from_statefulset,
     notifications_tooltip, parse_hex_color, render_action_toast_overlay, render_add_cluster_modal,
-    render_context_menu_overlay, render_custom_titlebar, render_notification_drawer,
-    render_port_forward_modal, render_profile_drawer, render_resource_drawer,
-    render_tab_resource_picker_overlay, render_workload_action_modal, render_workspace_tab_bar,
-    render_yaml_viewer, resolve_window_chrome_style,
+    render_command_palette_overlay, render_context_menu_overlay, render_custom_titlebar,
+    render_notification_drawer, render_port_forward_modal, render_profile_drawer,
+    render_resource_drawer, render_tab_resource_picker_overlay, render_workload_action_modal,
+    render_workspace_tab_bar, render_yaml_viewer, resolve_window_chrome_style,
 };
 use crate::icons::{render_icon, theme_mode_icon, theme_mode_tooltip};
 use crate::navigation::{
@@ -58,11 +59,60 @@ use crate::state::{
     PodsState, PortForwardKindFilter, PortForwardsLoadStatus, PortForwardsState, ReplicaSetsState,
     ResourceQuotaKindFilter, ResourceQuotasState, SecretsState, ServicesState, StatefulSetsState,
     StorageOverviewState, TabDropPosition, WorkloadActionKind, WorkloadsOverviewState,
-    WorkspaceTabsState, calculate_tab_drop_index,
+    WorkspaceTabsState,
 };
 use crate::theme::{
     AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, sync_native_titlebar_appearance,
 };
+
+gpui::actions!(orbit_shell, [OpenCommandPalette, ToggleSidebar]);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GlobalWorkspaceShortcut {
+    ToggleCommandPalette,
+    ToggleSidebar,
+    FocusSearch,
+    RefreshWorkspace,
+}
+
+pub fn primary_shortcut_label_for_os(key: &str, is_macos: bool) -> String {
+    if is_macos {
+        format!("⌘{key}")
+    } else {
+        format!("Ctrl+{key}")
+    }
+}
+
+pub fn primary_shortcut_label(key: &str) -> String {
+    primary_shortcut_label_for_os(key, cfg!(target_os = "macos"))
+}
+
+pub fn resolve_global_workspace_shortcut(
+    key: &str,
+    key_char: Option<&str>,
+    ctrl: bool,
+    platform: bool,
+    alt: bool,
+    text_input_focused: bool,
+) -> Option<GlobalWorkspaceShortcut> {
+    let has_primary_mod = (ctrl || platform) && !alt;
+    if has_primary_mod && key.eq_ignore_ascii_case("k") {
+        return Some(GlobalWorkspaceShortcut::ToggleCommandPalette);
+    }
+    if has_primary_mod && key.eq_ignore_ascii_case("b") {
+        return Some(GlobalWorkspaceShortcut::ToggleSidebar);
+    }
+    if text_input_focused || ctrl || platform || alt {
+        return None;
+    }
+    if key == "/" || key_char == Some("/") {
+        return Some(GlobalWorkspaceShortcut::FocusSearch);
+    }
+    if key.eq_ignore_ascii_case("r") || key_char.is_some_and(|c| c.eq_ignore_ascii_case("r")) {
+        return Some(GlobalWorkspaceShortcut::RefreshWorkspace);
+    }
+    None
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShellFocusTarget {
@@ -2048,6 +2098,8 @@ pub struct OrbitShell {
     namespace_search_focus: FocusHandle,
     picker_search_focus: FocusHandle,
     log_search_focus: FocusHandle,
+    command_palette: CommandPaletteState,
+    command_palette_focus: FocusHandle,
     command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
     enable_experience_features: bool,
     resolved_system_is_dark: bool,
@@ -2272,6 +2324,8 @@ impl OrbitShell {
             namespace_search_focus: cx.focus_handle(),
             picker_search_focus: cx.focus_handle(),
             log_search_focus: cx.focus_handle(),
+            command_palette: CommandPaletteState::default(),
+            command_palette_focus: cx.focus_handle(),
             command_tx,
             enable_experience_features: config.enable_experience_features(),
             resolved_system_is_dark,
@@ -2642,24 +2696,25 @@ impl OrbitShell {
                 if !confirm.can_submit() {
                     return;
                 }
+                let spec = &confirm.dialog.spec;
                 match confirm.action {
                     WorkloadActionKind::Restart => ClusterBridgeCommand::RestartWorkload {
                         cluster_id,
-                        namespace: confirm.namespace.clone(),
-                        kind: confirm.kind.clone(),
-                        name: confirm.name.clone(),
+                        namespace: spec.namespace.clone(),
+                        kind: spec.kind.clone(),
+                        name: spec.name.clone(),
                     },
                     WorkloadActionKind::RestartPod => ClusterBridgeCommand::RestartPod {
                         cluster_id,
-                        namespace: confirm.namespace.clone(),
-                        name: confirm.name.clone(),
+                        namespace: spec.namespace.clone(),
+                        name: spec.name.clone(),
                     },
                     WorkloadActionKind::Delete => ClusterBridgeCommand::DeleteResource {
                         cluster_id,
-                        namespace: (!confirm.namespace.trim().is_empty())
-                            .then(|| confirm.namespace.clone()),
-                        kind: confirm.kind.clone(),
-                        name: confirm.name.clone(),
+                        namespace: (!spec.namespace.trim().is_empty())
+                            .then(|| spec.namespace.clone()),
+                        kind: spec.kind.clone(),
+                        name: spec.name.clone(),
                     },
                     _ => return,
                 }
@@ -2701,7 +2756,7 @@ impl OrbitShell {
                     e.update(cx, |shell, cx| {
                         let is_submitting = match &shell.workload_action_modal.dialog {
                             WorkloadActionDialogState::Scale(s) => s.submitting,
-                            WorkloadActionDialogState::Confirm(c) => c.submitting,
+                            WorkloadActionDialogState::Confirm(c) => c.dialog.submitting,
                             WorkloadActionDialogState::Closed => false,
                         };
                         if !is_submitting {
@@ -3880,11 +3935,9 @@ impl OrbitShell {
         pos: TabDropPosition,
         cx: &mut Context<Self>,
     ) {
-        let to_idx = calculate_tab_drop_index(from_idx, hover_idx, pos);
-        self.tabs.reorder_tab(from_idx, to_idx);
-        self.tabs.drop_target = None;
-        self.tabs.dragging_index = None;
-        self.persist_tabs();
+        if self.tabs.apply_drop(from_idx, hover_idx, pos) {
+            self.persist_tabs();
+        }
         cx.notify();
     }
 
@@ -6623,6 +6676,47 @@ impl OrbitShell {
                     .gap_2()
                     .child(
                         theme
+                            .style_control(div().id("command-palette-trigger-btn"))
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .h(theme.typography.control_height_sm)
+                            .px(theme.typography.control_padding_x_md)
+                            .hover(move |style| style.bg(control_hover))
+                            .cursor_pointer()
+                            .tooltip(|_window, cx| {
+                                cx.new(|_| {
+                                    TextTooltip::new(format!(
+                                        "Command Palette ({})",
+                                        primary_shortcut_label("K")
+                                    ))
+                                })
+                                .into()
+                            })
+                            .on_click(cx.listener(|this, _event, window, cx| {
+                                this.toggle_command_palette(window, cx);
+                            }))
+                            .child(render_icon(Icon::Search, px(13.0), theme.text.muted))
+                            .child(
+                                apply_text_step(div(), theme.typography.size_xs)
+                                    .text_color(theme.text.muted)
+                                    .child("Search..."),
+                            )
+                            .child(
+                                apply_text_step(div(), theme.typography.size_3xs)
+                                    .px_1p5()
+                                    .py(px(1.0))
+                                    .rounded(theme.style.radius_control)
+                                    .bg(theme.surface.bg_panel)
+                                    .border_1()
+                                    .border_color(theme.border.default)
+                                    .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                                    .text_color(theme.text.muted)
+                                    .child(primary_shortcut_label("K")),
+                            ),
+                    )
+                    .child(
+                        theme
                             .style_control(div().id("refresh-clusters-btn"))
                             .flex()
                             .items_center()
@@ -6633,6 +6727,9 @@ impl OrbitShell {
                             .when(!is_refreshing, |el| {
                                 el.hover(move |style| style.bg(control_hover))
                                     .cursor_pointer()
+                            })
+                            .tooltip(|_window, cx| {
+                                cx.new(|_| TextTooltip::new("Refresh workspace (R)")).into()
                             })
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 if !this.is_active_view_loading() {
@@ -11672,9 +11769,873 @@ impl OrbitShell {
     fn dismiss_overlays(&mut self) {
         self.dismiss_context_menu();
         self.tabs.close_picker();
+        self.command_palette.close();
         self.state.dropdown_open = false;
         self.namespaces.close_dropdown();
         self.active_shell_drawer.close();
+    }
+
+    fn toggle_command_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.command_palette.is_open {
+            self.close_command_palette(window, cx);
+        } else {
+            self.dismiss_overlays();
+            self.command_palette.open();
+            self.command_palette_focus.focus(window);
+            cx.notify();
+        }
+    }
+
+    fn close_command_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.command_palette.close();
+        self.focus_handle.focus(window);
+        cx.notify();
+    }
+
+    fn execute_command_palette_action(
+        &mut self,
+        action: CommandPaletteAction,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.command_palette.close();
+        self.focus_handle.focus(window);
+        match action {
+            CommandPaletteAction::NavigateView(view) => {
+                self.select_workspace_view(view, cx);
+            }
+            CommandPaletteAction::SwitchCluster(cluster_id) => {
+                self.select_cluster(&cluster_id, cx);
+            }
+            CommandPaletteAction::SelectAllNamespaces
+            | CommandPaletteAction::ClearNamespaceFilter => {
+                if let Some(cleared) = self.namespaces.select_all_namespaces()
+                    && let Some(cluster_id) = self.namespaces.cluster_id.clone()
+                {
+                    self.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
+                        cluster_id,
+                        namespaces: cleared,
+                    });
+                }
+                self.reset_exemplar_pages();
+                cx.notify();
+            }
+            CommandPaletteAction::ToggleNamespace(ns_name) => {
+                if let Some(updated) = self.namespaces.toggle_namespace(&ns_name)
+                    && let Some(cluster_id) = self.namespaces.cluster_id.clone()
+                {
+                    self.dispatch_command(ClusterBridgeCommand::SaveNamespaceSelection {
+                        cluster_id,
+                        namespaces: updated,
+                    });
+                }
+                self.reset_exemplar_pages();
+                cx.notify();
+            }
+            CommandPaletteAction::RefreshWorkspace => {
+                self.refresh_workspace(cx);
+            }
+            CommandPaletteAction::ToggleSidebar => {
+                self.sidebar.toggle_collapse();
+                cx.notify();
+            }
+            CommandPaletteAction::OpenSettings => {
+                self.select_workspace_view(WorkspaceView::Settings, cx);
+            }
+            CommandPaletteAction::AddCluster => {
+                self.open_add_cluster_modal(window, cx);
+            }
+            CommandPaletteAction::DisconnectCluster => {
+                self.disconnect_cluster(cx);
+            }
+        }
+    }
+
+    fn is_text_input_focused(&self) -> bool {
+        if self.add_cluster.is_open
+            || self.port_forward_modal.is_some()
+            || self.workload_action_modal.is_open()
+            || self.command_palette.is_open
+            || self.tabs.picker_open
+            || self.namespaces.dropdown_open
+        {
+            return true;
+        }
+        if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab()
+            && self
+                .log_tabs
+                .get(&target)
+                .is_some_and(|log_state| log_state.search_focused)
+        {
+            return true;
+        }
+        match self.sidebar.active_view {
+            WorkspaceView::Pods => self.pods.table.filters.search_focused,
+            WorkspaceView::Deployments => self.deployments.table.filters.search_focused,
+            WorkspaceView::Services => self.services.table.filters.search_focused,
+            WorkspaceView::Events => self.events.table.filters.search_focused,
+            WorkspaceView::PortForward => self.port_forwards.search_focused,
+            _ => false,
+        }
+    }
+
+    fn focus_active_view_search(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if let Some(WorkspaceTab::Logs(target)) = self.tabs.active_tab() {
+            if let Some(log_state) = self.log_tabs.get_mut(&target) {
+                log_state.search_focused = true;
+                self.log_search_focus.focus(window);
+                cx.notify();
+                return true;
+            }
+            return false;
+        }
+        match self.sidebar.active_view {
+            WorkspaceView::Pods => {
+                self.pods.table.filters.search_focused = true;
+                cx.notify();
+                true
+            }
+            WorkspaceView::Deployments => {
+                self.deployments.table.filters.search_focused = true;
+                cx.notify();
+                true
+            }
+            WorkspaceView::Services => {
+                self.services.table.filters.search_focused = true;
+                cx.notify();
+                true
+            }
+            WorkspaceView::Events => {
+                self.events.table.filters.search_focused = true;
+                cx.notify();
+                true
+            }
+            WorkspaceView::PortForward => {
+                self.port_forwards.search_focused = true;
+                cx.notify();
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn move_active_table_selection(&mut self, delta: isize, cx: &mut Context<Self>) -> bool {
+        if matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))) {
+            return false;
+        }
+        let moved = match self.sidebar.active_view {
+            WorkspaceView::Pods => {
+                let keys: Vec<String> = views::pods::filter_and_sort_pods_with_filters(
+                    &self.pods.pods,
+                    &self.namespaces,
+                    &self.pods.table.filters,
+                    self.pods.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|p| format!("{}/{}", p.namespace, p.name))
+                .collect();
+                self.pods.table.move_selection_by_delta(delta, &keys).is_some()
+            }
+            WorkspaceView::Deployments => {
+                let keys: Vec<String> =
+                    views::deployments::filter_and_sort_deployments_with_filters(
+                        &self.deployments.deployments,
+                        &self.namespaces,
+                        &self.deployments.table.filters,
+                        self.deployments.table.sort.as_ref(),
+                    )
+                    .into_iter()
+                    .map(|d| format!("{}/{}", d.namespace, d.name))
+                    .collect();
+                self.deployments
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Services => {
+                let keys: Vec<String> = views::services::filter_and_sort_services_with_filters(
+                    &self.services.services,
+                    &self.namespaces,
+                    self.services.type_filter,
+                    &self.services.table.filters,
+                    self.services.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|s| format!("{}/{}", s.namespace, s.name))
+                .collect();
+                self.services
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Events => {
+                let keys: Vec<String> = views::events::filter_and_sort_events_with_filters(
+                    &self.events.events,
+                    &self.namespaces,
+                    self.events.type_filter,
+                    &self.events.table.filters,
+                    self.events.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|ev| {
+                    if !ev.uid.is_empty() {
+                        ev.uid.clone()
+                    } else {
+                        format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
+                    }
+                })
+                .collect();
+                self.events
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Nodes => {
+                let keys: Vec<String> =
+                    views::nodes::sort_nodes(&self.nodes.nodes, self.nodes.table.sort.as_ref())
+                        .into_iter()
+                        .map(|n| n.name.clone())
+                        .collect();
+                self.nodes
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Namespaces => {
+                let keys: Vec<String> = views::namespaces::sort_namespaces(
+                    &self.namespaces.namespaces,
+                    self.namespaces_view.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|ns| ns.name.clone())
+                .collect();
+                self.namespaces_view
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::StatefulSets => {
+                let keys: Vec<String> = views::statefulsets::filter_and_sort_statefulsets(
+                    &self.statefulsets.statefulsets,
+                    &self.namespaces,
+                    self.statefulsets.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|s| format!("{}/{}", s.namespace, s.name))
+                .collect();
+                self.statefulsets
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::DaemonSets => {
+                let keys: Vec<String> = views::daemonsets::filter_and_sort_daemonsets(
+                    &self.daemonsets.daemonsets,
+                    &self.namespaces,
+                    self.daemonsets.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|d| format!("{}/{}", d.namespace, d.name))
+                .collect();
+                self.daemonsets
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::ReplicaSets => {
+                let keys: Vec<String> = views::replicasets::filter_and_sort_replicasets(
+                    &self.replicasets.replicasets,
+                    &self.namespaces,
+                    self.replicasets.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|r| format!("{}/{}", r.namespace, r.name))
+                .collect();
+                self.replicasets
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Jobs => {
+                let keys: Vec<String> = views::jobs::filter_and_sort_jobs(
+                    &self.jobs.jobs,
+                    &self.namespaces,
+                    self.jobs.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|j| format!("{}/{}", j.namespace, j.name))
+                .collect();
+                self.jobs
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::CronJobs => {
+                let keys: Vec<String> = views::cronjobs::filter_and_sort_cronjobs(
+                    &self.cronjobs.cronjobs,
+                    &self.namespaces,
+                    self.cronjobs.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|c| format!("{}/{}", c.namespace, c.name))
+                .collect();
+                self.cronjobs
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Hpas => {
+                let keys: Vec<String> = views::hpas::filter_and_sort_hpas(
+                    &self.list_views.hpas.hpas,
+                    &self.namespaces,
+                    "",
+                    self.list_views.hpas.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|h| format!("{}/{}", h.namespace, h.name))
+                .collect();
+                self.list_views
+                    .hpas
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Ingresses => {
+                let keys: Vec<String> = views::ingresses::filter_and_sort_ingresses(
+                    &self.ingresses.ingresses,
+                    &self.namespaces,
+                    self.ingresses.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|i| format!("{}/{}", i.namespace, i.name))
+                .collect();
+                self.ingresses
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::PersistentVolumes => {
+                let keys: Vec<String> = views::persistent_volumes::sort_persistent_volumes(
+                    &self.persistent_volumes.persistent_volumes,
+                    self.persistent_volumes.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|pv| pv.name.clone())
+                .collect();
+                self.persistent_volumes
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::PersistentVolumeClaims => {
+                let keys: Vec<String> =
+                    views::persistent_volume_claims::filter_and_sort_persistent_volume_claims(
+                        &self.persistent_volume_claims.persistent_volume_claims,
+                        &self.namespaces,
+                        self.persistent_volume_claims.table.sort.as_ref(),
+                    )
+                    .into_iter()
+                    .map(|pvc| format!("{}/{}", pvc.namespace, pvc.name))
+                    .collect();
+                self.persistent_volume_claims
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::StorageClasses => {
+                let keys: Vec<String> = views::storage_classes::filter_and_sort_storage_classes(
+                    &self.list_views.storage_classes.classes,
+                    "",
+                    self.list_views.storage_classes.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|sc| sc.name.clone())
+                .collect();
+                self.list_views
+                    .storage_classes
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::ConfigMaps => {
+                let keys: Vec<String> = views::configmaps::filter_and_sort_configmaps(
+                    &self.configmaps.configmaps,
+                    &self.namespaces,
+                    self.configmaps.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|cm| format!("{}/{}", cm.namespace, cm.name))
+                .collect();
+                self.configmaps
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::Secrets => {
+                let keys: Vec<String> = views::secrets::filter_and_sort_secrets(
+                    &self.secrets.secrets,
+                    &self.namespaces,
+                    self.secrets.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|s| format!("{}/{}", s.namespace, s.name))
+                .collect();
+                self.secrets
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::NetworkPolicies => {
+                let keys: Vec<String> = views::network_policies::filter_and_sort_network_policies(
+                    &self.network_policies.network_policies,
+                    &self.namespaces,
+                    self.network_policies.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|np| format!("{}/{}", np.namespace, np.name))
+                .collect();
+                self.network_policies
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::PodSecurity => {
+                let keys: Vec<String> = views::pod_security::filter_and_sort_pod_security_policies(
+                    &self.pod_security.policies,
+                    &self.namespaces,
+                    self.pod_security.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|p| format!("{}/{}", p.namespace, p.name))
+                .collect();
+                self.pod_security
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::ResourceQuotas => {
+                let keys: Vec<String> = views::resource_quotas::filter_and_sort_resource_policies(
+                    &self.resource_quotas.policies,
+                    &self.namespaces,
+                    self.resource_quotas.kind_filter,
+                    self.resource_quotas.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name))
+                .collect();
+                self.resource_quotas
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::AdmissionWebhooks => {
+                let keys: Vec<String> =
+                    views::admission_webhooks::filter_and_sort_admission_webhooks(
+                        &self.list_views.admission_webhooks.policies,
+                        self.list_views.admission_webhooks.table.sort.as_ref(),
+                    )
+                    .into_iter()
+                    .map(|w| format!("{}/{}", w.kind, w.name))
+                    .collect();
+                self.list_views
+                    .admission_webhooks
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            WorkspaceView::SecurityOverview => {
+                let keys: Vec<String> = views::security_overview::filter_and_sort_security_policies(
+                    &self.list_views.security_overview.policies,
+                    &self.namespaces,
+                    self.list_views.security_overview.table.sort.as_ref(),
+                )
+                .into_iter()
+                .map(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name))
+                .collect();
+                self.list_views
+                    .security_overview
+                    .table
+                    .move_selection_by_delta(delta, &keys)
+                    .is_some()
+            }
+            _ => false,
+        };
+        if moved {
+            cx.notify();
+        }
+        moved
+    }
+
+    fn open_selected_table_row_drawer(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(target) = self.selected_table_row_drawer_target() else {
+            return false;
+        };
+        self.open_resource_drawer(target, ResourceDrawerTabId::Overview, cx);
+        true
+    }
+
+    fn selected_table_row_drawer_target(&self) -> Option<ResourceDrawerTarget> {
+        if matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))) {
+            return None;
+        }
+        match self.sidebar.active_view {
+            WorkspaceView::Pods => {
+                let key = self.pods.table.selected_row_key.as_deref()?;
+                views::pods::filter_and_sort_pods_with_filters(
+                    &self.pods.pods,
+                    &self.namespaces,
+                    &self.pods.table.filters,
+                    self.pods.table.sort.as_ref(),
+                )
+                .into_iter()
+                .find(|p| format!("{}/{}", p.namespace, p.name) == key)
+                .map(|p| ResourceDrawerTarget::Pod {
+                    name: p.name.clone(),
+                    namespace: p.namespace.clone(),
+                })
+            }
+            WorkspaceView::Deployments => {
+                let key = self.deployments.table.selected_row_key.as_deref()?;
+                views::deployments::filter_and_sort_deployments_with_filters(
+                    &self.deployments.deployments,
+                    &self.namespaces,
+                    &self.deployments.table.filters,
+                    self.deployments.table.sort.as_ref(),
+                )
+                .into_iter()
+                .find(|d| format!("{}/{}", d.namespace, d.name) == key)
+                .map(|d| ResourceDrawerTarget::Deployment {
+                    name: d.name.clone(),
+                    namespace: d.namespace.clone(),
+                })
+            }
+            WorkspaceView::Services => {
+                let key = self.services.table.selected_row_key.as_deref()?;
+                views::services::filter_and_sort_services_with_filters(
+                    &self.services.services,
+                    &self.namespaces,
+                    self.services.type_filter,
+                    &self.services.table.filters,
+                    self.services.table.sort.as_ref(),
+                )
+                .into_iter()
+                .find(|s| format!("{}/{}", s.namespace, s.name) == key)
+                .map(|s| ResourceDrawerTarget::Service {
+                    name: s.name.clone(),
+                    namespace: s.namespace.clone(),
+                })
+            }
+            WorkspaceView::Events => {
+                let key = self.events.table.selected_row_key.as_deref()?;
+                views::events::filter_and_sort_events_with_filters(
+                    &self.events.events,
+                    &self.namespaces,
+                    self.events.type_filter,
+                    &self.events.table.filters,
+                    self.events.table.sort.as_ref(),
+                )
+                .into_iter()
+                .find(|ev| {
+                    let ev_key = if !ev.uid.is_empty() {
+                        ev.uid.clone()
+                    } else {
+                        format!("{}/{}/{}", ev.namespace, ev.reason, ev.object_name)
+                    };
+                    ev_key == key
+                })
+                .map(|ev| ResourceDrawerTarget::Event {
+                    uid: ev.uid.clone(),
+                    name: ev.object_name.clone(),
+                    reason: ev.reason.clone(),
+                    namespace: ev.namespace.clone(),
+                })
+            }
+            WorkspaceView::Nodes => {
+                let key = self.nodes.table.selected_row_key.as_deref()?;
+                self.nodes
+                    .nodes
+                    .iter()
+                    .find(|n| n.name == key)
+                    .map(|n| ResourceDrawerTarget::Node {
+                        name: n.name.clone(),
+                    })
+            }
+            WorkspaceView::Namespaces => {
+                let key = self.namespaces_view.table.selected_row_key.as_deref()?;
+                self.namespaces
+                    .namespaces
+                    .iter()
+                    .find(|ns| ns.name == key)
+                    .map(|ns| ResourceDrawerTarget::Namespace {
+                        name: ns.name.clone(),
+                    })
+            }
+            WorkspaceView::StatefulSets => {
+                let key = self.statefulsets.table.selected_row_key.as_deref()?;
+                self.statefulsets
+                    .statefulsets
+                    .iter()
+                    .find(|s| format!("{}/{}", s.namespace, s.name) == key)
+                    .map(|s| ResourceDrawerTarget::StatefulSet {
+                        name: s.name.clone(),
+                        namespace: s.namespace.clone(),
+                    })
+            }
+            WorkspaceView::DaemonSets => {
+                let key = self.daemonsets.table.selected_row_key.as_deref()?;
+                self.daemonsets
+                    .daemonsets
+                    .iter()
+                    .find(|d| format!("{}/{}", d.namespace, d.name) == key)
+                    .map(|d| ResourceDrawerTarget::DaemonSet {
+                        name: d.name.clone(),
+                        namespace: d.namespace.clone(),
+                    })
+            }
+            WorkspaceView::ReplicaSets => {
+                let key = self.replicasets.table.selected_row_key.as_deref()?;
+                self.replicasets
+                    .replicasets
+                    .iter()
+                    .find(|r| format!("{}/{}", r.namespace, r.name) == key)
+                    .map(|r| ResourceDrawerTarget::ReplicaSet {
+                        name: r.name.clone(),
+                        namespace: r.namespace.clone(),
+                    })
+            }
+            WorkspaceView::Jobs => {
+                let key = self.jobs.table.selected_row_key.as_deref()?;
+                self.jobs
+                    .jobs
+                    .iter()
+                    .find(|j| format!("{}/{}", j.namespace, j.name) == key)
+                    .map(|j| ResourceDrawerTarget::Job {
+                        name: j.name.clone(),
+                        namespace: j.namespace.clone(),
+                    })
+            }
+            WorkspaceView::CronJobs => {
+                let key = self.cronjobs.table.selected_row_key.as_deref()?;
+                self.cronjobs
+                    .cronjobs
+                    .iter()
+                    .find(|c| format!("{}/{}", c.namespace, c.name) == key)
+                    .map(|c| ResourceDrawerTarget::CronJob {
+                        name: c.name.clone(),
+                        namespace: c.namespace.clone(),
+                    })
+            }
+            WorkspaceView::Hpas => {
+                let key = self.list_views.hpas.table.selected_row_key.as_deref()?;
+                self.list_views
+                    .hpas
+                    .hpas
+                    .iter()
+                    .find(|h| format!("{}/{}", h.namespace, h.name) == key)
+                    .map(|h| ResourceDrawerTarget::Hpa {
+                        name: h.name.clone(),
+                        namespace: h.namespace.clone(),
+                    })
+            }
+            WorkspaceView::Ingresses => {
+                let key = self.ingresses.table.selected_row_key.as_deref()?;
+                self.ingresses
+                    .ingresses
+                    .iter()
+                    .find(|i| format!("{}/{}", i.namespace, i.name) == key)
+                    .map(|i| ResourceDrawerTarget::Ingress {
+                        name: i.name.clone(),
+                        namespace: i.namespace.clone(),
+                    })
+            }
+            WorkspaceView::PersistentVolumes => {
+                let key = self.persistent_volumes.table.selected_row_key.as_deref()?;
+                self.persistent_volumes
+                    .persistent_volumes
+                    .iter()
+                    .find(|pv| pv.name == key)
+                    .map(|pv| ResourceDrawerTarget::PersistentVolume {
+                        name: pv.name.clone(),
+                    })
+            }
+            WorkspaceView::PersistentVolumeClaims => {
+                let key = self
+                    .persistent_volume_claims
+                    .table
+                    .selected_row_key
+                    .as_deref()?;
+                self.persistent_volume_claims
+                    .persistent_volume_claims
+                    .iter()
+                    .find(|pvc| format!("{}/{}", pvc.namespace, pvc.name) == key)
+                    .map(|pvc| ResourceDrawerTarget::PersistentVolumeClaim {
+                        name: pvc.name.clone(),
+                        namespace: pvc.namespace.clone(),
+                    })
+            }
+            WorkspaceView::StorageClasses => {
+                let key = self
+                    .list_views
+                    .storage_classes
+                    .table
+                    .selected_row_key
+                    .as_deref()?;
+                self.list_views
+                    .storage_classes
+                    .classes
+                    .iter()
+                    .find(|sc| sc.name == key)
+                    .map(|sc| ResourceDrawerTarget::StorageClass {
+                        name: sc.name.clone(),
+                    })
+            }
+            WorkspaceView::ConfigMaps => {
+                let key = self.configmaps.table.selected_row_key.as_deref()?;
+                self.configmaps
+                    .configmaps
+                    .iter()
+                    .find(|cm| format!("{}/{}", cm.namespace, cm.name) == key)
+                    .map(|cm| ResourceDrawerTarget::ConfigMap {
+                        name: cm.name.clone(),
+                        namespace: cm.namespace.clone(),
+                    })
+            }
+            WorkspaceView::Secrets => {
+                let key = self.secrets.table.selected_row_key.as_deref()?;
+                self.secrets
+                    .secrets
+                    .iter()
+                    .find(|s| format!("{}/{}", s.namespace, s.name) == key)
+                    .map(|s| ResourceDrawerTarget::Secret {
+                        name: s.name.clone(),
+                        namespace: s.namespace.clone(),
+                    })
+            }
+            WorkspaceView::NetworkPolicies => {
+                let key = self.network_policies.table.selected_row_key.as_deref()?;
+                self.network_policies
+                    .network_policies
+                    .iter()
+                    .find(|np| format!("{}/{}", np.namespace, np.name) == key)
+                    .map(|np| ResourceDrawerTarget::NetworkPolicy {
+                        name: np.name.clone(),
+                        namespace: np.namespace.clone(),
+                    })
+            }
+            WorkspaceView::PodSecurity => {
+                let key = self.pod_security.table.selected_row_key.as_deref()?;
+                self.pod_security
+                    .policies
+                    .iter()
+                    .find(|p| format!("{}/{}", p.namespace, p.name) == key)
+                    .map(|p| ResourceDrawerTarget::PodSecurity {
+                        name: p.name.clone(),
+                        namespace: p.namespace.clone(),
+                    })
+            }
+            WorkspaceView::ResourceQuotas => {
+                let key = self.resource_quotas.table.selected_row_key.as_deref()?;
+                self.resource_quotas
+                    .policies
+                    .iter()
+                    .find(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name) == key)
+                    .map(|p| {
+                        if p.kind.eq_ignore_ascii_case("LimitRange") {
+                            ResourceDrawerTarget::LimitRange {
+                                name: p.name.clone(),
+                                namespace: p.namespace.clone(),
+                            }
+                        } else {
+                            ResourceDrawerTarget::ResourceQuota {
+                                name: p.name.clone(),
+                                namespace: p.namespace.clone(),
+                            }
+                        }
+                    })
+            }
+            WorkspaceView::AdmissionWebhooks => {
+                let key = self
+                    .list_views
+                    .admission_webhooks
+                    .table
+                    .selected_row_key
+                    .as_deref()?;
+                self.list_views
+                    .admission_webhooks
+                    .policies
+                    .iter()
+                    .find(|w| format!("{}/{}", w.kind, w.name) == key)
+                    .map(|w| ResourceDrawerTarget::AdmissionWebhook {
+                        is_mutating: w.kind.contains("Mutating"),
+                        name: w.name.clone(),
+                    })
+            }
+            WorkspaceView::SecurityOverview => {
+                let key = self
+                    .list_views
+                    .security_overview
+                    .table
+                    .selected_row_key
+                    .as_deref()?;
+                self.list_views
+                    .security_overview
+                    .policies
+                    .iter()
+                    .find(|p| format!("{}/{}/{}", p.kind, p.namespace, p.name) == key)
+                    .map(|p| ResourceDrawerTarget::SecurityPolicy {
+                        kind: p.kind.clone(),
+                        name: p.name.clone(),
+                        namespace: p.namespace.clone(),
+                    })
+            }
+            _ => None,
+        }
+    }
+
+    fn render_command_palette_overlay_view(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if !self.command_palette.is_open {
+            return None;
+        }
+        let theme = OrbitTheme::get(cx).clone();
+        let catalog = build_command_palette_items(
+            &self.state.clusters,
+            self.state.active_cluster_id.as_deref(),
+            &self.namespaces,
+        );
+        let filtered = self.command_palette.filter_items(&catalog);
+        let exec_entity = cx.entity().clone();
+        let clear_entity = cx.entity().clone();
+        let close_entity = cx.entity().clone();
+        Some(render_command_palette_overlay(
+            &self.command_palette,
+            &filtered,
+            &theme,
+            &self.command_palette_focus,
+            self.command_palette_focus.is_focused(window),
+            CommandPaletteCallbacks {
+                on_execute: std::rc::Rc::new(move |action, window, cx| {
+                    exec_entity.update(cx, |shell, cx| {
+                        shell.execute_command_palette_action(action, window, cx);
+                    });
+                }),
+                on_clear_query: std::rc::Rc::new(move |window, cx| {
+                    clear_entity.update(cx, |shell, cx| {
+                        shell.command_palette.clear_query();
+                        shell.command_palette_focus.focus(window);
+                        cx.notify();
+                    });
+                }),
+                on_close: std::rc::Rc::new(move |window, cx| {
+                    close_entity.update(cx, |shell, cx| {
+                        shell.close_command_palette(window, cx);
+                    });
+                }),
+            },
+        ))
     }
 
     fn apply_focus_target(&self, target: ShellFocusTarget, window: &mut Window) {
@@ -11740,6 +12701,7 @@ impl OrbitShell {
         let menu_entity = cx.entity().clone();
         let drag_start_entity = cx.entity().clone();
         let drag_move_entity = cx.entity().clone();
+        let drag_leave_entity = cx.entity().clone();
         let drop_entity = cx.entity().clone();
         let picker_entity = cx.entity().clone();
 
@@ -11774,8 +12736,14 @@ impl OrbitShell {
             }),
             on_drag_move: std::rc::Rc::new(move |idx, pos, _window, cx| {
                 drag_move_entity.update(cx, |shell, cx| {
-                    if shell.tabs.drop_target != Some((idx, pos)) {
-                        shell.tabs.drop_target = Some((idx, pos));
+                    if shell.tabs.update_drop_target(idx, pos) {
+                        cx.notify();
+                    }
+                });
+            }),
+            on_drag_leave: std::rc::Rc::new(move |_window, cx| {
+                drag_leave_entity.update(cx, |shell, cx| {
+                    if shell.tabs.clear_drop_target() {
                         cx.notify();
                     }
                 });
@@ -12058,6 +13026,23 @@ impl Render for OrbitShell {
         div()
             .id("orbit-shell-root")
             .track_focus(&self.focus_handle)
+            .on_action(cx.listener(|this, _: &OpenCommandPalette, window, cx| {
+                if !this.add_cluster.is_open
+                    && this.port_forward_modal.is_none()
+                    && !this.workload_action_modal.is_open()
+                {
+                    this.toggle_command_palette(window, cx);
+                }
+            }))
+            .on_action(cx.listener(|this, _: &ToggleSidebar, _window, cx| {
+                if !this.add_cluster.is_open
+                    && this.port_forward_modal.is_none()
+                    && !this.workload_action_modal.is_open()
+                {
+                    this.sidebar.toggle_collapse();
+                    cx.notify();
+                }
+            }))
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| {
                 if this.add_cluster.is_open {
                     let key = event.keystroke.key.to_ascii_lowercase();
@@ -12146,6 +13131,44 @@ impl Render for OrbitShell {
                     }
                     return;
                 }
+                if this.command_palette.is_open {
+                    if !(event.keystroke.modifiers.control
+                        || event.keystroke.modifiers.alt
+                        || event.keystroke.modifiers.platform)
+                    {
+                        let key = event.keystroke.key.to_ascii_lowercase();
+                        let catalog = build_command_palette_items(
+                            &this.state.clusters,
+                            this.state.active_cluster_id.as_deref(),
+                            &this.namespaces,
+                        );
+                        let filtered = this.command_palette.filter_items(&catalog);
+                        match this.command_palette.handle_key_input(
+                            &key,
+                            event.keystroke.key_char.as_deref(),
+                            filtered.len(),
+                        ) {
+                            crate::components::CommandPaletteKeyResult::Close => {
+                                this.focus_handle.focus(window);
+                                cx.notify();
+                            }
+                            crate::components::CommandPaletteKeyResult::Execute(idx) => {
+                                if let Some(item) = filtered.get(idx) {
+                                    this.execute_command_palette_action(
+                                        item.action.clone(),
+                                        window,
+                                        cx,
+                                    );
+                                }
+                            }
+                            crate::components::CommandPaletteKeyResult::Handled => {
+                                cx.notify();
+                            }
+                            crate::components::CommandPaletteKeyResult::Ignored => {}
+                        }
+                    }
+                    return;
+                }
                 if this.context_menu.is_open {
                     let key = event.keystroke.key.to_ascii_lowercase();
                     let (action, callback) = this.context_menu.handle_key(&key);
@@ -12220,6 +13243,12 @@ impl Render for OrbitShell {
                 }
                 if event.keystroke.key.eq_ignore_ascii_case("escape") && this.drawer.is_open {
                     this.dismiss_resource_drawer(cx);
+                    return;
+                }
+                if event.keystroke.key.eq_ignore_ascii_case("escape")
+                    && this.tabs.clear_drag_state()
+                {
+                    cx.notify();
                     return;
                 }
                 if let Some(WorkspaceTab::Logs(target)) = this.tabs.active_tab() {
@@ -12326,12 +13355,48 @@ impl Render for OrbitShell {
                     cx.notify();
                     return;
                 }
-                let toggle_pressed = (event.keystroke.modifiers.control
+                let text_input_focused = this.is_text_input_focused();
+                if let Some(shortcut) = resolve_global_workspace_shortcut(
+                    &event.keystroke.key,
+                    event.keystroke.key_char.as_deref(),
+                    event.keystroke.modifiers.control,
+                    event.keystroke.modifiers.platform,
+                    event.keystroke.modifiers.alt,
+                    text_input_focused,
+                ) {
+                    match shortcut {
+                        // Ctrl/Cmd+K and Ctrl/Cmd+B are dispatched via GPUI cx.bind_keys + .on_action
+                        GlobalWorkspaceShortcut::ToggleCommandPalette
+                        | GlobalWorkspaceShortcut::ToggleSidebar => {}
+                        GlobalWorkspaceShortcut::FocusSearch => {
+                            this.focus_active_view_search(window, cx);
+                            return;
+                        }
+                        GlobalWorkspaceShortcut::RefreshWorkspace => {
+                            if !this.is_active_view_loading() {
+                                this.refresh_workspace(cx);
+                            }
+                            return;
+                        }
+                    }
+                }
+                if !(text_input_focused
+                    || event.keystroke.modifiers.control
+                    || event.keystroke.modifiers.alt
                     || event.keystroke.modifiers.platform)
-                    && event.keystroke.key.eq_ignore_ascii_case("b");
-                if toggle_pressed {
-                    this.sidebar.toggle_collapse();
-                    cx.notify();
+                {
+                    match event.keystroke.key.to_ascii_lowercase().as_str() {
+                        "up" => {
+                            this.move_active_table_selection(-1, cx);
+                        }
+                        "down" => {
+                            this.move_active_table_selection(1, cx);
+                        }
+                        "enter" => {
+                            this.open_selected_table_row_drawer(cx);
+                        }
+                        _ => {}
+                    }
                 }
             }))
             .on_mouse_down(
@@ -12378,9 +13443,7 @@ impl Render for OrbitShell {
                     if this.finish_active_table_column_resize() {
                         changed = true;
                     }
-                    if this.tabs.dragging_index.is_some() || this.tabs.drop_target.is_some() {
-                        this.tabs.dragging_index = None;
-                        this.tabs.drop_target = None;
+                    if this.tabs.clear_drag_state() {
                         changed = true;
                     }
                     if changed {
@@ -12495,6 +13558,10 @@ impl Render for OrbitShell {
                     },
                 ))
             })
+            .when_some(
+                self.render_command_palette_overlay_view(window, cx),
+                |el, overlay| el.child(overlay),
+            )
             .when_some(context_menu_overlay, |el, overlay| el.child(overlay))
             .when(
                 cfg!(target_os = "linux")
@@ -12605,6 +13672,13 @@ fn main() -> std::process::ExitCode {
         if let Err(err) = crate::icons::register_lucide_font(cx) {
             tracing::warn!(error = %err, "Failed to register embedded Lucide icon font");
         }
+
+        cx.bind_keys([
+            gpui::KeyBinding::new("ctrl-k", OpenCommandPalette, None),
+            gpui::KeyBinding::new("cmd-k", OpenCommandPalette, None),
+            gpui::KeyBinding::new("ctrl-b", ToggleSidebar, None),
+            gpui::KeyBinding::new("cmd-b", ToggleSidebar, None),
+        ]);
 
         cx.on_window_closed(|cx| {
             if cx.windows().is_empty() {
@@ -21312,9 +22386,9 @@ mod tests {
         assert!(modal.is_open());
         match &modal.dialog {
             WorkloadActionDialogState::Confirm(confirm) => {
-                assert!(!confirm.submitting);
+                assert!(!confirm.dialog.submitting);
                 assert_eq!(
-                    confirm.error.as_deref(),
+                    confirm.dialog.error.as_deref(),
                     Some("Permission denied: pods \"web-0\" is forbidden")
                 );
                 assert!(confirm.can_submit());
@@ -21694,5 +22768,45 @@ mod tests {
         assert_eq!(id, "pods");
         assert!(table.active_resize.is_none());
         assert_eq!(cfg.column_widths.get("name").copied(), Some(640));
+    }
+
+    #[test]
+    fn test_global_shortcut_guard_blocks_slash_and_r_when_text_input_active() {
+        assert_eq!(
+            resolve_global_workspace_shortcut("/", Some("/"), false, false, false, true),
+            None
+        );
+        assert_eq!(
+            resolve_global_workspace_shortcut("r", Some("r"), false, false, false, true),
+            None
+        );
+        assert_eq!(
+            resolve_global_workspace_shortcut("/", Some("/"), false, false, false, false),
+            Some(GlobalWorkspaceShortcut::FocusSearch)
+        );
+        assert_eq!(
+            resolve_global_workspace_shortcut("r", Some("r"), false, false, false, false),
+            Some(GlobalWorkspaceShortcut::RefreshWorkspace)
+        );
+        assert_eq!(
+            resolve_global_workspace_shortcut("k", Some("k"), true, false, false, true),
+            Some(GlobalWorkspaceShortcut::ToggleCommandPalette)
+        );
+        assert_eq!(
+            resolve_global_workspace_shortcut("k", Some("k"), false, true, false, true),
+            Some(GlobalWorkspaceShortcut::ToggleCommandPalette)
+        );
+        assert_eq!(
+            resolve_global_workspace_shortcut("b", Some("b"), true, false, false, false),
+            Some(GlobalWorkspaceShortcut::ToggleSidebar)
+        );
+    }
+
+    #[test]
+    fn test_shortcut_hint_labels_adapt_to_platform() {
+        assert_eq!(primary_shortcut_label_for_os("K", true), "⌘K");
+        assert_eq!(primary_shortcut_label_for_os("K", false), "Ctrl+K");
+        assert_eq!(primary_shortcut_label_for_os("B", true), "⌘B");
+        assert_eq!(primary_shortcut_label_for_os("B", false), "Ctrl+B");
     }
 }

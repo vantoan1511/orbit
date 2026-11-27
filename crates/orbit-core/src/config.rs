@@ -1103,8 +1103,6 @@ impl Drop for TestConfigDirGuard {
 mod tests {
     use super::*;
 
-    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
     #[test]
     fn test_orbit_config_default_and_getters() {
         let config = OrbitConfig::default();
@@ -1408,7 +1406,9 @@ mod tests {
 
     #[test]
     fn test_orbit_config_dev_mode_directory_resolution() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = TEST_CONFIG_DIR_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         // Save current env state
         let original_orbit_dev = std::env::var("ORBIT_DEV").ok();
         let original_config_dir = std::env::var_os("ORBIT_CONFIG_DIR");
@@ -1464,7 +1464,9 @@ mod tests {
 
     #[test]
     fn test_orbit_config_dir_respects_custom_env_override() {
-        let _lock = ENV_LOCK.lock().unwrap();
+        let _lock = TEST_CONFIG_DIR_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let original_custom = std::env::var_os("ORBIT_CONFIG_DIR");
         let test_custom_path = PathBuf::from("/custom/test/orbit_config_path");
 

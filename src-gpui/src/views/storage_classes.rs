@@ -307,6 +307,7 @@ pub fn render_storage_classes_view(
         StorageClassesPresentationMode::Table => {
             let mut table_state = state.table.clone();
             table_state.loading = is_loading && state.classes.is_empty();
+            table_state.refreshing = is_loading && !state.classes.is_empty();
             table_state.empty_message = SharedString::from(storage_classes_empty_message(state));
 
             let key_rows = filtered_rows.clone();
