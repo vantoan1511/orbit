@@ -225,6 +225,13 @@ pub const fn should_show_header_kind_badge(_view: WorkspaceView) -> bool {
     false
 }
 
+pub const fn should_render_workspace_view_header(
+    view: WorkspaceView,
+    has_active_logs_tab: bool,
+) -> bool {
+    !matches!(view, WorkspaceView::Settings) || has_active_logs_tab
+}
+
 pub const fn is_full_bleed_table_view(view: WorkspaceView) -> bool {
     matches!(
         view,
@@ -2104,6 +2111,7 @@ pub struct OrbitShell {
     enable_experience_features: bool,
     resolved_system_is_dark: bool,
     settings_error: Option<String>,
+    settings_dropdown: views::settings::SettingsDropdownState,
     context_menu: ContextMenuState,
     add_cluster: AddClusterModalState,
     workload_action_modal: WorkloadActionModalState,
@@ -2330,6 +2338,7 @@ impl OrbitShell {
             enable_experience_features: config.enable_experience_features(),
             resolved_system_is_dark,
             settings_error: None,
+            settings_dropdown: views::settings::SettingsDropdownState::default(),
             context_menu: ContextMenuState::new(),
             add_cluster: AddClusterModalState::default(),
             workload_action_modal: WorkloadActionModalState::default(),
@@ -2346,6 +2355,7 @@ impl OrbitShell {
     fn open_add_cluster_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.state.close_dropdown();
         self.namespaces.close_dropdown();
+        self.settings_dropdown.close();
         self.context_menu.close();
         self.add_cluster.open(&self.state.clusters);
         self.focus_handle.focus(window);
@@ -3119,6 +3129,7 @@ impl OrbitShell {
     ) {
         self.state.close_dropdown();
         self.namespaces.close_dropdown();
+        self.settings_dropdown.close();
         self.context_menu.open(anchor, entries);
         cx.notify();
     }
@@ -3504,6 +3515,7 @@ impl OrbitShell {
     }
 
     fn select_workspace_view(&mut self, view: WorkspaceView, cx: &mut Context<Self>) {
+        self.settings_dropdown.close();
         if view != self.sidebar.active_view {
             self.drawer.reset_for_context_change();
         }
@@ -3556,6 +3568,7 @@ impl OrbitShell {
     }
 
     fn sync_active_tab_view(&mut self, prev_view: WorkspaceView) {
+        self.settings_dropdown.close();
         let active = self.tabs.active_view();
         self.sidebar.sync_for_view(active);
         if self.sidebar.active_view != prev_view {
@@ -5894,6 +5907,7 @@ impl OrbitShell {
     }
 
     fn select_theme_mode(&mut self, mode: ThemeMode, window: &mut Window, cx: &mut Context<Self>) {
+        self.settings_dropdown.close();
         let updated = OrbitTheme::get(cx).with_mode(mode, window.appearance());
         apply_theme(updated, window, cx);
         self.settings_error = None;
@@ -5904,6 +5918,7 @@ impl OrbitShell {
     }
 
     fn select_ui_style(&mut self, style: UiStyle, window: &mut Window, cx: &mut Context<Self>) {
+        self.settings_dropdown.close();
         let updated = OrbitTheme::get(cx).with_ui_style(style, window.appearance());
         apply_theme(updated, window, cx);
         self.settings_error = None;
@@ -5936,6 +5951,7 @@ impl OrbitShell {
     }
 
     fn reset_appearance_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.settings_dropdown.close();
         let updated = OrbitTheme::get(cx).with_appearance(
             ThemeMode::Dark,
             UiStyle::Flat,
@@ -6586,6 +6602,7 @@ impl OrbitShell {
                             .on_click(cx.listener(|this, _event, _window, cx| {
                                 this.dismiss_context_menu();
                                 this.namespaces.close_dropdown();
+                                this.settings_dropdown.close();
                                 this.state.toggle_dropdown();
                                 cx.notify();
                             }))
@@ -6629,6 +6646,7 @@ impl OrbitShell {
                                     .on_click(cx.listener(|this, _event, window, cx| {
                                         this.dismiss_context_menu();
                                         this.state.close_dropdown();
+                                        this.settings_dropdown.close();
                                         this.namespaces.toggle_dropdown();
                                         if this.namespaces.dropdown_open {
                                             this.namespace_search_focus.focus(window);
@@ -7506,6 +7524,7 @@ impl OrbitShell {
             config_file_path,
             sidebar_status,
             save_error: self.settings_error.as_deref(),
+            dropdown: &self.settings_dropdown,
         };
 
         let mode_entity = cx.entity().clone();
@@ -7513,6 +7532,8 @@ impl OrbitShell {
         let accent_entity = cx.entity().clone();
         let exp_entity = cx.entity().clone();
         let reset_entity = cx.entity().clone();
+        let toggle_dropdown_entity = cx.entity().clone();
+        let hover_dropdown_entity = cx.entity().clone();
 
         let callbacks = views::settings::SettingsCallbacks {
             on_select_theme_mode: std::rc::Rc::new(move |mode, window, cx| {
@@ -7533,6 +7554,35 @@ impl OrbitShell {
             }),
             on_reset_appearance: std::rc::Rc::new(move |window, cx| {
                 reset_entity.update(cx, |shell, cx| shell.reset_appearance_defaults(window, cx));
+            }),
+            on_toggle_dropdown: std::rc::Rc::new(move |kind, window, cx| {
+                toggle_dropdown_entity.update(cx, |shell, cx| {
+                    shell.state.close_dropdown();
+                    shell.namespaces.close_dropdown();
+                    shell.dismiss_context_menu();
+                    let current_theme = OrbitTheme::get(cx);
+                    let current_index = match kind {
+                        views::settings::SettingsDropdownKind::ThemeMode => {
+                            views::settings::theme_mode_index(current_theme.mode)
+                        }
+                        views::settings::SettingsDropdownKind::UiStyle => {
+                            views::settings::ui_style_index(current_theme.style.ui_style)
+                        }
+                    };
+                    shell.settings_dropdown.toggle(kind, current_index);
+                    if shell.settings_dropdown.is_any_open() {
+                        shell.focus_handle.focus(window);
+                    }
+                    cx.notify();
+                });
+            }),
+            on_hover_dropdown_option: std::rc::Rc::new(move |idx, _window, cx| {
+                hover_dropdown_entity.update(cx, |shell, cx| {
+                    if shell.settings_dropdown.highlighted_index != idx {
+                        shell.settings_dropdown.set_highlight(idx);
+                        cx.notify();
+                    }
+                });
             }),
         };
 
@@ -11772,6 +11822,7 @@ impl OrbitShell {
         self.command_palette.close();
         self.state.dropdown_open = false;
         self.namespaces.close_dropdown();
+        self.settings_dropdown.close();
         self.active_shell_drawer.close();
     }
 
@@ -12763,6 +12814,12 @@ impl OrbitShell {
         Some(render_workspace_tab_bar(&mut self.tabs, &theme, callbacks))
     }
 
+    fn is_settings_dropdown_visible(&self) -> bool {
+        self.sidebar.active_view == WorkspaceView::Settings
+            && !matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_)))
+            && self.settings_dropdown.is_any_open()
+    }
+
     fn render_workspace(&mut self, window_width: f32, cx: &mut Context<Self>) -> AnyElement {
         let theme = OrbitTheme::get(cx).clone();
 
@@ -12910,7 +12967,13 @@ impl OrbitShell {
                 .flex()
                 .flex_col()
                 .gap_4()
-                .child(self.render_workspace_view_header(&theme))
+                .when(
+                    should_render_workspace_view_header(
+                        self.sidebar.active_view,
+                        matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))),
+                    ),
+                    |el| el.child(self.render_workspace_view_header(&theme)),
+                )
                 .child(body)
         };
 
@@ -13178,6 +13241,25 @@ impl Render for OrbitShell {
                         }
                         cx.notify();
                         return;
+                    }
+                }
+                if this.is_settings_dropdown_visible() {
+                    let key = event.keystroke.key.to_ascii_lowercase();
+                    match this.settings_dropdown.handle_key(&key) {
+                        views::settings::SettingsDropdownKeyAction::Navigated
+                        | views::settings::SettingsDropdownKeyAction::Closed => {
+                            cx.notify();
+                            return;
+                        }
+                        views::settings::SettingsDropdownKeyAction::SelectThemeMode(mode) => {
+                            this.select_theme_mode(mode, window, cx);
+                            return;
+                        }
+                        views::settings::SettingsDropdownKeyAction::SelectUiStyle(style) => {
+                            this.select_ui_style(style, window, cx);
+                            return;
+                        }
+                        views::settings::SettingsDropdownKeyAction::Ignored => {}
                     }
                 }
                 if this.tabs.picker_open {
@@ -13500,6 +13582,30 @@ impl Render for OrbitShell {
             })
             .when_some(self.render_namespace_dropdown_overlay(cx), |el, overlay| {
                 el.child(overlay)
+            })
+            .when(self.is_settings_dropdown_visible(), |el| {
+                el.child(
+                    div()
+                        .id("settings-dropdown-backdrop")
+                        .absolute()
+                        .inset_0()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _event, _window, cx| {
+                                cx.stop_propagation();
+                                this.settings_dropdown.close();
+                                cx.notify();
+                            }),
+                        )
+                        .on_mouse_down(
+                            MouseButton::Right,
+                            cx.listener(|this, _event, _window, cx| {
+                                cx.stop_propagation();
+                                this.settings_dropdown.close();
+                                cx.notify();
+                            }),
+                        ),
+                )
             })
             .when_some(self.render_add_cluster_modal_overlay(cx), |el, overlay| {
                 el.child(overlay)
@@ -22808,5 +22914,21 @@ mod tests {
         assert_eq!(primary_shortcut_label_for_os("K", false), "Ctrl+K");
         assert_eq!(primary_shortcut_label_for_os("B", true), "⌘B");
         assert_eq!(primary_shortcut_label_for_os("B", false), "Ctrl+B");
+    }
+
+    #[test]
+    fn test_settings_workspace_header_and_dropdown_dismissal_rules() {
+        assert!(!should_render_workspace_view_header(
+            WorkspaceView::Settings,
+            false
+        ));
+        assert!(should_render_workspace_view_header(
+            WorkspaceView::Settings,
+            true
+        ));
+        assert!(should_render_workspace_view_header(
+            WorkspaceView::Overview,
+            false
+        ));
     }
 }
