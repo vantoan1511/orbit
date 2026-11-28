@@ -710,6 +710,21 @@ impl OrbitShell {
         })
         .detach();
 
+        Self::new_inner(config, command_tx, window, cx)
+    }
+
+    #[cfg(test)]
+    fn new_for_test(config: &OrbitConfig, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let (command_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+        Self::new_inner(config, command_tx, window, cx)
+    }
+
+    fn new_inner(
+        config: &OrbitConfig,
+        command_tx: tokio::sync::mpsc::UnboundedSender<ClusterBridgeCommand>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let appearance_entity = cx.entity().clone();
         window
             .observe_window_appearance(move |window, cx| {
@@ -3873,9 +3888,11 @@ impl OrbitShell {
                 el.border_color(theme.accent.accent)
             })
             .cursor_pointer()
+            .occlude()
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _event, window, cx| {
+                    window.prevent_default();
                     cx.stop_propagation();
                     this.dismiss_context_menu();
                     this.state.close_dropdown();
@@ -3916,6 +3933,12 @@ impl OrbitShell {
             })
             .child(render_icon(ns_chevron, px(13.0), theme.text.secondary));
 
+        #[cfg(test)]
+        let ns_trigger = {
+            use gpui::test::TestSupportExt as _;
+            ns_trigger.test_support()
+        };
+
         div()
             .flex()
             .flex_col()
@@ -3946,9 +3969,11 @@ impl OrbitShell {
                 el.border_color(theme.accent.accent)
             })
             .cursor_pointer()
+            .occlude()
             .on_mouse_down(
                 MouseButton::Left,
-                cx.listener(|this, _event, _window, cx| {
+                cx.listener(|this, _event, window, cx| {
+                    window.prevent_default();
                     cx.stop_propagation();
                     this.dismiss_context_menu();
                     this.resources.namespaces.close_dropdown();
@@ -3980,6 +4005,12 @@ impl OrbitShell {
             )
             .child(render_icon(cluster_chevron, px(13.0), theme.text.secondary));
 
+        #[cfg(test)]
+        let cluster_trigger = {
+            use gpui::test::TestSupportExt as _;
+            cluster_trigger.test_support()
+        };
+
         let cluster_control =
             div()
                 .flex()
@@ -4008,125 +4039,139 @@ impl OrbitShell {
         let control_hover = theme.surface.control_hover;
         let is_refreshing = self.is_active_view_loading();
 
+        let command_palette_btn = theme
+            .style_control(div().id("command-palette-trigger-btn"))
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .h(px(TITLEBAR_CONTROL_HEIGHT))
+            .px(theme.typography.control_padding_x_sm)
+            .hover(move |style| style.bg(control_hover))
+            .cursor_pointer()
+            .occlude()
+            .tooltip(|_window, cx| {
+                cx.new(|_| {
+                    TextTooltip::new(format!(
+                        "Command Palette ({})",
+                        primary_shortcut_label("K")
+                    ))
+                })
+                .into()
+            })
+            .on_mouse_down(MouseButton::Left, |_event, window, cx| {
+                window.prevent_default();
+                cx.stop_propagation();
+            })
+            .on_click(cx.listener(|this, _event, window, cx| {
+                this.toggle_command_palette(window, cx);
+            }))
+            .child(render_icon(Icon::Search, px(13.0), theme.text.muted))
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .text_color(theme.text.muted)
+                    .child("Search..."),
+            )
+            .child(
+                apply_text_step(div(), theme.typography.size_3xs)
+                    .px_1p5()
+                    .py(px(1.0))
+                    .rounded(theme.style.radius_control)
+                    .bg(theme.surface.bg_panel)
+                    .border_1()
+                    .border_color(theme.border.default)
+                    .font(theme.typography.mono_font(FontWeight::MEDIUM))
+                    .text_color(theme.text.muted)
+                    .child(primary_shortcut_label("K")),
+            );
+
+        let refresh_btn = theme
+            .style_control(div().id("refresh-clusters-btn"))
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .h(px(TITLEBAR_CONTROL_HEIGHT))
+            .px(theme.typography.control_padding_x_sm)
+            .when(is_refreshing, |el| el.opacity(0.6))
+            .when(!is_refreshing, |el| {
+                el.hover(move |style| style.bg(control_hover))
+                    .cursor_pointer()
+            })
+            .occlude()
+            .tooltip(|_window, cx| cx.new(|_| TextTooltip::new("Refresh workspace (R)")).into())
+            .on_mouse_down(MouseButton::Left, |_event, window, cx| {
+                window.prevent_default();
+                cx.stop_propagation();
+            })
+            .on_click(cx.listener(|this, _event, _window, cx| {
+                if !this.is_active_view_loading() {
+                    this.refresh_workspace(cx);
+                }
+            }))
+            .child(render_icon(
+                Icon::RefreshCw,
+                px(13.0),
+                if is_refreshing {
+                    theme.text.muted
+                } else {
+                    theme.text.secondary
+                },
+            ))
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(if is_refreshing {
+                        theme.text.muted
+                    } else {
+                        theme.text.primary
+                    })
+                    .child(if is_refreshing {
+                        "Refreshing..."
+                    } else {
+                        "Refresh"
+                    }),
+            );
+
+        let switch_btn = theme
+            .style_control(div().id("switch-to-old-ui"))
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .h(px(TITLEBAR_CONTROL_HEIGHT))
+            .px(theme.typography.control_padding_x_sm)
+            .hover(move |style| style.bg(control_hover))
+            .cursor_pointer()
+            .occlude()
+            .on_mouse_down(MouseButton::Left, |_event, window, cx| {
+                window.prevent_default();
+                cx.stop_propagation();
+            })
+            .on_click(cx.listener(|_this, _event, _window, cx| {
+                cx.quit();
+            }))
+            .child(render_icon(Icon::LogOut, px(13.0), theme.text.secondary))
+            .child(
+                apply_text_step(div(), theme.typography.size_xs)
+                    .font_weight(FontWeight::MEDIUM)
+                    .child("Switch to Old UI"),
+            );
+
+        #[cfg(test)]
+        let (command_palette_btn, refresh_btn, switch_btn) = {
+            use gpui::test::TestSupportExt as _;
+            (
+                command_palette_btn.test_support(),
+                refresh_btn.test_support(),
+                switch_btn.test_support(),
+            )
+        };
+
         div()
             .flex()
             .items_center()
             .gap_1p5()
-            .child(
-                theme
-                    .style_control(div().id("command-palette-trigger-btn"))
-                    .flex()
-                    .items_center()
-                    .gap_1p5()
-                    .h(px(TITLEBAR_CONTROL_HEIGHT))
-                    .px(theme.typography.control_padding_x_sm)
-                    .hover(move |style| style.bg(control_hover))
-                    .cursor_pointer()
-                    .tooltip(|_window, cx| {
-                        cx.new(|_| {
-                            TextTooltip::new(format!(
-                                "Command Palette ({})",
-                                primary_shortcut_label("K")
-                            ))
-                        })
-                        .into()
-                    })
-                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
-                        cx.stop_propagation();
-                    })
-                    .on_click(cx.listener(|this, _event, window, cx| {
-                        this.toggle_command_palette(window, cx);
-                    }))
-                    .child(render_icon(Icon::Search, px(13.0), theme.text.muted))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .text_color(theme.text.muted)
-                            .child("Search..."),
-                    )
-                    .child(
-                        apply_text_step(div(), theme.typography.size_3xs)
-                            .px_1p5()
-                            .py(px(1.0))
-                            .rounded(theme.style.radius_control)
-                            .bg(theme.surface.bg_panel)
-                            .border_1()
-                            .border_color(theme.border.default)
-                            .font(theme.typography.mono_font(FontWeight::MEDIUM))
-                            .text_color(theme.text.muted)
-                            .child(primary_shortcut_label("K")),
-                    ),
-            )
-            .child(
-                theme
-                    .style_control(div().id("refresh-clusters-btn"))
-                    .flex()
-                    .items_center()
-                    .gap_1p5()
-                    .h(px(TITLEBAR_CONTROL_HEIGHT))
-                    .px(theme.typography.control_padding_x_sm)
-                    .when(is_refreshing, |el| el.opacity(0.6))
-                    .when(!is_refreshing, |el| {
-                        el.hover(move |style| style.bg(control_hover))
-                            .cursor_pointer()
-                    })
-                    .tooltip(|_window, cx| {
-                        cx.new(|_| TextTooltip::new("Refresh workspace (R)")).into()
-                    })
-                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
-                        cx.stop_propagation();
-                    })
-                    .on_click(cx.listener(|this, _event, _window, cx| {
-                        if !this.is_active_view_loading() {
-                            this.refresh_workspace(cx);
-                        }
-                    }))
-                    .child(render_icon(
-                        Icon::RefreshCw,
-                        px(13.0),
-                        if is_refreshing {
-                            theme.text.muted
-                        } else {
-                            theme.text.secondary
-                        },
-                    ))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(if is_refreshing {
-                                theme.text.muted
-                            } else {
-                                theme.text.primary
-                            })
-                            .child(if is_refreshing {
-                                "Refreshing..."
-                            } else {
-                                "Refresh"
-                            }),
-                    ),
-            )
-            .child(
-                theme
-                    .style_control(div().id("switch-to-old-ui"))
-                    .flex()
-                    .items_center()
-                    .gap_1p5()
-                    .h(px(TITLEBAR_CONTROL_HEIGHT))
-                    .px(theme.typography.control_padding_x_sm)
-                    .hover(move |style| style.bg(control_hover))
-                    .cursor_pointer()
-                    .on_mouse_down(MouseButton::Left, |_event, _window, cx| {
-                        cx.stop_propagation();
-                    })
-                    .on_click(cx.listener(|_this, _event, _window, cx| {
-                        cx.quit();
-                    }))
-                    .child(render_icon(Icon::LogOut, px(13.0), theme.text.secondary))
-                    .child(
-                        apply_text_step(div(), theme.typography.size_xs)
-                            .font_weight(FontWeight::MEDIUM)
-                            .child("Switch to Old UI"),
-                    ),
-            )
+            .child(command_palette_btn)
+            .child(refresh_btn)
+            .child(switch_btn)
             .into_any_element()
     }
 
@@ -6092,6 +6137,7 @@ impl Render for OrbitShell {
                 decorations,
                 &theme,
                 window,
+                cx,
             ))
             .child(
                 div()
@@ -12424,5 +12470,174 @@ mod tests {
             "10,000 pod burst took {:?}, exceeding 500ms budget",
             start.elapsed()
         );
+    }
+
+    #[gpui::test]
+    fn test_shell_titlebar_interactive_controls_do_not_block_empty_drag_or_lose_clicks(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui::test::TestWindowExt as _;
+
+        let config = OrbitConfig::default();
+        let initial_theme = OrbitTheme::from_config(&config, WindowAppearance::Dark);
+        let options = OrbitShell::window_options_for_theme(
+            gpui::Bounds::new(
+                gpui::point(px(0.0), px(0.0)),
+                gpui::size(px(1280.0), px(800.0)),
+            ),
+            &initial_theme,
+        );
+        let config_for_window = config.clone();
+
+        let opened = cx.update(|cx| {
+            gpui::init(cx);
+            gpui::open_window(options, cx, move |window, cx| {
+                let resolved_theme =
+                    OrbitTheme::from_config(&config_for_window, window.appearance());
+                apply_theme(resolved_theme, window, cx);
+                cx.new(|cx| OrbitShell::new_for_test(&config_for_window, window, cx))
+            })
+        });
+        let Ok((window, view)) = opened else {
+            panic!("failed to open OrbitShell test window");
+        };
+
+        cx.update(|cx| {
+            view.update(cx, |shell, cx| {
+                shell.state.clusters = vec![ClusterInfo {
+                    id: "test-ctx".to_string(),
+                    name: "test-ctx".to_string(),
+                    status: "connected".to_string(),
+                    alias: None,
+                    tags: Vec::new(),
+                    color: None,
+                    description: None,
+                    server_url: Some("https://127.0.0.1:6443".to_string()),
+                }];
+                shell.state.active_cluster_id = Some("test-ctx".to_string());
+                shell.state.connection_state = ClusterConnectionState::Connected {
+                    cluster_id: "test-ctx".to_string(),
+                    display_name: "test-ctx".to_string(),
+                    k8s_version: Some("v1.31.0".to_string()),
+                };
+                cx.notify();
+            });
+        });
+
+        let dispatch_mouse = |window: &mut Window,
+                              cx: &mut gpui::App,
+                              pos: gpui::Point<gpui::Pixels>,
+                              click_count: usize| {
+            let down = window.dispatch_event(
+                gpui::PlatformInput::MouseDown(gpui::MouseDownEvent {
+                    position: pos,
+                    button: gpui::MouseButton::Left,
+                    modifiers: gpui::Modifiers::default(),
+                    click_count,
+                    first_mouse: false,
+                }),
+                cx,
+            );
+            let up = window.dispatch_event(
+                gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                    position: pos,
+                    button: gpui::MouseButton::Left,
+                    modifiers: gpui::Modifiers::default(),
+                    click_count,
+                }),
+                cx,
+            );
+            (down, up)
+        };
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+
+                assert!(window.try_find("cluster-switcher-btn").is_some());
+                assert!(window.try_find("namespace-selector-btn").is_some());
+                assert!(window.try_find("command-palette-trigger-btn").is_some());
+                assert!(window.try_find("refresh-clusters-btn").is_some());
+                assert!(window.try_find("switch-to-old-ui").is_some());
+
+                // 1. Clicking cluster-switcher-btn opens cluster dropdown.
+                let cluster_center = window.find("cluster-switcher-btn").bounds().center();
+                let (down, _) = dispatch_mouse(window, cx, cluster_center, 1);
+                assert!(!down.propagate);
+                assert!(down.default_prevented);
+            });
+        });
+        cx.update(|cx| {
+            assert!(view.read(cx).state.dropdown_open);
+            view.update(cx, |shell, cx| {
+                shell.state.close_dropdown();
+                cx.notify();
+            });
+        });
+
+        // 2. Clicking namespace-selector-btn opens namespace dropdown.
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                let ns_center = window.find("namespace-selector-btn").bounds().center();
+                let (down, _) = dispatch_mouse(window, cx, ns_center, 1);
+                assert!(!down.propagate);
+                assert!(down.default_prevented);
+            });
+        });
+        cx.update(|cx| {
+            assert!(view.read(cx).resources.namespaces.dropdown_open);
+            // Close dropdown before next click.
+            view.update(cx, |shell, cx| {
+                shell.resources.namespaces.close_dropdown();
+                cx.notify();
+            });
+        });
+
+        // 3. Clicking command-palette-trigger-btn opens command palette.
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                let palette_center = window.find("command-palette-trigger-btn").bounds().center();
+                let (down, _) = dispatch_mouse(window, cx, palette_center, 1);
+                assert!(!down.propagate);
+                assert!(down.default_prevented);
+            });
+        });
+        cx.update(|cx| {
+            assert!(view.read(cx).command_palette.is_open);
+            view.update(cx, |shell, cx| {
+                shell.command_palette.close();
+                cx.notify();
+            });
+        });
+
+        // 4. Empty space in drag-region, left-slot, and right-slot leaves menus closed & propagates on Windows.
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                let drag_center = window.find("orbit-titlebar-drag-region").bounds().center();
+                let left_slot = window.find("orbit-titlebar-left-slot").bounds();
+                let empty_left = gpui::point(left_slot.left() + px(2.0), left_slot.top() + px(2.0));
+                let right_slot = window.find("orbit-titlebar-right-slot").bounds();
+                let empty_right = gpui::point(right_slot.right() - px(2.0), right_slot.top() + px(2.0));
+
+                for pos in [drag_center, empty_left, empty_right] {
+                    let (down_1, _) = dispatch_mouse(window, cx, pos, 1);
+                    let (down_2, _) = dispatch_mouse(window, cx, pos, 2);
+                    if components::TitlebarPlatform::current() == components::TitlebarPlatform::Windows
+                    {
+                        assert!(down_1.propagate);
+                        assert!(down_2.propagate);
+                    }
+                }
+            });
+        });
+        cx.update(|cx| {
+            let shell = view.read(cx);
+            assert!(!shell.state.dropdown_open);
+            assert!(!shell.resources.namespaces.dropdown_open);
+            assert!(!shell.command_palette.is_open);
+        });
     }
 }
