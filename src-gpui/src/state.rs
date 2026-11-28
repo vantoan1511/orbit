@@ -186,16 +186,9 @@ pub enum ClusterBridgeCommand {
     SaveThemeMode {
         mode: String,
     },
-    SaveUiStyle {
-        style: String,
-    },
-    SaveAccentColor {
-        accent: String,
-    },
     SaveEnableExperienceFeatures {
         enabled: bool,
     },
-    ResetAppearanceDefaults,
     AddCluster(AddClusterRequest),
     ScaleWorkload {
         cluster_id: String,
