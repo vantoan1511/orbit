@@ -8,17 +8,20 @@ use orbit_core::kubernetes::manager::ClusterSwitchOutcome;
 use orbit_core::kubernetes::models::{
     ClusterInfo, ConfigMapInfo, CronJobInfo, DaemonSetInfo, DeploymentInfo, EventInfo, HpaInfo,
     IngressInfo, JobInfo, NamespaceInfo, NodeInfo, PersistentVolumeClaimInfo, PersistentVolumeInfo,
-    PodInfo, PolicyInfo, ReplicaSetInfo, SecretInfo, ServiceInfo, StatefulSetInfo,
+    PodInfo, PodMetricItem, PolicyInfo, ReplicaSetInfo, SecretInfo, ServiceInfo, StatefulSetInfo,
     StorageClassInfo, UserProfileInfo,
 };
 use orbit_core::kubernetes::overview::ClusterOverviewSummary;
 use orbit_core::kubernetes::port_forward::PersistedPortForward;
+use orbit_core::kubernetes::services::ServiceEndpointsSnapshot;
 use orbit_core::kubernetes::storage_overview::StorageOverviewSnapshot;
+use orbit_core::kubernetes::watchers::{WatchAction, WatchUpdate};
 use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
 
 pub use crate::add_cluster_state::*;
 use crate::components::data_table::DataTableState;
 use crate::navigation::{LogsTabTarget, SidebarCategory, WorkspaceTab, WorkspaceView};
+pub use crate::watch_state::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClusterConnectionState {
@@ -255,6 +258,11 @@ pub enum ClusterBridgeCommand {
     },
     StopAllPortForwards {
         cluster_id: String,
+    },
+    SyncActiveWatchers {
+        cluster_id: String,
+        generation: u64,
+        kinds: Vec<WatchResourceKind>,
     },
 }
 
@@ -641,6 +649,11 @@ pub enum ClusterBridgeEvent {
         id: Option<String>,
         message: String,
     },
+    ResourceWatchUpdated {
+        cluster_id: String,
+        generation: u64,
+        payload: ResourceWatchPayload,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -656,8 +669,12 @@ pub enum NamespaceLoadStatus {
 pub struct NamespaceFilterState {
     pub cluster_id: Option<String>,
     pub generation: u64,
+    pub watch_generation: u64,
+    pub data_revision: u64,
+    pub selection_revision: u64,
     pub status: NamespaceLoadStatus,
     pub namespaces: Vec<NamespaceInfo>,
+    pub key_index: KeyIndex,
     pub error_message: Option<String>,
     pub selected_by_cluster: SelectedNamespacesMap,
     pub dropdown_open: bool,
@@ -681,6 +698,9 @@ impl NamespaceFilterState {
         self.cluster_id = Some(cluster_id.to_string());
         self.status = NamespaceLoadStatus::Loading;
         self.namespaces.clear();
+        self.key_index.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.error_message = None;
         self.dropdown_open = false;
         self.search_query.clear();
@@ -703,12 +723,38 @@ impl NamespaceFilterState {
 
     pub fn reset_for_disconnected(&mut self) {
         self.generation += 1;
+        self.watch_generation = self.watch_generation.wrapping_add(1);
         self.cluster_id = None;
         self.status = NamespaceLoadStatus::Idle;
         self.namespaces.clear();
+        self.key_index.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         self.error_message = None;
         self.dropdown_open = false;
         self.search_query.clear();
+    }
+
+    fn prune_selected_for_cluster(&mut self, cluster_id: &str) -> Option<Vec<String>> {
+        let valid_names: HashSet<&str> = self.namespaces.iter().map(|ns| ns.name.as_str()).collect();
+        let current = self.selected_by_cluster.get(cluster_id)?.clone();
+        let filtered: Vec<String> = current
+            .iter()
+            .filter(|name| valid_names.contains(name.as_str()))
+            .cloned()
+            .collect();
+        if filtered.len() != current.len() {
+            if filtered.is_empty() {
+                self.selected_by_cluster.remove(cluster_id);
+            } else {
+                self.selected_by_cluster
+                    .insert(cluster_id.to_string(), filtered.clone());
+            }
+            self.selection_revision = self.selection_revision.wrapping_add(1);
+            Some(filtered)
+        } else {
+            None
+        }
     }
 
     pub fn apply_loaded(
@@ -722,28 +768,39 @@ impl NamespaceFilterState {
         }
         self.status = NamespaceLoadStatus::Loaded;
         self.error_message = None;
-
-        let valid_names: HashSet<&str> = namespaces.iter().map(|ns| ns.name.as_str()).collect();
-        let mut pruned_selection = None;
-        if let Some(current) = self.selected_by_cluster.get(cluster_id).cloned() {
-            let filtered: Vec<String> = current
-                .iter()
-                .filter(|name| valid_names.contains(name.as_str()))
-                .cloned()
-                .collect();
-            if filtered.len() != current.len() {
-                if filtered.is_empty() {
-                    self.selected_by_cluster.remove(cluster_id);
-                } else {
-                    self.selected_by_cluster
-                        .insert(cluster_id.to_string(), filtered.clone());
-                }
-                pruned_selection = Some(filtered);
-            }
-        }
-
         self.namespaces = namespaces;
+        self.key_index.rebuild(&self.namespaces);
+        self.data_revision = self.data_revision.wrapping_add(1);
+        let pruned_selection = self.prune_selected_for_cluster(cluster_id);
         (true, pruned_selection)
+    }
+
+    pub fn apply_watch_update(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        update: WatchUpdate<NamespaceInfo>,
+    ) -> (bool, Option<Vec<String>>) {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+        {
+            return (false, None);
+        }
+        let mutated = apply_indexed_watch_update(
+            &mut self.namespaces,
+            &mut self.key_index,
+            &mut self.data_revision,
+            update,
+            |_, _| {},
+        );
+        self.status = NamespaceLoadStatus::Loaded;
+        self.error_message = None;
+        let pruned = if mutated {
+            self.prune_selected_for_cluster(cluster_id)
+        } else {
+            None
+        };
+        (mutated, pruned)
     }
 
     pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
@@ -770,6 +827,7 @@ impl NamespaceFilterState {
     pub fn select_all_namespaces(&mut self) -> Option<Vec<String>> {
         let cluster_id = self.cluster_id.as_deref()?;
         if self.selected_by_cluster.remove(cluster_id).is_some() {
+            self.selection_revision = self.selection_revision.wrapping_add(1);
             Some(Vec::new())
         } else {
             None
@@ -797,6 +855,7 @@ impl NamespaceFilterState {
         if updated.is_empty() {
             self.selected_by_cluster.remove(&cluster_id);
         }
+        self.selection_revision = self.selection_revision.wrapping_add(1);
         Some(updated)
     }
 
@@ -866,6 +925,7 @@ impl NamespaceFilterState {
 #[derive(Debug, Clone, Default)]
 pub struct NamespacesViewState {
     pub table: DataTableState,
+    pub row_cache: FilteredRowsCache<NamespaceInfo>,
 }
 
 impl NamespacesViewState {
@@ -873,12 +933,14 @@ impl NamespacesViewState {
         self.table.selected_row_key = None;
         self.table.loading = false;
         self.table.refreshing = false;
+        self.row_cache.clear();
     }
 
     pub fn reset_for_disconnected(&mut self) {
         self.table.selected_row_key = None;
         self.table.loading = false;
         self.table.refreshing = false;
+        self.row_cache.clear();
     }
 }
 
@@ -1064,6 +1126,9 @@ macro_rules! cluster_list_state {
             self.error_message = None;
             if switching_cluster {
                 self.$field.clear();
+                self.key_index.clear();
+                self.row_cache.clear();
+                self.data_revision = self.data_revision.wrapping_add(1);
                 self.table.selected_row_key = None;
             }
             self.table.loading = self.$field.is_empty();
@@ -1095,6 +1160,7 @@ macro_rules! cluster_list_state {
 
         pub fn reset_for_disconnected(&mut self) {
             self.generation += 1;
+            self.watch_generation = self.watch_generation.wrapping_add(1);
             self.cluster_id = None;
             self.clear_to_idle();
         }
@@ -1102,6 +1168,9 @@ macro_rules! cluster_list_state {
         fn clear_to_idle(&mut self) {
             self.status = $status::Idle;
             self.$field.clear();
+            self.key_index.clear();
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.error_message = None;
             self.table.selected_row_key = None;
             self.table.loading = false;
@@ -1117,6 +1186,9 @@ macro_rules! cluster_list_state {
             if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
                 self.status = $status::Loaded;
                 self.$field = items;
+                self.key_index.rebuild(&self.$field);
+                self.row_cache.clear();
+                self.data_revision = self.data_revision.wrapping_add(1);
                 self.error_message = None;
                 self.table.loading = false;
                 self.table.refreshing = false;
@@ -1124,6 +1196,57 @@ macro_rules! cluster_list_state {
             } else {
                 false
             }
+        }
+
+        pub fn apply_watch_update(
+            &mut self,
+            cluster_id: &str,
+            watch_generation: u64,
+            update: WatchUpdate<$item>,
+        ) -> bool {
+            if self.cluster_id.as_deref() != Some(cluster_id)
+                || self.watch_generation != watch_generation
+            {
+                return false;
+            }
+            let mutated = apply_indexed_watch_update(
+                &mut self.$field,
+                &mut self.key_index,
+                &mut self.data_revision,
+                update,
+                |_, _| {},
+            );
+            self.status = $status::Loaded;
+            self.error_message = None;
+            self.table.loading = false;
+            self.table.refreshing = false;
+            mutated
+        }
+
+        pub fn apply_watch_update_prefixed(
+            &mut self,
+            cluster_id: &str,
+            watch_generation: u64,
+            prefix: &str,
+            update: WatchUpdate<$item>,
+        ) -> bool {
+            if self.cluster_id.as_deref() != Some(cluster_id)
+                || self.watch_generation != watch_generation
+            {
+                return false;
+            }
+            let mutated = apply_indexed_watch_update_prefixed(
+                &mut self.$field,
+                &mut self.key_index,
+                &mut self.data_revision,
+                prefix,
+                update,
+            );
+            self.status = $status::Loaded;
+            self.error_message = None;
+            self.table.loading = false;
+            self.table.refreshing = false;
+            mutated
         }
 
         pub fn apply_failed(
@@ -1161,8 +1284,12 @@ macro_rules! cluster_list_state {
         pub struct $state {
             pub cluster_id: Option<String>,
             pub generation: u64,
+            pub watch_generation: u64,
+            pub data_revision: u64,
             pub status: $status,
             pub $field: Vec<$item>,
+            pub key_index: KeyIndex,
+            pub row_cache: FilteredRowsCache<$item>,
             pub error_message: Option<String>,
             pub table: DataTableState,
         }
@@ -1185,8 +1312,12 @@ macro_rules! cluster_list_state {
         pub struct $state {
             pub cluster_id: Option<String>,
             pub generation: u64,
+            pub watch_generation: u64,
+            pub data_revision: u64,
             pub status: $status,
             pub $field: Vec<$item>,
+            pub key_index: KeyIndex,
+            pub row_cache: FilteredRowsCache<$item>,
             pub error_message: Option<String>,
             pub table: DataTableState,
         }
@@ -1202,8 +1333,12 @@ macro_rules! cluster_list_state {
                 Self {
                     cluster_id: None,
                     generation: 0,
+                    watch_generation: 0,
+                    data_revision: 0,
                     status: $status::Idle,
                     $field: Vec::new(),
+                    key_index: KeyIndex::default(),
+                    row_cache: FilteredRowsCache::default(),
                     error_message: None,
                     table: DataTableState::new().with_pagination(),
                 }
@@ -1270,6 +1405,87 @@ cluster_list_state!(
     LoadPods
 );
 
+impl PodsState {
+    /// Applies a live Pod watch update while preserving existing CPU/memory metrics
+    /// (which arrive asynchronously from the PodMetrics poller).
+    pub fn apply_pod_watch_update(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        update: WatchUpdate<PodInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+        {
+            return false;
+        }
+        let mutated = apply_indexed_watch_update(
+            &mut self.pods,
+            &mut self.key_index,
+            &mut self.data_revision,
+            update,
+            |existing, incoming| {
+                if incoming.cpu.is_none() {
+                    incoming.cpu = existing.cpu.clone();
+                    incoming.cpu_cores = existing.cpu_cores;
+                    incoming.cpu_pct = existing.cpu_pct;
+                }
+                if incoming.memory.is_none() {
+                    incoming.memory = existing.memory.clone();
+                    incoming.memory_bytes = existing.memory_bytes;
+                    incoming.memory_pct = existing.memory_pct;
+                }
+            },
+        );
+        self.status = PodsLoadStatus::Loaded;
+        self.error_message = None;
+        self.table.loading = false;
+        self.table.refreshing = false;
+        mutated
+    }
+
+    /// Merges a polled `PodMetrics` batch into existing pods in O(M) via `key_index`.
+    pub fn apply_pod_metrics_batch(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        metrics: &[PodMetricItem],
+    ) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+            || metrics.is_empty()
+        {
+            return false;
+        }
+        let mut mutated = false;
+        for metric in metrics {
+            let key = if metric.namespace.is_empty() {
+                metric.name.clone()
+            } else {
+                format!("{}/{}", metric.namespace, metric.name)
+            };
+            if let Some(idx) = self.key_index.get(&key) {
+                let pod = &mut self.pods[idx];
+                let changed = pod.cpu.as_deref() != Some(metric.cpu.as_str())
+                    || pod.memory.as_deref() != Some(metric.memory.as_str())
+                    || pod.cpu_cores != metric.cpu_cores
+                    || pod.memory_bytes != metric.memory_bytes;
+                if changed {
+                    pod.cpu = Some(metric.cpu.clone());
+                    pod.memory = Some(metric.memory.clone());
+                    pod.cpu_cores = metric.cpu_cores;
+                    pod.memory_bytes = metric.memory_bytes;
+                    mutated = true;
+                }
+            }
+        }
+        if mutated {
+            self.data_revision = self.data_revision.wrapping_add(1);
+        }
+        mutated
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ServicesLoadStatus {
     #[default]
@@ -1325,8 +1541,13 @@ impl ServiceTypeFilter {
 pub struct ServicesState {
     pub cluster_id: Option<String>,
     pub generation: u64,
+    pub watch_generation: u64,
+    pub data_revision: u64,
     pub status: ServicesLoadStatus,
     pub services: Vec<ServiceInfo>,
+    pub key_index: KeyIndex,
+    pub endpoints_by_key: HashMap<String, ServiceEndpointsSnapshot>,
+    pub row_cache: FilteredRowsCache<ServiceInfo>,
     pub type_filter: ServiceTypeFilter,
     pub error_message: Option<String>,
     pub table: DataTableState,
@@ -1343,8 +1564,13 @@ impl ServicesState {
         Self {
             cluster_id: None,
             generation: 0,
+            watch_generation: 0,
+            data_revision: 0,
             status: ServicesLoadStatus::Idle,
             services: Vec::new(),
+            key_index: KeyIndex::default(),
+            endpoints_by_key: HashMap::new(),
+            row_cache: FilteredRowsCache::default(),
             type_filter: ServiceTypeFilter::All,
             error_message: None,
             table: DataTableState::new().with_pagination(),
@@ -1368,6 +1594,10 @@ impl ServicesState {
         self.error_message = None;
         if switching_cluster {
             self.services.clear();
+            self.key_index.clear();
+            self.endpoints_by_key.clear();
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.type_filter = ServiceTypeFilter::All;
             self.table.selected_row_key = None;
         }
@@ -1397,6 +1627,10 @@ impl ServicesState {
         self.cluster_id = Some(cluster_id.to_string());
         self.status = ServicesLoadStatus::Idle;
         self.services.clear();
+        self.key_index.clear();
+        self.endpoints_by_key.clear();
+        self.row_cache.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
         self.type_filter = ServiceTypeFilter::All;
         self.error_message = None;
         self.table.selected_row_key = None;
@@ -1406,9 +1640,14 @@ impl ServicesState {
 
     pub fn reset_for_disconnected(&mut self) {
         self.generation += 1;
+        self.watch_generation = self.watch_generation.wrapping_add(1);
         self.cluster_id = None;
         self.status = ServicesLoadStatus::Idle;
         self.services.clear();
+        self.key_index.clear();
+        self.endpoints_by_key.clear();
+        self.row_cache.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
         self.type_filter = ServiceTypeFilter::All;
         self.error_message = None;
         self.table.selected_row_key = None;
@@ -1425,6 +1664,9 @@ impl ServicesState {
         if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
             self.status = ServicesLoadStatus::Loaded;
             self.services = services;
+            self.key_index.rebuild(&self.services);
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.error_message = None;
             self.table.loading = false;
             self.table.refreshing = false;
@@ -1432,6 +1674,118 @@ impl ServicesState {
         } else {
             false
         }
+    }
+
+    pub fn apply_watch_update(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        update: WatchUpdate<ServiceInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+        {
+            return false;
+        }
+        let mutated = apply_indexed_watch_update(
+            &mut self.services,
+            &mut self.key_index,
+            &mut self.data_revision,
+            update,
+            |existing, incoming| {
+                if incoming.endpoints == "-" && incoming.endpoints_list.is_empty() {
+                    incoming.endpoints = existing.endpoints.clone();
+                    incoming.endpoints_list = existing.endpoints_list.clone();
+                }
+            },
+        );
+        if !self.endpoints_by_key.is_empty() {
+            for (idx, svc) in self.services.iter_mut().enumerate() {
+                if svc.endpoints == "-"
+                    && svc.endpoints_list.is_empty()
+                    && let Some(key) = self.key_index.key_at(idx)
+                    && let Some(snap) = self.endpoints_by_key.get(key)
+                {
+                    svc.endpoints = snap.endpoints.clone();
+                    svc.endpoints_list = snap.endpoints_list.clone();
+                }
+            }
+        }
+        self.status = ServicesLoadStatus::Loaded;
+        self.error_message = None;
+        self.table.loading = false;
+        self.table.refreshing = false;
+        mutated
+    }
+
+    pub fn apply_endpoints_watch_update(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        update: WatchUpdate<ServiceEndpointsSnapshot>,
+    ) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+        {
+            return false;
+        }
+        let mut mutated = false;
+        match update {
+            WatchUpdate::Reset(entries) => {
+                self.endpoints_by_key = entries.into_iter().collect();
+                for (idx, svc) in self.services.iter_mut().enumerate() {
+                    let key = self.key_index.key_at(idx).unwrap_or_default();
+                    if let Some(snap) = self.endpoints_by_key.get(key) {
+                        if svc.endpoints != snap.endpoints
+                            || svc.endpoints_list != snap.endpoints_list
+                        {
+                            svc.endpoints = snap.endpoints.clone();
+                            svc.endpoints_list = snap.endpoints_list.clone();
+                            mutated = true;
+                        }
+                    } else if svc.endpoints != "-" || !svc.endpoints_list.is_empty() {
+                        svc.endpoints = "-".to_string();
+                        svc.endpoints_list.clear();
+                        mutated = true;
+                    }
+                }
+            }
+            WatchUpdate::Delta(deltas) => {
+                for delta in deltas {
+                    match delta.action {
+                        WatchAction::Applied => {
+                            self.endpoints_by_key
+                                .insert(delta.key.clone(), delta.item.clone());
+                            if let Some(idx) = self.key_index.get(&delta.key) {
+                                let svc = &mut self.services[idx];
+                                if svc.endpoints != delta.item.endpoints
+                                    || svc.endpoints_list != delta.item.endpoints_list
+                                {
+                                    svc.endpoints = delta.item.endpoints;
+                                    svc.endpoints_list = delta.item.endpoints_list;
+                                    mutated = true;
+                                }
+                            }
+                        }
+                        WatchAction::Deleted => {
+                            self.endpoints_by_key.remove(&delta.key);
+                            if let Some(idx) = self.key_index.get(&delta.key) {
+                                let svc = &mut self.services[idx];
+                                if svc.endpoints != "-" || !svc.endpoints_list.is_empty() {
+                                    svc.endpoints = "-".to_string();
+                                    svc.endpoints_list.clear();
+                                    mutated = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if mutated {
+            self.data_revision = self.data_revision.wrapping_add(1);
+        }
+        mutated
     }
 
     pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
@@ -1723,8 +2077,12 @@ impl ResourceQuotaKindFilter {
 pub struct ResourceQuotasState {
     pub cluster_id: Option<String>,
     pub generation: u64,
+    pub watch_generation: u64,
+    pub data_revision: u64,
     pub status: ResourceQuotasLoadStatus,
     pub policies: Vec<PolicyInfo>,
+    pub key_index: KeyIndex,
+    pub row_cache: FilteredRowsCache<PolicyInfo>,
     pub kind_filter: ResourceQuotaKindFilter,
     pub error_message: Option<String>,
     pub table: DataTableState,
@@ -1743,6 +2101,9 @@ impl ResourceQuotasState {
         self.error_message = None;
         if switching_cluster {
             self.policies.clear();
+            self.key_index.clear();
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.kind_filter = ResourceQuotaKindFilter::All;
             self.table.selected_row_key = None;
         }
@@ -1772,6 +2133,9 @@ impl ResourceQuotasState {
         self.cluster_id = Some(cluster_id.to_string());
         self.status = ResourceQuotasLoadStatus::Idle;
         self.policies.clear();
+        self.key_index.clear();
+        self.row_cache.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
         self.kind_filter = ResourceQuotaKindFilter::All;
         self.error_message = None;
         self.table.selected_row_key = None;
@@ -1781,9 +2145,13 @@ impl ResourceQuotasState {
 
     pub fn reset_for_disconnected(&mut self) {
         self.generation += 1;
+        self.watch_generation = self.watch_generation.wrapping_add(1);
         self.cluster_id = None;
         self.status = ResourceQuotasLoadStatus::Idle;
         self.policies.clear();
+        self.key_index.clear();
+        self.row_cache.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
         self.kind_filter = ResourceQuotaKindFilter::All;
         self.error_message = None;
         self.table.selected_row_key = None;
@@ -1800,6 +2168,9 @@ impl ResourceQuotasState {
         if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
             self.status = ResourceQuotasLoadStatus::Loaded;
             self.policies = policies;
+            self.key_index.rebuild(&self.policies);
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.error_message = None;
             self.table.loading = false;
             self.table.refreshing = false;
@@ -1807,6 +2178,32 @@ impl ResourceQuotasState {
         } else {
             false
         }
+    }
+
+    pub fn apply_watch_update_prefixed(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        prefix: &str,
+        update: WatchUpdate<PolicyInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+        {
+            return false;
+        }
+        let mutated = apply_indexed_watch_update_prefixed(
+            &mut self.policies,
+            &mut self.key_index,
+            &mut self.data_revision,
+            prefix,
+            update,
+        );
+        self.status = ResourceQuotasLoadStatus::Loaded;
+        self.error_message = None;
+        self.table.loading = false;
+        self.table.refreshing = false;
+        mutated
     }
 
     pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
@@ -1953,8 +2350,12 @@ impl EventTypeFilter {
 pub struct EventsState {
     pub cluster_id: Option<String>,
     pub generation: u64,
+    pub watch_generation: u64,
+    pub data_revision: u64,
     pub status: EventsLoadStatus,
     pub events: Vec<EventInfo>,
+    pub key_index: KeyIndex,
+    pub row_cache: FilteredRowsCache<EventInfo>,
     pub type_filter: EventTypeFilter,
     pub error_message: Option<String>,
     pub table: DataTableState,
@@ -1971,8 +2372,12 @@ impl EventsState {
         Self {
             cluster_id: None,
             generation: 0,
+            watch_generation: 0,
+            data_revision: 0,
             status: EventsLoadStatus::Idle,
             events: Vec::new(),
+            key_index: KeyIndex::default(),
+            row_cache: FilteredRowsCache::default(),
             type_filter: EventTypeFilter::All,
             error_message: None,
             table: DataTableState::new().with_pagination(),
@@ -1996,6 +2401,9 @@ impl EventsState {
         self.error_message = None;
         if switching_cluster {
             self.events.clear();
+            self.key_index.clear();
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.type_filter = EventTypeFilter::All;
             self.table.selected_row_key = None;
         }
@@ -2025,6 +2433,9 @@ impl EventsState {
         self.cluster_id = Some(cluster_id.to_string());
         self.status = EventsLoadStatus::Idle;
         self.events.clear();
+        self.key_index.clear();
+        self.row_cache.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
         self.type_filter = EventTypeFilter::All;
         self.error_message = None;
         self.table.selected_row_key = None;
@@ -2034,9 +2445,13 @@ impl EventsState {
 
     pub fn reset_for_disconnected(&mut self) {
         self.generation += 1;
+        self.watch_generation = self.watch_generation.wrapping_add(1);
         self.cluster_id = None;
         self.status = EventsLoadStatus::Idle;
         self.events.clear();
+        self.key_index.clear();
+        self.row_cache.clear();
+        self.data_revision = self.data_revision.wrapping_add(1);
         self.type_filter = EventTypeFilter::All;
         self.error_message = None;
         self.table.selected_row_key = None;
@@ -2044,15 +2459,31 @@ impl EventsState {
         self.table.refreshing = false;
     }
 
+    fn enforce_retention_cap(&mut self) {
+        if self.events.len() <= MAX_RETAINED_EVENTS {
+            return;
+        }
+        let excess = self.events.len() - MAX_RETAINED_EVENTS;
+        self.events.drain(0..excess);
+        self.key_index.rebuild(&self.events);
+    }
+
     pub fn apply_loaded(
         &mut self,
         cluster_id: &str,
         generation: u64,
-        events: Vec<EventInfo>,
+        mut events: Vec<EventInfo>,
     ) -> bool {
         if self.cluster_id.as_deref() == Some(cluster_id) && self.generation == generation {
+            if events.len() > MAX_RETAINED_EVENTS {
+                let excess = events.len() - MAX_RETAINED_EVENTS;
+                events.drain(0..excess);
+            }
             self.status = EventsLoadStatus::Loaded;
             self.events = events;
+            self.key_index.rebuild(&self.events);
+            self.row_cache.clear();
+            self.data_revision = self.data_revision.wrapping_add(1);
             self.error_message = None;
             self.table.loading = false;
             self.table.refreshing = false;
@@ -2060,6 +2491,32 @@ impl EventsState {
         } else {
             false
         }
+    }
+
+    pub fn apply_watch_update(
+        &mut self,
+        cluster_id: &str,
+        watch_generation: u64,
+        update: WatchUpdate<EventInfo>,
+    ) -> bool {
+        if self.cluster_id.as_deref() != Some(cluster_id)
+            || self.watch_generation != watch_generation
+        {
+            return false;
+        }
+        let mutated = apply_indexed_watch_update(
+            &mut self.events,
+            &mut self.key_index,
+            &mut self.data_revision,
+            update,
+            |_, _| {},
+        );
+        self.enforce_retention_cap();
+        self.status = EventsLoadStatus::Loaded;
+        self.error_message = None;
+        self.table.loading = false;
+        self.table.refreshing = false;
+        mutated
     }
 
     pub fn apply_failed(&mut self, cluster_id: &str, generation: u64, message: String) -> bool {
@@ -2668,7 +3125,8 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::PortForwardStarted { .. }
             | ClusterBridgeEvent::PortForwardStopped { .. }
             | ClusterBridgeEvent::PortForwardsCleared { .. }
-            | ClusterBridgeEvent::PortForwardFailed { .. } => {}
+            | ClusterBridgeEvent::PortForwardFailed { .. }
+            | ClusterBridgeEvent::ResourceWatchUpdated { .. } => {}
         }
     }
 
@@ -3305,6 +3763,10 @@ impl WorkspaceTabsState {
 /// Aggregates all cluster-scoped Kubernetes resource view states owned by `OrbitShell`.
 #[derive(Debug, Clone, Default)]
 pub struct WorkspaceResourcesState {
+    pub watch_generation: u64,
+    pub last_synced_watch_cluster: Option<String>,
+    pub last_synced_watch_generation: u64,
+    pub last_synced_watch_kinds: Vec<WatchResourceKind>,
     pub overview: ClusterOverviewState,
     pub workloads_overview: WorkloadsOverviewState,
     pub namespaces: NamespaceFilterState,
@@ -3340,7 +3802,43 @@ impl WorkspaceResourcesState {
         }
     }
 
+    pub fn begin_watch_session(&mut self) -> u64 {
+        self.watch_generation = self.watch_generation.wrapping_add(1);
+        let wg = self.watch_generation;
+        self.last_synced_watch_cluster = None;
+        self.last_synced_watch_generation = 0;
+        self.last_synced_watch_kinds.clear();
+        self.namespaces.watch_generation = wg;
+        self.deployments.watch_generation = wg;
+        self.statefulsets.watch_generation = wg;
+        self.daemonsets.watch_generation = wg;
+        self.replicasets.watch_generation = wg;
+        self.jobs.watch_generation = wg;
+        self.cronjobs.watch_generation = wg;
+        self.pods.watch_generation = wg;
+        self.services.watch_generation = wg;
+        self.ingresses.watch_generation = wg;
+        self.configmaps.watch_generation = wg;
+        self.secrets.watch_generation = wg;
+        self.persistent_volumes.watch_generation = wg;
+        self.persistent_volume_claims.watch_generation = wg;
+        self.network_policies.watch_generation = wg;
+        self.pod_security.watch_generation = wg;
+        self.resource_quotas.watch_generation = wg;
+        self.list_views.hpas.watch_generation = wg;
+        self.list_views.storage_classes.watch_generation = wg;
+        self.list_views.security_overview.watch_generation = wg;
+        self.list_views.admission_webhooks.watch_generation = wg;
+        self.nodes.watch_generation = wg;
+        self.events.watch_generation = wg;
+        wg
+    }
+
     pub fn reset_all_for_disconnect(&mut self) {
+        self.watch_generation = self.watch_generation.wrapping_add(1);
+        self.last_synced_watch_cluster = None;
+        self.last_synced_watch_generation = 0;
+        self.last_synced_watch_kinds.clear();
         self.overview.reset_for_disconnected();
         self.workloads_overview.reset_for_disconnected();
         self.namespaces.reset_for_disconnected();
@@ -6904,5 +7402,414 @@ mod tests {
                 .load_command_for_active_view(&switcher, Some(WorkspaceView::Deployments))
                 .is_none()
         );
+    }
+
+    #[test]
+    fn watch_resource_kind_maps_all_resource_views_and_excludes_non_table_views() {
+        let watchable = [
+            (WorkspaceView::Namespaces, WatchResourceKind::Namespaces),
+            (WorkspaceView::Deployments, WatchResourceKind::Deployments),
+            (WorkspaceView::StatefulSets, WatchResourceKind::StatefulSets),
+            (WorkspaceView::DaemonSets, WatchResourceKind::DaemonSets),
+            (WorkspaceView::ReplicaSets, WatchResourceKind::ReplicaSets),
+            (WorkspaceView::Jobs, WatchResourceKind::Jobs),
+            (WorkspaceView::CronJobs, WatchResourceKind::CronJobs),
+            (WorkspaceView::Pods, WatchResourceKind::Pods),
+            (WorkspaceView::Services, WatchResourceKind::Services),
+            (WorkspaceView::Ingresses, WatchResourceKind::Ingresses),
+            (WorkspaceView::ConfigMaps, WatchResourceKind::ConfigMaps),
+            (WorkspaceView::Secrets, WatchResourceKind::Secrets),
+            (
+                WorkspaceView::PersistentVolumes,
+                WatchResourceKind::PersistentVolumes,
+            ),
+            (
+                WorkspaceView::PersistentVolumeClaims,
+                WatchResourceKind::PersistentVolumeClaims,
+            ),
+            (
+                WorkspaceView::StorageClasses,
+                WatchResourceKind::StorageClasses,
+            ),
+            (WorkspaceView::Hpas, WatchResourceKind::Hpas),
+            (
+                WorkspaceView::NetworkPolicies,
+                WatchResourceKind::NetworkPolicies,
+            ),
+            (WorkspaceView::PodSecurity, WatchResourceKind::PodSecurity),
+            (
+                WorkspaceView::ResourceQuotas,
+                WatchResourceKind::ResourceQuotas,
+            ),
+            (
+                WorkspaceView::AdmissionWebhooks,
+                WatchResourceKind::AdmissionWebhooks,
+            ),
+            (
+                WorkspaceView::SecurityOverview,
+                WatchResourceKind::SecurityOverview,
+            ),
+            (WorkspaceView::Nodes, WatchResourceKind::Nodes),
+            (WorkspaceView::Events, WatchResourceKind::Events),
+        ];
+        assert_eq!(watchable.len(), 23);
+        for (view, kind) in watchable {
+            assert_eq!(WatchResourceKind::from_workspace_view(view), Some(kind));
+            assert_eq!(kind.workspace_view(), view);
+        }
+
+        for excluded in [
+            WorkspaceView::Overview,
+            WorkspaceView::WorkloadsOverview,
+            WorkspaceView::StorageOverview,
+            WorkspaceView::PortForward,
+            WorkspaceView::Settings,
+        ] {
+            assert_eq!(WatchResourceKind::from_workspace_view(excluded), None);
+        }
+    }
+
+    #[test]
+    fn pods_state_apply_watch_delta_preserves_metrics_and_selection() {
+        use orbit_core::kubernetes::watchers::WatchItem;
+
+        let mut state = PodsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+        state.table.selected_row_key = Some("default/api-0".to_string());
+
+        let mut pod_pending = sample_pod("api-0", "default");
+        pod_pending.status = "Pending".to_string();
+        pod_pending.cpu = None;
+        pod_pending.memory = None;
+        pod_pending.cpu_cores = None;
+        pod_pending.memory_bytes = None;
+
+        assert!(state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/api-0".to_string(),
+                action: WatchAction::Applied,
+                item: pod_pending,
+            }]),
+        ));
+        let rev_after_insert = state.data_revision;
+
+        assert!(state.apply_pod_metrics_batch(
+            "ctx-a",
+            1,
+            &[PodMetricItem {
+                name: "api-0".to_string(),
+                namespace: "default".to_string(),
+                cpu: "120m".to_string(),
+                memory: "64Mi".to_string(),
+                cpu_cores: Some(0.12),
+                memory_bytes: Some(67_108_864.0),
+            }],
+        ));
+        assert!(state.data_revision > rev_after_insert);
+        let rev_after_metrics = state.data_revision;
+
+        let mut pod_running = sample_pod("api-0", "default");
+        pod_running.status = "Running".to_string();
+        pod_running.cpu = None;
+        pod_running.memory = None;
+        pod_running.cpu_cores = None;
+        pod_running.memory_bytes = None;
+
+        assert!(state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/api-0".to_string(),
+                action: WatchAction::Applied,
+                item: pod_running,
+            }]),
+        ));
+        assert_eq!(state.pods.len(), 1);
+        assert_eq!(state.pods[0].status, "Running");
+        assert_eq!(state.pods[0].cpu.as_deref(), Some("120m"));
+        assert_eq!(state.pods[0].memory.as_deref(), Some("64Mi"));
+        assert_eq!(
+            state.table.selected_row_key.as_deref(),
+            Some("default/api-0")
+        );
+        assert!(state.data_revision > rev_after_metrics);
+    }
+
+    #[test]
+    fn pods_state_apply_watch_delete_uses_swap_remove_and_keeps_index_consistent() {
+        use orbit_core::kubernetes::watchers::WatchItem;
+
+        let mut state = PodsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+
+        assert!(state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![
+                ("default/pod-a".to_string(), sample_pod("pod-a", "default")),
+                ("default/pod-b".to_string(), sample_pod("pod-b", "default")),
+                ("default/pod-c".to_string(), sample_pod("pod-c", "default")),
+            ]),
+        ));
+        assert_eq!(state.pods.len(), 3);
+        assert_eq!(state.key_index.len(), 3);
+
+        assert!(state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/pod-a".to_string(),
+                action: WatchAction::Deleted,
+                item: sample_pod("pod-a", "default"),
+            }]),
+        ));
+        assert_eq!(state.pods.len(), 2);
+        assert_eq!(state.key_index.len(), 2);
+
+        let mut updated_c = sample_pod("pod-c", "default");
+        updated_c.status = "Succeeded".to_string();
+        assert!(state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/pod-c".to_string(),
+                action: WatchAction::Applied,
+                item: updated_c,
+            }]),
+        ));
+        assert_eq!(state.pods.len(), 2);
+        let Some(idx_c) = state.key_index.get("default/pod-c") else {
+            panic!("pod-c must remain indexed after swap_remove");
+        };
+        assert_eq!(state.pods[idx_c].status, "Succeeded");
+    }
+
+    #[test]
+    fn services_state_preserves_endpoints_across_service_and_endpoint_updates() {
+        use orbit_core::kubernetes::watchers::WatchItem;
+
+        let mut state = ServicesState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+
+        let make_svc = |cluster_ip: &str| ServiceInfo {
+            name: "api".to_string(),
+            namespace: "prod".to_string(),
+            r#type: "ClusterIP".to_string(),
+            cluster_ip: cluster_ip.to_string(),
+            external_ip: "-".to_string(),
+            ports: "80/TCP".to_string(),
+            endpoints: "-".to_string(),
+            age: "1m".to_string(),
+            session_affinity: "None".to_string(),
+            internal_traffic_policy: None,
+            created: String::new(),
+            uid: String::new(),
+            selector: Default::default(),
+            labels: Default::default(),
+            ports_list: Vec::new(),
+            endpoints_list: Vec::new(),
+            events: Vec::new(),
+        };
+
+        assert!(state.apply_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![("prod/api".to_string(), make_svc("10.96.0.1"))]),
+        ));
+        assert!(state.apply_endpoints_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "prod/api".to_string(),
+                action: WatchAction::Applied,
+                item: ServiceEndpointsSnapshot {
+                    endpoints: "2 ready".to_string(),
+                    endpoints_list: vec!["10.0.0.1:80".to_string(), "10.0.0.2:80".to_string()],
+                },
+            }]),
+        ));
+        assert_eq!(state.services[0].endpoints, "2 ready");
+
+        assert!(state.apply_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "prod/api".to_string(),
+                action: WatchAction::Applied,
+                item: make_svc("10.96.0.2"),
+            }]),
+        ));
+        assert_eq!(state.services[0].cluster_ip, "10.96.0.2");
+        assert_eq!(state.services[0].endpoints, "2 ready");
+
+        assert!(state.apply_endpoints_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "prod/api".to_string(),
+                action: WatchAction::Deleted,
+                item: ServiceEndpointsSnapshot {
+                    endpoints: "-".to_string(),
+                    endpoints_list: Vec::new(),
+                },
+            }]),
+        ));
+        assert_eq!(state.services[0].endpoints, "-");
+        assert!(state.services[0].endpoints_list.is_empty());
+    }
+
+    #[test]
+    fn events_state_caps_retained_events_under_burst() {
+        let mut state = EventsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+
+        let burst: Vec<(String, EventInfo)> = (0..6_000)
+            .map(|i| {
+                let mut ev = sample_event(&format!("ev-{i}"), "Normal", "Started", "default");
+                ev.name = format!("ev-{i}");
+                (format!("default/ev-{i}"), ev)
+            })
+            .collect();
+
+        assert!(state.apply_watch_update("ctx-a", 1, WatchUpdate::Reset(burst)));
+        assert_eq!(state.events.len(), MAX_RETAINED_EVENTS);
+        assert_eq!(state.key_index.len(), state.events.len());
+    }
+
+    #[test]
+    fn filtered_rows_cache_reuses_rc_pointer_when_inputs_unchanged_and_invalidates_on_revision() {
+        use std::rc::Rc;
+
+        let cache: FilteredRowsCache<String> = FilteredRowsCache::default();
+        let key1 = RowCacheKey {
+            data_revision: 1,
+            namespaces_revision: 1,
+            search_query: String::new(),
+            extra_filters_hash: 0,
+            sort: None,
+            aux_filter_tag: 0,
+        };
+        let first = cache.get_or_compute(key1.clone(), || vec!["a".to_string(), "b".to_string()]);
+        let second = cache.get_or_compute(key1.clone(), || panic!("cache hit must not recompute"));
+        assert!(Rc::ptr_eq(&first, &second));
+
+        let key2 = RowCacheKey {
+            data_revision: 2,
+            ..key1
+        };
+        let third = cache.get_or_compute(key2, || vec!["a".to_string(), "c".to_string()]);
+        assert!(!Rc::ptr_eq(&first, &third));
+        assert_eq!(third.as_ref(), &vec!["a".to_string(), "c".to_string()]);
+    }
+
+    #[test]
+    fn stale_cluster_or_generation_watch_update_is_ignored() {
+        let mut state = PodsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 2;
+
+        assert!(!state.apply_pod_watch_update(
+            "ctx-other",
+            2,
+            WatchUpdate::Reset(vec![("default/p1".to_string(), sample_pod("p1", "default"))]),
+        ));
+        assert!(!state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![("default/p1".to_string(), sample_pod("p1", "default"))]),
+        ));
+        assert!(state.pods.is_empty());
+    }
+
+    #[test]
+    fn pod_security_apply_loaded_then_prefixed_watch_reset_has_no_duplicates() {
+        let mut state = SecurityOverviewState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+
+        let make_psa = |ns: &str, mode: &str| PolicyInfo {
+            uid: format!("uid-{ns}"),
+            name: format!("psa-{ns}"),
+            r#type: "Pod Security".to_string(),
+            scope: "Namespace".to_string(),
+            namespace: ns.to_string(),
+            status: "Enforced".to_string(),
+            mode: mode.to_string(),
+            violations: 0,
+            last_updated: "1m".to_string(),
+            description: String::new(),
+            rules: String::new(),
+            kind: "Namespace".to_string(),
+        };
+
+        assert!(state.apply_loaded("ctx-a", 1, vec![make_psa("prod", "enforce: baseline")]));
+        assert_eq!(state.policies.len(), 1);
+        assert_eq!(state.key_index.get("PodSecurity:prod"), Some(0));
+
+        assert!(state.apply_watch_update_prefixed(
+            "ctx-a",
+            1,
+            "PodSecurity",
+            WatchUpdate::Reset(vec![(
+                "PodSecurity:prod".to_string(),
+                make_psa("prod", "enforce: restricted"),
+            )]),
+        ));
+        assert_eq!(state.policies.len(), 1);
+        assert_eq!(state.policies[0].mode, "enforce: restricted");
+    }
+
+    #[test]
+    fn services_state_applies_cached_endpoints_when_endpoints_arrive_before_services() {
+        let mut state = ServicesState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+
+        // Endpoints arrive BEFORE Services Reset
+        let _ = state.apply_endpoints_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![(
+                "prod/api".to_string(),
+                ServiceEndpointsSnapshot {
+                    endpoints: "2 ready".to_string(),
+                    endpoints_list: vec!["10.0.0.1:80".to_string(), "10.0.0.2:80".to_string()],
+                },
+            )]),
+        );
+
+        let svc = ServiceInfo {
+            name: "api".to_string(),
+            namespace: "prod".to_string(),
+            r#type: "ClusterIP".to_string(),
+            cluster_ip: "10.96.0.1".to_string(),
+            external_ip: "-".to_string(),
+            ports: "80/TCP".to_string(),
+            endpoints: "-".to_string(),
+            age: "1m".to_string(),
+            session_affinity: "None".to_string(),
+            internal_traffic_policy: None,
+            created: String::new(),
+            uid: String::new(),
+            selector: Default::default(),
+            labels: Default::default(),
+            ports_list: Vec::new(),
+            endpoints_list: Vec::new(),
+            events: Vec::new(),
+        };
+        assert!(state.apply_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![("prod/api".to_string(), svc)]),
+        ));
+        assert_eq!(state.services.len(), 1);
+        assert_eq!(state.services[0].endpoints, "2 ready");
+        assert_eq!(state.services[0].endpoints_list.len(), 2);
     }
 }

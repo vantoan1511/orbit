@@ -283,12 +283,14 @@ pub fn render_persistent_volumes_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = persistent_volume_columns();
-    let sorted_rows: Rc<Vec<PersistentVolumeInfo>> = Rc::new(
+    let cache_key =
+        crate::state::RowCacheKey::from_table(state.data_revision, 0, &state.table, 0);
+    let sorted_rows = state.row_cache.get_or_compute(cache_key, || {
         sort_persistent_volumes(&state.persistent_volumes, state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = sorted_rows.len();
     let is_loading = state.status == PersistentVolumesLoadStatus::Loading;
     let presentation_mode = persistent_volumes_presentation_mode(state);

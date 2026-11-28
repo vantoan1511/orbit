@@ -253,12 +253,14 @@ pub fn render_admission_webhooks_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = admission_webhook_columns();
-    let filtered_rows: Rc<Vec<PolicyInfo>> = Rc::new(
+    let cache_key =
+        crate::state::RowCacheKey::from_table(state.data_revision, 0, &state.table, 0);
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_admission_webhooks(&state.policies, state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = filtered_rows.len();
     let is_loading = state.status == AdmissionWebhooksLoadStatus::Loading;
     let presentation_mode = admission_webhooks_presentation_mode(state);

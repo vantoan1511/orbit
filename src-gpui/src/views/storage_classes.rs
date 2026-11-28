@@ -252,12 +252,14 @@ pub fn render_storage_classes_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = storage_class_columns();
-    let filtered_rows: Rc<Vec<StorageClassInfo>> = Rc::new(
+    let cache_key =
+        crate::state::RowCacheKey::from_table(state.data_revision, 0, &state.table, 0);
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_storage_classes(&state.classes, "", state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = state.classes.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == StorageClassesLoadStatus::Loading;

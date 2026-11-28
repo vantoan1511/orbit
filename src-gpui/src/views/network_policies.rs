@@ -281,7 +281,13 @@ pub fn render_network_policies_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = network_policy_columns();
-    let filtered_rows: Rc<Vec<PolicyInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_network_policies(
             &state.network_policies,
             namespaces,
@@ -289,8 +295,8 @@ pub fn render_network_policies_view(
         )
         .into_iter()
         .cloned()
-        .collect(),
-    );
+        .collect()
+    });
     let total_count = state
         .network_policies
         .iter()

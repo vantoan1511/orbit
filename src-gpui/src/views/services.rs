@@ -388,6 +388,30 @@ pub fn build_service_context_menu_entries(
     ]
 }
 
+pub fn cached_filtered_services(
+    state: &ServicesState,
+    namespaces: &NamespaceFilterState,
+) -> Rc<Vec<ServiceInfo>> {
+    let key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        state.type_filter as u64,
+    );
+    state.row_cache.get_or_compute(key, || {
+        filter_and_sort_services_with_filters(
+            &state.services,
+            namespaces,
+            state.type_filter,
+            &state.table.filters,
+            state.table.sort.as_ref(),
+        )
+        .into_iter()
+        .cloned()
+        .collect()
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn render_services_view(
     state: &ServicesState,
@@ -402,15 +426,7 @@ pub fn render_services_view(
     enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = service_columns();
-    let filtered_refs = filter_and_sort_services_with_filters(
-        &state.services,
-        namespaces,
-        state.type_filter,
-        &state.table.filters,
-        state.table.sort.as_ref(),
-    );
-    let filtered_rows: Rc<Vec<ServiceInfo>> =
-        Rc::new(filtered_refs.into_iter().cloned().collect());
+    let filtered_rows = cached_filtered_services(state, namespaces);
     let total_count = state.services.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == ServicesLoadStatus::Loading;
@@ -1033,5 +1049,49 @@ mod tests {
         );
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].name, "api-lb");
+    }
+
+    #[test]
+    fn services_cached_rows_reflect_live_endpoint_update() {
+        use orbit_core::kubernetes::services::ServiceEndpointsSnapshot;
+        use orbit_core::kubernetes::watchers::{WatchAction, WatchItem, WatchUpdate};
+
+        let mut state = ServicesState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+
+        assert!(state.apply_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![(
+                "default/api".to_string(),
+                make_service("api", "default", "ClusterIP", "10.0.0.1", "-", "80/TCP", "-", "1m"),
+            )]),
+        ));
+
+        let ns = NamespaceFilterState::default();
+        let before = cached_filtered_services(&state, &ns);
+        assert_eq!(before[0].endpoints, "-");
+
+        assert!(state.apply_endpoints_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/api".to_string(),
+                action: WatchAction::Applied,
+                item: ServiceEndpointsSnapshot {
+                    endpoints: "3 ready".to_string(),
+                    endpoints_list: vec![
+                        "10.0.0.1:80".to_string(),
+                        "10.0.0.2:80".to_string(),
+                        "10.0.0.3:80".to_string(),
+                    ],
+                },
+            }]),
+        ));
+
+        let after = cached_filtered_services(&state, &ns);
+        assert!(!Rc::ptr_eq(&before, &after));
+        assert_eq!(after[0].endpoints, "3 ready");
     }
 }

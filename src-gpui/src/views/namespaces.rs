@@ -255,12 +255,14 @@ pub fn render_namespaces_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = namespace_columns();
-    let sorted_rows: Rc<Vec<NamespaceInfo>> = Rc::new(
+    let cache_key =
+        crate::state::RowCacheKey::from_table(state.data_revision, 0, &view_state.table, 0);
+    let sorted_rows = view_state.row_cache.get_or_compute(cache_key, || {
         sort_namespaces(&state.namespaces, view_state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = sorted_rows.len();
     let is_loading = state.status == NamespaceLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);

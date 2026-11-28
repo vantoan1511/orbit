@@ -429,7 +429,13 @@ pub fn render_events_view(
         .collect();
     let total_ns_count = ns_filtered.len();
 
-    let filtered_rows: Rc<Vec<EventInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        state.type_filter as u64,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_events_with_filters(
             &state.events,
             namespaces,
@@ -439,8 +445,8 @@ pub fn render_events_view(
         )
         .into_iter()
         .cloned()
-        .collect(),
-    );
+        .collect()
+    });
     let visible_count = filtered_rows.len();
     let is_loading = state.status == EventsLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);

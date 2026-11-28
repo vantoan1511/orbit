@@ -330,6 +330,29 @@ pub fn build_deployment_context_menu_entries(
     ]
 }
 
+pub fn cached_filtered_deployments(
+    state: &DeploymentsState,
+    namespaces: &NamespaceFilterState,
+) -> Rc<Vec<DeploymentInfo>> {
+    let key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    state.row_cache.get_or_compute(key, || {
+        filter_and_sort_deployments_with_filters(
+            &state.deployments,
+            namespaces,
+            &state.table.filters,
+            state.table.sort.as_ref(),
+        )
+        .into_iter()
+        .cloned()
+        .collect()
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn render_deployments_view(
     state: &DeploymentsState,
@@ -344,17 +367,7 @@ pub fn render_deployments_view(
     enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = deployment_columns();
-    let filtered_rows: Rc<Vec<DeploymentInfo>> = Rc::new(
-        filter_and_sort_deployments_with_filters(
-            &state.deployments,
-            namespaces,
-            &state.table.filters,
-            state.table.sort.as_ref(),
-        )
-        .into_iter()
-        .cloned()
-        .collect(),
-    );
+    let filtered_rows = cached_filtered_deployments(state, namespaces);
     let total_count = state.deployments.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == DeploymentsLoadStatus::Loading;
@@ -1146,5 +1159,53 @@ mod tests {
         let matched = filter_and_sort_deployments_with_filters(&deps, &ns, &filters, None);
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].name, "web-canary");
+    }
+
+    #[test]
+    fn deployments_cached_rows_update_live_and_preserve_sort_order() {
+        use orbit_core::kubernetes::watchers::{WatchAction, WatchItem, WatchUpdate};
+
+        let mut state = DeploymentsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+        state.table.sort = Some(SortState {
+            column_id: "replicas".to_string(),
+            direction: crate::components::data_table::SortDirection::Desc,
+        });
+
+        assert!(state.apply_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Reset(vec![
+                (
+                    "default/api".to_string(),
+                    make_deployment("api", "default", "Available", 2, 2, 2, 2, None, vec![], "1m"),
+                ),
+                (
+                    "default/web".to_string(),
+                    make_deployment("web", "default", "Available", 4, 4, 4, 4, None, vec![], "1m"),
+                ),
+            ]),
+        ));
+
+        let ns = NamespaceFilterState::default();
+        let before = cached_filtered_deployments(&state, &ns);
+        assert_eq!(before[0].name, "web");
+        assert_eq!(before[1].name, "api");
+
+        assert!(state.apply_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/api".to_string(),
+                action: WatchAction::Applied,
+                item: make_deployment("api", "default", "Available", 8, 8, 8, 8, None, vec![], "1m"),
+            }]),
+        ));
+
+        let after = cached_filtered_deployments(&state, &ns);
+        assert!(!Rc::ptr_eq(&before, &after));
+        assert_eq!(after[0].name, "api");
+        assert_eq!(after[0].replicas.desired, 8);
     }
 }

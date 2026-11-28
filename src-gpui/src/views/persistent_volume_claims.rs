@@ -330,7 +330,13 @@ pub fn render_persistent_volume_claims_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = persistent_volume_claim_columns();
-    let filtered_rows: Rc<Vec<PersistentVolumeClaimInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_persistent_volume_claims(
             &state.persistent_volume_claims,
             namespaces,
@@ -338,8 +344,8 @@ pub fn render_persistent_volume_claims_view(
         )
         .into_iter()
         .cloned()
-        .collect(),
-    );
+        .collect()
+    });
     let total_count = state.persistent_volume_claims.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == PersistentVolumeClaimsLoadStatus::Loading;

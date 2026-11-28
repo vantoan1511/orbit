@@ -131,9 +131,15 @@ pub fn map_service(s: &Service) -> models::ServiceInfo {
     }
 }
 
-/// Formats ready addresses from a Kubernetes `Endpoints` object into `"ip:port"` strings
-/// and a compact summary string (e.g. `"2 ready"` or `"-"` when empty).
-pub fn apply_endpoints_to_service(service: &mut models::ServiceInfo, endpoints: &Endpoints) {
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ServiceEndpointsSnapshot {
+    pub endpoints: String,
+    pub endpoints_list: Vec<String>,
+}
+
+/// Extracts ready `"ip:port"` addresses and a compact summary string (e.g. `"2 ready"` or `"-"`)
+/// from a Kubernetes `Endpoints` object.
+pub fn extract_endpoints_summary(endpoints: &Endpoints) -> ServiceEndpointsSnapshot {
     let mut formatted = Vec::new();
     if let Some(subsets) = &endpoints.subsets {
         for subset in subsets {
@@ -155,12 +161,23 @@ pub fn apply_endpoints_to_service(service: &mut models::ServiceInfo, endpoints: 
         }
     }
 
-    service.endpoints = if formatted.is_empty() {
+    let summary = if formatted.is_empty() {
         "-".to_string()
     } else {
         format!("{} ready", formatted.len())
     };
-    service.endpoints_list = formatted;
+    ServiceEndpointsSnapshot {
+        endpoints: summary,
+        endpoints_list: formatted,
+    }
+}
+
+/// Formats ready addresses from a Kubernetes `Endpoints` object into `"ip:port"` strings
+/// and a compact summary string (e.g. `"2 ready"` or `"-"` when empty).
+pub fn apply_endpoints_to_service(service: &mut models::ServiceInfo, endpoints: &Endpoints) {
+    let snapshot = extract_endpoints_summary(endpoints);
+    service.endpoints = snapshot.endpoints;
+    service.endpoints_list = snapshot.endpoints_list;
 }
 
 pub async fn list_services(
@@ -396,5 +413,39 @@ mod tests {
         apply_endpoints_to_service(&mut svc, &empty_endpoints);
         assert!(svc.endpoints_list.is_empty());
         assert_eq!(svc.endpoints, "-");
+    }
+
+    #[test]
+    fn extract_endpoints_summary_formats_ready_count_and_addresses() {
+        let empty = extract_endpoints_summary(&Endpoints::default());
+        assert_eq!(empty.endpoints, "-");
+        assert!(empty.endpoints_list.is_empty());
+
+        let endpoints = Endpoints {
+            subsets: Some(vec![EndpointSubset {
+                addresses: Some(vec![
+                    EndpointAddress {
+                        ip: "10.0.0.1".to_string(),
+                        ..Default::default()
+                    },
+                    EndpointAddress {
+                        ip: "10.0.0.2".to_string(),
+                        ..Default::default()
+                    },
+                ]),
+                ports: Some(vec![EndpointPort {
+                    port: 80,
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        };
+        let snapshot = extract_endpoints_summary(&endpoints);
+        assert_eq!(snapshot.endpoints, "2 ready");
+        assert_eq!(
+            snapshot.endpoints_list,
+            vec!["10.0.0.1:80".to_string(), "10.0.0.2:80".to_string()]
+        );
     }
 }
