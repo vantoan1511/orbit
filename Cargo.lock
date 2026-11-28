@@ -6587,6 +6587,7 @@ name = "orbit-gpui"
 version = "0.20.1"
 dependencies = [
  "gpui-kit",
+ "k8s-openapi",
  "kube",
  "lucide-icons",
  "orbit-core",

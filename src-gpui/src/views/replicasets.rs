@@ -256,12 +256,18 @@ pub fn render_replicasets_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = replicaset_columns();
-    let filtered_rows: Rc<Vec<ReplicaSetInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_replicasets(&state.replicasets, namespaces, state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = state.replicasets.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == ReplicaSetsLoadStatus::Loading;

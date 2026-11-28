@@ -10,6 +10,7 @@ mod shell;
 mod state;
 pub mod theme;
 pub mod views;
+mod watch_state;
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -58,6 +59,50 @@ use crate::state::{
     WorkloadActionKind, WorkspaceResourcesState, WorkspaceTabsState,
 };
 use crate::theme::{OrbitTheme, ThemeMode, apply_text_step, sync_native_titlebar_appearance};
+
+pub const MAX_EVENTS_PER_FRAME_BATCH: usize = 128;
+pub const FRAME_PACING_INTERVAL: std::time::Duration = std::time::Duration::from_millis(16);
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct BatchApplySummary {
+    pub should_notify: bool,
+    pub pure_watch_batch: bool,
+}
+
+/// Drains `first` plus up to `max_batch - 1` immediately ready events from `event_rx`
+/// so bursts are applied inside a single GPUI entity update and render pass.
+pub fn drain_ready_events(
+    event_rx: &mut mpsc::UnboundedReceiver<ClusterBridgeEvent>,
+    first: ClusterBridgeEvent,
+    max_batch: usize,
+) -> Vec<ClusterBridgeEvent> {
+    let cap = max_batch.max(1);
+    let mut batch = Vec::with_capacity(cap.min(MAX_EVENTS_PER_FRAME_BATCH));
+    batch.push(first);
+    while batch.len() < cap {
+        match event_rx.try_recv() {
+            Ok(next) => batch.push(next),
+            Err(_) => break,
+        }
+    }
+    batch
+}
+
+/// Returns the remaining 60 FPS pacing sleep duration only for pure watch-update batches
+/// that triggered a visible UI refresh. User-action events always flush immediately.
+pub fn should_pace_after_batch(
+    summary: BatchApplySummary,
+    elapsed_since_last_flush: std::time::Duration,
+) -> Option<std::time::Duration> {
+    if summary.pure_watch_batch
+        && summary.should_notify
+        && elapsed_since_last_flush < FRAME_PACING_INTERVAL
+    {
+        Some(FRAME_PACING_INTERVAL.saturating_sub(elapsed_since_last_flush))
+    } else {
+        None
+    }
+}
 
 gpui::actions!(orbit_shell, [OpenCommandPalette, ToggleSidebar]);
 
@@ -508,87 +553,137 @@ impl OrbitShell {
         } = start_cluster_bridge();
 
         cx.spawn(async move |this, cx| {
-            while let Some(event) = event_rx.recv().await {
+            let mut last_watch_flush = std::time::Instant::now()
+                .checked_sub(FRAME_PACING_INTERVAL)
+                .unwrap_or_else(std::time::Instant::now);
+
+            while let Some(first_event) = event_rx.recv().await {
+                let batch = drain_ready_events(&mut event_rx, first_event, MAX_EVENTS_PER_FRAME_BATCH);
+                let mut summary = BatchApplySummary {
+                    should_notify: false,
+                    pure_watch_batch: true,
+                };
+
                 if this
                     .update(cx, |shell, cx| {
-                        if let ClusterBridgeEvent::SettingsSaveFailed { ref message } = event {
-                            shell.settings_error = Some(message.clone());
-                        }
-                        if let Some((severity, title, message)) =
-                            notification_from_bridge_event(&event)
-                        {
-                            shell.record_notification(severity, title, message);
-                        }
-                        apply_add_cluster_modal_event(&mut shell.add_cluster, &event);
-                        apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
-                        if let Some((toast_id, toast_kind, refresh_cmds)) =
-                            apply_workload_action_event(
-                                shell.state.active_cluster_id.as_deref(),
-                                &mut shell.workload_action_modal,
-                                &mut shell.action_toast,
-                                &mut shell.drawer,
-                                &mut shell.resources,
-                                &event,
-                            )
-                        {
-                            for cmd in refresh_cmds {
-                                shell.dispatch_command(cmd);
+                        for event in batch {
+                            if let ClusterBridgeEvent::ResourceWatchUpdated {
+                                cluster_id,
+                                generation,
+                                payload,
+                            } = event
+                            {
+                                let (outcome, follow_up) = apply_resource_watch_update(
+                                    &mut shell.resources,
+                                    &cluster_id,
+                                    generation,
+                                    payload,
+                                    shell.sidebar.active_view,
+                                    shell.drawer.target.as_ref(),
+                                );
+                                if let Some(cmd) = follow_up {
+                                    shell.dispatch_command(cmd);
+                                }
+                                if outcome.affects_active_ui {
+                                    summary.should_notify = true;
+                                }
+                                continue;
                             }
-                            shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
-                        }
-                        if matches!(
-                            event,
-                            ClusterBridgeEvent::ClusterConnected { .. }
-                                | ClusterBridgeEvent::ClusterDisconnected { .. }
-                                | ClusterBridgeEvent::ClusterUnreachable { .. }
-                        ) {
-                            let stop_cmds =
-                                clear_all_log_tabs_in_state(&mut shell.tabs, &mut shell.log_tabs);
-                            for cmd in stop_cmds {
-                                shell.dispatch_command(cmd);
+
+                            summary.pure_watch_batch = false;
+                            summary.should_notify = true;
+
+                            if let ClusterBridgeEvent::SettingsSaveFailed { ref message } = event {
+                                shell.settings_error = Some(message.clone());
                             }
-                        }
-                        apply_log_bridge_event(
-                            &mut shell.log_tabs,
-                            shell.state.active_cluster_id.as_deref(),
-                            &event,
-                        );
-                        if let Some((pf_cmds, toast_info)) = apply_port_forward_event(
-                            &mut shell.resources.port_forwards,
-                            &mut shell.port_forward_modal,
-                            &mut shell.action_toast,
-                            &event,
-                        ) {
-                            if shell.port_forward_modal.is_none() {
-                                shell.close_port_forward_modal();
+                            if let Some((severity, title, message)) =
+                                notification_from_bridge_event(&event)
+                            {
+                                shell.record_notification(severity, title, message);
                             }
-                            for cmd in pf_cmds {
-                                shell.dispatch_command(cmd);
-                            }
-                            if let Some((toast_id, toast_kind)) = toast_info {
+                            apply_add_cluster_modal_event(&mut shell.add_cluster, &event);
+                            apply_drawer_lifecycle_for_event(&mut shell.drawer, &event);
+                            if let Some((toast_id, toast_kind, refresh_cmds)) =
+                                apply_workload_action_event(
+                                    shell.state.active_cluster_id.as_deref(),
+                                    &mut shell.workload_action_modal,
+                                    &mut shell.action_toast,
+                                    &mut shell.drawer,
+                                    &mut shell.resources,
+                                    &event,
+                                )
+                            {
+                                for cmd in refresh_cmds {
+                                    shell.dispatch_command(cmd);
+                                }
                                 shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
                             }
+                            if matches!(
+                                event,
+                                ClusterBridgeEvent::ClusterConnected { .. }
+                                    | ClusterBridgeEvent::ClusterDisconnected { .. }
+                                    | ClusterBridgeEvent::ClusterUnreachable { .. }
+                            ) {
+                                let stop_cmds =
+                                    clear_all_log_tabs_in_state(&mut shell.tabs, &mut shell.log_tabs);
+                                for cmd in stop_cmds {
+                                    shell.dispatch_command(cmd);
+                                }
+                            }
+                            apply_log_bridge_event(
+                                &mut shell.log_tabs,
+                                shell.state.active_cluster_id.as_deref(),
+                                &event,
+                            );
+                            if let Some((pf_cmds, toast_info)) = apply_port_forward_event(
+                                &mut shell.resources.port_forwards,
+                                &mut shell.port_forward_modal,
+                                &mut shell.action_toast,
+                                &event,
+                            ) {
+                                if shell.port_forward_modal.is_none() {
+                                    shell.close_port_forward_modal();
+                                }
+                                for cmd in pf_cmds {
+                                    shell.dispatch_command(cmd);
+                                }
+                                if let Some((toast_id, toast_kind)) = toast_info {
+                                    shell.schedule_toast_dismiss(toast_id, toast_kind, cx);
+                                }
+                            }
+                            let is_cluster_connected =
+                                matches!(event, ClusterBridgeEvent::ClusterConnected { .. });
+                            for cmd in apply_cluster_event_with_tabs(
+                                &mut shell.state,
+                                &mut shell.sidebar,
+                                &mut shell.resources,
+                                &mut shell.tabs,
+                                event,
+                            ) {
+                                shell.dispatch_command(cmd);
+                            }
+                            if is_cluster_connected {
+                                shell.hydrate_exemplar_tables();
+                            }
                         }
-                        let is_cluster_connected =
-                            matches!(event, ClusterBridgeEvent::ClusterConnected { .. });
-                        for cmd in apply_cluster_event_with_tabs(
-                            &mut shell.state,
-                            &mut shell.sidebar,
-                            &mut shell.resources,
-                            &mut shell.tabs,
-                            event,
-                        ) {
-                            shell.dispatch_command(cmd);
+
+                        if summary.should_notify {
+                            shell.reconcile_drawer_target_exists();
+                            cx.notify();
                         }
-                        if is_cluster_connected {
-                            shell.hydrate_exemplar_tables();
-                        }
-                        shell.reconcile_drawer_target_exists();
-                        cx.notify();
                     })
                     .is_err()
                 {
                     break;
+                }
+
+                if summary.should_notify {
+                    if let Some(wait) =
+                        should_pace_after_batch(summary, last_watch_flush.elapsed())
+                    {
+                        cx.background_executor().timer(wait).await;
+                    }
+                    last_watch_flush = std::time::Instant::now();
                 }
             }
         })
@@ -2009,6 +2104,14 @@ impl OrbitShell {
         }
         if let Some(cmd) = load_command_for_active_view(&self.state, &mut self.resources, active) {
             self.dispatch_command(cmd);
+        }
+        if let Some(sync_cmd) = sync_active_watchers_command(
+            &self.state,
+            &mut self.resources,
+            &self.tabs,
+            self.sidebar.active_view,
+        ) {
+            self.dispatch_command(sync_cmd);
         }
         self.persist_tabs();
     }
@@ -11741,5 +11844,143 @@ mod tests {
             WorkspaceView::Overview,
             false
         ));
+    }
+
+    #[test]
+    fn drain_event_batch_caps_at_max_and_coalesces_burst() {
+        use orbit_core::kubernetes::watchers::WatchUpdate;
+
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        for _ in 0..500 {
+            let _ = tx.send(ClusterBridgeEvent::ResourceWatchUpdated {
+                cluster_id: "ctx-a".to_string(),
+                generation: 1,
+                payload: crate::state::ResourceWatchPayload::Pods(WatchUpdate::Delta(Vec::new())),
+            });
+        }
+
+        let Some(first) = rx.try_recv().ok() else {
+            panic!("expected queued event");
+        };
+        let batch = drain_ready_events(&mut rx, first, MAX_EVENTS_PER_FRAME_BATCH);
+        assert_eq!(batch.len(), MAX_EVENTS_PER_FRAME_BATCH);
+
+        let mut remaining = 0usize;
+        while rx.try_recv().is_ok() {
+            remaining += 1;
+        }
+        assert_eq!(remaining, 500 - MAX_EVENTS_PER_FRAME_BATCH);
+    }
+
+    #[test]
+    fn should_pace_after_batch_only_throttles_watch_bursts_not_user_actions() {
+        let pure_watch = BatchApplySummary {
+            should_notify: true,
+            pure_watch_batch: true,
+        };
+        let wait = should_pace_after_batch(pure_watch, std::time::Duration::from_millis(4));
+        assert_eq!(wait, Some(std::time::Duration::from_millis(12)));
+        assert_eq!(
+            should_pace_after_batch(pure_watch, FRAME_PACING_INTERVAL),
+            None
+        );
+
+        let bg_watch = BatchApplySummary {
+            should_notify: false,
+            pure_watch_batch: true,
+        };
+        assert_eq!(
+            should_pace_after_batch(bg_watch, std::time::Duration::from_millis(1)),
+            None
+        );
+
+        let user_action = BatchApplySummary {
+            should_notify: true,
+            pure_watch_batch: false,
+        };
+        assert_eq!(
+            should_pace_after_batch(user_action, std::time::Duration::from_millis(1)),
+            None
+        );
+    }
+
+    #[test]
+    fn burst_stress_10000_pod_updates_stays_fast_and_bounded() {
+        use orbit_core::kubernetes::models::PodInfo;
+        use orbit_core::kubernetes::watchers::{
+            TypedEmitDedup, TypedWatchBuffer, WatchAction, WatchItem, WatchUpdate,
+        };
+
+        let start = std::time::Instant::now();
+        let mut dedup = TypedEmitDedup::new();
+        let mut buffer = TypedWatchBuffer::<PodInfo>::new();
+        let mut pods_state = crate::state::PodsState::default();
+        let _ = pods_state.begin_load_for_cluster("ctx-a");
+        pods_state.watch_generation = 1;
+        pods_state.table.sort = Some(crate::components::data_table::SortState {
+            column_id: "status".to_string(),
+            direction: crate::components::data_table::SortDirection::Asc,
+        });
+        let ns = NamespaceFilterState::default();
+
+        const UNIQUE_PODS: usize = 500;
+        for i in 0..10_000usize {
+            let pod_idx = i % UNIQUE_PODS;
+            let name = format!("pod-{pod_idx:04}");
+            let key = format!("prod/{name}");
+            let status = if i % 3 == 0 { "Running" } else { "Pending" };
+            let pod = PodInfo {
+                name,
+                namespace: "prod".to_string(),
+                status: status.to_string(),
+                age: "1m".to_string(),
+                cpu: None,
+                memory: None,
+                cpu_cores: None,
+                memory_bytes: None,
+                cpu_pct: None,
+                memory_pct: None,
+                node: Some("node-1".to_string()),
+                restarts: (i / UNIQUE_PODS) as i32,
+                images: Vec::new(),
+                labels: Default::default(),
+                annotations: Default::default(),
+                ip: None,
+                node_ip: None,
+                controlled_by: None,
+                qos_class: None,
+                containers: Vec::new(),
+            };
+
+            if dedup.should_emit(&key, WatchAction::Applied, &pod)
+                && buffer.upsert(WatchItem {
+                    key,
+                    action: WatchAction::Applied,
+                    item: pod,
+                })
+                && let Some(batch) = buffer.take_batch()
+            {
+                let _ = pods_state.apply_pod_watch_update(
+                    "ctx-a",
+                    1,
+                    WatchUpdate::Delta(batch),
+                );
+            }
+        }
+        if let Some(batch) = buffer.take_batch() {
+            let _ = pods_state.apply_pod_watch_update("ctx-a", 1, WatchUpdate::Delta(batch));
+        }
+
+        let rows_a = views::pods::cached_filtered_pods(&pods_state, &ns);
+        let rows_b = views::pods::cached_filtered_pods(&pods_state, &ns);
+        assert!(std::rc::Rc::ptr_eq(&rows_a, &rows_b));
+        assert_eq!(pods_state.pods.len(), UNIQUE_PODS);
+        assert_eq!(pods_state.key_index.len(), UNIQUE_PODS);
+        assert_eq!(rows_a.len(), UNIQUE_PODS);
+        assert!(
+            start.elapsed() < std::time::Duration::from_millis(500),
+            "10,000 pod burst took {:?}, exceeding 500ms budget",
+            start.elapsed()
+        );
     }
 }

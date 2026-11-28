@@ -1,13 +1,274 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
-use crate::components::{ActionToastKind, ActionToastState, NotificationSeverity};
+use crate::components::{
+    ActionToastKind, ActionToastState, NotificationSeverity, ResourceDrawerTarget,
+};
 use crate::navigation::{LogsTabTarget, SidebarLayoutState, WorkspaceView};
 use crate::state::{
-    AddClusterModalState, ClusterBridgeCommand, ClusterBridgeEvent, ClusterSwitcherState,
-    PortForwardsState, WorkloadActionKind, WorkspaceResourcesState, WorkspaceTabsState,
+    AddClusterModalState, ClusterBridgeCommand, ClusterBridgeEvent, ClusterConnectionState,
+    ClusterSwitcherState, PortForwardsState, ResourceWatchPayload, WatchResourceKind,
+    WorkloadActionKind, WorkspaceResourcesState, WorkspaceTabsState,
 };
 use crate::views;
 use crate::{PortForwardModalState, ResourceDrawerState, WorkloadActionModalState};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WatchApplyOutcome {
+    pub mutated: bool,
+    pub affects_active_ui: bool,
+}
+
+/// Computes the deterministic, deduplicated set of Kubernetes watchers that should be active
+/// for the currently open tabs and active view (`Namespaces` is always included).
+pub fn desired_watch_kinds(
+    tabs: &WorkspaceTabsState,
+    active_view: WorkspaceView,
+) -> Vec<WatchResourceKind> {
+    let mut kinds = BTreeSet::new();
+    kinds.insert(WatchResourceKind::Namespaces);
+    if let Some(kind) = WatchResourceKind::from_workspace_view(active_view) {
+        kinds.insert(kind);
+    }
+    for view in tabs.open_views() {
+        if let Some(kind) = WatchResourceKind::from_workspace_view(view) {
+            kinds.insert(kind);
+        }
+    }
+    kinds.into_iter().collect()
+}
+
+/// Emits `SyncActiveWatchers` when connected and the desired watcher set (or cluster/generation)
+/// differs from the last dispatched sync.
+pub fn sync_active_watchers_command(
+    state: &ClusterSwitcherState,
+    resources: &mut WorkspaceResourcesState,
+    tabs: &WorkspaceTabsState,
+    active_view: WorkspaceView,
+) -> Option<ClusterBridgeCommand> {
+    let ClusterConnectionState::Connected { cluster_id, .. } = &state.connection_state else {
+        return None;
+    };
+    let kinds = desired_watch_kinds(tabs, active_view);
+    let generation = resources.watch_generation;
+    if resources.last_synced_watch_cluster.as_deref() == Some(cluster_id.as_str())
+        && resources.last_synced_watch_generation == generation
+        && resources.last_synced_watch_kinds == kinds
+    {
+        return None;
+    }
+    resources.last_synced_watch_cluster = Some(cluster_id.clone());
+    resources.last_synced_watch_generation = generation;
+    resources.last_synced_watch_kinds = kinds.clone();
+    Some(ClusterBridgeCommand::SyncActiveWatchers {
+        cluster_id: cluster_id.clone(),
+        generation,
+        kinds,
+    })
+}
+
+fn drawer_target_matches_watch_kind(
+    target: &ResourceDrawerTarget,
+    kind: WatchResourceKind,
+) -> bool {
+    match target {
+        ResourceDrawerTarget::Deployment { .. } => kind == WatchResourceKind::Deployments,
+        ResourceDrawerTarget::StatefulSet { .. } => kind == WatchResourceKind::StatefulSets,
+        ResourceDrawerTarget::DaemonSet { .. } => kind == WatchResourceKind::DaemonSets,
+        ResourceDrawerTarget::ReplicaSet { .. } => kind == WatchResourceKind::ReplicaSets,
+        ResourceDrawerTarget::Job { .. } => kind == WatchResourceKind::Jobs,
+        ResourceDrawerTarget::CronJob { .. } => kind == WatchResourceKind::CronJobs,
+        ResourceDrawerTarget::Pod { .. } => kind == WatchResourceKind::Pods,
+        ResourceDrawerTarget::Service { .. } => kind == WatchResourceKind::Services,
+        ResourceDrawerTarget::Ingress { .. } => kind == WatchResourceKind::Ingresses,
+        ResourceDrawerTarget::ConfigMap { .. } => kind == WatchResourceKind::ConfigMaps,
+        ResourceDrawerTarget::Secret { .. } => kind == WatchResourceKind::Secrets,
+        ResourceDrawerTarget::PersistentVolume { .. } => {
+            kind == WatchResourceKind::PersistentVolumes
+        }
+        ResourceDrawerTarget::PersistentVolumeClaim { .. } => {
+            kind == WatchResourceKind::PersistentVolumeClaims
+        }
+        ResourceDrawerTarget::NetworkPolicy { .. } => {
+            matches!(
+                kind,
+                WatchResourceKind::NetworkPolicies | WatchResourceKind::SecurityOverview
+            )
+        }
+        ResourceDrawerTarget::PodSecurity { .. } => {
+            matches!(
+                kind,
+                WatchResourceKind::PodSecurity | WatchResourceKind::SecurityOverview
+            )
+        }
+        ResourceDrawerTarget::ResourceQuota { .. } | ResourceDrawerTarget::LimitRange { .. } => {
+            matches!(
+                kind,
+                WatchResourceKind::ResourceQuotas | WatchResourceKind::SecurityOverview
+            )
+        }
+        ResourceDrawerTarget::Hpa { .. } => kind == WatchResourceKind::Hpas,
+        ResourceDrawerTarget::StorageClass { .. } => kind == WatchResourceKind::StorageClasses,
+        ResourceDrawerTarget::AdmissionWebhook { .. } => {
+            matches!(
+                kind,
+                WatchResourceKind::AdmissionWebhooks | WatchResourceKind::SecurityOverview
+            )
+        }
+        ResourceDrawerTarget::SecurityPolicy { .. } => kind == WatchResourceKind::SecurityOverview,
+        ResourceDrawerTarget::Node { .. } => kind == WatchResourceKind::Nodes,
+        ResourceDrawerTarget::Namespace { .. } => kind == WatchResourceKind::Namespaces,
+        ResourceDrawerTarget::Event { .. } => kind == WatchResourceKind::Events,
+    }
+}
+
+/// Applies a live `ResourceWatchPayload` to `WorkspaceResourcesState` and reports whether
+/// the update is visibly relevant to the active view, open drawer, or namespace header.
+pub fn apply_resource_watch_update(
+    resources: &mut WorkspaceResourcesState,
+    cluster_id: &str,
+    generation: u64,
+    payload: ResourceWatchPayload,
+    active_view: WorkspaceView,
+    drawer_target: Option<&ResourceDrawerTarget>,
+) -> (WatchApplyOutcome, Option<ClusterBridgeCommand>) {
+    let kind = payload.kind();
+    let mut follow_up = None;
+    let mutated = match payload {
+        ResourceWatchPayload::Namespaces(update) => {
+            let (changed, pruned) =
+                resources
+                    .namespaces
+                    .apply_watch_update(cluster_id, generation, update);
+            if let Some(pruned_selection) = pruned {
+                follow_up = Some(ClusterBridgeCommand::SaveNamespaceSelection {
+                    cluster_id: cluster_id.to_string(),
+                    namespaces: pruned_selection,
+                });
+            }
+            changed
+        }
+        ResourceWatchPayload::Deployments(update) => {
+            resources
+                .deployments
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::StatefulSets(update) => {
+            resources
+                .statefulsets
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::DaemonSets(update) => {
+            resources
+                .daemonsets
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::ReplicaSets(update) => {
+            resources
+                .replicasets
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::Jobs(update) => {
+            resources
+                .jobs
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::CronJobs(update) => {
+            resources
+                .cronjobs
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::Pods(update) => {
+            resources
+                .pods
+                .apply_pod_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::PodMetrics(metrics) => {
+            resources
+                .pods
+                .apply_pod_metrics_batch(cluster_id, generation, &metrics)
+        }
+        ResourceWatchPayload::Services(update) => {
+            resources
+                .services
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::ServiceEndpoints(update) => resources
+            .services
+            .apply_endpoints_watch_update(cluster_id, generation, update),
+        ResourceWatchPayload::Ingresses(update) => {
+            resources
+                .ingresses
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::ConfigMaps(update) => {
+            resources
+                .configmaps
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::Secrets(update) => {
+            resources
+                .secrets
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::PersistentVolumes(update) => resources
+            .persistent_volumes
+            .apply_watch_update(cluster_id, generation, update),
+        ResourceWatchPayload::PersistentVolumeClaims(update) => resources
+            .persistent_volume_claims
+            .apply_watch_update(cluster_id, generation, update),
+        ResourceWatchPayload::StorageClasses(update) => resources
+            .list_views
+            .storage_classes
+            .apply_watch_update(cluster_id, generation, update),
+        ResourceWatchPayload::Hpas(update) => {
+            resources
+                .list_views
+                .hpas
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::NetworkPolicies(update) => resources
+            .network_policies
+            .apply_watch_update(cluster_id, generation, update),
+        ResourceWatchPayload::PodSecurity(update) => {
+            resources
+                .pod_security
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::ResourceQuotas { prefix, update } => resources
+            .resource_quotas
+            .apply_watch_update_prefixed(cluster_id, generation, prefix, update),
+        ResourceWatchPayload::AdmissionWebhooks { prefix, update } => resources
+            .list_views
+            .admission_webhooks
+            .apply_watch_update_prefixed(cluster_id, generation, prefix, update),
+        ResourceWatchPayload::SecurityOverview { prefix, update } => resources
+            .list_views
+            .security_overview
+            .apply_watch_update_prefixed(cluster_id, generation, prefix, update),
+        ResourceWatchPayload::Nodes(update) => {
+            resources
+                .nodes
+                .apply_watch_update(cluster_id, generation, update)
+        }
+        ResourceWatchPayload::Events(update) => {
+            resources
+                .events
+                .apply_watch_update(cluster_id, generation, update)
+        }
+    };
+
+    let visible = kind == WatchResourceKind::Namespaces
+        || kind.workspace_view() == active_view
+        || drawer_target.is_some_and(|target| drawer_target_matches_watch_kind(target, kind));
+
+    (
+        WatchApplyOutcome {
+            mutated,
+            affects_active_ui: mutated && visible,
+        },
+        follow_up,
+    )
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct KeyShortcutModifiers {
@@ -37,6 +298,10 @@ pub fn select_workspace_view_with_tabs(
     tabs.open_tab(view);
     if let Some(cmd) = select_workspace_view_with_state(state, sidebar, resources, view) {
         commands.push(cmd);
+    }
+    if let Some(sync_cmd) = sync_active_watchers_command(state, resources, tabs, sidebar.active_view)
+    {
+        commands.push(sync_cmd);
     }
     if let Some(save_cmd) = tabs.persistence_command() {
         commands.push(save_cmd);
@@ -101,6 +366,11 @@ pub fn apply_cluster_event_with_tabs(
             {
                 commands.push(load_cmd);
             }
+            if let Some(sync_cmd) =
+                sync_active_watchers_command(state, resources, tabs, sidebar.active_view)
+            {
+                commands.push(sync_cmd);
+            }
         }
     } else if is_disconnected {
         tabs.clear_active_cluster();
@@ -147,6 +417,10 @@ pub fn handle_tab_shortcut_with_state(
     if let Some(cmd) = load_command_for_active_view(state, resources, active) {
         commands.push(cmd);
     }
+    if let Some(sync_cmd) = sync_active_watchers_command(state, resources, tabs, sidebar.active_view)
+    {
+        commands.push(sync_cmd);
+    }
     if let Some(save_cmd) = tabs.persistence_command() {
         commands.push(save_cmd);
     }
@@ -172,6 +446,7 @@ pub fn apply_cluster_event_with_workspace(
             sidebar.on_cluster_connected();
             resources.namespaces_view.reset_for_cluster();
             if let Some(id) = state.active_cluster_id.as_deref() {
+                resources.begin_watch_session();
                 commands.push(resources.overview.begin_load_for_cluster(id));
                 commands.push(resources.namespaces.begin_load_for_cluster(id));
 
@@ -647,6 +922,23 @@ pub fn apply_cluster_event_with_workspace(
         | ClusterBridgeEvent::AdmissionWebhooksLoaded { .. }
         | ClusterBridgeEvent::AdmissionWebhooksLoadFailed { .. }) => {
             resources.list_views.apply_event(&other);
+        }
+        ClusterBridgeEvent::ResourceWatchUpdated {
+            cluster_id,
+            generation,
+            payload,
+        } => {
+            let (_outcome, follow_up) = apply_resource_watch_update(
+                resources,
+                &cluster_id,
+                generation,
+                payload,
+                sidebar.active_view,
+                None,
+            );
+            if let Some(cmd) = follow_up {
+                commands.push(cmd);
+            }
         }
         ClusterBridgeEvent::ResourceYamlLoaded { .. }
         | ClusterBridgeEvent::ResourceYamlLoadFailed { .. }
@@ -1291,5 +1583,240 @@ mod tests {
         );
         assert_eq!(resources.deployments.status, DeploymentsLoadStatus::Idle);
         assert!(resources.deployments.cluster_id.is_none());
+    }
+
+    #[test]
+    fn desired_watch_kinds_always_includes_namespaces_plus_open_tabs() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("ctx-a");
+        tabs.close_all_tabs();
+
+        assert_eq!(
+            desired_watch_kinds(&tabs, WorkspaceView::Overview),
+            vec![WatchResourceKind::Namespaces]
+        );
+
+        tabs.open_tab(WorkspaceView::Services);
+        tabs.open_tab(WorkspaceView::Pods);
+        tabs.open_tab(WorkspaceView::Services);
+
+        assert_eq!(
+            desired_watch_kinds(&tabs, WorkspaceView::Pods),
+            vec![
+                WatchResourceKind::Namespaces,
+                WatchResourceKind::Pods,
+                WatchResourceKind::Services,
+            ]
+        );
+    }
+
+    #[test]
+    fn opening_and_closing_tabs_emits_sync_active_watchers() {
+        let mut switcher = ClusterSwitcherState::new();
+        let mut sidebar = SidebarLayoutState::new();
+        let mut resources = WorkspaceResourcesState::default();
+        let mut tabs = WorkspaceTabsState::new();
+
+        let connect_event = ClusterBridgeEvent::ClusterConnected {
+            outcome: ClusterSwitchOutcome {
+                context_name: "ctx-a".to_string(),
+                healthy: true,
+                k8s_version: Some("v1.31.0".to_string()),
+                error_message: None,
+            },
+            clusters: Vec::new(),
+            profile: UserProfileInfo {
+                active_context: Some("ctx-a".to_string()),
+                user_name: None,
+                auth_type: "Certificate".to_string(),
+                cluster_name: Some("ctx-a".to_string()),
+                server_url: None,
+                kubeconfig_paths: Vec::new(),
+                k8s_version: Some("v1.31.0".to_string()),
+            },
+        };
+        let connect_cmds = apply_cluster_event_with_tabs(
+            &mut switcher,
+            &mut sidebar,
+            &mut resources,
+            &mut tabs,
+            connect_event,
+        );
+        assert!(connect_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::SyncActiveWatchers { cluster_id, kinds, .. }
+            if cluster_id == "ctx-a" && kinds == &[WatchResourceKind::Namespaces]
+        )));
+
+        let open_cmds = select_workspace_view_with_tabs(
+            &switcher,
+            &mut sidebar,
+            &mut resources,
+            &mut tabs,
+            WorkspaceView::Pods,
+        );
+        assert!(open_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::SyncActiveWatchers { kinds, .. }
+            if kinds == &[WatchResourceKind::Namespaces, WatchResourceKind::Pods]
+        )));
+
+        let (handled, close_cmds) = handle_tab_shortcut_with_state(
+            &switcher,
+            &mut sidebar,
+            &mut resources,
+            &mut tabs,
+            "w",
+            KeyShortcutModifiers {
+                ctrl: true,
+                shift: false,
+                platform: false,
+            },
+        );
+        assert!(handled);
+        assert!(close_cmds.iter().any(|c| matches!(
+            c,
+            ClusterBridgeCommand::SyncActiveWatchers { kinds, .. }
+            if kinds == &[WatchResourceKind::Namespaces]
+        )));
+    }
+
+    #[test]
+    fn resource_watch_updated_applies_to_pods_and_reports_visibility() {
+        use orbit_core::kubernetes::models::PodInfo;
+        use orbit_core::kubernetes::watchers::{WatchAction, WatchItem, WatchUpdate};
+
+        let mut resources = WorkspaceResourcesState::default();
+        let _ = resources.pods.begin_load_for_cluster("ctx-a");
+        let watch_gen = resources.begin_watch_session();
+
+        let make_pod = |status: &str| PodInfo {
+            name: "api-0".to_string(),
+            namespace: "prod".to_string(),
+            status: status.to_string(),
+            age: "1m".to_string(),
+            cpu: None,
+            memory: None,
+            cpu_cores: None,
+            memory_bytes: None,
+            cpu_pct: None,
+            memory_pct: None,
+            node: Some("node-1".to_string()),
+            restarts: 0,
+            images: Vec::new(),
+            labels: Default::default(),
+            annotations: Default::default(),
+            ip: None,
+            node_ip: None,
+            controlled_by: None,
+            qos_class: None,
+            containers: Vec::new(),
+        };
+
+        let (bg_outcome, _) = apply_resource_watch_update(
+            &mut resources,
+            "ctx-a",
+            watch_gen,
+            ResourceWatchPayload::Pods(WatchUpdate::Delta(vec![WatchItem {
+                key: "prod/api-0".to_string(),
+                action: WatchAction::Applied,
+                item: make_pod("Pending"),
+            }])),
+            WorkspaceView::Deployments,
+            None,
+        );
+        assert!(bg_outcome.mutated);
+        assert!(!bg_outcome.affects_active_ui);
+        assert_eq!(resources.pods.pods.len(), 1);
+
+        let (fg_outcome, _) = apply_resource_watch_update(
+            &mut resources,
+            "ctx-a",
+            watch_gen,
+            ResourceWatchPayload::Pods(WatchUpdate::Delta(vec![WatchItem {
+                key: "prod/api-0".to_string(),
+                action: WatchAction::Applied,
+                item: make_pod("Running"),
+            }])),
+            WorkspaceView::Pods,
+            None,
+        );
+        assert!(fg_outcome.mutated);
+        assert!(fg_outcome.affects_active_ui);
+        assert_eq!(resources.pods.pods[0].status, "Running");
+
+        let drawer = ResourceDrawerTarget::Pod {
+            name: "api-0".to_string(),
+            namespace: "prod".to_string(),
+        };
+        let (drawer_outcome, _) = apply_resource_watch_update(
+            &mut resources,
+            "ctx-a",
+            watch_gen,
+            ResourceWatchPayload::Pods(WatchUpdate::Delta(vec![WatchItem {
+                key: "prod/api-0".to_string(),
+                action: WatchAction::Applied,
+                item: make_pod("Succeeded"),
+            }])),
+            WorkspaceView::Deployments,
+            Some(&drawer),
+        );
+        assert!(drawer_outcome.mutated);
+        assert!(drawer_outcome.affects_active_ui);
+    }
+
+    #[test]
+    fn cluster_disconnect_clears_watch_state_and_bumps_generation() {
+        use orbit_core::kubernetes::models::NodeInfo;
+        use orbit_core::kubernetes::watchers::WatchUpdate;
+
+        let mut resources = WorkspaceResourcesState::default();
+        let _ = resources.nodes.begin_load_for_cluster("ctx-a");
+        let gen_before = resources.begin_watch_session();
+
+        resources.reset_all_for_disconnect();
+        assert!(resources.watch_generation > gen_before);
+        assert!(resources.last_synced_watch_cluster.is_none());
+
+        let (outcome, _) = apply_resource_watch_update(
+            &mut resources,
+            "ctx-a",
+            gen_before,
+            ResourceWatchPayload::Nodes(WatchUpdate::Reset(vec![(
+                "node-1".to_string(),
+                NodeInfo {
+                    name: "node-1".to_string(),
+                    status: "Ready".to_string(),
+                    role: "worker".to_string(),
+                    version: "v1.31.0".to_string(),
+                    cpu_pct: 0.0,
+                    cpu_used: String::new(),
+                    cpu_total: String::new(),
+                    mem_pct: 0.0,
+                    mem_used: String::new(),
+                    mem_total: String::new(),
+                    pods_count: 0,
+                    pods_limit: 110,
+                    uptime: String::new(),
+                    created_at: None,
+                    labels: Vec::new(),
+                    labels_map: Default::default(),
+                    annotations: Default::default(),
+                    is_cordoned: false,
+                    node_info: None,
+                    addresses: Vec::new(),
+                    conditions: Vec::new(),
+                    taints: Vec::new(),
+                    capacity: None,
+                    allocatable: None,
+                    images_count: 0,
+                },
+            )])),
+            WorkspaceView::Nodes,
+            None,
+        );
+        assert!(!outcome.mutated);
+        assert!(!outcome.affects_active_ui);
+        assert!(resources.nodes.nodes.is_empty());
     }
 }

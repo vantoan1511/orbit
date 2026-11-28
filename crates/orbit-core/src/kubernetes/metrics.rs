@@ -1,9 +1,15 @@
 use std::collections::HashMap;
+use std::future::Future;
+use std::time::Duration;
 
-use kube::api::DynamicObject;
+use kube::api::{Api, ApiResource, DynamicObject, GroupVersionKind, ListParams};
+use kube::Client;
+use tokio::sync::watch;
 
 use crate::kubernetes::models::PodMetricItem;
 use crate::kubernetes::nodes::{format_decimal, parse_cpu_quantity, parse_memory_quantity};
+
+pub const POD_METRICS_POLL_INTERVAL: Duration = Duration::from_secs(15);
 
 pub fn format_memory_mib(mib: f64) -> String {
     format!("{}Mi", format_decimal(mib, 2))
@@ -62,6 +68,54 @@ pub fn parse_pod_metrics_map(items: &[DynamicObject]) -> HashMap<(String, String
         }
     }
     map
+}
+
+/// Polls Kubernetes `PodMetrics` every 15 seconds and forwards parsed batches to `on_metrics`.
+/// Silently ignores missing Metrics Server errors and exits cleanly when `cancel_rx` becomes `true`
+/// or `on_metrics` returns `false`.
+pub async fn poll_pod_metrics_typed<F, Fut>(
+    client: Client,
+    mut cancel_rx: watch::Receiver<bool>,
+    mut on_metrics: F,
+) where
+    F: FnMut(Vec<PodMetricItem>) -> Fut + Send,
+    Fut: Future<Output = bool> + Send,
+{
+    let gvk = GroupVersionKind::gvk("metrics.k8s.io", "v1beta1", "PodMetrics");
+    let ar = ApiResource::from_gvk(&gvk);
+    let api: Api<DynamicObject> = Api::all_with(client, &ar);
+
+    loop {
+        if *cancel_rx.borrow() {
+            break;
+        }
+
+        match api.list(&ListParams::default()).await {
+            Ok(metric_list) => {
+                let metrics: Vec<PodMetricItem> = metric_list
+                    .items
+                    .iter()
+                    .filter_map(parse_pod_metric_obj)
+                    .collect();
+
+                if !metrics.is_empty() && !on_metrics(metrics).await {
+                    break;
+                }
+            }
+            Err(err) => {
+                tracing::debug!(error = ?err, "Pod metrics unavailable (Metrics Server not installed?)");
+            }
+        }
+
+        tokio::select! {
+            res = cancel_rx.changed() => {
+                if res.is_err() || *cancel_rx.borrow() {
+                    break;
+                }
+            }
+            _ = tokio::time::sleep(POD_METRICS_POLL_INTERVAL) => {}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -136,5 +190,20 @@ mod tests {
             .expect("web-0 in map");
         assert_eq!(item.cpu, "2.25 cores");
         assert_eq!(item.memory, "300Mi");
+    }
+
+    #[tokio::test]
+    async fn poll_pod_metrics_typed_exits_immediately_when_cancelled() {
+        let Ok(uri) = "http://127.0.0.1:1".parse() else {
+            panic!("valid test URI");
+        };
+        let mut config = kube::Config::new(uri);
+        config.connect_timeout = Some(Duration::from_millis(100));
+        let Ok(client) = Client::try_from(config) else {
+            panic!("valid client");
+        };
+        let (tx, rx) = watch::channel(true);
+        drop(tx);
+        poll_pod_metrics_typed(client, rx, |_batch| async { true }).await;
     }
 }

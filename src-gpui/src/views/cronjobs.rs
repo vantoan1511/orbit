@@ -283,12 +283,18 @@ pub fn render_cronjobs_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = cronjob_columns();
-    let filtered_rows: Rc<Vec<CronJobInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_cronjobs(&state.cronjobs, namespaces, state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = state.cronjobs.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == CronJobsLoadStatus::Loading;

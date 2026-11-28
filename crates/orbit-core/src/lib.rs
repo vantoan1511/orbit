@@ -22,6 +22,9 @@ pub mod kubernetes {
     pub mod services;
     pub mod storage;
     pub mod storage_overview;
+    pub mod watch_error;
+    pub mod watch_health;
+    pub mod watchers;
     pub mod workloads;
     pub mod workloads_overview;
 }

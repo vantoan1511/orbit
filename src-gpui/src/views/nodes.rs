@@ -253,12 +253,14 @@ pub fn render_nodes_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = node_columns();
-    let sorted_rows: Rc<Vec<NodeInfo>> = Rc::new(
+    let cache_key =
+        crate::state::RowCacheKey::from_table(state.data_revision, 0, &state.table, 0);
+    let sorted_rows = state.row_cache.get_or_compute(cache_key, || {
         sort_nodes(&state.nodes, state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = sorted_rows.len();
     let is_loading = state.status == NodesLoadStatus::Loading;
     let on_refresh_rc: super::ActionCallback = Rc::new(on_refresh);

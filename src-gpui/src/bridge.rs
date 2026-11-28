@@ -1,40 +1,72 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
-use orbit_core::kubernetes::batch::{execute_trigger_cronjob, fetch_cronjobs, fetch_jobs};
-use orbit_core::kubernetes::configmaps::fetch_configmaps;
+use k8s_openapi::api::admissionregistration::v1::{
+    MutatingWebhookConfiguration, ValidatingWebhookConfiguration,
+};
+use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
+use k8s_openapi::api::autoscaling::v2::HorizontalPodAutoscaler;
+use k8s_openapi::api::batch::v1::{CronJob, Job};
+use k8s_openapi::api::core::v1::{
+    ConfigMap, Endpoints, Event, LimitRange, Namespace, Node, PersistentVolume,
+    PersistentVolumeClaim, Pod, ResourceQuota, Secret, Service,
+};
+use k8s_openapi::api::networking::v1::{Ingress, NetworkPolicy};
+use k8s_openapi::api::storage::v1::StorageClass;
+use orbit_core::kubernetes::batch::{
+    execute_trigger_cronjob, fetch_cronjobs, fetch_jobs, map_cronjob, map_job,
+};
+use orbit_core::kubernetes::configmaps::{fetch_configmaps, format_configmap};
 use orbit_core::kubernetes::delete::{execute_delete_resource, format_target_label};
-use orbit_core::kubernetes::events::fetch_events;
-use orbit_core::kubernetes::hpa::fetch_hpas;
-use orbit_core::kubernetes::ingresses::fetch_ingresses;
+use orbit_core::kubernetes::events::{fetch_events, format_event};
+use orbit_core::kubernetes::hpa::{fetch_hpas, map_hpa};
+use orbit_core::kubernetes::ingresses::{fetch_ingresses, map_ingress};
 use orbit_core::kubernetes::logs::{
     LogStreamMessage, resolve_workload_pods, select_streamable_pods, stream_pod_logs,
 };
 use orbit_core::kubernetes::manager::KubeManager;
-use orbit_core::kubernetes::namespaces::fetch_namespaces;
-use orbit_core::kubernetes::nodes::fetch_nodes;
+use orbit_core::kubernetes::metrics::poll_pod_metrics_typed;
+use orbit_core::kubernetes::models::PolicyInfo;
+use orbit_core::kubernetes::namespaces::{fetch_namespaces, map_namespace};
+use orbit_core::kubernetes::nodes::{fetch_nodes, map_node};
 use orbit_core::kubernetes::overview::fetch_cluster_overview;
 use orbit_core::kubernetes::policies::{
     fetch_admission_webhooks, fetch_network_policies, fetch_pod_security_policies, fetch_policies,
-    fetch_resource_quotas_and_limits,
+    fetch_resource_quotas_and_limits, format_limit_range, format_mut_webhook,
+    format_network_policy, format_pod_security_namespace, format_resource_quota,
+    format_val_webhook,
 };
 use orbit_core::kubernetes::port_forward::{
     PortForwardLifecycleEvent, PortForwardRequest, get_persisted_for_cluster,
     restore_cluster_port_forwards, start_port_forward_tunnel, stop_all_active_port_forwards,
     stop_cluster_port_forwards, stop_port_forward_tunnel,
 };
-use orbit_core::kubernetes::secrets::fetch_secrets;
-use orbit_core::kubernetes::services::fetch_services;
-use orbit_core::kubernetes::storage::{fetch_pvcs, fetch_pvs, fetch_storage_classes};
+use orbit_core::kubernetes::secrets::{fetch_secrets, format_secret};
+use orbit_core::kubernetes::services::{extract_endpoints_summary, fetch_services, map_service};
+use orbit_core::kubernetes::storage::{
+    fetch_pvcs, fetch_pvs, fetch_storage_classes, format_pv, format_pvc, format_storage_class,
+};
 use orbit_core::kubernetes::storage_overview::fetch_storage_overview;
+use orbit_core::kubernetes::watch_health::{WATCHER_GIVE_UP_AFTER, WatcherHealthTracker};
+use orbit_core::kubernetes::watchers::{
+    TypedWatcherContext, watch_resource_typed, watch_resource_typed_filtered,
+};
 use orbit_core::kubernetes::workloads::{
     execute_restart_pod, execute_restart_resource, execute_scale_resource, fetch_daemonsets,
-    fetch_deployments, fetch_pods, fetch_replicasets, fetch_statefulsets,
+    fetch_deployments, fetch_pods, fetch_replicasets, fetch_statefulsets, map_daemonset,
+    map_deployment, map_pod, map_replicaset, map_statefulset,
 };
 use orbit_core::kubernetes::workloads_overview::fetch_workloads_overview;
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{RwLock, mpsc, watch};
 
-use crate::state::{ClusterBridgeCommand, ClusterBridgeEvent, WorkloadActionKind};
+use crate::state::{
+    ClusterBridgeCommand, ClusterBridgeEvent, ResourceWatchPayload, WatchResourceKind,
+    WorkloadActionKind,
+};
+
+pub const WATCH_CHANNEL_CAPACITY: usize = 64;
+const WATCHER_GIVE_UP_CHECK_INTERVAL: Duration = Duration::from_secs(5);
 
 pub struct ClusterBridge {
     pub command_tx: mpsc::UnboundedSender<ClusterBridgeCommand>,
@@ -93,10 +125,198 @@ impl LogStreamRegistry {
     }
 }
 
+pub struct ActiveResourceWatcher {
+    cancel_tx: watch::Sender<bool>,
+    abort_handles: Vec<tokio::task::AbortHandle>,
+}
+
+impl ActiveResourceWatcher {
+    pub fn new(cancel_tx: watch::Sender<bool>, abort_handles: Vec<tokio::task::AbortHandle>) -> Self {
+        Self {
+            cancel_tx,
+            abort_handles,
+        }
+    }
+
+    fn stop(self) {
+        let _ = self.cancel_tx.send(true);
+        for handle in self.abort_handles {
+            handle.abort();
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct ResourceWatcherRegistry {
+    cluster_id: Option<String>,
+    generation: u64,
+    watchers: HashMap<WatchResourceKind, ActiveResourceWatcher>,
+    health_tracker: Option<Arc<WatcherHealthTracker>>,
+    cluster_cancel_tx: Option<watch::Sender<bool>>,
+    watch_tx: Option<mpsc::Sender<ResourceWatchPayload>>,
+    forwarder_handle: Option<tokio::task::AbortHandle>,
+    give_up_handle: Option<tokio::task::AbortHandle>,
+}
+
+impl ResourceWatcherRegistry {
+    pub fn sync<F>(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        desired: &[WatchResourceKind],
+        mut spawn_kind: F,
+    ) where
+        F: FnMut(WatchResourceKind) -> ActiveResourceWatcher,
+    {
+        if self.cluster_id.as_deref() != Some(cluster_id) || self.generation != generation {
+            self.stop_all();
+            self.cluster_id = Some(cluster_id.to_string());
+            self.generation = generation;
+        }
+
+        let desired_set: HashSet<WatchResourceKind> = desired.iter().copied().collect();
+        let to_remove: Vec<WatchResourceKind> = self
+            .watchers
+            .keys()
+            .copied()
+            .filter(|kind| !desired_set.contains(kind))
+            .collect();
+        for kind in to_remove {
+            if let Some(active) = self.watchers.remove(&kind) {
+                active.stop();
+            }
+        }
+
+        for &kind in desired {
+            self.watchers
+                .entry(kind)
+                .or_insert_with(|| spawn_kind(kind));
+        }
+    }
+
+    fn ensure_cluster_session(
+        &mut self,
+        cluster_id: &str,
+        generation: u64,
+        event_tx: &mpsc::UnboundedSender<ClusterBridgeEvent>,
+    ) -> (
+        Arc<WatcherHealthTracker>,
+        mpsc::Sender<ResourceWatchPayload>,
+        watch::Receiver<bool>,
+    ) {
+        if self.cluster_id.as_deref() != Some(cluster_id) || self.generation != generation {
+            self.stop_all();
+            self.cluster_id = Some(cluster_id.to_string());
+            self.generation = generation;
+        }
+
+        if let (Some(tracker), Some(tx), Some(cancel_tx)) = (
+            &self.health_tracker,
+            &self.watch_tx,
+            &self.cluster_cancel_tx,
+        ) {
+            return (tracker.clone(), tx.clone(), cancel_tx.subscribe());
+        }
+
+        let (watch_tx, mut watch_rx) =
+            mpsc::channel::<ResourceWatchPayload>(WATCH_CHANNEL_CAPACITY);
+        let (cluster_cancel_tx, mut cluster_cancel_rx) = watch::channel(false);
+        let health_tracker =
+            WatcherHealthTracker::new(WATCHER_GIVE_UP_AFTER, cluster_cancel_tx.clone());
+
+        let fwd_event_tx = event_tx.clone();
+        let fwd_cluster = cluster_id.to_string();
+        let forwarder_handle = tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    res = cluster_cancel_rx.changed() => {
+                        if res.is_err() || *cluster_cancel_rx.borrow() {
+                            break;
+                        }
+                    }
+                    maybe_payload = watch_rx.recv() => {
+                        let Some(payload) = maybe_payload else {
+                            break;
+                        };
+                        if fwd_event_tx.send(ClusterBridgeEvent::ResourceWatchUpdated {
+                            cluster_id: fwd_cluster.clone(),
+                            generation,
+                            payload,
+                        }).is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+        })
+        .abort_handle();
+
+        let give_up_tracker = health_tracker.clone();
+        let mut give_up_cancel = cluster_cancel_tx.subscribe();
+        let give_up_handle = tokio::spawn(async move {
+            let mut ticker = tokio::time::interval(WATCHER_GIVE_UP_CHECK_INTERVAL);
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    res = give_up_cancel.changed() => {
+                        if res.is_err() || *give_up_cancel.borrow() {
+                            break;
+                        }
+                    }
+                    _ = ticker.tick() => {
+                        if give_up_tracker.check_give_up(Instant::now()).is_some() {
+                            break;
+                        }
+                    }
+                }
+            }
+        })
+        .abort_handle();
+
+        let watcher_cancel_rx = cluster_cancel_tx.subscribe();
+        self.health_tracker = Some(health_tracker.clone());
+        self.cluster_cancel_tx = Some(cluster_cancel_tx);
+        self.watch_tx = Some(watch_tx.clone());
+        self.forwarder_handle = Some(forwarder_handle);
+        self.give_up_handle = Some(give_up_handle);
+        (health_tracker, watch_tx, watcher_cancel_rx)
+    }
+
+    pub fn stop_all(&mut self) {
+        for (_, active) in self.watchers.drain() {
+            active.stop();
+        }
+        if let Some(tx) = self.cluster_cancel_tx.take() {
+            let _ = tx.send(true);
+        }
+        if let Some(handle) = self.forwarder_handle.take() {
+            handle.abort();
+        }
+        if let Some(handle) = self.give_up_handle.take() {
+            handle.abort();
+        }
+        self.health_tracker = None;
+        self.watch_tx = None;
+        self.cluster_id = None;
+        self.generation = 0;
+    }
+
+    #[cfg(test)]
+    pub fn active_count(&self) -> usize {
+        self.watchers.len()
+    }
+
+    #[cfg(test)]
+    pub fn is_active(&self, kind: WatchResourceKind) -> bool {
+        self.watchers.contains_key(&kind)
+    }
+}
+
 #[derive(Default)]
 pub struct BridgeTaskTracker {
     handles: Vec<tokio::task::AbortHandle>,
     pub log_streams: LogStreamRegistry,
+    pub resource_watchers: ResourceWatcherRegistry,
 }
 
 impl BridgeTaskTracker {
@@ -114,6 +334,7 @@ impl BridgeTaskTracker {
             handle.abort();
         }
         self.log_streams.stop_all();
+        self.resource_watchers.stop_all();
     }
 }
 
@@ -1813,7 +2034,338 @@ pub async fn handle_bridge_command_with_tracker(
             stop_cluster_port_forwards(manager, &cluster_id).await;
             let _ = event_tx.send(ClusterBridgeEvent::PortForwardsCleared { cluster_id });
         }
+        ClusterBridgeCommand::SyncActiveWatchers {
+            cluster_id,
+            generation,
+            kinds,
+        } => {
+            let client = {
+                let guard = manager.read().await;
+                guard.active_client_for_context(&cluster_id)
+            };
+            let Some(client) = client else {
+                tracker.resource_watchers.stop_all();
+                return;
+            };
+            let (health_tracker, watch_tx, cluster_cancel_rx) = tracker
+                .resource_watchers
+                .ensure_cluster_session(&cluster_id, generation, event_tx);
+            tracker
+                .resource_watchers
+                .sync(&cluster_id, generation, &kinds, |kind| {
+                    spawn_resource_watcher(
+                        kind,
+                        client.clone(),
+                        health_tracker.clone(),
+                        watch_tx.clone(),
+                        cluster_cancel_rx.clone(),
+                    )
+                });
+        }
     }
+}
+
+fn deleted_pod_security_placeholder(ns: &Namespace) -> PolicyInfo {
+    PolicyInfo {
+        uid: ns.metadata.uid.clone().unwrap_or_default(),
+        name: ns.metadata.name.clone().unwrap_or_default(),
+        r#type: "Pod Security".to_string(),
+        scope: "Namespace".to_string(),
+        namespace: ns.metadata.name.clone().unwrap_or_default(),
+        status: String::new(),
+        mode: String::new(),
+        violations: 0,
+        last_updated: String::new(),
+        description: String::new(),
+        rules: String::new(),
+        kind: "PodSecurity".to_string(),
+    }
+}
+
+fn spawn_cancel_relay(
+    mut cluster_cancel_rx: watch::Receiver<bool>,
+    kind_cancel_tx: watch::Sender<bool>,
+) -> tokio::task::AbortHandle {
+    tokio::spawn(async move {
+        if *cluster_cancel_rx.borrow() {
+            let _ = kind_cancel_tx.send(true);
+            return;
+        }
+        loop {
+            tokio::select! {
+                _ = kind_cancel_tx.closed() => break,
+                res = cluster_cancel_rx.changed() => {
+                    if res.is_err() || *cluster_cancel_rx.borrow() {
+                        let _ = kind_cancel_tx.send(true);
+                        break;
+                    }
+                }
+            }
+        }
+    })
+    .abort_handle()
+}
+
+fn spawn_resource_watcher(
+    kind: WatchResourceKind,
+    client: kube::Client,
+    health_tracker: Arc<WatcherHealthTracker>,
+    watch_tx: mpsc::Sender<ResourceWatchPayload>,
+    cluster_cancel_rx: watch::Receiver<bool>,
+) -> ActiveResourceWatcher {
+    let (cancel_tx, cancel_rx) = watch::channel(false);
+    let mut handles = vec![spawn_cancel_relay(cluster_cancel_rx, cancel_tx.clone())];
+
+    macro_rules! spawn_typed {
+        ($k8s:ty, $id:expr, $prefix:expr, $mapper:expr, $wrap:expr) => {{
+            let tx = watch_tx.clone();
+            let ctx = TypedWatcherContext {
+                watcher_id: $id.to_string(),
+                client: client.clone(),
+                tracker: health_tracker.clone(),
+                cancel_rx: cancel_rx.clone(),
+                key_prefix: $prefix,
+            };
+            let handle = tokio::spawn(watch_resource_typed::<$k8s, _, _, _, _>(
+                ctx,
+                $mapper,
+                move |update| {
+                    let tx = tx.clone();
+                    let payload = ($wrap)(update);
+                    async move { tx.send(payload).await.is_ok() }
+                },
+            ))
+            .abort_handle();
+            handles.push(handle);
+        }};
+    }
+
+    match kind {
+        WatchResourceKind::Namespaces => {
+            spawn_typed!(Namespace, "namespaces:Namespace", None, map_namespace, ResourceWatchPayload::Namespaces);
+        }
+        WatchResourceKind::Deployments => {
+            spawn_typed!(Deployment, "deployments:Deployment", None, map_deployment, ResourceWatchPayload::Deployments);
+        }
+        WatchResourceKind::StatefulSets => {
+            spawn_typed!(StatefulSet, "statefulsets:StatefulSet", None, map_statefulset, ResourceWatchPayload::StatefulSets);
+        }
+        WatchResourceKind::DaemonSets => {
+            spawn_typed!(DaemonSet, "daemonsets:DaemonSet", None, map_daemonset, ResourceWatchPayload::DaemonSets);
+        }
+        WatchResourceKind::ReplicaSets => {
+            spawn_typed!(ReplicaSet, "replicasets:ReplicaSet", None, map_replicaset, ResourceWatchPayload::ReplicaSets);
+        }
+        WatchResourceKind::Jobs => {
+            spawn_typed!(Job, "jobs:Job", None, map_job, ResourceWatchPayload::Jobs);
+        }
+        WatchResourceKind::CronJobs => {
+            spawn_typed!(CronJob, "cronjobs:CronJob", None, map_cronjob, ResourceWatchPayload::CronJobs);
+        }
+        WatchResourceKind::Pods => {
+            spawn_typed!(Pod, "pods:Pod", None, map_pod, ResourceWatchPayload::Pods);
+            let tx = watch_tx.clone();
+            let metrics_handle = tokio::spawn(poll_pod_metrics_typed(
+                client,
+                cancel_rx,
+                move |metrics| {
+                    let tx = tx.clone();
+                    async move { tx.send(ResourceWatchPayload::PodMetrics(metrics)).await.is_ok() }
+                },
+            ))
+            .abort_handle();
+            handles.push(metrics_handle);
+        }
+        WatchResourceKind::Services => {
+            spawn_typed!(Service, "services:Service", None, map_service, ResourceWatchPayload::Services);
+            spawn_typed!(
+                Endpoints,
+                "services:Endpoints",
+                None,
+                extract_endpoints_summary,
+                ResourceWatchPayload::ServiceEndpoints
+            );
+        }
+        WatchResourceKind::Ingresses => {
+            spawn_typed!(Ingress, "ingresses:Ingress", None, map_ingress, ResourceWatchPayload::Ingresses);
+        }
+        WatchResourceKind::ConfigMaps => {
+            spawn_typed!(ConfigMap, "configmaps:ConfigMap", None, format_configmap, ResourceWatchPayload::ConfigMaps);
+        }
+        WatchResourceKind::Secrets => {
+            spawn_typed!(Secret, "secrets:Secret", None, format_secret, ResourceWatchPayload::Secrets);
+        }
+        WatchResourceKind::PersistentVolumes => {
+            spawn_typed!(PersistentVolume, "pvs:PersistentVolume", None, format_pv, ResourceWatchPayload::PersistentVolumes);
+        }
+        WatchResourceKind::PersistentVolumeClaims => {
+            spawn_typed!(PersistentVolumeClaim, "pvcs:PersistentVolumeClaim", None, format_pvc, ResourceWatchPayload::PersistentVolumeClaims);
+        }
+        WatchResourceKind::StorageClasses => {
+            spawn_typed!(StorageClass, "storageclasses:StorageClass", None, format_storage_class, ResourceWatchPayload::StorageClasses);
+        }
+        WatchResourceKind::Hpas => {
+            spawn_typed!(HorizontalPodAutoscaler, "hpas:HorizontalPodAutoscaler", None, map_hpa, ResourceWatchPayload::Hpas);
+        }
+        WatchResourceKind::NetworkPolicies => {
+            spawn_typed!(
+                NetworkPolicy,
+                "networkpolicies:NetworkPolicy",
+                Some("NetworkPolicy"),
+                format_network_policy,
+                ResourceWatchPayload::NetworkPolicies
+            );
+        }
+        WatchResourceKind::PodSecurity => {
+            let tx = watch_tx.clone();
+            let handle = tokio::spawn(watch_resource_typed_filtered::<Namespace, _, _, _, _, _>(
+                TypedWatcherContext {
+                    watcher_id: "podsecurity:Namespace".to_string(),
+                    client,
+                    tracker: health_tracker,
+                    cancel_rx,
+                    key_prefix: Some("PodSecurity"),
+                },
+                format_pod_security_namespace,
+                deleted_pod_security_placeholder,
+                move |update| {
+                    let tx = tx.clone();
+                    async move { tx.send(ResourceWatchPayload::PodSecurity(update)).await.is_ok() }
+                },
+            ))
+            .abort_handle();
+            handles.push(handle);
+        }
+        WatchResourceKind::ResourceQuotas => {
+            spawn_typed!(
+                ResourceQuota,
+                "resourcequotas:ResourceQuota",
+                Some("ResourceQuota"),
+                format_resource_quota,
+                |update| ResourceWatchPayload::ResourceQuotas {
+                    prefix: "ResourceQuota",
+                    update,
+                }
+            );
+            spawn_typed!(
+                LimitRange,
+                "resourcequotas:LimitRange",
+                Some("LimitRange"),
+                format_limit_range,
+                |update| ResourceWatchPayload::ResourceQuotas {
+                    prefix: "LimitRange",
+                    update,
+                }
+            );
+        }
+        WatchResourceKind::AdmissionWebhooks => {
+            spawn_typed!(
+                ValidatingWebhookConfiguration,
+                "webhooks:ValidatingWebhookConfiguration",
+                Some("ValidatingWebhookConfiguration"),
+                format_val_webhook,
+                |update| ResourceWatchPayload::AdmissionWebhooks {
+                    prefix: "ValidatingWebhookConfiguration",
+                    update,
+                }
+            );
+            spawn_typed!(
+                MutatingWebhookConfiguration,
+                "webhooks:MutatingWebhookConfiguration",
+                Some("MutatingWebhookConfiguration"),
+                format_mut_webhook,
+                |update| ResourceWatchPayload::AdmissionWebhooks {
+                    prefix: "MutatingWebhookConfiguration",
+                    update,
+                }
+            );
+        }
+        WatchResourceKind::SecurityOverview => {
+            spawn_typed!(
+                NetworkPolicy,
+                "security:NetworkPolicy",
+                Some("NetworkPolicy"),
+                format_network_policy,
+                |update| ResourceWatchPayload::SecurityOverview {
+                    prefix: "NetworkPolicy",
+                    update,
+                }
+            );
+            spawn_typed!(
+                ResourceQuota,
+                "security:ResourceQuota",
+                Some("ResourceQuota"),
+                format_resource_quota,
+                |update| ResourceWatchPayload::SecurityOverview {
+                    prefix: "ResourceQuota",
+                    update,
+                }
+            );
+            spawn_typed!(
+                LimitRange,
+                "security:LimitRange",
+                Some("LimitRange"),
+                format_limit_range,
+                |update| ResourceWatchPayload::SecurityOverview {
+                    prefix: "LimitRange",
+                    update,
+                }
+            );
+            spawn_typed!(
+                ValidatingWebhookConfiguration,
+                "security:ValidatingWebhookConfiguration",
+                Some("ValidatingWebhookConfiguration"),
+                format_val_webhook,
+                |update| ResourceWatchPayload::SecurityOverview {
+                    prefix: "ValidatingWebhookConfiguration",
+                    update,
+                }
+            );
+            spawn_typed!(
+                MutatingWebhookConfiguration,
+                "security:MutatingWebhookConfiguration",
+                Some("MutatingWebhookConfiguration"),
+                format_mut_webhook,
+                |update| ResourceWatchPayload::SecurityOverview {
+                    prefix: "MutatingWebhookConfiguration",
+                    update,
+                }
+            );
+            let tx = watch_tx.clone();
+            let handle = tokio::spawn(watch_resource_typed_filtered::<Namespace, _, _, _, _, _>(
+                TypedWatcherContext {
+                    watcher_id: "security:PodSecurity".to_string(),
+                    client,
+                    tracker: health_tracker,
+                    cancel_rx,
+                    key_prefix: Some("PodSecurity"),
+                },
+                format_pod_security_namespace,
+                deleted_pod_security_placeholder,
+                move |update| {
+                    let tx = tx.clone();
+                    async move {
+                        tx.send(ResourceWatchPayload::SecurityOverview {
+                            prefix: "PodSecurity",
+                            update,
+                        })
+                        .await
+                        .is_ok()
+                    }
+                },
+            ))
+            .abort_handle();
+            handles.push(handle);
+        }
+        WatchResourceKind::Nodes => {
+            spawn_typed!(Node, "nodes:Node", None, map_node, ResourceWatchPayload::Nodes);
+        }
+        WatchResourceKind::Events => {
+            spawn_typed!(Event, "events:Event", None, format_event, ResourceWatchPayload::Events);
+        }
+    }
+
+    ActiveResourceWatcher::new(cancel_tx, handles)
 }
 
 fn spawn_port_forward_event_forwarder(
@@ -3578,5 +4130,121 @@ users:
 
         let guard = manager.read().await;
         assert!(guard.port_forward_cancel.is_empty());
+    }
+
+    #[tokio::test]
+    async fn resource_watcher_registry_sync_starts_only_new_and_stops_removed_kinds() {
+        let mut registry = ResourceWatcherRegistry::default();
+        let mut cancel_rxs: HashMap<WatchResourceKind, watch::Receiver<bool>> = HashMap::new();
+        let mut spawn_counts: HashMap<WatchResourceKind, usize> = HashMap::new();
+
+        registry.sync(
+            "ctx-a",
+            1,
+            &[WatchResourceKind::Namespaces, WatchResourceKind::Pods],
+            |kind| {
+                *spawn_counts.entry(kind).or_insert(0) += 1;
+                let (tx, rx) = watch::channel(false);
+                cancel_rxs.insert(kind, rx);
+                ActiveResourceWatcher::new(tx, Vec::new())
+            },
+        );
+        assert_eq!(registry.active_count(), 2);
+        assert!(registry.is_active(WatchResourceKind::Namespaces));
+        assert!(registry.is_active(WatchResourceKind::Pods));
+
+        registry.sync(
+            "ctx-a",
+            1,
+            &[
+                WatchResourceKind::Namespaces,
+                WatchResourceKind::Pods,
+                WatchResourceKind::Deployments,
+            ],
+            |kind| {
+                *spawn_counts.entry(kind).or_insert(0) += 1;
+                let (tx, rx) = watch::channel(false);
+                cancel_rxs.insert(kind, rx);
+                ActiveResourceWatcher::new(tx, Vec::new())
+            },
+        );
+        assert_eq!(registry.active_count(), 3);
+        assert_eq!(spawn_counts.get(&WatchResourceKind::Namespaces), Some(&1));
+        assert_eq!(spawn_counts.get(&WatchResourceKind::Pods), Some(&1));
+        assert_eq!(spawn_counts.get(&WatchResourceKind::Deployments), Some(&1));
+
+        registry.sync("ctx-a", 1, &[WatchResourceKind::Namespaces], |kind| {
+            *spawn_counts.entry(kind).or_insert(0) += 1;
+            let (tx, rx) = watch::channel(false);
+            cancel_rxs.insert(kind, rx);
+            ActiveResourceWatcher::new(tx, Vec::new())
+        });
+        assert_eq!(registry.active_count(), 1);
+        assert!(registry.is_active(WatchResourceKind::Namespaces));
+        assert!(!*cancel_rxs[&WatchResourceKind::Namespaces].borrow());
+        assert!(*cancel_rxs[&WatchResourceKind::Pods].borrow());
+        assert!(*cancel_rxs[&WatchResourceKind::Deployments].borrow());
+    }
+
+    #[tokio::test]
+    async fn resource_watcher_registry_resets_all_on_cluster_or_generation_change() {
+        let mut registry = ResourceWatcherRegistry::default();
+        let mut first_rxs = Vec::new();
+
+        registry.sync("ctx-a", 1, &[WatchResourceKind::Namespaces], |_| {
+            let (tx, rx) = watch::channel(false);
+            first_rxs.push(rx);
+            ActiveResourceWatcher::new(tx, Vec::new())
+        });
+        assert_eq!(registry.active_count(), 1);
+
+        let mut second_rxs = Vec::new();
+        registry.sync("ctx-a", 2, &[WatchResourceKind::Namespaces], |_| {
+            let (tx, rx) = watch::channel(false);
+            second_rxs.push(rx);
+            ActiveResourceWatcher::new(tx, Vec::new())
+        });
+        assert!(*first_rxs[0].borrow());
+        assert!(!*second_rxs[0].borrow());
+
+        registry.sync("ctx-b", 2, &[WatchResourceKind::Pods], |_| {
+            let (tx, _rx) = watch::channel(false);
+            ActiveResourceWatcher::new(tx, Vec::new())
+        });
+        assert!(*second_rxs[0].borrow());
+        assert_eq!(registry.active_count(), 1);
+        assert!(registry.is_active(WatchResourceKind::Pods));
+    }
+
+    #[tokio::test]
+    async fn bridge_task_tracker_cancel_all_stops_resource_watchers() {
+        let mut tracker = BridgeTaskTracker::default();
+        let (tx, rx) = watch::channel(false);
+        tracker
+            .resource_watchers
+            .sync("ctx-a", 1, &[WatchResourceKind::Pods], |_| {
+                ActiveResourceWatcher::new(tx.clone(), Vec::new())
+            });
+        assert_eq!(tracker.resource_watchers.active_count(), 1);
+
+        tracker.cancel_all();
+        assert_eq!(tracker.resource_watchers.active_count(), 0);
+        assert!(*rx.borrow());
+    }
+
+    #[tokio::test]
+    async fn cluster_cancel_relay_cancels_per_watcher_channel_on_give_up() {
+        let (cluster_tx, cluster_rx) = watch::channel(false);
+        let (kind_tx, mut kind_rx) = watch::channel(false);
+        let _handle = spawn_cancel_relay(cluster_rx, kind_tx);
+
+        assert!(!*kind_rx.borrow());
+        let _ = cluster_tx.send(true);
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), kind_rx.changed())
+                .await
+                .is_ok()
+        );
+        assert!(*kind_rx.borrow());
     }
 }

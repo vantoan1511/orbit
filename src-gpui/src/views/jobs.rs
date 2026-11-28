@@ -315,12 +315,18 @@ pub fn render_jobs_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = job_columns();
-    let filtered_rows: Rc<Vec<JobInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_jobs(&state.jobs, namespaces, state.table.sort.as_ref())
             .into_iter()
             .cloned()
-            .collect(),
-    );
+            .collect()
+    });
     let total_count = state.jobs.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == JobsLoadStatus::Loading;

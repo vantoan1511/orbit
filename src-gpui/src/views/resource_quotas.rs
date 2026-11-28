@@ -316,7 +316,13 @@ pub fn render_resource_quotas_view(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
 ) -> AnyElement {
     let columns = resource_quota_columns();
-    let filtered_rows: Rc<Vec<PolicyInfo>> = Rc::new(
+    let cache_key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        state.kind_filter as u64,
+    );
+    let filtered_rows = state.row_cache.get_or_compute(cache_key, || {
         filter_and_sort_resource_policies(
             &state.policies,
             namespaces,
@@ -325,8 +331,8 @@ pub fn render_resource_quotas_view(
         )
         .into_iter()
         .cloned()
-        .collect(),
-    );
+        .collect()
+    });
     let total_count = state
         .policies
         .iter()

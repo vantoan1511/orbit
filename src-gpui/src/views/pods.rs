@@ -390,6 +390,29 @@ pub fn build_pod_context_menu_entries(
     ]
 }
 
+pub fn cached_filtered_pods(
+    state: &PodsState,
+    namespaces: &NamespaceFilterState,
+) -> Rc<Vec<PodInfo>> {
+    let key = crate::state::RowCacheKey::from_table(
+        state.data_revision,
+        namespaces.selection_revision,
+        &state.table,
+        0,
+    );
+    state.row_cache.get_or_compute(key, || {
+        filter_and_sort_pods_with_filters(
+            &state.pods,
+            namespaces,
+            &state.table.filters,
+            state.table.sort.as_ref(),
+        )
+        .into_iter()
+        .cloned()
+        .collect()
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn render_pods_view(
     state: &PodsState,
@@ -404,13 +427,7 @@ pub fn render_pods_view(
     enhancements: Option<DataTableEnhancementCallbacks>,
 ) -> AnyElement {
     let columns = pod_columns();
-    let filtered_refs = filter_and_sort_pods_with_filters(
-        &state.pods,
-        namespaces,
-        &state.table.filters,
-        state.table.sort.as_ref(),
-    );
-    let filtered_rows: Rc<Vec<PodInfo>> = Rc::new(filtered_refs.into_iter().cloned().collect());
+    let filtered_rows = cached_filtered_pods(state, namespaces);
     let total_count = state.pods.len();
     let visible_count = filtered_rows.len();
     let is_loading = state.status == PodsLoadStatus::Loading;
@@ -1067,5 +1084,51 @@ mod tests {
         let matched = filter_and_sort_pods_with_filters(&pods, &ns, &filters, None);
         assert_eq!(matched.len(), 1);
         assert_eq!(matched[0].name, "api-1");
+    }
+
+    #[test]
+    fn pods_cached_rows_reuse_rc_across_renders_and_refresh_on_watch_delta() {
+        use orbit_core::kubernetes::watchers::{WatchAction, WatchItem, WatchUpdate};
+
+        let mut state = PodsState::default();
+        let _ = state.begin_load_for_cluster("ctx-a");
+        state.watch_generation = 1;
+        state.table.sort = Some(SortState {
+            column_id: "status".to_string(),
+            direction: crate::components::data_table::SortDirection::Asc,
+        });
+
+        let initial: Vec<(String, PodInfo)> = (0..2_000)
+            .map(|i| {
+                let name = format!("pod-{i:04}");
+                (
+                    format!("default/{name}"),
+                    make_pod(&name, "default", "Running", 1, 1, 0, None, None, "1m"),
+                )
+            })
+            .collect();
+        assert!(state.apply_pod_watch_update("ctx-a", 1, WatchUpdate::Reset(initial)));
+
+        let ns = NamespaceFilterState::default();
+        let first = cached_filtered_pods(&state, &ns);
+        let second = cached_filtered_pods(&state, &ns);
+        assert!(Rc::ptr_eq(&first, &second));
+        assert_eq!(first.len(), 2_000);
+
+        let updated = make_pod("pod-1999", "default", "CrashLoopBackOff", 0, 1, 2, None, None, "1m");
+        assert!(state.apply_pod_watch_update(
+            "ctx-a",
+            1,
+            WatchUpdate::Delta(vec![WatchItem {
+                key: "default/pod-1999".to_string(),
+                action: WatchAction::Applied,
+                item: updated,
+            }]),
+        ));
+
+        let third = cached_filtered_pods(&state, &ns);
+        assert!(!Rc::ptr_eq(&first, &third));
+        assert_eq!(third[0].name, "pod-1999");
+        assert_eq!(third[0].status, "CrashLoopBackOff");
     }
 }
