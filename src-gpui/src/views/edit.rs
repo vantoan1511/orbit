@@ -16,9 +16,10 @@ use gpui::{
 use lucide_icons::Icon;
 use orbit_core::kubernetes::edit_forms::{
     EditFormModel, EditMode, KeyValueEntry, apply_edit_form, extract_edit_form,
-    transition_edit_mode, validate_edit_form,
+    format_editable_resource_yaml, merge_preserved_server_fields, transition_edit_mode,
+    validate_edit_form,
 };
-use orbit_core::kubernetes::raw::{format_raw_resource_yaml, parse_resource_yaml};
+use orbit_core::kubernetes::raw::parse_resource_yaml;
 use serde_json::Value;
 
 use crate::icons::render_icon;
@@ -115,12 +116,13 @@ impl EditSessionState {
         if self.load_request_id != request_id {
             return false;
         }
+        let editable_yaml = format_editable_resource_yaml(&raw_json).unwrap_or(yaml);
         let form = extract_edit_form(&self.target.kind, &raw_json);
         self.form_validation_error = validate_edit_form(&form);
         self.raw_data = Some(raw_json);
         self.form_model = Some(form);
-        self.initial_yaml = yaml.clone();
-        self.yaml_content = yaml;
+        self.initial_yaml = editable_yaml.clone();
+        self.yaml_content = editable_yaml;
         self.status = EditTabStatus::Ready;
         self.yaml_parse_error = None;
         self.inline_error = None;
@@ -144,9 +146,13 @@ impl EditSessionState {
         let payload = match self.mode {
             EditMode::Yaml => match parse_resource_yaml(&self.yaml_content) {
                 Ok(parsed) => {
-                    self.raw_data = Some(parsed.clone());
+                    let merged = match self.raw_data.as_ref() {
+                        Some(snapshot) => merge_preserved_server_fields(&parsed, snapshot),
+                        None => parsed,
+                    };
+                    self.raw_data = Some(merged.clone());
                     self.yaml_parse_error = None;
-                    parsed
+                    merged
                 }
                 Err(err) => {
                     self.yaml_parse_error = Some(err.clone());
@@ -166,7 +172,7 @@ impl EditSessionState {
                     })?;
                     let updated = apply_edit_form(base, form);
                     self.raw_data = Some(updated.clone());
-                    if let Ok(yaml) = format_raw_resource_yaml(&updated) {
+                    if let Ok(yaml) = format_editable_resource_yaml(&updated) {
                         self.yaml_content = yaml;
                     }
                     updated
@@ -188,12 +194,13 @@ impl EditSessionState {
         if self.save_request_id != Some(request_id) {
             return false;
         }
+        let editable_yaml = format_editable_resource_yaml(&raw_json).unwrap_or(yaml);
         let form = extract_edit_form(&self.target.kind, &raw_json);
         self.form_validation_error = validate_edit_form(&form);
         self.raw_data = Some(raw_json);
         self.form_model = Some(form);
-        self.initial_yaml = yaml.clone();
-        self.yaml_content = yaml;
+        self.initial_yaml = editable_yaml.clone();
+        self.yaml_content = editable_yaml;
         self.save_request_id = None;
         self.status = EditTabStatus::Ready;
         self.yaml_parse_error = None;
@@ -251,7 +258,11 @@ impl EditSessionState {
         self.yaml_content = new_yaml;
         match parse_resource_yaml(&self.yaml_content) {
             Ok(parsed) => {
-                self.raw_data = Some(parsed);
+                let merged = match self.raw_data.as_ref() {
+                    Some(snapshot) => merge_preserved_server_fields(&parsed, snapshot),
+                    None => parsed,
+                };
+                self.raw_data = Some(merged);
                 self.yaml_parse_error = None;
                 self.inline_error = None;
             }
@@ -272,7 +283,7 @@ impl EditSessionState {
         self.form_validation_error = validate_edit_form(form);
         if let Some(base) = self.raw_data.as_ref() {
             let updated = apply_edit_form(base, form);
-            if let Ok(yaml) = format_raw_resource_yaml(&updated) {
+            if let Ok(yaml) = format_editable_resource_yaml(&updated) {
                 self.yaml_content = yaml;
             }
             self.raw_data = Some(updated);
@@ -382,7 +393,6 @@ pub type EditFormMutatorCallback =
     Rc<dyn Fn(Box<dyn FnOnce(&mut EditFormModel)>, bool, &mut Window, &mut App)>;
 
 pub struct EditViewCallbacks {
-    pub on_back: EditActionCallback,
     pub on_cancel: EditActionCallback,
     pub on_save: EditActionCallback,
     pub on_retry_load: EditActionCallback,
@@ -625,76 +635,51 @@ pub fn render_edit_view(
         .child(
             div()
                 .flex()
-                .items_center()
-                .gap_3()
+                .flex_col()
                 .min_w(px(0.0))
-                .child(
-                    Button::new("edit-back-btn")
-                        .outline()
-                        .small()
-                        .disabled(is_saving)
-                        .on_click({
-                            let cb = Rc::clone(&callbacks.on_back);
-                            move |_, window, cx| cb(window, cx)
-                        })
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_1()
-                                .child(render_icon(Icon::ArrowLeft, px(13.0), theme.text.secondary))
-                                .child("Back"),
-                        ),
-                )
                 .child(
                     div()
                         .flex()
-                        .flex_col()
-                        .min_w(px(0.0))
+                        .items_center()
+                        .gap_2()
                         .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .child(
-                                    apply_text_step(div(), theme.typography.size_sm)
-                                        .font_weight(FontWeight::SEMIBOLD)
-                                        .text_color(theme.text.primary)
-                                        .child(format!("Edit {kind}")),
-                                )
-                                .when(is_dirty, |el| {
-                                    el.child(
-                                        div()
-                                            .flex()
-                                            .items_center()
-                                            .gap_1()
-                                            .px_1p5()
-                                            .py(px(1.0))
-                                            .rounded(theme.style.radius_control)
-                                            .bg(theme.semantic.warning.soft)
-                                            .child(
-                                                div()
-                                                    .w(px(6.0))
-                                                    .h(px(6.0))
-                                                    .rounded_full()
-                                                    .bg(theme.semantic.warning.solid),
-                                            )
-                                            .child(
-                                                apply_text_step(div(), theme.typography.size_3xs)
-                                                    .font_weight(FontWeight::MEDIUM)
-                                                    .text_color(theme.semantic.warning.solid)
-                                                    .child("Unsaved"),
-                                            ),
-                                    )
-                                }),
+                            apply_text_step(div(), theme.typography.size_sm)
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(theme.text.primary)
+                                .child(format!("Edit {kind}")),
                         )
-                        .child(
-                            apply_text_step(div(), theme.typography.size_2xs)
-                                .font(theme.typography.mono_font(FontWeight::NORMAL))
-                                .text_color(theme.text.muted)
-                                .truncate()
-                                .child(subtitle),
-                        ),
+                        .when(is_dirty, |el| {
+                            el.child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap_1()
+                                    .px_1p5()
+                                    .py(px(1.0))
+                                    .rounded(theme.style.radius_control)
+                                    .bg(theme.semantic.warning.soft)
+                                    .child(
+                                        div()
+                                            .w(px(6.0))
+                                            .h(px(6.0))
+                                            .rounded_full()
+                                            .bg(theme.semantic.warning.solid),
+                                    )
+                                    .child(
+                                        apply_text_step(div(), theme.typography.size_3xs)
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .text_color(theme.semantic.warning.solid)
+                                            .child("Unsaved"),
+                                    ),
+                            )
+                        }),
+                )
+                .child(
+                    apply_text_step(div(), theme.typography.size_2xs)
+                        .font(theme.typography.mono_font(FontWeight::NORMAL))
+                        .text_color(theme.text.muted)
+                        .truncate()
+                        .child(subtitle),
                 ),
         )
         .child(
@@ -1938,7 +1923,47 @@ fn remove_list_entry(model: &mut EditFormModel, group: &str, idx: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use orbit_core::kubernetes::raw::format_raw_resource_yaml;
     use serde_json::json;
+
+    #[test]
+    fn test_edit_session_yaml_mode_hides_generated_fields_and_preserves_resource_version_on_save() {
+        let mut session =
+            EditSessionState::new(sample_target("ConfigMap", Some("default"), "cfg"), 1);
+        let raw = json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": "cfg",
+                "namespace": "default",
+                "uid": "u-1",
+                "resourceVersion": "77",
+                "creationTimestamp": "2026-01-01T00:00:00Z",
+                "managedFields": [{ "manager": "kubectl" }]
+            },
+            "data": { "k": "v1" },
+            "status": { "phase": "Active" }
+        });
+        let raw_yaml = format_raw_resource_yaml(&raw).expect("raw yaml");
+        assert!(session.apply_loaded(1, raw, raw_yaml));
+        assert!(!session.yaml_content.contains("resourceVersion:"));
+        assert!(!session.yaml_content.contains("managedFields:"));
+        assert!(!session.yaml_content.contains("uid:"));
+        assert!(!session.yaml_content.contains("status:"));
+        assert!(!session.is_dirty());
+
+        session.switch_mode(EditMode::Yaml).expect("yaml mode");
+        assert!(!session.yaml_content.contains("resourceVersion:"));
+        assert!(!session.is_dirty());
+
+        let edited = session.yaml_content.replace("k: v1", "k: v2");
+        session.update_yaml_from_editor(edited);
+        assert!(session.is_dirty());
+        let payload = session.begin_save(10).expect("begin save");
+        assert_eq!(payload["data"]["k"], "v2");
+        assert_eq!(payload["metadata"]["resourceVersion"], "77");
+        assert_eq!(payload["metadata"]["uid"], "u-1");
+    }
 
     fn sample_target(kind: &str, ns: Option<&str>, name: &str) -> EditTabTarget {
         EditTabTarget {

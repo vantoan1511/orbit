@@ -2394,7 +2394,6 @@ impl OrbitShell {
         };
 
         let entity = cx.entity().clone();
-        let target_back = target.clone();
         let target_cancel = target.clone();
         let target_save = target.clone();
         let target_retry = target.clone();
@@ -2403,15 +2402,6 @@ impl OrbitShell {
         let target_mutate = target.clone();
 
         let callbacks = views::edit::EditViewCallbacks {
-            on_back: {
-                let e = entity.clone();
-                std::rc::Rc::new(move |_, cx| {
-                    let t = target_back.clone();
-                    e.update(cx, |shell, cx| {
-                        shell.close_tab(WorkspaceTab::Edit(t), cx);
-                    });
-                })
-            },
             on_cancel: {
                 let e = entity.clone();
                 std::rc::Rc::new(move |_, cx| {

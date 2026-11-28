@@ -7,6 +7,26 @@ const STORAGE_CLASS_DEFAULT_ANNOTATION: &str = "storageclass.kubernetes.io/is-de
 const STORAGE_CLASS_BETA_DEFAULT_ANNOTATION: &str =
     "storageclass.beta.kubernetes.io/is-default-class";
 
+const GENERATED_METADATA_FIELDS: &[&str] = &[
+    "uid",
+    "resourceVersion",
+    "generation",
+    "creationTimestamp",
+    "deletionTimestamp",
+    "deletionGracePeriodSeconds",
+    "selfLink",
+    "managedFields",
+    "ownerReferences",
+];
+
+const PRESERVED_SERVER_METADATA_FIELDS: &[&str] = &[
+    "uid",
+    "resourceVersion",
+    "generation",
+    "creationTimestamp",
+    "ownerReferences",
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditMode {
     Form,
@@ -828,6 +848,55 @@ pub fn validate_edit_form(form: &EditFormModel) -> Option<String> {
     }
 }
 
+pub fn strip_generated_resource_fields(raw_data: &Value) -> Value {
+    let Some(map) = raw_data.as_object() else {
+        return raw_data.clone();
+    };
+    let mut cleaned = map.clone();
+    cleaned.remove("status");
+
+    if let Some(Value::Object(meta)) = cleaned.get_mut("metadata") {
+        for field in GENERATED_METADATA_FIELDS {
+            meta.remove(*field);
+        }
+    }
+
+    Value::Object(cleaned)
+}
+
+pub fn merge_preserved_server_fields(edited: &Value, server_snapshot: &Value) -> Value {
+    let Some(edited_map) = edited.as_object() else {
+        return edited.clone();
+    };
+    let Some(server_map) = server_snapshot.as_object() else {
+        return edited.clone();
+    };
+
+    let mut merged = edited_map.clone();
+    if !merged.contains_key("status")
+        && let Some(status) = server_map.get("status")
+    {
+        merged.insert("status".to_string(), status.clone());
+    }
+
+    if let Some(server_meta) = server_map.get("metadata").and_then(Value::as_object) {
+        let target_meta = ensure_object_mut(&mut merged, "metadata");
+        for field in PRESERVED_SERVER_METADATA_FIELDS {
+            if !target_meta.contains_key(*field)
+                && let Some(val) = server_meta.get(*field)
+            {
+                target_meta.insert((*field).to_string(), val.clone());
+            }
+        }
+    }
+
+    Value::Object(merged)
+}
+
+pub fn format_editable_resource_yaml(raw_data: &Value) -> Result<String, String> {
+    format_raw_resource_yaml(&strip_generated_resource_fields(raw_data))
+}
+
 pub fn transition_edit_mode(
     target_mode: EditMode,
     kind: &str,
@@ -836,7 +905,7 @@ pub fn transition_edit_mode(
 ) -> Result<EditModeTransition, String> {
     match target_mode {
         EditMode::Yaml => {
-            let next_yaml = format_raw_resource_yaml(raw_data)?;
+            let next_yaml = format_editable_resource_yaml(raw_data)?;
             Ok(EditModeTransition {
                 mode: EditMode::Yaml,
                 raw_data: raw_data.clone(),
@@ -846,10 +915,11 @@ pub fn transition_edit_mode(
         }
         EditMode::Form => {
             let parsed = parse_resource_yaml(yaml_content)?;
-            let form_model = extract_edit_form(kind, &parsed);
+            let merged = merge_preserved_server_fields(&parsed, raw_data);
+            let form_model = extract_edit_form(kind, &merged);
             Ok(EditModeTransition {
                 mode: EditMode::Form,
-                raw_data: parsed,
+                raw_data: merged,
                 yaml_content: yaml_content.to_string(),
                 form_model: Some(form_model),
             })
@@ -1181,5 +1251,60 @@ mod tests {
             }
             other => panic!("expected ConfigMap form model, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_strip_generated_fields_hides_server_metadata_and_status_while_merge_restores_them() {
+        let full = json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": "cfg",
+                "namespace": "default",
+                "uid": "abc-123",
+                "resourceVersion": "42",
+                "generation": 3,
+                "creationTimestamp": "2026-01-01T00:00:00Z",
+                "deletionTimestamp": "2026-01-02T00:00:00Z",
+                "deletionGracePeriodSeconds": 30,
+                "selfLink": "/api/v1/namespaces/default/configmaps/cfg",
+                "managedFields": [{ "manager": "kubectl" }],
+                "ownerReferences": [{ "kind": "Deployment", "name": "web" }],
+                "labels": { "app": "web" }
+            },
+            "data": { "k": "v1" },
+            "status": { "phase": "Active" }
+        });
+
+        let editable_yaml = format_editable_resource_yaml(&full).expect("editable yaml");
+        assert!(editable_yaml.contains("name: cfg"));
+        assert!(editable_yaml.contains("app: web"));
+        assert!(editable_yaml.contains("k: v1"));
+        for hidden in [
+            "uid:",
+            "resourceVersion:",
+            "generation:",
+            "creationTimestamp:",
+            "deletionTimestamp:",
+            "deletionGracePeriodSeconds:",
+            "selfLink:",
+            "managedFields:",
+            "ownerReferences:",
+            "status:",
+        ] {
+            assert!(
+                !editable_yaml.contains(hidden),
+                "generated field `{hidden}` must be hidden from editable YAML:\n{editable_yaml}"
+            );
+        }
+
+        let edited = parse_resource_yaml(&editable_yaml.replace("k: v1", "k: v2"))
+            .expect("parse edited yaml");
+        let merged = merge_preserved_server_fields(&edited, &full);
+        assert_eq!(merged["data"]["k"], "v2");
+        assert_eq!(merged["metadata"]["resourceVersion"], "42");
+        assert_eq!(merged["metadata"]["uid"], "abc-123");
+        assert_eq!(merged["metadata"]["ownerReferences"][0]["name"], "web");
+        assert_eq!(merged["status"]["phase"], "Active");
     }
 }
