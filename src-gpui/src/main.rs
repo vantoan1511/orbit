@@ -6314,6 +6314,7 @@ fn main() -> std::process::ExitCode {
 
     gpui::application().run(move |cx: &mut App| {
         gpui::init(cx);
+        views::edit::register_yaml_language_config(cx);
 
         if let Err(err) = crate::icons::register_lucide_font(cx) {
             tracing::warn!(error = %err, "Failed to register embedded Lucide icon font");

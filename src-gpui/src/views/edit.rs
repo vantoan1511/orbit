@@ -6,7 +6,10 @@ use gpui::component::{
     Disableable as _, Sizable as _,
     button::{Button, ButtonVariants as _},
     form::{field, v_form},
-    input::{Editor, EditorState, Input, InputState, TabSize},
+    input::{
+        AutoClosingPair, BracketPair, Editor, EditorState, IndentationRules, Input, InputState,
+        SyntaxContext, TabSize, language_config::LanguageConfig, set_language_config,
+    },
     switch::Switch,
 };
 use gpui::{
@@ -41,6 +44,34 @@ const PV_ACCESS_MODES: &[&str] = &[
     "ReadWriteMany",
     "ReadWriteOncePod",
 ];
+
+pub fn yaml_language_config() -> LanguageConfig {
+    let mut config = LanguageConfig::default()
+        .brackets([BracketPair::new("{", "}"), BracketPair::new("[", "]")])
+        .auto_closing_pairs(
+            [
+                AutoClosingPair::new("{", "}"),
+                AutoClosingPair::new("[", "]"),
+                AutoClosingPair::new("\"", "\""),
+                AutoClosingPair::new("'", "'"),
+            ]
+            .into_iter()
+            .map(|pair| pair.not_in([SyntaxContext::String, SyntaxContext::Comment])),
+        );
+
+    if let (Ok(increase), Ok(decrease)) = (
+        regex::Regex::new(r"(?::|\|[+-]?|>[+-]?|[\{\[])\s*$"),
+        regex::Regex::new(r"^\s*[\}\]]"),
+    ) {
+        config = config.indentation_rules(IndentationRules::new(increase, decrease));
+    }
+
+    config
+}
+
+pub fn register_yaml_language_config(cx: &mut App) {
+    set_language_config("yaml", yaml_language_config(), cx);
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EditTabStatus {
@@ -1963,6 +1994,38 @@ mod tests {
         assert_eq!(payload["data"]["k"], "v2");
         assert_eq!(payload["metadata"]["resourceVersion"], "77");
         assert_eq!(payload["metadata"]["uid"], "u-1");
+    }
+
+    #[test]
+    fn test_yaml_language_config_and_tree_sitter_yaml_highlighter_are_configured() {
+        let config = yaml_language_config();
+        assert_eq!(config.brackets.len(), 2);
+        assert_eq!(
+            config
+                .auto_closing_pairs
+                .as_ref()
+                .map(Vec::len),
+            Some(4)
+        );
+        let rules = config
+            .indentation_rules
+            .as_ref()
+            .expect("YAML indentation rules should be configured");
+        let inc = rules
+            .increase_indent_pattern
+            .as_ref()
+            .expect("increase indent pattern");
+        assert!(inc.is_match("metadata:"));
+        assert!(inc.is_match("  script: |"));
+        assert!(inc.is_match("  items: ["));
+        assert!(!inc.is_match("  name: app"));
+
+        assert!(
+            gpui::component::highlighter::LanguageRegistry::singleton()
+                .language("yaml")
+                .is_some_and(|cfg| cfg.language.is_some()),
+            "tree-sitter-yaml grammar must be registered for YAML syntax highlighting"
+        );
     }
 
     fn sample_target(kind: &str, ns: Option<&str>, name: &str) -> EditTabTarget {
