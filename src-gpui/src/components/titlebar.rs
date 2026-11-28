@@ -1,9 +1,12 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
+use gpui::base::InteractiveElementExt as _;
 use gpui::{
-    AnyElement, Decorations, InteractiveElement, IntoElement, Rgba, StatefulInteractiveElement,
-    Styled, Window, WindowControlArea, div, prelude::*, px,
+    AnyElement, App, Decorations, InteractiveElement, IntoElement, MouseButton, MouseDownEvent,
+    MouseMoveEvent, Rgba, StatefulInteractiveElement, Styled, Window, WindowControlArea, div,
+    prelude::*, px,
 };
-#[cfg(not(target_os = "windows"))]
-use gpui::{MouseButton, MouseDownEvent};
 use lucide_icons::Icon;
 
 use crate::components::TextTooltip;
@@ -119,6 +122,13 @@ pub fn resolve_window_chrome_style(
     }
 }
 
+/// Returns `true` when the OS/platform window procedure handles window control
+/// clicks (`Min`/`Max`/`Close`) and caption drag/double-click directly via
+/// `WM_NCHITTEST` (`WindowControlArea`).
+pub const fn uses_native_window_controls(platform: TitlebarPlatform) -> bool {
+    matches!(platform, TitlebarPlatform::Windows)
+}
+
 pub const fn maximize_control_icon(is_maximized: bool) -> Icon {
     if is_maximized {
         Icon::Copy
@@ -148,9 +158,10 @@ struct WindowControlSpec {
 
 fn render_window_control_button(
     spec: WindowControlSpec,
-    on_click: impl Fn(&mut Window, &mut gpui::App) + 'static,
+    platform: TitlebarPlatform,
+    on_click: impl Fn(&mut Window, &mut App) + 'static,
 ) -> AnyElement {
-    div()
+    let mut button = div()
         .id(spec.id)
         .group(spec.group_name)
         .w(px(WINDOW_CONTROL_WIDTH))
@@ -159,18 +170,36 @@ fn render_window_control_button(
         .items_center()
         .justify_center()
         .flex_shrink_0()
+        .occlude()
         .window_control_area(spec.control_area)
         .hover(move |s| s.bg(spec.hover_bg))
         .tooltip(move |_window, cx| cx.new(|_| TextTooltip::new(spec.tooltip_label)).into())
-        .on_click(move |_event, window, cx| {
-            on_click(window, cx);
-            cx.stop_propagation();
-        })
         .child(
             render_icon(spec.icon, px(13.0), spec.fg)
                 .group_hover(spec.group_name, move |s| s.text_color(spec.hover_fg)),
-        )
-        .into_any_element()
+        );
+
+    // On Windows, `gpui-pre-windows` handles `HTMINBUTTON` / `HTMAXBUTTON` / `HTCLOSE`
+    // in `WM_NCLBUTTONUP` only when `DispatchEventResult.propagate` stays `true`.
+    if !uses_native_window_controls(platform) {
+        button = button
+            .on_mouse_down(MouseButton::Left, |_event, window, cx| {
+                window.prevent_default();
+                cx.stop_propagation();
+            })
+            .on_click(move |_event, window, cx| {
+                on_click(window, cx);
+                cx.stop_propagation();
+            });
+    }
+
+    #[cfg(test)]
+    let button = {
+        use gpui::test::TestSupportExt as _;
+        button.test_support()
+    };
+
+    button.into_any_element()
 }
 
 pub fn render_custom_titlebar(
@@ -179,9 +208,11 @@ pub fn render_custom_titlebar(
     is_maximized: bool,
     decorations: Decorations,
     theme: &OrbitTheme,
-    _window: &Window,
+    window: &mut Window,
+    cx: &mut App,
 ) -> AnyElement {
-    let layout = resolve_titlebar_layout_spec(TitlebarPlatform::current(), decorations);
+    let platform = TitlebarPlatform::current();
+    let layout = resolve_titlebar_layout_spec(platform, decorations);
     let chrome = resolve_window_chrome_style(theme, is_window_active, is_maximized);
 
     let mut left_slot = div()
@@ -201,38 +232,97 @@ pub fn render_custom_titlebar(
         left_slot = left_slot.child(left_controls);
     }
 
-    #[allow(unused_mut)]
-    let mut drag_region = div()
+    #[cfg(test)]
+    let left_slot = {
+        use gpui::test::TestSupportExt as _;
+        left_slot.test_support()
+    };
+
+    let drag_region = div()
         .id("orbit-titlebar-drag-region")
         .flex_1()
         .min_w(px(32.0))
-        .h_full()
-        .window_control_area(WindowControlArea::Drag);
+        .h_full();
 
-    #[cfg(target_os = "macos")]
-    {
-        drag_region = drag_region.on_mouse_down(
-            MouseButton::Left,
-            |event: &MouseDownEvent, window, _cx| {
-                if event.click_count == 2 {
-                    window.titlebar_double_click();
-                }
-            },
-        );
+    #[cfg(test)]
+    let drag_region = {
+        use gpui::test::TestSupportExt as _;
+        drag_region.test_support()
+    };
+
+    let mut drag_surface = div()
+        .id("orbit-titlebar-drag-surface")
+        .flex_1()
+        .min_w(px(0.0))
+        .h_full()
+        .flex()
+        .items_center()
+        .window_control_area(WindowControlArea::Drag)
+        .child(left_slot)
+        .child(drag_region);
+
+    if let Some(right_controls) = slots.right_controls {
+        let right_slot = div()
+            .id("orbit-titlebar-right-slot")
+            .h_full()
+            .flex()
+            .items_center()
+            .gap_1p5()
+            .pr_2()
+            .flex_shrink_0()
+            .child(right_controls);
+
+        #[cfg(test)]
+        let right_slot = {
+            use gpui::test::TestSupportExt as _;
+            right_slot.test_support()
+        };
+
+        drag_surface = drag_surface.child(right_slot);
     }
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-    {
-        drag_region = drag_region.on_mouse_down(
-            MouseButton::Left,
-            |event: &MouseDownEvent, window, _cx| {
-                if event.click_count == 2 {
-                    window.zoom_window();
-                } else {
-                    window.start_window_move();
-                }
-            },
-        );
+    match platform {
+        TitlebarPlatform::Windows => {}
+        TitlebarPlatform::MacOs => {
+            drag_surface = drag_surface.on_mouse_down(
+                MouseButton::Left,
+                |event: &MouseDownEvent, window, _cx| {
+                    if event.click_count == 2 && !window.default_prevented() {
+                        window.titlebar_double_click();
+                    }
+                },
+            );
+        }
+        TitlebarPlatform::Linux => {
+            let should_move = window
+                .use_keyed_state("orbit-titlebar-should-move", cx, |_window, _cx| {
+                    Rc::new(Cell::new(false))
+                })
+                .read(cx)
+                .clone();
+            let should_move_down = Rc::clone(&should_move);
+            let should_move_move = Rc::clone(&should_move);
+            let should_move_up = should_move;
+
+            drag_surface = drag_surface
+                .on_double_click(|_event, window, _cx| {
+                    if !window.default_prevented() {
+                        window.zoom_window();
+                    }
+                })
+                .on_mouse_down(MouseButton::Left, move |_event, window, _cx| {
+                    should_move_down.set(!window.default_prevented());
+                })
+                .on_mouse_move(move |event: &MouseMoveEvent, window, _cx| {
+                    if event.pressed_button == Some(MouseButton::Left) && should_move_move.get() {
+                        should_move_move.set(false);
+                        window.start_window_move();
+                    }
+                })
+                .on_mouse_up(MouseButton::Left, move |_event, _window, _cx| {
+                    should_move_up.set(false);
+                });
+        }
     }
 
     let mut bar = div()
@@ -250,21 +340,13 @@ pub fn render_custom_titlebar(
         bar = bar.child(div().w(px(layout.left_inset_px)).h_full().flex_shrink_0());
     }
 
-    bar = bar.child(left_slot).child(drag_region);
+    #[cfg(test)]
+    let drag_surface = {
+        use gpui::test::TestSupportExt as _;
+        drag_surface.test_support()
+    };
 
-    if let Some(right_controls) = slots.right_controls {
-        bar = bar.child(
-            div()
-                .id("orbit-titlebar-right-slot")
-                .h_full()
-                .flex()
-                .items_center()
-                .gap_1p5()
-                .pr_2()
-                .flex_shrink_0()
-                .child(right_controls),
-        );
-    }
+    bar = bar.child(drag_surface);
 
     if layout.show_window_controls {
         let min_btn = render_window_control_button(
@@ -278,6 +360,7 @@ pub fn render_custom_titlebar(
                 hover_bg: chrome.control_hover_bg,
                 hover_fg: theme.text.primary,
             },
+            platform,
             |window, _cx| {
                 window.minimize_window();
             },
@@ -294,6 +377,7 @@ pub fn render_custom_titlebar(
                 hover_bg: chrome.control_hover_bg,
                 hover_fg: theme.text.primary,
             },
+            platform,
             |window, _cx| {
                 window.zoom_window();
             },
@@ -310,6 +394,7 @@ pub fn render_custom_titlebar(
                 hover_bg: chrome.close_hover_bg,
                 hover_fg: chrome.close_hover_fg,
             },
+            platform,
             |window, _cx| {
                 window.remove_window();
             },
@@ -422,5 +507,202 @@ mod tests {
         assert!(matches!(maximize_control_icon(true), Icon::Copy));
         assert_eq!(maximize_control_tooltip(false), "Maximize");
         assert_eq!(maximize_control_tooltip(true), "Restore");
+    }
+
+    #[test]
+    fn test_uses_native_window_controls_by_platform() {
+        assert!(uses_native_window_controls(TitlebarPlatform::Windows));
+        assert!(!uses_native_window_controls(TitlebarPlatform::MacOs));
+        assert!(!uses_native_window_controls(TitlebarPlatform::Linux));
+    }
+
+    #[gpui::test]
+    fn test_windows_titlebar_controls_and_empty_space_propagate_for_native_hit_testing(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use gpui::test::TestWindowExt as _;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        struct TitlebarHarness {
+            theme: OrbitTheme,
+            is_maximized: bool,
+            left_clicks: Rc<Cell<usize>>,
+            right_clicks: Rc<Cell<usize>>,
+        }
+
+        impl gpui::Render for TitlebarHarness {
+            fn render(
+                &mut self,
+                window: &mut Window,
+                cx: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                let left_clicks = Rc::clone(&self.left_clicks);
+                let right_clicks = Rc::clone(&self.right_clicks);
+                let left_pill = {
+                    use gpui::test::TestSupportExt as _;
+                    div()
+                        .id("test-left-pill")
+                        .occlude()
+                        .w(px(64.0))
+                        .h(px(TITLEBAR_CONTROL_HEIGHT))
+                        .on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
+                            left_clicks.set(left_clicks.get() + 1);
+                            window.prevent_default();
+                            cx.stop_propagation();
+                        })
+                        .test_support()
+                };
+                let right_pill = {
+                    use gpui::test::TestSupportExt as _;
+                    div()
+                        .id("test-right-pill")
+                        .occlude()
+                        .w(px(64.0))
+                        .h(px(TITLEBAR_CONTROL_HEIGHT))
+                        .on_mouse_down(gpui::MouseButton::Left, move |_, window, cx| {
+                            right_clicks.set(right_clicks.get() + 1);
+                            window.prevent_default();
+                            cx.stop_propagation();
+                        })
+                        .test_support()
+                };
+
+                div().size_full().flex().flex_col().child(render_custom_titlebar(
+                    TitlebarSlots {
+                        left_controls: Some(left_pill.into_any_element()),
+                        right_controls: Some(right_pill.into_any_element()),
+                    },
+                    true,
+                    self.is_maximized,
+                    Decorations::Client {
+                        tiling: Tiling::default(),
+                    },
+                    &self.theme,
+                    window,
+                    cx,
+                ))
+            }
+        }
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+        let left_clicks = Rc::new(Cell::new(0));
+        let right_clicks = Rc::new(Cell::new(0));
+        let left_clicks_for_view = Rc::clone(&left_clicks);
+        let right_clicks_for_view = Rc::clone(&right_clicks);
+
+        let opened = cx.update(|cx| {
+            gpui::init(cx);
+            crate::theme::kit_bridge::sync_kit_theme(&theme, cx);
+            gpui::open_window(gpui::WindowOptions::default(), cx, move |_, cx| {
+                cx.new(|_| TitlebarHarness {
+                    theme: theme.clone(),
+                    is_maximized: false,
+                    left_clicks: left_clicks_for_view,
+                    right_clicks: right_clicks_for_view,
+                })
+            })
+        });
+        let Ok((window, view)) = opened else {
+            panic!("failed to open test window");
+        };
+
+        let dispatch_mouse = |window: &mut Window,
+                              cx: &mut gpui::App,
+                              pos: gpui::Point<gpui::Pixels>,
+                              click_count: usize| {
+            let down = window.dispatch_event(
+                gpui::PlatformInput::MouseDown(gpui::MouseDownEvent {
+                    position: pos,
+                    button: gpui::MouseButton::Left,
+                    modifiers: gpui::Modifiers::default(),
+                    click_count,
+                    first_mouse: false,
+                }),
+                cx,
+            );
+            let up = window.dispatch_event(
+                gpui::PlatformInput::MouseUp(gpui::MouseUpEvent {
+                    position: pos,
+                    button: gpui::MouseButton::Left,
+                    modifiers: gpui::Modifiers::default(),
+                    click_count,
+                }),
+                cx,
+            );
+            (down, up)
+        };
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                assert!(window.try_find("orbit-titlebar-maximize").is_some());
+                assert!(window.try_find("orbit-titlebar-drag-surface").is_some());
+
+                // Interactive pills receive clicks and stop propagation.
+                let left_pill_center = window.find("test-left-pill").bounds().center();
+                let (down, _up) = dispatch_mouse(window, cx, left_pill_center, 1);
+                assert!(!down.propagate);
+
+                let right_pill_center = window.find("test-right-pill").bounds().center();
+                let (down, _up) = dispatch_mouse(window, cx, right_pill_center, 1);
+                assert!(!down.propagate);
+
+                if TitlebarPlatform::current() == TitlebarPlatform::Windows {
+                    // Maximize button must propagate so Windows native HTMAXBUTTON handles it.
+                    let max_center = window.find("orbit-titlebar-maximize").bounds().center();
+                    let (down, up) = dispatch_mouse(window, cx, max_center, 1);
+                    assert!(down.propagate);
+                    assert!(up.propagate);
+
+                    // Empty space in left slot, drag region, and right slot must propagate.
+                    let left_slot = window.find("orbit-titlebar-left-slot").bounds();
+                    let empty_left = gpui::point(left_slot.left() + px(2.0), left_slot.top() + px(2.0));
+                    let (down_1, _) = dispatch_mouse(window, cx, empty_left, 1);
+                    let (down_2, _) = dispatch_mouse(window, cx, empty_left, 2);
+                    assert!(down_1.propagate);
+                    assert!(down_2.propagate);
+
+                    let drag_center = window.find("orbit-titlebar-drag-region").bounds().center();
+                    let (down_1, _) = dispatch_mouse(window, cx, drag_center, 1);
+                    let (down_2, _) = dispatch_mouse(window, cx, drag_center, 2);
+                    assert!(down_1.propagate);
+                    assert!(down_2.propagate);
+
+                    let right_slot = window.find("orbit-titlebar-right-slot").bounds();
+                    let empty_right = gpui::point(right_slot.right() - px(2.0), right_slot.top() + px(2.0));
+                    let (down_1, _) = dispatch_mouse(window, cx, empty_right, 1);
+                    let (down_2, _) = dispatch_mouse(window, cx, empty_right, 2);
+                    assert!(down_1.propagate);
+                    assert!(down_2.propagate);
+                }
+            });
+        });
+
+        assert_eq!(left_clicks.get(), 1);
+        assert_eq!(right_clicks.get(), 1);
+
+        // Toggle is_maximized = true and verify Restore button still propagates on Windows.
+        cx.update(|cx| {
+            view.update(cx, |harness, cx| {
+                harness.is_maximized = true;
+                cx.notify();
+            });
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                if TitlebarPlatform::current() == TitlebarPlatform::Windows {
+                    let max_center = window.find("orbit-titlebar-maximize").bounds().center();
+                    let (down, up) = dispatch_mouse(window, cx, max_center, 1);
+                    assert!(down.propagate);
+                    assert!(up.propagate);
+                }
+            });
+        });
     }
 }
