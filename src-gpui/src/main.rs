@@ -57,9 +57,7 @@ use crate::state::{
     NamespaceLoadStatus, PickerKeyAction, PortForwardsLoadStatus, TabDropPosition,
     WorkloadActionKind, WorkspaceResourcesState, WorkspaceTabsState,
 };
-use crate::theme::{
-    AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, sync_native_titlebar_appearance,
-};
+use crate::theme::{OrbitTheme, ThemeMode, apply_text_step, sync_native_titlebar_appearance};
 
 gpui::actions!(orbit_shell, [OpenCommandPalette, ToggleSidebar]);
 
@@ -2742,32 +2740,6 @@ impl OrbitShell {
         cx.notify();
     }
 
-    fn select_ui_style(&mut self, style: UiStyle, window: &mut Window, cx: &mut Context<Self>) {
-        self.settings_dropdown.close();
-        let updated = OrbitTheme::get(cx).with_ui_style(style, window.appearance());
-        apply_theme(updated, window, cx);
-        self.settings_error = None;
-        self.dispatch_command(ClusterBridgeCommand::SaveUiStyle {
-            style: style.id().to_string(),
-        });
-        cx.notify();
-    }
-
-    fn select_accent_color(
-        &mut self,
-        accent: AccentColor,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let updated = OrbitTheme::get(cx).with_accent_color(accent, window.appearance());
-        apply_theme(updated, window, cx);
-        self.settings_error = None;
-        self.dispatch_command(ClusterBridgeCommand::SaveAccentColor {
-            accent: accent.id().to_string(),
-        });
-        cx.notify();
-    }
-
     fn toggle_experience_features(&mut self, enabled: bool, cx: &mut Context<Self>) {
         self.enable_experience_features = enabled;
         self.settings_error = None;
@@ -2776,17 +2748,7 @@ impl OrbitShell {
     }
 
     fn reset_appearance_defaults(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.settings_dropdown.close();
-        let updated = OrbitTheme::get(cx).with_appearance(
-            ThemeMode::Dark,
-            UiStyle::Flat,
-            AccentColor::Blue,
-            window.appearance(),
-        );
-        apply_theme(updated, window, cx);
-        self.settings_error = None;
-        self.dispatch_command(ClusterBridgeCommand::ResetAppearanceDefaults);
-        cx.notify();
+        self.select_theme_mode(ThemeMode::Dark, window, cx);
     }
 
     pub fn default_window_bounds(cx: &App) -> Bounds<gpui::Pixels> {
@@ -4384,8 +4346,6 @@ impl OrbitShell {
         };
 
         let mode_entity = cx.entity().clone();
-        let style_entity = cx.entity().clone();
-        let accent_entity = cx.entity().clone();
         let exp_entity = cx.entity().clone();
         let reset_entity = cx.entity().clone();
         let toggle_dropdown_entity = cx.entity().clone();
@@ -4394,14 +4354,6 @@ impl OrbitShell {
         let callbacks = views::settings::SettingsCallbacks {
             on_select_theme_mode: std::rc::Rc::new(move |mode, window, cx| {
                 mode_entity.update(cx, |shell, cx| shell.select_theme_mode(mode, window, cx));
-            }),
-            on_select_ui_style: std::rc::Rc::new(move |style, window, cx| {
-                style_entity.update(cx, |shell, cx| shell.select_ui_style(style, window, cx));
-            }),
-            on_select_accent_color: std::rc::Rc::new(move |accent, window, cx| {
-                accent_entity.update(cx, |shell, cx| {
-                    shell.select_accent_color(accent, window, cx);
-                });
             }),
             on_toggle_experience_features: std::rc::Rc::new(move |enabled, _window, cx| {
                 exp_entity.update(cx, |shell, cx| {
@@ -4420,9 +4372,6 @@ impl OrbitShell {
                     let current_index = match kind {
                         views::settings::SettingsDropdownKind::ThemeMode => {
                             views::settings::theme_mode_index(current_theme.mode)
-                        }
-                        views::settings::SettingsDropdownKind::UiStyle => {
-                            views::settings::ui_style_index(current_theme.style.ui_style)
                         }
                     };
                     shell.settings_dropdown.toggle(kind, current_index);
@@ -5329,10 +5278,6 @@ impl Render for OrbitShell {
                             this.select_theme_mode(mode, window, cx);
                             return;
                         }
-                        views::settings::SettingsDropdownKeyAction::SelectUiStyle(style) => {
-                            this.select_ui_style(style, window, cx);
-                            return;
-                        }
                         views::settings::SettingsDropdownKeyAction::Ignored => {}
                     }
                 }
@@ -5900,7 +5845,7 @@ mod tests {
     use super::*;
     use crate::components::{ResourceDrawerTabId, ResourceDrawerTarget};
     use crate::state::{DeploymentsState, PortForwardsState};
-    use crate::theme::{AccentColor, SemanticColorsPreference};
+    use crate::theme::{AccentColor, SemanticColorsPreference, UiStyle};
     use gpui::WindowBackgroundAppearance;
 
     #[test]
@@ -9127,8 +9072,10 @@ mod tests {
 
         assert_eq!(restored.mode, ThemeMode::System);
         assert!(!restored.is_dark);
-        assert_eq!(restored.style.ui_style, UiStyle::Paper);
-        assert_eq!(restored.accent_id, AccentColor::Emerald);
+        assert_eq!(restored.style.ui_style, UiStyle::Flat);
+        assert_eq!(restored.accent_id, AccentColor::Blue);
+        assert_eq!(reloaded.ui_style(), "paper");
+        assert_eq!(reloaded.accent_color(), "emerald");
         assert!(reloaded.enable_experience_features());
     }
 

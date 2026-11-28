@@ -70,25 +70,19 @@ impl OrbitTheme {
 
     pub fn from_config(config: &OrbitConfig, window_appearance: WindowAppearance) -> Self {
         let mode = ThemeMode::from_str_lossy(&config.theme_mode());
-        let ui_style = UiStyle::from_str_lossy(&config.ui_style());
-        let accent_id = AccentColor::from_str_lossy(&config.accent_color());
         let semantic_pref = SemanticColorsPreference::from_json(&config.semantic_colors());
 
-        Self::resolve(mode, ui_style, accent_id, semantic_pref, window_appearance)
+        Self::resolve(
+            mode,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            semantic_pref,
+            window_appearance,
+        )
     }
 
     pub fn get(cx: &App) -> &Self {
         cx.global::<Self>()
-    }
-
-    pub fn with_ui_style(&self, ui_style: UiStyle, window_appearance: WindowAppearance) -> Self {
-        Self::resolve(
-            self.mode,
-            ui_style,
-            self.accent_id,
-            self.semantic_pref.clone(),
-            window_appearance,
-        )
     }
 
     pub fn with_mode(&self, mode: ThemeMode, window_appearance: WindowAppearance) -> Self {
@@ -194,10 +188,10 @@ impl OrbitTheme {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use gpui::{WindowBackgroundAppearance, px};
+    use gpui::WindowBackgroundAppearance;
 
     #[test]
-    fn test_orbit_theme_from_config_resolves_system_mode_and_style() {
+    fn test_orbit_theme_from_config_ignores_legacy_style_and_accent_keys() {
         let mut config = OrbitConfig::default();
         config
             .values
@@ -216,27 +210,23 @@ mod tests {
         let dark_theme = OrbitTheme::from_config(&config, WindowAppearance::Dark);
         assert!(dark_theme.is_dark);
         assert_eq!(dark_theme.mode, ThemeMode::System);
-        assert_eq!(dark_theme.style.ui_style, UiStyle::LiquidGlass);
+        assert_eq!(dark_theme.style.ui_style, UiStyle::Flat);
         assert_eq!(
             dark_theme.style.window_background,
-            WindowBackgroundAppearance::Blurred
+            WindowBackgroundAppearance::Opaque
         );
-        assert_eq!(dark_theme.style.radius_card, px(12.0));
-        assert_eq!(dark_theme.style.radius_control, px(8.0));
-        assert_eq!(dark_theme.accent_id, AccentColor::Emerald);
+        assert_eq!(dark_theme.accent_id, AccentColor::Blue);
         assert_eq!(dark_theme.semantic.success.solid, rgb_hex(0x14b8a6));
 
         let light_theme = OrbitTheme::from_config(&config, WindowAppearance::Light);
         assert!(!light_theme.is_dark);
-        assert_eq!(light_theme.style.ui_style, UiStyle::LiquidGlass);
-        assert_eq!(light_theme.semantic.success.solid, rgb_hex(0x0f766e));
-
-        let flat_theme = light_theme.with_ui_style(UiStyle::Flat, WindowAppearance::Light);
-        assert_eq!(flat_theme.style.ui_style, UiStyle::Flat);
+        assert_eq!(light_theme.style.ui_style, UiStyle::Flat);
         assert_eq!(
-            flat_theme.style.window_background,
+            light_theme.style.window_background,
             WindowBackgroundAppearance::Opaque
         );
+        assert_eq!(light_theme.accent_id, AccentColor::Blue);
+        assert_eq!(light_theme.semantic.success.solid, rgb_hex(0x0f766e));
     }
 
     #[test]

@@ -7,38 +7,31 @@ use gpui::{
 };
 use lucide_icons::Icon;
 
-use crate::components::TextTooltip;
 use crate::dropdown_chevron_icon;
 use crate::icons::render_icon;
-use crate::theme::{
-    AccentColor, OrbitTheme, ThemeMode, UiStyle, apply_text_step, palettes::resolve_accent_tokens,
-};
+use crate::theme::{OrbitTheme, ThemeMode, apply_text_step};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsDropdownKind {
     ThemeMode,
-    UiStyle,
 }
 
 impl SettingsDropdownKind {
     const fn option_count(self) -> usize {
         match self {
             Self::ThemeMode => ThemeMode::ALL.len(),
-            Self::UiStyle => UiStyle::ALL.len(),
         }
     }
 
     const fn trigger_id(self) -> &'static str {
         match self {
             Self::ThemeMode => "settings-theme-mode-trigger",
-            Self::UiStyle => "settings-ui-style-trigger",
         }
     }
 
     const fn menu_id(self) -> &'static str {
         match self {
             Self::ThemeMode => "settings-theme-mode-menu",
-            Self::UiStyle => "settings-ui-style-menu",
         }
     }
 }
@@ -49,7 +42,6 @@ pub enum SettingsDropdownKeyAction {
     Navigated,
     Closed,
     SelectThemeMode(ThemeMode),
-    SelectUiStyle(UiStyle),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -127,11 +119,6 @@ impl SettingsDropdownState {
                         .copied()
                         .map(SettingsDropdownKeyAction::SelectThemeMode)
                         .unwrap_or(SettingsDropdownKeyAction::Closed),
-                    SettingsDropdownKind::UiStyle => UiStyle::ALL
-                        .get(idx)
-                        .copied()
-                        .map(SettingsDropdownKeyAction::SelectUiStyle)
-                        .unwrap_or(SettingsDropdownKeyAction::Closed),
                 }
             }
             _ => SettingsDropdownKeyAction::Ignored,
@@ -160,13 +147,6 @@ pub fn theme_mode_index(mode: ThemeMode) -> usize {
         .unwrap_or(0)
 }
 
-pub fn ui_style_index(style: UiStyle) -> usize {
-    UiStyle::ALL
-        .iter()
-        .position(|&candidate| candidate == style)
-        .unwrap_or(0)
-}
-
 pub struct SettingsViewModel<'a> {
     pub theme: &'a OrbitTheme,
     pub resolved_system_is_dark: bool,
@@ -182,8 +162,6 @@ pub type SettingsValueCallback<T> = Rc<dyn Fn(T, &mut Window, &mut App)>;
 
 pub struct SettingsCallbacks {
     pub on_select_theme_mode: SettingsValueCallback<ThemeMode>,
-    pub on_select_ui_style: SettingsValueCallback<UiStyle>,
-    pub on_select_accent_color: SettingsValueCallback<AccentColor>,
     pub on_toggle_experience_features: SettingsValueCallback<bool>,
     pub on_reset_appearance: SettingsActionCallback,
     pub on_toggle_dropdown: SettingsValueCallback<SettingsDropdownKind>,
@@ -192,8 +170,6 @@ pub struct SettingsCallbacks {
 
 pub fn is_appearance_modified(theme: &OrbitTheme) -> bool {
     theme.mode != ThemeMode::Dark
-        || theme.style.ui_style != UiStyle::Flat
-        || theme.accent_id != AccentColor::Blue
 }
 
 pub fn system_mode_hint(window_appearance: WindowAppearance) -> &'static str {
@@ -238,34 +214,18 @@ pub fn render_settings_view(
         .child(render_settings_section(
             theme,
             "APPEARANCE",
-            vec![
-                render_setting_row(
+            vec![render_setting_row(
+                theme,
+                "Theme Mode",
+                None,
+                "Switch between dark, light, or follow your OS appearance.",
+                render_theme_mode_dropdown(
                     theme,
-                    "Theme Mode",
-                    None,
-                    "Switch between dark noir, daylight, or follow your OS preference.",
-                    render_theme_mode_dropdown(
-                        theme,
-                        model.resolved_system_is_dark,
-                        model.dropdown,
-                        callbacks,
-                    ),
+                    model.resolved_system_is_dark,
+                    model.dropdown,
+                    callbacks,
                 ),
-                render_setting_row(
-                    theme,
-                    "UI Style",
-                    None,
-                    "Select how panels, cards, and overlays render across the workspace.",
-                    render_ui_style_dropdown(theme, model.dropdown, callbacks),
-                ),
-                render_setting_row(
-                    theme,
-                    "Accent Color",
-                    None,
-                    "Primary accent applied to active controls, selections, and focus rings.",
-                    render_accent_swatches(theme, &callbacks.on_select_accent_color),
-                ),
-            ],
+            )],
         ))
         .child(render_settings_section(
             theme,
@@ -332,7 +292,7 @@ fn render_settings_header(
                 .child(
                     apply_text_step(div(), theme.typography.size_xs)
                         .text_color(theme.text.secondary)
-                        .child("Appearance, surface aesthetics, and native shell preferences saved to ~/.orbit/config.json."),
+                        .child("Appearance and native shell preferences saved to ~/.orbit/config.json."),
                 ),
         )
         .child(
@@ -527,6 +487,12 @@ fn render_dropdown_control(
             theme.text.secondary,
         ));
 
+    #[cfg(test)]
+    let trigger = {
+        use gpui::test::TestSupportExt as _;
+        trigger.test_support()
+    };
+
     div()
         .flex()
         .flex_col()
@@ -689,114 +655,6 @@ fn render_theme_mode_dropdown(
     )
 }
 
-fn render_ui_style_dropdown(
-    theme: &OrbitTheme,
-    dropdown: &SettingsDropdownState,
-    callbacks: &SettingsCallbacks,
-) -> AnyElement {
-    let is_open = dropdown.is_open(SettingsDropdownKind::UiStyle);
-    let label = theme.style.ui_style.label().to_string();
-
-    let options = if is_open {
-        UiStyle::ALL
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(idx, style)| {
-                let on_select_style = Rc::clone(&callbacks.on_select_ui_style);
-                let trailing_meta = style.badge().map(|badge| {
-                    apply_text_step(div(), theme.typography.size_2xs)
-                        .px_1p5()
-                        .py_0p5()
-                        .rounded(theme.style.radius_control)
-                        .bg(theme.surface.bg_panel)
-                        .text_color(theme.text.secondary)
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(badge)
-                        .into_any_element()
-                });
-
-                render_dropdown_option(
-                    theme,
-                    DropdownOptionProps {
-                        id_prefix: "settings-ui-style-opt",
-                        idx,
-                        is_selected: theme.style.ui_style == style,
-                        is_highlighted: dropdown.highlighted_index == idx,
-                        leading_icon: None,
-                        label: style.label(),
-                        trailing_meta,
-                    },
-                    Rc::clone(&callbacks.on_hover_dropdown_option),
-                    Rc::new(move |window, cx| on_select_style(style, window, cx)),
-                )
-            })
-            .collect()
-    } else {
-        Vec::new()
-    };
-
-    render_dropdown_control(
-        theme,
-        SettingsDropdownKind::UiStyle,
-        is_open,
-        None,
-        label,
-        &callbacks.on_toggle_dropdown,
-        options,
-    )
-}
-
-fn render_accent_swatches(
-    theme: &OrbitTheme,
-    on_select: &SettingsValueCallback<AccentColor>,
-) -> AnyElement {
-    let mut swatch_row = div().flex().flex_row().items_center().gap_2();
-
-    for accent in AccentColor::ALL {
-        let is_selected = theme.accent_id == accent;
-        let tokens = resolve_accent_tokens(accent, theme.is_dark);
-        let callback = Rc::clone(on_select);
-        let label = accent.label();
-
-        swatch_row = swatch_row.child(
-            div()
-                .id(("settings-accent-swatch", accent as u32))
-                .w(px(24.0))
-                .h(px(24.0))
-                .rounded_full()
-                .border_2()
-                .border_color(if is_selected {
-                    theme.text.primary
-                } else {
-                    theme.border.default
-                })
-                .p(px(2.0))
-                .cursor_pointer()
-                .flex()
-                .items_center()
-                .justify_center()
-                .tooltip(move |_, cx| cx.new(|_| TextTooltip::new(label)).into())
-                .on_click(move |_, window, cx| callback(accent, window, cx))
-                .child(
-                    div()
-                        .w_full()
-                        .h_full()
-                        .rounded_full()
-                        .bg(tokens.accent)
-                        .flex()
-                        .items_center()
-                        .justify_center()
-                        .when(is_selected, |el| {
-                            el.child(render_icon(Icon::Check, px(11.0), theme.surface.bg_app))
-                        }),
-                ),
-        );
-    }
-
-    swatch_row.into_any_element()
-}
-
 fn render_experience_status_badge(theme: &OrbitTheme, enabled: bool) -> AnyElement {
     apply_text_step(div(), theme.typography.size_2xs)
         .px_1p5()
@@ -841,7 +699,7 @@ fn render_mono_value(theme: &OrbitTheme, value: String) -> AnyElement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::theme::SemanticColorsPreference;
+    use crate::theme::{AccentColor, SemanticColorsPreference, UiStyle};
 
     #[test]
     fn test_settings_view_model_modification_detection_and_labels() {
@@ -857,12 +715,17 @@ mod tests {
         let custom_mode = default_theme.with_mode(ThemeMode::Light, WindowAppearance::Dark);
         assert!(is_appearance_modified(&custom_mode));
 
-        let custom_style = default_theme.with_ui_style(UiStyle::Glass, WindowAppearance::Dark);
-        assert!(is_appearance_modified(&custom_style));
+        let system_mode = default_theme.with_mode(ThemeMode::System, WindowAppearance::Dark);
+        assert!(is_appearance_modified(&system_mode));
 
-        let custom_accent =
-            default_theme.with_accent_color(AccentColor::Emerald, WindowAppearance::Dark);
-        assert!(is_appearance_modified(&custom_accent));
+        let non_default_style_and_accent = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Glass,
+            AccentColor::Emerald,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+        assert!(!is_appearance_modified(&non_default_style_and_accent));
 
         assert_eq!(system_mode_hint(WindowAppearance::Dark), "Dark");
         assert_eq!(system_mode_hint(WindowAppearance::VibrantDark), "Dark");
@@ -878,28 +741,21 @@ mod tests {
         let mut state = SettingsDropdownState::default();
         assert!(!state.is_any_open());
         assert!(!state.is_open(SettingsDropdownKind::ThemeMode));
-        assert!(!state.is_open(SettingsDropdownKind::UiStyle));
 
         state.toggle(SettingsDropdownKind::ThemeMode, 1);
         assert!(state.is_any_open());
         assert!(state.is_open(SettingsDropdownKind::ThemeMode));
-        assert!(!state.is_open(SettingsDropdownKind::UiStyle));
         assert_eq!(state.highlighted_index, 1);
 
-        // Switching directly to UiStyle replaces open dropdown and updates highlight
-        state.toggle(SettingsDropdownKind::UiStyle, 3);
-        assert!(state.is_open(SettingsDropdownKind::UiStyle));
-        assert!(!state.is_open(SettingsDropdownKind::ThemeMode));
-        assert_eq!(state.highlighted_index, 3);
-
         // Toggling the already-open dropdown closes it
-        state.toggle(SettingsDropdownKind::UiStyle, 3);
+        state.toggle(SettingsDropdownKind::ThemeMode, 1);
         assert!(!state.is_any_open());
         assert_eq!(state.open, None);
 
         // Open again and verify explicit close()
         state.toggle(SettingsDropdownKind::ThemeMode, 2);
         assert!(state.is_open(SettingsDropdownKind::ThemeMode));
+        assert_eq!(state.highlighted_index, 2);
         state.close();
         assert_eq!(state.open, None);
         assert!(!state.is_any_open());
@@ -916,12 +772,12 @@ mod tests {
         // ThemeMode: 0 = Dark, 1 = Light, 2 = System
         state.toggle(SettingsDropdownKind::ThemeMode, 0);
         assert_eq!(
-            state.handle_key("arrowdown"),
+            state.handle_key("arrowup"),
             SettingsDropdownKeyAction::Navigated
         );
-        assert_eq!(state.highlighted_index, 1);
+        assert_eq!(state.highlighted_index, ThemeMode::ALL.len() - 1);
         assert_eq!(
-            state.handle_key("arrowup"),
+            state.handle_key("arrowdown"),
             SettingsDropdownKeyAction::Navigated
         );
         assert_eq!(state.highlighted_index, 0);
@@ -929,22 +785,10 @@ mod tests {
             state.handle_key("arrowdown"),
             SettingsDropdownKeyAction::Navigated
         );
+        assert_eq!(state.highlighted_index, 1);
         assert_eq!(
             state.handle_key("enter"),
             SettingsDropdownKeyAction::SelectThemeMode(ThemeMode::Light)
-        );
-        assert!(!state.is_any_open());
-
-        // UiStyle: 0 = Flat .. 5 = Paper; arrowup wraps to Paper
-        state.toggle(SettingsDropdownKind::UiStyle, 0);
-        assert_eq!(
-            state.handle_key("arrowup"),
-            SettingsDropdownKeyAction::Navigated
-        );
-        assert_eq!(state.highlighted_index, UiStyle::ALL.len() - 1);
-        assert_eq!(
-            state.handle_key("return"),
-            SettingsDropdownKeyAction::SelectUiStyle(UiStyle::Paper)
         );
         assert!(!state.is_any_open());
 
@@ -973,9 +817,81 @@ mod tests {
         for (expected_idx, mode) in ThemeMode::ALL.iter().copied().enumerate() {
             assert_eq!(theme_mode_index(mode), expected_idx);
         }
-        for (expected_idx, style) in UiStyle::ALL.iter().copied().enumerate() {
-            assert_eq!(ui_style_index(style), expected_idx);
+    }
+
+    #[gpui::test]
+    fn test_settings_view_hides_ui_style_and_accent_controls(cx: &mut gpui::TestAppContext) {
+        use gpui::test::TestWindowExt as _;
+
+        struct SettingsViewHarness {
+            theme: OrbitTheme,
+            dropdown: SettingsDropdownState,
         }
+
+        impl gpui::Render for SettingsViewHarness {
+            fn render(
+                &mut self,
+                _window: &mut Window,
+                _cx: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                let model = SettingsViewModel {
+                    theme: &self.theme,
+                    resolved_system_is_dark: true,
+                    enable_experience_features: false,
+                    config_file_path: Some("~/.orbit/config.json".to_string()),
+                    sidebar_status: "Expanded (220px)".to_string(),
+                    save_error: None,
+                    dropdown: &self.dropdown,
+                };
+                let callbacks = SettingsCallbacks {
+                    on_select_theme_mode: Rc::new(|_, _, _| {}),
+                    on_toggle_experience_features: Rc::new(|_, _, _| {}),
+                    on_reset_appearance: Rc::new(|_, _| {}),
+                    on_toggle_dropdown: Rc::new(|_, _, _| {}),
+                    on_hover_dropdown_option: Rc::new(|_, _, _| {}),
+                };
+                div()
+                    .p_4()
+                    .child(render_settings_view(&model, &callbacks))
+            }
+        }
+
+        let theme = OrbitTheme::resolve(
+            ThemeMode::Dark,
+            UiStyle::Flat,
+            AccentColor::Blue,
+            SemanticColorsPreference::default(),
+            WindowAppearance::Dark,
+        );
+
+        let window = cx.update(|cx| {
+            gpui::init(cx);
+            crate::theme::kit_bridge::sync_kit_theme(&theme, cx);
+            gpui::open_window(gpui::WindowOptions::default(), cx, move |_, cx| {
+                cx.new(|_| SettingsViewHarness {
+                    theme: theme.clone(),
+                    dropdown: SettingsDropdownState::default(),
+                })
+            })
+        });
+        let Ok((window, _view)) = window else {
+            panic!("failed to open test window");
+        };
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                assert!(window.try_find("settings-theme-mode-trigger").is_some());
+                assert!(window.try_find("settings-reset-appearance-btn").is_some());
+                assert!(window.try_find("settings-experience-toggle").is_some());
+                assert!(window.try_find("settings-ui-style-trigger").is_none());
+                assert!(
+                    window
+                        .try_find(("settings-accent-swatch", AccentColor::Blue as u32))
+                        .is_none()
+                );
+            });
+        });
     }
 
     #[gpui::test]
