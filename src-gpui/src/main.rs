@@ -6511,7 +6511,9 @@ fn main() -> std::process::ExitCode {
     let open_failed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let open_failed_for_run = std::sync::Arc::clone(&open_failed);
 
-    gpui::application().run(move |cx: &mut App| {
+    gpui::application()
+        .with_assets(gpui::assets::Assets)
+        .run(move |cx: &mut App| {
         gpui::init(cx);
         views::edit::register_yaml_language_config(cx);
 
@@ -12997,5 +12999,25 @@ mod tests {
             );
             assert!(shell.drawer.is_open);
         });
+    }
+
+    #[test]
+    fn test_gpui_kit_assets_provides_table_sort_icons() {
+        use gpui::AssetSource as _;
+        use gpui::component::{IconName, IconNamed as _};
+
+        let assets = gpui::assets::Assets;
+        for icon in [
+            IconName::ChevronsUpDown,
+            IconName::SortAscending,
+            IconName::SortDescending,
+        ] {
+            let path = icon.path();
+            let bytes = assets
+                .load(path.as_ref())
+                .expect("asset load should not error")
+                .expect("table sort icon SVG should exist in gpui::assets::Assets");
+            assert!(!bytes.is_empty());
+        }
     }
 }
