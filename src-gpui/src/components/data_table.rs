@@ -4,10 +4,13 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui::{
-    AnyElement, App, ClickEvent, CursorStyle, Div, ElementId, Font, FontWeight,
-    InteractiveElement, IntoElement, MouseButton, MouseDownEvent, Pixels, Rgba, SharedString,
-    StatefulInteractiveElement, Styled, UniformListScrollHandle, Window, div, prelude::*, px,
-    uniform_list,
+    AnyElement, App, ClickEvent, CursorStyle, Div, ElementId, Entity, Font, FontWeight,
+    InteractiveElement, IntoElement, MouseButton, MouseDownEvent, Pixels, RenderOnce, Rgba,
+    SharedString, StatefulInteractiveElement, Styled, TextAlign, UniformListScrollHandle, Window,
+    div, prelude::*, px, uniform_list,
+};
+use gpui::component::table::{
+    Column as KitColumn, ColumnSort, DataTable as KitDataTable, TableDelegate, TableState,
 };
 use lucide_icons::Icon;
 use orbit_core::config::{
@@ -163,6 +166,264 @@ impl TableColumn {
     }
 }
 
+pub fn column_sort_from_state(col: &TableColumn, sort: Option<&SortState>) -> Option<ColumnSort> {
+    if !col.sortable {
+        return None;
+    }
+    match sort {
+        Some(active) if active.column_id == col.id.as_ref() => Some(match active.direction {
+            SortDirection::Asc => ColumnSort::Ascending,
+            SortDirection::Desc => ColumnSort::Descending,
+        }),
+        _ => Some(ColumnSort::Default),
+    }
+}
+
+pub fn sort_direction_from_kit(sort: ColumnSort) -> Option<SortDirection> {
+    match sort {
+        ColumnSort::Ascending => Some(SortDirection::Asc),
+        ColumnSort::Descending => Some(SortDirection::Desc),
+        ColumnSort::Default => None,
+    }
+}
+
+pub fn to_kit_column(col: &TableColumn, state: &DataTableState) -> KitColumn {
+    let min_w = match col.width {
+        ColumnWidth::Flex { min_width, .. } => {
+            f32::from(min_width).clamp(col.min_resize_width(), MAX_COLUMN_WIDTH)
+        }
+        ColumnWidth::Fixed(_) => col.min_resize_width(),
+    };
+    let width = match state.resolve_column_width(col) {
+        ColumnWidth::Fixed(w) => clamp_column_width(f32::from(w), min_w),
+        ColumnWidth::Flex { min_width, .. } => {
+            clamp_column_width(f32::from(min_width).max(120.0), min_w)
+        }
+    };
+
+    let mut kit_col = KitColumn::new(col.id.clone(), col.header.clone())
+        .width(px(width))
+        .min_width(px(min_w))
+        .max_width(px(MAX_COLUMN_WIDTH))
+        .resizable(true)
+        .movable(false);
+
+    kit_col.align = match col.align {
+        ColumnAlign::Left => TextAlign::Left,
+        ColumnAlign::Right => TextAlign::Right,
+        ColumnAlign::Center => TextAlign::Center,
+    };
+    kit_col.sort = column_sort_from_state(col, state.sort.as_ref());
+    kit_col
+}
+
+pub type KitSortCallback = Rc<dyn Fn(SharedString, Option<SortDirection>, &mut Window, &mut App)>;
+pub type RowKeyFn = Rc<dyn Fn(usize) -> String>;
+pub type RenderCellFn = Rc<dyn Fn(usize, &TableColumn, &OrbitTheme) -> AnyElement>;
+
+pub struct OrbitTableDelegate {
+    pub columns: Vec<TableColumn>,
+    pub kit_columns: Vec<KitColumn>,
+    pub row_count: usize,
+    pub row_offset: usize,
+    pub row_key: RowKeyFn,
+    pub render_cell: RenderCellFn,
+    pub selected_row_key: Option<String>,
+    pub sort: Option<SortState>,
+    pub theme: OrbitTheme,
+    pub on_sort: Option<KitSortCallback>,
+    pub on_row_click: Option<RowClickCallback>,
+    pub on_row_context_menu: Option<RowContextMenuCallback>,
+    pub on_row_quick_yaml: Option<RowClickCallback>,
+}
+
+impl OrbitTableDelegate {
+    pub fn new(
+        columns: Vec<TableColumn>,
+        row_count: usize,
+        row_offset: usize,
+        row_key: RowKeyFn,
+        render_cell: RenderCellFn,
+        state: &DataTableState,
+        theme: OrbitTheme,
+    ) -> Self {
+        let kit_columns = columns.iter().map(|col| to_kit_column(col, state)).collect();
+        Self {
+            columns,
+            kit_columns,
+            row_count,
+            row_offset,
+            row_key,
+            render_cell,
+            selected_row_key: state.selected_row_key.clone(),
+            sort: state.sort.clone(),
+            theme,
+            on_sort: None,
+            on_row_click: None,
+            on_row_context_menu: None,
+            on_row_quick_yaml: None,
+        }
+    }
+
+    pub fn with_on_sort(mut self, on_sort: KitSortCallback) -> Self {
+        self.on_sort = Some(on_sort);
+        self
+    }
+
+    pub fn with_on_row_click(mut self, on_row_click: Option<RowClickCallback>) -> Self {
+        self.on_row_click = on_row_click;
+        self
+    }
+
+    pub fn with_on_row_context_menu(
+        mut self,
+        on_row_context_menu: Option<RowContextMenuCallback>,
+    ) -> Self {
+        self.on_row_context_menu = on_row_context_menu;
+        self
+    }
+
+    pub fn with_on_row_quick_yaml(mut self, on_row_quick_yaml: Option<RowClickCallback>) -> Self {
+        self.on_row_quick_yaml = on_row_quick_yaml;
+        self
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn sync_from(
+        &mut self,
+        columns: Vec<TableColumn>,
+        row_count: usize,
+        row_offset: usize,
+        row_key: RowKeyFn,
+        render_cell: RenderCellFn,
+        selected_row_key: Option<String>,
+        sort: Option<SortState>,
+        kit_columns: Vec<KitColumn>,
+        theme: OrbitTheme,
+    ) {
+        self.kit_columns = kit_columns;
+        self.columns = columns;
+        self.row_count = row_count;
+        self.row_offset = row_offset;
+        self.row_key = row_key;
+        self.render_cell = render_cell;
+        self.selected_row_key = selected_row_key;
+        self.sort = sort;
+        self.theme = theme;
+    }
+
+    pub fn row_key_at(&self, local_row_ix: usize) -> Option<(usize, SharedString)> {
+        if local_row_ix >= self.row_count {
+            return None;
+        }
+        let abs_row_ix = self.row_offset + local_row_ix;
+        Some((abs_row_ix, SharedString::from((self.row_key)(abs_row_ix))))
+    }
+}
+
+impl TableDelegate for OrbitTableDelegate {
+    fn columns_count(&self, _cx: &App) -> usize {
+        self.kit_columns.len()
+    }
+
+    fn rows_count(&self, _cx: &App) -> usize {
+        self.row_count
+    }
+
+    fn column(&self, col_ix: usize, _cx: &App) -> KitColumn {
+        self.kit_columns.get(col_ix).cloned().unwrap_or_default()
+    }
+
+    fn render_th(
+        &mut self,
+        col_ix: usize,
+        _window: &mut Window,
+        _cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let Some(col) = self.columns.get(col_ix) else {
+            return div().into_any_element();
+        };
+        let is_active = self
+            .sort
+            .as_ref()
+            .is_some_and(|s| s.column_id == col.id.as_ref());
+        let header_style = resolve_table_header_style(is_active, &self.theme);
+        apply_column_alignment(div().w_full().min_w(px(0.0)), col.align)
+            .flex()
+            .items_center()
+            .text_size(self.theme.typography.size_xs.font_size)
+            .line_height(self.theme.typography.size_xs.line_height)
+            .text_color(header_style.text_color)
+            .font(self.theme.typography.ui_font(header_style.font_weight))
+            .truncate()
+            .child(col.header.clone())
+            .into_any_element()
+    }
+
+    fn render_td(
+        &mut self,
+        row_ix: usize,
+        col_ix: usize,
+        _window: &mut Window,
+        _cx: &mut Context<TableState<Self>>,
+    ) -> impl IntoElement {
+        let Some(col) = self.columns.get(col_ix) else {
+            return div().into_any_element();
+        };
+        let abs_row_ix = self.row_offset + row_ix;
+        let content = (self.render_cell)(abs_row_ix, col, &self.theme);
+        let cell_font = resolve_table_cell_font(col, &self.theme);
+        apply_column_alignment(div().w_full().min_w(px(0.0)), col.align)
+            .h_full()
+            .flex()
+            .items_center()
+            .overflow_hidden()
+            .text_size(self.theme.typography.size_xs.font_size)
+            .line_height(self.theme.typography.size_xs.line_height)
+            .text_color(self.theme.text.primary)
+            .when_some(cell_font, |el, font| el.font(font))
+            .child(content)
+            .into_any_element()
+    }
+
+    fn perform_sort(
+        &mut self,
+        col_ix: usize,
+        sort: ColumnSort,
+        window: &mut Window,
+        cx: &mut Context<TableState<Self>>,
+    ) {
+        let Some(col_id) = self.columns.get(col_ix).map(|c| c.id.clone()) else {
+            return;
+        };
+        let mapped = sort_direction_from_kit(sort);
+        self.sort = mapped.map(|direction| SortState {
+            column_id: col_id.to_string(),
+            direction,
+        });
+        for (idx, kit_col) in self.kit_columns.iter_mut().enumerate() {
+            if let Some(col) = self.columns.get(idx) {
+                kit_col.sort = column_sort_from_state(col, self.sort.as_ref());
+            }
+        }
+        if let Some(on_sort) = self.on_sort.clone() {
+            (on_sort)(col_id, mapped, window, cx);
+        }
+    }
+
+    fn fit_column(
+        &mut self,
+        col_ix: usize,
+        _window: &mut Window,
+        _cx: &mut Context<TableState<Self>>,
+    ) -> Option<Pixels> {
+        let kit_col = self.kit_columns.get(col_ix)?;
+        let min_w = f32::from(kit_col.min_width);
+        let target = clamp_column_width(min_w.max(120.0), min_w);
+        Some(px(target))
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PaginationMode {
     /// Slices `0..row_count` locally using `first` and `page_size`.
@@ -271,6 +532,7 @@ pub struct DataTableState {
     pub config_popover_open: bool,
     pub column_widths: HashMap<String, f32>,
     pub active_resize: Option<ActiveColumnResize>,
+    pub kit_table: Option<Entity<TableState<OrbitTableDelegate>>>,
 }
 
 impl Default for DataTableState {
@@ -294,6 +556,7 @@ impl DataTableState {
             config_popover_open: false,
             column_widths: HashMap::new(),
             active_resize: None,
+            kit_table: None,
         }
     }
 
@@ -513,6 +776,30 @@ impl DataTableState {
     pub fn reset_column_widths(&mut self) {
         self.column_widths.clear();
         self.active_resize = None;
+    }
+
+    pub fn apply_kit_column_widths(&mut self, columns: &[TableColumn], widths: &[Pixels]) -> bool {
+        let mut changed = false;
+        for (col, width) in columns.iter().zip(widths.iter()) {
+            let min_w = match col.width {
+                ColumnWidth::Flex { min_width, .. } => {
+                    f32::from(min_width).clamp(col.min_resize_width(), MAX_COLUMN_WIDTH)
+                }
+                ColumnWidth::Fixed(_) => col.min_resize_width(),
+            };
+            let clamped = clamp_column_width(f32::from(*width), min_w);
+            let prev = self.column_widths.get(col.id.as_ref()).copied();
+            if prev.is_none_or(|p| (p - clamped).abs() > 0.5) {
+                self.column_widths.insert(col.id.to_string(), clamped);
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    pub fn sync_selected_row(&self, row_keys: &[String]) -> Option<usize> {
+        let selected = self.selected_row_key.as_deref()?;
+        row_keys.iter().position(|k| k == selected)
     }
 
     pub fn hydrate_from_preferences(
@@ -2035,6 +2322,75 @@ where
         .into_any_element()
 }
 
+#[derive(IntoElement)]
+struct KitDataTableSync {
+    entity: Entity<TableState<OrbitTableDelegate>>,
+    columns: Vec<TableColumn>,
+    kit_columns: Vec<KitColumn>,
+    row_count: usize,
+    row_offset: usize,
+    row_key: RowKeyFn,
+    render_cell: RenderCellFn,
+    selected_row_key: Option<String>,
+    sort: Option<SortState>,
+    theme: OrbitTheme,
+    on_sort: Option<SortCallback>,
+    on_row_click: Option<RowClickCallback>,
+    on_row_context_menu: Option<RowContextMenuCallback>,
+    on_row_quick_yaml: Option<RowClickCallback>,
+}
+
+impl RenderOnce for KitDataTableSync {
+    fn render(self, _window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let entity = self.entity.clone();
+        entity.update(cx, |table, cx| {
+            let needs_refresh = table.delegate().kit_columns.len() != self.kit_columns.len()
+                || table
+                    .delegate()
+                    .kit_columns
+                    .iter()
+                    .zip(self.kit_columns.iter())
+                    .any(|(prev, next)| {
+                        prev.key != next.key || prev.width != next.width || prev.sort != next.sort
+                    });
+
+            let bridged_sort = self.on_sort.clone().map(|legacy_cb| -> KitSortCallback {
+                Rc::new(move |col_id, _dir, window, cx| {
+                    let event = ClickEvent::Keyboard(gpui::KeyboardClickEvent::default());
+                    (legacy_cb)(col_id, &event, window, cx);
+                })
+            });
+
+            let delegate = table.delegate_mut();
+            delegate.sync_from(
+                self.columns,
+                self.row_count,
+                self.row_offset,
+                self.row_key,
+                self.render_cell,
+                self.selected_row_key,
+                self.sort,
+                self.kit_columns,
+                self.theme,
+            );
+            delegate.on_sort = bridged_sort;
+            delegate.on_row_click = self.on_row_click;
+            delegate.on_row_context_menu = self.on_row_context_menu;
+            delegate.on_row_quick_yaml = self.on_row_quick_yaml;
+
+            if needs_refresh {
+                table.refresh(cx);
+            }
+        });
+
+        div()
+            .flex_1()
+            .w_full()
+            .min_h(px(0.0))
+            .child(KitDataTable::new(&entity).stripe(false).bordered(true))
+    }
+}
+
 pub fn render_data_table<K, C>(
     table_id: impl Into<SharedString>,
     columns: &[TableColumn],
@@ -2049,14 +2405,6 @@ where
 {
     let table_id_str = table_id.into();
     let visible_cols = state.resolved_visible_columns(columns);
-    let header = render_table_header(
-        table_id_str.as_ref(),
-        &visible_cols,
-        state,
-        theme,
-        callbacks.on_sort.clone(),
-        callbacks.on_column_resize_start.clone(),
-    );
 
     let page_slice = if state.pagination.enabled {
         Some(paginate_rows_range(
@@ -2081,6 +2429,24 @@ where
     };
 
     let body_mode = state.body_mode(render_count);
+    let uses_kit_table = state.kit_table.is_some()
+        && matches!(
+            body_mode,
+            TableBodyMode::Rows | TableBodyMode::RefreshingRows
+        );
+    let header = if uses_kit_table {
+        None
+    } else {
+        Some(render_table_header(
+            table_id_str.as_ref(),
+            &visible_cols,
+            state,
+            theme,
+            callbacks.on_sort.clone(),
+            callbacks.on_column_resize_start.clone(),
+        ))
+    };
+
     let body = match body_mode {
         TableBodyMode::LoadingSkeleton => render_loading_skeleton(
             table_id_str.as_ref(),
@@ -2095,210 +2461,258 @@ where
             theme,
         ),
         TableBodyMode::Rows | TableBodyMode::RefreshingRows => {
-            let cols: Rc<[TableColumn]> = Rc::from(visible_cols);
-            let row_key_fn = Rc::new(callbacks.row_key);
-            let render_cell_fn = Rc::new(callbacks.render_cell);
-            let on_row_click = callbacks.on_row_click.clone();
-            let on_row_context_menu = callbacks.on_row_context_menu.clone();
-            let on_row_quick_yaml = callbacks.on_row_quick_yaml.clone();
-            let hover_actions = resolve_row_hover_actions(
-                on_row_quick_yaml.is_some(),
-                on_row_context_menu.is_some(),
-            );
-            let selected_key = state.selected_row_key.clone();
-            let theme_snapshot = theme.clone();
-            let list_id = SharedString::from(format!("{table_id_str}-rows"));
-            let row_prefix = SharedString::from(format!("{table_id_str}-row"));
-            let row_group_prefix = SharedString::from(format!("{table_id_str}-row-grp"));
-            let yaml_btn_prefix = SharedString::from(format!("{table_id_str}-row-yaml"));
-            let more_btn_prefix = SharedString::from(format!("{table_id_str}-row-more"));
+            if let Some(kit_table) = state.kit_table.clone() {
+                let kit_columns = visible_cols
+                    .iter()
+                    .map(|col| to_kit_column(col, state))
+                    .collect();
+                KitDataTableSync {
+                    entity: kit_table,
+                    columns: visible_cols,
+                    kit_columns,
+                    row_count: render_count,
+                    row_offset,
+                    row_key: Rc::new(callbacks.row_key),
+                    render_cell: Rc::new(callbacks.render_cell),
+                    selected_row_key: state.selected_row_key.clone(),
+                    sort: state.sort.clone(),
+                    theme: theme.clone(),
+                    on_sort: callbacks.on_sort.clone(),
+                    on_row_click: callbacks.on_row_click.clone(),
+                    on_row_context_menu: callbacks.on_row_context_menu.clone(),
+                    on_row_quick_yaml: callbacks.on_row_quick_yaml.clone(),
+                }
+                .into_any_element()
+            } else {
+                let cols: Rc<[TableColumn]> = Rc::from(visible_cols);
+                let row_key_fn = Rc::new(callbacks.row_key);
+                let render_cell_fn = Rc::new(callbacks.render_cell);
+                let on_row_click = callbacks.on_row_click.clone();
+                let on_row_context_menu = callbacks.on_row_context_menu.clone();
+                let on_row_quick_yaml = callbacks.on_row_quick_yaml.clone();
+                let hover_actions = resolve_row_hover_actions(
+                    on_row_quick_yaml.is_some(),
+                    on_row_context_menu.is_some(),
+                );
+                let selected_key = state.selected_row_key.clone();
+                let theme_snapshot = theme.clone();
+                let list_id = SharedString::from(format!("{table_id_str}-rows"));
+                let row_prefix = SharedString::from(format!("{table_id_str}-row"));
+                let row_group_prefix = SharedString::from(format!("{table_id_str}-row-grp"));
+                let yaml_btn_prefix = SharedString::from(format!("{table_id_str}-row-yaml"));
+                let more_btn_prefix = SharedString::from(format!("{table_id_str}-row-more"));
 
-            uniform_list(
-                ElementId::Name(list_id),
-                render_count,
-                move |range: Range<usize>, _window: &mut Window, _cx: &mut App| {
-                    let mut items = Vec::with_capacity(range.len());
-                    let surface = resolve_data_table_surface_style(&theme_snapshot);
-                    let hover_bg = theme_snapshot.surface.bg_hover;
-                    let selected_bg = theme_snapshot.accent.soft;
-                    let border_subtle = surface.row_separator;
-                    let accent_bar = theme_snapshot.accent.accent;
+                uniform_list(
+                    ElementId::Name(list_id),
+                    render_count,
+                    move |range: Range<usize>, _window: &mut Window, _cx: &mut App| {
+                        let mut items = Vec::with_capacity(range.len());
+                        let surface = resolve_data_table_surface_style(&theme_snapshot);
+                        let hover_bg = theme_snapshot.surface.bg_hover;
+                        let selected_bg = theme_snapshot.accent.soft;
+                        let border_subtle = surface.row_separator;
+                        let accent_bar = theme_snapshot.accent.accent;
 
-                    for local_idx in range {
-                        let row_idx = row_offset + local_idx;
-                        let key = (row_key_fn)(row_idx);
-                        let is_selected = selected_key.as_deref() == Some(key.as_str());
-                        let key_shared = SharedString::from(key);
-                        let row_group = SharedString::from(format!("{row_group_prefix}-{row_idx}"));
+                        for local_idx in range {
+                            let row_idx = row_offset + local_idx;
+                            let key = (row_key_fn)(row_idx);
+                            let is_selected = selected_key.as_deref() == Some(key.as_str());
+                            let key_shared = SharedString::from(key);
+                            let row_group =
+                                SharedString::from(format!("{row_group_prefix}-{row_idx}"));
 
-                        let mut row_el = div()
-                            .id(ElementId::NamedInteger(row_prefix.clone(), row_idx as u64))
-                            .group(row_group.clone())
-                            .relative()
-                            .h(px(TABLE_ROW_HEIGHT))
-                            .w_full()
-                            .flex()
-                            .items_center()
-                            .border_b_1()
-                            .border_color(border_subtle)
-                            .cursor_pointer()
-                            .when(is_selected, |el| el.bg(selected_bg))
-                            .hover(move |style| {
-                                style.bg(if is_selected { selected_bg } else { hover_bg })
-                            })
-                            .when(is_selected, |el| {
-                                el.child(
-                                    div()
-                                        .absolute()
-                                        .left_0()
-                                        .top_0()
-                                        .bottom_0()
-                                        .w(px(2.0))
-                                        .bg(accent_bar),
-                                )
-                            });
-
-                        if let Some(click_cb) = on_row_click.clone() {
-                            let row_key_for_click = key_shared.clone();
-                            row_el = row_el
-                                .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                                    cx.stop_propagation();
-                                })
-                                .on_click(move |event, window, cx| {
-                                    click_cb(row_idx, row_key_for_click.clone(), event, window, cx);
-                                });
-                        }
-
-                        if let Some(ctx_cb) = on_row_context_menu.clone() {
-                            let row_key_for_ctx = key_shared.clone();
-                            row_el = row_el.on_mouse_down(
-                                MouseButton::Right,
-                                move |event, window, cx| {
-                                    cx.stop_propagation();
-                                    ctx_cb(row_idx, row_key_for_ctx.clone(), event, window, cx);
-                                },
-                            );
-                        }
-
-                        for col in cols.iter() {
-                            let cell_content = (render_cell_fn)(row_idx, col, &theme_snapshot);
-                            row_el =
-                                row_el.child(render_table_cell(col, &theme_snapshot, cell_content));
-                        }
-
-                        if hover_actions.is_visible() {
-                            let pill_bg = theme_snapshot.surface.bg_hover;
-                            let pill_border = theme_snapshot.border.default;
-                            let btn_hover_bg = theme_snapshot.surface.bg_active;
-                            let icon_color = theme_snapshot.text.secondary;
-
-                            let mut pill = div()
-                                .h(px(24.0))
-                                .px_1()
-                                .gap_1()
+                            let mut row_el = div()
+                                .id(ElementId::NamedInteger(row_prefix.clone(), row_idx as u64))
+                                .group(row_group.clone())
+                                .relative()
+                                .h(px(TABLE_ROW_HEIGHT))
+                                .w_full()
                                 .flex()
                                 .items_center()
-                                .rounded(theme_snapshot.style.radius_control)
-                                .bg(pill_bg)
-                                .border_1()
-                                .border_color(pill_border)
-                                .opacity(0.0)
-                                .group_hover(row_group, |s| s.opacity(1.0));
+                                .border_b_1()
+                                .border_color(border_subtle)
+                                .cursor_pointer()
+                                .when(is_selected, |el| el.bg(selected_bg))
+                                .hover(move |style| {
+                                    style.bg(if is_selected { selected_bg } else { hover_bg })
+                                })
+                                .when(is_selected, |el| {
+                                    el.child(
+                                        div()
+                                            .absolute()
+                                            .left_0()
+                                            .top_0()
+                                            .bottom_0()
+                                            .w(px(2.0))
+                                            .bg(accent_bar),
+                                    )
+                                });
 
-                            if let Some(yaml_cb) = on_row_quick_yaml.clone() {
-                                let row_key_for_yaml = key_shared.clone();
-                                pill = pill.child(
-                                    div()
-                                        .id(ElementId::NamedInteger(
-                                            yaml_btn_prefix.clone(),
-                                            row_idx as u64,
-                                        ))
-                                        .w(px(20.0))
-                                        .h(px(20.0))
-                                        .rounded(theme_snapshot.style.radius_control)
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .cursor_pointer()
-                                        .hover(move |s| s.bg(btn_hover_bg))
-                                        .tooltip(|_window, cx| {
-                                            cx.new(|_| TextTooltip::new("View YAML")).into()
-                                        })
-                                        .on_mouse_down(MouseButton::Left, |_, _, cx| {
-                                            cx.stop_propagation();
-                                        })
-                                        .on_click(move |event, window, cx| {
-                                            cx.stop_propagation();
-                                            yaml_cb(
-                                                row_idx,
-                                                row_key_for_yaml.clone(),
-                                                event,
-                                                window,
-                                                cx,
-                                            );
-                                        })
-                                        .child(render_icon(Icon::FileCode, px(13.0), icon_color)),
-                                );
+                            if let Some(click_cb) = on_row_click.clone() {
+                                let row_key_for_click = key_shared.clone();
+                                row_el = row_el
+                                    .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                                        cx.stop_propagation();
+                                    })
+                                    .on_click(move |event, window, cx| {
+                                        click_cb(
+                                            row_idx,
+                                            row_key_for_click.clone(),
+                                            event,
+                                            window,
+                                            cx,
+                                        );
+                                    });
                             }
 
                             if let Some(ctx_cb) = on_row_context_menu.clone() {
-                                let row_key_for_more = key_shared.clone();
-                                pill = pill.child(
-                                    div()
-                                        .id(ElementId::NamedInteger(
-                                            more_btn_prefix.clone(),
-                                            row_idx as u64,
-                                        ))
-                                        .w(px(20.0))
-                                        .h(px(20.0))
-                                        .rounded(theme_snapshot.style.radius_control)
-                                        .flex()
-                                        .items_center()
-                                        .justify_center()
-                                        .cursor_pointer()
-                                        .hover(move |s| s.bg(btn_hover_bg))
-                                        .tooltip(|_window, cx| {
-                                            cx.new(|_| TextTooltip::new("More actions")).into()
-                                        })
-                                        .on_mouse_down(
-                                            MouseButton::Left,
-                                            move |event, window, cx| {
+                                let row_key_for_ctx = key_shared.clone();
+                                row_el = row_el.on_mouse_down(
+                                    MouseButton::Right,
+                                    move |event, window, cx| {
+                                        cx.stop_propagation();
+                                        ctx_cb(
+                                            row_idx,
+                                            row_key_for_ctx.clone(),
+                                            event,
+                                            window,
+                                            cx,
+                                        );
+                                    },
+                                );
+                            }
+
+                            for col in cols.iter() {
+                                let cell_content = (render_cell_fn)(row_idx, col, &theme_snapshot);
+                                row_el = row_el.child(render_table_cell(
+                                    col,
+                                    &theme_snapshot,
+                                    cell_content,
+                                ));
+                            }
+
+                            if hover_actions.is_visible() {
+                                let pill_bg = theme_snapshot.surface.bg_hover;
+                                let pill_border = theme_snapshot.border.default;
+                                let btn_hover_bg = theme_snapshot.surface.bg_active;
+                                let icon_color = theme_snapshot.text.secondary;
+
+                                let mut pill = div()
+                                    .h(px(24.0))
+                                    .px_1()
+                                    .gap_1()
+                                    .flex()
+                                    .items_center()
+                                    .rounded(theme_snapshot.style.radius_control)
+                                    .bg(pill_bg)
+                                    .border_1()
+                                    .border_color(pill_border)
+                                    .opacity(0.0)
+                                    .group_hover(row_group, |s| s.opacity(1.0));
+
+                                if let Some(yaml_cb) = on_row_quick_yaml.clone() {
+                                    let row_key_for_yaml = key_shared.clone();
+                                    pill = pill.child(
+                                        div()
+                                            .id(ElementId::NamedInteger(
+                                                yaml_btn_prefix.clone(),
+                                                row_idx as u64,
+                                            ))
+                                            .w(px(20.0))
+                                            .h(px(20.0))
+                                            .rounded(theme_snapshot.style.radius_control)
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .cursor_pointer()
+                                            .hover(move |s| s.bg(btn_hover_bg))
+                                            .tooltip(|_window, cx| {
+                                                cx.new(|_| TextTooltip::new("View YAML")).into()
+                                            })
+                                            .on_mouse_down(MouseButton::Left, |_, _, cx| {
                                                 cx.stop_propagation();
-                                                ctx_cb(
+                                            })
+                                            .on_click(move |event, window, cx| {
+                                                cx.stop_propagation();
+                                                yaml_cb(
                                                     row_idx,
-                                                    row_key_for_more.clone(),
+                                                    row_key_for_yaml.clone(),
                                                     event,
                                                     window,
                                                     cx,
                                                 );
-                                            },
-                                        )
-                                        .child(render_icon(Icon::Ellipsis, px(13.0), icon_color)),
+                                            })
+                                            .child(render_icon(
+                                                Icon::FileCode,
+                                                px(13.0),
+                                                icon_color,
+                                            )),
+                                    );
+                                }
+
+                                if let Some(ctx_cb) = on_row_context_menu.clone() {
+                                    let row_key_for_more = key_shared.clone();
+                                    pill = pill.child(
+                                        div()
+                                            .id(ElementId::NamedInteger(
+                                                more_btn_prefix.clone(),
+                                                row_idx as u64,
+                                            ))
+                                            .w(px(20.0))
+                                            .h(px(20.0))
+                                            .rounded(theme_snapshot.style.radius_control)
+                                            .flex()
+                                            .items_center()
+                                            .justify_center()
+                                            .cursor_pointer()
+                                            .hover(move |s| s.bg(btn_hover_bg))
+                                            .tooltip(|_window, cx| {
+                                                cx.new(|_| TextTooltip::new("More actions")).into()
+                                            })
+                                            .on_mouse_down(
+                                                MouseButton::Left,
+                                                move |event, window, cx| {
+                                                    cx.stop_propagation();
+                                                    ctx_cb(
+                                                        row_idx,
+                                                        row_key_for_more.clone(),
+                                                        event,
+                                                        window,
+                                                        cx,
+                                                    );
+                                                },
+                                            )
+                                            .child(render_icon(
+                                                Icon::Ellipsis,
+                                                px(13.0),
+                                                icon_color,
+                                            )),
+                                    );
+                                }
+
+                                row_el = row_el.child(
+                                    div()
+                                        .absolute()
+                                        .right_2()
+                                        .top_0()
+                                        .bottom_0()
+                                        .flex()
+                                        .items_center()
+                                        .child(pill),
                                 );
                             }
 
-                            row_el = row_el.child(
-                                div()
-                                    .absolute()
-                                    .right_2()
-                                    .top_0()
-                                    .bottom_0()
-                                    .flex()
-                                    .items_center()
-                                    .child(pill),
-                            );
+                            items.push(row_el);
                         }
-
-                        items.push(row_el);
-                    }
-                    items
-                },
-            )
-            .track_scroll(&state.scroll_handle)
-            .flex_1()
-            .w_full()
-            .min_h(px(0.0))
-            .into_any_element()
+                        items
+                    },
+                )
+                .track_scroll(&state.scroll_handle)
+                .flex_1()
+                .w_full()
+                .min_h(px(0.0))
+                .into_any_element()
+            }
         }
     };
 
@@ -2338,7 +2752,7 @@ where
                     .bg(theme.accent.accent),
             )
         })
-        .child(header)
+        .when_some(header, |el, header| el.child(header))
         .child(body)
         .when_some(paginator, |el, paginator| el.child(paginator))
         .into_any_element()
@@ -3105,5 +3519,152 @@ mod tests {
         assert_eq!(resolved.len(), 2);
         assert_eq!(resolved[0].width, ColumnWidth::Fixed(px(260.0)));
         assert_eq!(resolved[1].width, ColumnWidth::Fixed(px(80.0)));
+    }
+
+    #[test]
+    fn test_to_kit_column_maps_width_bounds_alignment_and_sort() {
+        let col = TableColumn::new("cpu", "CPU")
+            .flex_width(1.0, px(80.0))
+            .right_numeric();
+        let mut state = DataTableState::new();
+        state.column_widths.insert("cpu".to_string(), 140.0);
+        state.sort = Some(SortState {
+            column_id: "cpu".to_string(),
+            direction: SortDirection::Desc,
+        });
+
+        let kit_col = to_kit_column(&col, &state);
+        assert_eq!(kit_col.key.as_ref(), "cpu");
+        assert_eq!(kit_col.name.as_ref(), "CPU");
+        assert_eq!(kit_col.width, px(140.0));
+        assert_eq!(kit_col.min_width, px(80.0));
+        assert_eq!(kit_col.max_width, px(MAX_COLUMN_WIDTH));
+        assert_eq!(kit_col.align, gpui::TextAlign::Right);
+        assert_eq!(kit_col.sort, Some(gpui::component::table::ColumnSort::Descending));
+        assert!(kit_col.resizable);
+        assert!(!kit_col.movable);
+
+        let non_sortable = TableColumn::new("actions", "").sortable(false);
+        assert_eq!(column_sort_from_state(&non_sortable, state.sort.as_ref()), None);
+        assert_eq!(
+            sort_direction_from_kit(gpui::component::table::ColumnSort::Ascending),
+            Some(SortDirection::Asc)
+        );
+        assert_eq!(
+            sort_direction_from_kit(gpui::component::table::ColumnSort::Descending),
+            Some(SortDirection::Desc)
+        );
+        assert_eq!(
+            sort_direction_from_kit(gpui::component::table::ColumnSort::Default),
+            None
+        );
+    }
+
+    #[gpui::test]
+    fn test_orbit_table_delegate_counts_columns_rows_and_sorts(cx: &mut gpui::TestAppContext) {
+        type SortSpy = Rc<std::cell::RefCell<Option<(String, Option<SortDirection>)>>>;
+        let sort_spy: SortSpy = Rc::new(std::cell::RefCell::new(None));
+        let sort_spy_clone = sort_spy.clone();
+
+        let cols = vec![
+            TableColumn::new("name", "Name").flex_width(2.0, px(120.0)),
+            TableColumn::new("status", "Status").fixed_width(px(100.0)),
+            TableColumn::new("age", "Age").right_numeric(),
+        ];
+        let state = DataTableState::new();
+        let theme = OrbitTheme::from_config(
+            &orbit_core::config::OrbitConfig::default(),
+            gpui::WindowAppearance::Dark,
+        );
+
+        let delegate = OrbitTableDelegate::new(
+            cols,
+            5,
+            2,
+            Rc::new(|idx| format!("row-{idx}")),
+            Rc::new(|row_idx, col, _| div().child(format!("{row_idx}:{}", col.id)).into_any_element()),
+            &state,
+            theme,
+        )
+        .with_on_sort(Rc::new(move |col_id, dir, _window, _cx| {
+            *sort_spy_clone.borrow_mut() = Some((col_id.to_string(), dir));
+        }));
+
+        let window_handle = cx.open_window(Default::default(), |_, _| gpui::Empty);
+
+        let table_entity = window_handle
+            .update(cx, |_, window, cx| {
+                cx.new(|cx| TableState::new(delegate, window, cx))
+            })
+            .expect("table entity should be created");
+
+        window_handle
+            .update(cx, |_, window, cx| {
+                table_entity.update(cx, |table, cx| {
+                    assert_eq!(table.delegate().columns_count(cx), 3);
+                    assert_eq!(table.delegate().rows_count(cx), 5);
+                    assert_eq!(table.delegate().column(1, cx).key.as_ref(), "status");
+
+                    let fitted = table.delegate_mut().fit_column(0, window, cx);
+                    assert!(fitted.is_some());
+                    let fitted_px = f32::from(fitted.unwrap());
+                    assert!((120.0..=MAX_COLUMN_WIDTH).contains(&fitted_px));
+
+                    table
+                        .delegate_mut()
+                        .perform_sort(2, ColumnSort::Descending, window, cx);
+                });
+            })
+            .expect("table update should succeed");
+
+        assert_eq!(
+            *sort_spy.borrow(),
+            Some(("age".to_string(), Some(SortDirection::Desc)))
+        );
+    }
+
+    #[test]
+    fn test_apply_column_widths_changed_clamps_and_persists() {
+        let cols = vec![
+            TableColumn::new("name", "Name").fixed_width(px(120.0)),
+            TableColumn::new("status", "Status").fixed_width(px(100.0)),
+            TableColumn::new("age", "Age").right_numeric(),
+        ];
+        let mut state = DataTableState::new();
+        let widths = vec![px(10.0), px(220.0), px(9999.0)];
+
+        assert!(state.apply_kit_column_widths(&cols, &widths));
+        assert_eq!(
+            state.column_widths.get("name").copied(),
+            Some(cols[0].min_resize_width())
+        );
+        assert_eq!(state.column_widths.get("status").copied(), Some(220.0));
+        assert_eq!(
+            state.column_widths.get("age").copied(),
+            Some(MAX_COLUMN_WIDTH)
+        );
+
+        let persisted = state.to_persisted_config();
+        assert_eq!(
+            persisted.column_widths.get("name").copied(),
+            Some(cols[0].min_resize_width().round() as u32)
+        );
+        assert_eq!(persisted.column_widths.get("status").copied(), Some(220));
+        assert_eq!(
+            persisted.column_widths.get("age").copied(),
+            Some(MAX_COLUMN_WIDTH.round() as u32)
+        );
+
+        // Second identical call reports no changes
+        assert!(!state.apply_kit_column_widths(&cols, &widths));
+        assert_eq!(
+            state.sync_selected_row(&["a".to_string(), "b".to_string()]),
+            None
+        );
+        state.select_row("b");
+        assert_eq!(
+            state.sync_selected_row(&["a".to_string(), "b".to_string()]),
+            Some(1)
+        );
     }
 }

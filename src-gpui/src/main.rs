@@ -529,6 +529,7 @@ pub struct OrbitShell {
     port_forward_modal: Option<PortForwardModalState>,
     port_forward_inputs: Option<PortForwardInputs>,
     port_forward_subscriptions: Vec<gpui::Subscription>,
+    table_subscriptions: Vec<gpui::Subscription>,
     action_toast: ActionToastState,
     active_shell_drawer: ActiveShellDrawer,
     notifications: NotificationCenterState,
@@ -779,6 +780,7 @@ impl OrbitShell {
             port_forward_modal: None,
             port_forward_inputs: None,
             port_forward_subscriptions: Vec::new(),
+            table_subscriptions: Vec::new(),
             action_toast: ActionToastState::default(),
             active_shell_drawer: ActiveShellDrawer::default(),
             notifications: NotificationCenterState::default(),
@@ -2056,38 +2058,189 @@ impl OrbitShell {
         }
     }
 
-    fn update_active_table_column_resize(&mut self, pointer_x: f32) -> bool {
-        let mut updated = false;
-        for table in [
-            &mut self.resources.pods.table,
-            &mut self.resources.deployments.table,
-            &mut self.resources.services.table,
-            &mut self.resources.events.table,
-        ] {
-            if table.update_column_resize(pointer_x) {
-                updated = true;
+    fn table_mut_for_view(
+        &mut self,
+        view: WorkspaceView,
+    ) -> Option<(&'static str, &mut crate::components::DataTableState)> {
+        match view {
+            WorkspaceView::Nodes => Some(("nodes", &mut self.resources.nodes.table)),
+            WorkspaceView::Namespaces => {
+                Some(("namespaces", &mut self.resources.namespaces_view.table))
             }
+            WorkspaceView::Events => Some(("events", &mut self.resources.events.table)),
+            WorkspaceView::Pods => Some(("pods", &mut self.resources.pods.table)),
+            WorkspaceView::Deployments => {
+                Some(("deployments", &mut self.resources.deployments.table))
+            }
+            WorkspaceView::StatefulSets => {
+                Some(("statefulsets", &mut self.resources.statefulsets.table))
+            }
+            WorkspaceView::DaemonSets => {
+                Some(("daemonsets", &mut self.resources.daemonsets.table))
+            }
+            WorkspaceView::ReplicaSets => {
+                Some(("replicasets", &mut self.resources.replicasets.table))
+            }
+            WorkspaceView::Jobs => Some(("jobs", &mut self.resources.jobs.table)),
+            WorkspaceView::CronJobs => Some(("cronjobs", &mut self.resources.cronjobs.table)),
+            WorkspaceView::Hpas => Some(("hpas", &mut self.resources.list_views.hpas.table)),
+            WorkspaceView::Services => Some(("services", &mut self.resources.services.table)),
+            WorkspaceView::Ingresses => Some(("ingresses", &mut self.resources.ingresses.table)),
+            WorkspaceView::PortForward => {
+                Some(("port_forwards", &mut self.resources.port_forwards.table))
+            }
+            WorkspaceView::PersistentVolumes => Some((
+                "persistent_volumes",
+                &mut self.resources.persistent_volumes.table,
+            )),
+            WorkspaceView::PersistentVolumeClaims => Some((
+                "persistent_volume_claims",
+                &mut self.resources.persistent_volume_claims.table,
+            )),
+            WorkspaceView::StorageClasses => Some((
+                "storage_classes",
+                &mut self.resources.list_views.storage_classes.table,
+            )),
+            WorkspaceView::ConfigMaps => {
+                Some(("configmaps", &mut self.resources.configmaps.table))
+            }
+            WorkspaceView::Secrets => Some(("secrets", &mut self.resources.secrets.table)),
+            WorkspaceView::SecurityOverview => {
+                Some(("security_overview", &mut self.resources.list_views.security_overview.table))
+            }
+            WorkspaceView::NetworkPolicies => Some((
+                "network_policies",
+                &mut self.resources.network_policies.table,
+            )),
+            WorkspaceView::PodSecurity => {
+                Some(("pod_security", &mut self.resources.pod_security.table))
+            }
+            WorkspaceView::ResourceQuotas => {
+                Some(("resource_quotas", &mut self.resources.resource_quotas.table))
+            }
+            WorkspaceView::AdmissionWebhooks => Some((
+                "admission_webhooks",
+                &mut self.resources.list_views.admission_webhooks.table,
+            )),
+            WorkspaceView::Overview
+            | WorkspaceView::WorkloadsOverview
+            | WorkspaceView::StorageOverview
+            | WorkspaceView::Settings => None,
         }
-        updated
     }
 
-    fn finish_active_table_column_resize(&mut self) -> bool {
-        let mut finished = Vec::new();
-        for (table_id, table) in [
-            ("pods", &mut self.resources.pods.table),
-            ("deployments", &mut self.resources.deployments.table),
-            ("services", &mut self.resources.services.table),
-            ("events", &mut self.resources.events.table),
-        ] {
-            if let Some(item) = finish_table_column_resize(table_id, table) {
-                finished.push(item);
-            }
+    fn ensure_kit_table_for_view(
+        &mut self,
+        view: WorkspaceView,
+        theme: &OrbitTheme,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some((table_id, table)) = self.table_mut_for_view(view) else {
+            return;
+        };
+        if table.kit_table.is_some() {
+            return;
         }
-        let any_finished = !finished.is_empty();
-        for (table_id, cfg) in finished {
-            self.persist_table_config(table_id, cfg);
-        }
-        any_finished
+
+        let delegate = crate::components::data_table::OrbitTableDelegate::new(
+            Vec::new(),
+            0,
+            0,
+            std::rc::Rc::new(|_| String::new()),
+            std::rc::Rc::new(|_, _, _| div().into_any_element()),
+            table,
+            theme.clone(),
+        );
+        let entity = cx.new(|cx| {
+            gpui::component::table::TableState::new(delegate, window, cx)
+                .col_movable(false)
+                .col_selectable(false)
+        });
+        table.kit_table = Some(entity.clone());
+
+        let sub = cx.subscribe_in(
+            &entity,
+            window,
+            move |shell, table_entity, event, window, cx| {
+                use gpui::component::table::TableEvent;
+                match event {
+                    TableEvent::ColumnWidthsChanged(widths) => {
+                        let columns = table_entity.read(cx).delegate().columns.clone();
+                        let updated_cfg = shell
+                            .table_mut_for_view(view)
+                            .and_then(|(id, table)| {
+                                if table.apply_kit_column_widths(&columns, widths) {
+                                    Some((id, table.to_persisted_config()))
+                                } else {
+                                    None
+                                }
+                            });
+                        if let Some((id, cfg)) = updated_cfg {
+                            shell.persist_table_config(id, cfg);
+                            cx.notify();
+                        }
+                    }
+                    TableEvent::SelectRow(local_ix) | TableEvent::DoubleClickedRow(local_ix) => {
+                        let (row_info, on_row_click) = {
+                            let state = table_entity.read(cx);
+                            let delegate = state.delegate();
+                            (
+                                delegate.row_key_at(*local_ix),
+                                delegate.on_row_click.clone(),
+                            )
+                        };
+                        if let Some((abs_row_ix, row_key)) = row_info {
+                            if let Some((_, table)) = shell.table_mut_for_view(view) {
+                                table.selected_row_key = Some(row_key.to_string());
+                            }
+                            if let Some(cb) = on_row_click {
+                                window.defer(cx, move |window, cx| {
+                                    let click_event = gpui::ClickEvent::Keyboard(
+                                        gpui::KeyboardClickEvent::default(),
+                                    );
+                                    (cb)(abs_row_ix, row_key, &click_event, window, cx);
+                                });
+                            } else {
+                                cx.notify();
+                            }
+                        }
+                    }
+                    TableEvent::RightClickedRow(Some(local_ix)) => {
+                        let (row_info, on_row_context_menu) = {
+                            let state = table_entity.read(cx);
+                            let delegate = state.delegate();
+                            (
+                                delegate.row_key_at(*local_ix),
+                                delegate.on_row_context_menu.clone(),
+                            )
+                        };
+                        if let (Some((abs_row_ix, row_key)), Some(cb)) =
+                            (row_info, on_row_context_menu)
+                        {
+                            let position = window.mouse_position();
+                            window.defer(cx, move |window, cx| {
+                                let mouse_event = gpui::MouseDownEvent {
+                                    position,
+                                    button: gpui::MouseButton::Right,
+                                    ..Default::default()
+                                };
+                                (cb)(abs_row_ix, row_key, &mouse_event, window, cx);
+                            });
+                        }
+                    }
+                    TableEvent::ClearSelection => {
+                        if let Some((_, table)) = shell.table_mut_for_view(view) {
+                            table.clear_selection();
+                            cx.notify();
+                        }
+                    }
+                    _ => {}
+                }
+            },
+        );
+        self.table_subscriptions.push(sub);
+        let _ = table_id;
     }
 
     fn dispatch_command(&self, cmd: ClusterBridgeCommand) {
@@ -5426,6 +5579,12 @@ impl OrbitShell {
                         let cluster_id = cluster_id.clone();
                         let display_name = display_name.clone();
                         let k8s_version = k8s_version.clone();
+                        self.ensure_kit_table_for_view(
+                            self.sidebar.active_view,
+                            &theme,
+                            window,
+                            cx,
+                        );
                         self.render_connected_workspace(
                             &cluster_id,
                             &display_name,
@@ -6084,9 +6243,6 @@ impl Render for OrbitShell {
                     );
                     cx.notify();
                 }
-                if this.update_active_table_column_resize(f32::from(event.position.x)) {
-                    cx.notify();
-                }
             }))
             .on_mouse_up(
                 MouseButton::Left,
@@ -6104,9 +6260,6 @@ impl Render for OrbitShell {
                     }
                     if this.drawer.is_resizing {
                         this.drawer.stop_resize();
-                        changed = true;
-                    }
-                    if this.finish_active_table_column_resize() {
                         changed = true;
                     }
                     if this.tabs.clear_drag_state() {
@@ -6358,7 +6511,9 @@ fn main() -> std::process::ExitCode {
     let open_failed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let open_failed_for_run = std::sync::Arc::clone(&open_failed);
 
-    gpui::application().run(move |cx: &mut App| {
+    gpui::application()
+        .with_assets(gpui::assets::Assets)
+        .run(move |cx: &mut App| {
         gpui::init(cx);
         views::edit::register_yaml_language_config(cx);
 
@@ -6412,6 +6567,7 @@ fn table_container_width(viewport_width: f32, sidebar: &SidebarLayoutState) -> f
     (viewport_width - sidebar_width).max(320.0)
 }
 
+#[cfg(test)]
 fn finish_table_column_resize(
     table_id: &'static str,
     table: &mut crate::components::DataTableState,
@@ -12639,5 +12795,229 @@ mod tests {
             assert!(!shell.resources.namespaces.dropdown_open);
             assert!(!shell.command_palette.is_open);
         });
+    }
+
+    #[gpui::test]
+    fn test_table_event_column_widths_changed_updates_and_persists_config(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let config = OrbitConfig::default();
+        let initial_theme = OrbitTheme::from_config(&config, WindowAppearance::Dark);
+        let options = OrbitShell::window_options_for_theme(
+            gpui::Bounds::new(
+                gpui::point(px(0.0), px(0.0)),
+                gpui::size(px(1280.0), px(800.0)),
+            ),
+            &initial_theme,
+        );
+        let config_for_window = config.clone();
+
+        let opened = cx.update(|cx| {
+            gpui::init(cx);
+            gpui::open_window(options, cx, move |window, cx| {
+                let resolved_theme =
+                    OrbitTheme::from_config(&config_for_window, window.appearance());
+                apply_theme(resolved_theme, window, cx);
+                cx.new(|cx| OrbitShell::new_for_test(&config_for_window, window, cx))
+            })
+        });
+        let Ok((window, view)) = opened else {
+            panic!("failed to open OrbitShell test window");
+        };
+
+        let table_entity = cx
+            .update(|cx| {
+                window.update(cx, |_, window, cx| {
+                    view.update(cx, |shell, cx| {
+                        shell.ensure_kit_table_for_view(
+                            WorkspaceView::Pods,
+                            &initial_theme,
+                            window,
+                            cx,
+                        );
+                        shell.resources.pods.table.kit_table.clone()
+                    })
+                })
+            })
+            .expect("window update should succeed")
+            .expect("pods kit_table should be created");
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                let cols = views::pods::pod_columns();
+                table_entity.update(cx, |table, cx| {
+                    let kit_cols = cols
+                        .iter()
+                        .map(|c| {
+                            crate::components::data_table::to_kit_column(
+                                c,
+                                &crate::components::DataTableState::new(),
+                            )
+                        })
+                        .collect();
+                    table.delegate_mut().sync_from(
+                        cols,
+                        0,
+                        0,
+                        std::rc::Rc::new(|_| String::new()),
+                        std::rc::Rc::new(|_, _, _| div().into_any_element()),
+                        None,
+                        None,
+                        kit_cols,
+                        initial_theme.clone(),
+                    );
+                    cx.emit(gpui::component::table::TableEvent::ColumnWidthsChanged(vec![
+                        px(240.0),
+                        px(110.0),
+                    ]));
+                });
+                let _ = window;
+            });
+        });
+
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            let shell = view.read(cx);
+            assert_eq!(shell.resources.pods.table.column_widths.get("name"), Some(&240.0));
+            assert_eq!(
+                shell
+                    .table_preferences
+                    .tables
+                    .get("pods")
+                    .and_then(|c| c.column_widths.get("name"))
+                    .copied(),
+                Some(240)
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn test_table_event_select_row_updates_selected_key_and_opens_drawer(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let config = OrbitConfig::default();
+        let initial_theme = OrbitTheme::from_config(&config, WindowAppearance::Dark);
+        let options = OrbitShell::window_options_for_theme(
+            gpui::Bounds::new(
+                gpui::point(px(0.0), px(0.0)),
+                gpui::size(px(1280.0), px(800.0)),
+            ),
+            &initial_theme,
+        );
+        let config_for_window = config.clone();
+
+        let opened = cx.update(|cx| {
+            gpui::init(cx);
+            gpui::open_window(options, cx, move |window, cx| {
+                let resolved_theme =
+                    OrbitTheme::from_config(&config_for_window, window.appearance());
+                apply_theme(resolved_theme, window, cx);
+                cx.new(|cx| OrbitShell::new_for_test(&config_for_window, window, cx))
+            })
+        });
+        let Ok((window, view)) = opened else {
+            panic!("failed to open OrbitShell test window");
+        };
+
+        let table_entity = cx
+            .update(|cx| {
+                window.update(cx, |_, window, cx| {
+                    view.update(cx, |shell, cx| {
+                        shell.ensure_kit_table_for_view(
+                            WorkspaceView::Pods,
+                            &initial_theme,
+                            window,
+                            cx,
+                        );
+                        shell.resources.pods.table.kit_table.clone()
+                    })
+                })
+            })
+            .expect("window update should succeed")
+            .expect("pods kit_table should be created");
+
+        let shell_entity = view.clone();
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, _, cx| {
+                let cols = views::pods::pod_columns();
+                table_entity.update(cx, |table, _cx| {
+                    let kit_cols = cols
+                        .iter()
+                        .map(|c| {
+                            crate::components::data_table::to_kit_column(
+                                c,
+                                &crate::components::DataTableState::new(),
+                            )
+                        })
+                        .collect();
+                    let delegate = table.delegate_mut();
+                    delegate.sync_from(
+                        cols,
+                        1,
+                        0,
+                        std::rc::Rc::new(|_| "default/nginx-abc".to_string()),
+                        std::rc::Rc::new(|_, _, _| div().into_any_element()),
+                        None,
+                        None,
+                        kit_cols,
+                        initial_theme.clone(),
+                    );
+                    let target_shell = shell_entity.clone();
+                    delegate.on_row_click = Some(std::rc::Rc::new(
+                        move |_row_idx, row_key, _event, _window, cx| {
+                            target_shell.update(cx, |shell, cx| {
+                                shell.resources.pods.table.selected_row_key =
+                                    Some(row_key.to_string());
+                                if let Some((ns, name)) = row_key.as_ref().split_once('/') {
+                                    shell.open_resource_drawer(
+                                        ResourceDrawerTarget::Pod {
+                                            name: name.to_string(),
+                                            namespace: ns.to_string(),
+                                        },
+                                        ResourceDrawerTabId::Overview,
+                                        cx,
+                                    );
+                                }
+                            });
+                        },
+                    ));
+                });
+                table_entity.update(cx, |_, cx| {
+                    cx.emit(gpui::component::table::TableEvent::SelectRow(0));
+                });
+            });
+        });
+
+        cx.run_until_parked();
+
+        cx.update(|cx| {
+            let shell = view.read(cx);
+            assert_eq!(
+                shell.resources.pods.table.selected_row_key.as_deref(),
+                Some("default/nginx-abc")
+            );
+            assert!(shell.drawer.is_open);
+        });
+    }
+
+    #[test]
+    fn test_gpui_kit_assets_provides_table_sort_icons() {
+        use gpui::AssetSource as _;
+        use gpui::component::{IconName, IconNamed as _};
+
+        let assets = gpui::assets::Assets;
+        for icon in [
+            IconName::ChevronsUpDown,
+            IconName::SortAscending,
+            IconName::SortDescending,
+        ] {
+            let path = icon.path();
+            let bytes = assets
+                .load(path.as_ref())
+                .expect("asset load should not error")
+                .expect("table sort icon SVG should exist in gpui::assets::Assets");
+            assert!(!bytes.is_empty());
+        }
     }
 }
