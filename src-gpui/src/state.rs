@@ -20,7 +20,7 @@ use orbit_core::kubernetes::workloads_overview::WorkloadsOverviewSnapshot;
 
 pub use crate::add_cluster_state::*;
 use crate::components::data_table::DataTableState;
-use crate::navigation::{LogsTabTarget, SidebarCategory, WorkspaceTab, WorkspaceView};
+use crate::navigation::{EditTabTarget, LogsTabTarget, SidebarCategory, WorkspaceTab, WorkspaceView};
 pub use crate::watch_state::*;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -48,7 +48,7 @@ pub enum ClusterConnectionState {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ClusterBridgeCommand {
     LoadContexts,
     SwitchCluster {
@@ -167,6 +167,21 @@ pub enum ClusterBridgeCommand {
         kind: String,
         namespace: Option<String>,
         name: String,
+    },
+    LoadResourceForEdit {
+        cluster_id: String,
+        request_id: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+    },
+    ApplyResource {
+        cluster_id: String,
+        request_id: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        raw_json: serde_json::Value,
     },
     SaveNamespaceSelection {
         cluster_id: String,
@@ -575,6 +590,42 @@ pub enum ClusterBridgeEvent {
         namespace: Option<String>,
         name: String,
         message: String,
+    },
+    ResourceForEditLoaded {
+        cluster_id: String,
+        request_id: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        raw_json: serde_json::Value,
+        yaml: String,
+    },
+    ResourceForEditLoadFailed {
+        cluster_id: String,
+        request_id: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        message: String,
+    },
+    ResourceApplied {
+        cluster_id: String,
+        request_id: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        raw_json: serde_json::Value,
+        yaml: String,
+        message: String,
+    },
+    ResourceApplyFailed {
+        cluster_id: String,
+        request_id: u64,
+        kind: String,
+        namespace: Option<String>,
+        name: String,
+        message: String,
+        is_conflict: bool,
     },
     SettingsSaveFailed {
         message: String,
@@ -3126,6 +3177,10 @@ impl ClusterSwitcherState {
             | ClusterBridgeEvent::PortForwardStopped { .. }
             | ClusterBridgeEvent::PortForwardsCleared { .. }
             | ClusterBridgeEvent::PortForwardFailed { .. }
+            | ClusterBridgeEvent::ResourceForEditLoaded { .. }
+            | ClusterBridgeEvent::ResourceForEditLoadFailed { .. }
+            | ClusterBridgeEvent::ResourceApplied { .. }
+            | ClusterBridgeEvent::ResourceApplyFailed { .. }
             | ClusterBridgeEvent::ResourceWatchUpdated { .. } => {}
         }
     }
@@ -3198,6 +3253,12 @@ pub fn resolve_tab_drop_target(
         _ => (hover_index, position),
     };
     Some((canonical_hover, canonical_pos))
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ClosedWorkspaceTabs {
+    pub logs: Vec<LogsTabTarget>,
+    pub edits: Vec<EditTabTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -3341,11 +3402,13 @@ impl WorkspaceTabsState {
     }
 
     pub fn strip_logs_tabs(&mut self) {
+        self.strip_ephemeral_tabs();
+    }
+
+    pub fn strip_ephemeral_tabs(&mut self) {
         for cluster in self.by_cluster.values_mut() {
-            cluster
-                .open_tabs
-                .retain(|t| !matches!(t, WorkspaceTab::Logs(_)));
-            if matches!(cluster.active_tab, Some(WorkspaceTab::Logs(_))) {
+            cluster.open_tabs.retain(|t| !t.is_ephemeral());
+            if cluster.active_tab.as_ref().is_some_and(WorkspaceTab::is_ephemeral) {
                 cluster.active_tab = cluster.open_tabs.first().cloned();
             }
         }
@@ -3380,6 +3443,49 @@ impl WorkspaceTabsState {
         cluster.active_tab = Some(tab);
         self.pending_scroll_to_active = true;
         is_new
+    }
+
+    pub fn open_edit_tab(&mut self, target: EditTabTarget) -> bool {
+        let tab = WorkspaceTab::Edit(target);
+        let Some(cluster) = self.current_cluster_mut() else {
+            return false;
+        };
+        let is_new = !cluster.open_tabs.contains(&tab);
+        if is_new {
+            cluster.open_tabs.push(tab.clone());
+        }
+        cluster.active_tab = Some(tab);
+        self.pending_scroll_to_active = true;
+        is_new
+    }
+
+    pub fn tabs_closed_by_close_others(&self, keep: &WorkspaceTab) -> Vec<EditTabTarget> {
+        if !self.open_tabs().contains(keep) {
+            return Vec::new();
+        }
+        self.open_tabs()
+            .iter()
+            .filter(|t| *t != keep)
+            .filter_map(|t| t.as_edit().cloned())
+            .collect()
+    }
+
+    pub fn tabs_closed_by_close_right(&self, anchor: &WorkspaceTab) -> Vec<EditTabTarget> {
+        let tabs = self.open_tabs();
+        let Some(idx) = tabs.iter().position(|t| t == anchor) else {
+            return Vec::new();
+        };
+        tabs[(idx + 1)..]
+            .iter()
+            .filter_map(|t| t.as_edit().cloned())
+            .collect()
+    }
+
+    pub fn all_open_edit_tabs(&self) -> Vec<EditTabTarget> {
+        self.open_tabs()
+            .iter()
+            .filter_map(|t| t.as_edit().cloned())
+            .collect()
     }
 
     pub fn set_active_tab(&mut self, tab: impl Into<WorkspaceTab>) {
@@ -3430,13 +3536,13 @@ impl WorkspaceTabsState {
         self.pending_scroll_to_active = true;
     }
 
-    pub fn close_tab(&mut self, tab: impl Into<WorkspaceTab>) -> Vec<LogsTabTarget> {
+    pub fn close_tab(&mut self, tab: impl Into<WorkspaceTab>) -> ClosedWorkspaceTabs {
         let tab = tab.into();
         let Some(cluster) = self.current_cluster_mut() else {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         };
         let Some(idx) = cluster.open_tabs.iter().position(|t| *t == tab) else {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         };
         let removed = cluster.open_tabs.remove(idx);
         if cluster.active_tab.as_ref() == Some(&removed) {
@@ -3449,56 +3555,63 @@ impl WorkspaceTabsState {
             }
             self.pending_scroll_to_active = cluster.active_tab.is_some();
         }
+        let mut closed = ClosedWorkspaceTabs::default();
         match removed {
-            WorkspaceTab::Logs(target) => vec![target],
-            WorkspaceTab::View(_) => Vec::new(),
+            WorkspaceTab::Logs(target) => closed.logs.push(target),
+            WorkspaceTab::Edit(target) => closed.edits.push(target),
+            WorkspaceTab::View(_) => {}
         }
+        closed
     }
 
-    pub fn close_active_tab(&mut self) -> Vec<LogsTabTarget> {
+    pub fn close_active_tab(&mut self) -> ClosedWorkspaceTabs {
         if let Some(active) = self.active_tab() {
             self.close_tab(active)
         } else {
-            Vec::new()
+            ClosedWorkspaceTabs::default()
         }
     }
 
-    pub fn close_other_tabs(&mut self, tab: impl Into<WorkspaceTab>) -> Vec<LogsTabTarget> {
+    pub fn close_other_tabs(&mut self, tab: impl Into<WorkspaceTab>) -> ClosedWorkspaceTabs {
         let tab = tab.into();
         let Some(cluster) = self.current_cluster_mut() else {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         };
         if !cluster.open_tabs.contains(&tab) {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         }
-        let closed: Vec<LogsTabTarget> = cluster
-            .open_tabs
-            .iter()
-            .filter(|t| **t != tab)
-            .filter_map(|t| t.as_logs().cloned())
-            .collect();
+        let mut closed = ClosedWorkspaceTabs::default();
+        for existing in &cluster.open_tabs {
+            if *existing != tab {
+                match existing {
+                    WorkspaceTab::Logs(target) => closed.logs.push(target.clone()),
+                    WorkspaceTab::Edit(target) => closed.edits.push(target.clone()),
+                    WorkspaceTab::View(_) => {}
+                }
+            }
+        }
         cluster.open_tabs = vec![tab.clone()];
         cluster.active_tab = Some(tab);
         self.pending_scroll_to_active = true;
         closed
     }
 
-    pub fn close_tabs_to_right(&mut self, tab: impl Into<WorkspaceTab>) -> Vec<LogsTabTarget> {
+    pub fn close_tabs_to_right(&mut self, tab: impl Into<WorkspaceTab>) -> ClosedWorkspaceTabs {
         let tab = tab.into();
         let Some(cluster) = self.current_cluster_mut() else {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         };
         let Some(idx) = cluster.open_tabs.iter().position(|t| *t == tab) else {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         };
-        let closed: Vec<LogsTabTarget> = cluster
-            .open_tabs
-            .drain((idx + 1)..)
-            .filter_map(|t| match t {
-                WorkspaceTab::Logs(target) => Some(target),
-                WorkspaceTab::View(_) => None,
-            })
-            .collect();
+        let mut closed = ClosedWorkspaceTabs::default();
+        for removed in cluster.open_tabs.drain((idx + 1)..) {
+            match removed {
+                WorkspaceTab::Logs(target) => closed.logs.push(target),
+                WorkspaceTab::Edit(target) => closed.edits.push(target),
+                WorkspaceTab::View(_) => {}
+            }
+        }
         if let Some(active) = &cluster.active_tab
             && !cluster.open_tabs.contains(active)
         {
@@ -3508,18 +3621,18 @@ impl WorkspaceTabsState {
         closed
     }
 
-    pub fn close_all_tabs(&mut self) -> Vec<LogsTabTarget> {
+    pub fn close_all_tabs(&mut self) -> ClosedWorkspaceTabs {
         let Some(cluster) = self.current_cluster_mut() else {
-            return Vec::new();
+            return ClosedWorkspaceTabs::default();
         };
-        let closed: Vec<LogsTabTarget> = cluster
-            .open_tabs
-            .drain(..)
-            .filter_map(|t| match t {
-                WorkspaceTab::Logs(target) => Some(target),
-                WorkspaceTab::View(_) => None,
-            })
-            .collect();
+        let mut closed = ClosedWorkspaceTabs::default();
+        for removed in cluster.open_tabs.drain(..) {
+            match removed {
+                WorkspaceTab::Logs(target) => closed.logs.push(target),
+                WorkspaceTab::Edit(target) => closed.edits.push(target),
+                WorkspaceTab::View(_) => {}
+            }
+        }
         cluster.active_tab = None;
         closed
     }
@@ -5554,19 +5667,124 @@ mod tests {
         // [Overview, t1, t2, t3]
 
         let closed_right = tabs.close_tabs_to_right(WorkspaceTab::Logs(t1.clone()));
-        assert_eq!(closed_right, vec![t2.clone(), t3.clone()]);
+        assert_eq!(closed_right.logs, vec![t2.clone(), t3.clone()]);
 
         tabs.open_logs_tab(t2.clone());
         let closed_others = tabs.close_other_tabs(WorkspaceView::Overview);
-        assert_eq!(closed_others, vec![t1.clone(), t2.clone()]);
+        assert_eq!(closed_others.logs, vec![t1.clone(), t2.clone()]);
 
         tabs.open_logs_tab(t1.clone());
         let closed_single = tabs.close_tab(WorkspaceTab::Logs(t1.clone()));
-        assert_eq!(closed_single, vec![t1]);
+        assert_eq!(closed_single.logs, vec![t1]);
 
         tabs.open_logs_tab(t2.clone());
         let closed_all = tabs.close_all_tabs();
-        assert_eq!(closed_all, vec![t2]);
+        assert_eq!(closed_all.logs, vec![t2]);
+    }
+
+    #[test]
+    fn test_open_edit_tab_deduplicates_by_kind_namespace_and_name() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("cluster-a");
+
+        let cm_default = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "app-cfg".to_string(),
+        };
+        let cm_staging = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("staging".to_string()),
+            name: "app-cfg".to_string(),
+        };
+
+        assert!(tabs.open_edit_tab(cm_default.clone()));
+        assert_eq!(tabs.open_tabs().len(), 2);
+        assert_eq!(
+            tabs.active_tab(),
+            Some(WorkspaceTab::Edit(cm_default.clone()))
+        );
+
+        tabs.open_tab(WorkspaceView::Overview);
+        assert!(!tabs.open_edit_tab(cm_default.clone()));
+        assert_eq!(tabs.open_tabs().len(), 2);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceTab::Edit(cm_default)));
+
+        assert!(tabs.open_edit_tab(cm_staging.clone()));
+        assert_eq!(tabs.open_tabs().len(), 3);
+        assert_eq!(tabs.active_tab(), Some(WorkspaceTab::Edit(cm_staging)));
+    }
+
+    #[test]
+    fn test_close_tab_variants_return_closed_edit_tabs_and_never_persist_edit_tabs() {
+        let mut tabs = WorkspaceTabsState::new();
+        tabs.activate_cluster("cluster-a");
+        tabs.open_tab(WorkspaceView::ConfigMaps);
+
+        let e1 = EditTabTarget {
+            kind: "ConfigMap".to_string(),
+            namespace: Some("default".to_string()),
+            name: "cfg-1".to_string(),
+        };
+        let e2 = EditTabTarget {
+            kind: "Secret".to_string(),
+            namespace: Some("default".to_string()),
+            name: "sec-2".to_string(),
+        };
+        let e3 = EditTabTarget {
+            kind: "StorageClass".to_string(),
+            namespace: None,
+            name: "fast".to_string(),
+        };
+
+        tabs.open_edit_tab(e1.clone());
+        tabs.open_edit_tab(e2.clone());
+        tabs.open_edit_tab(e3.clone());
+
+        assert_eq!(
+            tabs.tabs_closed_by_close_right(&WorkspaceTab::Edit(e1.clone())),
+            vec![e2.clone(), e3.clone()]
+        );
+        assert_eq!(
+            tabs.tabs_closed_by_close_others(&WorkspaceTab::View(WorkspaceView::Overview)),
+            vec![e1.clone(), e2.clone(), e3.clone()]
+        );
+        assert_eq!(
+            tabs.all_open_edit_tabs(),
+            vec![e1.clone(), e2.clone(), e3.clone()]
+        );
+
+        let Some(ClusterBridgeCommand::SaveWorkspaceTabs {
+            open_tabs,
+            active_tab,
+            ..
+        }) = tabs.persistence_command()
+        else {
+            panic!("expected SaveWorkspaceTabs command");
+        };
+        assert_eq!(
+            open_tabs,
+            vec![
+                WorkspaceView::Overview.id().to_string(),
+                WorkspaceView::ConfigMaps.id().to_string(),
+            ]
+        );
+        assert_eq!(active_tab, None);
+
+        let closed_right = tabs.close_tabs_to_right(WorkspaceTab::Edit(e1.clone()));
+        assert_eq!(closed_right.edits, vec![e2.clone(), e3.clone()]);
+
+        tabs.open_edit_tab(e2.clone());
+        let closed_others = tabs.close_other_tabs(WorkspaceView::Overview);
+        assert_eq!(closed_others.edits, vec![e1.clone(), e2.clone()]);
+
+        tabs.open_edit_tab(e1.clone());
+        let closed_single = tabs.close_tab(WorkspaceTab::Edit(e1.clone()));
+        assert_eq!(closed_single.edits, vec![e1]);
+
+        tabs.open_edit_tab(e2.clone());
+        let closed_all = tabs.close_all_tabs();
+        assert_eq!(closed_all.edits, vec![e2]);
     }
 
     #[test]

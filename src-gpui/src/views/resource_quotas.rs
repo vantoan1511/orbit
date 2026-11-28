@@ -245,6 +245,7 @@ fn render_resource_policy_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_resource_policy_context_menu_entries(
     policy: &PolicyInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -252,6 +253,7 @@ pub fn build_resource_policy_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_edit: impl 'static + Fn(&mut Window, &mut App),
     on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     let delete_label = if policy.kind.eq_ignore_ascii_case("LimitRange") {
@@ -289,6 +291,11 @@ pub fn build_resource_policy_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("edit", "Edit")
+                .icon(Icon::Pencil)
+                .on_select(on_edit),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -869,6 +876,7 @@ mod tests {
         );
         let entries = build_resource_policy_context_menu_entries(
             &rq,
+            |_, _| {},
             |_, _| {},
             |_, _| {},
             |_, _| {},

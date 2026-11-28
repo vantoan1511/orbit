@@ -192,6 +192,7 @@ fn render_configmap_cell(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn build_configmap_context_menu_entries(
     cm: &ConfigMapInfo,
     on_copy_name: impl 'static + Fn(&mut Window, &mut App),
@@ -199,6 +200,7 @@ pub fn build_configmap_context_menu_entries(
     on_refresh: impl 'static + Fn(&mut Window, &mut App),
     on_view_details: impl 'static + Fn(&mut Window, &mut App),
     on_view_yaml: impl 'static + Fn(&mut Window, &mut App),
+    on_edit: impl 'static + Fn(&mut Window, &mut App),
     on_delete: impl 'static + Fn(&mut Window, &mut App),
 ) -> Vec<ContextMenuEntry> {
     vec![
@@ -230,6 +232,11 @@ pub fn build_configmap_context_menu_entries(
             ContextMenuItem::new("view-yaml", "View YAML")
                 .icon(Icon::FileCode)
                 .on_select(on_view_yaml),
+        ),
+        ContextMenuEntry::Item(
+            ContextMenuItem::new("edit", "Edit")
+                .icon(Icon::Pencil)
+                .on_select(on_edit),
         ),
         ContextMenuEntry::Separator,
         ContextMenuEntry::Item(
@@ -781,6 +788,7 @@ mod tests {
             |_, _| {},
             |_, _| {},
             |_, _| {},
+            |_, _| {},
         );
         let item_ids: Vec<&str> = entries
             .iter()
@@ -797,6 +805,7 @@ mod tests {
                 "refresh",
                 "view-details",
                 "view-yaml",
+                "edit",
                 "delete-configmap",
             ]
         );

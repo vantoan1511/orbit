@@ -9,9 +9,11 @@ impl OrbitShell {
         if self.add_cluster.is_open
             || self.port_forward_modal.is_some()
             || self.workload_action_modal.is_open()
+            || self.pending_edit_close.is_some()
             || self.command_palette.is_open
             || self.tabs.picker_open
             || self.resources.namespaces.dropdown_open
+            || matches!(self.tabs.active_tab(), Some(WorkspaceTab::Edit(_)))
         {
             return true;
         }
@@ -82,7 +84,12 @@ impl OrbitShell {
         delta: isize,
         cx: &mut Context<Self>,
     ) -> bool {
-        if matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))) {
+        if self
+            .tabs
+            .active_tab()
+            .as_ref()
+            .is_some_and(WorkspaceTab::is_ephemeral)
+        {
             return false;
         }
         let moved = match self.sidebar.active_view {
@@ -484,7 +491,12 @@ impl OrbitShell {
     }
 
     fn selected_table_row_drawer_target(&self) -> Option<ResourceDrawerTarget> {
-        if matches!(self.tabs.active_tab(), Some(WorkspaceTab::Logs(_))) {
+        if self
+            .tabs
+            .active_tab()
+            .as_ref()
+            .is_some_and(WorkspaceTab::is_ephemeral)
+        {
             return None;
         }
         match self.sidebar.active_view {
