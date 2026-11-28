@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use gpui::{
     AnyElement, App, Context, FocusHandle, FontWeight, InteractiveElement, IntoElement,
-    MouseButton, MouseDownEvent, Pixels, Point, Render, Rgba, ScrollWheelEvent, SharedString,
+    MouseButton, MouseDownEvent, Pixels, Point, Render, Rgba, ScrollEvent, SharedString,
     StatefulInteractiveElement, Styled, Window, div, prelude::*, px,
 };
 use lucide_icons::Icon;
@@ -257,7 +257,7 @@ pub fn render_workspace_tab_bar(
         .items_center()
         .overflow_x_scroll()
         .track_scroll(&scroll_handle)
-        .on_scroll_wheel(move |event: &ScrollWheelEvent, _window, cx| {
+        .on_scroll(move |event: &ScrollEvent, _window, cx| {
             let delta = event.delta.pixel_delta(px(16.0));
             let mut offset = wheel_scroll_handle.offset();
             offset.x -= delta.x + delta.y;
@@ -599,7 +599,7 @@ pub fn render_tab_resource_picker_overlay(
         .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
             window.prevent_default();
             cx.stop_propagation();
-            popover_focus.focus(window);
+            popover_focus.focus(window, cx);
         })
         .child(
             div()
@@ -616,7 +616,7 @@ pub fn render_tab_resource_picker_overlay(
                 .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
                     window.prevent_default();
                     cx.stop_propagation();
-                    input_focus.focus(window);
+                    input_focus.focus(window, cx);
                 })
                 .child(render_icon(Icon::Search, px(14.0), search_icon_color))
                 .child(div().flex_1().min_w_0().child(search_text))

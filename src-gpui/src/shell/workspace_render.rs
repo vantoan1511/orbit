@@ -307,7 +307,7 @@ impl OrbitShell {
                         let dep_name = deployment.name.clone();
                         let dep_ports = extract_ports_from_deployment(deployment);
                         let pf_entity = ctx_entity.clone();
-                        let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let port_forward_action = move |window: &mut Window, cx: &mut App| {
                             let ns = dep_ns.clone();
                             let name = dep_name.clone();
                             let ports = dep_ports.clone();
@@ -317,6 +317,7 @@ impl OrbitShell {
                                     "Deployment",
                                     &name,
                                     ports,
+                                    window,
                                     cx,
                                 );
                             });
@@ -534,7 +535,7 @@ impl OrbitShell {
                         let ss_name = statefulset.name.clone();
                         let ss_ports = extract_ports_from_statefulset(statefulset);
                         let pf_entity = ctx_entity.clone();
-                        let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let port_forward_action = move |window: &mut Window, cx: &mut App| {
                             let ns = ss_ns.clone();
                             let name = ss_name.clone();
                             let ports = ss_ports.clone();
@@ -544,6 +545,7 @@ impl OrbitShell {
                                     "StatefulSet",
                                     &name,
                                     ports,
+                                    window,
                                     cx,
                                 );
                             });
@@ -743,7 +745,7 @@ impl OrbitShell {
                         let rs_name = replicaset.name.clone();
                         let rs_ports = extract_ports_from_replicaset(replicaset);
                         let pf_entity = ctx_entity.clone();
-                        let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let port_forward_action = move |window: &mut Window, cx: &mut App| {
                             let ns = rs_ns.clone();
                             let name = rs_name.clone();
                             let ports = rs_ports.clone();
@@ -753,6 +755,7 @@ impl OrbitShell {
                                     "ReplicaSet",
                                     &name,
                                     ports,
+                                    window,
                                     cx,
                                 );
                             });
@@ -1463,12 +1466,14 @@ impl OrbitShell {
                         let pod_name = pod.name.clone();
                         let pod_ports = extract_ports_from_pod(pod);
                         let pf_entity = ctx_entity.clone();
-                        let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let port_forward_action = move |window: &mut Window, cx: &mut App| {
                             let ns = pod_ns.clone();
                             let name = pod_name.clone();
                             let ports = pod_ports.clone();
                             pf_entity.update(cx, |shell, cx| {
-                                shell.open_port_forward_target_modal(&ns, "Pod", &name, ports, cx);
+                                shell.open_port_forward_target_modal(
+                                    &ns, "Pod", &name, ports, window, cx,
+                                );
                             });
                         };
                         let entries = views::pods::build_pod_context_menu_entries(
@@ -1786,13 +1791,13 @@ impl OrbitShell {
                         let svc_name = svc.name.clone();
                         let svc_ports = extract_ports_from_service(svc);
                         let pf_entity = ctx_entity.clone();
-                        let port_forward_action = move |_w: &mut Window, cx: &mut App| {
+                        let port_forward_action = move |window: &mut Window, cx: &mut App| {
                             let ns = svc_ns.clone();
                             let name = svc_name.clone();
                             let ports = svc_ports.clone();
                             pf_entity.update(cx, |shell, cx| {
                                 shell.open_port_forward_target_modal(
-                                    &ns, "Service", &name, ports, cx,
+                                    &ns, "Service", &name, ports, window, cx,
                                 );
                             });
                         };
@@ -2169,9 +2174,9 @@ impl OrbitShell {
 
                 let create_entity = cx.entity().clone();
                 let on_open_create_modal =
-                    std::rc::Rc::new(move |_window: &mut Window, cx: &mut App| {
+                    std::rc::Rc::new(move |window: &mut Window, cx: &mut App| {
                         create_entity.update(cx, |shell, cx| {
-                            shell.open_port_forward_create_modal(cx);
+                            shell.open_port_forward_create_modal(window, cx);
                         });
                     });
 

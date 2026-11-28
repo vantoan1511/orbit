@@ -1,3 +1,4 @@
+pub mod kit_bridge;
 pub mod palettes;
 pub mod titlebar;
 pub mod tokens;
@@ -198,9 +199,15 @@ mod tests {
     #[test]
     fn test_orbit_theme_from_config_resolves_system_mode_and_style() {
         let mut config = OrbitConfig::default();
-        config.values.insert("themeMode".to_string(), serde_json::json!("system"));
-        config.values.insert("uiStyle".to_string(), serde_json::json!("liquidglass"));
-        config.values.insert("accentColor".to_string(), serde_json::json!("emerald"));
+        config
+            .values
+            .insert("themeMode".to_string(), serde_json::json!("system"));
+        config
+            .values
+            .insert("uiStyle".to_string(), serde_json::json!("liquidglass"));
+        config
+            .values
+            .insert("accentColor".to_string(), serde_json::json!("emerald"));
         config.values.insert(
             "semanticColors".to_string(),
             serde_json::json!({ "preset": "colorblind" }),

@@ -1,8 +1,13 @@
 use std::collections::BTreeSet;
 use std::rc::Rc;
 
+use gpui::component::{
+    Sizable as _,
+    input::{Input, InputState},
+};
 use gpui::{
-    AnyElement, App, FontWeight, MouseButton, SharedString, Window, div, prelude::*, px,
+    AnyElement, App, Entity, Focusable as _, FontWeight, MouseButton, SharedString, Window, div,
+    prelude::*, px,
 };
 use lucide_icons::Icon;
 use orbit_core::kubernetes::models::{
@@ -12,13 +17,8 @@ use orbit_core::kubernetes::models::{
 use crate::icons::render_icon;
 use crate::theme::OrbitTheme;
 
-pub const PORT_FORWARD_KINDS: &[&str] = &[
-    "Service",
-    "Pod",
-    "Deployment",
-    "StatefulSet",
-    "ReplicaSet",
-];
+pub const PORT_FORWARD_KINDS: &[&str] =
+    &["Service", "Pod", "Deployment", "StatefulSet", "ReplicaSet"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortForwardResourceOption {
@@ -114,7 +114,9 @@ impl PortForwardModalState {
         let initial_kind = "Service".to_string();
         let matching_resource = available_resources
             .iter()
-            .find(|r| r.namespace == initial_namespace && r.kind.eq_ignore_ascii_case(&initial_kind))
+            .find(|r| {
+                r.namespace == initial_namespace && r.kind.eq_ignore_ascii_case(&initial_kind)
+            })
             .or_else(|| {
                 available_resources
                     .iter()
@@ -196,7 +198,9 @@ impl PortForwardModalState {
                 ..
             } => available_resources
                 .iter()
-                .filter(|r| r.namespace == self.namespace && r.kind.eq_ignore_ascii_case(&self.kind))
+                .filter(|r| {
+                    r.namespace == self.namespace && r.kind.eq_ignore_ascii_case(&self.kind)
+                })
                 .cloned()
                 .collect(),
         }
@@ -296,46 +300,35 @@ impl PortForwardModalState {
             return PortForwardModalKeyResult::Handled;
         }
         if key == "backspace" {
-            match self.active_field {
+            return match self.active_field {
                 PortForwardModalField::ResourceName => {
                     self.name.pop();
+                    self.error = None;
+                    PortForwardModalKeyResult::Handled
                 }
-                PortForwardModalField::LocalPort => {
-                    self.local_port_input.pop();
+                PortForwardModalField::LocalPort | PortForwardModalField::RemotePort => {
+                    PortForwardModalKeyResult::Ignored
                 }
-                PortForwardModalField::RemotePort => {
-                    self.remote_port_input.pop();
-                }
-            }
-            self.error = None;
-            return PortForwardModalKeyResult::Handled;
+            };
         }
         if let Some(ch_str) = key_char {
             let mut chars = ch_str.chars();
             if let (Some(ch), None) = (chars.next(), chars.next()) {
-                match self.active_field {
+                return match self.active_field {
                     PortForwardModalField::ResourceName => {
                         if !ch.is_control() && self.name.len() < 128 {
                             self.name.push(ch);
                             self.error = None;
                         }
+                        PortForwardModalKeyResult::Handled
                     }
-                    PortForwardModalField::LocalPort => {
-                        if ch.is_ascii_digit() && self.local_port_input.len() < 5 {
-                            self.local_port_input.push(ch);
-                            self.error = None;
-                        }
+                    PortForwardModalField::LocalPort | PortForwardModalField::RemotePort => {
+                        PortForwardModalKeyResult::Ignored
                     }
-                    PortForwardModalField::RemotePort => {
-                        if ch.is_ascii_digit() && self.remote_port_input.len() < 5 {
-                            self.remote_port_input.push(ch);
-                            self.error = None;
-                        }
-                    }
-                }
+                };
             }
         }
-        PortForwardModalKeyResult::Handled
+        PortForwardModalKeyResult::Ignored
     }
 }
 
@@ -418,8 +411,69 @@ pub struct PortForwardModalCallbacks {
     pub on_select_resource: PortForwardValueCallback<String>,
 }
 
+pub struct PortForwardInputs {
+    pub local: Entity<InputState>,
+    pub remote: Entity<InputState>,
+}
+
+impl PortForwardInputs {
+    pub fn new(
+        local_initial: &str,
+        remote_initial: &str,
+        window: &mut Window,
+        cx: &mut App,
+    ) -> Self {
+        let local_init = local_initial.to_string();
+        let remote_init = remote_initial.to_string();
+        let local = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("e.g. 8080")
+                .default_value(local_init)
+        });
+        let remote = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("e.g. 8080")
+                .default_value(remote_init)
+        });
+        Self { local, remote }
+    }
+
+    pub fn sync_from_state(
+        &self,
+        state: &PortForwardModalState,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        let local_val = state.local_port_input.clone();
+        let remote_val = state.remote_port_input.clone();
+        self.local.update(cx, |input, cx| {
+            if input.value().as_ref() != local_val.as_str() {
+                input.set_value(local_val, window, cx);
+            }
+        });
+        self.remote.update(cx, |input, cx| {
+            if input.value().as_ref() != remote_val.as_str() {
+                input.set_value(remote_val, window, cx);
+            }
+        });
+    }
+
+    pub fn focus_field(&self, field: PortForwardModalField, window: &mut Window, cx: &mut App) {
+        match field {
+            PortForwardModalField::LocalPort => {
+                self.local.read(cx).focus_handle(cx).focus(window, cx);
+            }
+            PortForwardModalField::RemotePort => {
+                self.remote.read(cx).focus_handle(cx).focus(window, cx);
+            }
+            PortForwardModalField::ResourceName => {}
+        }
+    }
+}
+
 pub fn render_port_forward_modal(
     state: &PortForwardModalState,
+    inputs: &PortForwardInputs,
     theme: &OrbitTheme,
     callbacks: &PortForwardModalCallbacks,
 ) -> AnyElement {
@@ -452,7 +506,11 @@ pub fn render_port_forward_modal(
         } => {
             let matching_resources = state.matching_resources();
             body = body
-                .child(render_kind_selector(&state.kind, theme, &callbacks.on_select_kind))
+                .child(render_kind_selector(
+                    &state.kind,
+                    theme,
+                    &callbacks.on_select_kind,
+                ))
                 .child(render_namespace_selector(
                     available_namespaces,
                     &state.namespace,
@@ -484,28 +542,20 @@ pub fn render_port_forward_modal(
                 .grid_cols(2)
                 .gap_3()
                 .child(render_port_input(
-                    PortInputProps {
-                        id: "pf-local-port-input",
-                        label: "Local Port",
-                        value: &state.local_port_input,
-                        focused: state.active_field == PortForwardModalField::LocalPort,
-                        invalid: local_invalid || local_collision,
-                        field: PortForwardModalField::LocalPort,
-                    },
+                    "port-forward-local-port",
+                    "Local Port",
+                    &inputs.local,
+                    local_invalid || local_collision,
+                    state.submitting,
                     theme,
-                    &callbacks.on_focus_field,
                 ))
                 .child(render_port_input(
-                    PortInputProps {
-                        id: "pf-remote-port-input",
-                        label: "Remote Port",
-                        value: &state.remote_port_input,
-                        focused: state.active_field == PortForwardModalField::RemotePort,
-                        invalid: remote_invalid,
-                        field: PortForwardModalField::RemotePort,
-                    },
+                    "port-forward-remote-port",
+                    "Remote Port",
+                    &inputs.remote,
+                    remote_invalid,
+                    state.submitting,
                     theme,
-                    &callbacks.on_focus_field,
                 )),
         )
         .when(local_invalid || remote_invalid, |el| {
@@ -986,61 +1036,57 @@ fn render_detected_ports_chips(
                 .text_color(theme.text.secondary)
                 .child("Detected Ports"),
         )
-        .child(div().flex().flex_wrap().gap_1p5().children(ports.iter().map(
-            |&port| {
-                let is_active = active_remote == Some(port);
-                let cb = on_select_port.clone();
-                div()
-                    .id(SharedString::from(format!("pf-detected-port-{port}")))
-                    .px_2()
-                    .py_0p5()
-                    .rounded(theme.style.radius_control)
-                    .border_1()
-                    .border_color(if is_active {
-                        theme.accent.accent
-                    } else {
-                        theme.border.default
-                    })
-                    .bg(if is_active {
-                        theme.accent.soft
-                    } else {
-                        theme.surface.bg_panel
-                    })
-                    .text_xs()
-                    .font_weight(FontWeight::MEDIUM)
-                    .text_color(if is_active {
-                        theme.accent.accent
-                    } else {
-                        theme.text.primary
-                    })
-                    .cursor_pointer()
-                    .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                        window.prevent_default();
-                        cx.stop_propagation();
-                        cb(port, window, cx);
-                    })
-                    .child(format!(":{port}"))
-            },
-        )))
+        .child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_1p5()
+                .children(ports.iter().map(|&port| {
+                    let is_active = active_remote == Some(port);
+                    let cb = on_select_port.clone();
+                    div()
+                        .id(SharedString::from(format!("pf-detected-port-{port}")))
+                        .px_2()
+                        .py_0p5()
+                        .rounded(theme.style.radius_control)
+                        .border_1()
+                        .border_color(if is_active {
+                            theme.accent.accent
+                        } else {
+                            theme.border.default
+                        })
+                        .bg(if is_active {
+                            theme.accent.soft
+                        } else {
+                            theme.surface.bg_panel
+                        })
+                        .text_xs()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(if is_active {
+                            theme.accent.accent
+                        } else {
+                            theme.text.primary
+                        })
+                        .cursor_pointer()
+                        .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                            window.prevent_default();
+                            cx.stop_propagation();
+                            cb(port, window, cx);
+                        })
+                        .child(format!(":{port}"))
+                })),
+        )
         .into_any_element()
 }
 
-struct PortInputProps<'a> {
+fn render_port_input(
     id: &'static str,
     label: &'static str,
-    value: &'a str,
-    focused: bool,
+    input_state: &Entity<InputState>,
     invalid: bool,
-    field: PortForwardModalField,
-}
-
-fn render_port_input(
-    props: PortInputProps<'_>,
+    disabled: bool,
     theme: &OrbitTheme,
-    on_focus_field: &PortForwardValueCallback<PortForwardModalField>,
 ) -> AnyElement {
-    let cb = on_focus_field.clone();
-    let field = props.field;
     div()
         .flex()
         .flex_col()
@@ -1050,39 +1096,14 @@ fn render_port_input(
                 .text_xs()
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.text.secondary)
-                .child(props.label),
+                .child(label),
         )
         .child(
-            div()
-                .id(props.id)
-                .h(px(32.0))
-                .px_2p5()
-                .rounded(theme.style.radius_control)
-                .bg(theme.surface.input_bg)
-                .border_1()
-                .border_color(if props.invalid {
-                    theme.semantic.danger.solid
-                } else if props.focused {
-                    theme.accent.accent
-                } else {
-                    theme.border.input
-                })
-                .flex()
-                .items_center()
-                .text_sm()
-                .font_weight(FontWeight::SEMIBOLD)
-                .text_color(theme.text.primary)
-                .cursor_pointer()
-                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                    window.prevent_default();
-                    cx.stop_propagation();
-                    cb(field, window, cx);
-                })
-                .child(if props.value.is_empty() {
-                    SharedString::from(" ")
-                } else {
-                    SharedString::from(props.value.to_string())
-                }),
+            Input::new(input_state)
+                .id(id)
+                .small()
+                .disabled(disabled)
+                .when(invalid, |el| el.border_color(theme.semantic.danger.solid)),
         )
         .into_any_element()
 }
@@ -1204,16 +1225,16 @@ mod tests {
             Vec::new(),
         );
         assert_eq!(modal.active_field, PortForwardModalField::LocalPort);
+        // Character editing for port fields is owned by gpui-kit Input (no double-typing).
         assert_eq!(
             modal.handle_key_input("backspace", None),
-            PortForwardModalKeyResult::Handled
+            PortForwardModalKeyResult::Ignored
         );
-        assert_eq!(modal.local_port_input, "8");
         assert_eq!(
             modal.handle_key_input("digit", Some("4")),
-            PortForwardModalKeyResult::Handled
+            PortForwardModalKeyResult::Ignored
         );
-        assert_eq!(modal.local_port_input, "84");
+        assert_eq!(modal.local_port_input, "80");
 
         assert_eq!(
             modal.handle_key_input("tab", None),
@@ -1229,6 +1250,159 @@ mod tests {
             modal.handle_key_input("escape", None),
             PortForwardModalKeyResult::Cancel
         );
+    }
+
+    #[test]
+    fn test_port_inputs_sync_into_state_validation() {
+        let mut modal = PortForwardModalState::new_targeted(
+            "ctx-a",
+            "dev",
+            "default",
+            "Service",
+            "api",
+            vec![8080],
+            Vec::new(),
+        );
+        modal.local_port_input = "abc".to_string();
+        assert_eq!(modal.parsed_local_port(), None);
+        assert!(!modal.can_submit());
+
+        modal.local_port_input = "8080".to_string();
+        assert_eq!(modal.parsed_local_port(), Some(8080));
+        assert!(modal.can_submit());
+    }
+
+    #[gpui::test]
+    fn test_port_forward_local_input_updates_modal_state(cx: &mut gpui::TestAppContext) {
+        use gpui::component::input::InputEvent;
+        use gpui::test::TestWindowExt as _;
+
+        struct ModalHarness {
+            state: PortForwardModalState,
+            inputs: PortForwardInputs,
+            theme: OrbitTheme,
+            _subscriptions: Vec<gpui::Subscription>,
+        }
+
+        impl ModalHarness {
+            fn new(window: &mut Window, cx: &mut gpui::Context<Self>) -> Self {
+                let state = PortForwardModalState::new_targeted(
+                    "ctx-a",
+                    "dev",
+                    "default",
+                    "Service",
+                    "api",
+                    vec![8080, 3000],
+                    Vec::new(),
+                );
+                let inputs = PortForwardInputs::new(
+                    &state.local_port_input,
+                    &state.remote_port_input,
+                    window,
+                    cx,
+                );
+                let local_sub = cx.subscribe_in(
+                    &inputs.local,
+                    window,
+                    |this, input, event: &InputEvent, _window, cx| {
+                        if let InputEvent::Change = event {
+                            this.state.local_port_input = input.read(cx).value().to_string();
+                            cx.notify();
+                        }
+                    },
+                );
+                let remote_sub = cx.subscribe_in(
+                    &inputs.remote,
+                    window,
+                    |this, input, event: &InputEvent, _window, cx| {
+                        if let InputEvent::Change = event {
+                            this.state.remote_port_input = input.read(cx).value().to_string();
+                            cx.notify();
+                        }
+                    },
+                );
+                let theme = OrbitTheme::resolve(
+                    crate::theme::ThemeMode::Dark,
+                    crate::theme::UiStyle::Flat,
+                    crate::theme::AccentColor::Blue,
+                    crate::theme::SemanticColorsPreference::default(),
+                    gpui::WindowAppearance::Dark,
+                );
+                Self {
+                    state,
+                    inputs,
+                    theme,
+                    _subscriptions: vec![local_sub, remote_sub],
+                }
+            }
+        }
+
+        impl gpui::Render for ModalHarness {
+            fn render(
+                &mut self,
+                _window: &mut Window,
+                _cx: &mut gpui::Context<Self>,
+            ) -> impl IntoElement {
+                let callbacks = PortForwardModalCallbacks {
+                    on_close: Rc::new(|_, _| {}),
+                    on_submit: Rc::new(|_, _| {}),
+                    on_focus_field: Rc::new(|_, _, _| {}),
+                    on_select_detected_port: Rc::new(|_, _, _| {}),
+                    on_select_kind: Rc::new(|_, _, _| {}),
+                    on_select_namespace: Rc::new(|_, _, _| {}),
+                    on_select_resource: Rc::new(|_, _, _| {}),
+                };
+                render_port_forward_modal(&self.state, &self.inputs, &self.theme, &callbacks)
+            }
+        }
+
+        let opened = cx.update(|cx| {
+            gpui::init(cx);
+            let theme = OrbitTheme::resolve(
+                crate::theme::ThemeMode::Dark,
+                crate::theme::UiStyle::Flat,
+                crate::theme::AccentColor::Blue,
+                crate::theme::SemanticColorsPreference::default(),
+                gpui::WindowAppearance::Dark,
+            );
+            crate::theme::kit_bridge::sync_kit_theme(&theme, cx);
+            gpui::open_window(gpui::WindowOptions::default(), cx, |window, cx| {
+                cx.new(|cx| ModalHarness::new(window, cx))
+            })
+        });
+        let Ok((window, view)) = opened else {
+            panic!("failed to open test window");
+        };
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                window.render_frame(cx);
+                let local_input = view.read(cx).inputs.local.clone();
+                local_input.update(cx, |input, cx| input.set_value("", window, cx));
+                let local_focus = local_input.read(cx).focus_handle(cx);
+                local_focus.focus(window, cx);
+                window.render_frame(cx);
+                window.input("9090", cx);
+            });
+        });
+
+        let local_after_input = cx.update(|cx| view.read(cx).state.local_port_input.clone());
+        assert_eq!(local_after_input, "9090");
+
+        cx.update(|cx| {
+            let _ = window.update(cx, |_, window, cx| {
+                view.update(cx, |harness, cx| {
+                    harness.state.select_detected_port(3000);
+                    harness.inputs.sync_from_state(&harness.state, window, cx);
+                });
+            });
+        });
+
+        let synced_local = cx.update(|cx| view.read(cx).inputs.local.read(cx).value().to_string());
+        let synced_remote =
+            cx.update(|cx| view.read(cx).inputs.remote.read(cx).value().to_string());
+        assert_eq!(synced_local, "3000");
+        assert_eq!(synced_remote, "3000");
     }
 
     #[test]
